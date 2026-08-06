@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Ridy Uber Connector",
+  "version": "1.1.0",
+  "description": "Verbindet deine Uber-Flottensitzung mit Ridy — melde dich normal bei Uber an, die Sitzung wird automatisch erfasst.",
+  "permissions": ["cookies", "scripting", "storage"],
+  "host_permissions": [
+    "*://*.uber.com/*",
+    "http://localhost:8090/*",
+    "http://127.0.0.1:8090/*",
+    "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*",
+    "https://r.fleeteye.de/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://vsdispatch.uber.com/*", "*://supplier.uber.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["http://localhost:3000/*", "http://127.0.0.1:3000/*", "https://r.fleeteye.de/*"],
+      "js": ["pair.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Ridy Uber Connector"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ridy-uber-connector@fleeteye.de",
+      "strict_min_version": "121.0"
+    }
+  }
+}

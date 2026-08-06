@@ -1,0 +1,16 @@
+{
+  "name": "ridy-uber-auth",
+  "version": "1.0.0",
+  "description": "Interactive Uber sign-in service: drives a real browser, relays MFA, captures the fleet session for Ridy.",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node --env-file=.env src/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "playwright": "^1.47.0"
+  }
+}

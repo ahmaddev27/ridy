@@ -1,0 +1,13 @@
+{
+  "name": "ridy-dispatch-daemon",
+  "version": "1.0.0",
+  "description": "Holds the Uber RAMEN fleet dispatch stream 24/7 and forwards offers to the Ridy Laravel API.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

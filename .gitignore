@@ -1,0 +1,34 @@
+# DASHCAM monorepo — root ignore rules.
+# Per-package .gitignore files (backend/, frontend/) still apply within them.
+
+# Dependencies
+node_modules/
+vendor/
+
+# Environment / secrets
+.env
+.env.*
+!*.example
+
+# Captured Uber responses hold real personal data (names, emails, addresses) —
+# keep them local, never in the repo. The finder scripts + guide stay tracked.
+docs/uber-console/*response*.json
+docs/uber-console/roster-*.json
+
+# Next.js build output
+.next/
+
+# Local sqlite dev database
+/backend/database/database.sqlite
+
+# Build artifacts
+/build/
+/dist/
+*.log
+
+# Docker named-volume data (if bind-mounted locally)
+/docker/volumes/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db

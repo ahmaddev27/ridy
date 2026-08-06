@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DASHCAM — Fleet Compliance Dashboard (Prototype)</title>
+
+  <!-- Design system: Tailwind (CDN) maps directly to the tokens in docs/03-ui-design-brief.md -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    /* Slim scrollbars */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    .nav-item.active { background-color: #eef2ff; color: #4338ca; }
+    .nav-item.active svg { color: #4f46e5; }
+    .tab-btn.active { color: #4338ca; border-color: #4f46e5; }
+    [x-cloak] { display: none; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+
+  <!-- =========================================================== -->
+  <!-- LOGIN VIEW                                                  -->
+  <!-- =========================================================== -->
+  <div id="view-login" class="fixed inset-0 z-50 hidden bg-slate-100">
+    <div class="grid h-full lg:grid-cols-2">
+      <!-- Brand panel -->
+      <div class="relative hidden flex-col justify-between bg-indigo-700 p-12 text-white lg:flex">
+        <div class="flex items-center gap-2">
+          <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15">
+            <i data-lucide="radar" class="h-5 w-5"></i>
+          </div>
+          <span class="text-lg font-bold tracking-tight">DASHCAM</span>
+        </div>
+        <div>
+          <h1 class="text-3xl font-bold leading-snug">Fleet compliance,<br/>without the surveillance.</h1>
+          <p class="mt-4 max-w-md text-indigo-200">Match Samsara, Uber &amp; Bolt trips automatically, surface off-platform usage — and stay DSGVO-compliant by design.</p>
+          <div class="mt-8 flex items-center gap-2 text-sm text-indigo-200">
+            <i data-lucide="shield-check" class="h-4 w-4"></i> EU-hosted · GDPR / DSGVO by design
+          </div>
+        </div>
+        <p class="text-xs text-indigo-300">© 2026 DASHCAM GmbH · Hosted in Germany</p>
+      </div>
+      <!-- Form -->
+      <div class="flex items-center justify-center p-6">
+        <div class="w-full max-w-sm">
+          <div class="mb-8 flex items-center gap-2 lg:hidden">
+            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
+              <i data-lucide="radar" class="h-5 w-5"></i>
+            </div>
+            <span class="text-lg font-bold">DASHCAM</span>
+          </div>
+          <h2 class="text-2xl font-bold text-slate-900">Welcome back</h2>
+          <p class="mt-1 text-sm text-slate-500">Sign in to your fleet workspace.</p>
+
+          <form class="mt-8 space-y-4" onsubmit="enterApp(); return false;">
+            <div>
+              <label class="mb-1.5 block text-sm font-medium text-slate-700">Email</label>
+              <input type="email" value="manager@fleet.de" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+            </div>
+            <div>
+              <div class="mb-1.5 flex items-center justify-between">
+                <label class="text-sm font-medium text-slate-700">Password</label>
+                <a href="#" class="text-xs font-medium text-indigo-600 hover:underline">Forgot password?</a>
+              </div>
+              <input type="password" value="••••••••" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+            </div>
+            <button class="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700">Sign in</button>
+          </form>
+          <p class="mt-6 text-center text-xs text-slate-400">Protected by SSO · 2FA available</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================== -->
+  <!-- APP SHELL                                                   -->
+  <!-- =========================================================== -->
+  <div id="view-app" class="flex min-h-screen">
+
+    <!-- Sidebar -->
+    <aside class="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex">
+      <div class="flex h-16 items-center gap-2 border-b border-slate-200 px-5">
+        <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
+          <i data-lucide="radar" class="h-5 w-5"></i>
+        </div>
+        <div>
+          <div class="text-sm font-bold leading-tight text-slate-900">DASHCAM</div>
+          <div class="text-[11px] leading-tight text-slate-400">Fleet Compliance</div>
+        </div>
+      </div>
+
+      <nav class="flex-1 space-y-6 overflow-y-auto px-3 py-4 text-sm">
+        <div>
+          <p class="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Overview</p>
+          <a class="nav-item active flex items-center gap-3 rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50" data-target="dashboard">
+            <i data-lucide="layout-dashboard" class="h-4 w-4"></i><span data-en="Dashboard" data-de="Übersicht">Dashboard</span></a>
+          <a class="nav-item flex items-center gap-3 rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50" data-target="connections">
+            <i data-lucide="plug" class="h-4 w-4"></i><span data-en="Connections" data-de="Verbindungen">Connections</span></a>
+          <a class="nav-item flex items-center justify-between rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50" data-target="notifications">
+            <span class="flex items-center gap-3"><i data-lucide="bell" class="h-4 w-4"></i><span data-en="Notifications" data-de="Benachrichtigungen">Notifications</span></span>
+            <span class="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">3</span></a>
+        </div>
+
+        <div>
+          <p class="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Fleet</p>
+          <a class="nav-item flex items-center gap-3 rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50" data-target="drivers">
+            <i data-lucide="users" class="h-4 w-4"></i><span data-en="Drivers" data-de="Fahrer">Drivers</span></a>
+          <a class="nav-item flex items-center gap-3 rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50" data-target="vehicles">
+            <i data-lucide="car" class="h-4 w-4"></i><span data-en="Vehicles" data-de="Fahrzeuge">Vehicles</span></a>
+          <a class="nav-item flex items-center gap-3 rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50" data-target="assignments">
+            <i data-lucide="link" class="h-4 w-4"></i><span data-en="Assignments" data-de="Zuordnungen">Assignments</span></a>
+        </div>
+
+        <div>
+          <p class="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Trips</p>
+          <a class="nav-item flex items-center gap-3 rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50" data-target="trips">
+            <i data-lucide="route" class="h-4 w-4"></i><span data-en="Trips" data-de="Fahrten">Trips</span></a>
+          <a class="nav-item flex items-center justify-between rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50" data-target="review">
+            <span class="flex items-center gap-3"><i data-lucide="git-compare" class="h-4 w-4"></i><span data-en="Review Queue" data-de="Prüfung">Review Queue</span></span>
+            <span class="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">7</span></a>
+          <a class="nav-item flex items-center justify-between rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50" data-target="personal">
+            <span class="flex items-center gap-3"><i data-lucide="user-x" class="h-4 w-4"></i><span data-en="Personal Trips" data-de="Privatfahrten">Personal Trips</span></span>
+            <span class="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">12</span></a>
+        </div>
+
+        <div>
+          <p class="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Insights</p>
+          <a class="nav-item flex items-center gap-3 rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50" data-target="reports">
+            <i data-lucide="bar-chart-3" class="h-4 w-4"></i><span data-en="Reports" data-de="Berichte">Reports</span></a>
+        </div>
+
+        <div>
+          <p class="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Governance</p>
+          <a class="nav-item flex items-center gap-3 rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50" data-target="compliance">
+            <i data-lucide="scale" class="h-4 w-4"></i><span data-en="Compliance" data-de="Compliance">Compliance</span></a>
+          <a class="nav-item flex items-center gap-3 rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50" data-target="audit">
+            <i data-lucide="file-clock" class="h-4 w-4"></i><span data-en="Audit Log" data-de="Audit-Log">Audit Log</span></a>
+          <a class="nav-item flex items-center gap-3 rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50" data-target="transparency">
+            <i data-lucide="eye" class="h-4 w-4"></i><span data-en="Driver Transparency" data-de="Fahrer-Transparenz">Driver Transparency</span></a>
+        </div>
+
+        <div>
+          <p class="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">System</p>
+          <a class="nav-item flex items-center gap-3 rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50" data-target="designsystem">
+            <i data-lucide="palette" class="h-4 w-4"></i><span data-en="Design System" data-de="Design-System">Design System</span></a>
+        </div>
+      </nav>
+
+      <div class="border-t border-slate-200 p-3">
+        <a class="nav-item flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50" data-target="settings">
+          <i data-lucide="settings" class="h-4 w-4"></i><span data-en="Settings" data-de="Einstellungen">Settings</span></a>
+      </div>
+    </aside>
+
+    <!-- Main column -->
+    <div class="flex min-h-screen flex-1 flex-col lg:pl-64">
+
+      <!-- Topbar -->
+      <header class="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur lg:px-8">
+        <button class="lg:hidden" onclick="document.querySelector('aside').classList.toggle('hidden')">
+          <i data-lucide="menu" class="h-5 w-5 text-slate-600"></i>
+        </button>
+        <div class="relative hidden max-w-md flex-1 sm:block">
+          <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
+          <input placeholder="Search vehicles, drivers, trips…" class="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-indigo-400 focus:bg-white" />
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+          <!-- DE/EN -->
+          <div class="flex items-center rounded-lg border border-slate-200 p-0.5 text-xs font-semibold">
+            <button id="lang-en" onclick="setLang('en')" class="rounded-md bg-indigo-600 px-2 py-1 text-white">EN</button>
+            <button id="lang-de" onclick="setLang('de')" class="rounded-md px-2 py-1 text-slate-500">DE</button>
+          </div>
+          <button onclick="showScreen('notifications')" class="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100">
+            <i data-lucide="bell" class="h-5 w-5"></i>
+            <span class="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-500"></span>
+          </button>
+          <div class="mx-1 h-6 w-px bg-slate-200"></div>
+          <button onclick="signOut()" class="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-slate-100">
+            <div class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">MK</div>
+            <div class="hidden text-left sm:block">
+              <div class="text-xs font-semibold leading-tight text-slate-800">M. Köhler</div>
+              <div class="text-[11px] leading-tight text-slate-400">Berlin Cabs GmbH</div>
+            </div>
+            <i data-lucide="chevron-down" class="hidden h-4 w-4 text-slate-400 sm:block"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Content -->
+      <main class="flex-1 p-4 lg:p-8">
+
+        <!-- ============================ DASHBOARD ============================ -->
+        <section id="screen-dashboard" class="screen active">
+          <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h1 class="text-2xl font-bold text-slate-900">Dashboard</h1>
+              <p class="text-sm text-slate-500">Fleet overview · last 7 days</p>
+            </div>
+            <button class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+              <i data-lucide="calendar" class="h-4 w-4"></i> Jun 1 – Jun 7
+            </button>
+          </div>
+
+          <!-- Gating banner (compliance) -->
+          <div class="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <i data-lucide="alert-triangle" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600"></i>
+            <div class="text-sm">
+              <p class="font-semibold text-amber-800">Personal-trip detection is limited until compliance is completed</p>
+              <p class="mt-0.5 text-amber-700">A signed Works Council Agreement (Betriebsvereinbarung) and a completed DPIA are required to enable full detection. <a class="font-semibold underline" data-target="compliance" onclick="showScreen('compliance')">Go to Compliance →</a></p>
+            </div>
+          </div>
+
+          <!-- Stat cards -->
+          <div class="grid grid-cols-2 gap-4 lg:grid-cols-5">
+            <div class="rounded-xl border border-slate-200 bg-white p-4">
+              <div class="flex items-center justify-between"><span class="text-sm text-slate-500">Vehicles</span><i data-lucide="car" class="h-4 w-4 text-slate-300"></i></div>
+              <div class="mt-2 text-2xl font-bold text-slate-900">48</div>
+              <div class="mt-1 text-xs text-emerald-600">42 active</div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4">
+              <div class="flex items-center justify-between"><span class="text-sm text-slate-500">Drivers</span><i data-lucide="users" class="h-4 w-4 text-slate-300"></i></div>
+              <div class="mt-2 text-2xl font-bold text-slate-900">61</div>
+              <div class="mt-1 text-xs text-slate-400">54 on shift</div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4">
+              <div class="flex items-center justify-between"><span class="text-sm text-slate-500">Trips today</span><i data-lucide="route" class="h-4 w-4 text-slate-300"></i></div>
+              <div class="mt-2 text-2xl font-bold text-slate-900">1,284</div>
+              <div class="mt-1 text-xs text-emerald-600">96% matched</div>
+            </div>
+            <div class="rounded-xl border border-rose-200 bg-rose-50 p-4">
+              <div class="flex items-center justify-between"><span class="text-sm text-rose-600">Personal trips</span><i data-lucide="user-x" class="h-4 w-4 text-rose-300"></i></div>
+              <div class="mt-2 text-2xl font-bold text-rose-700">12</div>
+              <div class="mt-1 text-xs text-rose-600">flagged this week</div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4">
+              <div class="flex items-center justify-between"><span class="text-sm text-slate-500">Sync health</span><i data-lucide="activity" class="h-4 w-4 text-slate-300"></i></div>
+              <div class="mt-2 text-2xl font-bold text-emerald-600">OK</div>
+              <div class="mt-1 text-xs text-slate-400">3/3 providers</div>
+            </div>
+          </div>
+
+          <div class="mt-6 grid gap-4 lg:grid-cols-3">
+            <!-- Trend chart -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5 lg:col-span-2">
+              <div class="mb-4 flex items-center justify-between">
+                <h3 class="font-semibold text-slate-800">Matched vs. personal trips</h3>
+                <div class="flex items-center gap-4 text-xs">
+                  <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>Matched</span>
+                  <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-rose-500"></span>Personal</span>
+                </div>
+              </div>
+              <!-- Simple SVG area chart -->
+              <svg viewBox="0 0 600 180" class="h-44 w-full">
+                <defs>
+                  <linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="#10b981" stop-opacity="0.25"/>
+                    <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <polyline fill="url(#g1)" stroke="none" points="0,150 0,90 100,70 200,80 300,55 400,65 500,40 600,50 600,180 0,180"/>
+                <polyline fill="none" stroke="#10b981" stroke-width="2.5" points="0,90 100,70 200,80 300,55 400,65 500,40 600,50"/>
+                <polyline fill="none" stroke="#f43f5e" stroke-width="2.5" points="0,160 100,158 200,150 300,162 400,148 500,152 600,140"/>
+                <g fill="#94a3b8" font-size="11">
+                  <text x="0" y="178">Mon</text><text x="98" y="178">Tue</text><text x="198" y="178">Wed</text>
+                  <text x="298" y="178">Thu</text><text x="398" y="178">Fri</text><text x="498" y="178">Sat</text><text x="560" y="178">Sun</text>
+                </g>
+              </svg>
+            </div>
+
+            <!-- Sync status -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 font-semibold text-slate-800">Provider sync</h3>
+              <ul class="space-y-3 text-sm">
+                <li class="flex items-center justify-between">
+                  <span class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>Samsara</span>
+                  <span class="text-xs text-slate-400">2 min ago</span>
+                </li>
+                <li class="flex items-center justify-between">
+                  <span class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>Uber Fleet</span>
+                  <span class="text-xs text-slate-400">6 min ago</span>
+                </li>
+                <li class="flex items-center justify-between">
+                  <span class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full bg-amber-500"></span>Bolt</span>
+                  <span class="text-xs text-amber-600">token expiring</span>
+                </li>
+              </ul>
+              <h3 class="mb-3 mt-6 font-semibold text-slate-800">Recent flags</h3>
+              <ul class="space-y-3 text-sm">
+                <li class="flex items-center gap-3">
+                  <span class="flex h-7 w-7 items-center justify-center rounded-full bg-rose-50 text-rose-600"><i data-lucide="user-x" class="h-3.5 w-3.5"></i></span>
+                  <div class="flex-1"><span class="font-medium text-slate-700">B-AB 1234</span> · outside hours</div>
+                  <span class="text-xs text-slate-400">14:20</span>
+                </li>
+                <li class="flex items-center gap-3">
+                  <span class="flex h-7 w-7 items-center justify-center rounded-full bg-rose-50 text-rose-600"><i data-lucide="user-x" class="h-3.5 w-3.5"></i></span>
+                  <div class="flex-1"><span class="font-medium text-slate-700">B-CD 5678</span> · 5–10 km</div>
+                  <span class="text-xs text-slate-400">11:05</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================ CONNECTIONS ============================ -->
+        <section id="screen-connections" class="screen">
+          <h1 class="text-2xl font-bold text-slate-900">Connections</h1>
+          <p class="mt-1 text-sm text-slate-500">Link your telematics and ride-hailing accounts. Trips are pulled automatically.</p>
+
+          <!-- Stepper -->
+          <ol class="mt-6 flex flex-wrap items-center gap-2 text-sm">
+            <li class="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 font-medium text-emerald-700"><i data-lucide="check" class="h-4 w-4"></i> 1. Samsara</li>
+            <i data-lucide="chevron-right" class="h-4 w-4 text-slate-300"></i>
+            <li class="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 font-medium text-emerald-700"><i data-lucide="check" class="h-4 w-4"></i> 2. Uber</li>
+            <i data-lucide="chevron-right" class="h-4 w-4 text-slate-300"></i>
+            <li class="flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 font-medium text-indigo-700"><span class="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[10px] text-white">3</span> Bolt</li>
+            <i data-lucide="chevron-right" class="h-4 w-4 text-slate-300"></i>
+            <li class="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 font-medium text-slate-500"><span class="flex h-4 w-4 items-center justify-center rounded-full bg-slate-300 text-[10px] text-white">4</span> Compliance</li>
+          </ol>
+
+          <div class="mt-6 grid gap-4 md:grid-cols-3">
+            <!-- Samsara -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <div class="flex items-center justify-between">
+                <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-900 text-white font-bold">S</div>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/20"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>Connected</span>
+              </div>
+              <h3 class="mt-4 font-semibold text-slate-800">Samsara Telematics</h3>
+              <p class="mt-1 text-sm text-slate-500">Ground-truth vehicle movement.</p>
+              <div class="mt-4 flex items-center justify-between text-xs text-slate-400"><span>Last sync</span><span>2 min ago</span></div>
+              <button class="mt-4 w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Manage</button>
+            </div>
+            <!-- Uber -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <div class="flex items-center justify-between">
+                <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-black text-white font-bold">U</div>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/20"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>Connected</span>
+              </div>
+              <h3 class="mt-4 font-semibold text-slate-800">Uber Fleet</h3>
+              <p class="mt-1 text-sm text-slate-500">Official platform trips (Supplier API).</p>
+              <div class="mt-4 flex items-center justify-between text-xs text-slate-400"><span>Last sync</span><span>6 min ago</span></div>
+              <button class="mt-4 w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Manage</button>
+            </div>
+            <!-- Bolt -->
+            <div class="rounded-xl border border-amber-200 bg-white p-5 ring-1 ring-amber-100">
+              <div class="flex items-center justify-between">
+                <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-500 text-white font-bold">B</div>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-600/20"><span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>Token expiring</span>
+              </div>
+              <h3 class="mt-4 font-semibold text-slate-800">Bolt Fleet</h3>
+              <p class="mt-1 text-sm text-slate-500">Official platform trips (Fleet API).</p>
+              <div class="mt-4 flex items-center justify-between text-xs text-slate-400"><span>Expires in</span><span class="text-amber-600">3 days</span></div>
+              <button class="mt-4 w-full rounded-lg bg-indigo-600 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Reconnect</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================ PERSONAL TRIPS (CORE) ============================ -->
+        <section id="screen-personal" class="screen">
+          <div class="mb-1 flex items-center gap-2">
+            <h1 class="text-2xl font-bold text-slate-900">Personal Trips</h1>
+            <span class="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700">12 flagged</span>
+          </div>
+          <p class="text-sm text-slate-500">Telematics trips with no matching platform trip — likely off-platform / private use.</p>
+
+          <!-- Privacy note -->
+          <div class="mt-4 flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 text-sm">
+            <i data-lucide="shield" class="mt-0.5 h-4 w-4 shrink-0 text-indigo-500"></i>
+            <p class="text-indigo-900/80"><span class="font-semibold">Data minimization (DSGVO):</span> we show that an unmatched trip occurred and coarse buckets only — no route, no destination, no private location. "Detect, don't surveil."</p>
+          </div>
+
+          <div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><div class="text-sm text-slate-500">Flagged this period</div><div class="mt-1 text-2xl font-bold text-rose-700">12</div></div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><div class="text-sm text-slate-500">Outside working hours</div><div class="mt-1 text-2xl font-bold text-slate-900">7</div></div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><div class="text-sm text-slate-500">Vehicles involved</div><div class="mt-1 text-2xl font-bold text-slate-900">9</div></div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><div class="text-sm text-slate-500">Pending review</div><div class="mt-1 text-2xl font-bold text-amber-600">5</div></div>
+          </div>
+
+          <!-- Filters -->
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <button class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600"><i data-lucide="car" class="h-4 w-4"></i> Vehicle</button>
+            <button class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600"><i data-lucide="user" class="h-4 w-4"></i> Driver</button>
+            <button class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600"><i data-lucide="calendar" class="h-4 w-4"></i> This week</button>
+            <label class="ml-auto flex items-center gap-2 text-xs font-medium text-slate-500"><input type="checkbox" class="rounded border-slate-300" checked /> Pseudonymize drivers</label>
+          </div>
+
+          <!-- Table -->
+          <div class="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-400">
+                <tr>
+                  <th class="px-4 py-3 font-semibold">Date</th>
+                  <th class="px-4 py-3 font-semibold">Vehicle</th>
+                  <th class="px-4 py-3 font-semibold">Driver</th>
+                  <th class="px-4 py-3 font-semibold">Window</th>
+                  <th class="px-4 py-3 font-semibold">Duration</th>
+                  <th class="px-4 py-3 font-semibold">Distance</th>
+                  <th class="px-4 py-3 font-semibold">Status</th>
+                  <th class="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr class="hover:bg-slate-50">
+                  <td class="px-4 py-3 text-slate-500">Jun 7, 14:20</td>
+                  <td class="px-4 py-3 font-medium text-slate-800">B-AB 1234</td>
+                  <td class="px-4 py-3 text-slate-600">Driver #D-204</td>
+                  <td class="px-4 py-3"><span class="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">Outside hours</span></td>
+                  <td class="px-4 py-3 text-slate-600">15–30 min</td>
+                  <td class="px-4 py-3 text-slate-600">5–10 km</td>
+                  <td class="px-4 py-3"><span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">New</span></td>
+                  <td class="px-4 py-3 text-right"><button class="text-indigo-600 hover:underline" onclick="document.getElementById('pt-sheet').classList.remove('hidden')">View</button></td>
+                </tr>
+                <tr class="hover:bg-slate-50">
+                  <td class="px-4 py-3 text-slate-500">Jun 7, 11:05</td>
+                  <td class="px-4 py-3 font-medium text-slate-800">B-CD 5678</td>
+                  <td class="px-4 py-3 text-slate-600">Driver #D-118</td>
+                  <td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Within hours</span></td>
+                  <td class="px-4 py-3 text-slate-600">5–15 min</td>
+                  <td class="px-4 py-3 text-slate-600">2–5 km</td>
+                  <td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Reviewed</span></td>
+                  <td class="px-4 py-3 text-right"><button class="text-indigo-600 hover:underline" onclick="document.getElementById('pt-sheet').classList.remove('hidden')">View</button></td>
+                </tr>
+                <tr class="hover:bg-slate-50">
+                  <td class="px-4 py-3 text-slate-500">Jun 6, 22:40</td>
+                  <td class="px-4 py-3 font-medium text-slate-800">B-EF 9012</td>
+                  <td class="px-4 py-3 text-slate-600">Driver #D-076</td>
+                  <td class="px-4 py-3"><span class="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">Outside hours</span></td>
+                  <td class="px-4 py-3 text-slate-600">30–60 min</td>
+                  <td class="px-4 py-3 text-slate-600">10–20 km</td>
+                  <td class="px-4 py-3"><span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">New</span></td>
+                  <td class="px-4 py-3 text-right"><button class="text-indigo-600 hover:underline" onclick="document.getElementById('pt-sheet').classList.remove('hidden')">View</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================ REVIEW QUEUE ============================ -->
+        <section id="screen-review" class="screen">
+          <h1 class="text-2xl font-bold text-slate-900">Review Queue</h1>
+          <p class="mt-1 text-sm text-slate-500">Resolve ambiguous matches and unmatched vehicle identities.</p>
+
+          <div class="mt-5 flex gap-6 border-b border-slate-200 text-sm">
+            <button class="tab-btn active border-b-2 border-transparent pb-3 font-semibold text-slate-500" onclick="switchTab('review', 'ambiguous', this)">Ambiguous matches <span class="ml-1 rounded-full bg-amber-100 px-1.5 text-xs text-amber-700">5</span></button>
+            <button class="tab-btn border-b-2 border-transparent pb-3 font-semibold text-slate-500" onclick="switchTab('review', 'identity', this)">Identity matches <span class="ml-1 rounded-full bg-slate-100 px-1.5 text-xs text-slate-600">2</span></button>
+          </div>
+
+          <!-- Ambiguous -->
+          <div data-tab="review-ambiguous" class="mt-5 space-y-4">
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <div class="mb-4 flex items-center justify-between">
+                <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Confidence 62%</span>
+                <span class="text-xs text-slate-400">B-AB 1234 · Jun 7</span>
+              </div>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div class="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <div class="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-500"><i data-lucide="satellite" class="h-3.5 w-3.5"></i> SAMSARA (telematics)</div>
+                  <div class="text-sm text-slate-700">14:18 → 14:46 · 8.2 km</div>
+                </div>
+                <div class="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <div class="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-500"><i data-lucide="car" class="h-3.5 w-3.5"></i> UBER (platform)</div>
+                  <div class="text-sm text-slate-700">14:22 → 14:44 · 7.9 km</div>
+                  <div class="mt-1 text-xs text-slate-400">Alexanderplatz → Mitte</div>
+                </div>
+              </div>
+              <div class="mt-4 flex justify-end gap-2">
+                <button class="rounded-lg border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50">Reject</button>
+                <button class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700">Approve match</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Identity -->
+          <div data-tab="review-identity" class="mt-5 hidden space-y-4">
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <div class="mb-3 flex items-center gap-2">
+                <i data-lucide="alert-circle" class="h-4 w-4 text-amber-500"></i>
+                <span class="font-medium text-slate-800">Plate didn’t auto-match across providers</span>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-3">
+                <div class="rounded-lg border border-slate-100 p-3 text-sm"><div class="text-xs text-slate-400">Samsara</div><div class="font-medium">B-GH-3344</div></div>
+                <div class="rounded-lg border border-slate-100 p-3 text-sm"><div class="text-xs text-slate-400">Uber</div><div class="font-medium">B GH 3344</div></div>
+                <div class="rounded-lg border border-dashed border-slate-200 p-3 text-sm text-slate-400">Bolt — not found</div>
+              </div>
+              <div class="mt-4 flex justify-end gap-2">
+                <button class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">Ignore</button>
+                <button class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700">Link as one vehicle</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================ TRIPS ============================ -->
+        <section id="screen-trips" class="screen">
+          <h1 class="text-2xl font-bold text-slate-900">Trips</h1>
+          <p class="mt-1 text-sm text-slate-500">All telematics and platform trips.</p>
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <button class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600"><i data-lucide="filter" class="h-4 w-4"></i> Provider</button>
+            <button class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600"><i data-lucide="car" class="h-4 w-4"></i> Vehicle</button>
+            <button class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600"><i data-lucide="calendar" class="h-4 w-4"></i> Jun 7</button>
+            <div class="ml-auto flex items-center gap-3 text-xs">
+              <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>Matched</span>
+              <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-rose-500"></span>Personal</span>
+              <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-amber-500"></span>Ambiguous</span>
+              <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-slate-400"></span>Gap</span>
+            </div>
+          </div>
+          <div class="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-400">
+                <tr>
+                  <th class="px-4 py-3 font-semibold">Source</th><th class="px-4 py-3 font-semibold">Vehicle</th>
+                  <th class="px-4 py-3 font-semibold">Driver</th><th class="px-4 py-3 font-semibold">Start</th>
+                  <th class="px-4 py-3 font-semibold">End</th><th class="px-4 py-3 font-semibold">Distance</th>
+                  <th class="px-4 py-3 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600"><i data-lucide="car" class="h-3.5 w-3.5"></i>Uber</span></td><td class="px-4 py-3 font-medium">B-AB 1234</td><td class="px-4 py-3 text-slate-600">M. Weber</td><td class="px-4 py-3 text-slate-500">14:22</td><td class="px-4 py-3 text-slate-500">14:44</td><td class="px-4 py-3">7.9 km</td><td class="px-4 py-3"><span class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Matched</span></td></tr>
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600"><i data-lucide="satellite" class="h-3.5 w-3.5"></i>Samsara</span></td><td class="px-4 py-3 font-medium">B-EF 9012</td><td class="px-4 py-3 text-slate-600">Driver #D-076</td><td class="px-4 py-3 text-slate-500">22:40</td><td class="px-4 py-3 text-slate-500">23:18</td><td class="px-4 py-3">10–20 km</td><td class="px-4 py-3"><span class="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">Personal</span></td></tr>
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600"><i data-lucide="satellite" class="h-3.5 w-3.5"></i>Samsara</span></td><td class="px-4 py-3 font-medium">B-AB 1234</td><td class="px-4 py-3 text-slate-600">M. Weber</td><td class="px-4 py-3 text-slate-500">14:18</td><td class="px-4 py-3 text-slate-500">14:46</td><td class="px-4 py-3">8.2 km</td><td class="px-4 py-3"><span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Ambiguous</span></td></tr>
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600"><i data-lucide="car" class="h-3.5 w-3.5"></i>Bolt</span></td><td class="px-4 py-3 font-medium">B-CD 5678</td><td class="px-4 py-3 text-slate-600">A. Klein</td><td class="px-4 py-3 text-slate-500">09:12</td><td class="px-4 py-3 text-slate-500">09:31</td><td class="px-4 py-3">4.1 km</td><td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Gap</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================ VEHICLES ============================ -->
+        <section id="screen-vehicles" class="screen">
+          <div class="flex items-center justify-between">
+            <div><h1 class="text-2xl font-bold text-slate-900">Vehicles</h1><p class="mt-1 text-sm text-slate-500">Unified across Samsara, Uber &amp; Bolt by license plate.</p></div>
+            <button class="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"><i data-lucide="plus" class="h-4 w-4"></i> Add vehicle</button>
+          </div>
+          <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-400">
+                <tr><th class="px-4 py-3 font-semibold">Plate</th><th class="px-4 py-3 font-semibold">VIN</th><th class="px-4 py-3 font-semibold">Make / Model</th><th class="px-4 py-3 font-semibold">Linked</th><th class="px-4 py-3 font-semibold">Driver</th><th class="px-4 py-3 font-semibold">Status</th></tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3 font-semibold text-slate-800">B-AB 1234</td><td class="px-4 py-3 text-slate-400">WVWZZZ…8821</td><td class="px-4 py-3 text-slate-600">VW Passat</td><td class="px-4 py-3"><span class="flex gap-1"><span class="rounded bg-slate-900 px-1.5 py-0.5 text-[10px] font-bold text-white">S</span><span class="rounded bg-black px-1.5 py-0.5 text-[10px] font-bold text-white">U</span><span class="rounded bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-white">B</span></span></td><td class="px-4 py-3 text-slate-600">M. Weber</td><td class="px-4 py-3"><span class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Active</span></td></tr>
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3 font-semibold text-slate-800">B-GH 3344</td><td class="px-4 py-3 text-slate-400">WDB…1190</td><td class="px-4 py-3 text-slate-600">Mercedes E-Class</td><td class="px-4 py-3"><span class="flex gap-1"><span class="rounded bg-slate-900 px-1.5 py-0.5 text-[10px] font-bold text-white">S</span><span class="rounded bg-black px-1.5 py-0.5 text-[10px] font-bold text-white">U</span><span class="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-400">B</span></span></td><td class="px-4 py-3 text-slate-400">—</td><td class="px-4 py-3"><span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Needs match</span></td></tr>
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3 font-semibold text-slate-800">B-CD 5678</td><td class="px-4 py-3 text-slate-400">ZFA…4410</td><td class="px-4 py-3 text-slate-600">Toyota Prius</td><td class="px-4 py-3"><span class="flex gap-1"><span class="rounded bg-slate-900 px-1.5 py-0.5 text-[10px] font-bold text-white">S</span><span class="rounded bg-black px-1.5 py-0.5 text-[10px] font-bold text-white">U</span><span class="rounded bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-white">B</span></span></td><td class="px-4 py-3 text-slate-600">A. Klein</td><td class="px-4 py-3"><span class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Active</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================ DRIVERS ============================ -->
+        <section id="screen-drivers" class="screen">
+          <div class="flex items-center justify-between">
+            <div><h1 class="text-2xl font-bold text-slate-900">Drivers</h1><p class="mt-1 text-sm text-slate-500">Employees · regime: <span class="font-medium text-slate-700">Employee (strict)</span></p></div>
+            <label class="flex items-center gap-2 text-xs font-medium text-slate-500"><input type="checkbox" class="rounded border-slate-300" checked /> Pseudonymize</label>
+          </div>
+          <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-400">
+                <tr><th class="px-4 py-3 font-semibold">Driver</th><th class="px-4 py-3 font-semibold">Phone</th><th class="px-4 py-3 font-semibold">License</th><th class="px-4 py-3 font-semibold">Linked</th><th class="px-4 py-3 font-semibold">Current vehicle</th></tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3"><div class="flex items-center gap-2"><span class="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">MW</span><span class="font-medium text-slate-800">M. Weber</span></div></td><td class="px-4 py-3 text-slate-500">+49 ••• ••21</td><td class="px-4 py-3 text-slate-500">B••••204</td><td class="px-4 py-3"><span class="flex gap-1"><span class="rounded bg-slate-900 px-1.5 py-0.5 text-[10px] font-bold text-white">S</span><span class="rounded bg-black px-1.5 py-0.5 text-[10px] font-bold text-white">U</span></span></td><td class="px-4 py-3 text-slate-600">B-AB 1234</td></tr>
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3"><div class="flex items-center gap-2"><span class="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">AK</span><span class="font-medium text-slate-800">A. Klein</span></div></td><td class="px-4 py-3 text-slate-500">+49 ••• ••18</td><td class="px-4 py-3 text-slate-500">B••••118</td><td class="px-4 py-3"><span class="flex gap-1"><span class="rounded bg-slate-900 px-1.5 py-0.5 text-[10px] font-bold text-white">S</span><span class="rounded bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-white">B</span></span></td><td class="px-4 py-3 text-slate-600">B-CD 5678</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================ ASSIGNMENTS ============================ -->
+        <section id="screen-assignments" class="screen">
+          <div class="flex items-center justify-between">
+            <div><h1 class="text-2xl font-bold text-slate-900">Assignments</h1><p class="mt-1 text-sm text-slate-500">Which driver was in which vehicle, and when — used to resolve who drove a flagged trip.</p></div>
+            <button onclick="openModal('modal-assign')" class="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"><i data-lucide="plus" class="h-4 w-4"></i> New assignment</button>
+          </div>
+
+          <!-- Time ruler -->
+          <div class="mt-5 rounded-xl border border-slate-200 bg-white p-5">
+            <div class="mb-3 flex items-center justify-between">
+              <span class="text-sm font-semibold text-slate-700">Shift timeline · Jun 7, 2026</span>
+              <div class="flex items-center gap-4 text-xs text-slate-500">
+                <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded bg-indigo-500"></span>Shift A</span>
+                <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded bg-emerald-500"></span>Shift B</span>
+                <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded bg-slate-200"></span>Idle</span>
+              </div>
+            </div>
+            <div class="grid grid-cols-[110px_1fr] gap-y-3 text-xs">
+              <div class="text-slate-400"></div>
+              <div class="flex justify-between text-slate-400"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+
+              <div class="flex items-center font-medium text-slate-700">B-AB 1234</div>
+              <div class="relative h-7 rounded-lg bg-slate-100">
+                <div class="absolute inset-y-0 left-[25%] w-[33%] rounded-lg bg-indigo-500/80"></div>
+                <div class="absolute inset-y-0 left-[58%] w-[33%] rounded-lg bg-emerald-500/80"></div>
+              </div>
+
+              <div class="flex items-center font-medium text-slate-700">B-CD 5678</div>
+              <div class="relative h-7 rounded-lg bg-slate-100">
+                <div class="absolute inset-y-0 left-[33%] w-[42%] rounded-lg bg-indigo-500/80"></div>
+              </div>
+
+              <div class="flex items-center font-medium text-slate-700">B-EF 9012</div>
+              <div class="relative h-7 rounded-lg bg-slate-100">
+                <div class="absolute inset-y-0 left-[8%] w-[30%] rounded-lg bg-emerald-500/80"></div>
+                <div class="absolute inset-y-0 left-[88%] w-[10%] rounded-lg bg-rose-400/80" title="Personal trip"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Assignments table -->
+          <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-400">
+                <tr><th class="px-4 py-3 font-semibold">Vehicle</th><th class="px-4 py-3 font-semibold">Driver</th><th class="px-4 py-3 font-semibold">From</th><th class="px-4 py-3 font-semibold">To</th><th class="px-4 py-3 font-semibold">Source</th><th class="px-4 py-3"></th></tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">B-AB 1234</td><td class="px-4 py-3 text-slate-600">M. Weber</td><td class="px-4 py-3 text-slate-500">Jun 7, 06:00</td><td class="px-4 py-3 text-slate-500">14:00</td><td class="px-4 py-3"><span class="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">Samsara</span></td><td class="px-4 py-3 text-right"><button class="text-slate-400 hover:text-slate-600"><i data-lucide="more-horizontal" class="h-4 w-4"></i></button></td></tr>
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">B-AB 1234</td><td class="px-4 py-3 text-slate-600">S. Yilmaz</td><td class="px-4 py-3 text-slate-500">Jun 7, 14:00</td><td class="px-4 py-3 text-slate-500">22:00</td><td class="px-4 py-3"><span class="rounded bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">Manual</span></td><td class="px-4 py-3 text-right"><button class="text-slate-400 hover:text-slate-600"><i data-lucide="more-horizontal" class="h-4 w-4"></i></button></td></tr>
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">B-CD 5678</td><td class="px-4 py-3 text-slate-600">A. Klein</td><td class="px-4 py-3 text-slate-500">Jun 7, 08:00</td><td class="px-4 py-3 text-slate-500">18:00</td><td class="px-4 py-3"><span class="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">Samsara</span></td><td class="px-4 py-3 text-right"><button class="text-slate-400 hover:text-slate-600"><i data-lucide="more-horizontal" class="h-4 w-4"></i></button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================ REPORTS ============================ -->
+        <section id="screen-reports" class="screen">
+          <div class="flex items-center justify-between">
+            <div><h1 class="text-2xl font-bold text-slate-900">Reports</h1><p class="mt-1 text-sm text-slate-500">Personal-use summaries per driver, vehicle and period.</p></div>
+            <button onclick="showToast('success','Export started','Your CSV will be emailed shortly.')" class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"><i data-lucide="download" class="h-4 w-4"></i> Export CSV</button>
+          </div>
+
+          <div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><div class="text-sm text-slate-500">Personal trips</div><div class="mt-1 text-2xl font-bold text-rose-700">12</div><div class="mt-1 text-xs text-slate-400">this month</div></div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><div class="text-sm text-slate-500">Est. private km</div><div class="mt-1 text-2xl font-bold text-slate-900">~110</div><div class="mt-1 text-xs text-slate-400">bucketed</div></div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><div class="text-sm text-slate-500">Match rate</div><div class="mt-1 text-2xl font-bold text-emerald-600">96%</div><div class="mt-1 text-xs text-emerald-600">+2% vs last</div></div>
+            <div class="rounded-xl border border-slate-200 bg-white p-4"><div class="text-sm text-slate-500">Data gaps</div><div class="mt-1 text-2xl font-bold text-slate-900">3</div><div class="mt-1 text-xs text-slate-400">camera offline</div></div>
+          </div>
+
+          <div class="mt-4 grid gap-4 lg:grid-cols-2">
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 font-semibold text-slate-800">Top flagged vehicles</h3>
+              <div class="space-y-3 text-sm">
+                <div><div class="mb-1 flex justify-between"><span>B-EF 9012</span><span class="font-medium">4</span></div><div class="h-2 rounded bg-slate-100"><div class="h-2 w-[80%] rounded bg-rose-400"></div></div></div>
+                <div><div class="mb-1 flex justify-between"><span>B-AB 1234</span><span class="font-medium">3</span></div><div class="h-2 rounded bg-slate-100"><div class="h-2 w-[60%] rounded bg-rose-400"></div></div></div>
+                <div><div class="mb-1 flex justify-between"><span>B-CD 5678</span><span class="font-medium">2</span></div><div class="h-2 rounded bg-slate-100"><div class="h-2 w-[40%] rounded bg-rose-400"></div></div></div>
+              </div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 font-semibold text-slate-800">Personal trips by window</h3>
+              <div class="flex h-40 items-end gap-3">
+                <div class="flex flex-1 flex-col items-center gap-2"><div class="w-full rounded-t bg-rose-400" style="height:75%"></div><span class="text-xs text-slate-500">Outside hrs</span></div>
+                <div class="flex flex-1 flex-col items-center gap-2"><div class="w-full rounded-t bg-slate-300" style="height:42%"></div><span class="text-xs text-slate-500">Within hrs</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================ COMPLIANCE ============================ -->
+        <section id="screen-compliance" class="screen">
+          <h1 class="text-2xl font-bold text-slate-900">Compliance</h1>
+          <p class="mt-1 text-sm text-slate-500">DSGVO controls. Sensitive detection stays locked until attestations are complete.</p>
+
+          <!-- Gating banner -->
+          <div class="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <i data-lucide="lock" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600"></i>
+            <div class="text-sm"><p class="font-semibold text-amber-800">Full detection is locked</p><p class="mt-0.5 text-amber-700">Complete the Works Council Agreement and DPIA below to enable continuous tracking &amp; personal-trip detection.</p></div>
+          </div>
+
+          <div class="mt-5 grid gap-4 lg:grid-cols-2">
+            <!-- Attestations -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 font-semibold text-slate-800">Legal attestations</h3>
+              <div class="space-y-3">
+                <div class="flex items-center justify-between rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
+                  <div><div class="text-sm font-medium text-slate-800">Works Council Agreement</div><div class="text-xs text-slate-500">Betriebsvereinbarung · §87 BetrVG</div></div>
+                  <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">Completed</span>
+                </div>
+                <div class="flex items-center justify-between rounded-lg border border-amber-100 bg-amber-50/50 p-3">
+                  <div><div class="text-sm font-medium text-slate-800">DPIA</div><div class="text-xs text-slate-500">Art. 35 GDPR · Data Protection Impact Assessment</div></div>
+                  <button class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">Mark complete</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 font-semibold text-slate-800">Processing settings</h3>
+              <div class="space-y-4 text-sm">
+                <div class="flex items-center justify-between"><div><div class="font-medium text-slate-700">Working hours window</div><div class="text-xs text-slate-400">Mon–Fri · 06:00–22:00</div></div><button class="text-indigo-600 hover:underline">Edit</button></div>
+                <div class="flex items-center justify-between"><div><div class="font-medium text-slate-700">Raw location retention</div><div class="text-xs text-slate-400">30 days (auto-delete)</div></div><button class="text-indigo-600 hover:underline">Edit</button></div>
+                <div class="flex items-center justify-between"><div><div class="font-medium text-slate-700">Private mode</div><div class="text-xs text-slate-400">Drivers can switch to private use</div></div><span class="inline-flex h-5 w-9 items-center rounded-full bg-emerald-500 p-0.5"><span class="ml-auto h-4 w-4 rounded-full bg-white"></span></span></div>
+                <div class="flex items-center justify-between"><div><div class="font-medium text-slate-700">Regime</div><div class="text-xs text-slate-400">Default to strictest</div></div><span class="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium">Employee</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================ AUDIT LOG ============================ -->
+        <section id="screen-audit" class="screen">
+          <h1 class="text-2xl font-bold text-slate-900">Audit Log</h1>
+          <p class="mt-1 text-sm text-slate-500">Append-only record of access to location data and configuration changes.</p>
+          <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-400">
+                <tr><th class="px-4 py-3 font-semibold">Time</th><th class="px-4 py-3 font-semibold">Actor</th><th class="px-4 py-3 font-semibold">Action</th><th class="px-4 py-3 font-semibold">Subject</th><th class="px-4 py-3 font-semibold">IP</th></tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3 text-slate-500">14:52</td><td class="px-4 py-3 text-slate-700">M. Köhler</td><td class="px-4 py-3"><span class="rounded bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">viewed personal trip</span></td><td class="px-4 py-3 text-slate-500">PT-3391</td><td class="px-4 py-3 text-slate-400">10.0.0.4</td></tr>
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3 text-slate-500">14:30</td><td class="px-4 py-3 text-slate-700">System</td><td class="px-4 py-3"><span class="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">retention delete</span></td><td class="px-4 py-3 text-slate-500">raw_gps &lt; 30d</td><td class="px-4 py-3 text-slate-400">—</td></tr>
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3 text-slate-500">12:11</td><td class="px-4 py-3 text-slate-700">S. Admin</td><td class="px-4 py-3"><span class="rounded bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">changed working hours</span></td><td class="px-4 py-3 text-slate-500">compliance_settings</td><td class="px-4 py-3 text-slate-400">10.0.0.2</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================ DRIVER TRANSPARENCY ============================ -->
+        <section id="screen-transparency" class="screen">
+          <h1 class="text-2xl font-bold text-slate-900">Driver Transparency</h1>
+          <p class="mt-1 text-sm text-slate-500">What the driver sees — clear, reassuring, German-first in production.</p>
+          <div class="mt-4 max-w-2xl space-y-4">
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <div class="flex items-center gap-2"><i data-lucide="eye" class="h-5 w-5 text-indigo-500"></i><h3 class="font-semibold text-slate-800">What we collect about you</h3></div>
+              <ul class="mt-3 space-y-2 text-sm text-slate-600">
+                <li class="flex items-start gap-2"><i data-lucide="check" class="mt-0.5 h-4 w-4 text-emerald-500"></i> Vehicle movement during your <b class="mx-1">working hours</b> only.</li>
+                <li class="flex items-start gap-2"><i data-lucide="check" class="mt-0.5 h-4 w-4 text-emerald-500"></i> Platform trips from Uber/Bolt assigned to you.</li>
+                <li class="flex items-start gap-2"><i data-lucide="x" class="mt-0.5 h-4 w-4 text-rose-500"></i> <b class="mr-1">Never</b> your private routes — private trips store only "occurred + coarse bucket".</li>
+              </ul>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <div class="flex items-center justify-between"><div><h3 class="font-semibold text-slate-800">Current mode</h3><p class="text-sm text-slate-500">You control private use.</p></div><span class="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">Work mode</span></div>
+            </div>
+            <div class="flex gap-3">
+              <button class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"><i data-lucide="download" class="h-4 w-4"></i> Request my data (Art. 15)</button>
+              <button class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"><i data-lucide="hand" class="h-4 w-4"></i> Object (Art. 21)</button>
+            </div>
+            <p class="text-xs text-slate-400">Legal basis: Art. 6(1)(f) GDPR. Controller: your employer. You may contact the DPO and lodge a complaint with a supervisory authority.</p>
+          </div>
+        </section>
+
+        <!-- ============================ SETTINGS ============================ -->
+        <section id="screen-settings" class="screen">
+          <h1 class="text-2xl font-bold text-slate-900">Settings — Users &amp; Roles</h1>
+          <p class="mt-1 text-sm text-slate-500">Role-based access. Raw location is need-to-know only.</p>
+          <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-400">
+                <tr><th class="px-4 py-3 font-semibold">User</th><th class="px-4 py-3 font-semibold">Email</th><th class="px-4 py-3 font-semibold">Role</th><th class="px-4 py-3 font-semibold">Location access</th></tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">M. Köhler</td><td class="px-4 py-3 text-slate-500">manager@fleet.de</td><td class="px-4 py-3"><span class="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">fleet_manager</span></td><td class="px-4 py-3 text-emerald-600">Yes</td></tr>
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">L. Braun</td><td class="px-4 py-3 text-slate-500">analyst@fleet.de</td><td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">analyst</span></td><td class="px-4 py-3 text-slate-400">Aggregates only</td></tr>
+                <tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">Dr. Frank</td><td class="px-4 py-3 text-slate-500">dpo@fleet.de</td><td class="px-4 py-3"><span class="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">dpo</span></td><td class="px-4 py-3 text-emerald-600">Audit</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================ NOTIFICATIONS ============================ -->
+        <section id="screen-notifications" class="screen">
+          <div class="flex items-center justify-between">
+            <div><h1 class="text-2xl font-bold text-slate-900">Notifications</h1><p class="mt-1 text-sm text-slate-500">In-app alerts. Critical items are also emailed.</p></div>
+            <button onclick="showToast('info','All marked read','Notifications cleared.')" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Mark all read</button>
+          </div>
+          <div class="mt-4 max-w-2xl divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div class="flex items-start gap-3 bg-indigo-50/30 p-4">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600"><i data-lucide="user-x" class="h-4 w-4"></i></span>
+              <div class="flex-1"><p class="text-sm font-medium text-slate-800">New personal trip flagged</p><p class="text-sm text-slate-500">B-AB 1234 · outside working hours · 5–10 km</p></div>
+              <div class="flex flex-col items-end gap-1"><span class="text-xs text-slate-400">14:20</span><span class="h-2 w-2 rounded-full bg-indigo-500"></span></div>
+            </div>
+            <div class="flex items-start gap-3 bg-indigo-50/30 p-4">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600"><i data-lucide="plug-zap" class="h-4 w-4"></i></span>
+              <div class="flex-1"><p class="text-sm font-medium text-slate-800">Bolt token expiring</p><p class="text-sm text-slate-500">Reconnect within 3 days to avoid sync gaps.</p></div>
+              <div class="flex flex-col items-end gap-1"><span class="text-xs text-slate-400">09:02</span><span class="h-2 w-2 rounded-full bg-indigo-500"></span></div>
+            </div>
+            <div class="flex items-start gap-3 p-4">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600"><i data-lucide="git-compare" class="h-4 w-4"></i></span>
+              <div class="flex-1"><p class="text-sm font-medium text-slate-800">5 trips awaiting review</p><p class="text-sm text-slate-500">Ambiguous matches need a decision.</p></div>
+              <span class="text-xs text-slate-400">Yesterday</span>
+            </div>
+            <div class="flex items-start gap-3 p-4">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><i data-lucide="check-circle" class="h-4 w-4"></i></span>
+              <div class="flex-1"><p class="text-sm font-medium text-slate-800">DPIA marked complete</p><p class="text-sm text-slate-500">Full detection is now unlocked.</p></div>
+              <span class="text-xs text-slate-400">2 days ago</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================ DESIGN SYSTEM ============================ -->
+        <section id="screen-designsystem" class="screen">
+          <h1 class="text-2xl font-bold text-slate-900">Design System</h1>
+          <p class="mt-1 text-sm text-slate-500">All tokens, components and patterns used across DASHCAM. Click the interactive ones.</p>
+
+          <div class="mt-6 grid gap-6 lg:grid-cols-2">
+
+            <!-- Colors -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5 lg:col-span-2">
+              <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Color tokens</h3>
+              <div class="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-9">
+                <div><div class="h-12 rounded-lg bg-indigo-600"></div><p class="mt-1 text-xs font-medium">Primary</p><p class="text-[10px] text-slate-400">indigo-600</p></div>
+                <div><div class="h-12 rounded-lg bg-slate-900"></div><p class="mt-1 text-xs font-medium">Text</p><p class="text-[10px] text-slate-400">slate-900</p></div>
+                <div><div class="h-12 rounded-lg bg-slate-500"></div><p class="mt-1 text-xs font-medium">Muted</p><p class="text-[10px] text-slate-400">slate-500</p></div>
+                <div><div class="h-12 rounded-lg border border-slate-200 bg-slate-50"></div><p class="mt-1 text-xs font-medium">Surface</p><p class="text-[10px] text-slate-400">slate-50</p></div>
+                <div><div class="h-12 rounded-lg bg-emerald-500"></div><p class="mt-1 text-xs font-medium">Matched</p><p class="text-[10px] text-slate-400">emerald-500</p></div>
+                <div><div class="h-12 rounded-lg bg-rose-500"></div><p class="mt-1 text-xs font-medium">Personal</p><p class="text-[10px] text-slate-400">rose-500</p></div>
+                <div><div class="h-12 rounded-lg bg-amber-500"></div><p class="mt-1 text-xs font-medium">Review</p><p class="text-[10px] text-slate-400">amber-500</p></div>
+                <div><div class="h-12 rounded-lg bg-slate-400"></div><p class="mt-1 text-xs font-medium">Gap</p><p class="text-[10px] text-slate-400">slate-400</p></div>
+                <div><div class="h-12 rounded-lg bg-violet-500"></div><p class="mt-1 text-xs font-medium">Private</p><p class="text-[10px] text-slate-400">violet-500</p></div>
+              </div>
+            </div>
+
+            <!-- Typography -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Typography · Inter</h3>
+              <div class="space-y-2">
+                <p class="text-3xl font-bold text-slate-900">Heading 1</p>
+                <p class="text-2xl font-bold text-slate-900">Heading 2</p>
+                <p class="text-lg font-semibold text-slate-800">Heading 3</p>
+                <p class="text-sm text-slate-600">Body — 14px regular text for tables and content.</p>
+                <p class="text-xs text-slate-400">Caption — 12px muted for metadata.</p>
+              </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Buttons</h3>
+              <div class="flex flex-wrap items-center gap-3">
+                <button class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Primary</button>
+                <button class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Secondary</button>
+                <button class="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100">Ghost</button>
+                <button class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">Danger</button>
+                <button class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"><i data-lucide="plus" class="h-4 w-4"></i> With icon</button>
+                <button class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white">Small</button>
+                <button disabled class="cursor-not-allowed rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-400">Disabled</button>
+                <button class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white"><svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg> Loading</button>
+              </div>
+            </div>
+
+            <!-- Badges -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Badges &amp; status</h3>
+              <div class="flex flex-wrap gap-2 text-xs font-medium">
+                <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700 ring-1 ring-emerald-600/20">Matched</span>
+                <span class="rounded-full bg-rose-50 px-2.5 py-1 text-rose-700 ring-1 ring-rose-600/20">Personal</span>
+                <span class="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700 ring-1 ring-amber-600/20">Ambiguous</span>
+                <span class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 ring-1 ring-slate-500/20">Data gap</span>
+                <span class="rounded-full bg-violet-50 px-2.5 py-1 text-violet-700 ring-1 ring-violet-600/20">Private mode</span>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>Connected</span>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-amber-700"><span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>Expiring</span>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-rose-700"><span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span>Error</span>
+              </div>
+            </div>
+
+            <!-- Form controls -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Form controls</h3>
+              <div class="space-y-3">
+                <input placeholder="Text input" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+                <select class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"><option>Select an option</option><option>Uber</option><option>Bolt</option></select>
+                <textarea placeholder="Textarea" rows="2" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"></textarea>
+                <div class="flex flex-wrap items-center gap-5 text-sm text-slate-600">
+                  <label class="flex items-center gap-2"><input type="checkbox" checked class="rounded border-slate-300 text-indigo-600" /> Checkbox</label>
+                  <label class="flex items-center gap-2"><input type="radio" name="dsr" checked class="border-slate-300 text-indigo-600" /> Radio</label>
+                  <span class="flex items-center gap-2">Switch <span class="inline-flex h-5 w-9 items-center rounded-full bg-emerald-500 p-0.5"><span class="ml-auto h-4 w-4 rounded-full bg-white"></span></span></span>
+                  <input type="date" class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Alerts -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Alerts / Banners</h3>
+              <div class="space-y-3 text-sm">
+                <div class="flex items-start gap-2.5 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-indigo-800"><i data-lucide="info" class="mt-0.5 h-4 w-4 shrink-0 text-indigo-500"></i><p><b>Info.</b> Data minimization is active for private trips.</p></div>
+                <div class="flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-800"><i data-lucide="check-circle" class="mt-0.5 h-4 w-4 shrink-0 text-emerald-500"></i><p><b>Success.</b> All providers synced successfully.</p></div>
+                <div class="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800"><i data-lucide="alert-triangle" class="mt-0.5 h-4 w-4 shrink-0 text-amber-600"></i><p><b>Warning.</b> Detection locked until DPIA is complete.</p></div>
+                <div class="flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-800"><i data-lucide="x-circle" class="mt-0.5 h-4 w-4 shrink-0 text-rose-500"></i><p><b>Error.</b> Bolt connection failed — token revoked.</p></div>
+              </div>
+            </div>
+
+            <!-- Toasts -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Toasts <span class="font-normal normal-case text-slate-400">(click)</span></h3>
+              <div class="flex flex-wrap gap-2">
+                <button onclick="showToast('success','Saved','Changes were saved.')" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white">Success</button>
+                <button onclick="showToast('error','Failed','Could not connect to Bolt.')" class="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-medium text-white">Error</button>
+                <button onclick="showToast('warning','Heads up','Token expires in 3 days.')" class="rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-medium text-white">Warning</button>
+                <button onclick="showToast('info','FYI','12 trips synced from Samsara.')" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white">Info</button>
+              </div>
+            </div>
+
+            <!-- Modals -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Modals &amp; dialogs <span class="font-normal normal-case text-slate-400">(click)</span></h3>
+              <div class="flex flex-wrap gap-2">
+                <button onclick="openModal('modal-confirm')" class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Confirm dialog</button>
+                <button onclick="openModal('modal-info')" class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Info dialog</button>
+                <button onclick="openModal('modal-assign')" class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Form dialog</button>
+                <button onclick="document.getElementById('pt-sheet').classList.remove('hidden')" class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Side sheet</button>
+              </div>
+            </div>
+
+            <!-- Avatars + Dropdown -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Avatars &amp; menu</h3>
+              <div class="flex items-center gap-3">
+                <span class="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">MK</span>
+                <span class="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700">AK</span>
+                <span class="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-500">+6</span>
+                <div class="ml-2 w-48 rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-sm">
+                  <a class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50"><i data-lucide="user" class="h-4 w-4 text-slate-400"></i> Profile</a>
+                  <a class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50"><i data-lucide="settings" class="h-4 w-4 text-slate-400"></i> Settings</a>
+                  <div class="my-1 border-t border-slate-100"></div>
+                  <a class="flex items-center gap-2 px-3 py-1.5 text-rose-600 hover:bg-rose-50"><i data-lucide="log-out" class="h-4 w-4"></i> Sign out</a>
+                </div>
+              </div>
+            </div>
+
+            <!-- Progress + Skeleton -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Progress &amp; skeleton</h3>
+              <div class="space-y-2">
+                <div class="h-2 w-full rounded-full bg-slate-100"><div class="h-2 w-[70%] rounded-full bg-indigo-600"></div></div>
+                <div class="h-2 w-full rounded-full bg-slate-100"><div class="h-2 w-[40%] rounded-full bg-emerald-500"></div></div>
+              </div>
+              <div class="mt-4 space-y-2">
+                <div class="h-4 w-2/3 animate-pulse rounded bg-slate-100"></div>
+                <div class="h-4 w-full animate-pulse rounded bg-slate-100"></div>
+                <div class="h-4 w-1/2 animate-pulse rounded bg-slate-100"></div>
+              </div>
+            </div>
+
+            <!-- Empty state -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Empty state</h3>
+              <div class="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 py-8 text-center">
+                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400"><i data-lucide="inbox" class="h-6 w-6"></i></div>
+                <p class="mt-3 text-sm font-medium text-slate-700">No personal trips flagged</p>
+                <p class="text-xs text-slate-400">Everything matched a platform trip. Nice.</p>
+              </div>
+            </div>
+
+            <!-- Tabs + Pagination + Tooltip -->
+            <div class="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Tabs · Pagination · Tooltip</h3>
+              <div class="flex gap-5 border-b border-slate-200 text-sm">
+                <button class="border-b-2 border-indigo-500 pb-2 font-semibold text-indigo-700">Active</button>
+                <button class="border-b-2 border-transparent pb-2 font-semibold text-slate-500">Tab two</button>
+                <button class="border-b-2 border-transparent pb-2 font-semibold text-slate-500">Tab three</button>
+              </div>
+              <div class="mt-4 flex items-center gap-1 text-sm">
+                <button class="rounded-md border border-slate-200 px-2.5 py-1 text-slate-500 hover:bg-slate-50">‹</button>
+                <button class="rounded-md bg-indigo-600 px-2.5 py-1 text-white">1</button>
+                <button class="rounded-md border border-slate-200 px-2.5 py-1 text-slate-600 hover:bg-slate-50">2</button>
+                <button class="rounded-md border border-slate-200 px-2.5 py-1 text-slate-600 hover:bg-slate-50">3</button>
+                <button class="rounded-md border border-slate-200 px-2.5 py-1 text-slate-500 hover:bg-slate-50">›</button>
+              </div>
+              <div class="group relative mt-4 inline-block">
+                <button class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600">Hover me</button>
+                <span class="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100">Tooltip text</span>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Personal-trip detail Sheet -->
+  <div id="pt-sheet" class="fixed inset-0 z-40 hidden">
+    <div class="absolute inset-0 bg-slate-900/30" onclick="document.getElementById('pt-sheet').classList.add('hidden')"></div>
+    <div class="absolute inset-y-0 right-0 w-full max-w-md overflow-y-auto bg-white shadow-xl">
+      <div class="flex items-center justify-between border-b border-slate-200 p-5">
+        <h3 class="font-semibold text-slate-900">Personal trip · PT-3391</h3>
+        <button onclick="document.getElementById('pt-sheet').classList.add('hidden')" class="rounded-lg p-1.5 hover:bg-slate-100"><i data-lucide="x" class="h-5 w-5 text-slate-500"></i></button>
+      </div>
+      <div class="space-y-4 p-5 text-sm">
+        <div class="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3 text-indigo-900/80"><span class="font-semibold">Minimized record.</span> No route, destination or precise location is stored for private trips.</div>
+        <dl class="space-y-3">
+          <div class="flex justify-between"><dt class="text-slate-500">Vehicle</dt><dd class="font-medium">B-AB 1234</dd></div>
+          <div class="flex justify-between"><dt class="text-slate-500">Driver</dt><dd class="font-medium">Driver #D-204</dd></div>
+          <div class="flex justify-between"><dt class="text-slate-500">Date</dt><dd class="font-medium">Jun 7, 2026</dd></div>
+          <div class="flex justify-between"><dt class="text-slate-500">Window</dt><dd><span class="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">Outside hours</span></dd></div>
+          <div class="flex justify-between"><dt class="text-slate-500">Duration bucket</dt><dd class="font-medium">15–30 min</dd></div>
+          <div class="flex justify-between"><dt class="text-slate-500">Distance bucket</dt><dd class="font-medium">5–10 km</dd></div>
+        </dl>
+        <div class="border-t border-slate-100 pt-4">
+          <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Access trail</div>
+          <p class="text-xs text-slate-500">Viewed by M. Köhler · 14:52 · logged to audit.</p>
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button onclick="document.getElementById('pt-sheet').classList.add('hidden'); openModal('modal-confirm')" class="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Dismiss</button>
+          <button onclick="document.getElementById('pt-sheet').classList.add('hidden'); showToast('success','Marked reviewed','Trip PT-3391 has been reviewed.')" class="flex-1 rounded-lg bg-indigo-600 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Mark reviewed</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-[60] space-y-2"></div>
+
+  <!-- Confirm modal (destructive) -->
+  <div id="modal-confirm" class="fixed inset-0 z-[55] hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/40" onclick="closeModal('modal-confirm')"></div>
+    <div class="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+      <div class="flex items-start gap-4">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600"><i data-lucide="alert-triangle" class="h-5 w-5"></i></div>
+        <div><h3 class="text-lg font-semibold text-slate-900">Dismiss this flag?</h3><p class="mt-1 text-sm text-slate-500">This personal-trip flag will be marked as dismissed. The action is recorded in the audit log.</p></div>
+      </div>
+      <div class="mt-6 flex justify-end gap-2">
+        <button onclick="closeModal('modal-confirm')" class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
+        <button onclick="closeModal('modal-confirm'); showToast('success','Flag dismissed','Recorded in the audit log.')" class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info modal -->
+  <div id="modal-info" class="fixed inset-0 z-[55] hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/40" onclick="closeModal('modal-info')"></div>
+    <div class="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+      <div class="flex items-start gap-4">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600"><i data-lucide="shield" class="h-5 w-5"></i></div>
+        <div><h3 class="text-lg font-semibold text-slate-900">Why minimized data?</h3><p class="mt-1 text-sm text-slate-500">Under German DSGVO we store only that a private trip occurred plus coarse buckets — never the route or destination. This keeps the feature lawful.</p></div>
+      </div>
+      <div class="mt-6 flex justify-end">
+        <button onclick="closeModal('modal-info')" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form modal (new assignment) -->
+  <div id="modal-assign" class="fixed inset-0 z-[55] hidden items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/40" onclick="closeModal('modal-assign')"></div>
+    <div class="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-slate-900">New assignment</h3>
+        <button onclick="closeModal('modal-assign')" class="rounded-lg p-1.5 hover:bg-slate-100"><i data-lucide="x" class="h-5 w-5 text-slate-500"></i></button>
+      </div>
+      <div class="space-y-3 text-sm">
+        <div><label class="mb-1.5 block font-medium text-slate-700">Vehicle</label><select class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"><option>B-AB 1234</option><option>B-CD 5678</option></select></div>
+        <div><label class="mb-1.5 block font-medium text-slate-700">Driver</label><select class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500"><option>M. Weber</option><option>A. Klein</option></select></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="mb-1.5 block font-medium text-slate-700">From</label><input type="datetime-local" class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500" /></div>
+          <div><label class="mb-1.5 block font-medium text-slate-700">To</label><input type="datetime-local" class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500" /></div>
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end gap-2">
+        <button onclick="closeModal('modal-assign')" class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
+        <button onclick="closeModal('modal-assign'); showToast('success','Assignment created','Driver linked to vehicle.')" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================== -->
+  <!-- SCRIPTS                                                     -->
+  <!-- =========================================================== -->
+  <script>
+    const titles = {
+      dashboard: 'Dashboard', connections: 'Connections', drivers: 'Drivers', vehicles: 'Vehicles',
+      assignments: 'Assignments', trips: 'Trips', review: 'Review Queue', personal: 'Personal Trips',
+      reports: 'Reports', compliance: 'Compliance', audit: 'Audit Log', transparency: 'Driver Transparency',
+      settings: 'Settings', notifications: 'Notifications', designsystem: 'Design System'
+    };
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      const el = document.getElementById('screen-' + id);
+      if (el) el.classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.target === id));
+      document.title = 'DASHCAM — ' + (titles[id] || 'Dashboard');
+      window.scrollTo(0, 0);
+      if (window.innerWidth < 1024) document.querySelector('aside').classList.add('hidden');
+    }
+
+    function switchTab(screen, tab, btn) {
+      document.querySelectorAll('#screen-' + screen + ' .tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('#screen-' + screen + ' [data-tab]').forEach(p => p.classList.add('hidden'));
+      document.querySelector('[data-tab="' + screen + '-' + tab + '"]').classList.remove('hidden');
+    }
+
+    function setLang(lang) {
+      document.querySelectorAll('[data-en]').forEach(el => { el.textContent = el.dataset[lang] || el.dataset.en; });
+      document.getElementById('lang-en').className = lang === 'en' ? 'rounded-md bg-indigo-600 px-2 py-1 text-white' : 'rounded-md px-2 py-1 text-slate-500';
+      document.getElementById('lang-de').className = lang === 'de' ? 'rounded-md bg-indigo-600 px-2 py-1 text-white' : 'rounded-md px-2 py-1 text-slate-500';
+    }
+
+    function enterApp() { document.getElementById('view-login').classList.add('hidden'); document.getElementById('view-app').classList.remove('hidden'); }
+    function signOut() { document.getElementById('view-app').classList.add('hidden'); document.getElementById('view-login').classList.remove('hidden'); lucide.createIcons(); }
+
+    function openModal(id) { const m = document.getElementById(id); m.classList.remove('hidden'); m.classList.add('flex'); }
+    function closeModal(id) { const m = document.getElementById(id); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    function showToast(type, title, msg) {
+      const cfg = {
+        success: { c: 'emerald', i: 'check-circle' },
+        error:   { c: 'rose',    i: 'x-circle' },
+        warning: { c: 'amber',   i: 'alert-triangle' },
+        info:    { c: 'indigo',  i: 'info' },
+      }[type] || { c: 'slate', i: 'bell' };
+      const el = document.createElement('div');
+      el.className = 'flex w-80 items-start gap-3 rounded-xl border border-' + cfg.c + '-200 bg-white p-4 shadow-lg';
+      el.innerHTML =
+        '<span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-' + cfg.c + '-50 text-' + cfg.c + '-600"><i data-lucide="' + cfg.i + '" class="h-4 w-4"></i></span>' +
+        '<div class="flex-1 text-sm"><div class="font-semibold text-slate-800">' + title + '</div><div class="text-slate-500">' + (msg || '') + '</div></div>' +
+        '<button class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="h-4 w-4"></i></button>';
+      el.querySelector('button').onclick = () => el.remove();
+      document.getElementById('toast-container').appendChild(el);
+      lucide.createIcons();
+      setTimeout(() => el.remove(), 4000);
+    }
+
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', () => { if (item.dataset.target) showScreen(item.dataset.target); });
+    });
+
+    lucide.createIcons();
+  </script>
+</body>
+</html>

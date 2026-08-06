@@ -1,0 +1,29 @@
+# Build context exclusions for docker/backend.Dockerfile.
+# Dependencies are installed inside the image; secrets and local state never
+# belong in it.
+
+vendor
+node_modules
+
+# Secrets / environment
+.env
+.env.*
+!.env.example
+
+# Local sqlite dev database (Compose uses MySQL)
+database/database.sqlite
+
+# Logs and framework caches
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+bootstrap/cache/*
+
+# VCS / tooling
+.git
+.gitignore
+.gitattributes
+.phpunit.result.cache
+Dockerfile
+.dockerignore

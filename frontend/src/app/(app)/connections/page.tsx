@@ -1,0 +1,377 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Loader2, Plug, LogIn, ChevronDown, Puzzle, Copy, AlertTriangle } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge, type Status } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { useI18n } from "@/lib/i18n/context";
+import { useAsync } from "@/hooks/use-async";
+import { getFleetSession, captureFleetSession, type Cookie } from "@/lib/api/fleet-session";
+import { startUberLogin, submitUberMfa } from "@/lib/api/uber-login";
+import { issueExtensionToken } from "@/lib/api/extension";
+
+const statusTone: Record<string, Status> = {
+  active: "connected",
+  expired: "error",
+  needs_relink: "error",
+};
+
+/** Accepts an EditThisCookie-style JSON array and reduces it to {name,value}. */
+function parseCookies(raw: string, msgArray: string, msgNone: string): Cookie[] {
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) throw new Error(msgArray);
+  const cookies = parsed
+    .filter((c) => c && typeof c.name === "string" && typeof c.value === "string")
+    .map((c) => ({ name: c.name, value: c.value }));
+  if (cookies.length === 0) throw new Error(msgNone);
+  return cookies;
+}
+
+export default function ConnectionsPage() {
+  const { t, locale } = useI18n();
+  const { data, loading, refetch } = useAsync(getFleetSession);
+
+  // Interactive login state machine.
+  const [step, setStep] = useState<"credentials" | "mfa">("credentials");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginId, setLoginId] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  // Manual cookie-paste fallback.
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [orgUuid, setOrgUuid] = useState("");
+  const [cookiesRaw, setCookiesRaw] = useState("");
+
+  // Extension pairing token.
+  const [extToken, setExtToken] = useState<string | null>(null);
+  const [extBusy, setExtBusy] = useState(false);
+
+  // Whether the Ridy extension is installed (null = still probing).
+  const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
+
+  const c = (k: string) => t(`screens.connections.${k}`);
+
+  // Probe for the extension: ping, and if no "present" reply arrives, it's absent.
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.source === window && (e.data as { source?: string })?.source === "ridy-ext-present") {
+        setExtInstalled(true);
+      }
+    }
+    window.addEventListener("message", onMessage);
+    window.postMessage({ source: "ridy-ext-ping" }, "*");
+    const timer = setTimeout(() => setExtInstalled((v) => v ?? false), 800);
+    return () => {
+      window.removeEventListener("message", onMessage);
+      clearTimeout(timer);
+    };
+  }, []);
+
+  // Confirmation that the installed extension picked up the pairing.
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.source === window && (e.data as { source?: string })?.source === "ridy-pair-ack") {
+        toast.success(c("extensionPaired"));
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * One click does everything: mint a token, hand it to the extension (auto-pair),
+   * then open Uber so the extension captures the session after the manager signs in.
+   */
+  async function connectViaExtension() {
+    setExtBusy(true);
+    try {
+      const token = await issueExtensionToken();
+      setExtToken(token);
+
+      // Hand the URL + token straight to the extension (if installed). Use
+      // 127.0.0.1 over localhost to dodge the IPv6 loopback pitfall.
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace("localhost", "127.0.0.1");
+      window.postMessage({ source: "ridy-pair", apiUrl, token }, "*");
+
+      // Give the extension a moment to store the pairing, then open Uber.
+      setTimeout(() => window.open("https://vsdispatch.uber.com/", "_blank"), 500);
+    } catch (e) {
+      toast.error(c("loginFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setExtBusy(false);
+    }
+  }
+
+  function onDone() {
+    toast.success(c("loginSuccess"), { description: c("loginSuccessDesc") });
+    setStep("credentials");
+    setEmail("");
+    setPassword("");
+    setCode("");
+    setLoginId(null);
+    refetch();
+  }
+
+  function onOutcome(status: string) {
+    if (status === "success") return onDone();
+    if (status === "mfa_required") {
+      setStep("mfa");
+      return;
+    }
+    const messages: Record<string, string> = {
+      passkey_unsupported: c("passkeyUnsupported"),
+      bad_credentials: c("badCredentials"),
+      error: c("genericError"),
+    };
+    toast.error(c("loginFailed"), { description: messages[status] ?? c("genericError") });
+  }
+
+  async function doStart() {
+    if (!email || !password) return;
+    setBusy(true);
+    try {
+      const res = await startUberLogin(email, password);
+      if (res.login_id) setLoginId(res.login_id);
+      onOutcome(res.status);
+    } catch (e) {
+      toast.error(c("loginFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function doMfa() {
+    if (!loginId || !code) return;
+    setBusy(true);
+    try {
+      const res = await submitUberMfa(loginId, code);
+      onOutcome(res.status);
+      if (res.retry) toast.error(c("loginFailed"), { description: c("genericError") });
+    } catch (e) {
+      toast.error(c("loginFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function doManualCapture() {
+    let cookies: Cookie[];
+    try {
+      cookies = parseCookies(cookiesRaw, c("cookiesArray"), c("cookiesNone"));
+    } catch (e) {
+      toast.error(c("cookiesInvalid"), { description: e instanceof Error ? e.message : undefined });
+      return;
+    }
+    if (!orgUuid.trim()) return toast.error(c("orgMissing"));
+
+    setBusy(true);
+    try {
+      await captureFleetSession({ uber_org_uuid: orgUuid.trim(), cookies });
+      toast.success(c("connectedToast"), {
+        description: c("connectedToastDesc").replace("{count}", String(cookies.length)),
+      });
+      setCookiesRaw("");
+      await refetch();
+    } catch (e) {
+      toast.error(c("connectFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title={c("title")} subtitle={c("subtitle")} />
+
+      {/* Extension-missing warning */}
+      {extInstalled === false && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+          <div className="flex-1">
+            <p className="font-semibold text-amber-900">{c("extMissingTitle")}</p>
+            <p className="mt-0.5 text-sm text-amber-700">{c("extMissingBody")}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Current session */}
+      <Card className="p-5">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-slate-800">{c("current")}</h3>
+          {loading ? (
+            <span className="h-5 w-24 animate-pulse rounded bg-slate-100" />
+          ) : data ? (
+            <Badge status={statusTone[data.status] ?? "neutral"} dot>
+              {c(
+                data.status === "active"
+                  ? "statusActive"
+                  : data.status === "expired"
+                    ? "statusExpired"
+                    : "statusRelink",
+              )}
+            </Badge>
+          ) : (
+            <Badge status="gap" dot>
+              {c("notConnected")}
+            </Badge>
+          )}
+        </div>
+        {data && (
+          <div className="mt-4 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-slate-500">{c("orgUuid")}</span>
+              <span className="font-mono text-xs text-slate-600">{data.uber_org_uuid}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">{c("lastEvent")}</span>
+              <span className="text-slate-600">
+                {data.last_event_at ? new Date(data.last_event_at).toLocaleString(locale) : "—"}
+              </span>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Recommended: browser extension */}
+      <Card className="p-5">
+        <div className="mb-1 flex items-center gap-2">
+          <Puzzle className="h-4 w-4 text-slate-700" />
+          <h3 className="font-semibold text-slate-800">{c("extensionTitle")}</h3>
+        </div>
+        <p className="mb-4 text-sm text-slate-500">{c("extensionHint")}</p>
+
+        {/* One button: mint token -> auto-pair extension -> open Uber. */}
+        <Button onClick={connectViaExtension} disabled={extBusy || extInstalled === false}>
+          {extBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+          {c("openUber")}
+        </Button>
+
+        {/* Fallback for when the extension isn't installed yet: the raw token. */}
+        {extToken && (
+          <details className="mt-4">
+            <summary className="cursor-pointer text-xs text-slate-500">{c("tokenManualFallback")}</summary>
+            <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+              <code className="flex-1 overflow-x-auto whitespace-nowrap text-xs text-slate-700">
+                {extToken}
+              </code>
+              <button
+                onClick={() => navigator.clipboard.writeText(extToken)}
+                className="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-200"
+                title="Copy"
+              >
+                <Copy className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-slate-400">{c("tokenHint")}</p>
+          </details>
+        )}
+      </Card>
+
+      {/* Interactive sign-in */}
+      <Card className="p-5">
+        {step === "credentials" ? (
+          <>
+            <h3 className="mb-1 font-semibold text-slate-800">{c("loginTitle")}</h3>
+            <p className="mb-4 text-sm text-slate-500">{c("loginHint")}</p>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">{c("email")}</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="off"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">{c("password")}</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="off"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={doStart} disabled={busy || !email || !password}>
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+                  {c("signIn")}
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <h3 className="mb-1 font-semibold text-slate-800">{c("mfaTitle")}</h3>
+            <p className="mb-4 text-sm text-slate-500">{c("mfaHint")}</p>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">{c("mfaCode")}</label>
+                <input
+                  inputMode="numeric"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-lg tracking-widest outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={doMfa} disabled={busy || !code}>
+                  {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {c("verify")}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </Card>
+
+      {/* Manual fallback */}
+      <Card className="p-5">
+        <button
+          onClick={() => setShowAdvanced((v) => !v)}
+          className="flex w-full items-center justify-between text-sm font-medium text-slate-600"
+        >
+          {c("advanced")}
+          <ChevronDown className={`h-4 w-4 transition ${showAdvanced ? "rotate-180" : ""}`} />
+        </button>
+        {showAdvanced && (
+          <div className="mt-4 space-y-3">
+            <p className="text-sm text-slate-500">{c("captureHint")}</p>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">{c("orgUuid")}</label>
+              <input
+                value={orgUuid}
+                onChange={(e) => setOrgUuid(e.target.value)}
+                placeholder="7b118561-0f8e-4816-a93f-d6e9c770cfd0"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">{c("cookiesLabel")}</label>
+              <textarea
+                value={cookiesRaw}
+                onChange={(e) => setCookiesRaw(e.target.value)}
+                rows={6}
+                placeholder='[{"name":"sid","value":"..."}]'
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button variant="secondary" onClick={doManualCapture} disabled={busy}>
+                <Plug className="h-4 w-4" /> {c("connect")}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}

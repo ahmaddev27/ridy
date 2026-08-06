@@ -1,0 +1,29 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use App\Domain\Tenancy\TenantContext;
+use Closure;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Symfony\Component\HttpFoundation\Response;
+
+/**
+ * Resolves the active tenant from the authenticated user and seeds TenantContext.
+ * Applied to authenticated API routes.
+ */
+class ResolveTenant
+{
+    public function __construct(private TenantContext $context) {}
+
+    public function handle(Request $request, Closure $next): Response
+    {
+        $user = Auth::user();
+
+        if ($user && $user->tenant_id) {
+            $this->context->set((int) $user->tenant_id);
+        }
+
+        return $next($request);
+    }
+}

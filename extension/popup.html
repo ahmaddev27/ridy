@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root { color-scheme: light; }
+      body {
+        width: 320px;
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        color: #0f172a;
+        background: #fff;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 16px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      header .logo {
+        width: 26px; height: 26px; border-radius: 7px;
+        background: #000; color: #fff; font-weight: 700;
+        display: grid; place-items: center; font-size: 14px;
+      }
+      header h1 { font-size: 15px; margin: 0; }
+      main { padding: 16px; }
+      label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin: 10px 0 4px; }
+      input {
+        width: 100%; box-sizing: border-box; padding: 8px 10px;
+        border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none;
+      }
+      input:focus { border-color: #000; box-shadow: 0 0 0 2px #e2e8f0; }
+      button {
+        width: 100%; margin-top: 14px; padding: 10px; border: 0; border-radius: 8px;
+        background: #000; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
+      }
+      button:disabled { opacity: .5; cursor: default; }
+      button.secondary { background: #f1f5f9; color: #0f172a; }
+      .status { margin-top: 12px; font-size: 13px; padding: 8px 10px; border-radius: 8px; display: none; }
+      .status.ok { display: block; background: #ecfdf5; color: #047857; }
+      .status.err { display: block; background: #fef2f2; color: #b91c1c; }
+      .hint { font-size: 11px; color: #94a3b8; margin-top: 6px; }
+      details { margin-top: 14px; }
+      summary { font-size: 12px; color: #64748b; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="logo">R</span>
+      <h1>Ridy Uber Connector</h1>
+    </header>
+    <main>
+      <button id="connect">Uber-Sitzung verbinden</button>
+      <div id="status" class="status"></div>
+      <p class="hint">
+        Melde dich zuerst bei <b>vsdispatch.uber.com</b> an und klicke dann hier.
+      </p>
+
+      <details id="settings">
+        <summary>Einstellungen</summary>
+        <label for="apiUrl">Ridy-URL</label>
+        <input id="apiUrl" placeholder="https://r.fleeteye.de" />
+        <label for="token">Kopplungs-Token</label>
+        <input id="token" type="password" placeholder="aus dem Ridy-Dashboard" />
+        <button id="save" class="secondary">Speichern</button>
+      </details>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

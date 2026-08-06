@@ -1,0 +1,17 @@
+# Build context exclusions for docker/frontend.Dockerfile.
+# Dependencies and the build output are produced inside the image.
+
+node_modules
+.next
+
+# Secrets / environment
+.env
+.env.*
+!.env.example
+
+# VCS / tooling
+.git
+.gitignore
+Dockerfile
+.dockerignore
+npm-debug.log*

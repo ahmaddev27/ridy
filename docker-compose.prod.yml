@@ -1,0 +1,106 @@
+# Ridy — production stack for a fresh VPS (r.fleeteye.de).
+#
+# Services: caddy (TLS edge), backend (Laravel PHP-FPM), frontend (Next.js),
+# mysql, dispatch-daemon (Node RAMEN stream). Values come from a root .env
+# (see .env.prod.example). Deploy steps: docs/13-deployment.md.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  # --- Caddy — TLS edge + reverse proxy -------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Backend public/ so Caddy can serve Laravel's front controller via FastCGI.
+      - ./backend:/var/www
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # --- MySQL 8 --------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # --- Backend — Laravel (PHP-FPM) ------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: ./docker/backend.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      APP_NAME: Ridy
+      APP_ENV: production
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: "false"
+      APP_URL: https://${DOMAIN}
+      FRONTEND_URL: https://${DOMAIN}
+      SANCTUM_STATEFUL_DOMAINS: ${DOMAIN}
+      SESSION_DOMAIN: ${DOMAIN}
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
+      FCM_SERVER_KEY: ${FCM_SERVER_KEY}
+    volumes:
+      - ./backend:/var/www
+      - /var/www/vendor
+
+  # --- Frontend — Next.js dashboard -----------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: ./docker/frontend.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://${DOMAIN}
+    restart: unless-stopped
+
+  # --- Dispatch daemon — holds the Uber RAMEN stream ------------------------
+  dispatch-daemon:
+    build:
+      context: .
+      dockerfile: ./docker/dispatch-daemon.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      # Reaches the API through Caddy over the public HTTPS domain (hairpin).
+      RIDY_API_URL: https://${DOMAIN}
+      DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
+      UBER_DISPATCH_BASE_URL: https://vsdispatch.uber.com
+      UBER_RAMEN_PATH: /ramendca/events
+
+volumes:
+  dbdata:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,29 @@
+# Ridy edge — Caddy terminates TLS (auto Let's Encrypt) and routes:
+#   /api/*, /sanctum/*, /up  -> Laravel via PHP-FPM (same origin, so Sanctum
+#                               cookies just work)
+#   everything else          -> the Next.js dashboard
+#
+# {$SITE_ADDRESS} comes from the environment (e.g. r.fleeteye.de). Set it to
+# :80 for a quick HTTP-only test without a domain.
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# Laravel API + Sanctum. The backend app is mounted so its public/ is the root.
+	@laravel path /api/* /sanctum/* /up
+	handle @laravel {
+		root * /var/www/public
+		php_fastcgi backend:9000
+	}
+
+	# Static assets Laravel serves from public/ (favicon, storage links, etc.).
+	handle_path /storage/* {
+		root * /var/www/public
+		file_server
+	}
+
+	# Everything else is the Next.js dashboard.
+	handle {
+		reverse_proxy frontend:3000
+	}
+}

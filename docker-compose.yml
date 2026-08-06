@@ -1,0 +1,161 @@
+# DASHCAM — Docker Compose stack (Hetzner / EU, DSGVO data residency).
+#
+# Services: mysql, redis, backend (php-fpm), nginx, horizon, scheduler, frontend.
+# Values are read from a root .env file (see .env.example for the keys).
+#
+# NOTE ON DATABASES:
+#   - Local dev (php artisan serve) uses sqlite — see backend/.env.example.
+#   - This Compose stack runs MySQL 8, the production target. The backend
+#     service is configured with DB_CONNECTION=mysql below.
+
+services:
+  # --- MySQL 8 — primary datastore -------------------------------------------
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: dashcam
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Redis — queues (Horizon), cache, sessions -----------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  # --- Backend — Laravel app served via PHP-FPM ------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: ./docker/backend.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      APP_NAME: ${APP_NAME}
+      APP_ENV: ${APP_ENV}
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: ${APP_DEBUG}
+      APP_URL: ${APP_URL}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+    volumes:
+      # Bind-mount source for local development (hot reload of PHP code).
+      - ./backend:/var/www
+      # Keep the image's vendor/ — don't let the host mount shadow it.
+      - /var/www/vendor
+
+  # --- nginx — web server / FastCGI proxy to the backend ---------------------
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # Mount the app so nginx can serve static files from backend/public.
+      - ./backend:/var/www
+
+  # --- Horizon — Redis queue worker / supervisor -----------------------------
+  horizon:
+    build:
+      context: .
+      dockerfile: ./docker/backend.Dockerfile
+    restart: unless-stopped
+    command: php artisan horizon
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      APP_NAME: ${APP_NAME}
+      APP_ENV: ${APP_ENV}
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: ${APP_DEBUG}
+      APP_URL: ${APP_URL}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+    volumes:
+      - ./backend:/var/www
+      - /var/www/vendor
+
+  # --- Scheduler — runs Laravel's scheduled tasks ----------------------------
+  scheduler:
+    build:
+      context: .
+      dockerfile: ./docker/backend.Dockerfile
+    restart: unless-stopped
+    command: php artisan schedule:work
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      APP_NAME: ${APP_NAME}
+      APP_ENV: ${APP_ENV}
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: ${APP_DEBUG}
+      APP_URL: ${APP_URL}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+    volumes:
+      - ./backend:/var/www
+      - /var/www/vendor
+
+  # --- Frontend — Next.js SPA / dashboard ------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: ./docker/frontend.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+
+# Named volume for MySQL data so it survives container recreation.
+volumes:
+  dbdata:
