@@ -1,0 +1,105 @@
+name: Deploy
+
+# Zero-touch deploy: a push to main provisions and updates the VPS entirely over
+# SSH — installs Docker if missing, clones the repo on first run, writes .env
+# from secrets, then builds + migrates. You never open the server manually.
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   SSH_HOST                — server IP or hostname (e.g. r.fleeteye.de)
+#   SSH_USER                — deploy user (e.g. fleeteye)
+#   SSH_KEY                 — the PRIVATE SSH key (contents)
+#   REPO_URL                — git URL the server pulls from (https with token or ssh)
+#   DOMAIN                  — r.fleeteye.de
+#   APP_KEY                 — base64 app key (php artisan key:generate --show); or leave blank to auto-generate
+#   DB_PASSWORD, DB_ROOT_PASSWORD, DISPATCH_INGEST_SECRET  — strong random strings
+#   FCM_SERVER_KEY          — optional (blank = pushes logged, not sent)
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Provision & deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Provision and deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          # Pass secrets as env so they never appear in the script text/logs.
+          envs: REPO_URL,DOMAIN,APP_KEY,DB_PASSWORD,DB_ROOT_PASSWORD,DISPATCH_INGEST_SECRET,FCM_SERVER_KEY
+          script_stop: true
+          script: |
+            set -e
+            APP_DIR="$HOME/ridy"
+            COMPOSE="docker compose -f docker-compose.prod.yml"
+
+            # --- 1. Install Docker on first run -------------------------------
+            if ! command -v docker >/dev/null 2>&1; then
+              echo "Installing Docker..."
+              curl -fsSL https://get.docker.com | sudo sh
+              sudo usermod -aG docker "$USER" || true
+            fi
+            # Use sudo for docker if the group isn't active in this session yet.
+            if ! docker ps >/dev/null 2>&1; then DOCKER_SUDO="sudo"; else DOCKER_SUDO=""; fi
+            COMPOSE="$DOCKER_SUDO $COMPOSE"
+
+            # --- 2. Clone on first run, pull thereafter -----------------------
+            if [ ! -d "$APP_DIR/.git" ]; then
+              echo "Cloning repository..."
+              git clone "$REPO_URL" "$APP_DIR"
+            fi
+            cd "$APP_DIR"
+            git fetch origin main
+            git reset --hard origin/main
+
+            # --- 3. Write .env from secrets (idempotent) ----------------------
+            if [ -z "$APP_KEY" ]; then
+              APP_KEY="base64:$(head -c 32 /dev/urandom | base64)"
+            fi
+            cat > .env <<EOF
+            DOMAIN=$DOMAIN
+            SITE_ADDRESS=$DOMAIN
+            APP_KEY=$APP_KEY
+            DB_DATABASE=ridy
+            DB_USERNAME=ridy
+            DB_PASSWORD=$DB_PASSWORD
+            DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD
+            DISPATCH_INGEST_SECRET=$DISPATCH_INGEST_SECRET
+            FCM_SERVER_KEY=$FCM_SERVER_KEY
+            EOF
+
+            # --- 4. Build + start ---------------------------------------------
+            $COMPOSE up -d --build
+
+            # --- 5. Wait for MySQL, then migrate ------------------------------
+            echo "Waiting for the database..."
+            for i in $(seq 1 30); do
+              if $COMPOSE exec -T backend php artisan migrate --force 2>/dev/null; then
+                break
+              fi
+              sleep 3
+            done
+
+            # Seed the admin user only on the very first deploy.
+            if [ ! -f "$APP_DIR/.seeded" ]; then
+              $COMPOSE exec -T backend php artisan db:seed --force || true
+              touch "$APP_DIR/.seeded"
+            fi
+
+            $COMPOSE exec -T backend php artisan config:cache || true
+            echo "Deploy complete: https://$DOMAIN"
+        env:
+          REPO_URL: ${{ secrets.REPO_URL }}
+          DOMAIN: ${{ secrets.DOMAIN }}
+          APP_KEY: ${{ secrets.APP_KEY }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD }}
+          DISPATCH_INGEST_SECRET: ${{ secrets.DISPATCH_INGEST_SECRET }}
+          FCM_SERVER_KEY: ${{ secrets.FCM_SERVER_KEY }}
