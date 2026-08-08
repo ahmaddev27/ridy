@@ -1,4 +1,7 @@
-export type Locale = "en" | "de";
+export type Locale = "en" | "de" | "ar";
+
+/** Locales that read right-to-left. */
+export const RTL_LOCALES: Locale[] = ["ar"];
 
 const en = {
   navGroups: {
@@ -144,4 +147,76 @@ const de: typeof en = {
   },
 };
 
-export const dictionaries: Record<Locale, typeof en> = { en, de };
+const ar: typeof en = {
+  navGroups: {
+    overview: "نظرة عامة",
+    fleet: "الأسطول",
+    trips: "الرحلات",
+    insights: "التحليلات",
+    governance: "الحوكمة",
+    system: "النظام",
+  },
+  nav: {
+    dashboard: "لوحة التحكّم",
+    offers: "العروض",
+    connections: "ربط أوبر",
+    driverLinking: "ربط السواقين",
+    notifications: "الإشعارات",
+    drivers: "السواقون",
+    auditLog: "سجل التدقيق",
+    designSystem: "نظام التصميم",
+  },
+  pages: {
+    dashboard: { title: "لوحة التحكّم", subtitle: "نظرة عامة على إرساليات أوبر — السواقون والعروض الحيّة وجلسة الأسطول." },
+    connections: { title: "ربط أوبر", subtitle: "اربط جلسة أسطول أوبر لاستقبال تيار الإرساليات." },
+    vehicles: { title: "المركبات", subtitle: "موحّدة عبر المزوّدين حسب لوحة السيارة." },
+    drivers: { title: "السواقون", subtitle: "سواقو الأسطول وحالة ربطهم بأوبر." },
+    assignments: { title: "الإسنادات", subtitle: "أي سائق كان بأي مركبة ومتى." },
+    trips: { title: "الرحلات", subtitle: "رحلات التتبّع والمنصّة مع حالة المطابقة." },
+    reviewQueue: { title: "قائمة المراجعة", subtitle: "حلّ المطابقات الغامضة والهويات غير المحلولة." },
+    personalTrips: { title: "الرحلات الشخصية", subtitle: "رحلات بلا مقابل على المنصّة — مُعلَّمة كاستخدام شخصي." },
+    reports: { title: "التقارير", subtitle: "ملخّصات الاستخدام الشخصي لكل مركبة." },
+    billing: { title: "الفوترة", subtitle: "رسوم تقديرية للاستخدام الشخصي." },
+    compliance: { title: "الامتثال", subtitle: "ضوابط الخصوصية (DSGVO)." },
+    auditLog: { title: "سجل التدقيق", subtitle: "سجل غير قابل للتعديل للوصول للبيانات والتغييرات." },
+    notifications: { title: "الإشعارات", subtitle: "تنبيهات داخل التطبيق. المهم منها يُرسَل بالبريد أيضاً." },
+    transparency: { title: "شفافية السائق", subtitle: "ما يُجمَع عنك، ولماذا، ولكم من الوقت." },
+    designSystem: { title: "نظام التصميم", subtitle: "كل العناصر والمكوّنات والأنماط." },
+  },
+  common: {
+    save: "حفظ التغييرات",
+    cancel: "إلغاء",
+    connect: "ربط",
+    reconnect: "إعادة الربط",
+    sync: "مزامنة",
+    create: "إنشاء",
+    delete: "حذف",
+    approve: "تأكيد المطابقة",
+    reject: "رفض",
+    close: "إغلاق",
+    markReviewed: "تعليم كمراجَع",
+    dismiss: "تجاهل",
+    markAllRead: "تعليم الكل كمقروء",
+    exportCsv: "تصدير CSV",
+    runMatching: "تشغيل المطابقة",
+    loading: "جارٍ التحميل…",
+    saving: "جارٍ الحفظ…",
+  },
+  topbar: {
+    search: "ابحث عن مركبات، سواقين، رحلات…",
+    signOut: "تسجيل الخروج",
+  },
+  login: {
+    title: "تسجيل الدخول",
+    subtitle: "أهلاً بعودتك إلى لوحة الأسطول.",
+    email: "البريد الإلكتروني",
+    password: "كلمة المرور",
+    signIn: "تسجيل الدخول",
+    signingIn: "جارٍ الدخول…",
+    hosted: "مستضاف في ألمانيا · متوافق مع DSGVO",
+    failed: "فشل تسجيل الدخول",
+    invalid: "البريد أو كلمة المرور غير صحيحة.",
+  },
+};
+
+export const dictionaries: Record<Locale, typeof en> = { en, de, ar };

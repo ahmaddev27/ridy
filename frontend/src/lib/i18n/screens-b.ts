@@ -2,7 +2,11 @@
 // compliance, audit-log, notifications, transparency, design-system.
 // Keys live under `screens.<screen>.*`. Keep en/de in lockstep.
 
-export const screensB: { en: Record<string, unknown>; de: Record<string, unknown> } = {
+export const screensB: {
+  en: Record<string, unknown>;
+  de: Record<string, unknown>;
+  ar: Record<string, unknown>;
+} = {
   en: {
     personalTrips: {
       runMatching: "Run matching",
@@ -507,6 +511,30 @@ export const screensB: { en: Record<string, unknown>; de: Record<string, unknown
       gotIt: "Verstanden",
       infoModalBody:
         "Gemäß deutscher DSGVO speichern wir nur, dass eine Privatfahrt stattgefunden hat, sowie grobe Klassen — niemals die Route oder das Ziel.",
+    },
+  },
+  ar: {
+    auditLog: {
+      immutableNote: "السجلات غير قابلة للتعديل. كل إجراء حسّاس يُسجَّل هنا للمساءلة (DSGVO).",
+      searchPlaceholder: "ابحث بالإجراء أو الموضوع",
+      loadError: "تعذّر تحميل سجل التدقيق —",
+      emptyTitle: "لا سجلات",
+      emptyDesc: "ستظهر هنا الإجراءات الحسّاسة (تغييرات، مراجعات، وصول).",
+      colTime: "الوقت",
+      colActor: "الفاعل",
+      colAction: "الإجراء",
+      colSubject: "الموضوع",
+      colIp: "IP",
+      actorUser: "مستخدم رقم {id}",
+      actorSystem: "النظام",
+    },
+    notifications: {
+      markAllRead: "تعليم الكل كمقروء",
+      allMarkedRead: "تم تعليم الكل كمقروء",
+      updateError: "فشل تحديث الإشعارات",
+      loadError: "تعذّر تحميل الإشعارات —",
+      emptyTitle: "لا إشعارات",
+      emptyDesc: "سنُنبّهك هنا عند وصول أحداث جديدة.",
     },
   },
 };

@@ -2,7 +2,11 @@
 // drivers, assignments, trips, review-queue. Keys live under `screens.<screen>.*`.
 // Keep en/de in lockstep.
 
-export const screensA: { en: Record<string, unknown>; de: Record<string, unknown> } = {
+export const screensA: {
+  en: Record<string, unknown>;
+  de: Record<string, unknown>;
+  ar: Record<string, unknown>;
+} = {
   en: {
     dashboard: {
       apiError: "Couldn’t reach the API",
@@ -320,6 +324,20 @@ export const screensA: { en: Record<string, unknown>; de: Record<string, unknown
       vehiclesLinked: "Fahrzeuge verknüpft",
       identityMerged: "Anbieter-Identität zusammengeführt.",
       linkFailed: "Verknüpfung fehlgeschlagen",
+    },
+  },
+  ar: {
+    drivers: {
+      loadError: "تعذّر تحميل السواقين",
+      emptyTitle: "لا سواقون بعد",
+      emptyDesc: "يظهر السواقون تلقائياً بعد ربط أوبر ومزامنة الأسطول.",
+      colName: "الاسم",
+      colPhone: "الهاتف",
+      colLicense: "الرخصة",
+      colType: "النوع",
+      colLinked: "مربوط",
+      linked: "مربوط",
+      notLinked: "غير مربوط",
     },
   },
 };

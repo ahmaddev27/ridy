@@ -7,7 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
-import { dictionaries, type Locale } from "./dictionaries";
+import { dictionaries, RTL_LOCALES, type Locale } from "./dictionaries";
 import { screensA } from "./screens-a";
 import { screensB } from "./screens-b";
 import { screensRidy } from "./screens-ridy";
@@ -42,8 +42,16 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const saved = typeof localStorage !== "undefined" ? localStorage.getItem("locale") : null;
-    if (saved === "en" || saved === "de") setLocaleState(saved);
+    if (saved === "en" || saved === "de" || saved === "ar") setLocaleState(saved);
   }, []);
+
+  // Reflect the language + reading direction on <html> so RTL (Arabic) flips the
+  // whole layout and native controls follow suit.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.lang = locale;
+    document.documentElement.dir = RTL_LOCALES.includes(locale) ? "rtl" : "ltr";
+  }, [locale]);
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);

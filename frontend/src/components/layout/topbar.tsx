@@ -37,7 +37,7 @@ export function Topbar() {
       <div className="ml-auto flex items-center gap-2">
         {/* Locale switch (functional) */}
         <div className="flex items-center rounded-lg border border-slate-200 p-0.5 text-xs font-medium">
-          {(["en", "de"] as const).map((l) => (
+          {(["en", "de", "ar"] as const).map((l) => (
             <button
               key={l}
               onClick={() => setLocale(l)}
