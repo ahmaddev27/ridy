@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Plug, LogIn, ChevronDown, Puzzle, Copy, AlertTriangle } from "lucide-react";
+import { Loader2, Plug, LogIn, ChevronDown, Puzzle, Copy, AlertTriangle, Download } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge, type Status } from "@/components/ui/badge";
@@ -189,15 +189,35 @@ export default function ConnectionsPage() {
     <div className="space-y-6">
       <PageHeader title={c("title")} subtitle={c("subtitle")} />
 
-      {/* Extension-missing warning */}
+      {/* Extension not installed: warning + install card with download */}
       {extInstalled === false && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
-          <div className="flex-1">
-            <p className="font-semibold text-amber-900">{c("extMissingTitle")}</p>
-            <p className="mt-0.5 text-sm text-amber-700">{c("extMissingBody")}</p>
+        <>
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+            <div className="flex-1">
+              <p className="font-semibold text-amber-900">{c("extMissingTitle")}</p>
+              <p className="mt-0.5 text-sm text-amber-700">{c("extMissingBody")}</p>
+            </div>
           </div>
-        </div>
+
+          <Card className="p-5">
+            <div className="mb-1 flex items-center gap-2">
+              <Download className="h-4 w-4 text-slate-700" />
+              <h3 className="font-semibold text-slate-800">{c("installTitle")}</h3>
+            </div>
+            <p className="mb-3 text-sm text-slate-500">{c("installBody")}</p>
+            <ol className="mb-4 ml-4 list-decimal space-y-1 text-sm text-slate-600">
+              <li>{c("installStep1")}</li>
+              <li>{c("installStep2")}</li>
+              <li>{c("installStep3")}</li>
+            </ol>
+            <a href="/downloads/ridy-extension.zip" download>
+              <Button>
+                <Download className="h-4 w-4" /> {c("installDownload")}
+              </Button>
+            </a>
+          </Card>
+        </>
       )}
 
       {/* Current session */}
