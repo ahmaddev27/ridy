@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Ridy Uber Connector",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Verbindet deine Uber-Flottensitzung mit Ridy — melde dich normal bei Uber an, die Sitzung wird automatisch erfasst.",
   "permissions": ["cookies", "scripting", "storage"],
   "host_permissions": [
