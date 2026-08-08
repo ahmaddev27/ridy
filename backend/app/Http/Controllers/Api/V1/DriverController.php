@@ -9,6 +9,7 @@ use App\Domain\Fleet\Models\Driver;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DriverResource;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class DriverController extends Controller
@@ -21,9 +22,23 @@ class DriverController extends Controller
     }
 
     /**
-     * Pull the freshest roster from Uber on demand (the Drivers page triggers
-     * this on load), using the tenant's active fleet session. Best-effort: if
-     * Uber can't be reached, the cached roster is still shown.
+     * The Ridy extension fetched supplier /api/getDrivers from the manager's own
+     * browser (real IP, so Uber responds) and posts the driver list here. This is
+     * the reliable path — server-side pulls get blocked by Uber's datacenter check.
+     */
+    public function ingestRoster(Request $request, RosterSyncService $roster): JsonResponse
+    {
+        $data = $request->validate(['drivers' => ['required', 'array']]);
+
+        $tenantId = (int) $request->user()->tenant_id;
+        $result = $roster->sync($tenantId, $data['drivers']);
+
+        return response()->json(['data' => $result]);
+    }
+
+    /**
+     * Server-side on-demand pull (fallback). Often blocked by Uber's datacenter
+     * check — the extension path (ingestRoster) is the reliable one.
      */
     public function sync(UberSupplierClient $client, RosterSyncService $roster): JsonResponse
     {

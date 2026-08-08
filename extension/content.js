@@ -63,4 +63,29 @@
     tryCapture();
     if (done || Date.now() - started > 60000) clearInterval(timer);
   }, 1500);
+
+  // On supplier.uber.com, also pull the driver roster from the manager's own
+  // browser (real IP → Uber responds) and forward it. Server-side pulls get
+  // blocked by Uber's datacenter check, so this is the reliable path.
+  let rosterDone = false;
+  async function tryRoster() {
+    if (rosterDone) return;
+    if (!/supplier\.uber\.com/i.test(location.host)) return;
+    try {
+      const res = await fetch("/api/getDrivers?localeCode=en", { credentials: "include" });
+      if (!res.ok) return;
+      const body = await res.json();
+      const drivers = body?.data?.drivers ?? [];
+      if (drivers.length === 0) return;
+      rosterDone = true;
+      const out = await api.runtime.sendMessage({ type: "roster", drivers });
+      toast(out?.ok ? `Ridy: ${drivers.length} Fahrer synchronisiert ✓` : `Ridy: ${out?.reason || "Fehler"}`, !!out?.ok);
+    } catch {
+      /* best-effort */
+    }
+  }
+  const rosterTimer = setInterval(() => {
+    tryRoster();
+    if (rosterDone || Date.now() - started > 60000) clearInterval(rosterTimer);
+  }, 3000);
 })();

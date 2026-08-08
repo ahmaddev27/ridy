@@ -52,9 +52,39 @@ async function capture(orgUuid, { manual = false } = {}) {
   }
 }
 
+/** Forward the driver roster (captured from the manager's browser) to Ridy. */
+async function postRoster(drivers) {
+  const { apiUrl, token } = await api.storage.local.get(["apiUrl", "token"]);
+  if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
+
+  try {
+    const res = await fetch(`${apiUrl}/api/v1/drivers/roster`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ drivers }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { ok: false, reason: body.message || `http_${res.status}` };
+    }
+    const body = await res.json();
+    return { ok: true, ...body.data };
+  } catch (e) {
+    return { ok: false, reason: e.message };
+  }
+}
+
 api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "capture" && msg.orgUuid) {
     capture(msg.orgUuid, { manual: !!msg.manual }).then(sendResponse);
     return true; // async response
+  }
+  if (msg?.type === "roster" && Array.isArray(msg.drivers)) {
+    postRoster(msg.drivers).then(sendResponse);
+    return true;
   }
 });

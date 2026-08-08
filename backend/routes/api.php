@@ -42,6 +42,7 @@ Route::prefix('v1')->group(function () {
         // Fleet drivers
         Route::get('drivers', [DriverController::class, 'index']);
         Route::post('drivers/sync', [DriverController::class, 'sync']);
+        Route::post('drivers/roster', [DriverController::class, 'ingestRoster']);
 
         // Dispatch offers feed
         Route::get('dispatch/offers', [DispatchOfferController::class, 'index']);

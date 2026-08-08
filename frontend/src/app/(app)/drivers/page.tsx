@@ -45,7 +45,7 @@ export default function DriversPage() {
         action={
           <Button variant="secondary" onClick={runSync} disabled={syncing}>
             <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Aktualisiere…" : "Von Uber aktualisieren"}
+            {syncing ? t("screens.drivers.refreshing") : t("screens.drivers.refreshFromUber")}
           </Button>
         }
       />
@@ -72,9 +72,9 @@ export default function DriversPage() {
                 <tr>
                   <th className="px-4 py-3 font-semibold">{t("screens.drivers.colName")}</th>
                   <th className="px-4 py-3 font-semibold">{t("screens.drivers.colPhone")}</th>
-                  <th className="px-4 py-3 font-semibold">Bewertung</th>
-                  <th className="px-4 py-3 font-semibold">Fahrten</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold">{t("screens.drivers.colRating")}</th>
+                  <th className="px-4 py-3 font-semibold">{t("screens.drivers.colTrips")}</th>
+                  <th className="px-4 py-3 font-semibold">{t("screens.drivers.colStatus")}</th>
                   <th className="px-4 py-3 font-semibold">Uber</th>
                 </tr>
               </thead>
@@ -119,7 +119,7 @@ export default function DriversPage() {
                     </td>
                     <td className="px-4 py-3">
                       <Badge status={d.active ? "connected" : "gap"} dot>
-                        {d.active ? "Aktiv" : "Inaktiv"}
+                        {d.active ? t("screens.drivers.active") : t("screens.drivers.inactive")}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
