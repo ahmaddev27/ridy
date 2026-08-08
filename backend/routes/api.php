@@ -46,6 +46,8 @@ Route::prefix('v1')->group(function () {
 
         // Dispatch offers feed
         Route::get('dispatch/offers', [DispatchOfferController::class, 'index']);
+        // Extension forwards RAMEN offers captured in the manager's browser.
+        Route::post('dispatch/offers/ingest', [DispatchOfferController::class, 'ingest']);
         Route::post('dispatch/offers/bulk-delete', [DispatchOfferController::class, 'bulkDestroy']);
         Route::delete('dispatch/offers/{offer}', [DispatchOfferController::class, 'destroy']);
 

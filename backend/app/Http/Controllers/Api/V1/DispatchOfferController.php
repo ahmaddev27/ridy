@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Dispatch\DispatchOfferIngestor;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchOfferResource;
@@ -33,6 +34,31 @@ class DispatchOfferController extends Controller
             ->withQueryString();
 
         return DispatchOfferResource::collection($offers);
+    }
+
+    /**
+     * The Ridy extension holds the RAMEN stream in the manager's own browser
+     * (real IP, so Uber responds — our datacenter IP is blocked) and posts the
+     * offers it sees here. Ingestion is idempotent on offer_uuid, so the same
+     * offer arriving from the stream more than once is de-duplicated.
+     */
+    public function ingest(Request $request, DispatchOfferIngestor $ingestor): JsonResponse
+    {
+        $data = $request->validate([
+            'offers' => ['required', 'array'],
+            'offers.*' => ['array'],
+            'seq' => ['nullable', 'integer'],
+        ]);
+
+        $tenantId = (int) $request->user()->tenant_id;
+        $results = ['routed' => 0, 'unlinked_driver' => 0, 'duplicate' => 0, 'skipped_no_uuid' => 0];
+
+        foreach ($data['offers'] as $offer) {
+            $outcome = $ingestor->ingest($tenantId, $offer, $data['seq'] ?? null);
+            $results[$outcome['status']] = ($results[$outcome['status']] ?? 0) + 1;
+        }
+
+        return response()->json(['data' => $results]);
     }
 
     /** Delete a single offer. */

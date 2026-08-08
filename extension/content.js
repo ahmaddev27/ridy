@@ -88,4 +88,86 @@
     tryRoster();
     if (rosterDone || Date.now() - started > 60000) clearInterval(rosterTimer);
   }, 3000);
+
+  // ── RAMEN offer stream ────────────────────────────────────────────────────
+  // On vsdispatch.uber.com we hold the live dispatch stream from the manager's
+  // own browser (real IP → Uber responds; our server IP is blocked) and forward
+  // every offer to Ridy. Uber pushes across parallel regional channels, so we
+  // read them all. Ingestion de-dups by offer_uuid, so overlap is harmless.
+  if (/vsdispatch\.uber\.com/i.test(location.host)) {
+    const CHANNELS = ["/ramendca/events", "/ramenphx/events"];
+    let offerToastAt = 0;
+
+    async function forwardOffers(offers, seq) {
+      const out = await api.runtime.sendMessage({ type: "offers", offers, seq });
+      // Throttle toasts so a burst of offers doesn't spam the screen.
+      if (out?.ok && Date.now() - offerToastAt > 4000) {
+        offerToastAt = Date.now();
+        toast(`Ridy: ${offers.length} Angebot(e) empfangen ✓`, true);
+      }
+    }
+
+    function extractOffers(payload) {
+      const result = [];
+      let maxSeq = null;
+      for (const message of payload?.msg ?? []) {
+        if (typeof message.seq === "number") maxSeq = Math.max(maxSeq ?? message.seq, message.seq);
+        if (message.type !== "push_fleet_unified_offer") continue;
+        let inner;
+        try {
+          inner = typeof message.msg === "string" ? JSON.parse(message.msg) : message.msg;
+        } catch {
+          continue;
+        }
+        for (const offer of inner?.offers ?? []) result.push({ offer, seq: message.seq });
+      }
+      return { offers: result, maxSeq };
+    }
+
+    async function runChannel(path) {
+      let seq = 0;
+      // Reconnect forever while the tab stays open.
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        try {
+          await fetch(`${path}/ack?seq=${seq}`, { credentials: "include" });
+          const recv = await fetch(`${path}/recv?seq=${seq}`, { credentials: "include" });
+          if (!recv.ok || !recv.body) throw new Error(`recv ${recv.status}`);
+
+          const reader = recv.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() ?? "";
+            for (const line of lines) {
+              if (!line.startsWith("data:")) continue;
+              const data = line.slice(5).trim();
+              if (!data) continue;
+              let payload;
+              try {
+                payload = JSON.parse(data);
+              } catch {
+                continue;
+              }
+              const { offers, maxSeq } = extractOffers(payload);
+              if (maxSeq != null) seq = Math.max(seq, maxSeq);
+              if (offers.length) {
+                // Forward each offer with the seq of its own message.
+                for (const item of offers) forwardOffers([item.offer], item.seq);
+              }
+            }
+          }
+        } catch {
+          /* fall through to backoff + reconnect */
+        }
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
+
+    for (const channel of CHANNELS) runChannel(channel);
+  }
 })();

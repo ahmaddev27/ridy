@@ -113,7 +113,10 @@ export class RamenStream {
         await this.connectOnce();
       } catch (e) {
         if (this.stopped) break;
-        console.error(`[${this.tag()}] stream error: ${e.message}`);
+        // The blocked-IP case already warned once; don't spam it every retry.
+        if (e.message !== "ramen_blocked_404") {
+          console.error(`[${this.tag()}] stream error: ${e.message}`);
+        }
       }
       if (this.stopped) break;
       await this.backoff();
@@ -126,6 +129,21 @@ export class RamenStream {
     // 1. Handshake. Uber's client sends seq=0 here (seq=-1 returns 404).
     const ack = await fetch(this.url("/ack", 0), { headers: this.headers(), signal: this.controller.signal });
     if (await this.handleAuthFailure(ack.status)) return;
+    // Uber returns 404 on RAMEN for non-residential (datacenter) IPs. Without a
+    // residential proxy the server can't hold the stream — offers are captured
+    // via the browser extension instead. Warn once, then retry slowly so the
+    // daemon recovers automatically if a proxy is later configured.
+    if (ack.status === 404) {
+      if (!this.blockedWarned) {
+        this.blockedWarned = true;
+        console.warn(
+          `[${this.tag()}] RAMEN 404 — server IP looks blocked by Uber; ` +
+            `offers rely on the browser extension. Set a residential proxy to stream server-side.`,
+        );
+      }
+      this.reconnectDelay = config.reconnectMaxDelay;
+      throw new Error("ramen_blocked_404");
+    }
     if (!ack.ok) throw new Error(`ack -> ${ack.status}`);
     await this.absorbCookies(ack);
 

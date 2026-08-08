@@ -102,6 +102,32 @@ async function fetchRoster() {
   }
 }
 
+/** Forward RAMEN offers (captured in the manager's browser) to Ridy. */
+async function postOffers(offers, seq) {
+  const { apiUrl, token } = await api.storage.local.get(["apiUrl", "token"]);
+  if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
+
+  try {
+    const res = await fetch(`${apiUrl}/api/v1/dispatch/offers/ingest`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ offers, seq }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { ok: false, reason: body.message || `http_${res.status}` };
+    }
+    const body = await res.json();
+    return { ok: true, ...body.data };
+  } catch (e) {
+    return { ok: false, reason: e.message };
+  }
+}
+
 api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "capture" && msg.orgUuid) {
     capture(msg.orgUuid, { manual: !!msg.manual }).then(sendResponse);
@@ -113,6 +139,10 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   if (msg?.type === "fetchRoster") {
     fetchRoster().then(sendResponse);
+    return true;
+  }
+  if (msg?.type === "offers" && Array.isArray(msg.offers)) {
+    postOffers(msg.offers, msg.seq).then(sendResponse);
     return true;
   }
 });
