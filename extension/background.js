@@ -105,6 +105,7 @@ async function fetchRoster() {
 /** Forward RAMEN offers (captured in the manager's browser) to Ridy. */
 async function postOffers(offers, seq) {
   const { apiUrl, token } = await api.storage.local.get(["apiUrl", "token"]);
+  console.log("[Ridy bg] postOffers", { offers: offers.length, apiUrl, hasToken: !!token });
   if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
 
   try {
@@ -119,11 +120,14 @@ async function postOffers(offers, seq) {
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
+      console.warn("[Ridy bg] ingest failed", res.status, body);
       return { ok: false, reason: body.message || `http_${res.status}` };
     }
     const body = await res.json();
+    console.log("[Ridy bg] ingest ok", body.data);
     return { ok: true, ...body.data };
   } catch (e) {
+    console.error("[Ridy bg] ingest error", e.message);
     return { ok: false, reason: e.message };
   }
 }

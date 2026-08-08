@@ -4,6 +4,14 @@
 // script. We never read the original body or send acks, so Uber's page keeps
 // working normally and we don't compete for the seq-numbered messages.
 (() => {
+  const log = (...a) => console.log("%c[Ridy inject]", "color:#059669;font-weight:700", ...a);
+
+  if (window.__ridyInjected) {
+    log("already installed, skipping");
+    return;
+  }
+  window.__ridyInjected = true;
+
   const origFetch = window.fetch;
   const isRecv = (u) => typeof u === "string" && /\/ramen\w*\/events\/recv/i.test(u);
 
@@ -12,19 +20,22 @@
     const promise = origFetch.apply(this, arguments);
 
     if (isRecv(url)) {
+      log("tapping recv stream:", url);
       promise
         .then((res) => {
           // clone() tees the stream: the page reads the original, we read the copy.
           try {
             tap(res.clone());
-          } catch {
-            /* clone can throw on already-consumed bodies — ignore */
+          } catch (e) {
+            log("clone failed:", e.message);
           }
         })
         .catch(() => {});
     }
     return promise;
   };
+
+  log("fetch hook installed ✓ (waiting for the dispatch stream)");
 
   async function tap(res) {
     if (!res.body) return;
@@ -61,6 +72,7 @@
           }
           const offers = inner?.offers ?? [];
           if (offers.length) {
+            log(`captured ${offers.length} offer(s) from stream, posting to content script`);
             window.postMessage({ source: "ridy-offer", offers, seq: message.seq }, "*");
           }
         }

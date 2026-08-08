@@ -29,7 +29,7 @@
       background: ok ? "#059669" : "#dc2626",
       boxShadow: "0 4px 12px rgba(0,0,0,.2)",
     });
-    document.body.appendChild(el);
+    (document.body || document.documentElement).appendChild(el);
     setTimeout(() => el.remove(), 5000);
   }
 
@@ -107,11 +107,16 @@
       const offers = event.data.offers ?? [];
       if (offers.length === 0) return;
 
+      console.log("%c[Ridy content]", "color:#2563eb;font-weight:700", `forwarding ${offers.length} offer(s) to background`);
       const out = await api.runtime.sendMessage({ type: "offers", offers, seq: event.data.seq });
+      console.log("%c[Ridy content]", "color:#2563eb;font-weight:700", "background replied:", out);
+
       // Throttle toasts so a burst of offers doesn't spam the screen.
       if (out?.ok && Date.now() - offerToastAt > 4000) {
         offerToastAt = Date.now();
         toast(`Ridy: ${offers.length} Angebot(e) empfangen ✓`, true);
+      } else if (out && !out.ok) {
+        toast(`Ridy: ${out.reason || "Fehler"}`, false);
       }
     });
   }

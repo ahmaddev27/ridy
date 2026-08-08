@@ -10,7 +10,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getFleetSession, captureFleetSession, type Cookie } from "@/lib/api/fleet-session";
-import { startUberLogin, submitUberMfa } from "@/lib/api/uber-login";
 import { issueExtensionToken } from "@/lib/api/extension";
 import { LATEST_EXTENSION_VERSION, isExtensionOutdated } from "@/lib/extension";
 
@@ -35,12 +34,6 @@ export default function ConnectionsPage() {
   const { t, locale } = useI18n();
   const { data, loading, refetch } = useAsync(getFleetSession);
 
-  // Interactive login state machine.
-  const [step, setStep] = useState<"credentials" | "mfa">("credentials");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loginId, setLoginId] = useState<string | null>(null);
-  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
 
   // Manual cookie-paste fallback.
@@ -110,58 +103,6 @@ export default function ConnectionsPage() {
       toast.error(c("loginFailed"), { description: e instanceof Error ? e.message : undefined });
     } finally {
       setExtBusy(false);
-    }
-  }
-
-  function onDone() {
-    toast.success(c("loginSuccess"), { description: c("loginSuccessDesc") });
-    setStep("credentials");
-    setEmail("");
-    setPassword("");
-    setCode("");
-    setLoginId(null);
-    refetch();
-  }
-
-  function onOutcome(status: string) {
-    if (status === "success") return onDone();
-    if (status === "mfa_required") {
-      setStep("mfa");
-      return;
-    }
-    const messages: Record<string, string> = {
-      passkey_unsupported: c("passkeyUnsupported"),
-      bad_credentials: c("badCredentials"),
-      error: c("genericError"),
-    };
-    toast.error(c("loginFailed"), { description: messages[status] ?? c("genericError") });
-  }
-
-  async function doStart() {
-    if (!email || !password) return;
-    setBusy(true);
-    try {
-      const res = await startUberLogin(email, password);
-      if (res.login_id) setLoginId(res.login_id);
-      onOutcome(res.status);
-    } catch (e) {
-      toast.error(c("loginFailed"), { description: e instanceof Error ? e.message : undefined });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function doMfa() {
-    if (!loginId || !code) return;
-    setBusy(true);
-    try {
-      const res = await submitUberMfa(loginId, code);
-      onOutcome(res.status);
-      if (res.retry) toast.error(c("loginFailed"), { description: c("genericError") });
-    } catch (e) {
-      toast.error(c("loginFailed"), { description: e instanceof Error ? e.message : undefined });
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -316,66 +257,6 @@ export default function ConnectionsPage() {
             </div>
             <p className="mt-1.5 text-xs text-slate-400">{c("tokenHint")}</p>
           </details>
-        )}
-      </Card>
-
-      {/* Interactive sign-in */}
-      <Card className="p-5">
-        {step === "credentials" ? (
-          <>
-            <h3 className="mb-1 font-semibold text-slate-800">{c("loginTitle")}</h3>
-            <p className="mb-4 text-sm text-slate-500">{c("loginHint")}</p>
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">{c("email")}</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="off"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">{c("password")}</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="off"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
-              <div className="flex justify-end">
-                <Button onClick={doStart} disabled={busy || !email || !password}>
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
-                  {c("signIn")}
-                </Button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <h3 className="mb-1 font-semibold text-slate-800">{c("mfaTitle")}</h3>
-            <p className="mb-4 text-sm text-slate-500">{c("mfaHint")}</p>
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">{c("mfaCode")}</label>
-                <input
-                  inputMode="numeric"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-lg tracking-widest outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
-              <div className="flex justify-end">
-                <Button onClick={doMfa} disabled={busy || !code}>
-                  {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {c("verify")}
-                </Button>
-              </div>
-            </div>
-          </>
         )}
       </Card>
 
