@@ -86,7 +86,13 @@ jobs:
             FCM_SERVER_KEY=$FCM_SERVER_KEY
             EOF
 
-            # --- 4. Build + start ---------------------------------------------
+            # --- 4. Free the web ports + build + start ------------------------
+            # AlmaLinux may ship Apache (httpd) which grabs port 80/443 and blocks
+            # Caddy. Stop and mask it so it can never resurface.
+            systemctl stop httpd 2>/dev/null || true
+            systemctl disable httpd 2>/dev/null || true
+            systemctl mask httpd 2>/dev/null || true
+
             $COMPOSE up -d --build
 
             # The repo is bind-mounted and owned by root, so make Laravel's
