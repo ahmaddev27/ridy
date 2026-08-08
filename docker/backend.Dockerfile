@@ -6,7 +6,7 @@
 # Build context is the repository root; this Dockerfile lives in ./docker.
 # Production target DB is MySQL 8 (local dev uses sqlite — see README).
 
-FROM php:8.3-fpm AS base
+FROM php:8.4-fpm AS base
 
 # --- System dependencies -----------------------------------------------------
 # Only what the PHP extensions below need at build time; cleaned afterwards to
