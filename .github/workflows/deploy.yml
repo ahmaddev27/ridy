@@ -44,14 +44,21 @@ jobs:
             COMPOSE="docker compose -f docker-compose.prod.yml"
 
             # --- 1. Install Docker on first run -------------------------------
+            # Runs as root, so no sudo. get.docker.com doesn't support AlmaLinux/
+            # RHEL, so use the official Docker dnf repo there; fall back to the
+            # convenience script on Debian/Ubuntu.
             if ! command -v docker >/dev/null 2>&1; then
               echo "Installing Docker..."
-              curl -fsSL https://get.docker.com | sudo sh
-              sudo usermod -aG docker "$USER" || true
+              if command -v dnf >/dev/null 2>&1; then
+                dnf -y install dnf-plugins-core || true
+                dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+                dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+                systemctl enable --now docker
+              else
+                curl -fsSL https://get.docker.com | sh
+                systemctl enable --now docker || true
+              fi
             fi
-            # Use sudo for docker if the group isn't active in this session yet.
-            if ! docker ps >/dev/null 2>&1; then DOCKER_SUDO="sudo"; else DOCKER_SUDO=""; fi
-            COMPOSE="$DOCKER_SUDO $COMPOSE"
 
             # --- 2. Clone on first run, pull thereafter -----------------------
             if [ ! -d "$APP_DIR/.git" ]; then
