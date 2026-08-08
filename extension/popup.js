@@ -1,7 +1,7 @@
-// Ridy Uber Connector — one-click capture of the manager's real Uber session.
+// Reidey Uber Connector — one-click capture of the manager's real Uber session.
 // No automation touches Uber (so it's never blocked): it reads the cookies of
 // the session the manager already established, plus the org uuid from the page,
-// and posts them to Ridy with the manager's pairing token.
+// and posts them to Reidey with the manager's pairing token.
 
 const api = globalThis.browser || globalThis["chrome"];
 const $ = (id) => document.getElementById(id);
@@ -44,7 +44,7 @@ async function connect() {
   const { apiUrl, token } = await api.storage.local.get(["apiUrl", "token"]);
   if (!apiUrl || !token) {
     $("settings").open = true;
-    return setStatus("err", "Bitte zuerst Ridy-URL und Token speichern.");
+    return setStatus("err", "Bitte zuerst Reidey-URL und Token speichern.");
   }
 
   const [tab] = await api.tabs.query({ active: true, currentWindow: true });

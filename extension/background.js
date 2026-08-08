@@ -1,4 +1,4 @@
-// Ridy background worker — owns cookie access and the POST to Ridy. Content
+// Reidey background worker — owns cookie access and the POST to Reidey. Content
 // scripts (which can't read httpOnly cookies) message it with a detected org
 // uuid; it captures the full cookie jar and syncs the session. It only re-sends
 // when the session actually changes, so a normal login triggers exactly one sync.
@@ -45,17 +45,19 @@ async function capture(orgUuid, { manual = false } = {}) {
       const body = await res.json().catch(() => ({}));
       return { ok: false, reason: body.message || `http_${res.status}` };
     }
-    await api.storage.local.set({ lastSync: fp });
+    // Remember the org so the on-demand roster pull (from the dashboard, with no
+    // supplier tab open) knows which fleet to query.
+    await api.storage.local.set({ lastSync: fp, orgUuid });
     return { ok: true, count: cookies.length };
   } catch (e) {
     return { ok: false, reason: e.message };
   }
 }
 
-/** Forward the driver roster (captured from the manager's browser) to Ridy. */
+/** Forward the driver roster (captured from the manager's browser) to Reidey. */
 async function postRoster(drivers) {
   const { apiUrl, token } = await api.storage.local.get(["apiUrl", "token"]);
-  console.log("[Ridy bg] postRoster", { drivers: drivers.length, apiUrl, hasToken: !!token });
+  console.log("[Reidey bg] postRoster", { drivers: drivers.length, apiUrl, hasToken: !!token });
   if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
 
   try {
@@ -70,14 +72,14 @@ async function postRoster(drivers) {
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      console.warn("[Ridy bg] roster ingest failed", res.status, body);
+      console.warn("[Reidey bg] roster ingest failed", res.status, body);
       return { ok: false, reason: body.message || `http_${res.status}` };
     }
     const body = await res.json();
-    console.log("[Ridy bg] roster ingest ok", body.data);
+    console.log("[Reidey bg] roster ingest ok", body.data);
     return { ok: true, ...body.data };
   } catch (e) {
-    console.error("[Ridy bg] roster ingest error", e.message);
+    console.error("[Reidey bg] roster ingest error", e.message);
     return { ok: false, reason: e.message };
   }
 }
@@ -85,34 +87,81 @@ async function postRoster(drivers) {
 /**
  * Pull the roster straight from supplier.uber.com using the manager's own
  * cookies and real browser IP (Uber blocks datacenter IPs, so this is the
- * reliable path), then forward it to Ridy. Triggered on demand from the
+ * reliable path), then forward it to Reidey. Triggered on demand from the
  * dashboard — no supplier tab needs to be open.
  */
+// Uber's supplier getDrivers is a POST that pages through the roster. These are
+// the filters the supplier UI itself sends (all empty = "everyone").
+const ROSTER_FILTERS = {
+  documentFilter: [],
+  activationFilter: [],
+  tripsCountFilter: [],
+  tripActivityFilter: [],
+  rewardStatusFilter: [],
+  onboardingStatusFilter: [],
+  complianceStatusFitler: [],
+  vehicleAssignmentStatusFilter: [],
+  gigUnifiedStatusFilter: [],
+  gigBaseTypeFilter: [],
+  cityIdFilter: [],
+  flowTypeFilter: [],
+  driverRoleFilter: [],
+  excludeAmdVirtualOperators: true,
+  gigTypeOnboardingStatusFilter: [],
+  gigTypeDocumentStatusFilter: [],
+};
+
 async function fetchRoster() {
+  const { orgUuid } = await api.storage.local.get(["orgUuid"]);
+  if (!orgUuid) return { ok: false, reason: "no_org_uuid" };
+
+  const rows = [];
+  let pageToken = "";
   try {
-    const res = await fetch("https://supplier.uber.com/api/getDrivers?localeCode=en", {
-      credentials: "include",
-      headers: { accept: "application/json" },
-    });
-    console.log("[Ridy bg] getDrivers ->", res.status);
-    if (!res.ok) return { ok: false, reason: `supplier_http_${res.status}` };
+    for (let page = 1; page <= 100; page++) {
+      const res = await fetch("https://supplier.uber.com/api/getDrivers?localeCode=en-GB", {
+        method: "POST",
+        credentials: "include",
+        headers: { accept: "*/*", "content-type": "application/json", "x-csrf-token": "x" },
+        body: JSON.stringify({
+          orgUuid: { uuid: { value: orgUuid } },
+          driversFilters: ROSTER_FILTERS,
+          driverUuids: [],
+          paginationOptions: {
+            pageSize: { value: 100 },
+            pageToken: pageToken ? { value: pageToken } : {},
+          },
+        }),
+      });
+      console.log("[Reidey bg] getDrivers page", page, "->", res.status);
+      if (!res.ok) return { ok: false, reason: `supplier_http_${res.status}` };
 
-    const body = await res.json();
-    const drivers = body?.data?.drivers ?? [];
-    console.log("[Ridy bg] getDrivers returned", drivers.length, "drivers");
-    if (drivers.length === 0) return { ok: false, reason: "no_drivers" };
+      const result = await res.json();
+      if (result.status !== "success") {
+        return { ok: false, reason: result.message || "getdrivers_failed" };
+      }
+      const data = result.data || {};
+      rows.push(...(data.driversData || []));
 
-    return await postRoster(drivers);
+      const next = data.pageToken || "";
+      if (!next || next === pageToken) break;
+      pageToken = next;
+    }
+
+    console.log("[Reidey bg] getDrivers collected", rows.length, "drivers");
+    if (rows.length === 0) return { ok: false, reason: "no_drivers" };
+
+    return await postRoster(rows);
   } catch (e) {
-    console.error("[Ridy bg] fetchRoster error", e.message);
+    console.error("[Reidey bg] fetchRoster error", e.message);
     return { ok: false, reason: e.message };
   }
 }
 
-/** Forward RAMEN offers (captured in the manager's browser) to Ridy. */
+/** Forward RAMEN offers (captured in the manager's browser) to Reidey. */
 async function postOffers(offers, seq) {
   const { apiUrl, token } = await api.storage.local.get(["apiUrl", "token"]);
-  console.log("[Ridy bg] postOffers", { offers: offers.length, apiUrl, hasToken: !!token });
+  console.log("[Reidey bg] postOffers", { offers: offers.length, apiUrl, hasToken: !!token });
   if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
 
   try {
@@ -127,14 +176,14 @@ async function postOffers(offers, seq) {
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      console.warn("[Ridy bg] ingest failed", res.status, body);
+      console.warn("[Reidey bg] ingest failed", res.status, body);
       return { ok: false, reason: body.message || `http_${res.status}` };
     }
     const body = await res.json();
-    console.log("[Ridy bg] ingest ok", body.data);
+    console.log("[Reidey bg] ingest ok", body.data);
     return { ok: true, ...body.data };
   } catch (e) {
-    console.error("[Ridy bg] ingest error", e.message);
+    console.error("[Reidey bg] ingest error", e.message);
     return { ok: false, reason: e.message };
   }
 }

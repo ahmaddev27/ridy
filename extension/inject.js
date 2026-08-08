@@ -6,7 +6,7 @@
 // offer to the content script. We never send acks, so we don't compete with the
 // page for the seq-numbered messages.
 (() => {
-  const log = (...a) => console.log("%c[Ridy inject]", "color:#059669;font-weight:700", ...a);
+  const log = (...a) => console.log("%c[Reidey inject]", "color:#059669;font-weight:700", ...a);
 
   if (window.__ridyInjected) {
     log("already installed, skipping");

@@ -19,7 +19,7 @@ export function Sidebar() {
           <ShieldCheck className="h-5 w-5" />
         </div>
         <div className="leading-tight">
-          <div className="text-sm font-bold text-slate-900">Ridy</div>
+          <div className="text-sm font-bold text-slate-900">Reidey</div>
           <div className="text-[11px] text-slate-400">Uber Dispatch</div>
         </div>
       </div>

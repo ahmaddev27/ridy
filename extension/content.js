@@ -44,15 +44,15 @@
     if (res?.ok) {
       // Confirm whether it was freshly captured or already connected.
       toast(
-        res.reason === "unchanged" ? "Ridy: bereits verbunden ✓" : "Ridy: Uber-Sitzung verbunden ✓",
+        res.reason === "unchanged" ? "Reidey: bereits verbunden ✓" : "Reidey: Uber-Sitzung verbunden ✓",
         true,
       );
     } else if (res && !res.ok) {
       done = false; // allow a later retry (e.g. after pairing)
       if (res.reason === "not_paired") {
-        toast("Ridy: Bitte zuerst die Erweiterung im Dashboard koppeln.", false);
+        toast("Reidey: Bitte zuerst die Erweiterung im Dashboard koppeln.", false);
       } else if (res.reason !== "no_cookies") {
-        toast(`Ridy: ${res.reason}`, false);
+        toast(`Reidey: ${res.reason}`, false);
       }
     }
   }
@@ -64,41 +64,20 @@
     if (done || Date.now() - started > 60000) clearInterval(timer);
   }, 1500);
 
-  // On supplier.uber.com, also pull the driver roster from the manager's own
-  // browser (real IP → Uber responds) and forward it. Server-side pulls get
-  // blocked by Uber's datacenter check, so this is the reliable path.
-  let rosterDone = false;
-  async function tryRoster() {
-    if (rosterDone) return;
-    if (!/supplier\.uber\.com/i.test(location.host)) return;
-    try {
-      const res = await fetch("/api/getDrivers?localeCode=en", { credentials: "include" });
-      if (!res.ok) return;
-      const body = await res.json();
-      const drivers = body?.data?.drivers ?? [];
-      if (drivers.length === 0) return;
-      rosterDone = true;
-      const out = await api.runtime.sendMessage({ type: "roster", drivers });
-      toast(out?.ok ? `Ridy: ${drivers.length} Fahrer synchronisiert ✓` : `Ridy: ${out?.reason || "Fehler"}`, !!out?.ok);
-    } catch {
-      /* best-effort */
-    }
-  }
-  const rosterTimer = setInterval(() => {
-    tryRoster();
-    if (rosterDone || Date.now() - started > 60000) clearInterval(rosterTimer);
-  }, 3000);
+  // The driver roster is pulled on demand from the dashboard via the background
+  // worker (correct paginated POST to supplier getDrivers using the stored org),
+  // so no per-page polling is needed here.
 
   // ── RAMEN offer tap ───────────────────────────────────────────────────────
   // On vsdispatch.uber.com we do NOT open our own dispatch stream — that would
   // compete with Uber's own page for the same seq-numbered messages, so each
   // offer would land in only one of them. Instead we inject a page-world script
   // (inject.js) that passively tees Uber's own recv stream and posts every
-  // offer here; we just forward them to Ridy. No competition, no message loss.
+  // offer here; we just forward them to Reidey. No competition, no message loss.
   if (/vsdispatch\.uber\.com/i.test(location.host)) {
     // inject.js is registered as a MAIN-world content script in the manifest,
     // so it patches the page's fetch directly (no CSP-blocked <script> inject).
-    console.log("%c[Ridy content]", "color:#2563eb;font-weight:700", "listening for offers from the page tap");
+    console.log("%c[Reidey content]", "color:#2563eb;font-weight:700", "listening for offers from the page tap");
 
     let offerToastAt = 0;
     window.addEventListener("message", async (event) => {
@@ -106,7 +85,7 @@
       const offers = event.data.offers ?? [];
       if (offers.length === 0) return;
 
-      console.log("%c[Ridy content]", "color:#2563eb;font-weight:700", `forwarding ${offers.length} offer(s) to background`);
+      console.log("%c[Reidey content]", "color:#2563eb;font-weight:700", `forwarding ${offers.length} offer(s) to background`);
 
       let out;
       try {
@@ -115,21 +94,21 @@
         // Happens when the extension was reloaded/updated but this tab still
         // runs the old content script — the page must be refreshed to reconnect.
         if (/context invalidated/i.test(e.message)) {
-          console.warn("%c[Ridy content]", "color:#dc2626;font-weight:700", "extension was updated — please refresh this tab (F5) to reconnect.");
-          toast("Ridy: Bitte diese Seite neu laden (F5), um fortzufahren.", false);
+          console.warn("%c[Reidey content]", "color:#dc2626;font-weight:700", "extension was updated — please refresh this tab (F5) to reconnect.");
+          toast("Reidey: Bitte diese Seite neu laden (F5), um fortzufahren.", false);
         } else {
-          console.error("%c[Ridy content]", "color:#dc2626;font-weight:700", "send failed:", e.message);
+          console.error("%c[Reidey content]", "color:#dc2626;font-weight:700", "send failed:", e.message);
         }
         return;
       }
-      console.log("%c[Ridy content]", "color:#2563eb;font-weight:700", "background replied:", out);
+      console.log("%c[Reidey content]", "color:#2563eb;font-weight:700", "background replied:", out);
 
       // Throttle toasts so a burst of offers doesn't spam the screen.
       if (out?.ok && Date.now() - offerToastAt > 4000) {
         offerToastAt = Date.now();
-        toast(`Ridy: ${offers.length} Angebot(e) empfangen ✓`, true);
+        toast(`Reidey: ${offers.length} Angebot(e) empfangen ✓`, true);
       } else if (out && !out.ok) {
-        toast(`Ridy: ${out.reason || "Fehler"}`, false);
+        toast(`Reidey: ${out.reason || "Fehler"}`, false);
       }
     });
   }

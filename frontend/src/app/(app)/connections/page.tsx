@@ -45,7 +45,7 @@ export default function ConnectionsPage() {
   const [extToken, setExtToken] = useState<string | null>(null);
   const [extBusy, setExtBusy] = useState(false);
 
-  // Whether the Ridy extension is installed (null = still probing).
+  // Whether the Reidey extension is installed (null = still probing).
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
   // The installed extension's reported version (null = unknown / not reported).
   const [extVersion, setExtVersion] = useState<string | null>(null);
@@ -167,7 +167,7 @@ export default function ConnectionsPage() {
               <li>{c("installStep2")}</li>
               <li>{c("installStep3")}</li>
             </ol>
-            <a href="/downloads/ridy-extension.zip" download>
+            <a href="/downloads/reidey-extension.zip" download>
               <Button>
                 <Download className="h-4 w-4" /> {c("installDownload")}
               </Button>
@@ -188,7 +188,7 @@ export default function ConnectionsPage() {
                 .replace("{installed}", extVersion ?? "?")
                 .replace("{latest}", LATEST_EXTENSION_VERSION)}
             </p>
-            <a href="/downloads/ridy-extension.zip" download className="mt-3 inline-block">
+            <a href="/downloads/reidey-extension.zip" download className="mt-3 inline-block">
               <Button>
                 <Download className="h-4 w-4" /> {c("extUpdateDownload")}
               </Button>

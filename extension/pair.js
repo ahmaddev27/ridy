@@ -1,4 +1,4 @@
-// Auto-pairing content script — runs on the Ridy dashboard. The dashboard knows
+// Auto-pairing content script — runs on the Reidey dashboard. The dashboard knows
 // its own backend URL and can mint a token, so it hands both to the extension via
 // window.postMessage. The manager never types a URL or pastes a token.
 
@@ -39,11 +39,11 @@ window.addEventListener("message", async (event) => {
   if (event.source !== window) return;
   if (event.data?.source !== "ridy-sync-roster") return;
 
-  console.log("%c[Ridy roster]", "color:#2563eb;font-weight:700", "dashboard asked for roster → fetching from supplier");
+  console.log("%c[Reidey roster]", "color:#2563eb;font-weight:700", "dashboard asked for roster → fetching from supplier");
   const res = await api.runtime.sendMessage({ type: "fetchRoster" }).catch((e) => ({
     ok: false,
     reason: e?.message || "extension_error",
   }));
-  console.log("%c[Ridy roster]", "color:#2563eb;font-weight:700", "background result:", res);
+  console.log("%c[Reidey roster]", "color:#2563eb;font-weight:700", "background result:", res);
   window.postMessage({ source: "ridy-roster-done", ...res }, "*");
 });

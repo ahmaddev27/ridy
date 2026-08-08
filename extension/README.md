@@ -1,4 +1,4 @@
-# Ridy Uber Connector — إضافة المتصفّح (Chrome + Firefox)
+# Reidey Uber Connector — إضافة المتصفّح (Chrome + Firefox)
 
 إضافة تلتقط جلسة أوبر تبع المدير **تلقائياً** بعد ما يسجّل دخوله عادي — بدون أتمتة (فأوبر ما بتحجبها)، وبدون نسخ كوكيز يدوي.
 
@@ -28,7 +28,7 @@
 ## الإعداد (مرة واحدة)
 
 1. لوحة رايدي → **Uber-Verbindung** → **Kopplungs-Token generieren** → انسخ التوكن
-2. أيقونة الإضافة → Einstellungen → الصق **Ridy-URL** (`http://localhost:8090` أو `https://r.fleeteye.de`) + **Token** → Speichern
+2. أيقونة الإضافة → Einstellungen → الصق **Reidey-URL** (`http://localhost:8090` أو `https://r.fleeteye.de`) + **Token** → Speichern
 
 ---
 
