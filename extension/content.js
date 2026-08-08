@@ -96,10 +96,9 @@
   // (inject.js) that passively tees Uber's own recv stream and posts every
   // offer here; we just forward them to Ridy. No competition, no message loss.
   if (/vsdispatch\.uber\.com/i.test(location.host)) {
-    const injected = document.createElement("script");
-    injected.src = api.runtime.getURL("inject.js");
-    injected.onload = () => injected.remove();
-    (document.head || document.documentElement).appendChild(injected);
+    // inject.js is registered as a MAIN-world content script in the manifest,
+    // so it patches the page's fetch directly (no CSP-blocked <script> inject).
+    console.log("%c[Ridy content]", "color:#2563eb;font-weight:700", "listening for offers from the page tap");
 
     let offerToastAt = 0;
     window.addEventListener("message", async (event) => {
