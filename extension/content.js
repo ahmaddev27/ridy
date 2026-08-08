@@ -89,85 +89,30 @@
     if (rosterDone || Date.now() - started > 60000) clearInterval(rosterTimer);
   }, 3000);
 
-  // ── RAMEN offer stream ────────────────────────────────────────────────────
-  // On vsdispatch.uber.com we hold the live dispatch stream from the manager's
-  // own browser (real IP → Uber responds; our server IP is blocked) and forward
-  // every offer to Ridy. Uber pushes across parallel regional channels, so we
-  // read them all. Ingestion de-dups by offer_uuid, so overlap is harmless.
+  // ── RAMEN offer tap ───────────────────────────────────────────────────────
+  // On vsdispatch.uber.com we do NOT open our own dispatch stream — that would
+  // compete with Uber's own page for the same seq-numbered messages, so each
+  // offer would land in only one of them. Instead we inject a page-world script
+  // (inject.js) that passively tees Uber's own recv stream and posts every
+  // offer here; we just forward them to Ridy. No competition, no message loss.
   if (/vsdispatch\.uber\.com/i.test(location.host)) {
-    const CHANNELS = ["/ramendca/events", "/ramenphx/events"];
-    let offerToastAt = 0;
+    const injected = document.createElement("script");
+    injected.src = api.runtime.getURL("inject.js");
+    injected.onload = () => injected.remove();
+    (document.head || document.documentElement).appendChild(injected);
 
-    async function forwardOffers(offers, seq) {
-      const out = await api.runtime.sendMessage({ type: "offers", offers, seq });
+    let offerToastAt = 0;
+    window.addEventListener("message", async (event) => {
+      if (event.source !== window || event.data?.source !== "ridy-offer") return;
+      const offers = event.data.offers ?? [];
+      if (offers.length === 0) return;
+
+      const out = await api.runtime.sendMessage({ type: "offers", offers, seq: event.data.seq });
       // Throttle toasts so a burst of offers doesn't spam the screen.
       if (out?.ok && Date.now() - offerToastAt > 4000) {
         offerToastAt = Date.now();
         toast(`Ridy: ${offers.length} Angebot(e) empfangen ✓`, true);
       }
-    }
-
-    function extractOffers(payload) {
-      const result = [];
-      let maxSeq = null;
-      for (const message of payload?.msg ?? []) {
-        if (typeof message.seq === "number") maxSeq = Math.max(maxSeq ?? message.seq, message.seq);
-        if (message.type !== "push_fleet_unified_offer") continue;
-        let inner;
-        try {
-          inner = typeof message.msg === "string" ? JSON.parse(message.msg) : message.msg;
-        } catch {
-          continue;
-        }
-        for (const offer of inner?.offers ?? []) result.push({ offer, seq: message.seq });
-      }
-      return { offers: result, maxSeq };
-    }
-
-    async function runChannel(path) {
-      let seq = 0;
-      // Reconnect forever while the tab stays open.
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        try {
-          await fetch(`${path}/ack?seq=${seq}`, { credentials: "include" });
-          const recv = await fetch(`${path}/recv?seq=${seq}`, { credentials: "include" });
-          if (!recv.ok || !recv.body) throw new Error(`recv ${recv.status}`);
-
-          const reader = recv.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() ?? "";
-            for (const line of lines) {
-              if (!line.startsWith("data:")) continue;
-              const data = line.slice(5).trim();
-              if (!data) continue;
-              let payload;
-              try {
-                payload = JSON.parse(data);
-              } catch {
-                continue;
-              }
-              const { offers, maxSeq } = extractOffers(payload);
-              if (maxSeq != null) seq = Math.max(seq, maxSeq);
-              if (offers.length) {
-                // Forward each offer with the seq of its own message.
-                for (const item of offers) forwardOffers([item.offer], item.seq);
-              }
-            }
-          }
-        } catch {
-          /* fall through to backoff + reconnect */
-        }
-        await new Promise((r) => setTimeout(r, 3000));
-      }
-    }
-
-    for (const channel of CHANNELS) runChannel(channel);
+    });
   }
 })();
