@@ -70,7 +70,7 @@ export default function DriverLinkingPage() {
           />
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-start text-xs uppercase tracking-wider text-slate-400">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-400 [&_th]:text-start">
               <tr>
                 <th className="px-4 py-3 font-semibold">{t("screens.driverLinking.colDriver")}</th>
                 <th className="px-4 py-3 font-semibold">{t("screens.driverLinking.colUuid")}</th>

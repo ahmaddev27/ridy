@@ -8,7 +8,7 @@
 // The extension version this dashboard build expects. Bump it in lockstep with
 // extension/manifest.json so managers running an older, manually-installed
 // build get prompted to update (unpacked extensions don't auto-update).
-export const LATEST_EXTENSION_VERSION = "1.7.2";
+export const LATEST_EXTENSION_VERSION = "1.7.3";
 
 /** True when `installed` is a valid version older than LATEST_EXTENSION_VERSION. */
 export function isExtensionOutdated(installed: string | null | undefined): boolean {
@@ -53,6 +53,11 @@ export function syncRosterViaExtension(timeoutMs = 15000): Promise<RosterSyncRes
       settled = true;
       window.removeEventListener("message", onMessage);
       clearTimeout(timer);
+      if (result === null) {
+        console.warn("%c[Ridy roster]", "color:#b45309;font-weight:700", "no extension answered within timeout — falling back to server pull");
+      } else {
+        console.log("%c[Ridy roster]", "color:#059669;font-weight:700", "extension result:", result);
+      }
       resolve(result);
     }
 
@@ -65,6 +70,7 @@ export function syncRosterViaExtension(timeoutMs = 15000): Promise<RosterSyncRes
 
     const timer = setTimeout(() => finish(null), timeoutMs);
     window.addEventListener("message", onMessage);
+    console.log("%c[Ridy roster]", "color:#2563eb;font-weight:700", "requesting roster from the extension…");
     window.postMessage({ source: "ridy-sync-roster" }, "*");
   });
 }

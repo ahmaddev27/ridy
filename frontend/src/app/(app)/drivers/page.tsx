@@ -77,7 +77,7 @@ export default function DriversPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-start text-xs uppercase tracking-wider text-slate-400">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-400 [&_th]:text-start">
                 <tr>
                   <th className="px-4 py-3 font-semibold">{t("screens.drivers.colName")}</th>
                   <th className="px-4 py-3 font-semibold">{t("screens.drivers.colPhone")}</th>

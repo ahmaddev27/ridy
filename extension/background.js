@@ -55,6 +55,7 @@ async function capture(orgUuid, { manual = false } = {}) {
 /** Forward the driver roster (captured from the manager's browser) to Ridy. */
 async function postRoster(drivers) {
   const { apiUrl, token } = await api.storage.local.get(["apiUrl", "token"]);
+  console.log("[Ridy bg] postRoster", { drivers: drivers.length, apiUrl, hasToken: !!token });
   if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
 
   try {
@@ -69,11 +70,14 @@ async function postRoster(drivers) {
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
+      console.warn("[Ridy bg] roster ingest failed", res.status, body);
       return { ok: false, reason: body.message || `http_${res.status}` };
     }
     const body = await res.json();
+    console.log("[Ridy bg] roster ingest ok", body.data);
     return { ok: true, ...body.data };
   } catch (e) {
+    console.error("[Ridy bg] roster ingest error", e.message);
     return { ok: false, reason: e.message };
   }
 }
@@ -90,14 +94,17 @@ async function fetchRoster() {
       credentials: "include",
       headers: { accept: "application/json" },
     });
+    console.log("[Ridy bg] getDrivers ->", res.status);
     if (!res.ok) return { ok: false, reason: `supplier_http_${res.status}` };
 
     const body = await res.json();
     const drivers = body?.data?.drivers ?? [];
+    console.log("[Ridy bg] getDrivers returned", drivers.length, "drivers");
     if (drivers.length === 0) return { ok: false, reason: "no_drivers" };
 
     return await postRoster(drivers);
   } catch (e) {
+    console.error("[Ridy bg] fetchRoster error", e.message);
     return { ok: false, reason: e.message };
   }
 }

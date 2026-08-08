@@ -342,9 +342,9 @@ export const screensA: {
   },
   ar: {
     drivers: {
-      loadError: "تعذّر تحميل السواقين",
-      emptyTitle: "لا سواقون بعد",
-      emptyDesc: "يظهر السواقون تلقائياً بعد ربط أوبر ومزامنة الأسطول.",
+      loadError: "تعذّر تحميل السائقين",
+      emptyTitle: "لا سائقون بعد",
+      emptyDesc: "يظهر السائقون تلقائياً بعد ربط أوبر ومزامنة الأسطول.",
       colName: "الاسم",
       colPhone: "الهاتف",
       colLicense: "الرخصة",
