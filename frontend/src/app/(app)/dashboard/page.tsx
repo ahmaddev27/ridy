@@ -82,7 +82,7 @@ export default function DashboardPage() {
             href="/drivers"
             className="flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700"
           >
-            {k("manageDrivers")} <ArrowRight className="h-4 w-4" />
+            {k("manageDrivers")} <ArrowRight className="h-4 w-4 rtl:rotate-180" />
           </Link>
         </div>
         <div className="px-5 py-4 text-sm text-slate-500">

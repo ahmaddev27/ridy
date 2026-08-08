@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Radio, MapPin, Search, Trash2, Loader2 } from "lucide-react";
+import { Radio, MapPin, Search, Trash2, Loader2, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -201,7 +201,10 @@ export default function OffersPage() {
                         <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
                         <div className="min-w-0">
                           <div className="truncate">{o.pickup_address ?? "—"}</div>
-                          <div className="truncate text-slate-400">→ {o.dropoff_address ?? "—"}</div>
+                          <div className="flex items-center gap-1 truncate text-slate-400">
+                            <ArrowRight className="h-3 w-3 shrink-0 rtl:rotate-180" />
+                            <span className="truncate">{o.dropoff_address ?? "—"}</span>
+                          </div>
                         </div>
                       </div>
                     </td>

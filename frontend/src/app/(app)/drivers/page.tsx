@@ -9,8 +9,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { listDrivers, syncDrivers } from "@/lib/api/drivers";
+import { listDrivers, syncDrivers, type Driver } from "@/lib/api/drivers";
 import { syncRosterViaExtension } from "@/lib/extension";
+import { DriverDetailModal } from "./driver-detail-modal";
 
 export default function DriversPage() {
   const { t } = useI18n();
@@ -19,6 +20,7 @@ export default function DriversPage() {
   const { data, loading, error, refetch } = useAsync(listDrivers, { refetchInterval: 15000 });
   const drivers = data ?? [];
   const [syncing, setSyncing] = useState(false);
+  const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const didAutoSync = useRef(false);
 
   async function runSync() {
@@ -91,7 +93,11 @@ export default function DriversPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {drivers.map((d) => (
-                  <tr key={d.id} className="hover:bg-slate-50">
+                  <tr
+                    key={d.id}
+                    onClick={() => setSelectedDriver(d)}
+                    className="cursor-pointer hover:bg-slate-50"
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {d.picture_url ? (
@@ -149,6 +155,10 @@ export default function DriversPage() {
           </div>
         )}
       </Card>
+
+      {selectedDriver && (
+        <DriverDetailModal driver={selectedDriver} onClose={() => setSelectedDriver(null)} />
+      )}
     </div>
   );
 }
