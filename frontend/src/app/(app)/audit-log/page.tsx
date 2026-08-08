@@ -61,7 +61,7 @@ export default function AuditLogPage() {
           />
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-400">
+            <thead className="bg-slate-50 text-start text-xs uppercase tracking-wider text-slate-400">
               <tr>
                 <th className="px-4 py-3 font-semibold">{t("screens.auditLog.colTime")}</th>
                 <th className="px-4 py-3 font-semibold">{t("screens.auditLog.colActor")}</th>

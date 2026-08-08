@@ -70,7 +70,7 @@ export default function DriverLinkingPage() {
           />
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-400">
+            <thead className="bg-slate-50 text-start text-xs uppercase tracking-wider text-slate-400">
               <tr>
                 <th className="px-4 py-3 font-semibold">{t("screens.driverLinking.colDriver")}</th>
                 <th className="px-4 py-3 font-semibold">{t("screens.driverLinking.colUuid")}</th>
@@ -86,7 +86,7 @@ export default function DriverLinkingPage() {
                   <td className="px-4 py-3">
                     <Badge status="neutral">{r.offers}</Badge>
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-end">
                     <Button
                       variant="primary"
                       onClick={() => {

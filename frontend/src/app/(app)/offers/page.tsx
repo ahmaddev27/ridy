@@ -146,7 +146,7 @@ export default function OffersPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-400">
+              <thead className="bg-slate-50 text-start text-xs uppercase tracking-wider text-slate-400">
                 <tr>
                   <th className="px-4 py-3">
                     <input type="checkbox" checked={allSelected} onChange={toggleAll} />
@@ -193,7 +193,7 @@ export default function OffersPage() {
                         {o.linked ? c("linked") : c("unlinked")}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-end">
                       <button
                         onClick={() => removeOne(o.id)}
                         disabled={busy}
