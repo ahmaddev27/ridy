@@ -72,14 +72,8 @@ jobs:
             # --- 3. Write .env from secrets (idempotent) ----------------------
             # Persist a generated APP_KEY so it never rotates between deploys
             # (a new key would make previously-encrypted data undecryptable).
-            if [ -z "$APP_KEY" ]; then
-              if [ -f "$APP_DIR/.app_key" ]; then
-                APP_KEY="$(cat "$APP_DIR/.app_key")"
-              else
-                APP_KEY="base64:$(head -c 32 /dev/urandom | base64)"
-                echo "$APP_KEY" > "$APP_DIR/.app_key"
-              fi
-            fi
+            if [ -z "$APP_KEY" ] && [ -f "$APP_DIR/.app_key" ]; then APP_KEY="$(cat "$APP_DIR/.app_key")"; fi
+            if [ -z "$APP_KEY" ]; then APP_KEY="base64:$(head -c 32 /dev/urandom | base64 | tr -d '\n')"; printf '%s' "$APP_KEY" > "$APP_DIR/.app_key"; fi
             cat > .env <<EOF
             DOMAIN=$DOMAIN
             SITE_ADDRESS=$DOMAIN
