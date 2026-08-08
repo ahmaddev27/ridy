@@ -27,7 +27,11 @@ class UberLoginController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $result = $this->auth->start($data['email'], $data['password']);
+        try {
+            $result = $this->auth->start($data['email'], $data['password']);
+        } catch (\Throwable $e) {
+            return $this->authUnavailable();
+        }
 
         return $this->respond($request, $result);
     }
@@ -39,9 +43,26 @@ class UberLoginController extends Controller
             'code' => ['required', 'string'],
         ]);
 
-        $result = $this->auth->submitMfa($data['login_id'], $data['code']);
+        try {
+            $result = $this->auth->submitMfa($data['login_id'], $data['code']);
+        } catch (\Throwable $e) {
+            return $this->authUnavailable();
+        }
 
         return $this->respond($request, $result);
+    }
+
+    /**
+     * The interactive-login service (uber-auth) is not run in production, where
+     * Uber blocks datacenter logins anyway. Return a clean, actionable status
+     * instead of a 500 so the UI points the user to the extension.
+     */
+    private function authUnavailable(): JsonResponse
+    {
+        return response()->json([
+            'status' => 'service_unavailable',
+            'message' => 'Der automatische Uber-Login ist hier nicht verfügbar. Bitte nutze die Ridy-Erweiterung.',
+        ]);
     }
 
     /**

@@ -70,8 +70,15 @@ jobs:
             git reset --hard origin/main
 
             # --- 3. Write .env from secrets (idempotent) ----------------------
+            # Persist a generated APP_KEY so it never rotates between deploys
+            # (a new key would make previously-encrypted data undecryptable).
             if [ -z "$APP_KEY" ]; then
-              APP_KEY="base64:$(head -c 32 /dev/urandom | base64)"
+              if [ -f "$APP_DIR/.app_key" ]; then
+                APP_KEY="$(cat "$APP_DIR/.app_key")"
+              else
+                APP_KEY="base64:$(head -c 32 /dev/urandom | base64)"
+                echo "$APP_KEY" > "$APP_DIR/.app_key"
+              fi
             fi
             cat > .env <<EOF
             DOMAIN=$DOMAIN
@@ -87,6 +94,11 @@ jobs:
 
             # --- 4. Build + start ---------------------------------------------
             $COMPOSE up -d --build
+
+            # The repo is bind-mounted and owned by root, so make Laravel's
+            # writable dirs writable by php-fpm (www-data) — otherwise any log or
+            # cache write 500s the request.
+            $COMPOSE exec -T backend sh -c "chown -R www-data:www-data storage bootstrap/cache && chmod -R 775 storage bootstrap/cache" || true
 
             # --- 5. Wait for MySQL, then migrate ------------------------------
             echo "Waiting for the database..."
