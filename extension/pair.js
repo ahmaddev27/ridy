@@ -6,9 +6,12 @@ const api = globalThis.browser || globalThis["chrome"];
 
 // Announce presence so the dashboard can tell whether the extension is installed
 // (both on load and on demand, since the page may mount after this script runs).
-function announce() {
+async function announce() {
   const version = api.runtime.getManifest?.().version ?? null;
-  window.postMessage({ source: "ridy-ext-present", version }, "*");
+  // Report whether we already hold a pairing token, so the dashboard can
+  // silently re-pair us if it was lost (e.g. the extension was reinstalled).
+  const { token } = await api.storage.local.get(["token"]);
+  window.postMessage({ source: "ridy-ext-present", version, paired: !!token }, "*");
 }
 announce();
 window.addEventListener("message", (e) => {

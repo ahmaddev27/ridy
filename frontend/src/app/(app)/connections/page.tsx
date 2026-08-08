@@ -52,13 +52,29 @@ export default function ConnectionsPage() {
 
   const c = (k: string) => t(`screens.connections.${k}`);
 
+  // Mint a fresh token and hand it to the extension. Used both by the explicit
+  // "connect" button and for silent re-pairing when the extension lost its token.
+  async function pairExtension(): Promise<void> {
+    const token = await issueExtensionToken();
+    setExtToken(token);
+    // Use 127.0.0.1 over localhost to dodge the IPv6 loopback pitfall.
+    const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace("localhost", "127.0.0.1");
+    window.postMessage({ source: "ridy-pair", apiUrl, token }, "*");
+  }
+
   // Probe for the extension: ping, and if no "present" reply arrives, it's absent.
+  // If it's present but unpaired (e.g. reinstalled), re-pair it silently.
   useEffect(() => {
+    let repaired = false;
     function onMessage(e: MessageEvent) {
-      const d = e.data as { source?: string; version?: string };
+      const d = e.data as { source?: string; version?: string; paired?: boolean };
       if (e.source === window && d?.source === "ridy-ext-present") {
         setExtInstalled(true);
         if (d.version) setExtVersion(d.version);
+        if (d.paired === false && !repaired) {
+          repaired = true;
+          pairExtension().catch(() => {});
+        }
       }
     }
     window.addEventListener("message", onMessage);
@@ -68,6 +84,7 @@ export default function ConnectionsPage() {
       window.removeEventListener("message", onMessage);
       clearTimeout(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Confirmation that the installed extension picked up the pairing.
@@ -89,14 +106,7 @@ export default function ConnectionsPage() {
   async function connectViaExtension() {
     setExtBusy(true);
     try {
-      const token = await issueExtensionToken();
-      setExtToken(token);
-
-      // Hand the URL + token straight to the extension (if installed). Use
-      // 127.0.0.1 over localhost to dodge the IPv6 loopback pitfall.
-      const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace("localhost", "127.0.0.1");
-      window.postMessage({ source: "ridy-pair", apiUrl, token }, "*");
-
+      await pairExtension();
       // Give the extension a moment to store the pairing, then open Uber.
       setTimeout(() => window.open("https://vsdispatch.uber.com/", "_blank"), 500);
     } catch (e) {
