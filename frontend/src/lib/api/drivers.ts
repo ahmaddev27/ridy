@@ -9,9 +9,23 @@ export type Driver = {
   uber_email: string | null;
   uber_link_method: string | null;
   uber_linked: boolean;
+  picture_url: string | null;
+  rating: number | null;
+  total_trips: number | null;
+  status: string | null;
+  active: boolean;
 };
 
 export async function listDrivers(): Promise<Driver[]> {
   const res = await apiFetch<{ data: Driver[] }>("/api/v1/drivers");
+  return res.data;
+}
+
+/** Trigger an on-demand roster pull from Uber (best-effort). */
+export async function syncDrivers(): Promise<{ synced: number; created?: number; reason?: string }> {
+  const res = await apiFetch<{ data: { synced: number; created?: number; reason?: string } }>(
+    "/api/v1/drivers/sync",
+    { method: "POST", withCsrf: true },
+  );
   return res.data;
 }

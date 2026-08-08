@@ -19,6 +19,12 @@ export const config = {
   uberDispatchBase: (process.env.UBER_DISPATCH_BASE_URL || "https://vsdispatch.uber.com").replace(/\/$/, ""),
   ramenPath: process.env.UBER_RAMEN_PATH || "/ramendca/events",
 
+  // Uber supplier host — the driver roster (/api/getDrivers) lives here.
+  uberSupplierBase: (process.env.UBER_SUPPLIER_BASE_URL || "https://supplier.uber.com").replace(/\/$/, ""),
+
+  // How often to re-pull the roster (ms). Default 30 min.
+  rosterInterval: Number(process.env.ROSTER_INTERVAL_MS || 1800000),
+
   // How often to re-read the active session list from the backend (ms).
   sessionPollInterval: Number(process.env.SESSION_POLL_INTERVAL_MS || 60000),
 

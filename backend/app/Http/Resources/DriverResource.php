@@ -21,6 +21,11 @@ class DriverResource extends JsonResource
             'uber_email' => $this->uber_email,
             'uber_link_method' => $this->uber_link_method,
             'uber_linked' => $this->uber_driver_uuid !== null,
+            'picture_url' => $this->uber_picture_url,
+            'rating' => $this->uber_rating !== null ? (float) $this->uber_rating : null,
+            'total_trips' => $this->uber_total_trips,
+            'status' => $this->uber_status,
+            'active' => $this->uber_status === 'ONBOARDING_STATUS_ACTIVE',
         ];
     }
 }

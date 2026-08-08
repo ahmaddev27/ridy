@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\FleetSessionService;
 use App\Domain\Dispatch\Models\UberFleetSession;
+use App\Domain\Dispatch\RosterSyncService;
 use App\Http\Controllers\Controller;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -76,6 +77,20 @@ class DispatchDaemonController extends Controller
         $this->find($session)->forceFill(['last_event_at' => CarbonImmutable::now()])->save();
 
         return response()->json(['data' => ['status' => 'ok']]);
+    }
+
+    /**
+     * The daemon fetched supplier /api/getDrivers for a session's org and forwards
+     * the driver list here to be upserted into the roster.
+     */
+    public function roster(Request $request, int $session, RosterSyncService $roster): JsonResponse
+    {
+        $data = $request->validate(['drivers' => ['required', 'array']]);
+
+        $tenantId = (int) $this->find($session)->tenant_id;
+        $result = $roster->sync($tenantId, $data['drivers']);
+
+        return response()->json(['data' => $result]);
     }
 
     private function find(int $id): UberFleetSession

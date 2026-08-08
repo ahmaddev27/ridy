@@ -29,6 +29,7 @@ Route::prefix('v1')->group(function () {
         Route::post('sessions/{session}/cookies', [DispatchDaemonController::class, 'refreshCookies']);
         Route::post('sessions/{session}/needs-relink', [DispatchDaemonController::class, 'needsRelink']);
         Route::post('sessions/{session}/heartbeat', [DispatchDaemonController::class, 'heartbeat']);
+        Route::post('sessions/{session}/roster', [DispatchDaemonController::class, 'roster']);
     });
 
     Route::middleware(['auth:sanctum', ResolveTenant::class])->group(function () {
@@ -40,6 +41,7 @@ Route::prefix('v1')->group(function () {
 
         // Fleet drivers
         Route::get('drivers', [DriverController::class, 'index']);
+        Route::post('drivers/sync', [DriverController::class, 'sync']);
 
         // Dispatch offers feed
         Route::get('dispatch/offers', [DispatchOfferController::class, 'index']);

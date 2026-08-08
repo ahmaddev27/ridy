@@ -41,6 +41,11 @@ export const api = {
     return call("POST", `/sessions/${sessionId}/needs-relink`);
   },
 
+  /** Forward the driver roster pulled from supplier /api/getDrivers. */
+  async roster(sessionId, drivers) {
+    return call("POST", `/sessions/${sessionId}/roster`, { drivers });
+  },
+
   /** Liveness heartbeat. */
   async heartbeat(sessionId) {
     return call("POST", `/sessions/${sessionId}/heartbeat`);

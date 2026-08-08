@@ -19,6 +19,28 @@ export class RamenStream {
   stop() {
     this.stopped = true;
     this.controller?.abort();
+    if (this.rosterTimer) clearInterval(this.rosterTimer);
+  }
+
+  /** Fetch the fleet's driver roster from supplier /api/getDrivers and forward it. */
+  async syncRoster() {
+    try {
+      const res = await fetch(`${config.uberSupplierBase}/api/getDrivers?localeCode=en`, {
+        headers: { ...this.headers(), accept: "application/json" },
+      });
+      if (!res.ok) {
+        console.warn(`[${this.tag()}] roster fetch -> ${res.status}`);
+        return;
+      }
+      const body = await res.json();
+      const drivers = body?.data?.drivers ?? [];
+      if (drivers.length === 0) return;
+
+      const result = await api.roster(this.session.id, drivers);
+      console.log(`[${this.tag()}] roster synced: ${drivers.length} drivers`, result);
+    } catch (e) {
+      console.error(`[${this.tag()}] roster sync failed: ${e.message}`);
+    }
   }
 
   headers() {
@@ -101,6 +123,10 @@ export class RamenStream {
 
     console.log(`[${this.tag()}] stream open (seq ${this.seq})`);
     this.reconnectDelay = config.reconnectMinDelay; // reset backoff on success
+
+    // Pull the driver roster once the session is proven good, then periodically.
+    this.syncRoster();
+    this.rosterTimer ??= setInterval(() => this.syncRoster(), config.rosterInterval);
 
     await this.readSse(recv.body);
   }
