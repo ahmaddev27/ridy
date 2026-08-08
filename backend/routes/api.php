@@ -45,6 +45,8 @@ Route::prefix('v1')->group(function () {
 
         // Dispatch offers feed
         Route::get('dispatch/offers', [DispatchOfferController::class, 'index']);
+        Route::post('dispatch/offers/bulk-delete', [DispatchOfferController::class, 'bulkDestroy']);
+        Route::delete('dispatch/offers/{offer}', [DispatchOfferController::class, 'destroy']);
 
         // Interactive Uber sign-in (email/password -> optional MFA code)
         Route::post('uber-login/start', [UberLoginController::class, 'start']);

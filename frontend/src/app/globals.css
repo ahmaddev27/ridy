@@ -14,6 +14,15 @@ body {
   font-family: var(--font-sans);
 }
 
+/* Arabic: use Tajawal and slightly larger line-height for legibility. */
+html[lang="ar"] body,
+[dir="rtl"] body {
+  font-family: var(--font-tajawal), var(--font-sans);
+}
+[dir="rtl"] {
+  line-height: 1.7;
+}
+
 /* Thin, subtle scrollbars to match the dashboard aesthetic */
 ::-webkit-scrollbar {
   width: 8px;
