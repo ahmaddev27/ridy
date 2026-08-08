@@ -107,7 +107,21 @@
       if (offers.length === 0) return;
 
       console.log("%c[Ridy content]", "color:#2563eb;font-weight:700", `forwarding ${offers.length} offer(s) to background`);
-      const out = await api.runtime.sendMessage({ type: "offers", offers, seq: event.data.seq });
+
+      let out;
+      try {
+        out = await api.runtime.sendMessage({ type: "offers", offers, seq: event.data.seq });
+      } catch (e) {
+        // Happens when the extension was reloaded/updated but this tab still
+        // runs the old content script — the page must be refreshed to reconnect.
+        if (/context invalidated/i.test(e.message)) {
+          console.warn("%c[Ridy content]", "color:#dc2626;font-weight:700", "extension was updated — please refresh this tab (F5) to reconnect.");
+          toast("Ridy: Bitte diese Seite neu laden (F5), um fortzufahren.", false);
+        } else {
+          console.error("%c[Ridy content]", "color:#dc2626;font-weight:700", "send failed:", e.message);
+        }
+        return;
+      }
       console.log("%c[Ridy content]", "color:#2563eb;font-weight:700", "background replied:", out);
 
       // Throttle toasts so a burst of offers doesn't spam the screen.
