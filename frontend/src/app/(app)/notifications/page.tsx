@@ -16,7 +16,7 @@ import {
 
 export default function NotificationsPage() {
   const { t } = useI18n();
-  const { data, loading, error, refetch } = useAsync(listNotifications);
+  const { data, loading, error, refetch } = useAsync(listNotifications, { refetchInterval: 15000 });
   const items = data?.items ?? [];
   const unread = data?.unread ?? 0;
 

@@ -14,7 +14,9 @@ import { syncRosterViaExtension } from "@/lib/extension";
 
 export default function DriversPage() {
   const { t } = useI18n();
-  const { data, loading, error, refetch } = useAsync(listDrivers);
+  // Poll the (cheap, DB-backed) roster list so linked/status changes surface
+  // without a manual refresh. The heavier Uber pull still runs only on mount.
+  const { data, loading, error, refetch } = useAsync(listDrivers, { refetchInterval: 15000 });
   const drivers = data ?? [];
   const [syncing, setSyncing] = useState(false);
   const didAutoSync = useRef(false);

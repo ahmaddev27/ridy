@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Search, Bell, ChevronDown, LogOut } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/context";
+import { useAsync } from "@/hooks/use-async";
+import { listNotifications } from "@/lib/api/notifications";
 import { cn } from "@/lib/utils";
 
 function initials(name: string): string {
@@ -22,6 +24,10 @@ export function Topbar() {
   const { user, signOut } = useAuth();
   const { t, locale, setLocale } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Live unread badge — polled so new notifications surface without a refresh.
+  const { data: notifications } = useAsync(listNotifications, { refetchInterval: 15000 });
+  const unread = notifications?.unread ?? 0;
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/80 px-5 backdrop-blur">
@@ -58,7 +64,11 @@ export function Topbar() {
           aria-label="Notifications"
         >
           <Bell className="h-5 w-5" />
-          <span className="absolute end-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-500" />
+          {unread > 0 && (
+            <span className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+              {unread > 9 ? "9+" : unread}
+            </span>
+          )}
         </button>
 
         {/* User menu */}

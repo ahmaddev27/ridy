@@ -23,16 +23,21 @@ export default function OffersPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
 
-  async function load() {
-    setLoading(true);
-    setError(null);
+  // A silent load (background poll) refreshes the feed in place: it keeps the
+  // skeleton hidden and preserves the manager's current checkbox selection, so
+  // new offers appear without disrupting anything on screen.
+  async function load(silent = false) {
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       setOffers(await listOffers({ search: search.trim(), driverUuid: driverUuid || undefined }));
-      setSelected(new Set());
+      if (!silent) setSelected(new Set());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "error");
+      if (!silent) setError(e instanceof Error ? e.message : "error");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
@@ -40,6 +45,21 @@ export default function OffersPage() {
   useEffect(() => {
     const id = setTimeout(load, 300);
     return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, driverUuid]);
+
+  // Near real-time: silently poll for new offers every 5s (offers are the most
+  // time-sensitive surface). Also refetch when the tab regains focus.
+  useEffect(() => {
+    const id = setInterval(() => load(true), 5000);
+    const onFocus = () => document.visibilityState === "visible" && load(true);
+    document.addEventListener("visibilitychange", onFocus);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("focus", onFocus);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, driverUuid]);
 

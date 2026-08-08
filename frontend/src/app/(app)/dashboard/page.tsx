@@ -17,7 +17,7 @@ function sessionTone(status: string | undefined): Status {
 
 export default function DashboardPage() {
   const { t, locale } = useI18n();
-  const { data, loading, error } = useAsync(getDashboardSummary);
+  const { data, loading, error } = useAsync(getDashboardSummary, { refetchInterval: 10000 });
 
   const session = data?.fleet_session ?? null;
   const k = (key: string) => t(`screens.dashboard.${key}`);
