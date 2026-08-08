@@ -6,8 +6,17 @@ import { config } from "./config.js";
 import { api } from "./api.js";
 
 export class RamenStream {
-  constructor(session) {
+  /**
+   * @param session One fleet session { id, tenant_id, uber_org_uuid, cookies }.
+   * @param ramenPath The RAMEN channel path, e.g. "/ramendca/events".
+   * @param options.primary When true this stream also owns roster sync and
+   *   cookie rotation; secondary channels only ingest offers (avoids duplicate
+   *   roster pulls and racing cookie writes across a session's channels).
+   */
+  constructor(session, ramenPath = config.ramenPaths[0], { primary = true } = {}) {
     this.session = session; // { id, tenant_id, uber_org_uuid, cookies: [{name,value}] }
+    this.ramenPath = ramenPath;
+    this.primary = primary;
     this.jar = new Map(session.cookies.map((c) => [c.name, c.value]));
     this.seq = 0;
     this.stopped = false;
@@ -58,11 +67,15 @@ export class RamenStream {
   }
 
   url(path, seq) {
-    return `${config.uberDispatchBase}${config.ramenPath}${path}?seq=${seq}`;
+    return `${config.uberDispatchBase}${this.ramenPath}${path}?seq=${seq}`;
   }
 
   /** Merge any Set-Cookie from a response into the jar, then persist to backend. */
   async absorbCookies(response) {
+    // Only the primary channel persists rotated cookies, so a session's
+    // channels don't race each other writing back to the backend.
+    if (!this.primary) return;
+
     const setCookies = response.headers.getSetCookie?.() ?? [];
     if (setCookies.length === 0) return;
 
@@ -79,7 +92,8 @@ export class RamenStream {
   }
 
   tag() {
-    return `session ${this.session.id}/${this.session.uber_org_uuid.slice(0, 8)}`;
+    const channel = this.ramenPath.split("/").filter(Boolean)[0] ?? "ramen";
+    return `session ${this.session.id}/${this.session.uber_org_uuid.slice(0, 8)} ${channel}`;
   }
 
   /** True if Uber rejected the session (auth lapsed) — the manager must re-link. */
@@ -109,8 +123,8 @@ export class RamenStream {
   async connectOnce() {
     this.controller = new AbortController();
 
-    // 1. Handshake.
-    const ack = await fetch(this.url("/ack", -1), { headers: this.headers(), signal: this.controller.signal });
+    // 1. Handshake. Uber's client sends seq=0 here (seq=-1 returns 404).
+    const ack = await fetch(this.url("/ack", 0), { headers: this.headers(), signal: this.controller.signal });
     if (await this.handleAuthFailure(ack.status)) return;
     if (!ack.ok) throw new Error(`ack -> ${ack.status}`);
     await this.absorbCookies(ack);
@@ -125,8 +139,11 @@ export class RamenStream {
     this.reconnectDelay = config.reconnectMinDelay; // reset backoff on success
 
     // Pull the driver roster once the session is proven good, then periodically.
-    this.syncRoster();
-    this.rosterTimer ??= setInterval(() => this.syncRoster(), config.rosterInterval);
+    // Only the primary channel does this — secondary channels just ingest offers.
+    if (this.primary) {
+      this.syncRoster();
+      this.rosterTimer ??= setInterval(() => this.syncRoster(), config.rosterInterval);
+    }
 
     await this.readSse(recv.body);
   }

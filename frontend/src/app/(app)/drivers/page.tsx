@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { listDrivers, syncDrivers } from "@/lib/api/drivers";
+import { syncRosterViaExtension } from "@/lib/extension";
 
 export default function DriversPage() {
   const { t } = useI18n();
@@ -21,7 +22,15 @@ export default function DriversPage() {
   async function runSync() {
     setSyncing(true);
     try {
-      await syncDrivers();
+      // Preferred path: the browser extension pulls the roster from
+      // supplier.uber.com using the manager's real IP (Uber blocks our server).
+      const viaExt = await syncRosterViaExtension();
+
+      // Fall back to the server-side pull only when no extension answered.
+      if (viaExt === null) {
+        await syncDrivers();
+      }
+
       await refetch();
     } catch {
       /* best-effort — the cached roster stays visible */

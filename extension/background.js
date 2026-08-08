@@ -78,6 +78,30 @@ async function postRoster(drivers) {
   }
 }
 
+/**
+ * Pull the roster straight from supplier.uber.com using the manager's own
+ * cookies and real browser IP (Uber blocks datacenter IPs, so this is the
+ * reliable path), then forward it to Ridy. Triggered on demand from the
+ * dashboard — no supplier tab needs to be open.
+ */
+async function fetchRoster() {
+  try {
+    const res = await fetch("https://supplier.uber.com/api/getDrivers?localeCode=en", {
+      credentials: "include",
+      headers: { accept: "application/json" },
+    });
+    if (!res.ok) return { ok: false, reason: `supplier_http_${res.status}` };
+
+    const body = await res.json();
+    const drivers = body?.data?.drivers ?? [];
+    if (drivers.length === 0) return { ok: false, reason: "no_drivers" };
+
+    return await postRoster(drivers);
+  } catch (e) {
+    return { ok: false, reason: e.message };
+  }
+}
+
 api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "capture" && msg.orgUuid) {
     capture(msg.orgUuid, { manual: !!msg.manual }).then(sendResponse);
@@ -85,6 +109,10 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   if (msg?.type === "roster" && Array.isArray(msg.drivers)) {
     postRoster(msg.drivers).then(sendResponse);
+    return true;
+  }
+  if (msg?.type === "fetchRoster") {
+    fetchRoster().then(sendResponse);
     return true;
   }
 });

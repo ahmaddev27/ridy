@@ -17,7 +17,16 @@ export const config = {
 
   // Uber RAMEN dispatch stream host.
   uberDispatchBase: (process.env.UBER_DISPATCH_BASE_URL || "https://vsdispatch.uber.com").replace(/\/$/, ""),
-  ramenPath: process.env.UBER_RAMEN_PATH || "/ramendca/events",
+
+  // RAMEN channels. Uber's web client opens several regional channels in
+  // parallel (dca = Washington DC, phx = Phoenix) and an offer can arrive on
+  // any of them, so we mirror that and open all of them per session. The first
+  // is treated as primary (it owns roster sync + cookie rotation); the rest
+  // only ingest offers. Override with a comma-separated UBER_RAMEN_PATHS list.
+  ramenPaths: (process.env.UBER_RAMEN_PATHS || "/ramendca/events,/ramenphx/events")
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean),
 
   // Uber supplier host — the driver roster (/api/getDrivers) lives here.
   uberSupplierBase: (process.env.UBER_SUPPLIER_BASE_URL || "https://supplier.uber.com").replace(/\/$/, ""),

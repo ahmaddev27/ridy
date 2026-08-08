@@ -5,7 +5,13 @@ import { config } from "./config.js";
 import { api } from "./api.js";
 import { RamenStream } from "./stream.js";
 
-const streams = new Map(); // sessionId -> RamenStream
+// Keyed by `${sessionId}:${ramenPath}` — one entry per (session × RAMEN channel),
+// since Uber pushes offers across several regional channels in parallel.
+const streams = new Map();
+
+function streamKey(sessionId, path) {
+  return `${sessionId}:${path}`;
+}
 
 async function reconcile() {
   let sessions;
@@ -16,24 +22,29 @@ async function reconcile() {
     return;
   }
 
-  const activeIds = new Set(sessions.map((s) => s.id));
+  const wantedKeys = new Set(
+    sessions.flatMap((s) => config.ramenPaths.map((p) => streamKey(s.id, p))),
+  );
 
-  // Stop streams whose session is gone or no longer active.
-  for (const [id, stream] of streams) {
-    if (!activeIds.has(id)) {
-      console.log(`stopping stream for session ${id} (no longer active)`);
+  // Stop streams whose session is gone / no longer active.
+  for (const [key, stream] of streams) {
+    if (!wantedKeys.has(key)) {
+      console.log(`stopping stream ${key} (no longer active)`);
       stream.stop();
-      streams.delete(id);
+      streams.delete(key);
     }
   }
 
-  // Start a stream for every newly-active session.
+  // Start a stream per channel for every active session.
   for (const session of sessions) {
-    if (streams.has(session.id)) continue;
-    console.log(`starting stream for session ${session.id} (${session.uber_org_uuid})`);
-    const stream = new RamenStream(session);
-    streams.set(session.id, stream);
-    stream.run().catch((e) => console.error(`stream ${session.id} crashed: ${e.message}`));
+    config.ramenPaths.forEach((path, index) => {
+      const key = streamKey(session.id, path);
+      if (streams.has(key)) return;
+      console.log(`starting stream ${key} (${session.uber_org_uuid})`);
+      const stream = new RamenStream(session, path, { primary: index === 0 });
+      streams.set(key, stream);
+      stream.run().catch((e) => console.error(`stream ${key} crashed: ${e.message}`));
+    });
   }
 }
 

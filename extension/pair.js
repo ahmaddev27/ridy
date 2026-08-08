@@ -28,3 +28,16 @@ window.addEventListener("message", async (event) => {
   // Let the page know pairing succeeded so it can show a confirmation.
   window.postMessage({ source: "ridy-pair-ack" }, "*");
 });
+
+// The Drivers page asks the extension to pull the roster from supplier.uber.com
+// (manager's real IP → Uber responds), then reports the result back to the page.
+window.addEventListener("message", async (event) => {
+  if (event.source !== window) return;
+  if (event.data?.source !== "ridy-sync-roster") return;
+
+  const res = await api.runtime.sendMessage({ type: "fetchRoster" }).catch((e) => ({
+    ok: false,
+    reason: e?.message || "extension_error",
+  }));
+  window.postMessage({ source: "ridy-roster-done", ...res }, "*");
+});
