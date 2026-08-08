@@ -5,6 +5,29 @@
 // We talk to it purely via window.postMessage so the app stays decoupled from
 // any extension API and degrades gracefully when the extension isn't installed.
 
+// The extension version this dashboard build expects. Bump it in lockstep with
+// extension/manifest.json so managers running an older, manually-installed
+// build get prompted to update (unpacked extensions don't auto-update).
+export const LATEST_EXTENSION_VERSION = "1.4.0";
+
+/** True when `installed` is a valid version older than LATEST_EXTENSION_VERSION. */
+export function isExtensionOutdated(installed: string | null | undefined): boolean {
+  if (!installed) return false; // unknown version — don't nag
+  return compareVersions(installed, LATEST_EXTENSION_VERSION) < 0;
+}
+
+/** Numeric semver-ish compare: returns <0, 0, or >0. Ignores pre-release tags. */
+function compareVersions(a: string, b: string): number {
+  const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 export interface RosterSyncResult {
   ok: boolean;
   reason?: string;

@@ -12,6 +12,7 @@ import { useAsync } from "@/hooks/use-async";
 import { getFleetSession, captureFleetSession, type Cookie } from "@/lib/api/fleet-session";
 import { startUberLogin, submitUberMfa } from "@/lib/api/uber-login";
 import { issueExtensionToken } from "@/lib/api/extension";
+import { LATEST_EXTENSION_VERSION, isExtensionOutdated } from "@/lib/extension";
 
 const statusTone: Record<string, Status> = {
   active: "connected",
@@ -53,14 +54,18 @@ export default function ConnectionsPage() {
 
   // Whether the Ridy extension is installed (null = still probing).
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
+  // The installed extension's reported version (null = unknown / not reported).
+  const [extVersion, setExtVersion] = useState<string | null>(null);
 
   const c = (k: string) => t(`screens.connections.${k}`);
 
   // Probe for the extension: ping, and if no "present" reply arrives, it's absent.
   useEffect(() => {
     function onMessage(e: MessageEvent) {
-      if (e.source === window && (e.data as { source?: string })?.source === "ridy-ext-present") {
+      const d = e.data as { source?: string; version?: string };
+      if (e.source === window && d?.source === "ridy-ext-present") {
         setExtInstalled(true);
+        if (d.version) setExtVersion(d.version);
       }
     }
     window.addEventListener("message", onMessage);
@@ -218,6 +223,27 @@ export default function ConnectionsPage() {
             </a>
           </Card>
         </>
+      )}
+
+      {/* Extension installed but outdated: prompt to update (unpacked builds
+          don't auto-update, so the manager must download and reload). */}
+      {extInstalled && isExtensionOutdated(extVersion) && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+          <div className="flex-1">
+            <p className="font-semibold text-amber-900">{c("extUpdateTitle")}</p>
+            <p className="mt-0.5 text-sm text-amber-700">
+              {c("extUpdateBody")
+                .replace("{installed}", extVersion ?? "?")
+                .replace("{latest}", LATEST_EXTENSION_VERSION)}
+            </p>
+            <a href="/downloads/ridy-extension.zip" download className="mt-3 inline-block">
+              <Button>
+                <Download className="h-4 w-4" /> {c("extUpdateDownload")}
+              </Button>
+            </a>
+          </div>
+        </div>
       )}
 
       {/* Current session */}

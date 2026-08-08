@@ -7,7 +7,8 @@ const api = globalThis.browser || globalThis["chrome"];
 // Announce presence so the dashboard can tell whether the extension is installed
 // (both on load and on demand, since the page may mount after this script runs).
 function announce() {
-  window.postMessage({ source: "ridy-ext-present" }, "*");
+  const version = api.runtime.getManifest?.().version ?? null;
+  window.postMessage({ source: "ridy-ext-present", version }, "*");
 }
 announce();
 window.addEventListener("message", (e) => {
