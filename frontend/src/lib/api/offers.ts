@@ -15,6 +15,15 @@ export type DispatchOffer = {
   received_at: string | null;
 };
 
+export type DispatchOfferDetail = DispatchOffer & {
+  raw: Record<string, unknown> | null;
+};
+
+export async function getOffer(id: number): Promise<DispatchOfferDetail> {
+  const res = await apiFetch<{ data: DispatchOfferDetail }>(`/api/v1/dispatch/offers/${id}`);
+  return res.data;
+}
+
 export async function listOffers(params?: {
   search?: string;
   driverUuid?: string;
