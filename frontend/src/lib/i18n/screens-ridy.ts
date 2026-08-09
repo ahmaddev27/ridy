@@ -102,6 +102,10 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       connectedToast: "Uber session connected",
       connectedToastDesc: "{count} cookies stored. The dispatch stream starts shortly.",
       connectFailed: "Connection failed",
+      disconnect: "Disconnect session",
+      disconnectConfirm: "Delete the Uber session? Offers stop until you reconnect.",
+      disconnectedToast: "Session disconnected",
+      disconnectFailed: "Could not disconnect",
     },
     dashboard: {
       statDrivers: "Drivers",
@@ -215,6 +219,10 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       connectedToast: "Uber-Sitzung verbunden",
       connectedToastDesc: "{count} Cookies gespeichert. Der Dispatch-Stream startet in Kürze.",
       connectFailed: "Verbindung fehlgeschlagen",
+      disconnect: "Sitzung trennen",
+      disconnectConfirm: "Uber-Sitzung löschen? Angebote stoppen bis zur erneuten Verbindung.",
+      disconnectedToast: "Sitzung getrennt",
+      disconnectFailed: "Trennen fehlgeschlagen",
     },
     dashboard: {
       statDrivers: "Fahrer",
@@ -326,6 +334,10 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       connectedToast: "تم ربط جلسة أوبر",
       connectedToastDesc: "تم حفظ {count} كوكي. يبدأ تيار الإرساليات قريباً.",
       connectFailed: "فشل الربط",
+      disconnect: "فك الربط",
+      disconnectConfirm: "حذف جلسة أوبر؟ العروض بتوقف لحد ما تعيد الربط.",
+      disconnectedToast: "تم فك الربط",
+      disconnectFailed: "تعذّر فك الربط",
     },
     dashboard: {
       statDrivers: "السائقون",
