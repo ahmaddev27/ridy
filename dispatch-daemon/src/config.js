@@ -31,6 +31,12 @@ export const config = {
   // Uber supplier host — the driver roster (/api/getDrivers) lives here.
   uberSupplierBase: (process.env.UBER_SUPPLIER_BASE_URL || "https://supplier.uber.com").replace(/\/$/, ""),
 
+  // Residential proxy that all Uber traffic is routed through. Uber blocks our
+  // datacenter IP (RAMEN 404s, getDrivers returns 0), so a residential exit is
+  // required for the daemon to hold streams server-side. Format:
+  //   http://user:pass@host:port  (or socks5://…). Empty = direct (blocked).
+  proxyUrl: process.env.UBER_PROXY_URL || "",
+
   // How often to re-pull the roster (ms). Default 30 min.
   rosterInterval: Number(process.env.ROSTER_INTERVAL_MS || 1800000),
 

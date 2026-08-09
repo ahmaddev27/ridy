@@ -98,7 +98,9 @@ services:
       RIDY_API_URL: https://${DOMAIN}
       DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
       UBER_DISPATCH_BASE_URL: https://vsdispatch.uber.com
-      UBER_RAMEN_PATH: /ramendca/events
+      UBER_RAMEN_PATHS: /ramendca/events,/ramenphx/events
+      # Residential proxy for all Uber traffic (empty = direct = blocked).
+      UBER_PROXY_URL: ${UBER_PROXY_URL:-}
 
 volumes:
   dbdata:

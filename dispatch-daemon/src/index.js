@@ -4,6 +4,7 @@
 import { config } from "./config.js";
 import { api } from "./api.js";
 import { RamenStream } from "./stream.js";
+import { installProxy } from "./proxy.js";
 
 // Keyed by `${sessionId}:${ramenPath}` — one entry per (session × RAMEN channel),
 // since Uber pushes offers across several regional channels in parallel.
@@ -50,6 +51,7 @@ async function reconcile() {
 
 async function main() {
   console.log(`Ridy dispatch daemon starting -> ${config.apiBaseUrl}`);
+  installProxy(); // route Uber traffic through the residential proxy (if set)
   await reconcile();
   setInterval(reconcile, config.sessionPollInterval);
 }
