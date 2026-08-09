@@ -25,6 +25,7 @@ class DispatchDaemonController extends Controller
     public function sessions(): JsonResponse
     {
         $sessions = UberFleetSession::withoutGlobalScopes()
+            ->with('tenant:id,proxy_url')
             ->where('status', UberFleetSession::STATUS_ACTIVE)
             ->get()
             ->filter->isUsable()
@@ -33,6 +34,9 @@ class DispatchDaemonController extends Controller
                 'tenant_id' => $s->tenant_id,
                 'uber_org_uuid' => $s->uber_org_uuid,
                 'cookies' => $s->cookies,
+                // Per-company residential proxy; daemon falls back to its global
+                // UBER_PROXY_URL when null.
+                'proxy_url' => $s->tenant?->getAttribute('proxy_url'),
             ])
             ->values();
 

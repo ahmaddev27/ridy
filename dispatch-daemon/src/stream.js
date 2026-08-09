@@ -2,6 +2,7 @@
 // and persist rolling cookies so an actively-used session outlives its idle TTL.
 
 import { randomUUID } from "node:crypto";
+import { ProxyAgent } from "undici";
 import { config } from "./config.js";
 import { api } from "./api.js";
 
@@ -23,12 +24,19 @@ export class RamenStream {
     this.reconnectDelay = config.reconnectMinDelay;
     // A stable device id per stream, mirroring the browser client's headers.
     this.deviceId = `vs_dispatch-${randomUUID()}`;
+
+    // Route this company's Uber traffic through its own residential IP. Only
+    // Uber requests use this dispatcher — calls back to our API stay direct.
+    // Per-company proxy_url wins; else the daemon's global proxy; else direct.
+    const proxyUrl = session.proxy_url || config.proxyUrl;
+    this.dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
   }
 
   stop() {
     this.stopped = true;
     this.controller?.abort();
     if (this.rosterTimer) clearInterval(this.rosterTimer);
+    this.dispatcher?.close?.();
   }
 
   /** Fetch the fleet's driver roster from supplier /api/getDrivers and forward it. */
@@ -36,6 +44,7 @@ export class RamenStream {
     try {
       const res = await fetch(`${config.uberSupplierBase}/api/getDrivers?localeCode=en`, {
         headers: { ...this.headers(), accept: "application/json" },
+        dispatcher: this.dispatcher,
       });
       if (!res.ok) {
         console.warn(`[${this.tag()}] roster fetch -> ${res.status}`);
@@ -127,7 +136,7 @@ export class RamenStream {
     this.controller = new AbortController();
 
     // 1. Handshake. Uber's client sends seq=0 here (seq=-1 returns 404).
-    const ack = await fetch(this.url("/ack", 0), { headers: this.headers(), signal: this.controller.signal });
+    const ack = await fetch(this.url("/ack", 0), { headers: this.headers(), signal: this.controller.signal, dispatcher: this.dispatcher });
     if (await this.handleAuthFailure(ack.status)) return;
     // Uber returns 404 on RAMEN for non-residential (datacenter) IPs. Without a
     // residential proxy the server can't hold the stream — offers are captured
@@ -148,7 +157,7 @@ export class RamenStream {
     await this.absorbCookies(ack);
 
     // 2. Open the stream, resuming from the last seq we saw.
-    const recv = await fetch(this.url("/recv", this.seq), { headers: this.headers(), signal: this.controller.signal });
+    const recv = await fetch(this.url("/recv", this.seq), { headers: this.headers(), signal: this.controller.signal, dispatcher: this.dispatcher });
     if (await this.handleAuthFailure(recv.status)) return;
     if (!recv.ok) throw new Error(`recv -> ${recv.status}`);
     await this.absorbCookies(recv);

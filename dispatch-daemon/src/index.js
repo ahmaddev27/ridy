@@ -4,7 +4,6 @@
 import { config } from "./config.js";
 import { api } from "./api.js";
 import { RamenStream } from "./stream.js";
-import { installProxy } from "./proxy.js";
 
 // Keyed by `${sessionId}:${ramenPath}` — one entry per (session × RAMEN channel),
 // since Uber pushes offers across several regional channels in parallel.
@@ -51,7 +50,13 @@ async function reconcile() {
 
 async function main() {
   console.log(`Ridy dispatch daemon starting -> ${config.apiBaseUrl}`);
-  installProxy(); // route Uber traffic through the residential proxy (if set)
+  // Uber traffic is proxied per-stream (per-company proxy_url, else the global
+  // UBER_PROXY_URL); calls back to our own API stay direct.
+  console.log(
+    config.proxyUrl
+      ? "global fallback proxy configured; per-company proxy_url overrides it"
+      : "no global proxy — companies without their own proxy_url connect directly (Uber blocks that)",
+  );
   await reconcile();
   setInterval(reconcile, config.sessionPollInterval);
 }
