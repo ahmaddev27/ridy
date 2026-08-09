@@ -11,6 +11,7 @@ const en = {
     insights: "Insights",
     governance: "Governance",
     admin: "Administration",
+    account: "Account",
     system: "System",
   },
   nav: {
@@ -23,6 +24,9 @@ const en = {
     auditLog: "Audit Log",
     designSystem: "Design System",
     companies: "Companies",
+    adminDashboard: "Dashboard",
+    settings: "Settings",
+    profile: "Profile",
   },
   pages: {
     dashboard: { title: "Dashboard", subtitle: "Uber dispatch overview — drivers, live offers and fleet session." },
@@ -41,6 +45,9 @@ const en = {
     transparency: { title: "Driver Transparency", subtitle: "What is collected about you, why, and for how long." },
     designSystem: { title: "Design System", subtitle: "All tokens, components and patterns. Click the interactive ones." },
     companies: { title: "Companies", subtitle: "Manage companies, proxies, managers and Uber sessions." },
+    adminDashboard: { title: "Admin Dashboard", subtitle: "Platform overview and alerts." },
+    settings: { title: "Platform Settings", subtitle: "SMTP and the global proxy — applied live." },
+    profile: { title: "Profile", subtitle: "Edit your account." },
   },
   common: {
     save: "Save changes",
@@ -86,6 +93,7 @@ const de: typeof en = {
     insights: "Auswertungen",
     governance: "Governance",
     admin: "Administration",
+    account: "Konto",
     system: "System",
   },
   nav: {
@@ -98,6 +106,9 @@ const de: typeof en = {
     auditLog: "Audit-Log",
     designSystem: "Design-System",
     companies: "Firmen",
+    adminDashboard: "Dashboard",
+    settings: "Einstellungen",
+    profile: "Profil",
   },
   pages: {
     dashboard: { title: "Übersicht", subtitle: "Uber-Dispatch-Übersicht — Fahrer, Live-Angebote und Flottensitzung." },
@@ -116,6 +127,9 @@ const de: typeof en = {
     transparency: { title: "Fahrer-Transparenz", subtitle: "Was über dich erhoben wird, warum und wie lange." },
     designSystem: { title: "Design-System", subtitle: "Alle Tokens, Komponenten und Muster. Die interaktiven anklicken." },
     companies: { title: "Firmen", subtitle: "Firmen, Proxys, Manager und Uber-Sitzungen verwalten." },
+    adminDashboard: { title: "Admin-Dashboard", subtitle: "Plattform-Überblick und Warnungen." },
+    settings: { title: "Plattform-Einstellungen", subtitle: "SMTP und der globale Proxy — sofort aktiv." },
+    profile: { title: "Profil", subtitle: "Dein Konto bearbeiten." },
   },
   common: {
     save: "Änderungen speichern",
@@ -161,6 +175,7 @@ const ar: typeof en = {
     insights: "التحليلات",
     governance: "الحوكمة",
     admin: "الإدارة",
+    account: "الحساب",
     system: "النظام",
   },
   nav: {
@@ -173,6 +188,9 @@ const ar: typeof en = {
     auditLog: "سجل التدقيق",
     designSystem: "نظام التصميم",
     companies: "الشركات",
+    adminDashboard: "لوحة التحكّم",
+    settings: "الإعدادات",
+    profile: "الملف الشخصي",
   },
   pages: {
     dashboard: { title: "لوحة التحكّم", subtitle: "نظرة عامة على إرساليات أوبر — السائقون والعروض الحيّة وجلسة الأسطول." },
@@ -191,6 +209,9 @@ const ar: typeof en = {
     transparency: { title: "شفافية السائق", subtitle: "ما يُجمَع عنك، ولماذا، ولكم من الوقت." },
     designSystem: { title: "نظام التصميم", subtitle: "كل العناصر والمكوّنات والأنماط." },
     companies: { title: "الشركات", subtitle: "إدارة الشركات والبروكسي والمدراء وجلسات أوبر." },
+    adminDashboard: { title: "لوحة الأدمن", subtitle: "نظرة عامة على المنصة والتنبيهات." },
+    settings: { title: "إعدادات المنصة", subtitle: "SMTP والبروكسي العام — تُطبّق فوراً." },
+    profile: { title: "الملف الشخصي", subtitle: "تعديل حسابك." },
   },
   common: {
     save: "حفظ التغييرات",

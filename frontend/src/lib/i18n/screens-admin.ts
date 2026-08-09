@@ -3,6 +3,25 @@
 type Dict = Record<string, unknown>;
 
 const en: Dict = {
+  adminDashboard: {
+    companies: "Companies", activeCompanies: "Active", sessionsActive: "Live sessions",
+    sessionsAttention: "Need attention", drivers: "Drivers", offers: "Offers",
+    alerts: "Alerts", noAlerts: "Everything looks healthy.", resolve: "Resolve",
+    alert_no_session: "no Uber session", alert_expired: "session expired",
+    alert_needs_relink: "needs re-link", alert_no_proxy: "no proxy assigned",
+  },
+  settings: {
+    smtp: "Email (SMTP)", host: "Host", port: "Port", username: "Username",
+    password: "Password", encryption: "Encryption", none: "None",
+    fromName: "From name", fromAddress: "From address",
+    save: "Save", saved: "Saved", saveFailed: "Couldn’t save",
+    globalProxy: "Global proxy", globalProxyHint: "Used by companies with no dedicated proxy.",
+    proxyUrl: "Proxy URL",
+  },
+  profile: {
+    company: "Company", name: "Name", email: "Email", newPassword: "New password",
+    leaveEmpty: "Leave empty to keep current", save: "Save", saved: "Saved", saveFailed: "Couldn’t save",
+  },
   companies: {
     newCompany: "New company",
     loadError: "Couldn’t load companies",
@@ -69,6 +88,25 @@ const en: Dict = {
 };
 
 const de: Dict = {
+  adminDashboard: {
+    companies: "Firmen", activeCompanies: "Aktiv", sessionsActive: "Live-Sitzungen",
+    sessionsAttention: "Handlungsbedarf", drivers: "Fahrer", offers: "Angebote",
+    alerts: "Warnungen", noAlerts: "Alles in Ordnung.", resolve: "Beheben",
+    alert_no_session: "keine Uber-Sitzung", alert_expired: "Sitzung abgelaufen",
+    alert_needs_relink: "neu verbinden nötig", alert_no_proxy: "kein Proxy zugewiesen",
+  },
+  settings: {
+    smtp: "E-Mail (SMTP)", host: "Host", port: "Port", username: "Benutzername",
+    password: "Passwort", encryption: "Verschlüsselung", none: "Keine",
+    fromName: "Absendername", fromAddress: "Absenderadresse",
+    save: "Speichern", saved: "Gespeichert", saveFailed: "Speichern fehlgeschlagen",
+    globalProxy: "Globaler Proxy", globalProxyHint: "Für Firmen ohne eigenen Proxy.",
+    proxyUrl: "Proxy-URL",
+  },
+  profile: {
+    company: "Firma", name: "Name", email: "E-Mail", newPassword: "Neues Passwort",
+    leaveEmpty: "Leer lassen, um beizubehalten", save: "Speichern", saved: "Gespeichert", saveFailed: "Speichern fehlgeschlagen",
+  },
   companies: {
     newCompany: "Neue Firma",
     loadError: "Firmen konnten nicht geladen werden",
@@ -133,6 +171,25 @@ const de: Dict = {
 };
 
 const ar: Dict = {
+  adminDashboard: {
+    companies: "الشركات", activeCompanies: "النشطة", sessionsActive: "جلسات حيّة",
+    sessionsAttention: "تحتاج انتباه", drivers: "السائقون", offers: "العروض",
+    alerts: "التنبيهات", noAlerts: "كل شي تمام.", resolve: "معالجة",
+    alert_no_session: "لا جلسة أوبر", alert_expired: "الجلسة منتهية",
+    alert_needs_relink: "تحتاج إعادة ربط", alert_no_proxy: "لا بروكسي مخصّص",
+  },
+  settings: {
+    smtp: "البريد (SMTP)", host: "المضيف", port: "المنفذ", username: "اسم المستخدم",
+    password: "كلمة المرور", encryption: "التشفير", none: "بدون",
+    fromName: "اسم المُرسِل", fromAddress: "بريد المُرسِل",
+    save: "حفظ", saved: "تم الحفظ", saveFailed: "تعذّر الحفظ",
+    globalProxy: "البروكسي العام", globalProxyHint: "يُستعمل للشركات اللي مالها بروكسي خاص.",
+    proxyUrl: "رابط البروكسي",
+  },
+  profile: {
+    company: "الشركة", name: "الاسم", email: "البريد", newPassword: "كلمة مرور جديدة",
+    leaveEmpty: "اتركها فاضية للإبقاء على الحالية", save: "حفظ", saved: "تم الحفظ", saveFailed: "تعذّر الحفظ",
+  },
   companies: {
     newCompany: "شركة جديدة",
     loadError: "تعذّر تحميل الشركات",

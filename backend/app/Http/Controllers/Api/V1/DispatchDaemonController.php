@@ -6,6 +6,7 @@ use App\Domain\Dispatch\FleetSessionService;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
 use App\Http\Controllers\Controller;
+use App\Support\Settings;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,7 +41,12 @@ class DispatchDaemonController extends Controller
             ])
             ->values();
 
-        return response()->json(['data' => $sessions]);
+        // Global fallback proxy (super-admin setting) — used by the daemon when a
+        // company has no dedicated proxy_url of its own.
+        return response()->json([
+            'data' => $sessions,
+            'meta' => ['global_proxy_url' => Settings::get('global_proxy_url')],
+        ]);
     }
 
     /**

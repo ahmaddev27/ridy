@@ -26,3 +26,17 @@ export async function fetchMe(): Promise<AuthUser> {
   const res = await apiFetch<{ data: AuthUser }>("/api/v1/me");
   return res.data;
 }
+
+/** The authenticated user updates their own account. */
+export async function updateProfile(input: {
+  name?: string;
+  email?: string;
+  password?: string;
+}): Promise<AuthUser> {
+  const res = await apiFetch<{ data: AuthUser }>("/api/v1/profile", {
+    method: "PUT",
+    body: input,
+    withCsrf: true,
+  });
+  return res.data;
+}

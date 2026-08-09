@@ -20,8 +20,9 @@ export default function LoginPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await login(email, password);
-      router.push("/dashboard");
+      const u = await login(email, password);
+      // Super-admins land on the platform panel; managers on their dashboard.
+      router.push(u.roles.includes("super_admin") ? "/admin" : "/dashboard");
     } catch (err) {
       const message =
         err instanceof ApiError && err.status === 422

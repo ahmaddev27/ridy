@@ -51,6 +51,60 @@ export type UpdateCompanyInput = Partial<{
   proxy_url: string; // empty string clears it (→ global proxy)
 }>;
 
+export type AdminOverview = {
+  stats: {
+    companies: number;
+    active_companies: number;
+    drivers: number;
+    offers: number;
+    sessions_active: number;
+    sessions_need_attention: number;
+  };
+  alerts: { company_id: number; company: string; type: string }[];
+};
+
+export type PlatformSettings = {
+  smtp_host: string | null;
+  smtp_port: string | null;
+  smtp_username: string | null;
+  smtp_encryption: string | null;
+  mail_from_address: string | null;
+  mail_from_name: string | null;
+  has_smtp_password: boolean;
+  has_global_proxy: boolean;
+  global_proxy_masked: string | null;
+};
+
+export type UpdateSettingsInput = Partial<{
+  smtp_host: string;
+  smtp_port: number;
+  smtp_username: string;
+  smtp_password: string; // only when changing
+  smtp_encryption: string;
+  mail_from_address: string;
+  mail_from_name: string;
+  global_proxy_url: string; // only when changing (empty clears)
+}>;
+
+export async function getOverview(): Promise<AdminOverview> {
+  const res = await apiFetch<{ data: AdminOverview }>("/api/v1/admin/overview");
+  return res.data;
+}
+
+export async function getSettings(): Promise<PlatformSettings> {
+  const res = await apiFetch<{ data: PlatformSettings }>("/api/v1/admin/settings");
+  return res.data;
+}
+
+export async function updateSettings(input: UpdateSettingsInput): Promise<PlatformSettings> {
+  const res = await apiFetch<{ data: PlatformSettings }>("/api/v1/admin/settings", {
+    method: "PUT",
+    body: input,
+    withCsrf: true,
+  });
+  return res.data;
+}
+
 const base = "/api/v1/admin/companies";
 
 export async function listCompanies(): Promise<Company[]> {
