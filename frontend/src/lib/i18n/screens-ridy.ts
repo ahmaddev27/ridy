@@ -31,6 +31,8 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       stops: "stops",
       acceptWindow: "Accept window",
       rawPayload: "Full raw data",
+      distance: "Distance",
+      pricePerKm: "Price / km",
     },
     driverLinking: {
       title: "Link drivers",
@@ -155,6 +157,8 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       stops: "Stopps",
       acceptWindow: "Annahmefenster",
       rawPayload: "Vollständige Rohdaten",
+      distance: "Distanz",
+      pricePerKm: "Preis / km",
     },
     driverLinking: {
       title: "Fahrer verknüpfen",
@@ -277,6 +281,8 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       stops: "محطات",
       acceptWindow: "مهلة القبول",
       rawPayload: "كل البيانات الخام",
+      distance: "المسافة",
+      pricePerKm: "سعر الكيلو",
     },
     driverLinking: {
       title: "ربط السائقين",

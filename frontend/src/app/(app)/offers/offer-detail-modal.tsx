@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { X, MapPin, Flag, User, CircleDollarSign, Clock, Hash, Loader2 } from "lucide-react";
+import { StatCard } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n/context";
 import { getOffer, type DispatchOfferDetail } from "@/lib/api/offers";
+
+// Leaflet touches `window`, so load the map client-side only.
+const TripMap = dynamic(() => import("./trip-map").then((m) => m.TripMap), {
+  ssr: false,
+  loading: () => <div className="h-[220px] w-full animate-pulse rounded-xl bg-slate-100" />,
+});
 
 /**
  * Full detail for one dispatch offer. Renders the known fields, every stop found
@@ -93,6 +101,28 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
                   </p>
                 )}
               </div>
+
+              {/* Trip map + distance / price-per-km */}
+              {offer.trip && (offer.trip.pickup || offer.trip.dropoff) && (
+                <div className="space-y-3 border-b border-slate-100 p-5">
+                  <TripMap
+                    pickup={offer.trip.pickup}
+                    dropoff={offer.trip.dropoff}
+                    routeGeometry={offer.trip.route_geometry}
+                  />
+                  <div className="grid grid-cols-3 gap-3">
+                    <StatCard
+                      label={c("distance")}
+                      value={offer.trip.distance_km != null ? `${offer.trip.distance_km} km` : "—"}
+                    />
+                    <StatCard
+                      label={c("pricePerKm")}
+                      value={offer.trip.price_per_km != null ? `${offer.trip.price_per_km.toFixed(2)} €/km` : "—"}
+                    />
+                    <StatCard label={c("colFare")} value={offer.fare_formatted ?? "—"} />
+                  </div>
+                </div>
+              )}
 
               {/* Known fields */}
               <dl className="divide-y divide-slate-100">
