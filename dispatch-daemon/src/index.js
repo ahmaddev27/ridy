@@ -14,12 +14,18 @@ function streamKey(sessionId, path) {
 }
 
 async function reconcile() {
-  let sessions;
+  let sessions, globalProxyUrl;
   try {
-    sessions = await api.sessions();
+    ({ sessions, globalProxyUrl } = await api.sessions());
   } catch (e) {
     console.error(`session poll failed: ${e.message}`);
     return;
+  }
+
+  // Proxy priority: the company's own proxy_url, else the super-admin global
+  // proxy (from settings), else the daemon's UBER_PROXY_URL env fallback.
+  for (const s of sessions) {
+    s.proxy_url = s.proxy_url || globalProxyUrl || "";
   }
 
   const wantedKeys = new Set(

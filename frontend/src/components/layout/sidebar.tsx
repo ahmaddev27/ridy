@@ -13,10 +13,13 @@ export function Sidebar() {
   const { t } = useI18n();
   const { user } = useAuth();
 
-  // Role-gated groups (e.g. the admin group) only render for permitted users.
-  const groups = navGroups.filter(
-    (g) => !g.requiresRole || user?.roles.includes(g.requiresRole),
-  );
+  // Full split: admin groups show only to super-admins; company groups hide
+  // from them. Managers see the company surface, the admin sees the platform one.
+  const groups = navGroups.filter((g) => {
+    if (g.requiresRole && !user?.roles.includes(g.requiresRole)) return false;
+    if (g.hideForRole && user?.roles.includes(g.hideForRole)) return false;
+    return true;
+  });
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">

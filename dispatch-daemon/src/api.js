@@ -23,7 +23,8 @@ async function call(method, path, body) {
 export const api = {
   /** Active fleet sessions with decrypted cookies. */
   async sessions() {
-    return (await call("GET", "/sessions")).data;
+    const body = await call("GET", "/sessions");
+    return { sessions: body.data, globalProxyUrl: body.meta?.global_proxy_url || "" };
   },
 
   /** Forward a batch of raw offers for ingestion (dedup/route happens server-side). */

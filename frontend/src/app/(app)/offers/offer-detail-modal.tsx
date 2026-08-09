@@ -23,7 +23,6 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
   const c = (k: string) => t(`screens.offers.${k}`);
   const [offer, setOffer] = useState<DispatchOfferDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showRaw, setShowRaw] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -42,7 +41,7 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white text-start shadow-xl"
+        className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white text-start shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -138,25 +137,6 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
                   <span dir="ltr" className="font-mono text-xs text-slate-500">{offer.offer_uuid}</span>
                 </Row>
               </dl>
-
-              {/* Raw payload — nothing hidden */}
-              <div className="p-5">
-                <button
-                  onClick={() => setShowRaw((v) => !v)}
-                  className="text-sm font-medium text-slate-600 hover:text-slate-800"
-                >
-                  {showRaw ? "▾ " : "▸ "}
-                  {c("rawPayload") || "Full raw data"}
-                </button>
-                {showRaw && (
-                  <pre
-                    dir="ltr"
-                    className="mt-3 max-h-64 overflow-auto rounded-lg bg-slate-900 p-3 text-start font-mono text-[11px] leading-relaxed text-slate-100"
-                  >
-                    {JSON.stringify(offer.raw, null, 2)}
-                  </pre>
-                )}
-              </div>
             </>
           )}
         </div>
