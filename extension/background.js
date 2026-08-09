@@ -8,7 +8,13 @@
 const api = globalThis.browser || globalThis["chrome"];
 
 async function readCookies() {
-  const cookies = await api.cookies.getAll({ domain: "uber.com" });
+  // Capture exactly the cookies the browser sends to the RAMEN endpoint. A
+  // per-URL query returns one correct value per name; getAll({domain}) instead
+  // returns the same name from several domains (.uber.com, vsdispatch.uber.com,
+  // auth.uber.com), so the daemon sent e.g. three conflicting `jwt-session`
+  // values and Uber picked the wrong one -> 302. Matching the browser's own
+  // per-URL cookie set fixes the handshake.
+  const cookies = await api.cookies.getAll({ url: "https://vsdispatch.uber.com/ramendca/events" });
   return cookies.map((c) => ({ name: c.name, value: c.value }));
 }
 
