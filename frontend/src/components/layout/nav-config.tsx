@@ -7,6 +7,7 @@ import {
   Plug,
   ScrollText,
   Palette,
+  Building2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -18,7 +19,8 @@ export type NavItem = {
   badge?: string;
 };
 
-export type NavGroup = { title: string; items: NavItem[] };
+/** `requiresRole` hides the whole group unless the user has that role. */
+export type NavGroup = { title: string; items: NavItem[]; requiresRole?: string };
 
 export const navGroups: NavGroup[] = [
   {
@@ -40,6 +42,11 @@ export const navGroups: NavGroup[] = [
   {
     title: "navGroups.governance",
     items: [{ href: "/audit-log", label: "nav.auditLog", icon: ScrollText }],
+  },
+  {
+    title: "navGroups.admin",
+    requiresRole: "super_admin",
+    items: [{ href: "/admin/companies", label: "nav.companies", icon: Building2 }],
   },
   {
     title: "navGroups.system",

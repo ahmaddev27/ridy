@@ -10,6 +10,7 @@ const en = {
     trips: "Trips",
     insights: "Insights",
     governance: "Governance",
+    admin: "Administration",
     system: "System",
   },
   nav: {
@@ -21,6 +22,7 @@ const en = {
     drivers: "Drivers",
     auditLog: "Audit Log",
     designSystem: "Design System",
+    companies: "Companies",
   },
   pages: {
     dashboard: { title: "Dashboard", subtitle: "Uber dispatch overview — drivers, live offers and fleet session." },
@@ -38,6 +40,7 @@ const en = {
     notifications: { title: "Notifications", subtitle: "In-app alerts. Critical items are also emailed." },
     transparency: { title: "Driver Transparency", subtitle: "What is collected about you, why, and for how long." },
     designSystem: { title: "Design System", subtitle: "All tokens, components and patterns. Click the interactive ones." },
+    companies: { title: "Companies", subtitle: "Manage companies, proxies, managers and Uber sessions." },
   },
   common: {
     save: "Save changes",
@@ -82,6 +85,7 @@ const de: typeof en = {
     trips: "Fahrten",
     insights: "Auswertungen",
     governance: "Governance",
+    admin: "Administration",
     system: "System",
   },
   nav: {
@@ -93,6 +97,7 @@ const de: typeof en = {
     drivers: "Fahrer",
     auditLog: "Audit-Log",
     designSystem: "Design-System",
+    companies: "Firmen",
   },
   pages: {
     dashboard: { title: "Übersicht", subtitle: "Uber-Dispatch-Übersicht — Fahrer, Live-Angebote und Flottensitzung." },
@@ -110,6 +115,7 @@ const de: typeof en = {
     notifications: { title: "Benachrichtigungen", subtitle: "In-App-Hinweise. Kritische Punkte werden auch per E-Mail gesendet." },
     transparency: { title: "Fahrer-Transparenz", subtitle: "Was über dich erhoben wird, warum und wie lange." },
     designSystem: { title: "Design-System", subtitle: "Alle Tokens, Komponenten und Muster. Die interaktiven anklicken." },
+    companies: { title: "Firmen", subtitle: "Firmen, Proxys, Manager und Uber-Sitzungen verwalten." },
   },
   common: {
     save: "Änderungen speichern",
@@ -154,6 +160,7 @@ const ar: typeof en = {
     trips: "الرحلات",
     insights: "التحليلات",
     governance: "الحوكمة",
+    admin: "الإدارة",
     system: "النظام",
   },
   nav: {
@@ -165,6 +172,7 @@ const ar: typeof en = {
     drivers: "السائقون",
     auditLog: "سجل التدقيق",
     designSystem: "نظام التصميم",
+    companies: "الشركات",
   },
   pages: {
     dashboard: { title: "لوحة التحكّم", subtitle: "نظرة عامة على إرساليات أوبر — السائقون والعروض الحيّة وجلسة الأسطول." },
@@ -182,6 +190,7 @@ const ar: typeof en = {
     notifications: { title: "الإشعارات", subtitle: "تنبيهات داخل التطبيق. المهم منها يُرسَل بالبريد أيضاً." },
     transparency: { title: "شفافية السائق", subtitle: "ما يُجمَع عنك، ولماذا، ولكم من الوقت." },
     designSystem: { title: "نظام التصميم", subtitle: "كل العناصر والمكوّنات والأنماط." },
+    companies: { title: "الشركات", subtitle: "إدارة الشركات والبروكسي والمدراء وجلسات أوبر." },
   },
   common: {
     save: "حفظ التغييرات",

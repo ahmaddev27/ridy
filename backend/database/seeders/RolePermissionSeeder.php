@@ -19,6 +19,11 @@ class RolePermissionSeeder extends Seeder
             'connections.manage',
             'audit.view',
             'users.manage',
+            // Platform-owner (super-admin) permissions.
+            'companies.manage',
+            'companies.users.manage',
+            'companies.sessions.manage',
+            'platform.view',
         ];
 
         foreach ($permissions as $permission) {
@@ -26,7 +31,9 @@ class RolePermissionSeeder extends Seeder
         }
 
         $roles = [
-            'owner' => $permissions,
+            // Platform owner — full cross-tenant control.
+            'super_admin' => $permissions,
+            'owner' => ['offers.view', 'drivers.manage', 'connections.manage', 'audit.view', 'users.manage'],
             'fleet_manager' => ['offers.view', 'drivers.manage', 'connections.manage', 'audit.view'],
             'driver' => ['offers.view'],
             'viewer' => ['offers.view'],
