@@ -9,6 +9,26 @@ import { ProxyAgent, fetch } from "undici";
 import { config } from "./config.js";
 import { api } from "./api.js";
 
+// Filters the supplier getDrivers UI itself sends (all empty = "everyone").
+const ROSTER_FILTERS = {
+  documentFilter: [],
+  activationFilter: [],
+  tripsCountFilter: [],
+  tripActivityFilter: [],
+  rewardStatusFilter: [],
+  onboardingStatusFilter: [],
+  complianceStatusFitler: [],
+  vehicleAssignmentStatusFilter: [],
+  gigUnifiedStatusFilter: [],
+  gigBaseTypeFilter: [],
+  cityIdFilter: [],
+  flowTypeFilter: [],
+  driverRoleFilter: [],
+  excludeAmdVirtualOperators: true,
+  gigTypeOnboardingStatusFilter: [],
+  gigTypeDocumentStatusFilter: [],
+};
+
 export class RamenStream {
   /**
    * @param session One fleet session { id, tenant_id, uber_org_uuid, cookies }.
@@ -46,23 +66,50 @@ export class RamenStream {
     this.dispatcher?.close?.();
   }
 
-  /** Fetch the fleet's driver roster from supplier /api/getDrivers and forward it. */
+  /**
+   * Pull the fleet's driver roster from supplier getDrivers and forward it.
+   * getDrivers is a paginated POST (orgUuid + filters), returning driversData[]
+   * with nested fields; routed through the same residential proxy as the stream.
+   */
   async syncRoster() {
     try {
-      const res = await fetch(`${config.uberSupplierBase}/api/getDrivers?localeCode=en`, {
-        headers: { ...this.headers(), accept: "application/json" },
-        dispatcher: this.dispatcher,
-      });
-      if (!res.ok) {
-        console.warn(`[${this.tag()}] roster fetch -> ${res.status}`);
-        return;
-      }
-      const body = await res.json();
-      const drivers = body?.data?.drivers ?? [];
-      if (drivers.length === 0) return;
+      const rows = [];
+      let pageToken = "";
+      for (let page = 1; page <= 100; page++) {
+        const res = await fetch(`${config.uberSupplierBase}/api/getDrivers?localeCode=en-GB`, {
+          method: "POST",
+          headers: { ...this.headers(), "content-type": "application/json", "x-csrf-token": "x" },
+          dispatcher: this.dispatcher,
+          body: JSON.stringify({
+            orgUuid: { uuid: { value: this.session.uber_org_uuid } },
+            driversFilters: ROSTER_FILTERS,
+            driverUuids: [],
+            paginationOptions: {
+              pageSize: { value: 100 },
+              pageToken: pageToken ? { value: pageToken } : {},
+            },
+          }),
+        });
+        if (!res.ok) {
+          console.warn(`[${this.tag()}] roster fetch -> ${res.status}`);
+          return;
+        }
+        const result = await res.json();
+        if (result.status !== "success") {
+          console.warn(`[${this.tag()}] roster fetch: ${result.message || "not success"}`);
+          return;
+        }
+        rows.push(...(result.data?.driversData ?? []));
 
-      const result = await api.roster(this.session.id, drivers);
-      console.log(`[${this.tag()}] roster synced: ${drivers.length} drivers`, result);
+        const next = result.data?.pageToken || "";
+        if (!next || next === pageToken) break;
+        pageToken = next;
+      }
+
+      if (rows.length === 0) return;
+
+      const outcome = await api.roster(this.session.id, rows);
+      console.log(`[${this.tag()}] roster synced: ${rows.length} drivers`, outcome);
     } catch (e) {
       console.error(`[${this.tag()}] roster sync failed: ${e.message}`);
     }
