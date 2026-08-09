@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { listOffers, deleteOffer, bulkDeleteOffers, type DispatchOffer } from "@/lib/api/offers";
+import { OfferDetailModal } from "./offer-detail-modal";
 
 export default function OffersPage() {
   const { t, locale } = useI18n();
@@ -22,6 +23,7 @@ export default function OffersPage() {
   const [driverUuid, setDriverUuid] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [detailId, setDetailId] = useState<number | null>(null);
 
   // A silent load (background poll) refreshes the feed in place: it keeps the
   // skeleton hidden and preserves the manager's current checkbox selection, so
@@ -181,8 +183,12 @@ export default function OffersPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {offers.map((o) => (
-                  <tr key={o.id} className={selected.has(o.id) ? "bg-slate-50" : "hover:bg-slate-50"}>
-                    <td className="px-4 py-3">
+                  <tr
+                    key={o.id}
+                    onClick={() => setDetailId(o.id)}
+                    className={`cursor-pointer ${selected.has(o.id) ? "bg-slate-50" : "hover:bg-slate-50"}`}
+                  >
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selected.has(o.id)}
@@ -216,7 +222,7 @@ export default function OffersPage() {
                         {o.linked ? c("linked") : c("unlinked")}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-end">
+                    <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => removeOne(o.id)}
                         disabled={busy}
@@ -233,6 +239,10 @@ export default function OffersPage() {
           </div>
         )}
       </Card>
+
+      {detailId !== null && (
+        <OfferDetailModal id={detailId} onClose={() => setDetailId(null)} />
+      )}
     </div>
   );
 }

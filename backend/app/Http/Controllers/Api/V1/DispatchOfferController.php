@@ -61,6 +61,17 @@ class DispatchOfferController extends Controller
         return response()->json(['data' => $results]);
     }
 
+    /** Full detail for one offer, including the complete raw Uber payload. */
+    public function show(Request $request, DispatchOffer $offer): JsonResponse
+    {
+        return response()->json([
+            'data' => array_merge(
+                (new DispatchOfferResource($offer))->toArray($request),
+                ['raw' => $offer->raw_payload],
+            ),
+        ]);
+    }
+
     /** Delete a single offer. */
     public function destroy(DispatchOffer $offer): JsonResponse
     {
