@@ -106,6 +106,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       disconnectConfirm: "Delete the Uber session? Offers stop until you reconnect.",
       disconnectedToast: "Session disconnected",
       disconnectFailed: "Could not disconnect",
+      cancel: "Cancel",
     },
     dashboard: {
       statDrivers: "Drivers",
@@ -223,6 +224,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       disconnectConfirm: "Uber-Sitzung löschen? Angebote stoppen bis zur erneuten Verbindung.",
       disconnectedToast: "Sitzung getrennt",
       disconnectFailed: "Trennen fehlgeschlagen",
+      cancel: "Abbrechen",
     },
     dashboard: {
       statDrivers: "Fahrer",
@@ -338,6 +340,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       disconnectConfirm: "حذف جلسة أوبر؟ العروض بتوقف لحد ما تعيد الربط.",
       disconnectedToast: "تم فك الربط",
       disconnectFailed: "تعذّر فك الربط",
+      cancel: "إلغاء",
     },
     dashboard: {
       statDrivers: "السائقون",
