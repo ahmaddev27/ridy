@@ -2,7 +2,10 @@
 // and persist rolling cookies so an actively-used session outlives its idle TTL.
 
 import { randomUUID } from "node:crypto";
-import { ProxyAgent } from "undici";
+// Import fetch from undici (not the global fetch): Node's global fetch ignores
+// the per-request `dispatcher` option, so a per-stream ProxyAgent only takes
+// effect when we call undici's own fetch.
+import { ProxyAgent, fetch } from "undici";
 import { config } from "./config.js";
 import { api } from "./api.js";
 
@@ -30,6 +33,10 @@ export class RamenStream {
     // Per-company proxy_url wins; else the daemon's global proxy; else direct.
     const proxyUrl = session.proxy_url || config.proxyUrl;
     this.dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
+    if (this.primary) {
+      const safe = proxyUrl ? proxyUrl.replace(/\/\/[^@]*@/, "//***@") : "direct (no proxy)";
+      console.log(`[${this.tag()}] exit: ${safe}`);
+    }
   }
 
   stop() {
