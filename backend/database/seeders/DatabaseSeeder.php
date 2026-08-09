@@ -13,6 +13,17 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RolePermissionSeeder::class);
 
+        // Platform owner — cross-tenant super-admin (no tenant of their own).
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@reidey.app'],
+            [
+                'name' => 'Platform Admin',
+                'password' => Hash::make(env('SUPERADMIN_PASSWORD', 'password')),
+                'tenant_id' => null,
+            ],
+        );
+        $admin->assignRole('super_admin');
+
         $tenant = Tenant::firstOrCreate(
             ['name' => 'YA Mobility'],
             ['country' => 'DE', 'status' => 'active'],
