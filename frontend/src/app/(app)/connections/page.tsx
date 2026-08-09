@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Plug, LogIn, ChevronDown, Puzzle, Copy, AlertTriangle, Download } from "lucide-react";
+import { Loader2, Plug, LogIn, ChevronDown, Puzzle, Copy, AlertTriangle, Download, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge, type Status } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { getFleetSession, captureFleetSession, type Cookie } from "@/lib/api/fleet-session";
+import { getFleetSession, captureFleetSession, deleteFleetSession, type Cookie } from "@/lib/api/fleet-session";
 import { issueExtensionToken } from "@/lib/api/extension";
 import { LATEST_EXTENSION_VERSION, isExtensionOutdated } from "@/lib/extension";
 
@@ -113,6 +113,20 @@ export default function ConnectionsPage() {
       toast.error(c("loginFailed"), { description: e instanceof Error ? e.message : undefined });
     } finally {
       setExtBusy(false);
+    }
+  }
+
+  async function doDisconnect() {
+    if (!window.confirm(c("disconnectConfirm"))) return;
+    setBusy(true);
+    try {
+      await deleteFleetSession();
+      toast.success(c("disconnectedToast"));
+      await refetch();
+    } catch (e) {
+      toast.error(c("disconnectFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -230,6 +244,11 @@ export default function ConnectionsPage() {
               <span className="text-slate-600">
                 {data.last_event_at ? new Date(data.last_event_at).toLocaleString(locale) : "—"}
               </span>
+            </div>
+            <div className="flex justify-end pt-2">
+              <Button variant="secondary" onClick={doDisconnect} disabled={busy}>
+                <Trash2 className="h-4 w-4" /> {c("disconnect")}
+              </Button>
             </div>
           </div>
         )}

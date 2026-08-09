@@ -23,6 +23,19 @@ class FleetSessionController extends Controller
     }
 
     /**
+     * Disconnect: delete the tenant's Uber fleet session(s). The daemon stops
+     * their streams on its next reconcile. Used to clear a stale session before
+     * re-linking with fresh cookies.
+     */
+    public function destroy(): JsonResponse
+    {
+        // Auto-scoped to the manager's tenant by the BelongsToTenant global scope.
+        $deleted = UberFleetSession::query()->delete();
+
+        return response()->json(['data' => ['deleted' => $deleted]]);
+    }
+
+    /**
      * The manager pastes their captured Uber session (cookies + getUser org id).
      * We store it encrypted and bind the tenant to its Uber org.
      */

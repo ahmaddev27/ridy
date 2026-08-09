@@ -14,6 +14,15 @@ export async function getFleetSession(): Promise<FleetSession> {
   return res.data;
 }
 
+/** Disconnect: delete the tenant's Uber fleet session(s). */
+export async function deleteFleetSession(): Promise<{ deleted: number }> {
+  const res = await apiFetch<{ data: { deleted: number } }>("/api/v1/fleet-session", {
+    method: "DELETE",
+    withCsrf: true,
+  });
+  return res.data;
+}
+
 export async function captureFleetSession(input: {
   uber_org_uuid: string;
   cookies: Cookie[];
