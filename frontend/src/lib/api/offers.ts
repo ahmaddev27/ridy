@@ -15,8 +15,20 @@ export type DispatchOffer = {
   received_at: string | null;
 };
 
+export type TripInfo = {
+  pickup: { lat: number; lng: number } | null;
+  dropoff: { lat: number; lng: number } | null;
+  pickup_address: string | null;
+  dropoff_address: string | null;
+  route_geometry: { coordinates: [number, number][] } | null;
+  distance_km: number | null;
+  fare_amount: number | null;
+  price_per_km: number | null;
+};
+
 export type DispatchOfferDetail = DispatchOffer & {
   raw: Record<string, unknown> | null;
+  trip: TripInfo | null;
 };
 
 export async function getOffer(id: number): Promise<DispatchOfferDetail> {
