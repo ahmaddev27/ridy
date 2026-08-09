@@ -12,6 +12,7 @@ import { useAsync } from "@/hooks/use-async";
 import { getFleetSession, captureFleetSession, deleteFleetSession, type Cookie } from "@/lib/api/fleet-session";
 import { issueExtensionToken } from "@/lib/api/extension";
 import { LATEST_EXTENSION_VERSION, isExtensionOutdated } from "@/lib/extension";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 
 const statusTone: Record<string, Status> = {
   active: "connected",
@@ -35,6 +36,7 @@ export default function ConnectionsPage() {
   const { data, loading, refetch } = useAsync(getFleetSession);
 
   const [busy, setBusy] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
   // Manual cookie-paste fallback.
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -117,7 +119,6 @@ export default function ConnectionsPage() {
   }
 
   async function doDisconnect() {
-    if (!window.confirm(c("disconnectConfirm"))) return;
     setBusy(true);
     try {
       await deleteFleetSession();
@@ -127,6 +128,7 @@ export default function ConnectionsPage() {
       toast.error(c("disconnectFailed"), { description: e instanceof Error ? e.message : undefined });
     } finally {
       setBusy(false);
+      setConfirmDisconnect(false);
     }
   }
 
@@ -246,7 +248,7 @@ export default function ConnectionsPage() {
               </span>
             </div>
             <div className="flex justify-end pt-2">
-              <Button variant="secondary" onClick={doDisconnect} disabled={busy}>
+              <Button variant="secondary" onClick={() => setConfirmDisconnect(true)} disabled={busy}>
                 <Trash2 className="h-4 w-4" /> {c("disconnect")}
               </Button>
             </div>
@@ -328,6 +330,18 @@ export default function ConnectionsPage() {
           </div>
         )}
       </Card>
+
+      <ConfirmModal
+        open={confirmDisconnect}
+        danger
+        title={c("disconnect")}
+        message={c("disconnectConfirm")}
+        confirmLabel={c("disconnect")}
+        cancelLabel={c("cancel")}
+        busy={busy}
+        onConfirm={doDisconnect}
+        onCancel={() => setConfirmDisconnect(false)}
+      />
     </div>
   );
 }
