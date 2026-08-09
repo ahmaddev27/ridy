@@ -6,10 +6,17 @@ import { ShieldCheck } from "lucide-react";
 import { navGroups } from "./nav-config";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/context";
+import { useAuth } from "@/components/auth/auth-provider";
 
 export function Sidebar() {
   const pathname = usePathname();
   const { t } = useI18n();
+  const { user } = useAuth();
+
+  // Role-gated groups (e.g. the admin group) only render for permitted users.
+  const groups = navGroups.filter(
+    (g) => !g.requiresRole || user?.roles.includes(g.requiresRole),
+  );
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
@@ -26,7 +33,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4 text-sm">
-        {navGroups.map((group) => (
+        {groups.map((group) => (
           <div key={group.title}>
             <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               {t(group.title)}

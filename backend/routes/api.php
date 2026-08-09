@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Admin\CompanyController;
+use App\Http\Controllers\Api\V1\Admin\CompanySessionController;
+use App\Http\Controllers\Api\V1\Admin\CompanyUserController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\DashboardController;
@@ -78,5 +81,23 @@ Route::prefix('v1')->group(function () {
 
         // Governance
         Route::get('audit-logs', [AuditLogController::class, 'index']);
+    });
+
+    // Platform owner (super-admin). Deliberately WITHOUT ResolveTenant so the
+    // tenant context stays empty and the global scope no-ops → cross-tenant.
+    Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(function () {
+        Route::get('companies', [CompanyController::class, 'index']);
+        Route::post('companies', [CompanyController::class, 'store']);
+        Route::get('companies/{tenant}', [CompanyController::class, 'show']);
+        Route::put('companies/{tenant}', [CompanyController::class, 'update']);
+        Route::delete('companies/{tenant}', [CompanyController::class, 'destroy']);
+
+        Route::get('companies/{tenant}/users', [CompanyUserController::class, 'index']);
+        Route::post('companies/{tenant}/users', [CompanyUserController::class, 'store']);
+        Route::post('companies/{tenant}/users/{user}/reset-password', [CompanyUserController::class, 'resetPassword']);
+
+        Route::get('companies/{tenant}/session', [CompanySessionController::class, 'show']);
+        Route::post('companies/{tenant}/session/relink', [CompanySessionController::class, 'forceRelink']);
+        Route::delete('companies/{tenant}/session', [CompanySessionController::class, 'destroy']);
     });
 });

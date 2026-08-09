@@ -11,6 +11,7 @@ import { dictionaries, RTL_LOCALES, type Locale } from "./dictionaries";
 import { screensA } from "./screens-a";
 import { screensB } from "./screens-b";
 import { screensRidy } from "./screens-ridy";
+import { screensAdmin } from "./screens-admin";
 
 type I18nContextValue = {
   locale: Locale;
@@ -25,7 +26,7 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 function dictionaryFor(locale: Locale): Record<string, unknown> {
   return {
     ...dictionaries[locale],
-    screens: { ...screensA[locale], ...screensB[locale], ...screensRidy[locale] },
+    screens: { ...screensA[locale], ...screensB[locale], ...screensRidy[locale], ...screensAdmin[locale] },
   };
 }
 
