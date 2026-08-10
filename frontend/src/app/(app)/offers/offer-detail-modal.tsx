@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { X, MapPin, Flag, User, CircleDollarSign, Clock, Hash, Loader2 } from "lucide-react";
+import { X, MapPin, Flag, User, CircleDollarSign, Clock, Loader2 } from "lucide-react";
 import { StatCard } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n/context";
 import { getOffer, type DispatchOfferDetail } from "@/lib/api/offers";
@@ -132,9 +132,6 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
                 </Row>
                 <Row icon={Clock} label={c("colTime")}>
                   {offer.received_at ? new Date(offer.received_at).toLocaleString(locale) : "—"}
-                </Row>
-                <Row icon={Hash} label="Offer ID">
-                  <span dir="ltr" className="font-mono text-xs text-slate-500">{offer.offer_uuid}</span>
                 </Row>
               </dl>
             </>
