@@ -39,7 +39,7 @@ class VehicleController extends Controller
     /** Upsert the fleet's vehicles (posted by the extension after a sync). */
     public function ingest(Request $request): JsonResponse
     {
-        $data = $request->validate([
+        $request->validate([
             'vehicles' => ['required', 'array'],
             'vehicles.*.uber_vehicle_uuid' => ['required', 'string'],
         ]);
@@ -47,7 +47,11 @@ class VehicleController extends Controller
         $tenantId = (int) $request->user()->tenant_id;
         $count = 0;
 
-        foreach ($data['vehicles'] as $v) {
+        // Use the raw input (validate() would strip the unlisted vehicle fields).
+        foreach ($request->input('vehicles') as $v) {
+            if (empty($v['uber_vehicle_uuid'])) {
+                continue;
+            }
             Vehicle::updateOrCreate(
                 ['tenant_id' => $tenantId, 'uber_vehicle_uuid' => $v['uber_vehicle_uuid']],
                 [
