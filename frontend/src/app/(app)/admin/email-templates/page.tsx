@@ -22,7 +22,6 @@ export default function EmailTemplatesPage() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [activeKey, setActiveKey] = useState<string>("");
   const [subject, setSubject] = useState("");
-  const [logo, setLogo] = useState<string | null>(null);
   const [accent, setAccent] = useState("#4f46e5");
   const [footer, setFooter] = useState("");
   const [busy, setBusy] = useState(false);
@@ -35,7 +34,6 @@ export default function EmailTemplatesPage() {
   const loadInto = useCallback((tpl: EmailTemplate) => {
     setActiveKey(tpl.key);
     setSubject(tpl.subject);
-    setLogo(tpl.logo_url);
     setAccent(tpl.accent_color ?? "#4f46e5");
     setFooter(tpl.footer_text ?? "");
     if (editorRef.current) editorRef.current.innerHTML = tpl.body_html;
@@ -54,7 +52,7 @@ export default function EmailTemplatesPage() {
     return {
       subject,
       body_html: editorRef.current?.innerHTML ?? "",
-      logo_url: logo,
+      logo_url: null, // the platform Reidey logo is applied automatically
       accent_color: accent,
       footer_text: footer,
     };
@@ -70,7 +68,7 @@ export default function EmailTemplatesPage() {
     }, 500);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeKey, subject, logo, accent, footer]);
+  }, [activeKey, subject, accent, footer]);
 
   function exec(cmd: string, value?: string) {
     editorRef.current?.focus();
@@ -103,17 +101,6 @@ export default function EmailTemplatesPage() {
     try {
       const url = await uploadTemplateImage(file);
       exec("insertHTML", `<img src="${url}" style="max-width:100%;border-radius:8px" alt=""/>`);
-    } catch (err) {
-      toast.error(c("uploadFailed"), { description: err instanceof Error ? err.message : undefined });
-    }
-  }
-
-  async function onLogo(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    try {
-      setLogo(await uploadTemplateImage(file));
     } catch (err) {
       toast.error(c("uploadFailed"), { description: err instanceof Error ? err.message : undefined });
     }
@@ -195,13 +182,9 @@ export default function EmailTemplatesPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">{c("logo")}</label>
-              <div className="flex items-center gap-2">
-                {logo && <img src={logo} alt="" className="h-9 rounded border border-slate-200" />}
-                <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">
-                  {c("upload")}
-                  <input type="file" accept="image/*" className="hidden" onChange={onLogo} />
-                </label>
-                {logo && <button onClick={() => setLogo(null)} className="text-xs text-rose-500">{c("remove")}</button>}
+              <div className="flex h-9 items-center gap-2 rounded-lg border border-dashed border-slate-200 px-3 text-xs text-slate-400">
+                <span className="flex h-5 w-5 items-center justify-center rounded bg-slate-900 text-[10px] font-bold text-white">R</span>
+                {c("logoAuto")}
               </div>
             </div>
           </div>
