@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/context";
-import { listOffers, type DispatchOffer } from "@/lib/api/offers";
+import { listOffers, getOffer, type DispatchOffer } from "@/lib/api/offers";
 
 /**
  * App-wide new-offer watcher. Polls the offers feed every few seconds and, for
@@ -49,13 +49,38 @@ export function OfferAlerts() {
       }
     }
 
-    function announce(o: DispatchOffer) {
+    async function announce(o: DispatchOffer) {
       beep();
-      const parts = [o.rider_first_name, o.fare_formatted, o.pickup_address].filter(Boolean).join(" · ");
+      // Enrich with the geocoded trip (distance + price/km) — best-effort so a
+      // slow/failed geocode never blocks the alert.
+      let distanceKm: number | null = null;
+      let pricePerKm: number | null = null;
+      try {
+        const detail = await getOffer(o.id);
+        distanceKm = detail.trip?.distance_km ?? null;
+        pricePerKm = detail.trip?.price_per_km ?? null;
+      } catch {
+        /* show what we have */
+      }
+
+      const line1 = [
+        o.fare_formatted,
+        distanceKm != null ? `${distanceKm} km` : null,
+        pricePerKm != null ? `${pricePerKm.toFixed(2)} €/km` : null,
+      ].filter(Boolean).join(" · ");
+      const line2 = [o.driver_name, o.rider_first_name].filter(Boolean).join(" · ");
+      const line3 = [o.pickup_address, o.dropoff_address].filter(Boolean).join(" · ");
+
       toast(t("common.newOffer"), {
-        description: parts || undefined,
+        description: (
+          <div className="space-y-0.5 text-start">
+            {line1 && <div className="font-semibold text-slate-800">{line1}</div>}
+            {line2 && <div className="text-slate-600">{line2}</div>}
+            {line3 && <div className="truncate text-xs text-slate-400">{line3}</div>}
+          </div>
+        ),
         action: { label: t("common.view"), onClick: () => router.push("/offers") },
-        duration: 8000,
+        duration: 9000,
       });
     }
 
