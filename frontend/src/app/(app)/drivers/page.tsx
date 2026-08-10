@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { listDrivers, syncDrivers, type Driver } from "@/lib/api/drivers";
-import { syncRosterViaExtension } from "@/lib/extension";
+import { syncRosterViaExtension, fetchDriverStatusesViaExtension } from "@/lib/extension";
 import { DriverDetailModal } from "./driver-detail-modal";
 
 export default function DriversPage() {
@@ -36,6 +36,7 @@ export default function DriversPage() {
       }
 
       await refetch();
+      await refreshStatuses();
     } catch {
       /* best-effort — the cached roster stays visible */
     } finally {
@@ -43,11 +44,27 @@ export default function DriversPage() {
     }
   }
 
-  // Pull a fresh roster from Uber once when the page opens.
+  // Refresh live online/offline presence for the current drivers.
+  async function refreshStatuses() {
+    const list = await listDrivers().catch(() => []);
+    const uuids = list.map((d) => d.uber_driver_uuid).filter((u): u is string => Boolean(u));
+    const res = await fetchDriverStatusesViaExtension(uuids);
+    if (res?.ok) await refetch();
+  }
+
+  // Stale-while-revalidate: show the cached roster instantly, then silently
+  // pull a fresh one from Uber on open — but at most once every few minutes.
   useEffect(() => {
     if (didAutoSync.current) return;
     didAutoSync.current = true;
-    runSync();
+    const KEY = "drivers-autosync-at";
+    const last = Number(localStorage.getItem(KEY) || 0);
+    if (Date.now() - last > 3 * 60 * 1000) {
+      localStorage.setItem(KEY, String(Date.now()));
+      runSync();
+    } else {
+      refreshStatuses(); // cheap presence refresh even when the roster is fresh
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -100,18 +117,27 @@ export default function DriversPage() {
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        {d.picture_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={d.picture_url}
-                            alt=""
-                            className="h-9 w-9 rounded-full object-cover"
+                        <div className="relative">
+                          {d.picture_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={d.picture_url}
+                              alt=""
+                              className="h-9 w-9 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-500">
+                              {d.name.slice(0, 1)}
+                            </div>
+                          )}
+                          {/* Live online/offline dot */}
+                          <span
+                            className={`absolute -end-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-white ${
+                              d.online ? "bg-emerald-500" : "bg-slate-300"
+                            }`}
+                            title={d.online ? t("screens.drivers.online") : t("screens.drivers.offline")}
                           />
-                        ) : (
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-500">
-                            {d.name.slice(0, 1)}
-                          </div>
-                        )}
+                        </div>
                         <div>
                           <div className="font-medium text-slate-800">{d.name}</div>
                           {d.uber_email && (

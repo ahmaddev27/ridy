@@ -300,6 +300,63 @@ async function fetchVehicles() {
   }
 }
 
+/**
+ * Pull live online/offline presence for the given drivers from Uber's supplier
+ * GetDriverLiveLocation (bulk), then forward to Reidey. `driverUuids` is an
+ * array of Uber driver UUIDs.
+ */
+async function fetchDriverStatuses(driverUuids) {
+  const { orgUuid, apiUrl, token } = await api.storage.local.get(["orgUuid", "apiUrl", "token"]);
+  if (!orgUuid) return { ok: false, reason: "no_org_uuid" };
+  if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
+  if (!Array.isArray(driverUuids) || driverUuids.length === 0) return { ok: false, reason: "no_drivers" };
+
+  let locations;
+  try {
+    const res = await fetch("https://supplier.uber.com/api/GetDriverLiveLocation?localeCode=en-GB", {
+      method: "POST",
+      credentials: "include",
+      headers: { accept: "*/*", "content-type": "application/json", "x-csrf-token": "x" },
+      body: JSON.stringify({
+        orgId: { uuid: { value: orgUuid } },
+        driverIds: driverUuids.map((u) => ({ value: u })),
+        filters: { allowedStatuses: [] },
+        responseSelector: {
+          includeStats: false,
+          locationDetailsOptions: { fieldMask: { paths: ["location_updated_time", "driver_status"] } },
+        },
+      }),
+    });
+    if (!res.ok) return { ok: false, reason: `supplier_http_${res.status}` };
+    const body = await res.json();
+    if (body.status !== "success") return { ok: false, reason: body?.data?.message || "status_failed" };
+    locations = body.data?.driverLocations ?? [];
+  } catch (e) {
+    return { ok: false, reason: e.message };
+  }
+
+  const statuses = locations.map((l) => ({
+    driver_uuid: l.driverId?.value,
+    status: l.driverStatus ?? null,
+    location_updated_at: l.locationUpdatedTime?.value ? Number(l.locationUpdatedTime.value) : null,
+  })).filter((s) => s.driver_uuid);
+
+  try {
+    const res = await fetch(`${apiUrl}/api/v1/drivers/statuses`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ statuses }),
+    });
+    if (!res.ok) {
+      const b = await res.json().catch(() => ({}));
+      return { ok: false, reason: b.message || `http_${res.status}` };
+    }
+    return { ok: true, count: statuses.length };
+  } catch (e) {
+    return { ok: false, reason: e.message };
+  }
+}
+
 /** Forward RAMEN offers (captured in the manager's browser) to Reidey. */
 async function postOffers(offers, seq) {
   const { apiUrl, token } = await api.storage.local.get(["apiUrl", "token"]);
@@ -349,6 +406,10 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   if (msg?.type === "fetchVehicles") {
     fetchVehicles().then(sendResponse);
+    return true;
+  }
+  if (msg?.type === "fetchStatuses" && Array.isArray(msg.driverUuids)) {
+    fetchDriverStatuses(msg.driverUuids).then(sendResponse);
     return true;
   }
   if (msg?.type === "offers" && Array.isArray(msg.offers)) {

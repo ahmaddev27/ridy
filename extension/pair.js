@@ -67,3 +67,12 @@ window.addEventListener("message", async (event) => {
     .catch((e) => ({ ok: false, reason: e?.message || "extension_error" }));
   window.postMessage({ source: "ridy-vehicles-done", ...res }, "*");
 });
+
+// The Drivers page asks the extension to refresh live online/offline presence.
+window.addEventListener("message", async (event) => {
+  if (event.source !== window || event.data?.source !== "ridy-fetch-statuses") return;
+  const res = await api.runtime
+    .sendMessage({ type: "fetchStatuses", driverUuids: event.data.driverUuids })
+    .catch((e) => ({ ok: false, reason: e?.message || "extension_error" }));
+  window.postMessage({ source: "ridy-statuses-done", ...res }, "*");
+});

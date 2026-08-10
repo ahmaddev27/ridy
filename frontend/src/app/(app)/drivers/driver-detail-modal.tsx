@@ -74,6 +74,9 @@ export function DriverDetailModal({ driver, onClose }: { driver: Driver; onClose
               <p className="truncate text-sm text-slate-400">{driver.uber_email}</p>
             )}
             <div className="mt-2 flex flex-wrap gap-1.5">
+              <Badge status={driver.online ? "connected" : "neutral"} dot>
+                {driver.online ? d("online") : d("offline")}
+              </Badge>
               <Badge status={driver.active ? "connected" : "gap"} dot>
                 {driver.active ? d("active") : d("inactive")}
               </Badge>

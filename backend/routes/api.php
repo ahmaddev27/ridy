@@ -52,6 +52,7 @@ Route::prefix('v1')->group(function () {
         Route::get('drivers', [DriverController::class, 'index']);
         Route::post('drivers/sync', [DriverController::class, 'sync']);
         Route::post('drivers/roster', [DriverController::class, 'ingestRoster']);
+        Route::post('drivers/statuses', [DriverController::class, 'ingestStatuses']);
 
         // Per-driver Uber performance metrics (earnings/hours/trips)
         Route::post('drivers/metrics', [DriverMetricController::class, 'store']);

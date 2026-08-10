@@ -14,6 +14,9 @@ export type Driver = {
   total_trips: number | null;
   status: string | null;
   active: boolean;
+  online: boolean;
+  online_status: string | null;
+  location_updated_at: string | null;
 };
 
 export async function listDrivers(): Promise<Driver[]> {
