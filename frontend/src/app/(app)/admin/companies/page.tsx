@@ -31,7 +31,7 @@ export default function CompaniesPage() {
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
+  const [perPage] = useState(25);
   const [confirmDel, setConfirmDel] = useState<Company | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -88,20 +88,6 @@ export default function CompaniesPage() {
             className="w-full rounded-lg border border-slate-300 py-2 ps-9 pe-3 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
           />
         </div>
-        <select
-          value={perPage}
-          onChange={(e) => {
-            setPerPage(Number(e.target.value));
-            setPage(1);
-          }}
-          className="ms-auto rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-black"
-        >
-          {[10, 25, 50, 100].map((n) => (
-            <option key={n} value={n}>
-              {n} / {c("page")}
-            </option>
-          ))}
-        </select>
       </div>
 
       <Card className="overflow-hidden">

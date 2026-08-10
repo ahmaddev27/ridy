@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Radio, MapPin, Search, Trash2, Loader2, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { Radio, MapPin, Search, Trash2, Loader2, ArrowRight, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,9 @@ export default function OffersPage() {
   const [busy, setBusy] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
+  const [perPage] = useState(50); // fixed; offers are grouped by day, not paged by size
+  // Collapsible day groups — today starts open, the rest collapsed.
+  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set([new Date().toDateString()]));
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [meta, setMeta] = useState<PageMeta | null>(null);
@@ -93,16 +95,39 @@ export default function OffersPage() {
     return [...map.entries()];
   }, [offers]);
 
+  // Group the loaded offers into day buckets (feed is newest-first, so days stay ordered).
+  const groupedByDay = useMemo(() => {
+    const groups = new Map<string, DispatchOffer[]>();
+    for (const o of offers) {
+      const key = o.received_at ? new Date(o.received_at).toDateString() : "—";
+      const bucket = groups.get(key) ?? [];
+      bucket.push(o);
+      groups.set(key, bucket);
+    }
+    return [...groups.entries()];
+  }, [offers]);
+
+  function toggleDay(key: string) {
+    setOpenDays((s) => {
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  }
+
+  function dayLabel(key: string): string {
+    if (key === new Date().toDateString()) return c("today");
+    if (key === "—") return "—";
+    return new Date(key).toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
+  }
+
   function toggle(id: number) {
     setSelected((s) => {
       const next = new Set(s);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  }
-
-  function toggleAll() {
-    setSelected((s) => (s.size === offers.length ? new Set() : new Set(offers.map((o) => o.id))));
   }
 
   async function removeOne(id: number) {
@@ -131,8 +156,6 @@ export default function OffersPage() {
       setBusy(false);
     }
   }
-
-  const allSelected = offers.length > 0 && selected.size === offers.length;
 
   return (
     <div className="space-y-6">
@@ -196,20 +219,6 @@ export default function OffersPage() {
             {c("deleteSelected")} ({selected.size})
           </Button>
         )}
-
-        {/* Rows-per-page */}
-        <select
-          value={perPage}
-          onChange={(e) => setPerPage(Number(e.target.value))}
-          className="ms-auto rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
-          title={c("rowsPerPage")}
-        >
-          {[10, 25, 50, 100].map((n) => (
-            <option key={n} value={n}>
-              {n} / {c("page")}
-            </option>
-          ))}
-        </select>
       </div>
 
       {error && (
@@ -228,76 +237,80 @@ export default function OffersPage() {
         ) : offers.length === 0 ? (
           <EmptyState icon={Radio} title={c("empty")} description={c("emptyDesc")} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-400 [&_th]:text-start">
-                <tr>
-                  <th className="px-4 py-3">
-                    <input type="checkbox" checked={allSelected} onChange={toggleAll} />
-                  </th>
-                  <th className="px-4 py-3 font-semibold">{c("colTime")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colDriver")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colRoute")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colFare")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colStatus")}</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {offers.map((o) => (
-                  <tr
-                    key={o.id}
-                    onClick={() => setDetailId(o.id)}
-                    className={`cursor-pointer ${selected.has(o.id) ? "bg-slate-50" : "hover:bg-slate-50"}`}
+          <div>
+            {groupedByDay.map(([key, dayOffers]) => {
+              const open = openDays.has(key);
+              return (
+                <div key={key} className="border-b border-slate-100 last:border-0">
+                  <button
+                    onClick={() => toggleDay(key)}
+                    className="flex w-full items-center gap-2 px-4 py-3 text-start hover:bg-slate-50"
                   >
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(o.id)}
-                        onChange={() => toggle(o.id)}
-                      />
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-500">
-                      {o.received_at ? new Date(o.received_at).toLocaleTimeString(locale) : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-slate-800">{o.driver_name ?? "—"}</div>
-                      <div className="font-mono text-[10px] text-slate-400">{o.driver_uuid}</div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      <div className="flex items-start gap-1.5">
-                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                        <div className="min-w-0">
-                          <div className="truncate">{o.pickup_address ?? "—"}</div>
-                          <div className="flex items-center gap-1 truncate text-slate-400">
-                            <ArrowRight className="h-3 w-3 shrink-0 rtl:rotate-180" />
-                            <span className="truncate">{o.dropoff_address ?? "—"}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
-                      {o.fare_formatted ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge status={o.linked ? "connected" : "gap"} dot>
-                        {o.linked ? c("linked") : c("unlinked")}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => removeOne(o.id)}
-                        disabled={busy}
-                        className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                        title={c("delete")}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    <ChevronDown className={`h-4 w-4 text-slate-400 transition ${open ? "" : "-rotate-90"}`} />
+                    <span className="font-semibold text-slate-800">{dayLabel(key)}</span>
+                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                      {dayOffers.length} {c("offersCount")}
+                    </span>
+                  </button>
+                  {open && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <tbody className="divide-y divide-slate-100">
+                          {dayOffers.map((o) => (
+                            <tr
+                              key={o.id}
+                              onClick={() => setDetailId(o.id)}
+                              className={`cursor-pointer ${selected.has(o.id) ? "bg-slate-50" : "hover:bg-slate-50"}`}
+                            >
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggle(o.id)} />
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                                {o.received_at ? new Date(o.received_at).toLocaleTimeString(locale) : "—"}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-slate-800">{o.driver_name ?? "—"}</div>
+                                <div className="font-mono text-[10px] text-slate-400">{o.driver_uuid}</div>
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">
+                                <div className="flex items-start gap-1.5">
+                                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                                  <div className="min-w-0">
+                                    <div className="truncate">{o.pickup_address ?? "—"}</div>
+                                    <div className="flex items-center gap-1 truncate text-slate-400">
+                                      <ArrowRight className="h-3 w-3 shrink-0 rtl:rotate-180" />
+                                      <span className="truncate">{o.dropoff_address ?? "—"}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
+                                {o.fare_formatted ?? "—"}
+                              </td>
+                              <td className="px-4 py-3">
+                                <Badge status={o.linked ? "connected" : "gap"} dot>
+                                  {o.linked ? c("linked") : c("unlinked")}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => removeOne(o.id)}
+                                  disabled={busy}
+                                  className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                  title={c("delete")}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
