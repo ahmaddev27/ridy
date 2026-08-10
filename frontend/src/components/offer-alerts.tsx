@@ -75,6 +75,8 @@ export function OfferAlerts() {
 let audioCtx: AudioContext | null = null;
 function beep() {
   try {
+    // Respect the manager's mute toggle (persisted in localStorage).
+    if (localStorage.getItem("offerSoundMuted") === "1") return;
     const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     audioCtx = audioCtx ?? new Ctx();
     if (audioCtx.state === "suspended") audioCtx.resume();

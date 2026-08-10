@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Bell, ChevronDown, LogOut } from "lucide-react";
+import { Search, Bell, ChevronDown, LogOut, Volume2, VolumeX } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
@@ -28,6 +28,20 @@ export function Topbar() {
   // Live unread badge — polled so new notifications surface without a refresh.
   const { data: notifications } = useAsync(listNotifications, { refetchInterval: 15000 });
   const unread = notifications?.unread ?? 0;
+
+  // Offer-alert sound mute (persisted); the OfferAlerts watcher reads the same key.
+  const [muted, setMuted] = useState(false);
+  useEffect(() => {
+    setMuted(localStorage.getItem("offerSoundMuted") === "1");
+  }, []);
+  function toggleMute() {
+    setMuted((m) => {
+      const next = !m;
+      localStorage.setItem("offerSoundMuted", next ? "1" : "0");
+      return next;
+    });
+  }
+  const isManager = Boolean(user?.tenant);
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/80 px-5 backdrop-blur">
@@ -56,6 +70,18 @@ export function Topbar() {
             </button>
           ))}
         </div>
+
+        {/* Offer-sound mute toggle (managers only) */}
+        {isManager && (
+          <button
+            onClick={toggleMute}
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+            title={muted ? t("common.unmute") : t("common.mute")}
+            aria-label={muted ? t("common.unmute") : t("common.mute")}
+          >
+            {muted ? <VolumeX className="h-5 w-5 text-slate-400" /> : <Volume2 className="h-5 w-5" />}
+          </button>
+        )}
 
         {/* Notifications */}
         <button
