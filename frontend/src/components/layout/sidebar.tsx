@@ -7,7 +7,7 @@ import { NavList } from "./nav-list";
 export function SidebarBrand() {
   return (
     <div className="flex h-16 items-center gap-2.5 border-b border-slate-200 px-5">
-      <Logo size={34} className="text-slate-900" />
+      <Logo size={42} className="text-slate-900" />
       <div className="leading-tight">
         <div className="text-sm font-bold text-slate-900">Reidey</div>
         <div className="text-[11px] text-slate-400">Fleet Management</div>
