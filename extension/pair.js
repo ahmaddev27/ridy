@@ -58,3 +58,12 @@ window.addEventListener("message", async (event) => {
     .catch((e) => ({ ok: false, reason: e?.message || "extension_error" }));
   window.postMessage({ source: "ridy-metrics-done", ...res }, "*");
 });
+
+// The Vehicles page asks the extension to pull the fleet's vehicles.
+window.addEventListener("message", async (event) => {
+  if (event.source !== window || event.data?.source !== "ridy-fetch-vehicles") return;
+  const res = await api.runtime
+    .sendMessage({ type: "fetchVehicles" })
+    .catch((e) => ({ ok: false, reason: e?.message || "extension_error" }));
+  window.postMessage({ source: "ridy-vehicles-done", ...res }, "*");
+});

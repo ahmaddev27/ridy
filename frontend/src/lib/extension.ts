@@ -8,7 +8,7 @@
 // The extension version this dashboard build expects. Bump it in lockstep with
 // extension/manifest.json so managers running an older, manually-installed
 // build get prompted to update (unpacked extensions don't auto-update).
-export const LATEST_EXTENSION_VERSION = "1.11.0";
+export const LATEST_EXTENSION_VERSION = "1.12.0";
 
 /** True when `installed` is a valid version older than LATEST_EXTENSION_VERSION. */
 export function isExtensionOutdated(installed: string | null | undefined): boolean {
@@ -70,6 +70,36 @@ export function fetchDriverMetricsViaExtension(
     const timer = setTimeout(() => finish(null), timeoutMs);
     window.addEventListener("message", onMessage);
     window.postMessage({ source: "ridy-fetch-metrics", driverUuid, from, to }, "*");
+  });
+}
+
+export interface VehicleSyncResult {
+  ok: boolean;
+  reason?: string;
+  synced?: number;
+}
+
+/** Ask the extension to pull the fleet's vehicles from Uber and store them. */
+export function fetchVehiclesViaExtension(timeoutMs = 20000): Promise<VehicleSyncResult | null> {
+  if (typeof window === "undefined") return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    let settled = false;
+    function finish(result: VehicleSyncResult | null) {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener("message", onMessage);
+      clearTimeout(timer);
+      resolve(result);
+    }
+    function onMessage(event: MessageEvent) {
+      if (event.source !== window || event.data?.source !== "ridy-vehicles-done") return;
+      const { source: _s, ...result } = event.data;
+      finish(result as VehicleSyncResult);
+    }
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    window.addEventListener("message", onMessage);
+    window.postMessage({ source: "ridy-fetch-vehicles" }, "*");
   });
 }
 

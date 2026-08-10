@@ -230,6 +230,74 @@ async function fetchMetrics(driverUuid, from, to) {
   return { ok: true, metrics };
 }
 
+// Uber's supplier SearchVehicles GraphQL query (captured from the fleet UI).
+const SEARCH_VEHICLES_QUERY = `query SearchVehicles($orgUUID: String, $filters: SearchVehicleFilters, $withAssignments: Boolean!) {
+  SearchSupplierVehicles(orgUUID: $orgUUID, filters: $filters) {
+    vehicles { uuid make model year licensePlate vin color colorHexCode imageURL compliance { status } assignments @include(if: $withAssignments) { entityUUID } }
+  }
+}`;
+
+/**
+ * Pull the fleet's vehicles from supplier SearchVehicles (manager's own session
+ * + real IP), normalize them, and forward to Reidey. Triggered on demand from
+ * the Vehicles page.
+ */
+async function fetchVehicles() {
+  const { orgUuid, apiUrl, token } = await api.storage.local.get(["orgUuid", "apiUrl", "token"]);
+  if (!orgUuid) return { ok: false, reason: "no_org_uuid" };
+  if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
+
+  let vehicles;
+  try {
+    const res = await fetch("https://supplier.uber.com/graphql", {
+      method: "POST",
+      credentials: "include",
+      headers: { accept: "*/*", "content-type": "application/json", "x-csrf-token": "x" },
+      body: JSON.stringify({
+        operationName: "SearchVehicles",
+        query: SEARCH_VEHICLES_QUERY,
+        variables: { orgUUID: orgUuid, filters: {}, withAssignments: true },
+      }),
+    });
+    if (!res.ok) return { ok: false, reason: `supplier_http_${res.status}` };
+    const body = await res.json();
+    vehicles = body?.data?.SearchSupplierVehicles?.vehicles;
+    if (!Array.isArray(vehicles)) return { ok: false, reason: body?.errors?.[0]?.message || "no_vehicles" };
+  } catch (e) {
+    return { ok: false, reason: e.message };
+  }
+
+  const normalized = vehicles.map((v) => ({
+    uber_vehicle_uuid: v.uuid,
+    make: v.make ?? null,
+    model: v.model ?? null,
+    year: v.year || null,
+    license_plate: v.licensePlate ?? null,
+    vin: v.vin ?? null,
+    color: v.localizedColorName ?? v.color ?? null,
+    color_hex: v.colorHexCode ? "#" + String(v.colorHexCode).replace(/^#/, "") : null,
+    image_url: v.imageURL ?? null,
+    compliance_status: v.compliance?.status ?? null,
+    assigned_driver_uuid: v.assignments?.[0]?.entityUUID ?? null,
+  }));
+
+  try {
+    const res = await fetch(`${apiUrl}/api/v1/vehicles`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ vehicles: normalized }),
+    });
+    if (!res.ok) {
+      const b = await res.json().catch(() => ({}));
+      return { ok: false, reason: b.message || `http_${res.status}` };
+    }
+    const b = await res.json();
+    return { ok: true, ...b.data };
+  } catch (e) {
+    return { ok: false, reason: e.message };
+  }
+}
+
 /** Forward RAMEN offers (captured in the manager's browser) to Reidey. */
 async function postOffers(offers, seq) {
   const { apiUrl, token } = await api.storage.local.get(["apiUrl", "token"]);
@@ -275,6 +343,10 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   if (msg?.type === "fetchMetrics" && msg.driverUuid) {
     fetchMetrics(msg.driverUuid, msg.from, msg.to).then(sendResponse);
+    return true;
+  }
+  if (msg?.type === "fetchVehicles") {
+    fetchVehicles().then(sendResponse);
     return true;
   }
   if (msg?.type === "offers" && Array.isArray(msg.offers)) {
