@@ -109,8 +109,11 @@ export default function ConnectionsPage() {
     setExtBusy(true);
     try {
       await pairExtension();
-      // Give the extension a moment to store the pairing, then open Uber.
-      setTimeout(() => window.open("https://vsdispatch.uber.com/", "_blank"), 500);
+      // Give the extension a moment to store the pairing, then open Uber's main
+      // fleet portal (supplier.uber.com). The extension's content script runs on
+      // both supplier and vsdispatch and captures the shared *.uber.com session
+      // once the manager signs in — no need to send them to the dispatch page.
+      setTimeout(() => window.open("https://supplier.uber.com/", "_blank"), 500);
     } catch (e) {
       toast.error(c("loginFailed"), { description: e instanceof Error ? e.message : undefined });
     } finally {

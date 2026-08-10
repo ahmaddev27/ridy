@@ -49,7 +49,7 @@ async function connect() {
 
   const [tab] = await api.tabs.query({ active: true, currentWindow: true });
   if (!tab || !/uber\.com/i.test(tab.url || "")) {
-    return setStatus("err", "Öffne zuerst vsdispatch.uber.com und melde dich an.");
+    return setStatus("err", "Öffne zuerst supplier.uber.com und melde dich an.");
   }
 
   setStatus("ok", "Sitzung wird erfasst…");
