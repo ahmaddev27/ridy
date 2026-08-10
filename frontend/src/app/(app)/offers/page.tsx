@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { listOffersPaged, deleteOffer, bulkDeleteOffers, type DispatchOffer, type PageMeta } from "@/lib/api/offers";
+import { listDrivers, type Driver } from "@/lib/api/drivers";
 import { OfferDetailModal } from "./offer-detail-modal";
 
 export default function OffersPage() {
@@ -20,7 +21,9 @@ export default function OffersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [driverUuid, setDriverUuid] = useState("");
+  const [driverUuids, setDriverUuids] = useState<string[]>([]);
+  const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
+  const [driverFilterOpen, setDriverFilterOpen] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
@@ -43,7 +46,7 @@ export default function OffersPage() {
     try {
       const { items, meta: m } = await listOffersPaged({
         search: search.trim(),
-        driverUuid: driverUuid || undefined,
+        driverUuids: driverUuids.length ? driverUuids : undefined,
         from: from || undefined,
         to: to || undefined,
         page,
@@ -59,17 +62,19 @@ export default function OffersPage() {
     }
   }
 
+  const driverKey = driverUuids.join(",");
+
   // Filters/page-size reset to the first page.
   useEffect(() => {
     setPage(1);
-  }, [search, driverUuid, from, to, perPage]);
+  }, [search, driverKey, from, to, perPage]);
 
   // Debounce search + react to filter/page/page-size changes.
   useEffect(() => {
     const id = setTimeout(load, 300);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, driverUuid, from, to, page, perPage]);
+  }, [search, driverKey, from, to, page, perPage]);
 
   // Near real-time: silently poll for new offers every 5s (offers are the most
   // time-sensitive surface). Also refetch when the tab regains focus.
@@ -84,16 +89,19 @@ export default function OffersPage() {
       window.removeEventListener("focus", onFocus);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, driverUuid, from, to, page, perPage]);
+  }, [search, driverKey, from, to, page, perPage]);
 
-  // Distinct drivers present in the current feed, for the filter dropdown.
-  const driverOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const o of offers) {
-      if (o.driver_uuid) map.set(o.driver_uuid, o.driver_name ?? o.driver_uuid);
-    }
-    return [...map.entries()];
-  }, [offers]);
+  // All of the company's drivers (with an Uber UUID) populate the filter list.
+  useEffect(() => {
+    listDrivers()
+      .then((list) => setAllDrivers(list.filter((d) => d.uber_driver_uuid)))
+      .catch(() => {});
+  }, []);
+
+  const selectedDriverSet = useMemo(() => new Set(driverUuids), [driverUuids]);
+  function toggleDriver(uuid: string) {
+    setDriverUuids((prev) => (prev.includes(uuid) ? prev.filter((x) => x !== uuid) : [...prev, uuid]));
+  }
 
   // Group the loaded offers into day buckets (feed is newest-first, so days stay ordered).
   const groupedByDay = useMemo(() => {
@@ -172,18 +180,50 @@ export default function OffersPage() {
             className="w-full rounded-lg border border-slate-300 py-2 ps-9 pe-3 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
           />
         </div>
-        <select
-          value={driverUuid}
-          onChange={(e) => setDriverUuid(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
-        >
-          <option value="">{c("filterAll")}</option>
-          {driverOptions.map(([uuid, name]) => (
-            <option key={uuid} value={uuid}>
-              {name}
-            </option>
-          ))}
-        </select>
+        {/* Multi-select driver filter — lists every company driver */}
+        <div className="relative">
+          <button
+            onClick={() => setDriverFilterOpen((o) => !o)}
+            className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 outline-none hover:bg-slate-50"
+          >
+            {driverUuids.length === 0
+              ? c("filterAll")
+              : `${driverUuids.length} ${c("driversSelected")}`}
+            <ChevronDown className="h-4 w-4 text-slate-400" />
+          </button>
+          {driverFilterOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setDriverFilterOpen(false)} />
+              <div className="absolute z-20 mt-1 max-h-72 w-64 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                {driverUuids.length > 0 && (
+                  <button
+                    onClick={() => setDriverUuids([])}
+                    className="w-full rounded px-2 py-1.5 text-start text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                  >
+                    {c("clearSelection")}
+                  </button>
+                )}
+                {allDrivers.length === 0 ? (
+                  <p className="px-2 py-2 text-xs text-slate-400">{c("noDrivers")}</p>
+                ) : (
+                  allDrivers.map((d) => (
+                    <label
+                      key={d.id}
+                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-slate-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedDriverSet.has(d.uber_driver_uuid ?? "")}
+                        onChange={() => d.uber_driver_uuid && toggleDriver(d.uber_driver_uuid)}
+                      />
+                      <span className="truncate text-slate-700">{d.name}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Date range */}
         <input

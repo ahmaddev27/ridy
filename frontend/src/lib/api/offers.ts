@@ -42,6 +42,7 @@ export type PageMeta = { current_page: number; last_page: number; total: number;
 export async function listOffersPaged(params?: {
   search?: string;
   driverUuid?: string;
+  driverUuids?: string[];
   from?: string;
   to?: string;
   page?: number;
@@ -50,6 +51,7 @@ export async function listOffersPaged(params?: {
   const q = new URLSearchParams();
   if (params?.search) q.set("search", params.search);
   if (params?.driverUuid) q.set("driver_uuid", params.driverUuid);
+  for (const uuid of params?.driverUuids ?? []) q.append("driver_uuids[]", uuid);
   if (params?.from) q.set("from", params.from);
   if (params?.to) q.set("to", params.to);
   if (params?.page) q.set("page", String(params.page));

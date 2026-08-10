@@ -36,6 +36,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       rowsPerPage: "Rows per page", page: "page", of: "of", prev: "Previous", next: "Next",
       dateFrom: "From date", dateTo: "To date", clearDates: "Clear dates",
       today: "Today", offersCount: "offers",
+      driversSelected: "selected", clearSelection: "Clear selection", noDrivers: "No drivers",
     },
     driverLinking: {
       title: "Link drivers",
@@ -165,6 +166,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       rowsPerPage: "Zeilen pro Seite", page: "Seite", of: "von", prev: "Zurück", next: "Weiter",
       dateFrom: "Von Datum", dateTo: "Bis Datum", clearDates: "Datum löschen",
       today: "Heute", offersCount: "Angebote",
+      driversSelected: "ausgewählt", clearSelection: "Auswahl leeren", noDrivers: "Keine Fahrer",
     },
     driverLinking: {
       title: "Fahrer verknüpfen",
@@ -292,6 +294,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       rowsPerPage: "صفوف بالصفحة", page: "صفحة", of: "من", prev: "السابق", next: "التالي",
       dateFrom: "من تاريخ", dateTo: "إلى تاريخ", clearDates: "مسح التواريخ",
       today: "اليوم", offersCount: "عرض",
+      driversSelected: "محدد", clearSelection: "مسح التحديد", noDrivers: "لا سائقين",
     },
     driverLinking: {
       title: "ربط السائقين",

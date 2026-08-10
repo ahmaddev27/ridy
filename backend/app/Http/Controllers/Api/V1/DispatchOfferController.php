@@ -17,8 +17,10 @@ class DispatchOfferController extends Controller
     {
         $offers = DispatchOffer::query()
             ->with('driver:id,name')
-            // Filter by the driver's Uber UUID (exact) when provided.
+            // Filter by the driver's Uber UUID (single, back-compat).
             ->when($request->filled('driver_uuid'), fn ($q) => $q->where('driver_uuid', $request->string('driver_uuid')))
+            // Filter by any of several drivers (multi-select).
+            ->when($request->filled('driver_uuids'), fn ($q) => $q->whereIn('driver_uuid', (array) $request->input('driver_uuids')))
             // Free-text search across rider, driver name and both addresses.
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%'.$request->string('search').'%';
