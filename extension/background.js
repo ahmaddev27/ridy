@@ -213,7 +213,9 @@ async function fetchMetrics(driverUuid, from, to) {
     const field = METRIC_MAP[m.metricName];
     if (!field) continue;
     const v = m.metricValue ?? {};
-    metrics[field] = v.doubleValue ?? v.int64Value ?? v.stringValue ?? null;
+    // Uber nests the value one level deep, e.g. { doubleValue: { value: 4403.89 } }.
+    const raw = v.doubleValue ?? v.int64Value ?? v.stringValue ?? null;
+    metrics[field] = raw && typeof raw === "object" ? (raw.value ?? null) : raw;
   }
 
   // Store on Reidey (best-effort — still return to the page if this fails).
