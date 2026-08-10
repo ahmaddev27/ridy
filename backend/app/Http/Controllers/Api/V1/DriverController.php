@@ -8,6 +8,7 @@ use App\Domain\Dispatch\UberSupplierClient;
 use App\Domain\Fleet\Models\Driver;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DriverResource;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -34,6 +35,32 @@ class DriverController extends Controller
         $result = $roster->sync($tenantId, $data['drivers']);
 
         return response()->json(['data' => $result]);
+    }
+
+    /**
+     * Live online/offline presence, posted by the extension after querying
+     * Uber's GetDriverLiveLocation. Matched to drivers by Uber UUID.
+     */
+    public function ingestStatuses(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'statuses' => ['required', 'array'],
+            'statuses.*.driver_uuid' => ['required', 'string'],
+            'statuses.*.status' => ['nullable', 'string'],
+            'statuses.*.location_updated_at' => ['nullable', 'numeric'], // ms epoch
+        ]);
+
+        $updated = 0;
+        foreach ($data['statuses'] as $row) {
+            $updated += Driver::where('uber_driver_uuid', $row['driver_uuid'])->update([
+                'online_status' => $row['status'] ?? null,
+                'location_updated_at' => ! empty($row['location_updated_at'])
+                    ? CarbonImmutable::createFromTimestampMs($row['location_updated_at']) : null,
+                'status_synced_at' => now(),
+            ]);
+        }
+
+        return response()->json(['data' => ['updated' => $updated]]);
     }
 
     /**

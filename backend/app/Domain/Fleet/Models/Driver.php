@@ -14,6 +14,7 @@ class Driver extends Model
         'tenant_id', 'name', 'phone', 'license_no', 'employment_type', 'external_ids', 'pseudonym_id',
         'uber_driver_uuid', 'uber_email', 'uber_link_method',
         'uber_picture_url', 'uber_rating', 'uber_total_trips', 'uber_status', 'roster_synced_at',
+        'online_status', 'location_updated_at', 'status_synced_at',
     ];
 
     protected $casts = [
@@ -21,7 +22,17 @@ class Driver extends Model
         'uber_rating' => 'decimal:2',
         'uber_total_trips' => 'integer',
         'roster_synced_at' => 'datetime',
+        'location_updated_at' => 'datetime',
+        'status_synced_at' => 'datetime',
     ];
+
+    /** True when Uber's live driverStatus reads as online / on a trip. */
+    public function isOnline(): bool
+    {
+        $s = (string) $this->online_status;
+
+        return $s !== '' && preg_match('/ONLINE|ON_TRIP|ACTIVE/i', $s) && ! preg_match('/OFFLINE/i', $s);
+    }
 
     protected static function booted(): void
     {

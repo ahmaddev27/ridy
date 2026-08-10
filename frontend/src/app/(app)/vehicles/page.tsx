@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Car, RefreshCw, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -19,6 +19,25 @@ export default function VehiclesPage() {
   const { data, loading, refetch } = useAsync(listVehicles, { refetchInterval: 30000 });
   const vehicles = data ?? [];
   const [syncing, setSyncing] = useState(false);
+  const didAutoSync = useRef(false);
+
+  // Stale-while-revalidate: silently pull fresh vehicles from Uber on open,
+  // throttled to at most once every few minutes.
+  useEffect(() => {
+    if (didAutoSync.current) return;
+    didAutoSync.current = true;
+    const KEY = "vehicles-autosync-at";
+    const last = Number(localStorage.getItem(KEY) || 0);
+    if (Date.now() - last > 5 * 60 * 1000) {
+      localStorage.setItem(KEY, String(Date.now()));
+      fetchVehiclesViaExtension()
+        .then((res) => {
+          if (res?.ok) refetch();
+        })
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function sync() {
     setSyncing(true);

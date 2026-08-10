@@ -8,7 +8,7 @@
 // The extension version this dashboard build expects. Bump it in lockstep with
 // extension/manifest.json so managers running an older, manually-installed
 // build get prompted to update (unpacked extensions don't auto-update).
-export const LATEST_EXTENSION_VERSION = "1.12.1";
+export const LATEST_EXTENSION_VERSION = "1.12.2";
 
 /** True when `installed` is a valid version older than LATEST_EXTENSION_VERSION. */
 export function isExtensionOutdated(installed: string | null | undefined): boolean {
@@ -100,6 +100,33 @@ export function fetchVehiclesViaExtension(timeoutMs = 20000): Promise<VehicleSyn
     const timer = setTimeout(() => finish(null), timeoutMs);
     window.addEventListener("message", onMessage);
     window.postMessage({ source: "ridy-fetch-vehicles" }, "*");
+  });
+}
+
+/** Ask the extension to refresh live online/offline presence for the drivers. */
+export function fetchDriverStatusesViaExtension(
+  driverUuids: string[],
+  timeoutMs = 15000,
+): Promise<{ ok: boolean; count?: number; reason?: string } | null> {
+  if (typeof window === "undefined" || driverUuids.length === 0) return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    let settled = false;
+    function finish(result: { ok: boolean } | null) {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener("message", onMessage);
+      clearTimeout(timer);
+      resolve(result);
+    }
+    function onMessage(event: MessageEvent) {
+      if (event.source !== window || event.data?.source !== "ridy-statuses-done") return;
+      const { source: _s, ...result } = event.data;
+      finish(result);
+    }
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    window.addEventListener("message", onMessage);
+    window.postMessage({ source: "ridy-fetch-statuses", driverUuids }, "*");
   });
 }
 

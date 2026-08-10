@@ -26,6 +26,9 @@ class DriverResource extends JsonResource
             'total_trips' => $this->uber_total_trips,
             'status' => $this->uber_status,
             'active' => $this->uber_status === 'ONBOARDING_STATUS_ACTIVE',
+            'online' => $this->isOnline(),
+            'online_status' => $this->online_status,
+            'location_updated_at' => $this->location_updated_at?->toIso8601String(),
         ];
     }
 }
