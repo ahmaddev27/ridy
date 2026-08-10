@@ -9,6 +9,8 @@ const en: Dict = {
     alerts: "Alerts", noAlerts: "Everything looks healthy.", resolve: "Resolve",
     alert_no_session: "no Uber session", alert_expired: "session expired",
     alert_needs_relink: "needs re-link", alert_no_proxy: "no proxy assigned",
+    activeShort: "active", offersChart: "Offers (14 days)", sessionBreakdown: "Sessions by status",
+    topCompanies: "Top companies", stActive: "Active", stNeedsRelink: "Needs re-link", stExpired: "Expired", stNoSession: "No session",
   },
   settings: {
     smtp: "Email (SMTP)", host: "Host", port: "Port", username: "Username",
@@ -94,6 +96,8 @@ const de: Dict = {
     alerts: "Warnungen", noAlerts: "Alles in Ordnung.", resolve: "Beheben",
     alert_no_session: "keine Uber-Sitzung", alert_expired: "Sitzung abgelaufen",
     alert_needs_relink: "neu verbinden nötig", alert_no_proxy: "kein Proxy zugewiesen",
+    activeShort: "aktiv", offersChart: "Angebote (14 Tage)", sessionBreakdown: "Sitzungen nach Status",
+    topCompanies: "Top-Firmen", stActive: "Aktiv", stNeedsRelink: "Neu verbinden", stExpired: "Abgelaufen", stNoSession: "Keine Sitzung",
   },
   settings: {
     smtp: "E-Mail (SMTP)", host: "Host", port: "Port", username: "Benutzername",
@@ -177,6 +181,8 @@ const ar: Dict = {
     alerts: "التنبيهات", noAlerts: "كل شي تمام.", resolve: "معالجة",
     alert_no_session: "لا جلسة أوبر", alert_expired: "الجلسة منتهية",
     alert_needs_relink: "تحتاج إعادة ربط", alert_no_proxy: "لا بروكسي مخصّص",
+    activeShort: "نشطة", offersChart: "العروض (14 يوم)", sessionBreakdown: "الجلسات حسب الحالة",
+    topCompanies: "أعلى الشركات", stActive: "نشطة", stNeedsRelink: "تحتاج ربط", stExpired: "منتهية", stNoSession: "لا جلسة",
   },
   settings: {
     smtp: "البريد (SMTP)", host: "المضيف", port: "المنفذ", username: "اسم المستخدم",

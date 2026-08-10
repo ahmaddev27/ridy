@@ -61,6 +61,9 @@ export type AdminOverview = {
     sessions_need_attention: number;
   };
   alerts: { company_id: number; company: string; type: string }[];
+  session_breakdown: { active: number; expired: number; needs_relink: number; no_session: number };
+  offers_daily: { date: string; count: number }[];
+  top_companies: { company_id: number; company: string; offers: number; drivers: number }[];
 };
 
 export type PlatformSettings = {
