@@ -7,7 +7,9 @@ use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Platform overview for the super-admin dashboard: headline stats + a list of
@@ -46,7 +48,59 @@ class OverviewController extends Controller
             }
         }
 
-        return response()->json(['data' => ['stats' => $stats, 'alerts' => $alerts]]);
+        return response()->json(['data' => [
+            'stats' => $stats,
+            'alerts' => $alerts,
+            'session_breakdown' => [
+                'active' => $sessions->where('status', 'active')->count(),
+                'expired' => $sessions->where('status', 'expired')->count(),
+                'needs_relink' => $sessions->where('status', 'needs_relink')->count(),
+                'no_session' => max(0, $tenants->where('status', 'active')->count() - $sessions->count()),
+            ],
+            'offers_daily' => $this->offersDaily(),
+            'top_companies' => $this->topCompanies($tenants),
+        ]]);
+    }
+
+    /** Platform-wide offer volume for the last 14 days (zero-filled). */
+    private function offersDaily(): array
+    {
+        $since = CarbonImmutable::now()->subDays(13)->startOfDay();
+
+        $counts = DispatchOffer::withoutGlobalScopes()
+            ->where('received_at', '>=', $since)
+            ->groupBy('day')
+            ->orderBy('day')
+            ->pluck(DB::raw('count(*) as c'), DB::raw('date(received_at) as day'));
+
+        $out = [];
+        for ($i = 0; $i < 14; $i++) {
+            $day = $since->addDays($i)->toDateString();
+            $out[] = ['date' => $day, 'count' => (int) ($counts[$day] ?? 0)];
+        }
+
+        return $out;
+    }
+
+    /** Top 5 companies by captured offers (with their driver counts). */
+    private function topCompanies($tenants): array
+    {
+        $offers = DispatchOffer::withoutGlobalScopes()
+            ->selectRaw('tenant_id, count(*) c')->groupBy('tenant_id')->pluck('c', 'tenant_id');
+        $drivers = Driver::withoutGlobalScopes()
+            ->selectRaw('tenant_id, count(*) c')->groupBy('tenant_id')->pluck('c', 'tenant_id');
+
+        return $tenants
+            ->map(fn ($t) => [
+                'company_id' => $t->id,
+                'company' => $t->name,
+                'offers' => (int) ($offers[$t->id] ?? 0),
+                'drivers' => (int) ($drivers[$t->id] ?? 0),
+            ])
+            ->sortByDesc('offers')
+            ->take(5)
+            ->values()
+            ->all();
     }
 
     /** @return array<string, mixed> */
