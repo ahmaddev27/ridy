@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Notifications\SendTemplatedMail;
 use App\Domain\Tenancy\Models\Tenant;
+use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Http\Controllers\Controller;
 use App\Models\Registration;
 use App\Models\User;
@@ -20,6 +21,8 @@ use Illuminate\Validation\ValidationException;
  */
 class RegistrationController extends Controller
 {
+    use GeneratesOtp;
+
     private const OTP_TTL_MINUTES = 10;
 
     private const MAX_ATTEMPTS = 5;
@@ -56,7 +59,7 @@ class RegistrationController extends Controller
     {
         $data = $request->validate([
             'email' => ['required', 'email'],
-            'otp' => ['required', 'string'],
+            'otp' => ['required', 'digits:6'],
         ]);
 
         $registration = Registration::where('email', $data['email'])->first();
@@ -114,11 +117,6 @@ class RegistrationController extends Controller
         $this->sendOtp($registration);
 
         return response()->json(['data' => ['email' => $registration->email]]);
-    }
-
-    private function newOtp(): string
-    {
-        return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
     }
 
     private function sendOtp(Registration $registration): void

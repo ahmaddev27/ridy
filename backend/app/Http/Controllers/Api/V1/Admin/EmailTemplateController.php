@@ -64,6 +64,8 @@ class EmailTemplateController extends Controller
     {
         $samples = [
             'company_registration' => ['company_name' => 'YA Mobility', 'manager_name' => 'Basel', 'login_url' => config('app.frontend_url', 'https://r.fleeteye.de').'/login'],
+            'company_otp' => ['name' => 'Basel', 'otp' => '123456'],
+            'password_otp' => ['name' => 'Basel', 'otp' => '123456'],
             'driver_invite' => ['company_name' => 'YA Mobility', 'driver_name' => 'Ayman', 'invite_link' => config('app.frontend_url', 'https://r.fleeteye.de').'/invite?token=demo'],
         ];
 

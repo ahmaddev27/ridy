@@ -10,29 +10,26 @@ import { OtpInput } from "@/components/ui/otp-input";
 import { Logo } from "@/components/brand/logo";
 import { useI18n } from "@/lib/i18n/context";
 import { ApiError } from "@/lib/api/client";
-import { login } from "@/lib/api/auth";
-import { startRegistration, verifyRegistration, resendOtp } from "@/lib/api/register";
+import { forgotPassword, resetPassword } from "@/lib/api/password-reset";
 
-export default function RegisterPage() {
+export default function ForgotPasswordPage() {
   const router = useRouter();
   const { t } = useI18n();
-  const r = (k: string) => t(`register.${k}`);
+  const r = (k: string) => t(`forgot.${k}`);
 
-  const [step, setStep] = useState<"form" | "otp">("form");
-  const [company, setCompany] = useState("");
-  const [name, setName] = useState("");
+  const [step, setStep] = useState<"email" | "reset">("email");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function submitForm(e: React.FormEvent) {
+  async function submitEmail(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      await startRegistration({ company_name: company, name, email, password });
+      await forgotPassword(email);
       toast.success(r("codeSent"), { description: email });
-      setStep("otp");
+      setStep("reset");
     } catch (err) {
       toast.error(r("failed"), { description: fieldError(err) });
     } finally {
@@ -40,16 +37,15 @@ export default function RegisterPage() {
     }
   }
 
-  async function submitOtp(e: React.FormEvent) {
+  async function submitReset(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      await verifyRegistration(email, otp.trim());
-      // Verified → the company + account exist; sign in with the chosen password.
-      const user = await login(email, password);
-      router.push(user.roles.includes("super_admin") ? "/admin" : "/dashboard");
+      await resetPassword(email, otp.trim(), password);
+      toast.success(r("resetDone"));
+      router.push("/login");
     } catch (err) {
-      toast.error(r("verifyFailed"), { description: fieldError(err) });
+      toast.error(r("resetFailed"), { description: fieldError(err) });
     } finally {
       setBusy(false);
     }
@@ -57,7 +53,7 @@ export default function RegisterPage() {
 
   async function resend() {
     try {
-      await resendOtp(email);
+      await forgotPassword(email);
       toast.success(r("codeResent"));
     } catch (err) {
       toast.error(r("failed"), { description: fieldError(err) });
@@ -76,29 +72,46 @@ export default function RegisterPage() {
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          {step === "form" ? (
-            <form onSubmit={submitForm} className="space-y-3">
+          {step === "email" ? (
+            <form onSubmit={submitEmail} className="space-y-3">
               <h1 className="text-lg font-semibold text-slate-900">{r("title")}</h1>
               <p className="text-sm text-slate-400">{r("subtitle")}</p>
-              <Field label={r("company")} value={company} onChange={setCompany} />
-              <Field label={r("name")} value={name} onChange={setName} />
-              <Field label={r("email")} type="email" value={email} onChange={setEmail} />
-              <Field label={r("password")} type="password" value={password} onChange={setPassword} />
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">{r("email")}</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
               <Button type="submit" disabled={busy} className="w-full">
                 {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-                {r("createAccount")}
+                {r("sendCode")}
               </Button>
             </form>
           ) : (
-            <form onSubmit={submitOtp} className="space-y-3">
-              <h1 className="text-lg font-semibold text-slate-900">{r("verifyTitle")}</h1>
-              <p className="text-sm text-slate-400">{r("verifySubtitle").replace("{email}", email)}</p>
+            <form onSubmit={submitReset} className="space-y-3">
+              <h1 className="text-lg font-semibold text-slate-900">{r("resetTitle")}</h1>
+              <p className="text-sm text-slate-400">{r("resetSubtitle").replace("{email}", email)}</p>
               <div className="py-2">
                 <OtpInput value={otp} onChange={setOtp} autoFocus />
               </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">{r("newPassword")}</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
               <Button type="submit" disabled={busy || otp.length < 6} className="w-full">
                 {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-                {r("verify")}
+                {r("resetCta")}
               </Button>
               <button type="button" onClick={resend} className="w-full text-center text-xs font-medium text-slate-500 hover:text-slate-800">
                 {r("resend")}
@@ -108,9 +121,8 @@ export default function RegisterPage() {
         </div>
 
         <p className="mt-4 text-center text-sm text-slate-500">
-          {r("haveAccount")}{" "}
           <Link href="/login" className="font-medium text-slate-900 hover:underline">
-            {r("signIn")}
+            {r("backToLogin")}
           </Link>
         </p>
       </div>
@@ -123,29 +135,4 @@ function fieldError(err: unknown): string | undefined {
     return Object.values(err.errors).flat()[0];
   }
   return err instanceof Error ? err.message : undefined;
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-      />
-    </div>
-  );
 }

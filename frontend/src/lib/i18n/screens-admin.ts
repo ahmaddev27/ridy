@@ -4,7 +4,7 @@ type Dict = Record<string, unknown>;
 
 const en: Dict = {
   emailTemplates: {
-    type_company_registration: "Company registration", type_company_otp: "Company sign-up code", type_driver_invite: "Driver invite",
+    type_company_registration: "Company registration", type_company_otp: "Company sign-up code", type_password_otp: "Password reset code", type_driver_invite: "Driver invite",
     subject: "Subject", body: "Body", accent: "Accent color", logo: "Logo", logoAuto: "Reidey logo (automatic)", footer: "Footer",
     upload: "Upload", remove: "Remove", insertImage: "Insert image", insertVariable: "Insert variable",
     preview: "Live preview", save: "Save", saved: "Saved", saveFailed: "Couldn’t save", uploadFailed: "Upload failed",
@@ -103,7 +103,7 @@ const en: Dict = {
 
 const de: Dict = {
   emailTemplates: {
-    type_company_registration: "Firmenregistrierung", type_company_otp: "Firmen-Anmeldecode", type_driver_invite: "Fahrer-Einladung",
+    type_company_registration: "Firmenregistrierung", type_company_otp: "Firmen-Anmeldecode", type_password_otp: "Passwort-Reset-Code", type_driver_invite: "Fahrer-Einladung",
     subject: "Betreff", body: "Inhalt", accent: "Akzentfarbe", logo: "Logo", logoAuto: "Reidey-Logo (automatisch)", footer: "Fußzeile",
     upload: "Hochladen", remove: "Entfernen", insertImage: "Bild einfügen", insertVariable: "Variable einfügen",
     preview: "Live-Vorschau", save: "Speichern", saved: "Gespeichert", saveFailed: "Speichern fehlgeschlagen", uploadFailed: "Upload fehlgeschlagen",
@@ -200,7 +200,7 @@ const de: Dict = {
 
 const ar: Dict = {
   emailTemplates: {
-    type_company_registration: "تسجيل شركة", type_company_otp: "رمز تسجيل الشركة", type_driver_invite: "دعوة سائق",
+    type_company_registration: "تسجيل شركة", type_company_otp: "رمز تسجيل الشركة", type_password_otp: "رمز استعادة كلمة المرور", type_driver_invite: "دعوة سائق",
     subject: "العنوان", body: "النص", accent: "لون التمييز", logo: "الشعار", logoAuto: "شعار Reidey (تلقائي)", footer: "التذييل",
     upload: "رفع", remove: "إزالة", insertImage: "إدراج صورة", insertVariable: "إدراج متغير",
     preview: "معاينة حية", save: "حفظ", saved: "تم الحفظ", saveFailed: "تعذّر الحفظ", uploadFailed: "فشل الرفع",
