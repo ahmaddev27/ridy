@@ -80,7 +80,7 @@ export default function DashboardPage() {
           <h3 className="font-semibold text-slate-800">{k("driversTitle")}</h3>
           <Link
             href="/drivers"
-            className="flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+            className="flex items-center gap-1 text-sm font-medium text-slate-900 hover:text-slate-800"
           >
             {k("manageDrivers")} <ArrowRight className="h-4 w-4 rtl:rotate-180" />
           </Link>

@@ -50,7 +50,7 @@ export function Topbar() {
         <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           placeholder={t("topbar.search")}
-          className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 ps-9 pe-3 text-sm outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+          className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 ps-9 pe-3 text-sm outline-none focus:border-slate-900 focus:bg-white focus:ring-2 focus:ring-slate-200"
         />
       </div>
 
@@ -63,7 +63,7 @@ export function Topbar() {
               onClick={() => setLocale(l)}
               className={cn(
                 "rounded-md px-2 py-1 uppercase transition-colors",
-                locale === l ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-700",
+                locale === l ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-700",
               )}
             >
               {l}
@@ -103,7 +103,7 @@ export function Topbar() {
             onClick={() => setMenuOpen((o) => !o)}
             className="flex items-center gap-2 rounded-lg p-1 pe-2 hover:bg-slate-100"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-800">
               {initials(user?.name ?? "?")}
             </span>
             <ChevronDown className="h-4 w-4 text-slate-400" />

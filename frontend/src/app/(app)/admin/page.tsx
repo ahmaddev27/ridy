@@ -73,7 +73,7 @@ export default function AdminDashboardPage() {
                     <span className="text-slate-400">{tc.offers}</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-indigo-500" style={{ width: `${(tc.offers / topMax) * 100}%` }} />
+                    <div className="h-full rounded-full bg-slate-900" style={{ width: `${(tc.offers / topMax) * 100}%` }} />
                   </div>
                 </div>
               ))}
@@ -99,7 +99,7 @@ export default function AdminDashboardPage() {
                   <span className="font-medium text-slate-800">{a.company}</span>
                   <span className="text-slate-400">— {c(`alert_${a.type}`)}</span>
                 </span>
-                <Link href="/admin/companies" className="rounded-lg px-2.5 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50">
+                <Link href="/admin/companies" className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-900 hover:bg-slate-100">
                   {c("resolve")}
                 </Link>
               </li>
@@ -134,11 +134,11 @@ function Kpi({
   return (
     <Link
       href={href}
-      className="group rounded-xl border border-slate-200 bg-white p-4 transition hover:border-indigo-300 hover:shadow-sm"
+      className="group rounded-xl border border-slate-200 bg-white p-4 transition hover:border-slate-400 hover:shadow-sm"
     >
       <div className="flex items-center justify-between">
         <span className="text-sm text-slate-500">{label}</span>
-        <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:text-indigo-400 rtl:rotate-180" />
+        <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:text-slate-500 rtl:rotate-180" />
       </div>
       <div className={`mt-1 text-2xl font-bold ${valueColor}`}>{value ?? "…"}</div>
       {sub && <div className="mt-0.5 text-xs text-slate-400">{sub}</div>}

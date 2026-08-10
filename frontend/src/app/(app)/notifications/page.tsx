@@ -63,7 +63,7 @@ export default function NotificationsPage() {
                 key={n.id}
                 className={cn(
                   "flex items-start gap-3 p-4",
-                  !n.read && "bg-indigo-50/30",
+                  !n.read && "bg-slate-100/30",
                 )}
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600">
@@ -77,7 +77,7 @@ export default function NotificationsPage() {
                   <span className="text-xs text-slate-400">
                     {n.created_at ? new Date(n.created_at).toLocaleString() : ""}
                   </span>
-                  {!n.read && <span className="h-2 w-2 rounded-full bg-indigo-500" />}
+                  {!n.read && <span className="h-2 w-2 rounded-full bg-slate-900" />}
                 </div>
               </div>
             ))}

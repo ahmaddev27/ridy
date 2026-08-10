@@ -95,7 +95,7 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
                   })}
                 </ol>
                 {stops.length > 2 && (
-                  <p className="mt-3 text-xs font-medium text-indigo-600">
+                  <p className="mt-3 text-xs font-medium text-slate-900">
                     {stops.length} {c("stops") || "stops"}
                   </p>
                 )}

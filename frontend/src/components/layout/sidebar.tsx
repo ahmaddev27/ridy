@@ -25,7 +25,7 @@ export function Sidebar() {
     <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
       {/* Brand */}
       <div className="flex h-16 items-center gap-2.5 border-b border-slate-200 px-5">
-        <Logo size={34} className="text-indigo-600" />
+        <Logo size={34} className="text-slate-900" />
         <div className="leading-tight">
           <div className="text-sm font-bold text-slate-900">Reidey</div>
           <div className="text-[11px] text-slate-400">Fleet Management</div>
@@ -49,7 +49,7 @@ export function Sidebar() {
                   className={cn(
                     "flex items-center justify-between rounded-lg px-3 py-2 font-medium transition-colors",
                     active
-                      ? "bg-indigo-50 text-indigo-700"
+                      ? "bg-slate-100 text-slate-800"
                       : "text-slate-600 hover:bg-slate-50",
                   )}
                 >
@@ -58,7 +58,7 @@ export function Sidebar() {
                     {t(item.label)}
                   </span>
                   {item.badge && (
-                    <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
+                    <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-800">
                       {item.badge}
                     </span>
                   )}

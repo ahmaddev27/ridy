@@ -321,7 +321,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         autoComplete="off"
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
       />
     </div>
   );
