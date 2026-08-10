@@ -76,8 +76,9 @@ HTML;
 
     /**
      * The email header logo. A custom uploaded image wins when present; otherwise
-     * we render the platform's Reidey lockup as pure HTML — no external image and
-     * no SVG (which Gmail strips), so it always shows without any upload.
+     * we render the platform's real Reidey mark (a hosted PNG — reliable across
+     * every mail client, unlike SVG which Gmail strips) beside the wordmark, so it
+     * always shows without any upload.
      */
     private function brandHeader(EmailTemplate $template): string
     {
@@ -87,11 +88,13 @@ HTML;
             return '<img src="'.$src.'" alt="Reidey" style="max-height:48px;margin-bottom:20px">';
         }
 
-        return <<<'HTML'
+        $src = htmlspecialchars($this->absoluteUrl('email/reidey-logo.png'), ENT_QUOTES);
+
+        return <<<HTML
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:20px;border-collapse:collapse">
   <tr>
-    <td style="width:40px;height:40px;background:#0f172a;border-radius:9px;text-align:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:22px;font-weight:800;color:#ffffff;line-height:40px">R</td>
-    <td style="padding-left:10px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:18px;font-weight:700;color:#0f172a">Reidey</td>
+    <td style="vertical-align:middle"><img src="{$src}" width="40" height="40" alt="Reidey" style="display:block;border-radius:9px"></td>
+    <td style="padding-left:10px;vertical-align:middle;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:18px;font-weight:700;color:#0f172a">Reidey</td>
   </tr>
 </table>
 HTML;

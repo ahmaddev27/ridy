@@ -23,5 +23,6 @@ class EmailTemplate extends Model
         'company_registration' => ['company_name', 'manager_name', 'login_url'],
         'driver_invite' => ['company_name', 'driver_name', 'invite_link'],
         'company_otp' => ['name', 'otp'],
+        'password_otp' => ['name', 'otp'],
     ];
 }

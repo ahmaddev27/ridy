@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\ExtensionController;
 use App\Http\Controllers\Api\V1\FleetSessionController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\PasswordResetController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\UberLoginController;
@@ -35,6 +36,10 @@ Route::prefix('v1')->group(function () {
     Route::post('register', [RegistrationController::class, 'start'])->middleware('throttle:6,1');
     Route::post('register/verify', [RegistrationController::class, 'verify'])->middleware('throttle:12,1');
     Route::post('register/resend', [RegistrationController::class, 'resend'])->middleware('throttle:3,1');
+
+    // Public password reset via email OTP.
+    Route::post('password/forgot', [PasswordResetController::class, 'start'])->middleware('throttle:6,1');
+    Route::post('password/reset', [PasswordResetController::class, 'reset'])->middleware('throttle:12,1');
 
     // Internal — the dispatch daemon. Authenticated by a shared secret
     // (VerifyDispatchSecret), not a user session.
