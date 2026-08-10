@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/card";
+import { AreaChart } from "@/components/charts/area-chart";
 import { Badge, type Status } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { useI18n } from "@/lib/i18n/context";
@@ -32,13 +33,19 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label={k("statDrivers")} value={loading ? "…" : (data?.drivers ?? 0)} />
+        <StatCard
+          label={k("statOnline")}
+          value={loading ? "…" : (data?.online_drivers ?? 0)}
+          tone={data?.online_drivers ? "positive" : "default"}
+        />
         <StatCard
           label={k("statLinked")}
           value={loading ? "…" : (data?.linked_drivers ?? 0)}
           tone="positive"
         />
+        <StatCard label={k("statVehicles")} value={loading ? "…" : (data?.vehicles ?? 0)} />
         <StatCard label={k("statOffersToday")} value={loading ? "…" : (data?.offers_today ?? 0)} />
         <StatCard
           label={k("statUnlinked")}
@@ -46,6 +53,22 @@ export default function DashboardPage() {
           tone={data?.unlinked_offers ? "warning" : "default"}
         />
       </div>
+
+      {/* Offers over the last 7 days */}
+      <Card className="p-5">
+        <h3 className="mb-4 font-semibold text-slate-800">{k("offersTrend")}</h3>
+        {loading ? (
+          <div className="h-[180px] animate-pulse rounded-lg bg-slate-100" />
+        ) : (
+          <AreaChart
+            color="#0f172a"
+            data={(data?.offers_daily ?? []).map((d) => ({
+              label: new Date(d.date).toLocaleDateString(locale, { weekday: "short" }),
+              value: d.count,
+            }))}
+          />
+        )}
+      </Card>
 
       <Card className="p-5">
         <h3 className="mb-4 font-semibold text-slate-800">{k("sessionTitle")}</h3>

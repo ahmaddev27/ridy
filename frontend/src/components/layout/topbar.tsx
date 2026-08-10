@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Bell, ChevronDown, LogOut, Volume2, VolumeX } from "lucide-react";
+import { Search, Bell, ChevronDown, LogOut, Volume2, VolumeX, Menu, X } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { listNotifications } from "@/lib/api/notifications";
 import { cn } from "@/lib/utils";
+import { SidebarBrand } from "./sidebar";
+import { NavList } from "./nav-list";
 
 function initials(name: string): string {
   return name
@@ -24,6 +26,7 @@ export function Topbar() {
   const { user, signOut } = useAuth();
   const { t, locale, setLocale } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   // Live unread badge — polled so new notifications surface without a refresh.
   const { data: notifications } = useAsync(listNotifications, { refetchInterval: 15000 });
@@ -44,9 +47,38 @@ export function Topbar() {
   const isManager = Boolean(user?.tenant);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/80 px-5 backdrop-blur">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/80 px-4 backdrop-blur sm:px-5">
+      {/* Mobile nav toggle */}
+      <button
+        onClick={() => setNavOpen(true)}
+        className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
+        aria-label="Menu"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
+      {/* Mobile drawer */}
+      {navOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-slate-900/40" onClick={() => setNavOpen(false)} />
+          <div className="absolute inset-y-0 start-0 flex w-64 flex-col bg-white shadow-xl">
+            <div className="relative">
+              <SidebarBrand />
+              <button
+                onClick={() => setNavOpen(false)}
+                className="absolute end-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <NavList onNavigate={() => setNavOpen(false)} />
+          </div>
+        </div>
+      )}
+
       {/* Search */}
-      <div className="relative max-w-md flex-1">
+      <div className="relative hidden max-w-md flex-1 sm:block">
         <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           placeholder={t("topbar.search")}

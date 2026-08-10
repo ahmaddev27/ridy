@@ -1,22 +1,33 @@
-# DASHCAM
+<p align="center">
+  <img src="docs/logo.svg" alt="Reidey — Fleet Management" width="320">
+</p>
 
-DASHCAM is a fleet-compliance SaaS for German Uber/Bolt fleet operators. It correlates telematics trips (Samsara) with platform trips (Uber/Bolt) to detect personal/private vehicle use under a strict "detect, don't surveil" model, in line with DSGVO. The platform is a Laravel REST API with a Next.js dashboard, runs queued ingestion/matching jobs on Horizon + Redis, and is hosted on Hetzner (Germany) for EU data residency. See [`docs/`](./docs) for the full project analysis and technical plan.
+<h1 align="center">Reidey</h1>
+
+**Reidey** is a multi-tenant SaaS for German **Uber fleet operators**. It captures each company's **live Uber dispatch offer stream** and driver roster, routes offers to the right driver, and gives managers a real-time dashboard — plus driver earnings/performance, vehicles, and online presence pulled straight from Uber. Built as a Laravel REST API + Next.js dashboard, a Node dispatch-daemon that holds the RAMEN stream 24/7 through per-company **residential proxies**, and an **MV3 browser extension** that captures the session and supplier data from the manager's own browser (Uber blocks datacenter IPs).
+
+### Highlights
+
+- 🛰️ **Live offer capture** — RAMEN dispatch stream per company, offers routed to drivers by Uber UUID, with a **~5s accept window**.
+- 🔔 **Near real-time** — app-wide new-offer popup + sound, silent polling (stale-while-revalidate).
+- 🗺️ **Rich offer detail** — free map, road distance & price-per-km (Nominatim + OSRM).
+- 👤 **Drivers** — roster, **earnings/hours/trips/acceptance** (GetEarnerMetrics), **online/offline** presence (GetDriverLiveLocation).
+- 🚗 **Vehicles** — fleet cars synced from Uber (SearchVehicles) with driver assignment.
+- 🏢 **Super-admin panel** — companies CRUD, per-company proxy, platform settings (live SMTP), customizable email templates, cross-tenant monitoring.
+- 🌍 **i18n** — English / German / Arabic (RTL), black & white identity.
 
 ## Monorepo layout
 
 ```
-DASHCAM/
-├─ backend/              # Laravel 13 (PHP 8.4 dev / 8.3 CI) REST API
-├─ frontend/             # Next.js 16 (React 19) dashboard SPA
-├─ docs/                 # Project analysis + technical plan
-├─ mockup/               # UI mockups
+Reidey/
+├─ backend/              # Laravel 13 (PHP 8.4) REST API — multi-tenant, Sanctum
+├─ frontend/             # Next.js 16 (React 19) dashboard SPA (en/de/ar)
+├─ dispatch-daemon/      # Node service holding the RAMEN streams 24/7 (residential proxy)
+├─ extension/            # MV3 browser extension — captures session + supplier data
+├─ docs/                 # Project docs + Uber-console capture scripts + logo
 ├─ docker/               # Dockerfiles + nginx config
-│  ├─ backend.Dockerfile
-│  ├─ frontend.Dockerfile
-│  └─ nginx/default.conf
-├─ docker-compose.yml    # Full stack: mysql, redis, backend, nginx, horizon, scheduler, frontend
-├─ .github/workflows/    # CI (lint + tests for both packages)
-├─ .env.example          # Root env keys for docker-compose
+├─ docker-compose.yml    # Full stack
+├─ .github/workflows/    # CI (lint + tests)
 └─ README.md
 ```
 
