@@ -42,7 +42,7 @@ export default function LoginPage() {
           </div>
           <div className="leading-tight">
             <div className="text-lg font-bold text-slate-900">Reidey</div>
-            <div className="text-xs text-slate-400">Uber Dispatch</div>
+            <div className="text-xs text-slate-400">Fleet Management</div>
           </div>
         </div>
 

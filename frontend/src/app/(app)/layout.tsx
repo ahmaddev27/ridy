@@ -13,11 +13,13 @@ export default function AppLayout({
     <AuthProvider>
       <AppGuard>
         <OfferAlerts />
-        <div className="flex min-h-screen">
+        {/* Fixed-height shell: the sidebar and topbar stay put; only the main
+            content scrolls, so the sidebar never scrolls away or leaves white. */}
+        <div className="flex h-screen overflow-hidden">
           <Sidebar />
           <div className="flex min-w-0 flex-1 flex-col">
             <Topbar />
-            <main className="flex-1 p-6">{children}</main>
+            <main className="flex-1 overflow-y-auto p-6">{children}</main>
           </div>
         </div>
       </AppGuard>

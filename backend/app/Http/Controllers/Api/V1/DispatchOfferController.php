@@ -31,7 +31,7 @@ class DispatchOfferController extends Controller
                 });
             })
             ->orderByDesc('received_at')
-            ->paginate(30)
+            ->paginate(min(100, max(5, (int) $request->integer('per_page', 25))))
             ->withQueryString();
 
         return DispatchOfferResource::collection($offers);
