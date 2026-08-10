@@ -32,10 +32,20 @@ async function reconcile() {
     sessions.flatMap((s) => config.ramenPaths.map((p) => streamKey(s.id, p))),
   );
 
-  // Stop streams whose session is gone / no longer active.
+  // Effective proxy per session (per-company → global → env), used to detect
+  // when a company's proxy was changed in the admin panel.
+  const effectiveProxy = new Map(
+    sessions.map((s) => [s.id, s.proxy_url || config.proxyUrl || ""]),
+  );
+
+  // Stop streams whose session is gone, no longer active, OR whose proxy changed
+  // (a changed proxy is dropped here and immediately re-created below with it —
+  // so setting a company's proxy in the panel takes effect with no manual restart).
   for (const [key, stream] of streams) {
-    if (!wantedKeys.has(key)) {
-      console.log(`stopping stream ${key} (no longer active)`);
+    const sessionId = Number(key.split(":")[0]);
+    const proxyChanged = effectiveProxy.has(sessionId) && effectiveProxy.get(sessionId) !== stream.proxyUrl;
+    if (!wantedKeys.has(key) || proxyChanged) {
+      console.log(`stopping stream ${key} (${!wantedKeys.has(key) ? "no longer active" : "proxy changed"})`);
       stream.stop();
       streams.delete(key);
     }

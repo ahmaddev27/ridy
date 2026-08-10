@@ -52,6 +52,7 @@ export class RamenStream {
     // Uber requests use this dispatcher — calls back to our API stay direct.
     // Per-company proxy_url wins; else the daemon's global proxy; else direct.
     const proxyUrl = session.proxy_url || config.proxyUrl;
+    this.proxyUrl = proxyUrl || ""; // remembered so the supervisor can detect changes
     this.dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
     if (this.primary) {
       const safe = proxyUrl ? proxyUrl.replace(/\/\/[^@]*@/, "//***@") : "direct (no proxy)";

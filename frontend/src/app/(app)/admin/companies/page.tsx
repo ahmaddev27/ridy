@@ -1,17 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Loader2, Building2 } from "lucide-react";
+import { Plus, Loader2, Building2, Search, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge, type Status } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { listCompanies, createCompany, type Company } from "@/lib/api/admin";
+import { listCompanies, createCompany, disableCompany, type Company } from "@/lib/api/admin";
 import { CompanyDetailModal } from "./company-detail-modal";
 
 const sessionTone: Record<string, Status> = {
@@ -24,10 +25,43 @@ export default function CompaniesPage() {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.companies.${k}`);
   const { data, loading, error, refetch } = useAsync(listCompanies, { refetchInterval: 15000 });
-  const companies = data ?? [];
+  const all = data ?? [];
 
   const [selected, setSelected] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
+  const [confirmDel, setConfirmDel] = useState<Company | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // Client-side search + pagination (the company list is small).
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return all;
+    return all.filter((co) =>
+      [co.name, co.country, co.uber_org_uuid].some((v) => (v ?? "").toLowerCase().includes(q)),
+    );
+  }, [all, search]);
+
+  const lastPage = Math.max(1, Math.ceil(filtered.length / perPage));
+  const pageClamped = Math.min(page, lastPage);
+  const companies = filtered.slice((pageClamped - 1) * perPage, pageClamped * perPage);
+
+  async function doDelete() {
+    if (!confirmDel) return;
+    setBusy(true);
+    try {
+      await disableCompany(confirmDel.id);
+      toast.success(c("deletedToast"));
+      await refetch();
+    } catch (e) {
+      toast.error(c("deleteFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+      setConfirmDel(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -39,6 +73,36 @@ export default function CompaniesPage() {
           </Button>
         }
       />
+
+      {/* Toolbar: search + rows-per-page */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder={c("searchPlaceholder")}
+            className="w-full rounded-lg border border-slate-300 py-2 ps-9 pe-3 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
+          />
+        </div>
+        <select
+          value={perPage}
+          onChange={(e) => {
+            setPerPage(Number(e.target.value));
+            setPage(1);
+          }}
+          className="ms-auto rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-black"
+        >
+          {[10, 25, 50, 100].map((n) => (
+            <option key={n} value={n}>
+              {n} / {c("page")}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <Card className="overflow-hidden">
         {loading ? (
@@ -62,6 +126,7 @@ export default function CompaniesPage() {
                   <th className="px-4 py-3 font-semibold">{c("colDrivers")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colOffers")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colProxy")}</th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -100,10 +165,48 @@ export default function CompaniesPage() {
                         <span className="text-xs text-slate-400">{c("proxyGlobal")}</span>
                       )}
                     </td>
+                    <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => setConfirmDel(co)}
+                        className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                        title={c("deleteCompany")}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {filtered.length > perPage && (
+          <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-sm">
+            <span className="text-slate-500">
+              {(pageClamped - 1) * perPage + 1}–{Math.min(pageClamped * perPage, filtered.length)} {c("of")}{" "}
+              {filtered.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={pageClamped <= 1}
+                className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
+              </button>
+              <span className="px-2 text-slate-600">
+                {pageClamped} / {lastPage}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
+                disabled={pageClamped >= lastPage}
+                className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+              >
+                <ChevronRight className="h-4 w-4 rtl:rotate-180" />
+              </button>
+            </div>
           </div>
         )}
       </Card>
@@ -117,6 +220,18 @@ export default function CompaniesPage() {
       )}
 
       <CreateCompanyModal open={creating} onClose={() => setCreating(false)} onCreated={refetch} />
+
+      <ConfirmModal
+        open={confirmDel !== null}
+        danger
+        title={c("deleteCompany")}
+        message={c("deleteConfirm").replace("{name}", confirmDel?.name ?? "")}
+        confirmLabel={c("deleteCompany")}
+        cancelLabel={c("cancel")}
+        busy={busy}
+        onConfirm={doDelete}
+        onCancel={() => setConfirmDel(null)}
+      />
     </div>
   );
 }
@@ -173,6 +288,7 @@ function CreateCompanyModal({
     <Modal
       open={open}
       onClose={onClose}
+      size="xl"
       title={c("newCompany")}
       footer={
         <div className="flex justify-end gap-2">
