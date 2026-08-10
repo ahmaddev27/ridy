@@ -81,7 +81,7 @@ export default function SettingsPage() {
       <PageHeader tkey="settings" />
 
       {/* SMTP */}
-      <Card className="p-5">
+      <Card className="mx-auto w-full max-w-2xl p-5">
         <div className="mb-4 flex items-center gap-2">
           <Mail className="h-4 w-4 text-slate-700" />
           <h3 className="font-semibold text-slate-800">{c("smtp")}</h3>
@@ -121,7 +121,7 @@ export default function SettingsPage() {
       </Card>
 
       {/* Global proxy */}
-      <Card className="p-5">
+      <Card className="mx-auto w-full max-w-2xl p-5">
         <div className="mb-1 flex items-center gap-2">
           <Globe className="h-4 w-4 text-slate-700" />
           <h3 className="font-semibold text-slate-800">{c("globalProxy")}</h3>
