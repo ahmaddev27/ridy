@@ -18,6 +18,7 @@ class CaptureFleetSessionRequest extends FormRequest
     {
         return [
             'uber_org_uuid' => ['required', 'string'],
+            'uber_org_name' => ['nullable', 'string', 'max:255'],
             'cookies' => ['required', 'array', 'min:1'],
             'cookies.*.name' => ['required', 'string'],
             'cookies.*.value' => ['required', 'string'],
