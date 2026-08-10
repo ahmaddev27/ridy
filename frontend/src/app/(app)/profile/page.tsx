@@ -49,7 +49,7 @@ export default function ProfilePage() {
     <div className="space-y-6">
       <PageHeader tkey="profile" />
 
-      <Card className="max-w-lg p-5">
+      <Card className="mx-auto max-w-lg p-5">
         {user?.tenant && (
           <p className="mb-4 text-sm text-slate-400">
             {c("company")}: <span className="font-medium text-slate-600">{user.tenant.name}</span>

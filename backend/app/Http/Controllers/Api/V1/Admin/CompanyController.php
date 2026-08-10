@@ -94,11 +94,36 @@ class CompanyController extends Controller
     }
 
     /** Disable (reversible) — keeps offers/session history. */
+    /**
+     * Permanently delete a company and everything scoped to it — Uber session
+     * (which stops its daemon stream on the next reconcile), drivers, offers,
+     * device tokens, audit logs, and its users (with their notifications and API
+     * tokens). Runs in one transaction so it either fully succeeds or rolls back.
+     */
     public function destroy(Tenant $tenant): JsonResponse
     {
-        $tenant->update(['status' => 'disabled']);
+        DB::transaction(function () use ($tenant) {
+            $userIds = DB::table('users')->where('tenant_id', $tenant->id)->pluck('id');
 
-        return response()->json(['data' => ['status' => 'disabled']]);
+            // The users' notifications + API tokens (polymorphic, no tenant_id).
+            if ($userIds->isNotEmpty()) {
+                DB::table('notifications')
+                    ->where('notifiable_type', User::class)
+                    ->whereIn('notifiable_id', $userIds)->delete();
+                DB::table('personal_access_tokens')
+                    ->where('tokenable_type', User::class)
+                    ->whereIn('tokenable_id', $userIds)->delete();
+            }
+
+            // Everything scoped directly to the tenant.
+            foreach (['device_tokens', 'dispatch_offers', 'drivers', 'uber_fleet_sessions', 'audit_logs', 'users'] as $table) {
+                DB::table($table)->where('tenant_id', $tenant->id)->delete();
+            }
+
+            $tenant->delete();
+        });
+
+        return response()->json(['data' => ['deleted' => true]]);
     }
 
     /** Full detail with stats, users and session — proxy_url unmasked (edit form). */

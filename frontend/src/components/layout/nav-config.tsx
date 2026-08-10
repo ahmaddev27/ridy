@@ -6,7 +6,6 @@ import {
   Link2,
   Plug,
   ScrollText,
-  Palette,
   Building2,
   Settings,
   UserCircle,
@@ -70,10 +69,5 @@ export const navGroups: NavGroup[] = [
   {
     title: "navGroups.account",
     items: [{ href: "/profile", label: "nav.profile", icon: UserCircle }],
-  },
-  {
-    title: "navGroups.system",
-    requiresRole: "super_admin",
-    items: [{ href: "/design-system", label: "nav.designSystem", icon: Palette }],
   },
 ];
