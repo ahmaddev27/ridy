@@ -1,0 +1,38 @@
+<?php
+
+namespace App\Domain\Fleet\Models;
+
+use App\Domain\Tenancy\Concerns\BelongsToTenant;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+/**
+ * A driver's Uber performance metrics for one time window.
+ */
+class DriverMetric extends Model
+{
+    use BelongsToTenant;
+
+    protected $fillable = [
+        'tenant_id', 'driver_id', 'period_start', 'period_end',
+        'earnings', 'earnings_label', 'trips', 'hours_online', 'hours_on_trip',
+        'acceptance_rate', 'cancellation_rate', 'synced_at',
+    ];
+
+    protected $casts = [
+        'period_start' => 'datetime',
+        'period_end' => 'datetime',
+        'earnings' => 'decimal:2',
+        'trips' => 'integer',
+        'hours_online' => 'decimal:2',
+        'hours_on_trip' => 'decimal:2',
+        'acceptance_rate' => 'decimal:2',
+        'cancellation_rate' => 'decimal:2',
+        'synced_at' => 'datetime',
+    ];
+
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(Driver::class);
+    }
+}

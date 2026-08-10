@@ -8,7 +8,7 @@
 // The extension version this dashboard build expects. Bump it in lockstep with
 // extension/manifest.json so managers running an older, manually-installed
 // build get prompted to update (unpacked extensions don't auto-update).
-export const LATEST_EXTENSION_VERSION = "1.10.0";
+export const LATEST_EXTENSION_VERSION = "1.11.0";
 
 /** True when `installed` is a valid version older than LATEST_EXTENSION_VERSION. */
 export function isExtensionOutdated(installed: string | null | undefined): boolean {
@@ -26,6 +26,51 @@ function compareVersions(a: string, b: string): number {
     if (diff !== 0) return diff;
   }
   return 0;
+}
+
+export interface DriverMetrics {
+  driver_uuid: string;
+  period_start: number;
+  period_end: number;
+  earnings?: number | string | null;
+  earnings_label?: string | null;
+  trips?: number | string | null;
+  hours_online?: number | string | null;
+  hours_on_trip?: number | string | null;
+  acceptance_rate?: number | string | null;
+  cancellation_rate?: number | string | null;
+}
+
+/**
+ * Ask the extension to pull one driver's Uber performance metrics for a window
+ * (ms-epoch) via supplier GetEarnerMetrics, store them, and return them.
+ * Resolves null when no extension answers.
+ */
+export function fetchDriverMetricsViaExtension(
+  driverUuid: string,
+  from: number,
+  to: number,
+  timeoutMs = 15000,
+): Promise<DriverMetrics | null> {
+  if (typeof window === "undefined") return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    let settled = false;
+    function finish(result: DriverMetrics | null) {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener("message", onMessage);
+      clearTimeout(timer);
+      resolve(result);
+    }
+    function onMessage(event: MessageEvent) {
+      if (event.source !== window || event.data?.source !== "ridy-metrics-done") return;
+      finish(event.data.ok ? (event.data.metrics as DriverMetrics) : null);
+    }
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    window.addEventListener("message", onMessage);
+    window.postMessage({ source: "ridy-fetch-metrics", driverUuid, from, to }, "*");
+  });
 }
 
 export interface RosterSyncResult {

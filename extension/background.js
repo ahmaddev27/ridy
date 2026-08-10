@@ -164,6 +164,72 @@ async function fetchRoster() {
   }
 }
 
+// Uber metric names → our normalized fields.
+const METRIC_MAP = {
+  SUPPLY_METRIC_TOTAL_EARNINGS: "earnings",
+  SUPPLY_METRIC_TOTAL_EARNINGS_LABEL: "earnings_label",
+  SUPPLY_METRIC_TRIP_COUNT: "trips",
+  SUPPLY_METRIC_HOURS_ONLINE: "hours_online",
+  SUPPLY_METRIC_HOURS_ON_TRIP: "hours_on_trip",
+  SUPPLY_METRIC_ACCEPTANCE_RATE: "acceptance_rate",
+  SUPPLY_METRIC_CANCELLATION_RATE: "cancellation_rate",
+};
+const METRIC_NAMES = Object.keys(METRIC_MAP);
+
+/**
+ * Pull one driver's performance metrics from supplier GetEarnerMetrics (using
+ * the manager's own session + real IP), normalize them, store on Reidey, and
+ * return them to the dashboard. `from`/`to` are ms-epoch.
+ */
+async function fetchMetrics(driverUuid, from, to) {
+  const { orgUuid, apiUrl, token } = await api.storage.local.get(["orgUuid", "apiUrl", "token"]);
+  if (!orgUuid) return { ok: false, reason: "no_org_uuid" };
+  if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
+
+  let uberData;
+  try {
+    const res = await fetch("https://supplier.uber.com/api/GetEarnerMetrics?localeCode=en-GB", {
+      method: "POST",
+      credentials: "include",
+      headers: { accept: "*/*", "content-type": "application/json", "x-csrf-token": "x" },
+      body: JSON.stringify({
+        orgUuid: { value: orgUuid },
+        driverUuid: { value: driverUuid },
+        timeRange: { startsAt: { value: String(from) }, endsAt: { value: String(to) } },
+        metrics: METRIC_NAMES,
+      }),
+    });
+    if (!res.ok) return { ok: false, reason: `supplier_http_${res.status}` };
+    const body = await res.json();
+    if (body.status !== "success") return { ok: false, reason: body.message || "metrics_failed" };
+    uberData = body.data;
+  } catch (e) {
+    return { ok: false, reason: e.message };
+  }
+
+  // Normalize the metricName/metricValue pairs into flat fields.
+  const metrics = { driver_uuid: driverUuid, period_start: from, period_end: to };
+  for (const m of uberData?.metrics ?? []) {
+    const field = METRIC_MAP[m.metricName];
+    if (!field) continue;
+    const v = m.metricValue ?? {};
+    metrics[field] = v.doubleValue ?? v.int64Value ?? v.stringValue ?? null;
+  }
+
+  // Store on Reidey (best-effort — still return to the page if this fails).
+  try {
+    await fetch(`${apiUrl}/api/v1/drivers/metrics`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(metrics),
+    });
+  } catch (e) {
+    console.warn("[Reidey bg] metrics store failed", e.message);
+  }
+
+  return { ok: true, metrics };
+}
+
 /** Forward RAMEN offers (captured in the manager's browser) to Reidey. */
 async function postOffers(offers, seq) {
   const { apiUrl, token } = await api.storage.local.get(["apiUrl", "token"]);
@@ -205,6 +271,10 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   if (msg?.type === "fetchRoster") {
     fetchRoster().then(sendResponse);
+    return true;
+  }
+  if (msg?.type === "fetchMetrics" && msg.driverUuid) {
+    fetchMetrics(msg.driverUuid, msg.from, msg.to).then(sendResponse);
     return true;
   }
   if (msg?.type === "offers" && Array.isArray(msg.offers)) {

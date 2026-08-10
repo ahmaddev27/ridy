@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Reidey Uber Connector",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "Verbindet deine Uber-Flottensitzung mit Reidey — melde dich normal bei Uber an, die Sitzung wird automatisch erfasst.",
   "permissions": ["cookies", "scripting", "storage"],
   "host_permissions": [
