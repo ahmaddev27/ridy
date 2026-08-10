@@ -49,9 +49,11 @@ class AdminPlatformTest extends TestCase
 
     public function test_global_proxy_reaches_the_daemon_sessions_payload(): void
     {
+        // Pin the shared secret so the test passes regardless of the CI env.
+        config(['services.dispatch.ingest_secret' => 'test-secret']);
         Settings::setMany(['global_proxy_url' => 'http://g:g@global:1']);
 
-        $res = $this->withHeader('X-Dispatch-Secret', config('services.dispatch.ingest_secret'))
+        $res = $this->withHeader('X-Dispatch-Secret', 'test-secret')
             ->getJson('/api/v1/internal/dispatch/sessions')->assertOk();
 
         $res->assertJsonPath('meta.global_proxy_url', 'http://g:g@global:1');
