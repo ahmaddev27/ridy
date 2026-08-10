@@ -5,7 +5,6 @@ import {
   Radio,
   Link2,
   Plug,
-  ScrollText,
   Building2,
   Settings,
   UserCircle,
@@ -47,11 +46,6 @@ export const navGroups: NavGroup[] = [
       { href: "/driver-linking", label: "nav.driverLinking", icon: Link2 },
       { href: "/connections", label: "nav.connections", icon: Plug },
     ],
-  },
-  {
-    title: "navGroups.governance",
-    hideForRole: "super_admin",
-    items: [{ href: "/audit-log", label: "nav.auditLog", icon: ScrollText }],
   },
 
   // ── Super-admin surface (hidden from company managers) ─────────────────────

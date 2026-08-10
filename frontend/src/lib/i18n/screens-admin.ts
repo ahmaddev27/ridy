@@ -210,7 +210,7 @@ const ar: Dict = {
     colName: "الشركة",
     colStatus: "الحالة",
     colSession: "الجلسة",
-    colDrivers: "السائقون",
+    colDrivers: "السائقين",
     colOffers: "العروض",
     colProxy: "البروكسي",
     statusActive: "نشطة",
