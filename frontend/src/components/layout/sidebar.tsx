@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ShieldCheck } from "lucide-react";
 import { navGroups } from "./nav-config";
+import { Logo } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/context";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -25,9 +25,7 @@ export function Sidebar() {
     <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
       {/* Brand */}
       <div className="flex h-16 items-center gap-2.5 border-b border-slate-200 px-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white">
-          <ShieldCheck className="h-5 w-5" />
-        </div>
+        <Logo size={34} className="text-indigo-600" />
         <div className="leading-tight">
           <div className="text-sm font-bold text-slate-900">Reidey</div>
           <div className="text-[11px] text-slate-400">Fleet Management</div>
