@@ -47,3 +47,14 @@ window.addEventListener("message", async (event) => {
   console.log("%c[Reidey roster]", "color:#2563eb;font-weight:700", "background result:", res);
   window.postMessage({ source: "ridy-roster-done", ...res }, "*");
 });
+
+// The driver detail view asks the extension to pull that driver's metrics.
+window.addEventListener("message", async (event) => {
+  if (event.source !== window) return;
+  if (event.data?.source !== "ridy-fetch-metrics" || !event.data.driverUuid) return;
+
+  const res = await api.runtime
+    .sendMessage({ type: "fetchMetrics", driverUuid: event.data.driverUuid, from: event.data.from, to: event.data.to })
+    .catch((e) => ({ ok: false, reason: e?.message || "extension_error" }));
+  window.postMessage({ source: "ridy-metrics-done", ...res }, "*");
+});

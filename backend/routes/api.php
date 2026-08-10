@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\DispatchIngestController;
 use App\Http\Controllers\Api\V1\DispatchLinkController;
 use App\Http\Controllers\Api\V1\DispatchOfferController;
 use App\Http\Controllers\Api\V1\DriverController;
+use App\Http\Controllers\Api\V1\DriverMetricController;
 use App\Http\Controllers\Api\V1\ExtensionController;
 use App\Http\Controllers\Api\V1\FleetSessionController;
 use App\Http\Controllers\Api\V1\HealthController;
@@ -50,6 +51,10 @@ Route::prefix('v1')->group(function () {
         Route::get('drivers', [DriverController::class, 'index']);
         Route::post('drivers/sync', [DriverController::class, 'sync']);
         Route::post('drivers/roster', [DriverController::class, 'ingestRoster']);
+
+        // Per-driver Uber performance metrics (earnings/hours/trips)
+        Route::post('drivers/metrics', [DriverMetricController::class, 'store']);
+        Route::get('drivers/{driver}/metrics', [DriverMetricController::class, 'index']);
 
         // Dispatch offers feed
         Route::get('dispatch/offers', [DispatchOfferController::class, 'index']);
