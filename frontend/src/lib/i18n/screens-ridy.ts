@@ -34,6 +34,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       distance: "Distance",
       pricePerKm: "Price / km",
       rowsPerPage: "Rows per page", page: "page", of: "of", prev: "Previous", next: "Next",
+      dateFrom: "From date", dateTo: "To date", clearDates: "Clear dates",
     },
     driverLinking: {
       title: "Link drivers",
@@ -161,6 +162,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       distance: "Distanz",
       pricePerKm: "Preis / km",
       rowsPerPage: "Zeilen pro Seite", page: "Seite", of: "von", prev: "Zurück", next: "Weiter",
+      dateFrom: "Von Datum", dateTo: "Bis Datum", clearDates: "Datum löschen",
     },
     driverLinking: {
       title: "Fahrer verknüpfen",
@@ -286,6 +288,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       distance: "المسافة",
       pricePerKm: "سعر الكيلو",
       rowsPerPage: "صفوف بالصفحة", page: "صفحة", of: "من", prev: "السابق", next: "التالي",
+      dateFrom: "من تاريخ", dateTo: "إلى تاريخ", clearDates: "مسح التواريخ",
     },
     driverLinking: {
       title: "ربط السائقين",

@@ -42,12 +42,16 @@ export type PageMeta = { current_page: number; last_page: number; total: number;
 export async function listOffersPaged(params?: {
   search?: string;
   driverUuid?: string;
+  from?: string;
+  to?: string;
   page?: number;
   perPage?: number;
 }): Promise<{ items: DispatchOffer[]; meta: PageMeta }> {
   const q = new URLSearchParams();
   if (params?.search) q.set("search", params.search);
   if (params?.driverUuid) q.set("driver_uuid", params.driverUuid);
+  if (params?.from) q.set("from", params.from);
+  if (params?.to) q.set("to", params.to);
   if (params?.page) q.set("page", String(params.page));
   if (params?.perPage) q.set("per_page", String(params.perPage));
   const qs = q.toString();

@@ -26,6 +26,8 @@ export default function OffersPage() {
   const [detailId, setDetailId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [meta, setMeta] = useState<PageMeta | null>(null);
 
   // A silent load (background poll) refreshes the feed in place: it keeps the
@@ -40,6 +42,8 @@ export default function OffersPage() {
       const { items, meta: m } = await listOffersPaged({
         search: search.trim(),
         driverUuid: driverUuid || undefined,
+        from: from || undefined,
+        to: to || undefined,
         page,
         perPage,
       });
@@ -56,14 +60,14 @@ export default function OffersPage() {
   // Filters/page-size reset to the first page.
   useEffect(() => {
     setPage(1);
-  }, [search, driverUuid, perPage]);
+  }, [search, driverUuid, from, to, perPage]);
 
   // Debounce search + react to filter/page/page-size changes.
   useEffect(() => {
     const id = setTimeout(load, 300);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, driverUuid, page, perPage]);
+  }, [search, driverUuid, from, to, page, perPage]);
 
   // Near real-time: silently poll for new offers every 5s (offers are the most
   // time-sensitive surface). Also refetch when the tab regains focus.
@@ -78,7 +82,7 @@ export default function OffersPage() {
       window.removeEventListener("focus", onFocus);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, driverUuid, page, perPage]);
+  }, [search, driverUuid, from, to, page, perPage]);
 
   // Distinct drivers present in the current feed, for the filter dropdown.
   const driverOptions = useMemo(() => {
@@ -157,6 +161,35 @@ export default function OffersPage() {
             </option>
           ))}
         </select>
+
+        {/* Date range */}
+        <input
+          type="date"
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
+          title={c("dateFrom")}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 outline-none focus:border-black"
+        />
+        <span className="text-slate-400">–</span>
+        <input
+          type="date"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          title={c("dateTo")}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 outline-none focus:border-black"
+        />
+        {(from || to) && (
+          <button
+            onClick={() => {
+              setFrom("");
+              setTo("");
+            }}
+            className="text-xs font-medium text-indigo-600 hover:underline"
+          >
+            {c("clearDates")}
+          </button>
+        )}
+
         {selected.size > 0 && (
           <Button variant="secondary" onClick={removeSelected} disabled={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}

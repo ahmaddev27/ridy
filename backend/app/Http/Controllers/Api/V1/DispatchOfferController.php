@@ -30,6 +30,9 @@ class DispatchOfferController extends Controller
                         ->orWhere('dropoff_address', 'like', $term);
                 });
             })
+            // Date-range filter over the capture time (offers are kept forever).
+            ->when($request->filled('from'), fn ($q) => $q->whereDate('received_at', '>=', $request->date('from')))
+            ->when($request->filled('to'), fn ($q) => $q->whereDate('received_at', '<=', $request->date('to')))
             ->orderByDesc('received_at')
             ->paginate(min(100, max(5, (int) $request->integer('per_page', 25))))
             ->withQueryString();
