@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanySessionController;
 use App\Http\Controllers\Api\V1\Admin\CompanyUserController;
+use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Api\V1\Admin\OverviewController;
 use App\Http\Controllers\Api\V1\Admin\SettingsController;
 use App\Http\Controllers\Api\V1\AuditLogController;
@@ -95,6 +96,13 @@ Route::prefix('v1')->group(function () {
         Route::get('overview', OverviewController::class);
         Route::get('settings', [SettingsController::class, 'show']);
         Route::put('settings', [SettingsController::class, 'update']);
+
+        // Email templates (registration + driver invite)
+        Route::get('email-templates', [EmailTemplateController::class, 'index']);
+        Route::post('email-templates/image', [EmailTemplateController::class, 'uploadImage']);
+        Route::get('email-templates/{key}', [EmailTemplateController::class, 'show']);
+        Route::put('email-templates/{key}', [EmailTemplateController::class, 'update']);
+        Route::post('email-templates/{key}/preview', [EmailTemplateController::class, 'preview']);
 
         Route::get('companies', [CompanyController::class, 'index']);
         Route::post('companies', [CompanyController::class, 'store']);

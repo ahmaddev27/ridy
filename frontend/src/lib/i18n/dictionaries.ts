@@ -26,6 +26,7 @@ const en = {
     companies: "Companies",
     adminDashboard: "Dashboard",
     settings: "Settings",
+    emailTemplates: "Email Templates",
     profile: "Profile",
   },
   pages: {
@@ -47,6 +48,7 @@ const en = {
     companies: { title: "Companies", subtitle: "Manage companies, proxies, managers and Uber sessions." },
     adminDashboard: { title: "Admin Dashboard", subtitle: "Platform overview and alerts." },
     settings: { title: "Platform Settings", subtitle: "SMTP and the global proxy — applied live." },
+    emailTemplates: { title: "Email Templates", subtitle: "Customize the registration and driver-invite emails." },
     profile: { title: "Profile", subtitle: "Edit your account." },
   },
   common: {
@@ -112,6 +114,7 @@ const de: typeof en = {
     companies: "Firmen",
     adminDashboard: "Dashboard",
     settings: "Einstellungen",
+    emailTemplates: "E-Mail-Vorlagen",
     profile: "Profil",
   },
   pages: {
@@ -133,6 +136,7 @@ const de: typeof en = {
     companies: { title: "Firmen", subtitle: "Firmen, Proxys, Manager und Uber-Sitzungen verwalten." },
     adminDashboard: { title: "Admin-Dashboard", subtitle: "Plattform-Überblick und Warnungen." },
     settings: { title: "Plattform-Einstellungen", subtitle: "SMTP und der globale Proxy — sofort aktiv." },
+    emailTemplates: { title: "E-Mail-Vorlagen", subtitle: "Registrierungs- und Einladungs-E-Mails anpassen." },
     profile: { title: "Profil", subtitle: "Dein Konto bearbeiten." },
   },
   common: {
@@ -198,6 +202,7 @@ const ar: typeof en = {
     companies: "الشركات",
     adminDashboard: "لوحة التحكّم",
     settings: "الإعدادات",
+    emailTemplates: "قوالب الإيميل",
     profile: "الملف الشخصي",
   },
   pages: {
@@ -219,6 +224,7 @@ const ar: typeof en = {
     companies: { title: "الشركات", subtitle: "إدارة الشركات والبروكسي والمدراء وجلسات أوبر." },
     adminDashboard: { title: "لوحة الأدمن", subtitle: "نظرة عامة على المنصة والتنبيهات." },
     settings: { title: "إعدادات المنصة", subtitle: "SMTP والبروكسي العام — تُطبّق فوراً." },
+    emailTemplates: { title: "قوالب الإيميل", subtitle: "خصّص إيميلات التسجيل ودعوة السائق." },
     profile: { title: "الملف الشخصي", subtitle: "تعديل حسابك." },
   },
   common: {

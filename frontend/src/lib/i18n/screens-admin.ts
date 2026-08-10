@@ -3,6 +3,12 @@
 type Dict = Record<string, unknown>;
 
 const en: Dict = {
+  emailTemplates: {
+    type_company_registration: "Company registration", type_driver_invite: "Driver invite",
+    subject: "Subject", body: "Body", accent: "Accent color", logo: "Logo", footer: "Footer",
+    upload: "Upload", remove: "Remove", insertImage: "Insert image", insertVariable: "Insert variable",
+    preview: "Live preview", save: "Save", saved: "Saved", saveFailed: "Couldn’t save", uploadFailed: "Upload failed",
+  },
   adminDashboard: {
     companies: "Companies", activeCompanies: "Active", sessionsActive: "Live sessions",
     sessionsAttention: "Need attention", drivers: "Drivers", offers: "Offers",
@@ -93,6 +99,12 @@ const en: Dict = {
 };
 
 const de: Dict = {
+  emailTemplates: {
+    type_company_registration: "Firmenregistrierung", type_driver_invite: "Fahrer-Einladung",
+    subject: "Betreff", body: "Inhalt", accent: "Akzentfarbe", logo: "Logo", footer: "Fußzeile",
+    upload: "Hochladen", remove: "Entfernen", insertImage: "Bild einfügen", insertVariable: "Variable einfügen",
+    preview: "Live-Vorschau", save: "Speichern", saved: "Gespeichert", saveFailed: "Speichern fehlgeschlagen", uploadFailed: "Upload fehlgeschlagen",
+  },
   adminDashboard: {
     companies: "Firmen", activeCompanies: "Aktiv", sessionsActive: "Live-Sitzungen",
     sessionsAttention: "Handlungsbedarf", drivers: "Fahrer", offers: "Angebote",
@@ -181,6 +193,12 @@ const de: Dict = {
 };
 
 const ar: Dict = {
+  emailTemplates: {
+    type_company_registration: "تسجيل شركة", type_driver_invite: "دعوة سائق",
+    subject: "العنوان", body: "النص", accent: "لون التمييز", logo: "الشعار", footer: "التذييل",
+    upload: "رفع", remove: "إزالة", insertImage: "إدراج صورة", insertVariable: "إدراج متغير",
+    preview: "معاينة حية", save: "حفظ", saved: "تم الحفظ", saveFailed: "تعذّر الحفظ", uploadFailed: "فشل الرفع",
+  },
   adminDashboard: {
     companies: "الشركات", activeCompanies: "النشطة", sessionsActive: "جلسات حيّة",
     sessionsAttention: "تحتاج انتباه", drivers: "السائقون", offers: "العروض",
