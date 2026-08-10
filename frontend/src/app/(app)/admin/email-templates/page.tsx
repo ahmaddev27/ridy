@@ -143,7 +143,7 @@ export default function EmailTemplatesPage() {
             key={tpl.key}
             onClick={() => loadInto(tpl)}
             className={`rounded-lg px-4 py-2 text-sm font-medium ${
-              tpl.key === activeKey ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              tpl.key === activeKey ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
             }`}
           >
             {c(`type_${tpl.key}`)}
@@ -172,7 +172,7 @@ export default function EmailTemplatesPage() {
                 <button
                   key={v}
                   onClick={() => insertVariable(v)}
-                  className="flex items-center gap-1 rounded bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                  className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-800 hover:bg-slate-200"
                   title={c("insertVariable")}
                 >
                   <Braces className="h-3 w-3" /> {v}
@@ -184,7 +184,7 @@ export default function EmailTemplatesPage() {
               contentEditable
               onInput={schedulePreview}
               suppressContentEditableWarning
-              className="min-h-[220px] rounded-b-lg border border-slate-300 p-3 text-sm leading-relaxed outline-none focus:border-indigo-500 [&_a]:text-indigo-600 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-bold"
+              className="min-h-[220px] rounded-b-lg border border-slate-300 p-3 text-sm leading-relaxed outline-none focus:border-slate-900 [&_a]:text-slate-900 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-bold"
             />
           </div>
 
@@ -241,7 +241,7 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
       />
     </div>
   );

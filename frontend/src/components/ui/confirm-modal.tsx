@@ -51,7 +51,7 @@ export function ConfirmModal({
           <div className="flex items-start gap-3">
             <span
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                danger ? "bg-rose-100 text-rose-600" : "bg-indigo-100 text-indigo-600"
+                danger ? "bg-rose-100 text-rose-600" : "bg-slate-200 text-slate-900"
               }`}
             >
               <AlertTriangle className="h-5 w-5" />

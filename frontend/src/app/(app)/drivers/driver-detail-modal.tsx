@@ -64,7 +64,7 @@ export function DriverDetailModal({ driver, onClose }: { driver: Driver; onClose
             // eslint-disable-next-line @next/next/no-img-element
             <img src={driver.picture_url} alt="" className="h-16 w-16 rounded-full object-cover" />
           ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-xl font-semibold text-indigo-700">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-200 text-xl font-semibold text-slate-800">
               {driver.name.slice(0, 1)}
             </div>
           )}

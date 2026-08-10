@@ -18,7 +18,7 @@ export function Preloader() {
         .reidey-word { animation: reidey-pulse 1.6s ease-in-out infinite; }
       `}</style>
 
-      <svg width={120} height={120} viewBox="0 0 96 96" fill="none" className="text-indigo-600" aria-label="Loading">
+      <svg width={120} height={120} viewBox="0 0 96 96" fill="none" className="text-slate-900" aria-label="Loading">
         <g stroke="currentColor" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round">
           <path className="reidey-line" d="M30 22 V74" />
           <path className="reidey-line" style={{ animationDelay: "0.2s" }} d="M30 22 H52 C66 22 66 48 52 48 H30" />
@@ -34,7 +34,7 @@ export function Preloader() {
 
         {/* Car travelling along the mark (drawn around the origin so animateMotion
             places it on the path) */}
-        <g fill="#4f46e5">
+        <g fill="#0f172a">
           <rect x={-6} y={-3.5} width={12} height={7} rx={2.2} />
           <rect x={-3.5} y={-6.5} width={7} height={4} rx={1.6} />
           <circle cx={-3.5} cy={3.5} r={1.7} fill="#1e293b" />

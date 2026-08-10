@@ -198,7 +198,7 @@ export default function OffersPage() {
                 {driverUuids.length > 0 && (
                   <button
                     onClick={() => setDriverUuids([])}
-                    className="w-full rounded px-2 py-1.5 text-start text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                    className="w-full rounded px-2 py-1.5 text-start text-xs font-medium text-slate-900 hover:bg-slate-100"
                   >
                     {c("clearSelection")}
                   </button>
@@ -247,7 +247,7 @@ export default function OffersPage() {
               setFrom("");
               setTo("");
             }}
-            className="text-xs font-medium text-indigo-600 hover:underline"
+            className="text-xs font-medium text-slate-900 hover:underline"
           >
             {c("clearDates")}
           </button>
@@ -288,7 +288,7 @@ export default function OffersPage() {
                   >
                     <ChevronDown className={`h-4 w-4 text-slate-400 transition ${open ? "" : "-rotate-90"}`} />
                     <span className="font-semibold text-slate-800">{dayLabel(key)}</span>
-                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-800">
                       {dayOffers.length} {c("offersCount")}
                     </span>
                   </button>

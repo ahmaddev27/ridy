@@ -173,7 +173,7 @@ export function CompanyDetailModal({
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
                   >
                     <option value="active">{c("statusActive")}</option>
                     <option value="disabled">{c("statusDisabled")}</option>
@@ -225,13 +225,13 @@ export function CompanyDetailModal({
                 <div className="grid grid-cols-3 gap-2">
                   <input placeholder={c("fieldManagerName")} value={newUser.name}
                     onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                    className="rounded-lg border border-slate-300 px-2 py-2 text-sm outline-none focus:border-indigo-500" />
+                    className="rounded-lg border border-slate-300 px-2 py-2 text-sm outline-none focus:border-slate-900" />
                   <input placeholder={c("fieldManagerEmail")} type="email" value={newUser.email}
                     onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                    className="rounded-lg border border-slate-300 px-2 py-2 text-sm outline-none focus:border-indigo-500" />
+                    className="rounded-lg border border-slate-300 px-2 py-2 text-sm outline-none focus:border-slate-900" />
                   <input placeholder={c("fieldManagerPassword")} type="password" value={newUser.password}
                     onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                    className="rounded-lg border border-slate-300 px-2 py-2 text-sm outline-none focus:border-indigo-500" />
+                    className="rounded-lg border border-slate-300 px-2 py-2 text-sm outline-none focus:border-slate-900" />
                 </div>
                 <Button variant="secondary" onClick={addUser} disabled={busy || !newUser.email}>
                   <UserPlus className="h-4 w-4" /> {c("addManager")}
@@ -299,7 +299,7 @@ function Field({
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         autoComplete="off"
-        className={`w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${mono ? "font-mono text-xs" : ""}`}
+        className={`w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200 ${mono ? "font-mono text-xs" : ""}`}
       />
     </div>
   );
