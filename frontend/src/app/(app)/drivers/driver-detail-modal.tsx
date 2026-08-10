@@ -17,6 +17,13 @@ function pct(v: number | string | null | undefined): string {
   if (n == null) return "—";
   return `${(n <= 1 ? n * 100 : n).toFixed(0)}%`;
 }
+/** Uber's earnings_label is already fully formatted (e.g. "€2,478.75"); prefer it. */
+function earningsDisplay(m: DriverMetrics): string {
+  const label = typeof m.earnings_label === "string" ? m.earnings_label.trim() : "";
+  if (label && /\d/.test(label)) return label;
+  const n = num(m.earnings);
+  return n != null ? `${n.toFixed(2)} €` : "—";
+}
 
 /**
  * Read-only detail view for a single driver, shown in a centered modal. Pure
@@ -117,7 +124,7 @@ export function DriverDetailModal({ driver, onClose }: { driver: Driver; onClose
               </div>
             ) : metrics ? (
               <div className="grid grid-cols-3 gap-2">
-                <Tile label={d("mEarnings")} value={num(metrics.earnings) != null ? `${num(metrics.earnings)!.toFixed(2)} ${metrics.earnings_label ?? "€"}` : "—"} />
+                <Tile label={d("mEarnings")} value={earningsDisplay(metrics)} />
                 <Tile label={d("mTrips")} value={num(metrics.trips) != null ? `${num(metrics.trips)}` : "—"} />
                 <Tile label={d("mHoursOnline")} value={num(metrics.hours_online) != null ? `${num(metrics.hours_online)!.toFixed(1)}h` : "—"} />
                 <Tile label={d("mHoursOnTrip")} value={num(metrics.hours_on_trip) != null ? `${num(metrics.hours_on_trip)!.toFixed(1)}h` : "—"} />
