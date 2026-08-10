@@ -36,6 +36,27 @@ export async function getOffer(id: number): Promise<DispatchOfferDetail> {
   return res.data;
 }
 
+export type PageMeta = { current_page: number; last_page: number; total: number; per_page: number };
+
+/** Paginated offers with page metadata — powers the offers data table. */
+export async function listOffersPaged(params?: {
+  search?: string;
+  driverUuid?: string;
+  page?: number;
+  perPage?: number;
+}): Promise<{ items: DispatchOffer[]; meta: PageMeta }> {
+  const q = new URLSearchParams();
+  if (params?.search) q.set("search", params.search);
+  if (params?.driverUuid) q.set("driver_uuid", params.driverUuid);
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.perPage) q.set("per_page", String(params.perPage));
+  const qs = q.toString();
+  const res = await apiFetch<{ data: DispatchOffer[]; meta: PageMeta }>(
+    `/api/v1/dispatch/offers${qs ? `?${qs}` : ""}`,
+  );
+  return { items: res.data, meta: res.meta };
+}
+
 export async function listOffers(params?: {
   search?: string;
   driverUuid?: string;

@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Radio, MapPin, Search, Trash2, Loader2, ArrowRight } from "lucide-react";
+import { Radio, MapPin, Search, Trash2, Loader2, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
-import { listOffers, deleteOffer, bulkDeleteOffers, type DispatchOffer } from "@/lib/api/offers";
+import { listOffersPaged, deleteOffer, bulkDeleteOffers, type DispatchOffer, type PageMeta } from "@/lib/api/offers";
 import { OfferDetailModal } from "./offer-detail-modal";
 
 export default function OffersPage() {
@@ -24,6 +24,9 @@ export default function OffersPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
+  const [meta, setMeta] = useState<PageMeta | null>(null);
 
   // A silent load (background poll) refreshes the feed in place: it keeps the
   // skeleton hidden and preserves the manager's current checkbox selection, so
@@ -34,7 +37,14 @@ export default function OffersPage() {
       setError(null);
     }
     try {
-      setOffers(await listOffers({ search: search.trim(), driverUuid: driverUuid || undefined }));
+      const { items, meta: m } = await listOffersPaged({
+        search: search.trim(),
+        driverUuid: driverUuid || undefined,
+        page,
+        perPage,
+      });
+      setOffers(items);
+      setMeta(m);
       if (!silent) setSelected(new Set());
     } catch (e) {
       if (!silent) setError(e instanceof Error ? e.message : "error");
@@ -43,12 +53,17 @@ export default function OffersPage() {
     }
   }
 
-  // Debounce search + react to the driver filter.
+  // Filters/page-size reset to the first page.
+  useEffect(() => {
+    setPage(1);
+  }, [search, driverUuid, perPage]);
+
+  // Debounce search + react to filter/page/page-size changes.
   useEffect(() => {
     const id = setTimeout(load, 300);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, driverUuid]);
+  }, [search, driverUuid, page, perPage]);
 
   // Near real-time: silently poll for new offers every 5s (offers are the most
   // time-sensitive surface). Also refetch when the tab regains focus.
@@ -63,7 +78,7 @@ export default function OffersPage() {
       window.removeEventListener("focus", onFocus);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, driverUuid]);
+  }, [search, driverUuid, page, perPage]);
 
   // Distinct drivers present in the current feed, for the filter dropdown.
   const driverOptions = useMemo(() => {
@@ -148,6 +163,20 @@ export default function OffersPage() {
             {c("deleteSelected")} ({selected.size})
           </Button>
         )}
+
+        {/* Rows-per-page */}
+        <select
+          value={perPage}
+          onChange={(e) => setPerPage(Number(e.target.value))}
+          className="ms-auto rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
+          title={c("rowsPerPage")}
+        >
+          {[10, 25, 50, 100].map((n) => (
+            <option key={n} value={n}>
+              {n} / {c("page")}
+            </option>
+          ))}
+        </select>
       </div>
 
       {error && (
@@ -236,6 +265,37 @@ export default function OffersPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {meta && meta.total > 0 && (
+          <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-sm">
+            <span className="text-slate-500">
+              {(meta.current_page - 1) * meta.per_page + 1}–
+              {Math.min(meta.current_page * meta.per_page, meta.total)} {c("of")} {meta.total}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={meta.current_page <= 1}
+                className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+                aria-label={c("prev")}
+              >
+                <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
+              </button>
+              <span className="px-2 text-slate-600">
+                {meta.current_page} / {meta.last_page}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(meta.last_page, p + 1))}
+                disabled={meta.current_page >= meta.last_page}
+                className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+                aria-label={c("next")}
+              >
+                <ChevronRight className="h-4 w-4 rtl:rotate-180" />
+              </button>
+            </div>
           </div>
         )}
       </Card>

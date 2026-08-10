@@ -33,6 +33,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       rawPayload: "Full raw data",
       distance: "Distance",
       pricePerKm: "Price / km",
+      rowsPerPage: "Rows per page", page: "page", of: "of", prev: "Previous", next: "Next",
     },
     driverLinking: {
       title: "Link drivers",
@@ -159,6 +160,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       rawPayload: "Vollständige Rohdaten",
       distance: "Distanz",
       pricePerKm: "Preis / km",
+      rowsPerPage: "Zeilen pro Seite", page: "Seite", of: "von", prev: "Zurück", next: "Weiter",
     },
     driverLinking: {
       title: "Fahrer verknüpfen",
@@ -283,6 +285,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       rawPayload: "كل البيانات الخام",
       distance: "المسافة",
       pricePerKm: "سعر الكيلو",
+      rowsPerPage: "صفوف بالصفحة", page: "صفحة", of: "من", prev: "السابق", next: "التالي",
     },
     driverLinking: {
       title: "ربط السائقين",

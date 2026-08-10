@@ -13,7 +13,7 @@ const tajawal = Tajawal({
 });
 
 export const metadata: Metadata = {
-  title: "Reidey — Uber Dispatch",
+  title: "Reidey — Fleet Management",
   description: "Capture live Uber fleet dispatch offers and route them to your drivers.",
 };
 
