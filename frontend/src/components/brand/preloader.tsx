@@ -34,11 +34,11 @@ export function Preloader() {
 
         {/* Car travelling along the mark (drawn around the origin so animateMotion
             places it on the path) */}
-        <g fill="#0f172a">
+        <g fill="#fff" stroke="#0f172a" strokeWidth={1.2}>
           <rect x={-6} y={-3.5} width={12} height={7} rx={2.2} />
           <rect x={-3.5} y={-6.5} width={7} height={4} rx={1.6} />
-          <circle cx={-3.5} cy={3.5} r={1.7} fill="#1e293b" />
-          <circle cx={3.5} cy={3.5} r={1.7} fill="#1e293b" />
+          <circle cx={-3.5} cy={3.5} r={1.7} fill="#0f172a" stroke="none" />
+          <circle cx={3.5} cy={3.5} r={1.7} fill="#0f172a" stroke="none" />
           <animateMotion dur="3s" repeatCount="indefinite" rotate="auto" path={route} />
         </g>
       </svg>
