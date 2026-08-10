@@ -51,6 +51,8 @@ const en = {
   },
   common: {
     save: "Save changes",
+    newOffer: "New offer",
+    view: "View",
     cancel: "Cancel",
     connect: "Connect",
     reconnect: "Reconnect",
@@ -133,6 +135,8 @@ const de: typeof en = {
   },
   common: {
     save: "Änderungen speichern",
+    newOffer: "Neues Angebot",
+    view: "Ansehen",
     cancel: "Abbrechen",
     connect: "Verbinden",
     reconnect: "Neu verbinden",
@@ -215,6 +219,8 @@ const ar: typeof en = {
   },
   common: {
     save: "حفظ التغييرات",
+    newOffer: "عرض جديد",
+    view: "عرض",
     cancel: "إلغاء",
     connect: "ربط",
     reconnect: "إعادة الربط",
