@@ -59,20 +59,51 @@ class EmailTemplateRenderer
     private function wrap(EmailTemplate $template, string $body): string
     {
         $accent = htmlspecialchars($template->accent_color ?: '#4f46e5', ENT_QUOTES);
-        $logo = $template->logo_url
-            ? '<img src="'.htmlspecialchars($template->logo_url, ENT_QUOTES).'" alt="" style="max-height:48px;margin-bottom:16px">'
-            : '';
+        $header = $this->brandHeader($template);
         $footer = htmlspecialchars((string) $template->footer_text, ENT_QUOTES);
 
         return <<<HTML
 <div style="background:#f1f5f9;padding:24px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;color:#1e293b">
-    {$logo}
+    {$header}
     <div style="font-size:15px;line-height:1.6">{$body}</div>
   </div>
   <p style="max-width:560px;margin:16px auto 0;text-align:center;color:#94a3b8;font-size:12px">{$footer}</p>
   <style>.btn{display:inline-block;background:{$accent};color:#fff!important;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600;margin-top:8px}</style>
 </div>
 HTML;
+    }
+
+    /**
+     * The email header logo. A custom uploaded image wins when present; otherwise
+     * we render the platform's Reidey lockup as pure HTML — no external image and
+     * no SVG (which Gmail strips), so it always shows without any upload.
+     */
+    private function brandHeader(EmailTemplate $template): string
+    {
+        if (filled($template->logo_url)) {
+            $src = htmlspecialchars($this->absoluteUrl($template->logo_url), ENT_QUOTES);
+
+            return '<img src="'.$src.'" alt="Reidey" style="max-height:48px;margin-bottom:20px">';
+        }
+
+        return <<<'HTML'
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:20px;border-collapse:collapse">
+  <tr>
+    <td style="width:40px;height:40px;background:#0f172a;border-radius:9px;text-align:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:22px;font-weight:800;color:#ffffff;line-height:40px">R</td>
+    <td style="padding-left:10px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:18px;font-weight:700;color:#0f172a">Reidey</td>
+  </tr>
+</table>
+HTML;
+    }
+
+    /** Make an uploaded relative logo path absolute so remote mail clients load it. */
+    private function absoluteUrl(string $url): string
+    {
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            return $url;
+        }
+
+        return rtrim((string) config('app.url'), '/').'/'.ltrim($url, '/');
     }
 }
