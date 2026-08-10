@@ -9,6 +9,7 @@ import {
   Palette,
   Building2,
   Settings,
+  Mail,
   UserCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -62,6 +63,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: "/admin", label: "nav.adminDashboard", icon: LayoutDashboard },
       { href: "/admin/companies", label: "nav.companies", icon: Building2 },
+      { href: "/admin/email-templates", label: "nav.emailTemplates", icon: Mail },
       { href: "/admin/settings", label: "nav.settings", icon: Settings },
     ],
   },
