@@ -75,7 +75,6 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="mt-4 text-center text-xs text-slate-400">{t("login.hosted")}</p>
       </div>
     </div>
   );
