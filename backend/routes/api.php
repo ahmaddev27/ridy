@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\FleetSessionController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\ProfileController;
+use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\UberLoginController;
 use App\Http\Controllers\Api\V1\VehicleController;
 use App\Http\Middleware\ResolveTenant;
@@ -29,6 +30,11 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     Route::get('health', HealthController::class);
     Route::post('login', [AuthController::class, 'login']);
+
+    // Public company self-registration (email OTP).
+    Route::post('register', [RegistrationController::class, 'start'])->middleware('throttle:6,1');
+    Route::post('register/verify', [RegistrationController::class, 'verify'])->middleware('throttle:12,1');
+    Route::post('register/resend', [RegistrationController::class, 'resend'])->middleware('throttle:3,1');
 
     // Internal — the dispatch daemon. Authenticated by a shared secret
     // (VerifyDispatchSecret), not a user session.

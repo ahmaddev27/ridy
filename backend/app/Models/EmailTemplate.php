@@ -22,5 +22,6 @@ class EmailTemplate extends Model
     public const VARIABLES = [
         'company_registration' => ['company_name', 'manager_name', 'login_url'],
         'driver_invite' => ['company_name', 'driver_name', 'invite_link'],
+        'company_otp' => ['name', 'otp'],
     ];
 }

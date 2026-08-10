@@ -80,8 +80,10 @@ const en = {
     search: "Search vehicles, drivers, trips…",
     signOut: "Sign out",
   },
+  register: { title: "Create your company", subtitle: "Sign up and verify your email.", company: "Company name", name: "Your name", email: "Email", password: "Password", createAccount: "Create account", verifyTitle: "Verify your email", verifySubtitle: "Enter the 6-digit code sent to {email}.", verify: "Verify", resend: "Resend code", codeSent: "Code sent", codeResent: "New code sent", failed: "Registration failed", verifyFailed: "Verification failed", haveAccount: "Already have an account?", signIn: "Sign in" },
   login: {
     title: "Sign in",
+    noAccount: "New company?", registerCta: "Create an account",
     subtitle: "Welcome back to your fleet dashboard.",
     email: "Email",
     password: "Password",
@@ -170,8 +172,10 @@ const de: typeof en = {
     search: "Fahrzeuge, Fahrer, Fahrten suchen…",
     signOut: "Abmelden",
   },
+  register: { title: "Firma erstellen", subtitle: "Registrieren und E-Mail bestätigen.", company: "Firmenname", name: "Dein Name", email: "E-Mail", password: "Passwort", createAccount: "Konto erstellen", verifyTitle: "E-Mail bestätigen", verifySubtitle: "Gib den 6-stelligen Code ein, der an {email} gesendet wurde.", verify: "Bestätigen", resend: "Code erneut senden", codeSent: "Code gesendet", codeResent: "Neuer Code gesendet", failed: "Registrierung fehlgeschlagen", verifyFailed: "Bestätigung fehlgeschlagen", haveAccount: "Schon ein Konto?", signIn: "Anmelden" },
   login: {
     title: "Anmelden",
+    noAccount: "Neue Firma?", registerCta: "Konto erstellen",
     subtitle: "Willkommen zurück in deinem Flotten-Dashboard.",
     email: "E-Mail",
     password: "Passwort",
@@ -260,8 +264,10 @@ const ar: typeof en = {
     search: "ابحث عن مركبات، سائقين، رحلات…",
     signOut: "تسجيل الخروج",
   },
+  register: { title: "أنشئ شركتك", subtitle: "سجّل وأكّد بريدك.", company: "اسم الشركة", name: "اسمك", email: "البريد", password: "كلمة المرور", createAccount: "إنشاء حساب", verifyTitle: "أكّد بريدك", verifySubtitle: "أدخل الرمز المكوّن من 6 أرقام المُرسل إلى {email}.", verify: "تأكيد", resend: "إعادة إرسال الرمز", codeSent: "تم إرسال الرمز", codeResent: "تم إرسال رمز جديد", failed: "فشل التسجيل", verifyFailed: "فشل التأكيد", haveAccount: "عندك حساب؟", signIn: "تسجيل الدخول" },
   login: {
     title: "تسجيل الدخول",
+    noAccount: "شركة جديدة؟", registerCta: "أنشئ حساب",
     subtitle: "أهلاً بعودتك إلى لوحة الأسطول.",
     email: "البريد الإلكتروني",
     password: "كلمة المرور",

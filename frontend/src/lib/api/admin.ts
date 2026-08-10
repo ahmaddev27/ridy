@@ -11,6 +11,7 @@ export type Company = {
   proxy_url: string | null; // present only in detail
   driver_count: number;
   offer_count: number;
+  email_verified: boolean;
   session_status: string | null;
   session_last_event_at: string | null;
   session_expires_at: string | null;
@@ -132,6 +133,11 @@ export async function updateCompany(id: number, input: UpdateCompanyInput): Prom
 
 export async function disableCompany(id: number): Promise<void> {
   await apiFetch(`${base}/${id}`, { method: "DELETE", withCsrf: true });
+}
+
+/** Toggle a company between active and disabled (reversible, keeps all data). */
+export async function setCompanyActive(id: number, active: boolean): Promise<Company> {
+  return updateCompany(id, { status: active ? "active" : "disabled" });
 }
 
 export async function listCompanyUsers(id: number): Promise<CompanyUser[]> {

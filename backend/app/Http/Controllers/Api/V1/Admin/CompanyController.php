@@ -35,10 +35,16 @@ class CompanyController extends Controller
         $sessions = UberFleetSession::withoutGlobalScopes()
             ->orderByDesc('updated_at')->get()->keyBy('tenant_id');
 
-        $tenants->each(function (Tenant $t) use ($driverCounts, $offerCounts, $sessions) {
+        // Tenants with at least one email-verified user (self-registered companies
+        // always have one). One grouped query — no N+1.
+        $verifiedTenantIds = User::query()->whereNotNull('email_verified_at')
+            ->distinct()->pluck('tenant_id')->flip();
+
+        $tenants->each(function (Tenant $t) use ($driverCounts, $offerCounts, $sessions, $verifiedTenantIds) {
             $t->setAttribute('driver_count', $driverCounts[$t->id] ?? 0);
             $t->setAttribute('offer_count', $offerCounts[$t->id] ?? 0);
             $t->setAttribute('session_info', $this->sessionInfo($sessions->get($t->id)));
+            $t->setAttribute('email_verified', $verifiedTenantIds->has($t->id));
         });
 
         return CompanyResource::collection($tenants);
@@ -135,6 +141,7 @@ class CompanyController extends Controller
             UberFleetSession::withoutGlobalScopes()->where('tenant_id', $tenant->id)->orderByDesc('updated_at')->first()
         ));
         $tenant->setAttribute('users_list', User::where('tenant_id', $tenant->id)->orderBy('name')->get());
+        $tenant->setAttribute('email_verified', User::where('tenant_id', $tenant->id)->whereNotNull('email_verified_at')->exists());
 
         return CompanyResource::detail($tenant);
     }
