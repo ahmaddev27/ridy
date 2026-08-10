@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
@@ -75,6 +76,12 @@ export default function LoginPage() {
           </form>
         </div>
 
+        <p className="mt-4 text-center text-sm text-slate-500">
+          {t("login.noAccount")}{" "}
+          <Link href="/register" className="font-medium text-slate-900 hover:underline">
+            {t("login.registerCta")}
+          </Link>
+        </p>
       </div>
     </div>
   );

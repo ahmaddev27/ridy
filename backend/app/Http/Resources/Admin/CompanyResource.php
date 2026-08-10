@@ -45,6 +45,7 @@ class CompanyResource extends JsonResource
             // Stats (attached by the controller).
             'driver_count' => (int) ($this->getAttribute('driver_count') ?? 0),
             'offer_count' => (int) ($this->getAttribute('offer_count') ?? 0),
+            'email_verified' => (bool) $this->getAttribute('email_verified'),
             'session_status' => $session['status'] ?? null,
             'session_last_event_at' => $session['last_event_at'] ?? null,
             'session_expires_at' => $session['expires_at'] ?? null,

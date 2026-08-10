@@ -2,17 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Loader2, Building2, Search, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Building2, Search, Trash2, ChevronLeft, ChevronRight, MailCheck, Power, PowerOff } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge, type Status } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { listCompanies, createCompany, disableCompany, type Company } from "@/lib/api/admin";
+import { listCompanies, disableCompany, setCompanyActive, type Company } from "@/lib/api/admin";
 import { CompanyDetailModal } from "./company-detail-modal";
 
 const sessionTone: Record<string, Status> = {
@@ -28,7 +26,6 @@ export default function CompaniesPage() {
   const all = data ?? [];
 
   const [selected, setSelected] = useState<number | null>(null);
-  const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [perPage] = useState(25);
@@ -48,6 +45,17 @@ export default function CompaniesPage() {
   const pageClamped = Math.min(page, lastPage);
   const companies = filtered.slice((pageClamped - 1) * perPage, pageClamped * perPage);
 
+  async function toggleActive(co: Company) {
+    const next = co.status !== "active";
+    try {
+      await setCompanyActive(co.id, next);
+      toast.success(next ? c("enabledToast") : c("disabledToast"));
+      await refetch();
+    } catch (e) {
+      toast.error(c("updateFailed"), { description: e instanceof Error ? e.message : undefined });
+    }
+  }
+
   async function doDelete() {
     if (!confirmDel) return;
     setBusy(true);
@@ -65,14 +73,7 @@ export default function CompaniesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        tkey="companies"
-        action={
-          <Button onClick={() => setCreating(true)}>
-            <Plus className="h-4 w-4" /> {c("newCompany")}
-          </Button>
-        }
-      />
+      <PageHeader tkey="companies" />
 
       {/* Toolbar: search + rows-per-page */}
       <div className="flex flex-wrap items-center gap-3">
@@ -127,9 +128,18 @@ export default function CompaniesPage() {
                       <div className="text-xs text-slate-400">{co.country ?? "—"}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge status={co.status === "active" ? "connected" : "neutral"} dot>
-                        {co.status === "active" ? c("statusActive") : c("statusDisabled")}
-                      </Badge>
+                      <div className="flex flex-col items-start gap-1">
+                        <Badge status={co.status === "active" ? "connected" : "neutral"} dot>
+                          {co.status === "active" ? c("statusActive") : c("statusDisabled")}
+                        </Badge>
+                        {co.email_verified ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                            <MailCheck className="h-3 w-3" /> {c("emailVerified")}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-400">{c("emailUnverified")}</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {co.session_status ? (
@@ -152,13 +162,31 @@ export default function CompaniesPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => setConfirmDel(co)}
-                        className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                        title={c("deleteCompany")}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => toggleActive(co)}
+                          className={
+                            "rounded p-1.5 " +
+                            (co.status === "active"
+                              ? "text-slate-400 hover:bg-amber-50 hover:text-amber-600"
+                              : "text-slate-400 hover:bg-emerald-50 hover:text-emerald-600")
+                          }
+                          title={co.status === "active" ? c("disableCompany") : c("enableCompany")}
+                        >
+                          {co.status === "active" ? (
+                            <PowerOff className="h-4 w-4" />
+                          ) : (
+                            <Power className="h-4 w-4" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDel(co)}
+                          className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                          title={c("deleteCompany")}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -205,8 +233,6 @@ export default function CompaniesPage() {
         />
       )}
 
-      <CreateCompanyModal open={creating} onClose={() => setCreating(false)} onCreated={refetch} />
-
       <ConfirmModal
         open={confirmDel !== null}
         danger
@@ -222,107 +248,3 @@ export default function CompaniesPage() {
   );
 }
 
-function CreateCompanyModal({
-  open,
-  onClose,
-  onCreated,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onCreated: () => void;
-}) {
-  const { t } = useI18n();
-  const c = (k: string) => t(`screens.companies.${k}`);
-  const [name, setName] = useState("");
-  const [country, setCountry] = useState("DE");
-  const [mgrName, setMgrName] = useState("");
-  const [mgrEmail, setMgrEmail] = useState("");
-  const [mgrPassword, setMgrPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  function reset() {
-    setName("");
-    setCountry("DE");
-    setMgrName("");
-    setMgrEmail("");
-    setMgrPassword("");
-  }
-
-  async function submit() {
-    if (!name.trim()) return;
-    setBusy(true);
-    try {
-      await createCompany({
-        name: name.trim(),
-        country: country.trim() || undefined,
-        manager_name: mgrName.trim() || undefined,
-        manager_email: mgrEmail.trim() || undefined,
-        manager_password: mgrPassword || undefined,
-      });
-      toast.success(c("createdToast"));
-      reset();
-      onCreated();
-      onClose();
-    } catch (e) {
-      toast.error(c("createFailed"), { description: e instanceof Error ? e.message : undefined });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      size="xl"
-      title={c("newCompany")}
-      footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose} disabled={busy}>
-            {c("cancel")}
-          </Button>
-          <Button onClick={submit} disabled={busy || !name.trim()}>
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-            {c("create")}
-          </Button>
-        </div>
-      }
-    >
-      <div className="space-y-3 text-start">
-        <Field label={c("fieldName")} value={name} onChange={setName} />
-        <Field label={c("fieldCountry")} value={country} onChange={setCountry} />
-        <p className="pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          {c("firstManager")}
-        </p>
-        <Field label={c("fieldManagerName")} value={mgrName} onChange={setMgrName} />
-        <Field label={c("fieldManagerEmail")} type="email" value={mgrEmail} onChange={setMgrEmail} />
-        <Field label={c("fieldManagerPassword")} type="password" value={mgrPassword} onChange={setMgrPassword} />
-      </div>
-    </Modal>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        autoComplete="off"
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-      />
-    </div>
-  );
-}
