@@ -73,10 +73,10 @@ export function OfferAlerts() {
 
       toast(t("common.newOffer"), {
         description: (
-          <div className="space-y-0.5 text-start">
-            {line1 && <div className="font-semibold text-slate-800">{line1}</div>}
-            {line2 && <div className="text-slate-600">{line2}</div>}
-            {line3 && <div className="truncate text-xs text-slate-400">{line3}</div>}
+          <div className="w-full min-w-0 space-y-0.5 text-start">
+            {line1 && <div className="truncate font-semibold text-slate-800">{line1}</div>}
+            {line2 && <div className="truncate text-slate-600">{line2}</div>}
+            {line3 && <div className="line-clamp-2 break-words text-xs text-slate-400">{line3}</div>}
           </div>
         ),
         action: { label: t("common.view"), onClick: () => router.push("/offers") },

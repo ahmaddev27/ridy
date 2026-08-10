@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Radio, MapPin, Search, Trash2, Loader2, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { Radio, MapPin, Search, Trash2, Loader2, ArrowRight, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { listOffersPaged, deleteOffer, bulkDeleteOffers, type DispatchOffer, type PageMeta } from "@/lib/api/offers";
+import { listDrivers, type Driver } from "@/lib/api/drivers";
 import { OfferDetailModal } from "./offer-detail-modal";
 
 export default function OffersPage() {
@@ -20,12 +21,16 @@ export default function OffersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [driverUuid, setDriverUuid] = useState("");
+  const [driverUuids, setDriverUuids] = useState<string[]>([]);
+  const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
+  const [driverFilterOpen, setDriverFilterOpen] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
+  const [perPage] = useState(50); // fixed; offers are grouped by day, not paged by size
+  // Collapsible day groups — today starts open, the rest collapsed.
+  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set([new Date().toDateString()]));
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [meta, setMeta] = useState<PageMeta | null>(null);
@@ -41,7 +46,7 @@ export default function OffersPage() {
     try {
       const { items, meta: m } = await listOffersPaged({
         search: search.trim(),
-        driverUuid: driverUuid || undefined,
+        driverUuids: driverUuids.length ? driverUuids : undefined,
         from: from || undefined,
         to: to || undefined,
         page,
@@ -57,17 +62,19 @@ export default function OffersPage() {
     }
   }
 
+  const driverKey = driverUuids.join(",");
+
   // Filters/page-size reset to the first page.
   useEffect(() => {
     setPage(1);
-  }, [search, driverUuid, from, to, perPage]);
+  }, [search, driverKey, from, to, perPage]);
 
   // Debounce search + react to filter/page/page-size changes.
   useEffect(() => {
     const id = setTimeout(load, 300);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, driverUuid, from, to, page, perPage]);
+  }, [search, driverKey, from, to, page, perPage]);
 
   // Near real-time: silently poll for new offers every 5s (offers are the most
   // time-sensitive surface). Also refetch when the tab regains focus.
@@ -82,16 +89,46 @@ export default function OffersPage() {
       window.removeEventListener("focus", onFocus);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, driverUuid, from, to, page, perPage]);
+  }, [search, driverKey, from, to, page, perPage]);
 
-  // Distinct drivers present in the current feed, for the filter dropdown.
-  const driverOptions = useMemo(() => {
-    const map = new Map<string, string>();
+  // All of the company's drivers (with an Uber UUID) populate the filter list.
+  useEffect(() => {
+    listDrivers()
+      .then((list) => setAllDrivers(list.filter((d) => d.uber_driver_uuid)))
+      .catch(() => {});
+  }, []);
+
+  const selectedDriverSet = useMemo(() => new Set(driverUuids), [driverUuids]);
+  function toggleDriver(uuid: string) {
+    setDriverUuids((prev) => (prev.includes(uuid) ? prev.filter((x) => x !== uuid) : [...prev, uuid]));
+  }
+
+  // Group the loaded offers into day buckets (feed is newest-first, so days stay ordered).
+  const groupedByDay = useMemo(() => {
+    const groups = new Map<string, DispatchOffer[]>();
     for (const o of offers) {
-      if (o.driver_uuid) map.set(o.driver_uuid, o.driver_name ?? o.driver_uuid);
+      const key = o.received_at ? new Date(o.received_at).toDateString() : "—";
+      const bucket = groups.get(key) ?? [];
+      bucket.push(o);
+      groups.set(key, bucket);
     }
-    return [...map.entries()];
+    return [...groups.entries()];
   }, [offers]);
+
+  function toggleDay(key: string) {
+    setOpenDays((s) => {
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  }
+
+  function dayLabel(key: string): string {
+    if (key === new Date().toDateString()) return c("today");
+    if (key === "—") return "—";
+    return new Date(key).toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
+  }
 
   function toggle(id: number) {
     setSelected((s) => {
@@ -99,10 +136,6 @@ export default function OffersPage() {
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  }
-
-  function toggleAll() {
-    setSelected((s) => (s.size === offers.length ? new Set() : new Set(offers.map((o) => o.id))));
   }
 
   async function removeOne(id: number) {
@@ -132,8 +165,6 @@ export default function OffersPage() {
     }
   }
 
-  const allSelected = offers.length > 0 && selected.size === offers.length;
-
   return (
     <div className="space-y-6">
       <PageHeader title={c("title")} subtitle={c("subtitle")} />
@@ -149,18 +180,50 @@ export default function OffersPage() {
             className="w-full rounded-lg border border-slate-300 py-2 ps-9 pe-3 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
           />
         </div>
-        <select
-          value={driverUuid}
-          onChange={(e) => setDriverUuid(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
-        >
-          <option value="">{c("filterAll")}</option>
-          {driverOptions.map(([uuid, name]) => (
-            <option key={uuid} value={uuid}>
-              {name}
-            </option>
-          ))}
-        </select>
+        {/* Multi-select driver filter — lists every company driver */}
+        <div className="relative">
+          <button
+            onClick={() => setDriverFilterOpen((o) => !o)}
+            className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 outline-none hover:bg-slate-50"
+          >
+            {driverUuids.length === 0
+              ? c("filterAll")
+              : `${driverUuids.length} ${c("driversSelected")}`}
+            <ChevronDown className="h-4 w-4 text-slate-400" />
+          </button>
+          {driverFilterOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setDriverFilterOpen(false)} />
+              <div className="absolute z-20 mt-1 max-h-72 w-64 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                {driverUuids.length > 0 && (
+                  <button
+                    onClick={() => setDriverUuids([])}
+                    className="w-full rounded px-2 py-1.5 text-start text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                  >
+                    {c("clearSelection")}
+                  </button>
+                )}
+                {allDrivers.length === 0 ? (
+                  <p className="px-2 py-2 text-xs text-slate-400">{c("noDrivers")}</p>
+                ) : (
+                  allDrivers.map((d) => (
+                    <label
+                      key={d.id}
+                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-slate-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedDriverSet.has(d.uber_driver_uuid ?? "")}
+                        onChange={() => d.uber_driver_uuid && toggleDriver(d.uber_driver_uuid)}
+                      />
+                      <span className="truncate text-slate-700">{d.name}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Date range */}
         <input
@@ -196,20 +259,6 @@ export default function OffersPage() {
             {c("deleteSelected")} ({selected.size})
           </Button>
         )}
-
-        {/* Rows-per-page */}
-        <select
-          value={perPage}
-          onChange={(e) => setPerPage(Number(e.target.value))}
-          className="ms-auto rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
-          title={c("rowsPerPage")}
-        >
-          {[10, 25, 50, 100].map((n) => (
-            <option key={n} value={n}>
-              {n} / {c("page")}
-            </option>
-          ))}
-        </select>
       </div>
 
       {error && (
@@ -228,76 +277,80 @@ export default function OffersPage() {
         ) : offers.length === 0 ? (
           <EmptyState icon={Radio} title={c("empty")} description={c("emptyDesc")} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-400 [&_th]:text-start">
-                <tr>
-                  <th className="px-4 py-3">
-                    <input type="checkbox" checked={allSelected} onChange={toggleAll} />
-                  </th>
-                  <th className="px-4 py-3 font-semibold">{c("colTime")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colDriver")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colRoute")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colFare")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colStatus")}</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {offers.map((o) => (
-                  <tr
-                    key={o.id}
-                    onClick={() => setDetailId(o.id)}
-                    className={`cursor-pointer ${selected.has(o.id) ? "bg-slate-50" : "hover:bg-slate-50"}`}
+          <div>
+            {groupedByDay.map(([key, dayOffers]) => {
+              const open = openDays.has(key);
+              return (
+                <div key={key} className="border-b border-slate-100 last:border-0">
+                  <button
+                    onClick={() => toggleDay(key)}
+                    className="flex w-full items-center gap-2 px-4 py-3 text-start hover:bg-slate-50"
                   >
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(o.id)}
-                        onChange={() => toggle(o.id)}
-                      />
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-500">
-                      {o.received_at ? new Date(o.received_at).toLocaleTimeString(locale) : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-slate-800">{o.driver_name ?? "—"}</div>
-                      <div className="font-mono text-[10px] text-slate-400">{o.driver_uuid}</div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      <div className="flex items-start gap-1.5">
-                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                        <div className="min-w-0">
-                          <div className="truncate">{o.pickup_address ?? "—"}</div>
-                          <div className="flex items-center gap-1 truncate text-slate-400">
-                            <ArrowRight className="h-3 w-3 shrink-0 rtl:rotate-180" />
-                            <span className="truncate">{o.dropoff_address ?? "—"}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
-                      {o.fare_formatted ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge status={o.linked ? "connected" : "gap"} dot>
-                        {o.linked ? c("linked") : c("unlinked")}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => removeOne(o.id)}
-                        disabled={busy}
-                        className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                        title={c("delete")}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    <ChevronDown className={`h-4 w-4 text-slate-400 transition ${open ? "" : "-rotate-90"}`} />
+                    <span className="font-semibold text-slate-800">{dayLabel(key)}</span>
+                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                      {dayOffers.length} {c("offersCount")}
+                    </span>
+                  </button>
+                  {open && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <tbody className="divide-y divide-slate-100">
+                          {dayOffers.map((o) => (
+                            <tr
+                              key={o.id}
+                              onClick={() => setDetailId(o.id)}
+                              className={`cursor-pointer ${selected.has(o.id) ? "bg-slate-50" : "hover:bg-slate-50"}`}
+                            >
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggle(o.id)} />
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                                {o.received_at ? new Date(o.received_at).toLocaleTimeString(locale) : "—"}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-slate-800">{o.driver_name ?? "—"}</div>
+                                <div className="font-mono text-[10px] text-slate-400">{o.driver_uuid}</div>
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">
+                                <div className="flex items-start gap-1.5">
+                                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                                  <div className="min-w-0">
+                                    <div className="truncate">{o.pickup_address ?? "—"}</div>
+                                    <div className="flex items-center gap-1 truncate text-slate-400">
+                                      <ArrowRight className="h-3 w-3 shrink-0 rtl:rotate-180" />
+                                      <span className="truncate">{o.dropoff_address ?? "—"}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
+                                {o.fare_formatted ?? "—"}
+                              </td>
+                              <td className="px-4 py-3">
+                                <Badge status={o.linked ? "connected" : "gap"} dot>
+                                  {o.linked ? c("linked") : c("unlinked")}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => removeOne(o.id)}
+                                  disabled={busy}
+                                  className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                  title={c("delete")}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
