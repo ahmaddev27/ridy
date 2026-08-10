@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ShieldCheck, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { login } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
@@ -37,9 +38,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-white">
-            <ShieldCheck className="h-6 w-6" />
-          </div>
+          <Logo size={44} className="text-indigo-600" />
           <div className="leading-tight">
             <div className="text-lg font-bold text-slate-900">Reidey</div>
             <div className="text-xs text-slate-400">Fleet Management</div>
