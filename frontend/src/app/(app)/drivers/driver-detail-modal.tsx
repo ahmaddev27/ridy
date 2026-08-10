@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Star, Phone, Mail, Hash, Car, UserCheck, Smartphone, Loader2 } from "lucide-react";
+import { X, Star, Phone, Mail, Car, UserCheck, Smartphone, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/context";
 import type { Driver } from "@/lib/api/drivers";
@@ -147,15 +147,6 @@ export function DriverDetailModal({ driver, onClose }: { driver: Driver; onClose
           </Row>
           <Row icon={Mail} label={d("email")}>
             {driver.uber_email ? <span dir="ltr">{driver.uber_email}</span> : "—"}
-          </Row>
-          <Row icon={Hash} label={d("uberUuid")}>
-            {driver.uber_driver_uuid ? (
-              <span dir="ltr" className="font-mono text-xs text-slate-500">
-                {driver.uber_driver_uuid}
-              </span>
-            ) : (
-              "—"
-            )}
           </Row>
           <Row icon={UserCheck} label={d("linkMethod")}>
             {driver.uber_link_method ? d(`linkMethod_${driver.uber_link_method}`) : "—"}

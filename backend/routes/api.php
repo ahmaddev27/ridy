@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\UberLoginController;
+use App\Http\Controllers\Api\V1\VehicleController;
 use App\Http\Middleware\ResolveTenant;
 use Illuminate\Support\Facades\Route;
 
@@ -55,6 +56,10 @@ Route::prefix('v1')->group(function () {
         // Per-driver Uber performance metrics (earnings/hours/trips)
         Route::post('drivers/metrics', [DriverMetricController::class, 'store']);
         Route::get('drivers/{driver}/metrics', [DriverMetricController::class, 'index']);
+
+        // Fleet vehicles (synced from Uber via the extension)
+        Route::get('vehicles', [VehicleController::class, 'index']);
+        Route::post('vehicles', [VehicleController::class, 'ingest']);
 
         // Dispatch offers feed
         Route::get('dispatch/offers', [DispatchOfferController::class, 'index']);

@@ -6,6 +6,14 @@ import type { Locale } from "./dictionaries";
 
 export const screensRidy: Record<Locale, Record<string, unknown>> = {
   en: {
+    vehicles: {
+      sync: "Sync from Uber", syncOk: "Vehicles synced", syncFailed: "Sync failed",
+      syncNoExtension: "Extension not connected — open the Uber tab.",
+      empty: "No vehicles yet", emptyDesc: "Sync from Uber to pull your fleet vehicles.",
+      colVehicle: "Vehicle", colYear: "Year", colPlate: "Plate", colVin: "VIN",
+      colColor: "Color", colStatus: "Status", colAssignment: "Assignment",
+      statusActive: "Active", unassigned: "Unassigned",
+    },
     offers: {
       title: "Offers",
       subtitle: "Live Uber ride offers captured from the dispatch stream.",
@@ -136,6 +144,14 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
     },
   },
   de: {
+    vehicles: {
+      sync: "Von Uber synchronisieren", syncOk: "Fahrzeuge synchronisiert", syncFailed: "Sync fehlgeschlagen",
+      syncNoExtension: "Erweiterung nicht verbunden — Uber-Tab öffnen.",
+      empty: "Noch keine Fahrzeuge", emptyDesc: "Von Uber synchronisieren, um Flottenfahrzeuge zu laden.",
+      colVehicle: "Fahrzeug", colYear: "Jahr", colPlate: "Kennzeichen", colVin: "FIN",
+      colColor: "Farbe", colStatus: "Status", colAssignment: "Zuweisung",
+      statusActive: "Aktiv", unassigned: "Nicht zugewiesen",
+    },
     offers: {
       title: "Angebote",
       subtitle: "Live erfasste Uber-Fahrtangebote aus dem Dispatch-Stream.",
@@ -265,6 +281,14 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
     },
   },
   ar: {
+    vehicles: {
+      sync: "مزامنة من أوبر", syncOk: "تمت مزامنة المركبات", syncFailed: "فشلت المزامنة",
+      syncNoExtension: "الإضافة غير موصولة — افتح تبويب أوبر.",
+      empty: "لا مركبات بعد", emptyDesc: "زامن من أوبر لجلب مركبات أسطولك.",
+      colVehicle: "المركبة", colYear: "السنة", colPlate: "اللوحة", colVin: "الشاصي",
+      colColor: "اللون", colStatus: "الحالة", colAssignment: "الربط",
+      statusActive: "نشطة", unassigned: "غير مربوطة",
+    },
     offers: {
       title: "العروض",
       subtitle: "عروض رحلات أوبر الملتقطة حيّاً من تيار الإرساليات.",

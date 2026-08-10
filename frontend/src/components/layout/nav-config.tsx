@@ -5,6 +5,7 @@ import {
   Radio,
   Link2,
   Plug,
+  Car,
   Building2,
   Settings,
   Mail,
@@ -44,6 +45,7 @@ export const navGroups: NavGroup[] = [
     hideForRole: "super_admin",
     items: [
       { href: "/drivers", label: "nav.drivers", icon: Users },
+      { href: "/vehicles", label: "nav.vehicles", icon: Car },
       { href: "/driver-linking", label: "nav.driverLinking", icon: Link2 },
       { href: "/connections", label: "nav.connections", icon: Plug },
     ],
