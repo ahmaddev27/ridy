@@ -52,6 +52,7 @@ const en = {
     emailTemplates: { title: "Email Templates", subtitle: "Customize the registration and driver-invite emails." },
     profile: { title: "Profile", subtitle: "Edit your account." },
   },
+  extBanner: { missing: "Reidey extension not installed — offers won’t be captured.", outdated: "Your Reidey extension is outdated — please update it.", unpaired: "The Reidey extension isn’t paired yet.", action: "Fix" },
   common: {
     save: "Save changes",
     newOffer: "New offer",
@@ -141,6 +142,7 @@ const de: typeof en = {
     emailTemplates: { title: "E-Mail-Vorlagen", subtitle: "Registrierungs- und Einladungs-E-Mails anpassen." },
     profile: { title: "Profil", subtitle: "Dein Konto bearbeiten." },
   },
+  extBanner: { missing: "Reidey-Erweiterung nicht installiert — Angebote werden nicht erfasst.", outdated: "Deine Reidey-Erweiterung ist veraltet — bitte aktualisieren.", unpaired: "Die Reidey-Erweiterung ist noch nicht gekoppelt.", action: "Beheben" },
   common: {
     save: "Änderungen speichern",
     newOffer: "Neues Angebot",
@@ -230,6 +232,7 @@ const ar: typeof en = {
     emailTemplates: { title: "قوالب الإيميل", subtitle: "خصّص إيميلات التسجيل ودعوة السائق." },
     profile: { title: "الملف الشخصي", subtitle: "تعديل حسابك." },
   },
+  extBanner: { missing: "إضافة Reidey غير مثبّتة — لن تُلتقط العروض.", outdated: "إضافة Reidey قديمة — رجاءً حدّثها.", unpaired: "إضافة Reidey غير مقترنة بعد.", action: "إصلاح" },
   common: {
     save: "حفظ التغييرات",
     newOffer: "عرض جديد",

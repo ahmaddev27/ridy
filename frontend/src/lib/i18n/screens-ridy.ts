@@ -128,7 +128,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       cancel: "Cancel",
     },
     dashboard: {
-      statDrivers: "Drivers",
+      statDrivers: "Drivers", statOnline: "Online now", statVehicles: "Vehicles", offersTrend: "Offers · last 7 days",
       statLinked: "Linked to Uber",
       statOffersToday: "Offers today",
       statUnlinked: "Unassigned",
@@ -265,7 +265,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       cancel: "Abbrechen",
     },
     dashboard: {
-      statDrivers: "Fahrer",
+      statDrivers: "Fahrer", statOnline: "Jetzt online", statVehicles: "Fahrzeuge", offersTrend: "Angebote · letzte 7 Tage",
       statLinked: "Mit Uber verknüpft",
       statOffersToday: "Angebote heute",
       statUnlinked: "Nicht zugeordnet",
@@ -400,7 +400,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       cancel: "إلغاء",
     },
     dashboard: {
-      statDrivers: "السائقون",
+      statDrivers: "السائقون", statOnline: "أونلاين الآن", statVehicles: "المركبات", offersTrend: "العروض · آخر 7 أيام",
       statLinked: "مربوطون بأوبر",
       statOffersToday: "عروض اليوم",
       statUnlinked: "غير مسنَدة",

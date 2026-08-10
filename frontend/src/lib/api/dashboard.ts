@@ -10,8 +10,11 @@ export type FleetSession = {
 export type DashboardSummary = {
   drivers: number;
   linked_drivers: number;
+  online_drivers: number;
+  vehicles: number;
   offers_today: number;
   unlinked_offers: number;
+  offers_daily: { date: string; count: number }[];
   fleet_session: FleetSession;
 };
 
