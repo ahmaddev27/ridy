@@ -3,6 +3,7 @@ import { Inter, Tajawal } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { I18nProvider } from "@/lib/i18n/context";
+import { InitialLoader } from "@/components/brand/initial-loader";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 // Arabic UI font — applied via CSS when the document is in Arabic/RTL.
@@ -24,6 +25,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${tajawal.variable} h-full`}>
       <body className="min-h-full bg-slate-50 text-slate-900 antialiased">
         <I18nProvider>{children}</I18nProvider>
+        <InitialLoader />
         <Toaster position="bottom-right" richColors closeButton />
       </body>
     </html>
