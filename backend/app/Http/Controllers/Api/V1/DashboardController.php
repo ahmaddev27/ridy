@@ -19,9 +19,7 @@ class DashboardController extends Controller
         return response()->json(['data' => [
             'drivers' => Driver::count(),
             'linked_drivers' => Driver::whereNotNull('uber_driver_uuid')->count(),
-            'online_drivers' => Driver::where(fn ($q) => $q
-                ->where('online_status', 'like', '%ONLINE%')
-                ->orWhere('online_status', 'like', '%ON_TRIP%'))->count(),
+            'online_drivers' => Driver::online()->count(),
             'vehicles' => Vehicle::count(),
             'offers_today' => DispatchOffer::where('received_at', '>=', $today)->count(),
             'unlinked_offers' => DispatchOffer::whereNull('driver_id')->count(),

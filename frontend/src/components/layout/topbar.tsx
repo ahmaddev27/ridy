@@ -47,17 +47,10 @@ export function Topbar() {
   const isManager = Boolean(user?.tenant);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/80 px-4 backdrop-blur sm:px-5">
-      {/* Mobile nav toggle */}
-      <button
-        onClick={() => setNavOpen(true)}
-        className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
-        aria-label="Menu"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
-
-      {/* Mobile drawer */}
+    <>
+      {/* Mobile drawer — rendered OUTSIDE the backdrop-blur header, whose
+          `backdrop-filter` would otherwise become the containing block for this
+          `fixed` overlay and collapse it to the header's height. */}
       {navOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-slate-900/40" onClick={() => setNavOpen(false)} />
@@ -77,7 +70,17 @@ export function Topbar() {
         </div>
       )}
 
-      {/* Search */}
+      <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/80 px-4 backdrop-blur sm:px-5">
+        {/* Mobile nav toggle */}
+        <button
+          onClick={() => setNavOpen(true)}
+          className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
+          aria-label="Menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+
+        {/* Search */}
       <div className="relative hidden max-w-md flex-1 sm:block">
         <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
@@ -166,6 +169,7 @@ export function Topbar() {
           )}
         </div>
       </div>
-    </header>
+      </header>
+    </>
   );
 }

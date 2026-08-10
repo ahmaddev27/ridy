@@ -111,7 +111,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       advanced: "Advanced: paste cookies manually",
       capture: "Capture session manually",
       captureHint:
-        "Open vsdispatch.uber.com and sign in. Then export the cookies (e.g. with a browser extension) and paste them here as JSON.",
+        "Open supplier.uber.com and sign in. Then export the cookies (e.g. with a browser extension) and paste them here as JSON.",
       cookiesLabel: "Cookies (JSON)",
       connect: "Connect",
       cookiesInvalid: "Invalid cookies",
@@ -248,7 +248,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       advanced: "Erweitert: Cookies manuell einfügen",
       capture: "Sitzung manuell erfassen",
       captureHint:
-        "Öffne vsdispatch.uber.com und melde dich an. Exportiere anschließend die Cookies (z. B. mit einer Browser-Erweiterung) und füge sie hier als JSON ein.",
+        "Öffne supplier.uber.com und melde dich an. Exportiere anschließend die Cookies (z. B. mit einer Browser-Erweiterung) und füge sie hier als JSON ein.",
       cookiesLabel: "Cookies (JSON)",
       connect: "Verbinden",
       cookiesInvalid: "Cookies ungültig",
@@ -383,7 +383,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       extUpdateDownload: "تحميل التحديث (.zip)",
       advanced: "متقدّم: لصق الكوكيز يدوياً",
       capture: "التقاط الجلسة يدوياً",
-      captureHint: "افتح vsdispatch.uber.com وسجّل دخولك. صدّر الكوكيز (مثلاً بإضافة متصفّح) والصقها هنا كـJSON.",
+      captureHint: "افتح supplier.uber.com وسجّل دخولك. صدّر الكوكيز (مثلاً بإضافة متصفّح) والصقها هنا كـJSON.",
       cookiesLabel: "الكوكيز (JSON)",
       connect: "ربط",
       cookiesInvalid: "كوكيز غير صالحة",
