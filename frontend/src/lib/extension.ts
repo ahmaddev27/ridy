@@ -8,7 +8,7 @@
 // The extension version this dashboard build expects. Bump it in lockstep with
 // extension/manifest.json so managers running an older, manually-installed
 // build get prompted to update (unpacked extensions don't auto-update).
-export const LATEST_EXTENSION_VERSION = "1.9.0";
+export const LATEST_EXTENSION_VERSION = "1.10.0";
 
 /** True when `installed` is a valid version older than LATEST_EXTENSION_VERSION. */
 export function isExtensionOutdated(installed: string | null | undefined): boolean {

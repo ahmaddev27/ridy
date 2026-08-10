@@ -14,6 +14,24 @@
     return m ? m[1] : null;
   }
 
+  // Best-effort fleet/organization name from the page's embedded state, so the
+  // company in Reidey can adopt its real Uber name at link time.
+  function findOrgName() {
+    const html = document.documentElement.innerHTML;
+    const patterns = [
+      /"organizationName"\s*:\s*"([^"]{2,120})"/i,
+      /"orgName"\s*:\s*"([^"]{2,120})"/i,
+      /"partnerName"\s*:\s*"([^"]{2,120})"/i,
+      /"fleetName"\s*:\s*"([^"]{2,120})"/i,
+      /"organization"\s*:\s*\{[^{}]*?"name"\s*:\s*"([^"]{2,120})"/i,
+    ];
+    for (const p of patterns) {
+      const m = html.match(p);
+      if (m && m[1].trim()) return m[1].trim();
+    }
+    return null;
+  }
+
   function toast(message, ok) {
     const el = document.createElement("div");
     el.textContent = message;
@@ -39,7 +57,7 @@
     if (!orgUuid) return; // not logged in yet
 
     done = true; // attempt once per page load
-    const res = await api.runtime.sendMessage({ type: "capture", orgUuid });
+    const res = await api.runtime.sendMessage({ type: "capture", orgUuid, orgName: findOrgName() });
 
     if (res?.ok) {
       // Confirm whether it was freshly captured or already connected.

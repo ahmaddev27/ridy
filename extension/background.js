@@ -23,7 +23,7 @@ function fingerprint(orgUuid, cookies) {
   return orgUuid + "|" + cookies.length + "|" + cookies.map((c) => c.value.length).join(",");
 }
 
-async function capture(orgUuid, { manual = false } = {}) {
+async function capture(orgUuid, orgName, { manual = false } = {}) {
   const { apiUrl, token, lastSync } = await api.storage.local.get(["apiUrl", "token", "lastSync"]);
   if (!apiUrl || !token) {
     return { ok: false, reason: "not_paired" };
@@ -45,7 +45,7 @@ async function capture(orgUuid, { manual = false } = {}) {
         Accept: "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ uber_org_uuid: orgUuid, cookies }),
+      body: JSON.stringify({ uber_org_uuid: orgUuid, cookies, uber_org_name: orgName || undefined }),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
@@ -196,7 +196,7 @@ async function postOffers(offers, seq) {
 
 api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "capture" && msg.orgUuid) {
-    capture(msg.orgUuid, { manual: !!msg.manual }).then(sendResponse);
+    capture(msg.orgUuid, msg.orgName, { manual: !!msg.manual }).then(sendResponse);
     return true; // async response
   }
   if (msg?.type === "roster" && Array.isArray(msg.drivers)) {

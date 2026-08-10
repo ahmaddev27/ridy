@@ -23,10 +23,16 @@ class FleetSessionService
         string $uberOrgUuid,
         array $cookies,
         ?CarbonImmutable $expiresAt = null,
+        ?string $uberOrgName = null,
     ): UberFleetSession {
         // Binding the tenant to its Uber org lets offers (which carry partnerUUID)
-        // resolve back to this tenant during ingest.
-        $tenant->forceFill(['uber_org_uuid' => $uberOrgUuid])->save();
+        // resolve back to this tenant during ingest. When Uber gives us the fleet
+        // name at link time, adopt it as the company name.
+        $tenant->forceFill(['uber_org_uuid' => $uberOrgUuid]);
+        if ($uberOrgName !== null && trim($uberOrgName) !== '') {
+            $tenant->name = trim($uberOrgName);
+        }
+        $tenant->save();
 
         $session = UberFleetSession::updateOrCreate(
             ['tenant_id' => $tenant->id, 'uber_org_uuid' => $uberOrgUuid],
