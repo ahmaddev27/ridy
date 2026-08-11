@@ -10,7 +10,7 @@ import { apiErrorMessage } from "@/lib/api/error-message";
 import { activateCompany } from "@/lib/api/activation";
 
 export type SuspendedInfo = {
-  reason: "disabled" | "banned" | "expired";
+  reason: "disabled" | "banned" | "expired" | "inactive";
   email: string;
   password: string;
   supportEmail?: string | null;
@@ -34,7 +34,7 @@ export function SuspendedScreen({
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const canActivate = info.reason === "expired";
+  const canActivate = info.reason === "expired" || info.reason === "inactive";
 
   async function activate(e: React.FormEvent) {
     e.preventDefault();

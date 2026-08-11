@@ -231,7 +231,7 @@ export function CompanyDetailModal({
                   {company.state === null ? (
                     <Badge status="connected" dot>{c("subActive")}</Badge>
                   ) : (
-                    <Badge status={company.state === "expired" ? "expiring" : "error"} dot>
+                    <Badge status={company.state === "banned" || company.state === "disabled" ? "error" : "expiring"} dot>
                       {c(`sub_${company.state}`)}
                     </Badge>
                   )}
