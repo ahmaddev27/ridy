@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ban, Ticket, ShieldCheck } from "lucide-react";
@@ -198,7 +198,7 @@ export function CompanyDetail({
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl text-start">
+    <div className="w-full text-start">
       {/* Header with back link */}
       <div className="mb-5 flex items-center gap-3">
         <Link href="/admin/companies" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
@@ -214,7 +214,7 @@ export function CompanyDetail({
 
       {/* Side tabs (start side = right in RTL, left in LTR) + content */}
       <div className="flex flex-col gap-4 md:flex-row">
-        <nav className="flex gap-1 overflow-x-auto md:w-48 md:flex-col md:gap-0.5">
+        <nav className="flex gap-1 overflow-x-auto md:w-56 md:flex-col md:gap-0.5">
           {(["details", "drivers", "offers", "vehicles"] as const).map((tk) => (
             <button
               key={tk}
@@ -236,6 +236,8 @@ export function CompanyDetail({
             <div className="flex items-center justify-center py-10 text-slate-400">
               <Loader2 className="h-5 w-5 animate-spin" />
             </div>
+          ) : tab === "offers" ? (
+            <CompanyOffersTab id={id} />
           ) : tab !== "details" ? (
             <CompanyDataTab id={id} tab={tab} />
           ) : (
@@ -249,19 +251,23 @@ export function CompanyDetail({
 
               {/* Edit info */}
               <Section title={c("info")}>
-                <Field label={c("fieldName")} value={name} onChange={setName} />
-                <Field label={c("fieldCountry")} value={country} onChange={setCountry} />
-                <Field label={c("fieldOrgUuid")} value={orgUuid} onChange={setOrgUuid} mono />
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">{c("colStatus")}</label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
-                  >
-                    <option value="active">{c("statusActive")}</option>
-                    <option value="disabled">{c("statusDisabled")}</option>
-                  </select>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label={c("fieldName")} value={name} onChange={setName} />
+                  <Field label={c("fieldCountry")} value={country} onChange={setCountry} />
+                  <div className="md:col-span-2">
+                    <Field label={c("fieldOrgUuid")} value={orgUuid} onChange={setOrgUuid} mono />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">{c("colStatus")}</label>
+                    <select
+                      value={status}
+                      onChange={(e) => setStatus(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
+                    >
+                      <option value="active">{c("statusActive")}</option>
+                      <option value="disabled">{c("statusDisabled")}</option>
+                    </select>
+                  </div>
                 </div>
               </Section>
 
@@ -485,17 +491,16 @@ function Field({
 }
 
 /** Lazy-loaded drill-down list for a company's drivers / offers / vehicles. */
-function CompanyDataTab({ id, tab }: { id: number; tab: "drivers" | "offers" | "vehicles" }) {
+function CompanyDataTab({ id, tab }: { id: number; tab: "drivers" | "vehicles" }) {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.companies.${k}`);
-  const [rows, setRows] = useState<CompanyDriverRow[] | CompanyOfferRow[] | CompanyVehicleRow[]>([]);
+  const [rows, setRows] = useState<CompanyDriverRow[] | CompanyVehicleRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    const p =
-      tab === "drivers" ? getCompanyDrivers(id) : tab === "offers" ? getCompanyOffers(id) : getCompanyVehicles(id);
+    const p = tab === "drivers" ? getCompanyDrivers(id) : getCompanyVehicles(id);
     p.then((r) => alive && setRows(r))
       .catch(() => alive && setRows([]))
       .finally(() => alive && setLoading(false));
@@ -535,30 +540,6 @@ function CompanyDataTab({ id, tab }: { id: number; tab: "drivers" | "offers" | "
     );
   }
 
-  if (tab === "offers") {
-    return (
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <tbody className="divide-y divide-slate-100">
-            {(rows as CompanyOfferRow[]).map((o) => (
-              <tr key={o.id}>
-                <td className="whitespace-nowrap py-2.5 pe-3 text-slate-500">
-                  {o.received_at ? new Date(o.received_at).toLocaleString(locale) : "—"}
-                </td>
-                <td className="py-2.5 pe-3 font-medium text-slate-700">{o.driver_name ?? "—"}</td>
-                <td className="max-w-[220px] truncate py-2.5 pe-3 text-slate-500">{o.pickup_address ?? "—"}</td>
-                <td className="whitespace-nowrap py-2.5 pe-3 font-semibold text-slate-900">{o.fare_formatted ?? "—"}</td>
-                <td className="py-2.5">
-                  <Badge status={o.accepted ? "connected" : "neutral"} dot>{o.accepted ? c("accepted") : c("notAccepted")}</Badge>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
   return (
     <ul className="divide-y divide-slate-100">
       {(rows as CompanyVehicleRow[]).map((v) => (
@@ -570,5 +551,99 @@ function CompanyDataTab({ id, tab }: { id: number; tab: "drivers" | "offers" | "
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Company offers grouped by day, paginated (mirrors the manager offers page). */
+function CompanyOffersTab({ id }: { id: number }) {
+  const { t, locale } = useI18n();
+  const c = (k: string) => t(`screens.companies.${k}`);
+  const [rows, setRows] = useState<CompanyOfferRow[]>([]);
+  const [page, setPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    getCompanyOffers(id, page)
+      .then((r) => {
+        if (!alive) return;
+        setRows(r.items);
+        setLastPage(r.lastPage);
+      })
+      .catch(() => alive && setRows([]))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [id, page]);
+
+  const groups = useMemo(() => {
+    const m = new Map<string, CompanyOfferRow[]>();
+    for (const o of rows) {
+      const key = o.received_at ? new Date(o.received_at).toDateString() : "—";
+      (m.get(key) ?? m.set(key, []).get(key)!).push(o);
+    }
+    return [...m.entries()];
+  }, [rows]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-10 text-slate-400">
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </div>
+    );
+  }
+  if (rows.length === 0) {
+    return <p className="py-10 text-center text-sm text-slate-400">{c("noData")}</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {groups.map(([day, dayOffers]) => (
+        <div key={day}>
+          <div className="mb-1 flex items-center gap-2">
+            <h4 className="text-sm font-semibold text-slate-700">
+              {day === new Date().toDateString() ? c("today") : day === "—" ? "—" : new Date(day).toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" })}
+            </h4>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{dayOffers.length}</span>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-slate-100">
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-slate-100">
+                {dayOffers.map((o) => (
+                  <tr key={o.id}>
+                    <td className="whitespace-nowrap px-3 py-2 text-slate-500">
+                      {o.received_at ? new Date(o.received_at).toLocaleTimeString(locale) : "—"}
+                    </td>
+                    <td className="px-3 py-2 font-medium text-slate-700">{o.driver_name ?? "—"}</td>
+                    <td className="max-w-[200px] truncate px-3 py-2 text-slate-500">{o.pickup_address ?? "—"}</td>
+                    <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-900">{o.fare_formatted ?? "—"}</td>
+                    <td className="px-3 py-2">
+                      <Badge status={o.accepted ? "connected" : "neutral"} dot>{o.accepted ? c("accepted") : c("notAccepted")}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+
+      {lastPage > 1 && (
+        <div className="flex items-center justify-end gap-2 pt-1 text-sm">
+          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-500 hover:bg-slate-50 disabled:opacity-40">
+            {c("prev")}
+          </button>
+          <span className="text-slate-600">{page} / {lastPage}</span>
+          <button onClick={() => setPage((p) => Math.min(lastPage, p + 1))} disabled={page >= lastPage}
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-500 hover:bg-slate-50 disabled:opacity-40">
+            {c("next")}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

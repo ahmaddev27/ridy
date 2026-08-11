@@ -32,7 +32,12 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
             {t(group.title)}
           </p>
           {group.items.map((item) => {
-            const active = pathname === item.href;
+            // Active on the exact route or any nested route (e.g. a company
+            // detail page under /admin/companies). Index routes match exactly so
+            // they don't light up for their siblings' sub-pages.
+            const isIndex = item.href === "/admin" || item.href === "/dashboard";
+            const active =
+              pathname === item.href || (!isIndex && pathname.startsWith(item.href + "/"));
             const Icon = item.icon;
             return (
               <Link
