@@ -97,8 +97,8 @@ HTML;
         return <<<HTML
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:20px;border-collapse:collapse">
   <tr>
-    <td style="vertical-align:middle"><img src="{$src}" width="40" height="40" alt="Reidey" style="display:block;border-radius:9px"></td>
-    <td style="padding-left:10px;vertical-align:middle;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:18px;font-weight:700;color:#0f172a">Reidey</td>
+    <td style="vertical-align:middle"><img src="{$src}" width="56" height="56" alt="Reidey" style="display:block"></td>
+    <td style="padding-left:10px;vertical-align:middle;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:22px;font-weight:700;color:#0f172a">Reidey</td>
   </tr>
 </table>
 HTML;
