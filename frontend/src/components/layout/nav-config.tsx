@@ -10,6 +10,7 @@ import {
   Mail,
   UserCircle,
   Banknote,
+  MapPin,
   type LucideIcon,
 } from "lucide-react";
 
@@ -46,6 +47,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: "/drivers", label: "nav.drivers", icon: Users },
       { href: "/vehicles", label: "nav.vehicles", icon: Car },
+      { href: "/map", label: "nav.map", icon: MapPin },
       { href: "/connections", label: "nav.connections", icon: Plug },
     ],
   },

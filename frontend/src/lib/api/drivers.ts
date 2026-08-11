@@ -48,3 +48,22 @@ export async function syncDrivers(): Promise<{ synced: number; created?: number;
   );
   return res.data;
 }
+
+// ── Live map ─────────────────────────────────────────────────────────────────
+export type LiveWaypoint = { lat: number; lng: number; type: string | null };
+
+export type LiveDriver = {
+  id: number;
+  name: string;
+  status: string | null;
+  lat: number;
+  lng: number;
+  heading: number | null;
+  waypoints: LiveWaypoint[] | null;
+  location_updated_at: string | null;
+};
+
+export async function getLiveDrivers(): Promise<LiveDriver[]> {
+  const res = await apiFetch<{ data: LiveDriver[] }>("/api/v1/drivers/live");
+  return res.data;
+}
