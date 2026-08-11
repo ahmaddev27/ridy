@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/context";
 import type { Driver } from "@/lib/api/drivers";
 import { fetchDriverMetricsViaExtension, type DriverMetrics } from "@/lib/extension";
+import { getDriverStats, type DriverStats } from "@/lib/api/drivers";
 
 function num(v: number | string | null | undefined): number | null {
   if (v == null) return null;
@@ -36,6 +37,12 @@ export function DriverDetailModal({ driver, onClose }: { driver: Driver; onClose
   const [range, setRange] = useState<7 | 30>(30);
   const [metrics, setMetrics] = useState<DriverMetrics | null>(null);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
+  const [stats, setStats] = useState<DriverStats | null>(null);
+
+  // Our own stats (offers/acceptance/earnings) computed from captured data.
+  useEffect(() => {
+    getDriverStats(driver.id).then(setStats).catch(() => setStats(null));
+  }, [driver.id]);
 
   // Close on Escape.
   useEffect(() => {
@@ -100,6 +107,21 @@ export function DriverDetailModal({ driver, onClose }: { driver: Driver; onClose
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {/* Our data — computed from captured offers + acceptance (last 30 days) */}
+        {stats && (
+          <div className="border-b border-slate-100 p-5">
+            <h3 className="mb-3 text-sm font-semibold text-slate-700">{d("ourData")}</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <MiniStat label={d("statEarnings")} value={`€${stats.earnings.toFixed(2)}`} />
+              <MiniStat label={d("statTrips")} value={String(stats.trips)} />
+              <MiniStat label={d("statAccept")} value={`${stats.acceptance_rate}%`} />
+              <MiniStat label={d("statOffers")} value={String(stats.offers)} />
+              <MiniStat label={d("statAccepted")} value={String(stats.accepted)} />
+              <MiniStat label={d("statKm")} value={`${stats.km} km`} />
+            </div>
+          </div>
+        )}
 
         {/* Performance (Uber GetEarnerMetrics via the extension) */}
         {driver.uber_driver_uuid && (
@@ -196,6 +218,15 @@ function Row({
         {label}
       </dt>
       <dd className="min-w-0 truncate text-sm font-medium text-slate-800">{children}</dd>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+      <div className="text-[11px] text-slate-400">{label}</div>
+      <div className="mt-0.5 text-sm font-semibold text-slate-800">{value}</div>
     </div>
   );
 }

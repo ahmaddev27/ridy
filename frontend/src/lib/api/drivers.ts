@@ -24,6 +24,22 @@ export async function listDrivers(): Promise<Driver[]> {
   return res.data;
 }
 
+export type DriverStats = {
+  offers: number;
+  accepted: number;
+  declined: number;
+  acceptance_rate: number;
+  earnings: number;
+  trips: number;
+  km: number;
+};
+
+/** Work stats computed from our own captured offers/acceptance data. */
+export async function getDriverStats(id: number): Promise<DriverStats> {
+  const res = await apiFetch<{ data: DriverStats }>(`/api/v1/drivers/${id}/stats`);
+  return res.data;
+}
+
 /** Trigger an on-demand roster pull from Uber (best-effort). */
 export async function syncDrivers(): Promise<{ synced: number; created?: number; reason?: string }> {
   const res = await apiFetch<{ data: { synced: number; created?: number; reason?: string } }>(
