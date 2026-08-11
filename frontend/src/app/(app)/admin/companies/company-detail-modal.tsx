@@ -53,7 +53,7 @@ export function CompanyDetail({
   const [orgUuid, setOrgUuid] = useState("");
   const [proxyId, setProxyId] = useState("");
   const [proxies, setProxies] = useState<Proxy[]>([]);
-  const [tab, setTab] = useState<"details" | "drivers" | "offers" | "vehicles">("details");
+  const [tab, setTab] = useState<"details" | "subscription" | "managers" | "drivers" | "offers" | "vehicles">("details");
 
   // Sub-actions.
   const [confirm, setConfirm] = useState<null | "disable" | "relink" | "deleteSession">(null);
@@ -215,7 +215,7 @@ export function CompanyDetail({
       {/* Side tabs (start side = right in RTL, left in LTR) + content */}
       <div className="flex flex-col gap-4 md:flex-row">
         <nav className="flex gap-1 overflow-x-auto md:w-56 md:flex-col md:gap-0.5">
-          {(["details", "drivers", "offers", "vehicles"] as const).map((tk) => (
+          {(["details", "subscription", "managers", "drivers", "offers", "vehicles"] as const).map((tk) => (
             <button
               key={tk}
               onClick={() => setTab(tk)}
@@ -238,41 +238,10 @@ export function CompanyDetail({
             </div>
           ) : tab === "offers" ? (
             <CompanyOffersTab id={id} />
-          ) : tab !== "details" ? (
+          ) : tab === "drivers" || tab === "vehicles" ? (
             <CompanyDataTab id={id} tab={tab} />
-          ) : (
-            <>
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-3">
-                <StatCard label={c("colDrivers")} value={company.driver_count} />
-                <StatCard label={c("colOffers")} value={company.offer_count} />
-                <StatCard label={c("colSession")} value={company.session_status ? c(`session_${company.session_status}`) : c("noSession")} />
-              </div>
-
-              {/* Edit info */}
-              <Section title={c("info")}>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <Field label={c("fieldName")} value={name} onChange={setName} />
-                  <Field label={c("fieldCountry")} value={country} onChange={setCountry} />
-                  <div className="md:col-span-2">
-                    <Field label={c("fieldOrgUuid")} value={orgUuid} onChange={setOrgUuid} mono />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">{c("colStatus")}</label>
-                    <select
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
-                    >
-                      <option value="active">{c("statusActive")}</option>
-                      <option value="disabled">{c("statusDisabled")}</option>
-                    </select>
-                  </div>
-                </div>
-              </Section>
-
-              {/* Subscription + activation */}
-              <Section title={c("subscription")}>
+          ) : tab === "subscription" ? (
+            <Section title={c("subscription")}>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   {company.state === null ? (
                     <Badge status="connected" dot>{c("subActive")}</Badge>
@@ -324,16 +293,75 @@ export function CompanyDetail({
                     <span className="ms-2 text-xs text-emerald-600">{c("codeValid")}</span>
                   </div>
                 )}
+            </Section>
+          ) : tab === "managers" ? (
+            <Section title={c("managers")}>
+              <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+                {(company.users ?? []).map((u) => (
+                  <div key={u.id} className="flex items-center justify-between gap-2 px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-slate-800">{u.name}</div>
+                      <div className="truncate text-xs text-slate-400">{u.email}</div>
+                      {u.phone && (
+                        <a href={`tel:${u.phone}`} className="text-xs font-medium text-slate-500 hover:text-slate-800" dir="ltr">{u.phone}</a>
+                      )}
+                    </div>
+                    <Button variant="ghost" onClick={() => { setResetFor(u.id); setResetPwd(""); }}>
+                      <KeyRound className="h-4 w-4" /> {c("resetPassword")}
+                    </Button>
+                  </div>
+                ))}
+                {(company.users ?? []).length === 0 && (
+                  <div className="px-3 py-3 text-sm text-slate-400">{c("noManagers")}</div>
+                )}
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <input placeholder={c("fieldManagerName")} value={newUser.name}
+                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                  className="rounded-lg border border-slate-300 px-2 py-2 text-sm outline-none focus:border-slate-900" />
+                <input placeholder={c("fieldManagerEmail")} type="email" value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  className="rounded-lg border border-slate-300 px-2 py-2 text-sm outline-none focus:border-slate-900" />
+                <input placeholder={c("fieldManagerPassword")} type="password" value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  className="rounded-lg border border-slate-300 px-2 py-2 text-sm outline-none focus:border-slate-900" />
+              </div>
+              <Button variant="secondary" onClick={addUser} disabled={busy || !newUser.email}>
+                <UserPlus className="h-4 w-4" /> {c("addManager")}
+              </Button>
+            </Section>
+          ) : (
+            <>
+              {/* Status — at the top */}
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm font-medium text-slate-700">{c("colStatus")}</span>
+                <select value={status} onChange={(e) => setStatus(e.target.value)}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900">
+                  <option value="active">{c("statusActive")}</option>
+                  <option value="disabled">{c("statusDisabled")}</option>
+                </select>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-3">
+                <StatCard label={c("colDrivers")} value={company.driver_count} />
+                <StatCard label={c("colOffers")} value={company.offer_count} />
+                <StatCard label={c("colSession")} value={company.session_status ? c(`session_${company.session_status}`) : c("noSession")} />
+              </div>
+
+              {/* Edit info */}
+              <Section title={c("info")}>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label={c("fieldName")} value={name} onChange={setName} />
+                  <Field label={c("fieldCountry")} value={country} onChange={setCountry} />
+                </div>
               </Section>
 
               {/* Proxy — assigned from the shared pool */}
               <Section title={c("proxy")}>
                 <p className="text-xs text-slate-400">{c("proxyPoolHint")}</p>
-                <select
-                  value={proxyId}
-                  onChange={(e) => setProxyId(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
-                >
+                <select value={proxyId} onChange={(e) => setProxyId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900">
                   <option value="">{c("proxyNone")}</option>
                   {proxies.map((p) => (
                     <option key={p.id} value={p.id} disabled={p.free <= 0 && String(p.id) !== proxyId}>
@@ -341,56 +369,6 @@ export function CompanyDetail({
                     </option>
                   ))}
                 </select>
-              </Section>
-
-              <div className="flex justify-between">
-                <Button variant="secondary" onClick={() => setConfirm("disable")} disabled={busy || status === "disabled"}>
-                  <Ban className="h-4 w-4" /> {c("disable")}
-                </Button>
-                <Button onClick={saveInfo} disabled={busy}>
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {c("save")}
-                </Button>
-              </div>
-
-              {/* Users */}
-              <Section title={c("managers")}>
-                <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-                  {(company.users ?? []).map((u) => (
-                    <div key={u.id} className="flex items-center justify-between gap-2 px-3 py-2">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-slate-800">{u.name}</div>
-                        <div className="truncate text-xs text-slate-400">{u.email}</div>
-                        {u.phone && (
-                          <a href={`tel:${u.phone}`} className="text-xs font-medium text-slate-500 hover:text-slate-800" dir="ltr">
-                            {u.phone}
-                          </a>
-                        )}
-                      </div>
-                      <Button variant="ghost" onClick={() => { setResetFor(u.id); setResetPwd(""); }}>
-                        <KeyRound className="h-4 w-4" /> {c("resetPassword")}
-                      </Button>
-                    </div>
-                  ))}
-                  {(company.users ?? []).length === 0 && (
-                    <div className="px-3 py-3 text-sm text-slate-400">{c("noManagers")}</div>
-                  )}
-                </div>
-                {/* Add manager */}
-                <div className="grid grid-cols-3 gap-2">
-                  <input placeholder={c("fieldManagerName")} value={newUser.name}
-                    onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                    className="rounded-lg border border-slate-300 px-2 py-2 text-sm outline-none focus:border-slate-900" />
-                  <input placeholder={c("fieldManagerEmail")} type="email" value={newUser.email}
-                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                    className="rounded-lg border border-slate-300 px-2 py-2 text-sm outline-none focus:border-slate-900" />
-                  <input placeholder={c("fieldManagerPassword")} type="password" value={newUser.password}
-                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                    className="rounded-lg border border-slate-300 px-2 py-2 text-sm outline-none focus:border-slate-900" />
-                </div>
-                <Button variant="secondary" onClick={addUser} disabled={busy || !newUser.email}>
-                  <UserPlus className="h-4 w-4" /> {c("addManager")}
-                </Button>
               </Section>
 
               {/* Session controls */}
@@ -404,6 +382,16 @@ export function CompanyDetail({
                   </Button>
                 </div>
               </Section>
+
+              <div className="flex justify-between">
+                <Button variant="secondary" onClick={() => setConfirm("disable")} disabled={busy || status === "disabled"}>
+                  <Ban className="h-4 w-4" /> {c("disable")}
+                </Button>
+                <Button onClick={saveInfo} disabled={busy}>
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {c("save")}
+                </Button>
+              </div>
             </>
           )}
         </div>

@@ -75,16 +75,16 @@ export default function ProxiesPage() {
                     <td className="px-4 py-3 font-medium text-slate-800">{p.label}</td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-500" dir="ltr">{p.url_masked}</td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" dir="ltr">
                         <div className="h-2 w-28 overflow-hidden rounded-full bg-slate-100">
                           <div
                             className={`h-full rounded-full ${p.near_full ? "bg-amber-500" : "bg-emerald-500"}`}
                             style={{ width: `${Math.min(100, (p.used / Math.max(1, p.capacity)) * 100)}%` }}
                           />
                         </div>
-                        <span className="text-xs text-slate-600">{p.used} / {p.capacity}</span>
+                        <span className="whitespace-nowrap text-xs text-slate-600">{p.used} / {p.capacity}</span>
                         {p.near_full && (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600">
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-amber-600">
                             <AlertTriangle className="h-3 w-3" /> {c("nearFull")}
                           </span>
                         )}
