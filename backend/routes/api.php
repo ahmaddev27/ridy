@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Admin\BillingReportController;
 use App\Http\Controllers\Api\V1\Admin\CollectorController;
 use App\Http\Controllers\Api\V1\Admin\CollectorPaymentController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
@@ -181,5 +182,10 @@ Route::prefix('v1')->group(function () {
         Route::get('collector-payments/export', [CollectorPaymentController::class, 'export']);
         Route::post('collector-payments', [CollectorPaymentController::class, 'store']);
         Route::delete('collector-payments/{payment}', [CollectorPaymentController::class, 'destroy']);
+
+        // Billing: subscription revenue reports + auto-generated invoices.
+        Route::get('reports/billing-summary', [BillingReportController::class, 'summary']);
+        Route::get('subscription-invoices', [BillingReportController::class, 'invoices']);
+        Route::get('subscription-invoices/export', [BillingReportController::class, 'invoicesExport']);
     });
 });
