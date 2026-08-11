@@ -20,7 +20,7 @@ export function Preloader() {
       `}</style>
 
       <div className="reidey-mark text-slate-900">
-        <Logo size={104} />
+        <Logo size={128} />
       </div>
 
       {/* Track with a car running across it */}

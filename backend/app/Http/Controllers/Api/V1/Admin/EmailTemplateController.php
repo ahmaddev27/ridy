@@ -75,9 +75,9 @@ class EmailTemplateController extends Controller
         if ($request->filled('subject') || $request->filled('body_html')) {
             $draft = new EmailTemplate($request->only(['subject', 'body_html', 'logo_url', 'accent_color', 'footer_text']));
             $draft->key = $key;
-            $rendered = $renderer->renderTemplate($draft, $vars);
+            $rendered = $renderer->renderTemplate($draft, $vars, inlineAssets: true);
         } else {
-            $rendered = $renderer->render($key, $vars);
+            $rendered = $renderer->render($key, $vars, inlineAssets: true);
         }
 
         return response()->json(['data' => $rendered]);

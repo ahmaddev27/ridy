@@ -296,6 +296,11 @@ export function CompanyDetailModal({
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium text-slate-800">{u.name}</div>
                         <div className="truncate text-xs text-slate-400">{u.email}</div>
+                        {u.phone && (
+                          <a href={`tel:${u.phone}`} className="text-xs font-medium text-slate-500 hover:text-slate-800" dir="ltr">
+                            {u.phone}
+                          </a>
+                        )}
                       </div>
                       <Button variant="ghost" onClick={() => resetPw(u.id)}>
                         <KeyRound className="h-4 w-4" /> {c("resetPassword")}

@@ -13,6 +13,8 @@ import { useAsync } from "@/hooks/use-async";
 import { listCompanies, disableCompany, setCompanyActive, type Company } from "@/lib/api/admin";
 import { CompanyDetailModal } from "./company-detail-modal";
 
+type Filter = "all" | "linked" | "proxy" | "expired" | "banned";
+
 const sessionTone: Record<string, Status> = {
   active: "connected",
   needs_relink: "expiring",
@@ -27,19 +29,48 @@ export default function CompaniesPage() {
 
   const [selected, setSelected] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
   const [page, setPage] = useState(1);
   const [perPage] = useState(25);
   const [confirmDel, setConfirmDel] = useState<Company | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Client-side search + pagination (the company list is small).
+  const matchesFilter = (co: Company): boolean => {
+    switch (filter) {
+      case "banned":
+        return co.banned;
+      case "linked":
+        return co.session_status === "active"; // Uber fleet session live
+      case "proxy":
+        return co.has_proxy;
+      case "expired":
+        return co.state === "expired";
+      default:
+        return true;
+    }
+  };
+
+  // Client-side search + filter + pagination (the company list is small).
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return all;
-    return all.filter((co) =>
-      [co.name, co.country, co.uber_org_uuid].some((v) => (v ?? "").toLowerCase().includes(q)),
-    );
-  }, [all, search]);
+    return all.filter((co) => {
+      if (!matchesFilter(co)) return false;
+      if (!q) return true;
+      return [co.name, co.country, co.uber_org_uuid].some((v) => (v ?? "").toLowerCase().includes(q));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [all, search, filter]);
+
+  const counts = useMemo(
+    () => ({
+      all: all.length,
+      banned: all.filter((c) => c.banned).length,
+      linked: all.filter((c) => c.session_status === "active").length,
+      proxy: all.filter((c) => c.has_proxy).length,
+      expired: all.filter((c) => c.state === "expired").length,
+    }),
+    [all],
+  );
 
   const lastPage = Math.max(1, Math.ceil(filtered.length / perPage));
   const pageClamped = Math.min(page, lastPage);
@@ -89,6 +120,27 @@ export default function CompaniesPage() {
             className="w-full rounded-lg border border-slate-300 py-2 ps-9 pe-3 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
           />
         </div>
+      </div>
+
+      {/* Filter chips */}
+      <div className="flex flex-wrap gap-2">
+        {(["all", "linked", "proxy", "expired", "banned"] as Filter[]).map((f) => (
+          <button
+            key={f}
+            onClick={() => {
+              setFilter(f);
+              setPage(1);
+            }}
+            className={
+              "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors " +
+              (filter === f
+                ? "border-slate-900 bg-slate-900 text-white"
+                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50")
+            }
+          >
+            {c(`filter_${f}`)} <span className="opacity-60">{counts[f]}</span>
+          </button>
+        ))}
       </div>
 
       <Card className="overflow-hidden">

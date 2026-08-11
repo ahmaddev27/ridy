@@ -15,13 +15,13 @@ class EmailTemplateRenderer
      * @param  array<string, string>  $vars
      * @return array{subject: string, html: string}
      */
-    public function render(string $key, array $vars): array
+    public function render(string $key, array $vars, bool $inlineAssets = false): array
     {
         $template = EmailTemplate::find($key);
 
         return $template === null
             ? ['subject' => '', 'html' => '']
-            : $this->renderTemplate($template, $vars);
+            : $this->renderTemplate($template, $vars, $inlineAssets);
     }
 
     /**
@@ -30,12 +30,12 @@ class EmailTemplateRenderer
      * @param  array<string, string>  $vars
      * @return array{subject: string, html: string}
      */
-    public function renderTemplate(EmailTemplate $template, array $vars): array
+    public function renderTemplate(EmailTemplate $template, array $vars, bool $inlineAssets = false): array
     {
         $subject = $this->substitute($template->subject, $vars);
         $body = $this->substitute($this->sanitize((string) $template->body_html), $vars);
 
-        return ['subject' => $subject, 'html' => $this->wrap($template, $body)];
+        return ['subject' => $subject, 'html' => $this->wrap($template, $body, $inlineAssets)];
     }
 
     /** @param array<string, string> $vars */
@@ -56,10 +56,10 @@ class EmailTemplateRenderer
         return preg_replace('#\son\w+\s*=\s*("[^"]*"|\'[^\']*\')#i', '', $html);
     }
 
-    private function wrap(EmailTemplate $template, string $body): string
+    private function wrap(EmailTemplate $template, string $body, bool $inlineAssets = false): string
     {
         $accent = htmlspecialchars($template->accent_color ?: '#4f46e5', ENT_QUOTES);
-        $header = $this->brandHeader($template);
+        $header = $this->brandHeader($template, $inlineAssets);
         $footer = htmlspecialchars((string) $template->footer_text, ENT_QUOTES);
 
         return <<<HTML
@@ -80,7 +80,7 @@ HTML;
      * every mail client, unlike SVG which Gmail strips) beside the wordmark, so it
      * always shows without any upload.
      */
-    private function brandHeader(EmailTemplate $template): string
+    private function brandHeader(EmailTemplate $template, bool $inlineAssets = false): string
     {
         if (filled($template->logo_url)) {
             $src = htmlspecialchars($this->absoluteUrl($template->logo_url), ENT_QUOTES);
@@ -88,7 +88,11 @@ HTML;
             return '<img src="'.$src.'" alt="Reidey" style="max-height:48px;margin-bottom:20px">';
         }
 
-        $src = htmlspecialchars($this->absoluteUrl('email/reidey-logo.png'), ENT_QUOTES);
+        // Preview embeds the logo (renders regardless of a reachable host); real
+        // emails reference the hosted PNG (works in Gmail, which strips data URIs).
+        $src = $inlineAssets
+            ? $this->inlineLogo()
+            : htmlspecialchars($this->absoluteUrl('email/reidey-logo.png'), ENT_QUOTES);
 
         return <<<HTML
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:20px;border-collapse:collapse">
@@ -98,6 +102,17 @@ HTML;
   </tr>
 </table>
 HTML;
+    }
+
+    /** The platform logo as a base64 data URI (for previews / offline rendering). */
+    private function inlineLogo(): string
+    {
+        $path = public_path('email/reidey-logo.png');
+        if (! is_file($path)) {
+            return htmlspecialchars($this->absoluteUrl('email/reidey-logo.png'), ENT_QUOTES);
+        }
+
+        return 'data:image/png;base64,'.base64_encode((string) file_get_contents($path));
     }
 
     /** Make an uploaded relative logo path absolute so remote mail clients load it. */
