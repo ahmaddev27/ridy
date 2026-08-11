@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { OtpInput } from "@/components/ui/otp-input";
 import { Logo } from "@/components/brand/logo";
 import { useI18n } from "@/lib/i18n/context";
-import { ApiError } from "@/lib/api/client";
+import { apiErrorMessage } from "@/lib/api/error-message";
 import { login } from "@/lib/api/auth";
 import { startRegistration, verifyRegistration, resendOtp } from "@/lib/api/register";
 
@@ -34,7 +34,7 @@ export default function RegisterPage() {
       toast.success(r("codeSent"), { description: email });
       setStep("otp");
     } catch (err) {
-      toast.error(r("failed"), { description: fieldError(err) });
+      toast.error(r("failed"), { description: apiErrorMessage(err, t) });
     } finally {
       setBusy(false);
     }
@@ -49,7 +49,7 @@ export default function RegisterPage() {
       const user = await login(email, password);
       router.push(user.roles.includes("super_admin") ? "/admin" : "/dashboard");
     } catch (err) {
-      toast.error(r("verifyFailed"), { description: fieldError(err) });
+      toast.error(r("verifyFailed"), { description: apiErrorMessage(err, t) });
     } finally {
       setBusy(false);
     }
@@ -60,7 +60,7 @@ export default function RegisterPage() {
       await resendOtp(email);
       toast.success(r("codeResent"));
     } catch (err) {
-      toast.error(r("failed"), { description: fieldError(err) });
+      toast.error(r("failed"), { description: apiErrorMessage(err, t) });
     }
   }
 
@@ -118,12 +118,6 @@ export default function RegisterPage() {
   );
 }
 
-function fieldError(err: unknown): string | undefined {
-  if (err instanceof ApiError && err.errors) {
-    return Object.values(err.errors).flat()[0];
-  }
-  return err instanceof Error ? err.message : undefined;
-}
 
 function Field({
   label,

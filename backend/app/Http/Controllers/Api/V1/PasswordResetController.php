@@ -49,39 +49,63 @@ class PasswordResetController extends Controller
         return response()->json(['data' => ['sent' => true]]);
     }
 
-    /** Step 2 — verify the OTP and set the new password. */
+    /** Step 2 — verify the OTP alone (no password change yet). */
+    public function verify(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'otp' => ['required', 'digits:6'],
+        ]);
+
+        $this->validOtpOrFail($data['email'], $data['otp']);
+
+        return response()->json(['data' => ['verified' => true]]);
+    }
+
+    /** Step 3 — re-check the OTP and set the new password. */
     public function reset(Request $request): JsonResponse
     {
         $data = $request->validate([
             'email' => ['required', 'email'],
             'otp' => ['required', 'digits:6'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $reset = PasswordReset::where('email', $data['email'])->first();
-        if ($reset === null) {
-            throw ValidationException::withMessages(['otp' => __('No reset request for this email.')]);
-        }
-        if ($reset->otp_expires_at->isPast()) {
-            throw ValidationException::withMessages(['otp' => __('The code has expired. Please resend.')]);
-        }
-        if ($reset->attempts >= self::MAX_ATTEMPTS) {
-            throw ValidationException::withMessages(['otp' => __('Too many attempts. Please resend a new code.')]);
-        }
-        if (! hash_equals($reset->otp, $data['otp'])) {
-            $reset->increment('attempts');
-            throw ValidationException::withMessages(['otp' => __('Incorrect code.')]);
-        }
+        $reset = $this->validOtpOrFail($data['email'], $data['otp']);
 
         $user = User::where('email', $reset->email)->first();
         if ($user === null) {
             $reset->delete();
-            throw ValidationException::withMessages(['email' => __('No account for this email.')]);
+            throw ValidationException::withMessages(['email' => 'otp_none']);
         }
 
         $user->forceFill(['password' => Hash::make($data['password'])])->save();
         $reset->delete();
 
         return response()->json(['data' => ['reset' => true]]);
+    }
+
+    /**
+     * Resolve a pending reset whose OTP matches, or throw a coded validation
+     * error (the frontend localizes the code). A wrong code counts an attempt.
+     */
+    private function validOtpOrFail(string $email, string $otp): PasswordReset
+    {
+        $reset = PasswordReset::where('email', $email)->first();
+        if ($reset === null) {
+            throw ValidationException::withMessages(['otp' => 'otp_none']);
+        }
+        if ($reset->otp_expires_at->isPast()) {
+            throw ValidationException::withMessages(['otp' => 'otp_expired']);
+        }
+        if ($reset->attempts >= self::MAX_ATTEMPTS) {
+            throw ValidationException::withMessages(['otp' => 'otp_too_many']);
+        }
+        if (! hash_equals($reset->otp, $otp)) {
+            $reset->increment('attempts');
+            throw ValidationException::withMessages(['otp' => 'otp_incorrect']);
+        }
+
+        return $reset;
     }
 }
