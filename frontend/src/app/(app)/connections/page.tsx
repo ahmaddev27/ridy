@@ -37,6 +37,9 @@ export default function ConnectionsPage() {
 
   const [busy, setBusy] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  // True while we wait for the extension to capture the session in the Uber tab,
+  // so the page can poll and flip to "connected" on its own — no manual reload.
+  const [awaitingLink, setAwaitingLink] = useState(false);
 
   // Manual cookie-paste fallback.
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -116,12 +119,33 @@ export default function ConnectionsPage() {
       // reveal the org, so we don't use it). It then shows "connected" and closes
       // the tab; all data pulls run in the background afterwards.
       setTimeout(() => window.open("https://supplier.uber.com/", "_blank"), 500);
+      // Start polling so the card flips to "connected" once the extension captures.
+      setAwaitingLink(true);
     } catch (e) {
       toast.error(c("loginFailed"), { description: e instanceof Error ? e.message : undefined });
     } finally {
       setExtBusy(false);
     }
   }
+
+  // While awaiting the link, poll the session every 3s (capped at 2 min). The
+  // extension captures in a separate Uber tab, so this dashboard tab has no other
+  // signal — polling flips the card to "connected" the moment the session lands.
+  useEffect(() => {
+    if (!awaitingLink) return;
+    if (data?.status === "active") {
+      setAwaitingLink(false);
+      toast.success(c("connectedToast"));
+      return;
+    }
+    const poll = setInterval(() => refetch(), 3000);
+    const stop = setTimeout(() => setAwaitingLink(false), 120000);
+    return () => {
+      clearInterval(poll);
+      clearTimeout(stop);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaitingLink, data]);
 
   async function doDisconnect() {
     setBusy(true);
@@ -270,10 +294,15 @@ export default function ConnectionsPage() {
         <p className="mb-4 text-sm text-slate-500">{c("extensionHint")}</p>
 
         {/* One button: mint token -> auto-pair extension -> open Uber. */}
-        <Button onClick={connectViaExtension} disabled={extBusy || extInstalled === false}>
-          {extBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+        <Button onClick={connectViaExtension} disabled={extBusy || awaitingLink || extInstalled === false}>
+          {extBusy || awaitingLink ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
           {c("openUber")}
         </Button>
+        {awaitingLink && (
+          <p className="mt-2 flex items-center gap-1.5 text-sm text-slate-500">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> {c("awaitingLink")}
+          </p>
+        )}
 
         {/* Fallback for when the extension isn't installed yet: the raw token. */}
         {extToken && (
