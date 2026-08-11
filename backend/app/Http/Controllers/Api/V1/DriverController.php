@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Dispatch\UberSupplierClient;
+use App\Domain\Fleet\DriverStatsService;
 use App\Domain\Fleet\DriverStatusIngestor;
 use App\Domain\Fleet\Models\Driver;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DriverResource;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -20,6 +22,19 @@ class DriverController extends Controller
         $drivers = Driver::query()->orderBy('name')->paginate(50);
 
         return DriverResource::collection($drivers);
+    }
+
+    /** Work stats for one driver, computed from our own offers/acceptance data. */
+    public function stats(Request $request, Driver $driver, DriverStatsService $stats): JsonResponse
+    {
+        $from = $request->filled('from')
+            ? CarbonImmutable::parse($request->string('from'))->startOfDay()
+            : CarbonImmutable::now()->subDays(30)->startOfDay();
+        $to = $request->filled('to')
+            ? CarbonImmutable::parse($request->string('to'))->endOfDay()
+            : CarbonImmutable::now()->endOfDay();
+
+        return response()->json(['data' => $stats->forDriver($driver, $from, $to)]);
     }
 
     /**
