@@ -39,6 +39,7 @@ Route::prefix('v1')->group(function () {
 
     // Public password reset via email OTP.
     Route::post('password/forgot', [PasswordResetController::class, 'start'])->middleware('throttle:6,1');
+    Route::post('password/verify', [PasswordResetController::class, 'verify'])->middleware('throttle:12,1');
     Route::post('password/reset', [PasswordResetController::class, 'reset'])->middleware('throttle:12,1');
 
     // Internal — the dispatch daemon. Authenticated by a shared secret

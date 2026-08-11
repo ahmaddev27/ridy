@@ -52,11 +52,41 @@ class PasswordResetTest extends TestCase
         ]);
 
         $this->postJson('/api/v1/password/reset', [
-            'email' => $user->email, 'otp' => '123456', 'password' => 'brand-new-password',
+            'email' => $user->email, 'otp' => '123456',
+            'password' => 'brand-new-password', 'password_confirmation' => 'brand-new-password',
         ])->assertOk()->assertJsonPath('data.reset', true);
 
         $this->assertTrue(Hash::check('brand-new-password', $user->fresh()->password));
         $this->assertDatabaseCount('password_resets', 0);
+    }
+
+    public function test_verify_accepts_a_valid_code_without_consuming_it(): void
+    {
+        $user = $this->user();
+        PasswordReset::create([
+            'email' => $user->email, 'otp' => '123456',
+            'otp_expires_at' => CarbonImmutable::now()->addMinutes(10), 'attempts' => 0,
+        ]);
+
+        $this->postJson('/api/v1/password/verify', ['email' => $user->email, 'otp' => '123456'])
+            ->assertOk()->assertJsonPath('data.verified', true);
+
+        // Still pending — verify does not consume the code.
+        $this->assertDatabaseCount('password_resets', 1);
+    }
+
+    public function test_reset_rejects_mismatched_confirmation(): void
+    {
+        $user = $this->user();
+        PasswordReset::create([
+            'email' => $user->email, 'otp' => '123456',
+            'otp_expires_at' => CarbonImmutable::now()->addMinutes(10), 'attempts' => 0,
+        ]);
+
+        $this->postJson('/api/v1/password/reset', [
+            'email' => $user->email, 'otp' => '123456',
+            'password' => 'brand-new-password', 'password_confirmation' => 'different',
+        ])->assertStatus(422)->assertJsonValidationErrors('password');
     }
 
     public function test_reset_rejects_a_wrong_code_and_counts_the_attempt(): void
@@ -68,7 +98,8 @@ class PasswordResetTest extends TestCase
         ]);
 
         $this->postJson('/api/v1/password/reset', [
-            'email' => $user->email, 'otp' => '000000', 'password' => 'brand-new-password',
+            'email' => $user->email, 'otp' => '000000',
+            'password' => 'brand-new-password', 'password_confirmation' => 'brand-new-password',
         ])->assertStatus(422);
 
         $this->assertSame(1, PasswordReset::where('email', $user->email)->value('attempts'));

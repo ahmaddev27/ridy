@@ -64,17 +64,17 @@ class RegistrationController extends Controller
 
         $registration = Registration::where('email', $data['email'])->first();
         if ($registration === null) {
-            throw ValidationException::withMessages(['otp' => __('No pending registration for this email.')]);
+            throw ValidationException::withMessages(['otp' => 'otp_none']);
         }
         if ($registration->otp_expires_at->isPast()) {
-            throw ValidationException::withMessages(['otp' => __('The code has expired. Please resend.')]);
+            throw ValidationException::withMessages(['otp' => 'otp_expired']);
         }
         if ($registration->attempts >= self::MAX_ATTEMPTS) {
-            throw ValidationException::withMessages(['otp' => __('Too many attempts. Please resend a new code.')]);
+            throw ValidationException::withMessages(['otp' => 'otp_too_many']);
         }
         if (! hash_equals($registration->otp, $data['otp'])) {
             $registration->increment('attempts');
-            throw ValidationException::withMessages(['otp' => __('Incorrect code.')]);
+            throw ValidationException::withMessages(['otp' => 'otp_incorrect']);
         }
 
         DB::transaction(function () use ($registration) {
