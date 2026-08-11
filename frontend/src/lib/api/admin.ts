@@ -178,6 +178,41 @@ export async function reactivateCompany(id: number): Promise<void> {
   await apiFetch(`${base}/${id}/reactivate`, { method: "POST", withCsrf: true });
 }
 
+// ── Proxy pool ──────────────────────────────────────────────────────────────
+export type Proxy = {
+  id: number;
+  label: string;
+  url_masked: string | null;
+  capacity: number;
+  used: number;
+  free: number;
+  near_full: boolean;
+  notes: string | null;
+};
+
+export type ProxyInput = { label: string; url?: string; capacity: number; notes?: string };
+
+const proxyBase = "/api/v1/admin/proxies";
+
+export async function listProxies(): Promise<Proxy[]> {
+  const res = await apiFetch<{ data: Proxy[] }>(proxyBase);
+  return res.data;
+}
+
+export async function createProxy(input: ProxyInput): Promise<Proxy> {
+  const res = await apiFetch<{ data: Proxy }>(proxyBase, { method: "POST", body: input, withCsrf: true });
+  return res.data;
+}
+
+export async function updateProxy(id: number, input: ProxyInput): Promise<Proxy> {
+  const res = await apiFetch<{ data: Proxy }>(`${proxyBase}/${id}`, { method: "PUT", body: input, withCsrf: true });
+  return res.data;
+}
+
+export async function deleteProxy(id: number): Promise<void> {
+  await apiFetch(`${proxyBase}/${id}`, { method: "DELETE", withCsrf: true });
+}
+
 /** Toggle a company between active and disabled (reversible, keeps all data). */
 export async function setCompanyActive(id: number, active: boolean): Promise<Company> {
   return updateCompany(id, { status: active ? "active" : "disabled" });
