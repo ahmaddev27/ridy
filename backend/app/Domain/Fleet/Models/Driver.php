@@ -12,20 +12,12 @@ class Driver extends Model
     use BelongsToTenant;
 
     /**
-     * Substrings of Uber's raw `driverStatus` that mean the driver is available
-     * to receive dispatch. Uber returns a redacted enum over the API, so we match
-     * the known families defensively rather than a single exact string.
+     * Substrings of Uber's raw `driverStatus` that mean the driver is NOT taking
+     * dispatch. Uber returns a redacted/variable enum, and offline drivers often
+     * have no status at all — so "online" is defined as "has a status that is not
+     * one of these", which reflects reality without hard-coding online strings.
      */
-    private const ONLINE_TOKENS = ['ONLINE', 'ON_TRIP', 'EN_ROUTE', 'DISPATCHED', 'ACTIVE'];
-
-    /** Substrings that force offline even if an online token is also present. */
-    private const OFFLINE_TOKENS = ['OFFLINE', 'UNAVAILABLE', 'DISCONNECTED'];
-
-    /**
-     * Statuses are refreshed on-demand (when a manager opens the roster), so we
-     * allow a generous window before a last-known "online" is treated as stale.
-     */
-    private const ONLINE_FRESH_MINUTES = 30;
+    private const OFFLINE_TOKENS = ['OFFLINE', 'UNAVAILABLE', 'DISCONNECTED', 'OFF_DUTY', 'LOGGED_OUT'];
 
     protected $fillable = [
         'tenant_id', 'name', 'phone', 'license_no', 'employment_type', 'external_ids', 'pseudonym_id',
@@ -43,33 +35,20 @@ class Driver extends Model
         'status_synced_at' => 'datetime',
     ];
 
-    /** True when Uber's live driverStatus reads as online / on a trip and is fresh. */
+    /** True when Uber reports a live status for the driver that isn't an offline one. */
     public function isOnline(): bool
     {
-        if (! $this->hasFreshStatus()) {
+        $s = strtoupper(trim((string) $this->online_status));
+        if ($s === '') {
             return false;
         }
-
-        $s = strtoupper((string) $this->online_status);
         foreach (self::OFFLINE_TOKENS as $token) {
             if (str_contains($s, $token)) {
                 return false;
             }
         }
-        foreach (self::ONLINE_TOKENS as $token) {
-            if (str_contains($s, $token)) {
-                return true;
-            }
-        }
 
-        return false;
-    }
-
-    /** A last-known status is only trusted for a bounded window (on-demand sync). */
-    private function hasFreshStatus(): bool
-    {
-        return $this->status_synced_at !== null
-            && $this->status_synced_at->gt(now()->subMinutes(self::ONLINE_FRESH_MINUTES));
+        return true;
     }
 
     /** Drivers Uber currently reports as online — mirrors {@see isOnline()} in SQL. */
@@ -77,12 +56,7 @@ class Driver extends Model
     {
         return $query
             ->whereNotNull('online_status')
-            ->where('status_synced_at', '>=', now()->subMinutes(self::ONLINE_FRESH_MINUTES))
-            ->where(function (Builder $q) {
-                foreach (self::ONLINE_TOKENS as $token) {
-                    $q->orWhere('online_status', 'like', "%{$token}%");
-                }
-            })
+            ->where('online_status', '!=', '')
             ->where(function (Builder $q) {
                 foreach (self::OFFLINE_TOKENS as $token) {
                     $q->where('online_status', 'not like', "%{$token}%");
