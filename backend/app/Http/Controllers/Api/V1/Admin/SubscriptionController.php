@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Tenancy\Models\Tenant;
+use App\Domain\Tenancy\ProxyPool;
 use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -77,6 +78,8 @@ class SubscriptionController extends Controller
             'activation_code' => null,
             'activation_code_expires_at' => null,
         ])->save();
+
+        app(ProxyPool::class)->assign($tenant);
 
         return response()->json(['data' => ['reactivated' => true]]);
     }

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Admin\CompanySessionController;
 use App\Http\Controllers\Api\V1\Admin\CompanyUserController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Api\V1\Admin\OverviewController;
+use App\Http\Controllers\Api\V1\Admin\ProxyController;
 use App\Http\Controllers\Api\V1\Admin\SettingsController;
 use App\Http\Controllers\Api\V1\Admin\SubscriptionController;
 use App\Http\Controllers\Api\V1\AuditLogController;
@@ -131,6 +132,12 @@ Route::prefix('v1')->group(function () {
         Route::get('email-templates/{key}', [EmailTemplateController::class, 'show']);
         Route::put('email-templates/{key}', [EmailTemplateController::class, 'update']);
         Route::post('email-templates/{key}/preview', [EmailTemplateController::class, 'preview']);
+
+        // Residential proxy pool
+        Route::get('proxies', [ProxyController::class, 'index']);
+        Route::post('proxies', [ProxyController::class, 'store']);
+        Route::put('proxies/{proxy}', [ProxyController::class, 'update']);
+        Route::delete('proxies/{proxy}', [ProxyController::class, 'destroy']);
 
         Route::get('companies', [CompanyController::class, 'index']);
         Route::post('companies', [CompanyController::class, 'store']);
