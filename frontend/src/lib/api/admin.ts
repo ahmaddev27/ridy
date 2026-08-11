@@ -121,6 +121,15 @@ export async function getSettings(): Promise<PlatformSettings> {
   return res.data;
 }
 
+/** Send a test email to the admin's own address via the current provider. */
+export async function sendTestEmail(): Promise<{ sent: boolean; to?: string }> {
+  const res = await apiFetch<{ data: { sent: boolean; to?: string } }>("/api/v1/admin/settings/test-email", {
+    method: "POST",
+    withCsrf: true,
+  });
+  return res.data;
+}
+
 export async function updateSettings(input: UpdateSettingsInput): Promise<PlatformSettings> {
   const res = await apiFetch<{ data: PlatformSettings }>("/api/v1/admin/settings", {
     method: "PUT",

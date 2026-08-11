@@ -7,7 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { useI18n } from "@/lib/i18n/context";
-import { getSettings, updateSettings, type PlatformSettings } from "@/lib/api/admin";
+import { getSettings, updateSettings, sendTestEmail, type PlatformSettings } from "@/lib/api/admin";
+import { ApiError } from "@/lib/api/client";
 
 export default function SettingsPage() {
   const { t } = useI18n();
@@ -66,6 +67,24 @@ export default function SettingsPage() {
       await load();
     } catch (e) {
       toast.error(c("saveFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function testEmail() {
+    setBusy(true);
+    try {
+      const r = await sendTestEmail();
+      toast.success(c("testSent"), { description: r.to });
+    } catch (e) {
+      const desc =
+        e instanceof ApiError && (e.data?.data as { error?: string } | undefined)?.error
+          ? ((e.data!.data as { error?: string }).error as string)
+          : e instanceof Error
+            ? e.message
+            : undefined;
+      toast.error(c("testFailed"), { description: desc });
     } finally {
       setBusy(false);
     }
@@ -157,7 +176,10 @@ export default function SettingsPage() {
           <Field label={c("fromName")} value={fromName} onChange={setFromName} />
           <Field label={c("fromAddress")} type="email" value={fromAddress} onChange={setFromAddress} />
         </div>
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={testEmail} disabled={busy}>
+            {c("sendTest")}
+          </Button>
           <Button onClick={saveSmtp} disabled={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {c("save")}

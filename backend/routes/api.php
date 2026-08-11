@@ -129,6 +129,7 @@ Route::prefix('v1')->group(function () {
         Route::get('overview', OverviewController::class);
         Route::get('settings', [SettingsController::class, 'show']);
         Route::put('settings', [SettingsController::class, 'update']);
+        Route::post('settings/test-email', [SettingsController::class, 'testEmail']);
 
         // Email templates (registration + driver invite)
         Route::get('email-templates', [EmailTemplateController::class, 'index']);
