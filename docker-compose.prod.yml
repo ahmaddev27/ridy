@@ -72,6 +72,8 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
       FCM_SERVER_KEY: ${FCM_SERVER_KEY}
+      # Fixed OTP for testing — leave OTP_TEST_CODE unset in prod for random codes.
+      OTP_TEST_CODE: ${OTP_TEST_CODE:-}
     volumes:
       - ./backend:/var/www
       - /var/www/vendor
