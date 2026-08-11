@@ -21,7 +21,7 @@ const en: Dict = {
     topCompanies: "Top companies", stActive: "Active", stNeedsRelink: "Needs re-link", stExpired: "Expired", stNoSession: "No session",
   },
   settings: {
-    email: "Email delivery", sendTest: "Send test", testSent: "Test email sent", testFailed: "Test email failed", provider: "Provider", resendKey: "Resend API key", smtp: "Email (SMTP)", host: "Host", port: "Port", username: "Username",
+    email: "Email delivery", sendTest: "Send test", testTo: "Recipient email", testHint: "Leave empty to send to your own admin email.", cancel: "Cancel", testSent: "Test email sent", testFailed: "Test email failed", provider: "Provider", resendKey: "Resend API key", smtp: "Email (SMTP)", host: "Host", port: "Port", username: "Username",
     password: "Password", encryption: "Encryption", none: "None",
     fromName: "From name", fromAddress: "From address",
     save: "Save", saved: "Saved", saveFailed: "Couldn’t save",
@@ -123,7 +123,7 @@ const de: Dict = {
     topCompanies: "Top-Firmen", stActive: "Aktiv", stNeedsRelink: "Neu verbinden", stExpired: "Abgelaufen", stNoSession: "Keine Sitzung",
   },
   settings: {
-    email: "E-Mail-Versand", sendTest: "Test senden", testSent: "Test-E-Mail gesendet", testFailed: "Test-E-Mail fehlgeschlagen", provider: "Anbieter", resendKey: "Resend-API-Schlüssel", smtp: "E-Mail (SMTP)", host: "Host", port: "Port", username: "Benutzername",
+    email: "E-Mail-Versand", sendTest: "Test senden", testTo: "Empfänger-E-Mail", testHint: "Leer lassen, um an deine Admin-E-Mail zu senden.", cancel: "Abbrechen", testSent: "Test-E-Mail gesendet", testFailed: "Test-E-Mail fehlgeschlagen", provider: "Anbieter", resendKey: "Resend-API-Schlüssel", smtp: "E-Mail (SMTP)", host: "Host", port: "Port", username: "Benutzername",
     password: "Passwort", encryption: "Verschlüsselung", none: "Keine",
     fromName: "Absendername", fromAddress: "Absenderadresse",
     save: "Speichern", saved: "Gespeichert", saveFailed: "Speichern fehlgeschlagen",
@@ -223,7 +223,7 @@ const ar: Dict = {
     topCompanies: "أعلى الشركات", stActive: "نشطة", stNeedsRelink: "تحتاج ربط", stExpired: "منتهية", stNoSession: "لا جلسة",
   },
   settings: {
-    email: "إرسال البريد", sendTest: "إرسال تجريبي", testSent: "تم إرسال إيميل التجربة", testFailed: "فشل إيميل التجربة", provider: "المزوّد", resendKey: "مفتاح Resend API", smtp: "البريد (SMTP)", host: "المضيف", port: "المنفذ", username: "اسم المستخدم",
+    email: "إرسال البريد", sendTest: "إرسال تجريبي", testTo: "إيميل المستلم", testHint: "اتركه فاضي ليُرسَل لإيميل الأدمن تبعك.", cancel: "إلغاء", testSent: "تم إرسال إيميل التجربة", testFailed: "فشل إيميل التجربة", provider: "المزوّد", resendKey: "مفتاح Resend API", smtp: "البريد (SMTP)", host: "المضيف", port: "المنفذ", username: "اسم المستخدم",
     password: "كلمة المرور", encryption: "التشفير", none: "بدون",
     fromName: "اسم المُرسِل", fromAddress: "بريد المُرسِل",
     save: "حفظ", saved: "تم الحفظ", saveFailed: "تعذّر الحفظ",

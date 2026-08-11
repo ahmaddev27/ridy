@@ -82,7 +82,8 @@ class SettingsController extends Controller
      */
     public function testEmail(Request $request): JsonResponse
     {
-        $to = (string) $request->user()->email;
+        $data = $request->validate(['to' => ['nullable', 'email']]);
+        $to = $data['to'] ?? (string) $request->user()->email;
 
         try {
             Mail::html('<p>This is a test email from Reidey. If you received it, email delivery is working.</p>', function ($m) use ($to) {

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2, Save, Mail, LifeBuoy } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { useI18n } from "@/lib/i18n/context";
 import { getSettings, updateSettings, sendTestEmail, type PlatformSettings } from "@/lib/api/admin";
@@ -28,6 +29,8 @@ export default function SettingsPage() {
   const [supportWhatsapp, setSupportWhatsapp] = useState("");
   const [provider, setProvider] = useState<"smtp" | "resend">("smtp");
   const [resendKey, setResendKey] = useState("");
+  const [testOpen, setTestOpen] = useState(false);
+  const [testTo, setTestTo] = useState("");
 
   async function load() {
     const s = await getSettings();
@@ -75,8 +78,9 @@ export default function SettingsPage() {
   async function testEmail() {
     setBusy(true);
     try {
-      const r = await sendTestEmail();
+      const r = await sendTestEmail(testTo.trim() || undefined);
       toast.success(c("testSent"), { description: r.to });
+      setTestOpen(false);
     } catch (e) {
       const desc =
         e instanceof ApiError && (e.data?.data as { error?: string } | undefined)?.error
@@ -109,7 +113,7 @@ export default function SettingsPage() {
       <PageHeader tkey="settings" />
 
       {/* Email delivery */}
-      <Card className="mx-auto w-full max-w-2xl p-5">
+      <Card className="mx-auto w-full max-w-4xl p-5">
         <div className="mb-4 flex items-center gap-2">
           <Mail className="h-4 w-4 text-slate-700" />
           <h3 className="font-semibold text-slate-800">{c("email")}</h3>
@@ -177,7 +181,7 @@ export default function SettingsPage() {
           <Field label={c("fromAddress")} type="email" value={fromAddress} onChange={setFromAddress} />
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <Button variant="secondary" onClick={testEmail} disabled={busy}>
+          <Button variant="secondary" onClick={() => { setTestTo(""); setTestOpen(true); }} disabled={busy}>
             {c("sendTest")}
           </Button>
           <Button onClick={saveSmtp} disabled={busy}>
@@ -188,7 +192,7 @@ export default function SettingsPage() {
       </Card>
 
       {/* Support contacts — shown to suspended companies */}
-      <Card className="mx-auto w-full max-w-2xl p-5">
+      <Card className="mx-auto w-full max-w-4xl p-5">
         <div className="mb-1 flex items-center gap-2">
           <LifeBuoy className="h-4 w-4 text-slate-700" />
           <h3 className="font-semibold text-slate-800">{c("support")}</h3>
@@ -205,6 +209,33 @@ export default function SettingsPage() {
           </Button>
         </div>
       </Card>
+
+      <Modal
+        open={testOpen}
+        onClose={() => setTestOpen(false)}
+        title={c("sendTest")}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setTestOpen(false)} disabled={busy}>{c("cancel")}</Button>
+            <Button onClick={testEmail} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{c("sendTest")}
+            </Button>
+          </div>
+        }
+      >
+        <div className="text-start">
+          <label className="mb-1 block text-sm font-medium text-slate-700">{c("testTo")}</label>
+          <input
+            type="email"
+            value={testTo}
+            onChange={(e) => setTestTo(e.target.value)}
+            autoFocus
+            placeholder={settings ? "you@example.com" : ""}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+          />
+          <p className="mt-2 text-xs text-slate-400">{c("testHint")}</p>
+        </div>
+      </Modal>
     </div>
   );
 }
