@@ -48,6 +48,10 @@ return [
         'supplier_base_url' => env('UBER_SUPPLIER_BASE_URL', 'https://supplier.uber.com'),
     ],
 
+    // A fixed OTP/activation code for testing (any environment). Leave empty in a
+    // real production deployment so codes are random.
+    'otp_test_code' => env('OTP_TEST_CODE'),
+
     'uber_auth' => [
         // Node uber-auth service that drives the interactive Uber sign-in browser.
         'url' => env('UBER_AUTH_URL', 'http://localhost:8791'),
