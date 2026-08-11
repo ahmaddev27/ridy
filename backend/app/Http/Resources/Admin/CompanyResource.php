@@ -27,7 +27,6 @@ class CompanyResource extends JsonResource
 
     public function toArray(Request $request): array
     {
-        $proxy = $this->getAttribute('proxy_url');
         $session = $this->getAttribute('session_info');
 
         return [
@@ -37,10 +36,10 @@ class CompanyResource extends JsonResource
             'status' => $this->status,
             'uber_org_uuid' => $this->uber_org_uuid,
 
-            // Proxy — masked in list, real only in detail (never leaks creds in a list).
-            'has_proxy' => filled($proxy),
-            'proxy_url_masked' => $this->maskProxy($proxy),
-            'proxy_url' => $this->detailed ? $proxy : null,
+            // Proxy — assigned from the shared pool (no per-company credentials).
+            'has_proxy' => $this->proxy_id !== null,
+            'proxy_id' => $this->proxy_id,
+            'proxy_label' => $this->getAttribute('proxy_label'),
 
             // Stats (attached by the controller).
             'driver_count' => (int) ($this->getAttribute('driver_count') ?? 0),
@@ -62,15 +61,5 @@ class CompanyResource extends JsonResource
                 ? UserResource::collection($this->getAttribute('users_list') ?? collect())
                 : null,
         ];
-    }
-
-    /** Redact the userinfo (user:pass@) so a masked proxy never exposes creds. */
-    private function maskProxy(?string $url): ?string
-    {
-        if (! $url) {
-            return null;
-        }
-
-        return preg_replace('#//[^@/]*@#', '//••••@', $url);
     }
 }

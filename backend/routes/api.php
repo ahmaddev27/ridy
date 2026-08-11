@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
+use App\Http\Controllers\Api\V1\Admin\CompanyDataController;
 use App\Http\Controllers\Api\V1\Admin\CompanySessionController;
 use App\Http\Controllers\Api\V1\Admin\CompanyUserController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
@@ -144,6 +145,11 @@ Route::prefix('v1')->group(function () {
         Route::get('companies/{tenant}', [CompanyController::class, 'show']);
         Route::put('companies/{tenant}', [CompanyController::class, 'update']);
         Route::delete('companies/{tenant}', [CompanyController::class, 'destroy']);
+
+        // Read-only drill-down into a company's fleet data (admin tabs).
+        Route::get('companies/{tenant}/drivers', [CompanyDataController::class, 'drivers']);
+        Route::get('companies/{tenant}/offers', [CompanyDataController::class, 'offers']);
+        Route::get('companies/{tenant}/vehicles', [CompanyDataController::class, 'vehicles']);
 
         Route::get('companies/{tenant}/users', [CompanyUserController::class, 'index']);
         Route::post('companies/{tenant}/users', [CompanyUserController::class, 'store']);

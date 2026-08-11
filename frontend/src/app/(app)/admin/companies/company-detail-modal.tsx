@@ -19,7 +19,9 @@ import {
   deleteCompanySession,
   generateActivationCode,
   reactivateCompany,
+  listProxies,
   type Company,
+  type Proxy,
 } from "@/lib/api/admin";
 
 /** Super-admin company detail: edit, proxy, users, session controls. */
@@ -43,7 +45,8 @@ export function CompanyDetailModal({
   const [country, setCountry] = useState("");
   const [status, setStatus] = useState("active");
   const [orgUuid, setOrgUuid] = useState("");
-  const [proxy, setProxy] = useState("");
+  const [proxyId, setProxyId] = useState("");
+  const [proxies, setProxies] = useState<Proxy[]>([]);
 
   // Sub-actions.
   const [confirm, setConfirm] = useState<null | "disable" | "relink" | "deleteSession">(null);
@@ -65,7 +68,8 @@ export function CompanyDetailModal({
       setCountry(co.country ?? "");
       setStatus(co.status);
       setOrgUuid(co.uber_org_uuid ?? "");
-      setProxy(co.proxy_url ?? "");
+      setProxyId(co.proxy_id !== null ? String(co.proxy_id) : "");
+      listProxies().then(setProxies).catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "error");
     }
@@ -87,7 +91,7 @@ export function CompanyDetailModal({
         country: country.trim(),
         status,
         uber_org_uuid: orgUuid.trim() || undefined,
-        proxy_url: proxy, // empty string clears → global proxy
+        proxy_id: proxyId ? Number(proxyId) : null, // pool proxy; empty = auto/none
       });
       toast.success(c("savedToast"));
       await load();
@@ -275,16 +279,21 @@ export function CompanyDetailModal({
                 )}
               </Section>
 
-              {/* Proxy — super-admin only */}
+              {/* Proxy — assigned from the shared pool */}
               <Section title={c("proxy")}>
-                <p className="text-xs text-slate-400">{c("proxyHint")}</p>
-                <Field
-                  label={c("proxyUrl")}
-                  value={proxy}
-                  onChange={setProxy}
-                  mono
-                  placeholder="http://user:pass@host:port"
-                />
+                <p className="text-xs text-slate-400">{c("proxyPoolHint")}</p>
+                <select
+                  value={proxyId}
+                  onChange={(e) => setProxyId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
+                >
+                  <option value="">{c("proxyNone")}</option>
+                  {proxies.map((p) => (
+                    <option key={p.id} value={p.id} disabled={p.free <= 0 && String(p.id) !== proxyId}>
+                      {p.label} ({p.used}/{p.capacity})
+                    </option>
+                  ))}
+                </select>
               </Section>
 
               <div className="flex justify-between">

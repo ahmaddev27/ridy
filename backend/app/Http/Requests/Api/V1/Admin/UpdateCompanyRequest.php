@@ -21,6 +21,7 @@ class UpdateCompanyRequest extends FormRequest
             'country' => ['nullable', 'string', 'size:2'],
             'status' => ['nullable', 'string', 'in:active,disabled'],
             'subscription_ends_at' => ['sometimes', 'nullable', 'date'],
+            'proxy_id' => ['sometimes', 'nullable', 'integer', 'exists:proxies,id'],
             'uber_org_uuid' => ['nullable', 'uuid'],
             // Present only when the admin edits it; empty string clears it (→ global proxy).
             'proxy_url' => ['sometimes', 'nullable', 'string', 'max:1000'],

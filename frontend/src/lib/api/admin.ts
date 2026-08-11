@@ -7,8 +7,8 @@ export type Company = {
   status: string;
   uber_org_uuid: string | null;
   has_proxy: boolean;
-  proxy_url_masked: string | null;
-  proxy_url: string | null; // present only in detail
+  proxy_id: number | null;
+  proxy_label: string | null; // present only in detail
   driver_count: number;
   offer_count: number;
   email_verified: boolean;
@@ -64,7 +64,7 @@ export type UpdateCompanyInput = Partial<{
   country: string;
   status: string;
   uber_org_uuid: string;
-  proxy_url: string; // empty string clears it (→ global proxy)
+  proxy_id: number | null; // pool proxy; null = auto/none
   subscription_ends_at: string | null;
 }>;
 
@@ -91,8 +91,6 @@ export type PlatformSettings = {
   mail_from_address: string | null;
   mail_from_name: string | null;
   has_smtp_password: boolean;
-  has_global_proxy: boolean;
-  global_proxy_masked: string | null;
   support_email: string | null;
   support_whatsapp: string | null;
 };
@@ -105,7 +103,6 @@ export type UpdateSettingsInput = Partial<{
   smtp_encryption: string;
   mail_from_address: string;
   mail_from_name: string;
-  global_proxy_url: string; // only when changing (empty clears)
   support_email: string;
   support_whatsapp: string;
 }>;

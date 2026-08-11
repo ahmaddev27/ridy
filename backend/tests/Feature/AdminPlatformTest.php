@@ -32,31 +32,16 @@ class AdminPlatformTest extends TestCase
             'smtp_host' => 'smtp.mailtrap.io',
             'smtp_port' => 587,
             'smtp_password' => 'topsecret',
-            'global_proxy_url' => 'http://u:p@host:1',
         ])->assertOk()
             ->assertJsonPath('data.smtp_host', 'smtp.mailtrap.io')
-            ->assertJsonPath('data.has_smtp_password', true)
-            ->assertJsonPath('data.has_global_proxy', true);
+            ->assertJsonPath('data.has_smtp_password', true);
 
         // Secrets are never returned in full.
         $res = $this->getJson('/api/v1/admin/settings')->assertOk();
         $this->assertStringNotContainsString('topsecret', $res->getContent());
-        $this->assertStringNotContainsString('u:p@host', $res->getContent());
 
         // But they are stored (decrypted via the helper).
         $this->assertSame('topsecret', Settings::get('smtp_password'));
-    }
-
-    public function test_global_proxy_reaches_the_daemon_sessions_payload(): void
-    {
-        // Pin the shared secret so the test passes regardless of the CI env.
-        config(['services.dispatch.ingest_secret' => 'test-secret']);
-        Settings::setMany(['global_proxy_url' => 'http://g:g@global:1']);
-
-        $res = $this->withHeader('X-Dispatch-Secret', 'test-secret')
-            ->getJson('/api/v1/internal/dispatch/sessions')->assertOk();
-
-        $res->assertJsonPath('meta.global_proxy_url', 'http://g:g@global:1');
     }
 
     public function test_manager_cannot_reach_admin_settings(): void

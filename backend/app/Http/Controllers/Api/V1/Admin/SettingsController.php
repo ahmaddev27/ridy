@@ -15,8 +15,6 @@ class SettingsController extends Controller
 {
     public function show(): JsonResponse
     {
-        $globalProxy = Settings::get('global_proxy_url');
-
         return response()->json(['data' => [
             'smtp_host' => Settings::get('smtp_host'),
             'smtp_port' => Settings::get('smtp_port', '587'),
@@ -25,9 +23,6 @@ class SettingsController extends Controller
             'mail_from_address' => Settings::get('mail_from_address'),
             'mail_from_name' => Settings::get('mail_from_name'),
             'has_smtp_password' => (bool) Settings::get('smtp_password'),
-
-            'has_global_proxy' => (bool) $globalProxy,
-            'global_proxy_masked' => $globalProxy ? preg_replace('#//[^@/]*@#', '//••••@', $globalProxy) : null,
 
             // Shown to suspended companies on the "contact support" screen.
             'support_email' => Settings::get('support_email'),
@@ -45,7 +40,6 @@ class SettingsController extends Controller
             'smtp_encryption' => ['nullable', 'in:tls,ssl,none'],
             'mail_from_address' => ['nullable', 'email'],
             'mail_from_name' => ['nullable', 'string', 'max:255'],
-            'global_proxy_url' => ['nullable', 'string', 'max:1000'], // only when changing
             'support_email' => ['nullable', 'email'],
             'support_whatsapp' => ['nullable', 'string', 'max:32'],
         ]);
@@ -60,12 +54,10 @@ class SettingsController extends Controller
                 $values[$key] = $data[$key] !== null ? (string) $data[$key] : null;
             }
         }
-        // Secrets: only overwrite when a non-empty value is submitted; an explicit
-        // empty string clears them.
-        foreach (['smtp_password', 'global_proxy_url'] as $secret) {
-            if ($request->has($secret)) {
-                $values[$secret] = $data[$secret] !== '' ? $data[$secret] : null;
-            }
+        // The SMTP password is only overwritten when a non-empty value is
+        // submitted; an explicit empty string clears it.
+        if ($request->has('smtp_password')) {
+            $values['smtp_password'] = ($data['smtp_password'] ?? '') !== '' ? $data['smtp_password'] : null;
         }
 
         Settings::setMany($values);
