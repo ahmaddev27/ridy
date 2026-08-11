@@ -112,6 +112,9 @@ export default function ConnectionsPage() {
     setExtBusy(true);
     try {
       await pairExtension();
+      // Tell the extension THIS is an explicit connect, so it auto-closes the tab
+      // it's about to open (but never a supplier tab the manager opens later).
+      window.postMessage({ source: "ridy-connect-intent" }, "*");
       // Send the manager to the Uber fleet portal (supplier) — their familiar
       // driver-management site, NOT the technical dispatch stream page. The
       // browser lands on /orgs/<uuid>/, so the extension reads the fleet org

@@ -52,6 +52,20 @@ async function discoverOrgUuid() {
   }
 }
 
+/**
+ * True once, if the dashboard's connect button fired recently. Consuming it here
+ * means only the tab opened BY connect auto-closes — a supplier tab the manager
+ * opens later still syncs silently but is left open.
+ */
+async function consumeConnectIntent() {
+  const { connectPending } = await api.storage.local.get(["connectPending"]);
+  if (connectPending && Date.now() - connectPending < 600000) {
+    await api.storage.local.remove("connectPending");
+    return true;
+  }
+  return false;
+}
+
 async function capture(orgUuid, orgName, { manual = false } = {}) {
   const { apiUrl, token, lastSync } = await api.storage.local.get(["apiUrl", "token", "lastSync"]);
   if (!apiUrl || !token) {
@@ -76,7 +90,8 @@ async function capture(orgUuid, orgName, { manual = false } = {}) {
   // quiet again while nothing changes.
   const fp = fingerprint(orgUuid, cookies) + "|s" + supplierCookies.length;
   if (!manual && lastSync === fp) {
-    return { ok: true, reason: "unchanged" }; // already synced this session
+    // Already synced — but if the manager just pressed connect, still close the tab.
+    return { ok: true, reason: "unchanged", closeTab: await consumeConnectIntent() };
   }
 
   try {
@@ -101,7 +116,7 @@ async function capture(orgUuid, orgName, { manual = false } = {}) {
     // Remember the org so the on-demand roster pull (from the dashboard, with no
     // supplier tab open) knows which fleet to query.
     await api.storage.local.set({ lastSync: fp, orgUuid });
-    return { ok: true, count: cookies.length };
+    return { ok: true, count: cookies.length, closeTab: await consumeConnectIntent() };
   } catch (e) {
     return { ok: false, reason: e.message };
   }
@@ -442,15 +457,21 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     capture(msg.orgUuid || null, msg.orgName, { manual: !!msg.manual }).then((res) => {
       console.log("[Reidey bg] capture result:", res);
       sendResponse(res);
-      // After a FRESH connect, close the Uber tab we sent the manager to so the
-      // flow ends cleanly (open → sign in → "connected" → auto-close). We skip
-      // "unchanged" so we never close a tab the manager is actively using.
+      // Close the Uber tab ONLY when this capture belongs to an explicit connect
+      // (closeTab set via the dashboard's connect intent). A supplier tab the
+      // manager opens themselves syncs silently and is left open.
       const tabId = sender?.tab?.id;
-      if (res?.ok && res.reason !== "unchanged" && tabId != null) {
+      if (res?.ok && res.closeTab && tabId != null) {
         setTimeout(() => api.tabs?.remove(tabId).catch(() => {}), 2500);
       }
     });
     return true; // async response
+  }
+  if (msg?.type === "connectIntent") {
+    // The dashboard pressed connect — remember it so the next fresh capture's tab
+    // auto-closes. Expires after 10 min (see consumeConnectIntent).
+    api.storage.local.set({ connectPending: Date.now() }).then(() => sendResponse({ ok: true }));
+    return true;
   }
   if (msg?.type === "roster" && Array.isArray(msg.drivers)) {
     postRoster(msg.drivers).then(sendResponse);
