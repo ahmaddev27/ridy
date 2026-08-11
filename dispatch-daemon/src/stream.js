@@ -64,6 +64,7 @@ export class RamenStream {
     this.stopped = true;
     this.controller?.abort();
     if (this.rosterTimer) clearInterval(this.rosterTimer);
+    if (this.statusTimer) clearInterval(this.statusTimer);
     this.dispatcher?.close?.();
   }
 
@@ -113,6 +114,50 @@ export class RamenStream {
       console.log(`[${this.tag()}] roster synced: ${rows.length} drivers`, outcome);
     } catch (e) {
       console.error(`[${this.tag()}] roster sync failed: ${e.message}`);
+    }
+  }
+
+  /**
+   * Poll supplier GetDriverLiveLocation for the whole org and forward the driver
+   * statuses. Fast + continuous so an ON_TRIP transition (offer acceptance) is
+   * caught within seconds, regardless of whether a manager has a page open.
+   * Uber returns coordinates as 0,0 (redacted), so we only forward the status.
+   */
+  async syncStatuses() {
+    try {
+      const res = await fetch(`${config.uberSupplierBase}/api/GetDriverLiveLocation?localeCode=en-GB`, {
+        method: "POST",
+        headers: { ...this.headers(), "content-type": "application/json", "x-csrf-token": "x" },
+        dispatcher: this.dispatcher,
+        body: JSON.stringify({
+          orgId: { uuid: { value: this.session.uber_org_uuid } },
+          driverIds: [],
+          filters: { allowedStatuses: [] },
+          responseSelector: {
+            includeStats: false,
+            locationDetailsOptions: { fieldMask: { paths: ["location_updated_time", "driver_status"] } },
+          },
+        }),
+      });
+      if (!res.ok) return;
+      const body = await res.json();
+      if (body.status !== "success") return;
+
+      const statuses = (body.data?.driverLocations ?? [])
+        .map((l) => ({
+          driver_uuid: l.driverId?.value,
+          status: l.driverStatus ?? null,
+          location_updated_at: l.locationUpdatedTime?.value ? Number(l.locationUpdatedTime.value) : null,
+        }))
+        .filter((s) => s.driver_uuid);
+
+      if (statuses.length === 0) return;
+      const outcome = await api.statuses(this.session.id, statuses);
+      if (outcome?.data?.accepted) {
+        console.log(`[${this.tag()}] statuses: ${outcome.data.accepted} offer(s) marked accepted`);
+      }
+    } catch (e) {
+      console.error(`[${this.tag()}] status sync failed: ${e.message}`);
     }
   }
 
@@ -225,6 +270,8 @@ export class RamenStream {
     if (this.primary) {
       this.syncRoster();
       this.rosterTimer ??= setInterval(() => this.syncRoster(), config.rosterInterval);
+      this.syncStatuses();
+      this.statusTimer ??= setInterval(() => this.syncStatuses(), config.statusInterval);
     }
 
     await this.readSse(recv.body);

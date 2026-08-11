@@ -58,6 +58,7 @@ Route::prefix('v1')->group(function () {
         Route::post('sessions/{session}/needs-relink', [DispatchDaemonController::class, 'needsRelink']);
         Route::post('sessions/{session}/heartbeat', [DispatchDaemonController::class, 'heartbeat']);
         Route::post('sessions/{session}/roster', [DispatchDaemonController::class, 'roster']);
+        Route::post('sessions/{session}/statuses', [DispatchDaemonController::class, 'statuses']);
     });
 
     Route::middleware(['auth:sanctum', ResolveTenant::class])->group(function () {
