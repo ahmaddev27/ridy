@@ -113,7 +113,7 @@ export default function SettingsPage() {
       <PageHeader tkey="settings" />
 
       {/* Email delivery */}
-      <Card className="mx-auto w-full max-w-4xl p-5">
+      <Card className="w-full p-5">
         <div className="mb-4 flex items-center gap-2">
           <Mail className="h-4 w-4 text-slate-700" />
           <h3 className="font-semibold text-slate-800">{c("email")}</h3>
@@ -192,7 +192,7 @@ export default function SettingsPage() {
       </Card>
 
       {/* Support contacts — shown to suspended companies */}
-      <Card className="mx-auto w-full max-w-4xl p-5">
+      <Card className="w-full p-5">
         <div className="mb-1 flex items-center gap-2">
           <LifeBuoy className="h-4 w-4 text-slate-700" />
           <h3 className="font-semibold text-slate-800">{c("support")}</h3>

@@ -64,7 +64,7 @@ export default function ProfilePage() {
     <div className="space-y-6">
       <PageHeader tkey="profile" />
 
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 md:flex-row">
+      <div className="flex w-full flex-col gap-4 md:flex-row">
         {/* Side tabs */}
         <nav className="flex gap-1 overflow-x-auto md:w-48 md:flex-col md:gap-0.5">
           {([
