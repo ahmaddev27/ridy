@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Admin\CollectorController;
+use App\Http\Controllers\Api\V1\Admin\CollectorPaymentController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyDataController;
 use App\Http\Controllers\Api\V1\Admin\CompanySessionController;
@@ -167,5 +169,16 @@ Route::prefix('v1')->group(function () {
         Route::get('companies/{tenant}/session', [CompanySessionController::class, 'show']);
         Route::post('companies/{tenant}/session/relink', [CompanySessionController::class, 'forceRelink']);
         Route::delete('companies/{tenant}/session', [CompanySessionController::class, 'destroy']);
+
+        // Cash collectors + payment ledger.
+        Route::get('collectors', [CollectorController::class, 'index']);
+        Route::post('collectors', [CollectorController::class, 'store']);
+        Route::put('collectors/{collector}', [CollectorController::class, 'update']);
+        Route::delete('collectors/{collector}', [CollectorController::class, 'destroy']);
+
+        Route::get('collector-payments', [CollectorPaymentController::class, 'index']);
+        Route::get('collector-payments/export', [CollectorPaymentController::class, 'export']);
+        Route::post('collector-payments', [CollectorPaymentController::class, 'store']);
+        Route::delete('collector-payments/{payment}', [CollectorPaymentController::class, 'destroy']);
     });
 });
