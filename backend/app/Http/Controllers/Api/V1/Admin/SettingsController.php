@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 /**
  * Live platform settings (SMTP + global residential proxy), editable by the
@@ -70,5 +72,26 @@ class SettingsController extends Controller
         Settings::setMany($values);
 
         return $this->show();
+    }
+
+    /**
+     * Send a test email to the super-admin's own address using the currently
+     * saved provider (SMTP or Resend), so delivery can be verified before any
+     * real emails go out. The provider config is applied at boot; here we just
+     * try to send and surface any transport error verbatim.
+     */
+    public function testEmail(Request $request): JsonResponse
+    {
+        $to = (string) $request->user()->email;
+
+        try {
+            Mail::html('<p>This is a test email from Reidey. If you received it, email delivery is working.</p>', function ($m) use ($to) {
+                $m->to($to)->subject('Reidey · Test email');
+            });
+        } catch (Throwable $e) {
+            return response()->json(['data' => ['sent' => false, 'error' => $e->getMessage()]], 422);
+        }
+
+        return response()->json(['data' => ['sent' => true, 'to' => $to]]);
     }
 }
