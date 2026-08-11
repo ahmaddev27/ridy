@@ -99,7 +99,8 @@ class FleetSessionTest extends TestCase
 
         // The internal daemon endpoint surfaces the supplier jar so it can poll
         // roster/status server-side; the manager-facing resource never does.
-        $daemon = $this->getJson('/api/v1/internal/dispatch/sessions', ['X-Dispatch-Secret' => config('services.dispatch.ingest_secret')]);
+        config(['services.dispatch.ingest_secret' => 'test-daemon-secret']);
+        $daemon = $this->getJson('/api/v1/internal/dispatch/sessions', ['X-Dispatch-Secret' => 'test-daemon-secret']);
         $daemon->assertOk()->assertJsonPath('data.0.supplier_cookies.0.value', 'sup1');
     }
 
