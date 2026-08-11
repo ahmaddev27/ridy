@@ -46,6 +46,14 @@ class CompanyResource extends JsonResource
             'driver_count' => (int) ($this->getAttribute('driver_count') ?? 0),
             'offer_count' => (int) ($this->getAttribute('offer_count') ?? 0),
             'email_verified' => (bool) $this->getAttribute('email_verified'),
+
+            // Subscription lifecycle.
+            'state' => $this->stateReason(),                 // null = usable
+            'activated_at' => $this->activated_at?->toIso8601String(),
+            'subscription_ends_at' => $this->subscription_ends_at?->toIso8601String(),
+            'days_left' => $this->daysLeft(),
+            'banned' => $this->banned_at !== null,
+
             'session_status' => $session['status'] ?? null,
             'session_last_event_at' => $session['last_event_at'] ?? null,
             'session_expires_at' => $session['expires_at'] ?? null,

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { X, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ban } from "lucide-react";
+import { X, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ban, Ticket, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import {
@@ -15,6 +16,8 @@ import {
   resetCompanyUserPassword,
   forceRelink,
   deleteCompanySession,
+  generateActivationCode,
+  reactivateCompany,
   type Company,
 } from "@/lib/api/admin";
 
@@ -44,6 +47,10 @@ export function CompanyDetailModal({
   // Sub-actions.
   const [confirm, setConfirm] = useState<null | "disable" | "relink" | "deleteSession">(null);
   const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
+
+  // Subscription/activation.
+  const [days, setDays] = useState("30");
+  const [genCode, setGenCode] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -113,6 +120,34 @@ export function CompanyDetailModal({
     }
   }
 
+  async function genActivation() {
+    setBusy(true);
+    try {
+      const res = await generateActivationCode(id, Number(days) || 30);
+      setGenCode(res.code);
+      toast.success(c("codeGenerated"));
+      await load();
+    } catch (e) {
+      toast.error(c("codeFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function doReactivate() {
+    setBusy(true);
+    try {
+      await reactivateCompany(id);
+      toast.success(c("reactivatedToast"));
+      await load();
+      onChanged();
+    } catch (e) {
+      toast.error(c("actionFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function runConfirm() {
     if (!confirm) return;
     setBusy(true);
@@ -179,6 +214,56 @@ export function CompanyDetailModal({
                     <option value="disabled">{c("statusDisabled")}</option>
                   </select>
                 </div>
+              </Section>
+
+              {/* Subscription + activation */}
+              <Section title={c("subscription")}>
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  {company.state === null ? (
+                    <Badge status="connected" dot>{c("subActive")}</Badge>
+                  ) : (
+                    <Badge status={company.state === "expired" ? "expiring" : "error"} dot>
+                      {c(`sub_${company.state}`)}
+                    </Badge>
+                  )}
+                  {company.days_left !== null && (
+                    <span className="text-slate-500">{c("daysLeft").replace("{n}", String(company.days_left))}</span>
+                  )}
+                  {company.subscription_ends_at && (
+                    <span className="text-xs text-slate-400" dir="ltr">
+                      → {new Date(company.subscription_ends_at).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-400">{c("activationHint")}</p>
+                <div className="flex items-end gap-2">
+                  <div className="w-28">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">{c("days")}</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={days}
+                      onChange={(e) => setDays(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
+                    />
+                  </div>
+                  <Button variant="secondary" onClick={genActivation} disabled={busy}>
+                    <Ticket className="h-4 w-4" /> {c("generateCode")}
+                  </Button>
+                  {company.banned && (
+                    <Button onClick={doReactivate} disabled={busy}>
+                      <ShieldCheck className="h-4 w-4" /> {c("reactivate")}
+                    </Button>
+                  )}
+                </div>
+                {genCode && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                    {c("codeIs")}{" "}
+                    <span className="font-mono text-lg font-bold tracking-widest" dir="ltr">{genCode}</span>
+                    <span className="ms-2 text-xs text-emerald-600">{c("codeValid")}</span>
+                  </div>
+                )}
               </Section>
 
               {/* Proxy — super-admin only */}

@@ -33,6 +33,7 @@ class RegistrationController extends Controller
         $data = $request->validate([
             'company_name' => ['required', 'string', 'max:255'],
             'name' => ['required', 'string', 'max:255'],
+            'phone' => ['required', 'string', 'max:32'],
             'email' => ['required', 'email', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8'],
         ]);
@@ -42,6 +43,7 @@ class RegistrationController extends Controller
             [
                 'company_name' => $data['company_name'],
                 'name' => $data['name'],
+                'phone' => $data['phone'],
                 'password' => Hash::make($data['password']),
                 'otp' => $this->newOtp(),
                 'otp_expires_at' => CarbonImmutable::now()->addMinutes(self::OTP_TTL_MINUTES),
@@ -86,6 +88,7 @@ class RegistrationController extends Controller
             $user = User::create([
                 'name' => $registration->name,
                 'email' => $registration->email,
+                'phone' => $registration->phone,
                 'password' => $registration->password, // already hashed
                 'tenant_id' => $tenant->id,
             ]);

@@ -3,6 +3,7 @@
 type Dict = Record<string, unknown>;
 
 const en: Dict = {
+  banned: { reactivate: "Reactivate", reactivated: "Company reactivated", failed: "Action failed", emptyTitle: "No banned companies", emptyDesc: "Companies locked out will appear here.", colCompany: "Company", colOwner: "Owner", colPhone: "Phone" },
   emailTemplates: {
     type_company_registration: "Company registration", type_company_otp: "Company sign-up code", type_password_otp: "Password reset code", type_driver_invite: "Driver invite",
     subject: "Subject", body: "Body", accent: "Accent color", logo: "Logo", logoAuto: "Reidey logo (automatic)", footer: "Footer",
@@ -23,7 +24,7 @@ const en: Dict = {
     password: "Password", encryption: "Encryption", none: "None",
     fromName: "From name", fromAddress: "From address",
     save: "Save", saved: "Saved", saveFailed: "Couldn’t save",
-    globalProxy: "Global proxy", globalProxyHint: "Used by companies with no dedicated proxy.",
+    support: "Support contacts", supportHint: "Shown to suspended companies on the contact screen.", supportEmail: "Support email", supportWhatsapp: "Support WhatsApp", globalProxy: "Global proxy", globalProxyHint: "Used by companies with no dedicated proxy.",
     proxyUrl: "Proxy URL",
   },
   profile: {
@@ -45,7 +46,7 @@ const en: Dict = {
     statusDisabled: "Disabled",
     emailVerified: "Email verified", emailUnverified: "Email not verified",
     enableCompany: "Enable company", disableCompany: "Disable company",
-    enabledToast: "Company enabled", disabledToast: "Company disabled", updateFailed: "Update failed",
+    enabledToast: "Company enabled", disabledToast: "Company disabled", updateFailed: "Update failed", subscription: "Subscription", subActive: "Active", sub_disabled: "Disabled", sub_banned: "Banned", sub_expired: "Expired", daysLeft: "{n} days left", activationHint: "Generate a 2-minute code for the owner to enter.", days: "Days", generateCode: "Generate code", reactivate: "Reactivate", codeGenerated: "Code generated", codeFailed: "Could not generate code", reactivatedToast: "Company reactivated", codeIs: "Activation code:", codeValid: "valid 2 min",
     session_active: "Active",
     session_needs_relink: "Needs re-link",
     session_expired: "Expired",
@@ -102,6 +103,7 @@ const en: Dict = {
 };
 
 const de: Dict = {
+  banned: { reactivate: "Reaktivieren", reactivated: "Firma reaktiviert", failed: "Aktion fehlgeschlagen", emptyTitle: "Keine gesperrten Firmen", emptyDesc: "Gesperrte Firmen erscheinen hier.", colCompany: "Firma", colOwner: "Inhaber", colPhone: "Telefon" },
   emailTemplates: {
     type_company_registration: "Firmenregistrierung", type_company_otp: "Firmen-Anmeldecode", type_password_otp: "Passwort-Reset-Code", type_driver_invite: "Fahrer-Einladung",
     subject: "Betreff", body: "Inhalt", accent: "Akzentfarbe", logo: "Logo", logoAuto: "Reidey-Logo (automatisch)", footer: "Fußzeile",
@@ -122,7 +124,7 @@ const de: Dict = {
     password: "Passwort", encryption: "Verschlüsselung", none: "Keine",
     fromName: "Absendername", fromAddress: "Absenderadresse",
     save: "Speichern", saved: "Gespeichert", saveFailed: "Speichern fehlgeschlagen",
-    globalProxy: "Globaler Proxy", globalProxyHint: "Für Firmen ohne eigenen Proxy.",
+    support: "Support-Kontakte", supportHint: "Wird gesperrten Firmen auf dem Kontaktbildschirm angezeigt.", supportEmail: "Support-E-Mail", supportWhatsapp: "Support-WhatsApp", globalProxy: "Globaler Proxy", globalProxyHint: "Für Firmen ohne eigenen Proxy.",
     proxyUrl: "Proxy-URL",
   },
   profile: {
@@ -144,7 +146,7 @@ const de: Dict = {
     statusDisabled: "Deaktiviert",
     emailVerified: "E-Mail bestätigt", emailUnverified: "E-Mail nicht bestätigt",
     enableCompany: "Firma aktivieren", disableCompany: "Firma deaktivieren",
-    enabledToast: "Firma aktiviert", disabledToast: "Firma deaktiviert", updateFailed: "Aktualisierung fehlgeschlagen",
+    enabledToast: "Firma aktiviert", disabledToast: "Firma deaktiviert", updateFailed: "Aktualisierung fehlgeschlagen", subscription: "Abonnement", subActive: "Aktiv", sub_disabled: "Deaktiviert", sub_banned: "Gesperrt", sub_expired: "Abgelaufen", daysLeft: "{n} Tage übrig", activationHint: "Erzeuge einen 2-Minuten-Code, den der Inhaber eingibt.", days: "Tage", generateCode: "Code erzeugen", reactivate: "Reaktivieren", codeGenerated: "Code erzeugt", codeFailed: "Code konnte nicht erzeugt werden", reactivatedToast: "Firma reaktiviert", codeIs: "Aktivierungscode:", codeValid: "2 Min. gültig",
     session_active: "Aktiv",
     session_needs_relink: "Neu verbinden",
     session_expired: "Abgelaufen",
@@ -199,6 +201,7 @@ const de: Dict = {
 };
 
 const ar: Dict = {
+  banned: { reactivate: "إعادة تفعيل", reactivated: "تمت إعادة تفعيل الشركة", failed: "فشل الإجراء", emptyTitle: "لا شركات محظورة", emptyDesc: "الشركات المحظورة تظهر هنا.", colCompany: "الشركة", colOwner: "المالك", colPhone: "الجوال" },
   emailTemplates: {
     type_company_registration: "تسجيل شركة", type_company_otp: "رمز تسجيل الشركة", type_password_otp: "رمز استعادة كلمة المرور", type_driver_invite: "دعوة سائق",
     subject: "العنوان", body: "النص", accent: "لون التمييز", logo: "الشعار", logoAuto: "شعار Reidey (تلقائي)", footer: "التذييل",
@@ -219,7 +222,7 @@ const ar: Dict = {
     password: "كلمة المرور", encryption: "التشفير", none: "بدون",
     fromName: "اسم المُرسِل", fromAddress: "بريد المُرسِل",
     save: "حفظ", saved: "تم الحفظ", saveFailed: "تعذّر الحفظ",
-    globalProxy: "البروكسي العام", globalProxyHint: "يُستعمل للشركات اللي مالها بروكسي خاص.",
+    support: "جهات الدعم", supportHint: "تظهر للشركات المحظورة في شاشة التواصل.", supportEmail: "إيميل الدعم", supportWhatsapp: "واتساب الدعم", globalProxy: "البروكسي العام", globalProxyHint: "يُستعمل للشركات اللي مالها بروكسي خاص.",
     proxyUrl: "رابط البروكسي",
   },
   profile: {
@@ -241,7 +244,7 @@ const ar: Dict = {
     statusDisabled: "معطّلة",
     emailVerified: "البريد مؤكد", emailUnverified: "البريد غير مؤكد",
     enableCompany: "تفعيل الشركة", disableCompany: "تعطيل الشركة",
-    enabledToast: "تم تفعيل الشركة", disabledToast: "تم تعطيل الشركة", updateFailed: "فشل التحديث",
+    enabledToast: "تم تفعيل الشركة", disabledToast: "تم تعطيل الشركة", updateFailed: "فشل التحديث", subscription: "الاشتراك", subActive: "نشط", sub_disabled: "معطّل", sub_banned: "محظور", sub_expired: "منتهٍ", daysLeft: "باقي {n} يوم", activationHint: "ولّد كوداً صالحاً دقيقتين يُدخله صاحب الشركة.", days: "الأيام", generateCode: "توليد كود", reactivate: "إعادة تفعيل", codeGenerated: "تم توليد الكود", codeFailed: "تعذّر توليد الكود", reactivatedToast: "تمت إعادة تفعيل الشركة", codeIs: "كود التفعيل:", codeValid: "صالح دقيقتين",
     session_active: "نشطة",
     session_needs_relink: "تحتاج إعادة ربط",
     session_expired: "منتهية",

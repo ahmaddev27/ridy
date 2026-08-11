@@ -26,6 +26,7 @@ class CompanyRegistrationTest extends TestCase
         $this->postJson('/api/v1/register', [
             'company_name' => 'Acme Fleet',
             'name' => 'Alex Manager',
+            'phone' => '+49123456',
             'email' => 'alex@acme.de',
             'password' => 'super-secret',
         ])->assertOk()->assertJsonPath('data.email', 'alex@acme.de');
@@ -95,6 +96,7 @@ class CompanyRegistrationTest extends TestCase
         $this->postJson('/api/v1/register', [
             'company_name' => 'Acme Fleet',
             'name' => 'Alex',
+            'phone' => '+49123456',
             'email' => 'taken@acme.de',
             'password' => 'super-secret',
         ])->assertStatus(422)->assertJsonValidationErrors('email');

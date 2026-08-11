@@ -5,6 +5,8 @@ export class ApiError extends Error {
     public status: number,
     message: string,
     public errors?: Record<string, string[]>,
+    /** The full parsed error body — for endpoints that return extra fields. */
+    public data?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "ApiError";
@@ -57,6 +59,7 @@ export async function apiFetch<T>(
       response.status,
       (payload as { message?: string }).message ?? response.statusText,
       (payload as { errors?: Record<string, string[]> }).errors,
+      payload as Record<string, unknown>,
     );
   }
 

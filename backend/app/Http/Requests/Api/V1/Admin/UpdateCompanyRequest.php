@@ -20,6 +20,7 @@ class UpdateCompanyRequest extends FormRequest
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'country' => ['nullable', 'string', 'size:2'],
             'status' => ['nullable', 'string', 'in:active,disabled'],
+            'subscription_ends_at' => ['sometimes', 'nullable', 'date'],
             'uber_org_uuid' => ['nullable', 'uuid'],
             // Present only when the admin edits it; empty string clears it (→ global proxy).
             'proxy_url' => ['sometimes', 'nullable', 'string', 'max:1000'],
