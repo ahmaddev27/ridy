@@ -194,9 +194,14 @@ export async function getCompanyDrivers(id: number): Promise<CompanyDriverRow[]>
   const res = await apiFetch<{ data: CompanyDriverRow[] }>(`${base}/${id}/drivers`);
   return res.data;
 }
-export async function getCompanyOffers(id: number): Promise<CompanyOfferRow[]> {
-  const res = await apiFetch<{ data: CompanyOfferRow[] }>(`${base}/${id}/offers`);
-  return res.data;
+export async function getCompanyOffers(
+  id: number,
+  page = 1,
+): Promise<{ items: CompanyOfferRow[]; lastPage: number; total: number }> {
+  const res = await apiFetch<{ data: CompanyOfferRow[]; meta: { last_page: number; total: number } }>(
+    `${base}/${id}/offers?page=${page}`,
+  );
+  return { items: res.data, lastPage: res.meta.last_page, total: res.meta.total };
 }
 export async function getCompanyVehicles(id: number): Promise<CompanyVehicleRow[]> {
   const res = await apiFetch<{ data: CompanyVehicleRow[] }>(`${base}/${id}/vehicles`);

@@ -34,8 +34,7 @@ class CompanyDataController extends Controller
         $offers = DispatchOffer::withoutGlobalScopes()
             ->where('tenant_id', $tenant->id)
             ->latest('received_at')
-            ->limit(100)
-            ->get();
+            ->paginate(50); // paginator -> the resource collection adds meta/links
 
         return DispatchOfferResource::collection($offers);
     }
