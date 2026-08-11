@@ -151,7 +151,9 @@ export async function updateCompany(id: number, input: UpdateCompanyInput): Prom
   return res.data;
 }
 
-export async function disableCompany(id: number): Promise<void> {
+/** PERMANENTLY deletes a company and all its data. Not reversible — use
+ *  setCompanyActive(id, false) to merely disable. */
+export async function deleteCompany(id: number): Promise<void> {
   await apiFetch(`${base}/${id}`, { method: "DELETE", withCsrf: true });
 }
 

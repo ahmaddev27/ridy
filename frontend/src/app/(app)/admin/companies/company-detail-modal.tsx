@@ -12,7 +12,7 @@ import { useI18n } from "@/lib/i18n/context";
 import {
   getCompany,
   updateCompany,
-  disableCompany,
+  setCompanyActive,
   createCompanyUser,
   resetCompanyUserPassword,
   forceRelink,
@@ -161,7 +161,7 @@ export function CompanyDetailModal({
     if (!confirm) return;
     setBusy(true);
     try {
-      if (confirm === "disable") await disableCompany(id);
+      if (confirm === "disable") await setCompanyActive(id, false); // reversible — never deletes
       if (confirm === "relink") await forceRelink(id);
       if (confirm === "deleteSession") await deleteCompanySession(id);
       toast.success(c("done"));
