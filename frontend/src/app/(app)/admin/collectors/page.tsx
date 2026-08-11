@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { Select } from "@/components/ui/select";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import {
@@ -184,26 +185,18 @@ export default function CollectorsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
           <h3 className="font-semibold text-slate-800">{c("ledgerTitle")}</h3>
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={filters.collector_id ?? ""}
-              onChange={(e) => setFilters((f) => ({ ...f, collector_id: e.target.value ? Number(e.target.value) : undefined }))}
-              className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-slate-900"
-            >
-              <option value="">{c("filterCollector")}</option>
-              {collectors.map((col) => (
-                <option key={col.id} value={col.id}>{col.name}</option>
-              ))}
-            </select>
-            <select
-              value={filters.tenant_id ?? ""}
-              onChange={(e) => setFilters((f) => ({ ...f, tenant_id: e.target.value ? Number(e.target.value) : undefined }))}
-              className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-slate-900"
-            >
-              <option value="">{c("filterCompany")}</option>
-              {companies.map((co) => (
-                <option key={co.id} value={co.id}>{co.name}</option>
-              ))}
-            </select>
+            <Select
+              className="w-44"
+              value={filters.collector_id ? String(filters.collector_id) : ""}
+              onChange={(v) => setFilters((f) => ({ ...f, collector_id: v ? Number(v) : undefined }))}
+              options={[{ value: "", label: c("filterCollector") }, ...collectors.map((col) => ({ value: String(col.id), label: col.name }))]}
+            />
+            <Select
+              className="w-44"
+              value={filters.tenant_id ? String(filters.tenant_id) : ""}
+              onChange={(v) => setFilters((f) => ({ ...f, tenant_id: v ? Number(v) : undefined }))}
+              options={[{ value: "", label: c("filterCompany") }, ...companies.map((co) => ({ value: String(co.id), label: co.name }))]}
+            />
             <input
               type="date"
               value={filters.from ?? ""}
@@ -384,7 +377,7 @@ function PaymentModal({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const valid = collectorId && tenantId && Number(amount) > 0 && paidOn;
+  const valid = Boolean(collectorId && tenantId && Number(amount) > 0 && paidOn);
 
   async function save() {
     if (!valid) return;
@@ -426,21 +419,21 @@ function PaymentModal({
       <div className="space-y-3 text-start">
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">{c("fieldCompany")}</label>
-          <select value={tenantId} onChange={(e) => setTenantId(e.target.value)} className={selectClass}>
-            <option value="">{c("selectCompany")}</option>
-            {companies.map((co) => (
-              <option key={co.id} value={co.id}>{co.name}</option>
-            ))}
-          </select>
+          <Select
+            value={tenantId}
+            onChange={setTenantId}
+            placeholder={c("selectCompany")}
+            options={companies.map((co) => ({ value: String(co.id), label: co.name }))}
+          />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">{c("fieldCollector")}</label>
-          <select value={collectorId} onChange={(e) => setCollectorId(e.target.value)} className={selectClass}>
-            <option value="">{c("selectCollector")}</option>
-            {collectors.map((col) => (
-              <option key={col.id} value={col.id}>{col.name}</option>
-            ))}
-          </select>
+          <Select
+            value={collectorId}
+            onChange={setCollectorId}
+            placeholder={c("selectCollector")}
+            options={collectors.map((col) => ({ value: String(col.id), label: col.name }))}
+          />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label={c("fieldAmount")} type="number" value={amount} onChange={setAmount} />

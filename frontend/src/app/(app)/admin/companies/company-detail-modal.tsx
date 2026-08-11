@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ban, Ticket, ShieldCheck, ChevronDown } from "lucide-react";
+import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio } from "lucide-react";
+import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -214,19 +215,32 @@ export function CompanyDetail({
 
       {/* Side tabs (start side = right in RTL, left in LTR) + content */}
       <div className="flex flex-col gap-4 md:flex-row">
-        <nav className="flex gap-1 overflow-x-auto md:w-56 md:flex-col md:gap-0.5">
-          {(["details", "subscription", "managers", "drivers", "offers", "vehicles"] as const).map((tk) => (
-            <button
-              key={tk}
-              onClick={() => setTab(tk)}
-              className={
-                "whitespace-nowrap rounded-lg px-3 py-2 text-start text-sm font-medium transition-colors " +
-                (tab === tk ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100")
-              }
-            >
-              {c(`tab_${tk}`)}
-            </button>
-          ))}
+        <nav className="flex gap-1 overflow-x-auto rounded-xl bg-slate-50 p-1 md:w-56 md:flex-col md:gap-1 md:bg-transparent md:p-0">
+          {([
+            { k: "details", icon: Info },
+            { k: "subscription", icon: Ticket },
+            { k: "managers", icon: ShieldCheck },
+            { k: "drivers", icon: Users },
+            { k: "offers", icon: Radio },
+            { k: "vehicles", icon: Car },
+          ] as const).map(({ k: tk, icon: Icon }) => {
+            const active = tab === tk;
+            return (
+              <button
+                key={tk}
+                onClick={() => setTab(tk)}
+                className={
+                  "group flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-start text-sm font-medium transition-all " +
+                  (active
+                    ? "bg-slate-900 text-white shadow-sm"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-900")
+                }
+              >
+                <Icon className={"h-4 w-4 shrink-0 " + (active ? "text-white" : "text-slate-400 group-hover:text-slate-600")} />
+                {c(`tab_${tk}`)}
+              </button>
+            );
+          })}
         </nav>
 
         <div className="min-w-0 flex-1 space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -374,16 +388,19 @@ export function CompanyDetail({
 
               {/* Proxy — assigned from the shared pool */}
               <Section title={c("proxy")}>
-                <p className="text-xs text-slate-400">{c("proxyPoolHint")}</p>
-                <select value={proxyId} onChange={(e) => setProxyId(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900">
-                  <option value="">{c("proxyNone")}</option>
-                  {proxies.map((p) => (
-                    <option key={p.id} value={p.id} disabled={p.free <= 0 && String(p.id) !== proxyId}>
-                      {p.label} ({p.used}/{p.capacity})
-                    </option>
-                  ))}
-                </select>
+                <p className="mb-2 text-xs text-slate-400">{c("proxyPoolHint")}</p>
+                <Select
+                  value={proxyId}
+                  onChange={setProxyId}
+                  options={[
+                    { value: "", label: c("proxyNone") },
+                    ...proxies.map((p) => ({
+                      value: String(p.id),
+                      label: `${p.label} (${p.used}/${p.capacity})`,
+                      disabled: p.free <= 0 && String(p.id) !== proxyId,
+                    })),
+                  ]}
+                />
               </Section>
 
               {/* Session controls */}
@@ -398,10 +415,9 @@ export function CompanyDetail({
                 </div>
               </Section>
 
-              <div className="flex justify-between">
-                <Button variant="secondary" onClick={() => setConfirm("disable")} disabled={busy || status === "disabled"}>
-                  <Ban className="h-4 w-4" /> {c("disable")}
-                </Button>
+              {/* Enable/disable lives in the status toggle at the top of the panel,
+                  so no separate disable button here. */}
+              <div className="flex justify-end">
                 <Button onClick={saveInfo} disabled={busy}>
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {c("save")}

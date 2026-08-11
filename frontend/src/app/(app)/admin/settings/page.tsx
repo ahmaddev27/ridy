@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
+import { Select } from "@/components/ui/select";
 import { useI18n } from "@/lib/i18n/context";
 import { getSettings, updateSettings, sendTestEmail, type PlatformSettings } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";
@@ -154,15 +155,16 @@ export default function SettingsPage() {
               />
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">{c("encryption")}</label>
-                <select
+                <Select
                   value={encryption}
-                  onChange={(e) => setEncryption(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
-                >
-                  <option value="tls">TLS</option>
-                  <option value="ssl">SSL</option>
-                  <option value="none">{c("none")}</option>
-                </select>
+                  onChange={setEncryption}
+                  searchable={false}
+                  options={[
+                    { value: "tls", label: "TLS" },
+                    { value: "ssl", label: "SSL" },
+                    { value: "none", label: c("none") },
+                  ]}
+                />
               </div>
             </>
           ) : (
