@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
-import { listOffersPaged, type DispatchOffer, type PageMeta } from "@/lib/api/offers";
+import { listOffersPaged, getOfferStats, type DispatchOffer, type PageMeta, type OfferStats } from "@/lib/api/offers";
+import { StatCard } from "@/components/ui/card";
 import { listDrivers, type Driver } from "@/lib/api/drivers";
 import { OfferDetailModal } from "./offer-detail-modal";
 
@@ -31,6 +32,7 @@ export default function OffersPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [meta, setMeta] = useState<PageMeta | null>(null);
+  const [stats, setStats] = useState<OfferStats | null>(null);
 
   // A silent load (background poll) refreshes the feed in place: it keeps the
   // skeleton hidden and preserves the manager's current checkbox selection, so
@@ -51,6 +53,14 @@ export default function OffersPage() {
       });
       setOffers(items);
       setMeta(m);
+      getOfferStats({
+        search: search.trim(),
+        driverUuids: driverUuids.length ? driverUuids : undefined,
+        from: from || undefined,
+        to: to || undefined,
+      })
+        .then(setStats)
+        .catch(() => {});
     } catch (e) {
       if (!silent) setError(e instanceof Error ? e.message : "error");
     } finally {
@@ -216,6 +226,17 @@ export default function OffersPage() {
         )}
 
       </div>
+
+      {/* Stat cards for the current filter */}
+      {stats && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <StatCard label={c("statTotal")} value={stats.total.toLocaleString(locale)} />
+          <StatCard label={c("statAccepted")} value={stats.accepted.toLocaleString(locale)} tone="positive" />
+          <StatCard label={c("statNotTaken")} value={stats.declined.toLocaleString(locale)} />
+          <StatCard label={c("statRate")} value={`${stats.acceptance_rate}%`} tone={stats.acceptance_rate >= 50 ? "positive" : "default"} />
+          <StatCard label={c("statEarnings")} value={`€${stats.earnings.toFixed(2)}`} tone="positive" />
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">

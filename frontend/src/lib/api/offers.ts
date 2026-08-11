@@ -65,6 +65,31 @@ export async function listOffersPaged(params?: {
   return { items: res.data, meta: res.meta };
 }
 
+export type OfferStats = {
+  total: number;
+  accepted: number;
+  declined: number;
+  acceptance_rate: number;
+  earnings: number;
+};
+
+/** Aggregates for the current filter set (powers the offers stat cards). */
+export async function getOfferStats(params?: {
+  search?: string;
+  driverUuids?: string[];
+  from?: string;
+  to?: string;
+}): Promise<OfferStats> {
+  const q = new URLSearchParams();
+  if (params?.search) q.set("search", params.search);
+  for (const uuid of params?.driverUuids ?? []) q.append("driver_uuids[]", uuid);
+  if (params?.from) q.set("from", params.from);
+  if (params?.to) q.set("to", params.to);
+  const qs = q.toString();
+  const res = await apiFetch<{ data: OfferStats }>(`/api/v1/dispatch/offers/stats${qs ? `?${qs}` : ""}`);
+  return res.data;
+}
+
 export async function listOffers(params?: {
   search?: string;
   driverUuid?: string;
