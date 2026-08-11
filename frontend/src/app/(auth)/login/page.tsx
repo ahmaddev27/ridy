@@ -76,7 +76,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <Logo size={56} className="text-slate-900" />
+          <Logo size={72} className="text-slate-900" />
           <div className="leading-tight">
             <div className="text-lg font-bold text-slate-900">Reidey</div>
             <div className="text-xs text-slate-400">Fleet Management</div>
