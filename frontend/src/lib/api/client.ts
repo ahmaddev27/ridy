@@ -66,3 +66,10 @@ export async function apiFetch<T>(
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
+
+/** Fetch a file (e.g. a CSV export) as a Blob, carrying the session cookie. */
+export async function apiDownload(path: string): Promise<Blob> {
+  const response = await fetch(`${API_URL}${path}`, { credentials: "include" });
+  if (!response.ok) throw new ApiError(response.status, response.statusText);
+  return response.blob();
+}

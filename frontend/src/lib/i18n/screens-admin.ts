@@ -5,6 +5,20 @@ type Dict = Record<string, unknown>;
 const en: Dict = {
   banned: { reactivate: "Reactivate", reactivated: "Company reactivated", failed: "Action failed", emptyTitle: "No banned companies", emptyDesc: "Companies locked out will appear here.", colCompany: "Company", colOwner: "Owner", colPhone: "Phone" },
   proxies: { add: "Add proxy", edit: "Edit proxy", delete: "Delete", cancel: "Cancel", save: "Save", saved: "Proxy saved", failed: "Action failed", deleted: "Proxy deleted", deleteConfirm: "Delete proxy {label}? Assigned companies fall back to the global proxy.", nearFull: "Near full", emptyTitle: "No proxies", emptyDesc: "Add a residential proxy so new companies get assigned automatically.", colLabel: "Label", colUrl: "URL", colUsage: "Usage", fieldLabel: "Label", fieldUrl: "Proxy URL", fieldCapacity: "Capacity (companies)", fieldNotes: "Notes" },
+  collectors: {
+    add: "Add collector", edit: "Edit collector", delete: "Delete", cancel: "Cancel", save: "Save", saved: "Saved", failed: "Action failed", deleted: "Deleted",
+    deleteConfirm: "Delete collector {name}?", hasPayments: "This collector has payments — clear them first.",
+    emptyTitle: "No collectors", emptyDesc: "Add a cash collector to start recording fleet payments.",
+    colName: "Name", colPhone: "Phone", colTotal: "Total collected", colCount: "Payments", colLast: "Last payment",
+    fieldName: "Name", fieldPhone: "Phone", fieldAddress: "Address",
+    ledgerTitle: "Payment ledger", recordPayment: "Record payment", exportExcel: "Export Excel",
+    filterCollector: "All collectors", filterCompany: "All companies", from: "From", to: "To", clearFilters: "Clear",
+    colDate: "Date", colCompany: "Company", colCollector: "Collector", colAmount: "Amount", colNote: "Note",
+    ledgerEmpty: "No payments match.", ledgerSum: "Total", noneShort: "—",
+    fieldCollector: "Collector", fieldCompany: "Company (fleet that paid)", fieldAmount: "Amount", fieldDate: "Payment date", fieldNote: "Note",
+    selectCollector: "— Select collector —", selectCompany: "— Select company —",
+    deletePaymentConfirm: "Delete this payment?", paymentSaved: "Payment recorded", exportFailed: "Export failed",
+  },
   emailTemplates: {
     type_company_registration: "Company registration", type_company_otp: "Company sign-up code", type_password_otp: "Password reset code", type_driver_invite: "Driver invite",
     subject: "Subject", body: "Body", accent: "Accent color", logo: "Logo", logoAuto: "Reidey logo (automatic)", footer: "Footer",
@@ -107,6 +121,20 @@ const en: Dict = {
 const de: Dict = {
   banned: { reactivate: "Reaktivieren", reactivated: "Firma reaktiviert", failed: "Aktion fehlgeschlagen", emptyTitle: "Keine gesperrten Firmen", emptyDesc: "Gesperrte Firmen erscheinen hier.", colCompany: "Firma", colOwner: "Inhaber", colPhone: "Telefon" },
   proxies: { add: "Proxy hinzufügen", edit: "Proxy bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", saved: "Proxy gespeichert", failed: "Aktion fehlgeschlagen", deleted: "Proxy gelöscht", deleteConfirm: "Proxy {label} löschen? Zugewiesene Firmen nutzen den globalen Proxy.", nearFull: "Fast voll", emptyTitle: "Keine Proxys", emptyDesc: "Füge einen Residential-Proxy hinzu, damit neue Firmen automatisch zugewiesen werden.", colLabel: "Label", colUrl: "URL", colUsage: "Auslastung", fieldLabel: "Label", fieldUrl: "Proxy-URL", fieldCapacity: "Kapazität (Firmen)", fieldNotes: "Notizen" },
+  collectors: {
+    add: "Inkasso hinzufügen", edit: "Inkasso bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", saved: "Gespeichert", failed: "Aktion fehlgeschlagen", deleted: "Gelöscht",
+    deleteConfirm: "Inkassostelle {name} löschen?", hasPayments: "Diese Inkassostelle hat Zahlungen — zuerst löschen.",
+    emptyTitle: "Keine Inkassostellen", emptyDesc: "Füge eine Inkassostelle hinzu, um Zahlungen zu erfassen.",
+    colName: "Name", colPhone: "Telefon", colTotal: "Gesamt eingenommen", colCount: "Zahlungen", colLast: "Letzte Zahlung",
+    fieldName: "Name", fieldPhone: "Telefon", fieldAddress: "Adresse",
+    ledgerTitle: "Zahlungsbuch", recordPayment: "Zahlung erfassen", exportExcel: "Excel exportieren",
+    filterCollector: "Alle Inkassostellen", filterCompany: "Alle Firmen", from: "Von", to: "Bis", clearFilters: "Zurücksetzen",
+    colDate: "Datum", colCompany: "Firma", colCollector: "Inkasso", colAmount: "Betrag", colNote: "Notiz",
+    ledgerEmpty: "Keine passenden Zahlungen.", ledgerSum: "Summe", noneShort: "—",
+    fieldCollector: "Inkasso", fieldCompany: "Firma (die gezahlt hat)", fieldAmount: "Betrag", fieldDate: "Zahlungsdatum", fieldNote: "Notiz",
+    selectCollector: "— Inkasso wählen —", selectCompany: "— Firma wählen —",
+    deletePaymentConfirm: "Diese Zahlung löschen?", paymentSaved: "Zahlung erfasst", exportFailed: "Export fehlgeschlagen",
+  },
   emailTemplates: {
     type_company_registration: "Firmenregistrierung", type_company_otp: "Firmen-Anmeldecode", type_password_otp: "Passwort-Reset-Code", type_driver_invite: "Fahrer-Einladung",
     subject: "Betreff", body: "Inhalt", accent: "Akzentfarbe", logo: "Logo", logoAuto: "Reidey-Logo (automatisch)", footer: "Fußzeile",
@@ -207,6 +235,20 @@ const de: Dict = {
 const ar: Dict = {
   banned: { reactivate: "إعادة تفعيل", reactivated: "تمت إعادة تفعيل الشركة", failed: "فشل الإجراء", emptyTitle: "لا شركات محظورة", emptyDesc: "الشركات المحظورة تظهر هنا.", colCompany: "الشركة", colOwner: "المالك", colPhone: "الجوال" },
   proxies: { add: "إضافة بروكسي", edit: "تعديل البروكسي", delete: "حذف", cancel: "إلغاء", save: "حفظ", saved: "تم حفظ البروكسي", failed: "فشل الإجراء", deleted: "تم حذف البروكسي", deleteConfirm: "حذف البروكسي {label}؟ الشركات المرتبطة ترجع للبروكسي العام.", nearFull: "قربت تمتلئ", emptyTitle: "لا بروكسيات", emptyDesc: "أضف بروكسي سكني عشان الشركات الجديدة تتوزّع تلقائياً.", colLabel: "الاسم", colUrl: "الرابط", colUsage: "الاستخدام", fieldLabel: "الاسم", fieldUrl: "رابط البروكسي", fieldCapacity: "السعة (شركات)", fieldNotes: "ملاحظات" },
+  collectors: {
+    add: "إضافة محصّل", edit: "تعديل المحصّل", delete: "حذف", cancel: "إلغاء", save: "حفظ", saved: "تم الحفظ", failed: "فشل الإجراء", deleted: "تم الحذف",
+    deleteConfirm: "حذف المحصّل {name}؟", hasPayments: "هذا المحصّل عليه دفعات — احذف الدفعات أولاً.",
+    emptyTitle: "لا محصّلين", emptyDesc: "أضف محصّل كاش عشان تبلّش تسجّل دفعات الشركات.",
+    colName: "الاسم", colPhone: "الجوال", colTotal: "إجمالي المحصّل", colCount: "الدفعات", colLast: "آخر دفعة",
+    fieldName: "الاسم", fieldPhone: "الجوال", fieldAddress: "العنوان",
+    ledgerTitle: "سجلّ الدفعات", recordPayment: "تسجيل دفعة", exportExcel: "تصدير Excel",
+    filterCollector: "كل المحصّلين", filterCompany: "كل الشركات", from: "من", to: "إلى", clearFilters: "مسح",
+    colDate: "التاريخ", colCompany: "الشركة", colCollector: "المحصّل", colAmount: "المبلغ", colNote: "ملاحظة",
+    ledgerEmpty: "ما في دفعات مطابقة.", ledgerSum: "الإجمالي", noneShort: "—",
+    fieldCollector: "المحصّل", fieldCompany: "الشركة (الفليت الي دفع)", fieldAmount: "المبلغ", fieldDate: "تاريخ الدفعة", fieldNote: "ملاحظة",
+    selectCollector: "— اختر المحصّل —", selectCompany: "— اختر الشركة —",
+    deletePaymentConfirm: "حذف هالدفعة؟", paymentSaved: "تم تسجيل الدفعة", exportFailed: "فشل التصدير",
+  },
   emailTemplates: {
     type_company_registration: "تسجيل شركة", type_company_otp: "رمز تسجيل الشركة", type_password_otp: "رمز استعادة كلمة المرور", type_driver_invite: "دعوة سائق",
     subject: "العنوان", body: "النص", accent: "لون التمييز", logo: "الشعار", logoAuto: "شعار Reidey (تلقائي)", footer: "التذييل",

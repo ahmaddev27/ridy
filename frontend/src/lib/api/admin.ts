@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { apiFetch, apiDownload } from "./client";
 
 export type Company = {
   id: number;
@@ -255,6 +255,90 @@ export async function updateProxy(id: number, input: ProxyInput): Promise<Proxy>
 
 export async function deleteProxy(id: number): Promise<void> {
   await apiFetch(`${proxyBase}/${id}`, { method: "DELETE", withCsrf: true });
+}
+
+// ── Cash collectors + payment ledger ─────────────────────────────────────────
+export type Collector = {
+  id: number;
+  name: string;
+  phone: string | null;
+  address: string | null;
+  payments_count: number;
+  total_collected: number;
+  last_paid_on: string | null;
+};
+
+export type CollectorInput = { name: string; phone?: string; address?: string };
+
+export type CollectorPayment = {
+  id: number;
+  collector_id: number;
+  collector_name: string | null;
+  tenant_id: number;
+  company_name: string | null;
+  amount: number;
+  paid_on: string;
+  note: string | null;
+};
+
+export type PaymentFilters = { collector_id?: number; tenant_id?: number; from?: string; to?: string; page?: number };
+
+const collectorBase = "/api/v1/admin/collectors";
+const paymentBase = "/api/v1/admin/collector-payments";
+
+export async function listCollectors(): Promise<Collector[]> {
+  const res = await apiFetch<{ data: Collector[] }>(collectorBase);
+  return res.data;
+}
+
+export async function createCollector(input: CollectorInput): Promise<Collector> {
+  const res = await apiFetch<{ data: Collector }>(collectorBase, { method: "POST", body: input, withCsrf: true });
+  return res.data;
+}
+
+export async function updateCollector(id: number, input: CollectorInput): Promise<Collector> {
+  const res = await apiFetch<{ data: Collector }>(`${collectorBase}/${id}`, { method: "PUT", body: input, withCsrf: true });
+  return res.data;
+}
+
+export async function deleteCollector(id: number): Promise<void> {
+  await apiFetch(`${collectorBase}/${id}`, { method: "DELETE", withCsrf: true });
+}
+
+function paymentQuery(f: PaymentFilters): string {
+  const p = new URLSearchParams();
+  if (f.collector_id) p.set("collector_id", String(f.collector_id));
+  if (f.tenant_id) p.set("tenant_id", String(f.tenant_id));
+  if (f.from) p.set("from", f.from);
+  if (f.to) p.set("to", f.to);
+  if (f.page) p.set("page", String(f.page));
+  const qs = p.toString();
+  return qs ? `?${qs}` : "";
+}
+
+export async function listCollectorPayments(
+  f: PaymentFilters = {},
+): Promise<{ data: CollectorPayment[]; meta: { current_page: number; last_page: number; total: number; sum: number } }> {
+  return apiFetch(`${paymentBase}${paymentQuery(f)}`);
+}
+
+export async function createCollectorPayment(input: {
+  collector_id: number;
+  tenant_id: number;
+  amount: number;
+  paid_on: string;
+  note?: string;
+}): Promise<CollectorPayment> {
+  const res = await apiFetch<{ data: CollectorPayment }>(paymentBase, { method: "POST", body: input, withCsrf: true });
+  return res.data;
+}
+
+export async function deleteCollectorPayment(id: number): Promise<void> {
+  await apiFetch(`${paymentBase}/${id}`, { method: "DELETE", withCsrf: true });
+}
+
+export async function exportCollectorPayments(f: PaymentFilters = {}): Promise<Blob> {
+  return apiDownload(`${paymentBase}/export${paymentQuery(f)}`);
 }
 
 /** Toggle a company between active and disabled (reversible, keeps all data). */
