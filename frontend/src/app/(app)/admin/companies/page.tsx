@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Building2, Search, Trash2, ChevronLeft, ChevronRight, MailCheck, Power, PowerOff } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -11,7 +12,6 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { listCompanies, deleteCompany, setCompanyActive, type Company } from "@/lib/api/admin";
-import { CompanyDetailModal } from "./company-detail-modal";
 
 type Filter = "all" | "linked" | "proxy" | "expired" | "banned";
 
@@ -23,11 +23,11 @@ const sessionTone: Record<string, Status> = {
 
 export default function CompaniesPage() {
   const { t, locale } = useI18n();
+  const router = useRouter();
   const c = (k: string) => t(`screens.companies.${k}`);
   const { data, loading, error, refetch } = useAsync(listCompanies, { refetchInterval: 15000 });
   const all = data ?? [];
 
-  const [selected, setSelected] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [page, setPage] = useState(1);
@@ -172,7 +172,7 @@ export default function CompaniesPage() {
                 {companies.map((co) => (
                   <tr
                     key={co.id}
-                    onClick={() => setSelected(co.id)}
+                    onClick={() => router.push(`/admin/companies/${co.id}`)}
                     className="cursor-pointer hover:bg-slate-50"
                   >
                     <td className="px-4 py-3">
@@ -277,13 +277,6 @@ export default function CompaniesPage() {
         )}
       </Card>
 
-      {selected !== null && (
-        <CompanyDetailModal
-          id={selected}
-          onClose={() => setSelected(null)}
-          onChanged={refetch}
-        />
-      )}
 
       <ConfirmModal
         open={confirmDel !== null}
