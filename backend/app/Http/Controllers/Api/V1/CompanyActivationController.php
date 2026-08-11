@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Billing\Models\SubscriptionPeriod;
 use App\Domain\Tenancy\ProxyPool;
 use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Http\Controllers\Controller;
@@ -57,16 +58,28 @@ class CompanyActivationController extends Controller
             throw ValidationException::withMessages(['code' => 'otp_incorrect']);
         }
 
+        $days = (int) $tenant->activation_days;
+        $startsAt = CarbonImmutable::now();
+        $endsAt = $startsAt->addDays($days);
+
         $tenant->forceFill([
             'status' => 'active',
             'banned_at' => null,
-            'activated_at' => CarbonImmutable::now(),
-            'subscription_ends_at' => CarbonImmutable::now()->addDays((int) $tenant->activation_days),
+            'activated_at' => $startsAt,
+            'subscription_ends_at' => $endsAt,
             'activation_code' => null,
             'activation_code_expires_at' => null,
             'activation_days' => null,
             'activation_attempts' => 0,
         ])->save();
+
+        // Record the paid period as an invoice for billing reports.
+        SubscriptionPeriod::create([
+            'tenant_id' => $tenant->id,
+            'days' => $days,
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+        ]);
 
         // Now that it's active, place it on a proxy from the pool.
         app(ProxyPool::class)->assign($tenant);
