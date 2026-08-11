@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
-import { X, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ban, Ticket, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ban, Ticket, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,15 +31,14 @@ import {
   type CompanyVehicleRow,
 } from "@/lib/api/admin";
 
-/** Super-admin company detail: edit, proxy, users, session controls. */
-export function CompanyDetailModal({
+/** Super-admin company detail as a full page: edit, proxy, users, session,
+ *  subscription controls, plus drivers/offers/vehicles tabs. */
+export function CompanyDetail({
   id,
-  onClose,
-  onChanged,
+  onChanged = () => {},
 }: {
   id: number;
-  onClose: () => void;
-  onChanged: () => void;
+  onChanged?: () => void;
 }) {
   const { t } = useI18n();
   const c = (k: string) => t(`screens.companies.${k}`);
@@ -83,10 +83,7 @@ export function CompanyDetailModal({
   }
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
     load();
-    return () => document.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -201,38 +198,38 @@ export function CompanyDetailModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white text-start shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-slate-100 p-5">
-          <h2 className="text-lg font-semibold text-slate-900">{company?.name ?? c("company")}</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <div className="mx-auto w-full max-w-5xl text-start">
+      {/* Header with back link */}
+      <div className="mb-5 flex items-center gap-3">
+        <Link href="/admin/companies" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+          <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
+        </Link>
+        <h1 className="text-xl font-bold text-slate-900">{company?.name ?? c("company")}</h1>
+        {company?.state !== undefined && company?.state !== null && (
+          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+            {c(`sub_${company.state}`)}
+          </span>
+        )}
+      </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 border-b border-slate-100 px-4">
+      {/* Side tabs (start side = right in RTL, left in LTR) + content */}
+      <div className="flex flex-col gap-4 md:flex-row">
+        <nav className="flex gap-1 overflow-x-auto md:w-48 md:flex-col md:gap-0.5">
           {(["details", "drivers", "offers", "vehicles"] as const).map((tk) => (
             <button
               key={tk}
               onClick={() => setTab(tk)}
               className={
-                "border-b-2 px-3 py-2.5 text-sm font-medium transition-colors " +
-                (tab === tk ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-700")
+                "whitespace-nowrap rounded-lg px-3 py-2 text-start text-sm font-medium transition-colors " +
+                (tab === tk ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100")
               }
             >
               {c(`tab_${tk}`)}
             </button>
           ))}
-        </div>
+        </nav>
 
-        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-5">
+        <div className="min-w-0 flex-1 space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           {error ? (
             <div className="text-sm text-rose-600">{error}</div>
           ) : !company ? (
