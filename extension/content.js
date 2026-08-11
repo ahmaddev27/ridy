@@ -7,9 +7,15 @@
   let done = false;
 
   function findOrgUuid() {
+    // The fleet org uuid is right there in the supplier URL: /orgs/<uuid>/… —
+    // the most reliable source. Fall back to scraping the (SPA) HTML.
+    const fromUrl = location.href.match(/\/orgs\/([0-9a-f-]{36})/i);
+    if (fromUrl) return fromUrl[1];
+
     const html = document.documentElement.innerHTML;
     const m =
       html.match(/CustomerGatewayUser:([0-9a-f-]{36})/i) ||
+      html.match(/"orgUuid"\s*:\s*"([0-9a-f-]{36})"/i) ||
       html.match(/"uuid":"([0-9a-f-]{36})"/i);
     return m ? m[1] : null;
   }
