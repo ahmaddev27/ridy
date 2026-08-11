@@ -175,6 +175,34 @@ export async function reactivateCompany(id: number): Promise<void> {
   await apiFetch(`${base}/${id}/reactivate`, { method: "POST", withCsrf: true });
 }
 
+// ── Per-company drill-down (admin detail tabs) ───────────────────────────────
+export type CompanyDriverRow = {
+  id: number; name: string; online: boolean; online_status: string | null;
+  uber_linked: boolean; rating: number | null; total_trips: number | null;
+};
+export type CompanyOfferRow = {
+  id: number; received_at: string | null; driver_name: string | null;
+  pickup_address: string | null; dropoff_address: string | null;
+  fare_formatted: string | null; accepted: boolean;
+};
+export type CompanyVehicleRow = {
+  id: number; make: string | null; model: string | null; year: number | null;
+  license_plate: string | null; color: string | null; compliance_status: string | null;
+};
+
+export async function getCompanyDrivers(id: number): Promise<CompanyDriverRow[]> {
+  const res = await apiFetch<{ data: CompanyDriverRow[] }>(`${base}/${id}/drivers`);
+  return res.data;
+}
+export async function getCompanyOffers(id: number): Promise<CompanyOfferRow[]> {
+  const res = await apiFetch<{ data: CompanyOfferRow[] }>(`${base}/${id}/offers`);
+  return res.data;
+}
+export async function getCompanyVehicles(id: number): Promise<CompanyVehicleRow[]> {
+  const res = await apiFetch<{ data: CompanyVehicleRow[] }>(`${base}/${id}/vehicles`);
+  return res.data;
+}
+
 // ── Proxy pool ──────────────────────────────────────────────────────────────
 export type Proxy = {
   id: number;
