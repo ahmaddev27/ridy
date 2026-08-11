@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Tenancy\ProxyPool;
 use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -66,6 +67,9 @@ class CompanyActivationController extends Controller
             'activation_days' => null,
             'activation_attempts' => 0,
         ])->save();
+
+        // Now that it's active, place it on a proxy from the pool.
+        app(ProxyPool::class)->assign($tenant);
 
         return response()->json(['data' => ['activated' => true]]);
     }

@@ -6,6 +6,7 @@ use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
+use App\Domain\Tenancy\ProxyPool;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Admin\StoreCompanyRequest;
 use App\Http\Requests\Api\V1\Admin\UpdateCompanyRequest;
@@ -76,6 +77,11 @@ class CompanyController extends Controller
             return $tenant;
         });
 
+        // Auto-assign a pool proxy when the admin didn't set one explicitly.
+        if (empty($data['proxy_url']) && $tenant->isUsable()) {
+            app(ProxyPool::class)->assign($tenant);
+        }
+
         return response()->json(['data' => $this->detail($tenant)], 201);
     }
 
@@ -95,6 +101,12 @@ class CompanyController extends Controller
         }
         unset($data['proxy_url']);
         $tenant->fill($data)->save();
+
+        // Re-enabling a company (or extending its subscription) should place it back
+        // on a pool proxy if it has none.
+        if ($tenant->isUsable() && $tenant->proxy_id === null && blank($tenant->proxy_url)) {
+            app(ProxyPool::class)->assign($tenant);
+        }
 
         return response()->json(['data' => $this->detail($tenant->fresh())]);
     }

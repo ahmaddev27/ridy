@@ -4,6 +4,7 @@ type Dict = Record<string, unknown>;
 
 const en: Dict = {
   banned: { reactivate: "Reactivate", reactivated: "Company reactivated", failed: "Action failed", emptyTitle: "No banned companies", emptyDesc: "Companies locked out will appear here.", colCompany: "Company", colOwner: "Owner", colPhone: "Phone" },
+  proxies: { add: "Add proxy", edit: "Edit proxy", delete: "Delete", cancel: "Cancel", save: "Save", saved: "Proxy saved", failed: "Action failed", deleted: "Proxy deleted", deleteConfirm: "Delete proxy {label}? Assigned companies fall back to the global proxy.", nearFull: "Near full", emptyTitle: "No proxies", emptyDesc: "Add a residential proxy so new companies get assigned automatically.", colLabel: "Label", colUrl: "URL", colUsage: "Usage", fieldLabel: "Label", fieldUrl: "Proxy URL", fieldCapacity: "Capacity (companies)", fieldNotes: "Notes" },
   emailTemplates: {
     type_company_registration: "Company registration", type_company_otp: "Company sign-up code", type_password_otp: "Password reset code", type_driver_invite: "Driver invite",
     subject: "Subject", body: "Body", accent: "Accent color", logo: "Logo", logoAuto: "Reidey logo (automatic)", footer: "Footer",
@@ -104,6 +105,7 @@ const en: Dict = {
 
 const de: Dict = {
   banned: { reactivate: "Reaktivieren", reactivated: "Firma reaktiviert", failed: "Aktion fehlgeschlagen", emptyTitle: "Keine gesperrten Firmen", emptyDesc: "Gesperrte Firmen erscheinen hier.", colCompany: "Firma", colOwner: "Inhaber", colPhone: "Telefon" },
+  proxies: { add: "Proxy hinzufügen", edit: "Proxy bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", saved: "Proxy gespeichert", failed: "Aktion fehlgeschlagen", deleted: "Proxy gelöscht", deleteConfirm: "Proxy {label} löschen? Zugewiesene Firmen nutzen den globalen Proxy.", nearFull: "Fast voll", emptyTitle: "Keine Proxys", emptyDesc: "Füge einen Residential-Proxy hinzu, damit neue Firmen automatisch zugewiesen werden.", colLabel: "Label", colUrl: "URL", colUsage: "Auslastung", fieldLabel: "Label", fieldUrl: "Proxy-URL", fieldCapacity: "Kapazität (Firmen)", fieldNotes: "Notizen" },
   emailTemplates: {
     type_company_registration: "Firmenregistrierung", type_company_otp: "Firmen-Anmeldecode", type_password_otp: "Passwort-Reset-Code", type_driver_invite: "Fahrer-Einladung",
     subject: "Betreff", body: "Inhalt", accent: "Akzentfarbe", logo: "Logo", logoAuto: "Reidey-Logo (automatisch)", footer: "Fußzeile",
@@ -202,6 +204,7 @@ const de: Dict = {
 
 const ar: Dict = {
   banned: { reactivate: "إعادة تفعيل", reactivated: "تمت إعادة تفعيل الشركة", failed: "فشل الإجراء", emptyTitle: "لا شركات محظورة", emptyDesc: "الشركات المحظورة تظهر هنا.", colCompany: "الشركة", colOwner: "المالك", colPhone: "الجوال" },
+  proxies: { add: "إضافة بروكسي", edit: "تعديل البروكسي", delete: "حذف", cancel: "إلغاء", save: "حفظ", saved: "تم حفظ البروكسي", failed: "فشل الإجراء", deleted: "تم حذف البروكسي", deleteConfirm: "حذف البروكسي {label}؟ الشركات المرتبطة ترجع للبروكسي العام.", nearFull: "قربت تمتلئ", emptyTitle: "لا بروكسيات", emptyDesc: "أضف بروكسي سكني عشان الشركات الجديدة تتوزّع تلقائياً.", colLabel: "الاسم", colUrl: "الرابط", colUsage: "الاستخدام", fieldLabel: "الاسم", fieldUrl: "رابط البروكسي", fieldCapacity: "السعة (شركات)", fieldNotes: "ملاحظات" },
   emailTemplates: {
     type_company_registration: "تسجيل شركة", type_company_otp: "رمز تسجيل الشركة", type_password_otp: "رمز استعادة كلمة المرور", type_driver_invite: "دعوة سائق",
     subject: "العنوان", body: "النص", accent: "لون التمييز", logo: "الشعار", logoAuto: "شعار Reidey (تلقائي)", footer: "التذييل",
