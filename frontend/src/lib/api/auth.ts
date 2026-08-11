@@ -32,6 +32,7 @@ export async function updateProfile(input: {
   name?: string;
   email?: string;
   password?: string;
+  password_confirmation?: string;
 }): Promise<AuthUser> {
   const res = await apiFetch<{ data: AuthUser }>("/api/v1/profile", {
     method: "PUT",

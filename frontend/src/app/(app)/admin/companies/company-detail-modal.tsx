@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ban, Ticket, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ban, Ticket, ShieldCheck, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -565,6 +565,13 @@ function CompanyOffersTab({ id }: { id: number }) {
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set([new Date().toDateString()]));
+  const toggleDay = (k: string) =>
+    setOpenDays((s) => {
+      const n = new Set(s);
+      n.has(k) ? n.delete(k) : n.add(k);
+      return n;
+    });
 
   useEffect(() => {
     let alive = true;
@@ -604,35 +611,44 @@ function CompanyOffersTab({ id }: { id: number }) {
 
   return (
     <div className="space-y-4">
-      {groups.map(([day, dayOffers]) => (
-        <div key={day}>
-          <div className="mb-1 flex items-center gap-2">
-            <h4 className="text-sm font-semibold text-slate-700">
-              {day === new Date().toDateString() ? c("today") : day === "—" ? "—" : new Date(day).toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" })}
-            </h4>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{dayOffers.length}</span>
+      {groups.map(([day, dayOffers]) => {
+        const open = openDays.has(day);
+        return (
+          <div key={day} className="overflow-hidden rounded-lg border border-slate-100">
+            <button
+              onClick={() => toggleDay(day)}
+              className="flex w-full items-center gap-2 bg-slate-50 px-4 py-2.5 text-start hover:bg-slate-100"
+            >
+              <ChevronDown className={`h-4 w-4 text-slate-400 transition ${open ? "" : "-rotate-90"}`} />
+              <span className="font-semibold text-slate-800">
+                {day === new Date().toDateString() ? c("today") : day === "—" ? "—" : new Date(day).toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" })}
+              </span>
+              <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-600">{dayOffers.length}</span>
+            </button>
+            {open && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <tbody className="divide-y divide-slate-100">
+                    {dayOffers.map((o) => (
+                      <tr key={o.id}>
+                        <td className="whitespace-nowrap px-4 py-2.5 text-slate-500">
+                          {o.received_at ? new Date(o.received_at).toLocaleTimeString(locale) : "—"}
+                        </td>
+                        <td className="px-4 py-2.5 font-medium text-slate-700">{o.driver_name ?? "—"}</td>
+                        <td className="max-w-[220px] truncate px-4 py-2.5 text-slate-500">{o.pickup_address ?? "—"}</td>
+                        <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-slate-900">{o.fare_formatted ?? "—"}</td>
+                        <td className="px-4 py-2.5">
+                          <Badge status={o.accepted ? "connected" : "neutral"} dot>{o.accepted ? c("accepted") : c("notAccepted")}</Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-          <div className="overflow-x-auto rounded-lg border border-slate-100">
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-slate-100">
-                {dayOffers.map((o) => (
-                  <tr key={o.id}>
-                    <td className="whitespace-nowrap px-3 py-2 text-slate-500">
-                      {o.received_at ? new Date(o.received_at).toLocaleTimeString(locale) : "—"}
-                    </td>
-                    <td className="px-3 py-2 font-medium text-slate-700">{o.driver_name ?? "—"}</td>
-                    <td className="max-w-[200px] truncate px-3 py-2 text-slate-500">{o.pickup_address ?? "—"}</td>
-                    <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-900">{o.fare_formatted ?? "—"}</td>
-                    <td className="px-3 py-2">
-                      <Badge status={o.accepted ? "connected" : "neutral"} dot>{o.accepted ? c("accepted") : c("notAccepted")}</Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ))}
+        );
+      })}
 
       {lastPage > 1 && (
         <div className="flex items-center justify-end gap-2 pt-1 text-sm">
