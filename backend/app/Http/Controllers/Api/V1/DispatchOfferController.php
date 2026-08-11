@@ -8,6 +8,7 @@ use App\Domain\Dispatch\TripGeocoder;
 use App\Domain\Fleet\DriverStatsService;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchOfferResource;
+use App\Support\RidyLog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -79,11 +80,17 @@ class DispatchOfferController extends Controller
         ]);
 
         $tenantId = (int) $request->user()->tenant_id;
-        $results = ['routed' => 0, 'unlinked_driver' => 0, 'duplicate' => 0, 'skipped_no_uuid' => 0];
+        $results = ['routed' => 0, 'unlinked_driver' => 0, 'duplicate' => 0, 'skipped_no_uuid' => 0, 'error' => 0];
 
         foreach ($data['offers'] as $offer) {
-            $outcome = $ingestor->ingest($tenantId, $offer, $data['seq'] ?? null);
-            $results[$outcome['status']] = ($results[$outcome['status']] ?? 0) + 1;
+            try {
+                $outcome = $ingestor->ingest($tenantId, $offer, $data['seq'] ?? null);
+                $results[$outcome['status']] = ($results[$outcome['status']] ?? 0) + 1;
+            } catch (\Throwable $e) {
+                // One malformed/failed offer must never drop the rest of the batch.
+                $results['error']++;
+                RidyLog::event('dispatch_offer.ingest_error', ['error' => $e->getMessage()]);
+            }
         }
 
         return response()->json(['data' => $results]);
