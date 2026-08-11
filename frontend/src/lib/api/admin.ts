@@ -387,3 +387,36 @@ export async function forceRelink(id: number): Promise<void> {
 export async function deleteCompanySession(id: number): Promise<void> {
   await apiFetch(`${base}/${id}/session`, { method: "DELETE", withCsrf: true });
 }
+
+// ── Billing reports ──────────────────────────────────────────────────────────
+export type BillingSummary = {
+  revenue_by_month: { month: string; total: number }[];
+  expiring: { id: number; name: string; ends_at: string | null; days_left: number | null }[];
+  totals: { total_revenue: number; active_subscriptions: number; expiring_soon: number };
+};
+
+export type SubscriptionInvoice = {
+  id: number;
+  tenant_id: number;
+  company_name: string | null;
+  days: number;
+  starts_at: string;
+  ends_at: string;
+};
+
+export async function getBillingSummary(): Promise<BillingSummary> {
+  const res = await apiFetch<{ data: BillingSummary }>("/api/v1/admin/reports/billing-summary");
+  return res.data;
+}
+
+export async function listSubscriptionInvoices(
+  tenantId?: number,
+): Promise<{ data: SubscriptionInvoice[]; meta: { current_page: number; last_page: number; total: number } }> {
+  const qs = tenantId ? `?tenant_id=${tenantId}` : "";
+  return apiFetch(`/api/v1/admin/subscription-invoices${qs}`);
+}
+
+export async function exportSubscriptionInvoices(tenantId?: number): Promise<Blob> {
+  const qs = tenantId ? `?tenant_id=${tenantId}` : "";
+  return apiDownload(`/api/v1/admin/subscription-invoices/export${qs}`);
+}

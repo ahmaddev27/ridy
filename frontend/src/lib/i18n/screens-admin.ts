@@ -19,6 +19,14 @@ const en: Dict = {
     selectCollector: "— Select collector —", selectCompany: "— Select company —",
     deletePaymentConfirm: "Delete this payment?", paymentSaved: "Payment recorded", exportFailed: "Export failed",
   },
+  subscriptions: {
+    totalRevenue: "Total revenue", activeSubs: "Active subscriptions", expiringSoon: "Expiring soon",
+    revenueTitle: "Revenue by month", revenueEmpty: "No payments recorded yet.",
+    expiringTitle: "Expiring subscriptions", expiringEmpty: "Nothing expiring soon.", daysLeft: "{n} days left",
+    invoicesTitle: "Subscription invoices", exportExcel: "Export Excel", filterCompany: "All companies", clearFilters: "Clear",
+    colInvoice: "Invoice", colCompany: "Company", colDays: "Days", colStarts: "Starts", colEnds: "Ends",
+    invoicesEmpty: "No invoices yet.", exportFailed: "Export failed",
+  },
   emailTemplates: {
     type_company_registration: "Company registration", type_company_otp: "Company sign-up code", type_password_otp: "Password reset code", type_driver_invite: "Driver invite",
     subject: "Subject", body: "Body", accent: "Accent color", logo: "Logo", logoAuto: "Reidey logo (automatic)", footer: "Footer",
@@ -135,6 +143,14 @@ const de: Dict = {
     selectCollector: "— Inkasso wählen —", selectCompany: "— Firma wählen —",
     deletePaymentConfirm: "Diese Zahlung löschen?", paymentSaved: "Zahlung erfasst", exportFailed: "Export fehlgeschlagen",
   },
+  subscriptions: {
+    totalRevenue: "Gesamtumsatz", activeSubs: "Aktive Abos", expiringSoon: "Läuft bald ab",
+    revenueTitle: "Umsatz pro Monat", revenueEmpty: "Noch keine Zahlungen erfasst.",
+    expiringTitle: "Auslaufende Abos", expiringEmpty: "Nichts läuft demnächst ab.", daysLeft: "{n} Tage übrig",
+    invoicesTitle: "Abo-Rechnungen", exportExcel: "Excel exportieren", filterCompany: "Alle Firmen", clearFilters: "Zurücksetzen",
+    colInvoice: "Rechnung", colCompany: "Firma", colDays: "Tage", colStarts: "Start", colEnds: "Ende",
+    invoicesEmpty: "Noch keine Rechnungen.", exportFailed: "Export fehlgeschlagen",
+  },
   emailTemplates: {
     type_company_registration: "Firmenregistrierung", type_company_otp: "Firmen-Anmeldecode", type_password_otp: "Passwort-Reset-Code", type_driver_invite: "Fahrer-Einladung",
     subject: "Betreff", body: "Inhalt", accent: "Akzentfarbe", logo: "Logo", logoAuto: "Reidey-Logo (automatisch)", footer: "Fußzeile",
@@ -248,6 +264,14 @@ const ar: Dict = {
     fieldCollector: "المحصّل", fieldCompany: "الشركة (الفليت الي دفع)", fieldAmount: "المبلغ", fieldDate: "تاريخ الدفعة", fieldNote: "ملاحظة",
     selectCollector: "— اختر المحصّل —", selectCompany: "— اختر الشركة —",
     deletePaymentConfirm: "حذف هالدفعة؟", paymentSaved: "تم تسجيل الدفعة", exportFailed: "فشل التصدير",
+  },
+  subscriptions: {
+    totalRevenue: "إجمالي الإيرادات", activeSubs: "اشتراكات نشطة", expiringSoon: "قربت تنتهي",
+    revenueTitle: "الإيرادات شهرياً", revenueEmpty: "ما في دفعات مسجّلة بعد.",
+    expiringTitle: "اشتراكات قربت تنتهي", expiringEmpty: "ما في شي قرب ينتهي.", daysLeft: "باقي {n} يوم",
+    invoicesTitle: "فواتير الاشتراكات", exportExcel: "تصدير Excel", filterCompany: "كل الشركات", clearFilters: "مسح",
+    colInvoice: "الفاتورة", colCompany: "الشركة", colDays: "الأيام", colStarts: "البداية", colEnds: "النهاية",
+    invoicesEmpty: "ما في فواتير بعد.", exportFailed: "فشل التصدير",
   },
   emailTemplates: {
     type_company_registration: "تسجيل شركة", type_company_otp: "رمز تسجيل الشركة", type_password_otp: "رمز استعادة كلمة المرور", type_driver_invite: "دعوة سائق",
