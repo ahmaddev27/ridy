@@ -44,8 +44,10 @@ async function discoverOrgUuid() {
   try {
     const res = await fetch("https://supplier.uber.com/", { credentials: "include", redirect: "follow" });
     const m = res.url.match(/\/orgs\/([0-9a-f-]{36})/i);
+    console.log("[Reidey bg] discoverOrgUuid: supplier ->", res.url, "org:", m ? m[1] : "(none)");
     return m ? m[1] : null;
-  } catch {
+  } catch (e) {
+    console.warn("[Reidey bg] discoverOrgUuid failed:", e.message);
     return null;
   }
 }
@@ -56,6 +58,7 @@ async function capture(orgUuid, orgName, { manual = false } = {}) {
     return { ok: false, reason: "not_paired" };
   }
 
+  console.log("[Reidey bg] capture start — orgUuid:", orgUuid || "(discover)");
   // When connecting from account.uber.com there's no org uuid on the page —
   // discover it from the supplier redirect using the just-established session.
   if (!orgUuid) {
@@ -66,6 +69,7 @@ async function capture(orgUuid, orgName, { manual = false } = {}) {
   const cookies = await readCookies();
   if (cookies.length === 0) return { ok: false, reason: "no_cookies" };
   const supplierCookies = await readSupplierCookies();
+  console.log("[Reidey bg] capture — org:", orgUuid, "ramen cookies:", cookies.length, "supplier cookies:", supplierCookies.length);
 
   // Fold the supplier jar size into the fingerprint so already-linked managers
   // re-sync once after this update (to backfill the supplier cookies), then stay
@@ -432,8 +436,11 @@ async function postOffers(offers, seq) {
 }
 
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg?.type === "capture" && msg.orgUuid) {
-    capture(msg.orgUuid, msg.orgName, { manual: !!msg.manual }).then((res) => {
+  if (msg?.type === "capture") {
+    // orgUuid may be null (account.uber.com) — capture() discovers it in the
+    // background. Do NOT gate on it here, or that whole flow never runs.
+    capture(msg.orgUuid || null, msg.orgName, { manual: !!msg.manual }).then((res) => {
+      console.log("[Reidey bg] capture result:", res);
       sendResponse(res);
       // After a FRESH connect, close the Uber tab we sent the manager to so the
       // flow ends cleanly (open → sign in → "connected" → auto-close). We skip
