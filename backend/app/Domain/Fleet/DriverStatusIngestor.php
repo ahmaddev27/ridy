@@ -40,8 +40,12 @@ class DriverStatusIngestor
                 continue;
             }
 
-            $wasOnTrip = str_contains(strtoupper((string) $driver->online_status), 'ON_TRIP');
-            $isOnTrip = str_contains(strtoupper((string) ($row['status'] ?? '')), 'ON_TRIP');
+            // A driver is "engaged" the moment they accept an offer: EN_ROUTE (on
+            // the way to the rider) comes BEFORE ON_TRIP (rider aboard). Treating
+            // both as engaged catches the acceptance at the earliest signal and
+            // never misses a short trip that flips through EN_ROUTE quickly.
+            $wasEngaged = $this->isEngaged($driver->online_status);
+            $isEngaged = $this->isEngaged($row['status'] ?? '');
 
             $driver->update([
                 'online_status' => $row['status'] ?? null,
@@ -51,12 +55,20 @@ class DriverStatusIngestor
             ]);
             $updated++;
 
-            if ($isOnTrip && ! $wasOnTrip) {
+            if ($isEngaged && ! $wasEngaged) {
                 $accepted += $this->markLastOfferAccepted($tenantId, $uuid);
             }
         }
 
         return ['updated' => $updated, 'accepted' => $accepted];
+    }
+
+    /** True when the driver has accepted a job — heading to the rider or on the trip. */
+    private function isEngaged(?string $status): bool
+    {
+        $s = strtoupper((string) $status);
+
+        return str_contains($s, 'ON_TRIP') || str_contains($s, 'EN_ROUTE');
     }
 
     private function markLastOfferAccepted(int $tenantId, string $driverUuid): int

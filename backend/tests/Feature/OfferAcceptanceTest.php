@@ -66,6 +66,32 @@ class OfferAcceptanceTest extends TestCase
         $this->assertNotNull($offer->fresh()->accepted_at);
     }
 
+    public function test_transition_to_en_route_marks_acceptance_earliest(): void
+    {
+        // EN_ROUTE (heading to the rider) is the first sign of acceptance, before ON_TRIP.
+        $this->driver();
+        $offer = $this->offer();
+
+        $this->postJson('/api/v1/drivers/statuses', [
+            'statuses' => [['driver_uuid' => self::DRIVER_UUID, 'status' => 'MONITORING_SUPPLY_STATUS_EN_ROUTE']],
+        ])->assertOk()->assertJsonPath('data.accepted', 1);
+
+        $this->assertNotNull($offer->fresh()->accepted_at);
+    }
+
+    public function test_en_route_then_on_trip_does_not_double_accept(): void
+    {
+        // Once engaged via EN_ROUTE, flipping to ON_TRIP is the same job — no re-accept.
+        $this->driver()->update(['online_status' => 'MONITORING_SUPPLY_STATUS_EN_ROUTE']);
+        $offer = $this->offer();
+
+        $this->postJson('/api/v1/drivers/statuses', [
+            'statuses' => [['driver_uuid' => self::DRIVER_UUID, 'status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']],
+        ])->assertOk()->assertJsonPath('data.accepted', 0);
+
+        $this->assertNull($offer->fresh()->accepted_at);
+    }
+
     public function test_staying_on_trip_does_not_re_accept(): void
     {
         $this->driver()->update(['online_status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']);
