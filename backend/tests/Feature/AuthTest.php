@@ -23,7 +23,7 @@ class AuthTest extends TestCase
     {
         $this->seed(RolePermissionSeeder::class);
 
-        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE', 'activated_at' => now()]);
         $user = User::create([
             'name' => 'Anna',
             'email' => 'anna@acme.de',

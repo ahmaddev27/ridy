@@ -32,10 +32,11 @@ class Tenant extends Model
 
     /**
      * Why the company is blocked, or null when usable. Precedence: a manual
-     * disable and a ban are terminal; an expired subscription is recoverable by
-     * activation.
+     * disable and a ban are terminal; a never-activated company (fresh signup)
+     * and an expired subscription are both recoverable by entering an activation
+     * code.
      *
-     * @return 'disabled'|'banned'|'expired'|null
+     * @return 'disabled'|'banned'|'inactive'|'expired'|null
      */
     public function stateReason(): ?string
     {
@@ -44,6 +45,10 @@ class Tenant extends Model
         }
         if ($this->banned_at !== null) {
             return 'banned';
+        }
+        // Never activated (a fresh signup) — must enter an admin code to start.
+        if ($this->activated_at === null && $this->subscription_ends_at === null) {
+            return 'inactive';
         }
         if ($this->subscription_ends_at !== null && $this->subscription_ends_at->isPast()) {
             return 'expired';

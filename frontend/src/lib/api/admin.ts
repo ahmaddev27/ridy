@@ -12,7 +12,7 @@ export type Company = {
   driver_count: number;
   offer_count: number;
   email_verified: boolean;
-  state: "disabled" | "banned" | "expired" | null;
+  state: "disabled" | "banned" | "expired" | "inactive" | null;
   activated_at: string | null;
   subscription_ends_at: string | null;
   days_left: number | null;
