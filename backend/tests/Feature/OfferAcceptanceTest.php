@@ -66,6 +66,31 @@ class OfferAcceptanceTest extends TestCase
         $this->assertNotNull($offer->fresh()->accepted_at);
     }
 
+    public function test_engaged_driver_stores_live_coordinates_offline_clears_them(): void
+    {
+        $this->driver();
+
+        // EN_ROUTE with real coordinates + waypoints → stored for the map.
+        $this->postJson('/api/v1/drivers/statuses', [
+            'statuses' => [[
+                'driver_uuid' => self::DRIVER_UUID,
+                'status' => 'MONITORING_SUPPLY_STATUS_EN_ROUTE',
+                'latitude' => 51.335008, 'longitude' => 7.040565, 'heading' => 248.0,
+                'waypoints' => [['lat' => 51.334988, 'lng' => 7.040563, 'type' => 'pickup']],
+            ]],
+        ])->assertOk();
+
+        $live = $this->getJson('/api/v1/drivers/live')->assertOk();
+        $live->assertJsonCount(1, 'data')->assertJsonPath('data.0.lat', 51.335008);
+
+        // Going offline (0,0) clears the location → drops off the map.
+        $this->postJson('/api/v1/drivers/statuses', [
+            'statuses' => [['driver_uuid' => self::DRIVER_UUID, 'status' => 'MONITORING_SUPPLY_STATUS_OFFLINE', 'latitude' => 0, 'longitude' => 0]],
+        ])->assertOk();
+
+        $this->getJson('/api/v1/drivers/live')->assertOk()->assertJsonCount(0, 'data');
+    }
+
     public function test_transition_to_en_route_marks_acceptance_earliest(): void
     {
         // EN_ROUTE (heading to the rider) is the first sign of acceptance, before ON_TRIP.

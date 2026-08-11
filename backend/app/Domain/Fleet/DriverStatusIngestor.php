@@ -47,11 +47,20 @@ class DriverStatusIngestor
             $wasEngaged = $this->isEngaged($driver->online_status);
             $isEngaged = $this->isEngaged($row['status'] ?? '');
 
+            // Uber returns 0,0 for offline/idle drivers, so keep real coordinates
+            // only (null otherwise) — that also drops offline drivers off the map.
+            $lat = $this->coord($row['latitude'] ?? null);
+            $lng = $this->coord($row['longitude'] ?? null);
+
             $driver->update([
                 'online_status' => $row['status'] ?? null,
                 'location_updated_at' => ! empty($row['location_updated_at'])
                     ? CarbonImmutable::createFromTimestampMs($row['location_updated_at']) : null,
                 'status_synced_at' => now(),
+                'latitude' => $lat,
+                'longitude' => $lng,
+                'heading' => $lat !== null ? ($row['heading'] ?? null) : null,
+                'trip_waypoints' => $lat !== null && ! empty($row['waypoints']) ? $row['waypoints'] : null,
             ]);
             $updated++;
 
@@ -61,6 +70,14 @@ class DriverStatusIngestor
         }
 
         return ['updated' => $updated, 'accepted' => $accepted];
+    }
+
+    /** A usable coordinate, or null for the 0,0 Uber returns when there's no live fix. */
+    private function coord(mixed $value): ?float
+    {
+        $n = is_numeric($value) ? (float) $value : 0.0;
+
+        return abs($n) < 0.0001 ? null : $n;
     }
 
     /** True when the driver has accepted a job — heading to the rider or on the trip. */

@@ -24,6 +24,7 @@ class Driver extends Model
         'uber_driver_uuid', 'uber_email', 'uber_link_method',
         'uber_picture_url', 'uber_rating', 'uber_total_trips', 'uber_status', 'roster_synced_at',
         'online_status', 'location_updated_at', 'status_synced_at',
+        'latitude', 'longitude', 'heading', 'trip_waypoints',
     ];
 
     protected $casts = [
@@ -33,6 +34,10 @@ class Driver extends Model
         'roster_synced_at' => 'datetime',
         'location_updated_at' => 'datetime',
         'status_synced_at' => 'datetime',
+        'latitude' => 'decimal:7',
+        'longitude' => 'decimal:7',
+        'heading' => 'decimal:2',
+        'trip_waypoints' => 'array',
     ];
 
     /** True when Uber reports a live status for the driver that isn't an offline one. */
