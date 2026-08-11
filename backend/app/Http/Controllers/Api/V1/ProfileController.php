@@ -22,7 +22,7 @@ class ProfileController extends Controller
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'email' => ['sometimes', 'required', 'email', Rule::unique('users', 'email')->ignore($user->id)],
-            'password' => ['sometimes', 'required', 'string', 'min:8'],
+            'password' => ['sometimes', 'required', 'string', 'min:8', 'confirmed'],
         ]);
 
         if (isset($data['name'])) {
