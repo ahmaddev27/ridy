@@ -109,11 +109,13 @@ export default function ConnectionsPage() {
     setExtBusy(true);
     try {
       await pairExtension();
-      // Send the manager to their familiar Uber account page (not the dispatch
-      // portal). The extension detects the sign-in there, discovers the fleet org
-      // in the background, captures the session, shows "connected" and closes the
-      // tab. All data pulls then run in the background — no scary pages to open.
-      setTimeout(() => window.open("https://account.uber.com/", "_blank"), 500);
+      // Send the manager to the Uber fleet portal (supplier) — their familiar
+      // driver-management site, NOT the technical dispatch stream page. The
+      // browser lands on /orgs/<uuid>/, so the extension reads the fleet org
+      // straight from the URL and captures the session (account.uber.com can't
+      // reveal the org, so we don't use it). It then shows "connected" and closes
+      // the tab; all data pulls run in the background afterwards.
+      setTimeout(() => window.open("https://supplier.uber.com/", "_blank"), 500);
     } catch (e) {
       toast.error(c("loginFailed"), { description: e instanceof Error ? e.message : undefined });
     } finally {
