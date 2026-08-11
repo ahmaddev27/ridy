@@ -20,6 +20,8 @@ class DispatchOfferResource extends JsonResource
             'driver_name' => $this->driver?->name
                 ?? trim(($this->driver_first_name ?? '').' '.($this->driver_last_name ?? '')) ?: null,
             'linked' => $this->driver_id !== null,
+            'accepted' => $this->accepted_at !== null,
+            'accepted_at' => $this->accepted_at?->toIso8601String(),
             'rider_first_name' => $this->rider_first_name,
             'pickup_address' => $this->pickup_address,
             'dropoff_address' => $this->dropoff_address,

@@ -7,6 +7,8 @@ export type DispatchOffer = {
   driver_id: number | null;
   driver_name: string | null;
   linked: boolean;
+  accepted: boolean;
+  accepted_at: string | null;
   rider_first_name: string | null;
   pickup_address: string | null;
   dropoff_address: string | null;
