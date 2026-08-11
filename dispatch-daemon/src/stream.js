@@ -138,10 +138,9 @@ export class RamenStream {
           orgId: { uuid: { value: this.session.uber_org_uuid } },
           driverIds: [],
           filters: { allowedStatuses: [] },
-          responseSelector: {
-            includeStats: false,
-            locationDetailsOptions: { fieldMask: { paths: ["location_updated_time", "driver_status"] } },
-          },
+          // No fieldMask → Uber returns coordinates + course + trip waypoints for
+          // the live map (idle/offline drivers come back as 0,0).
+          responseSelector: { includeStats: true },
         }),
       });
       if (!res.ok) return;
@@ -153,6 +152,12 @@ export class RamenStream {
           driver_uuid: l.driverId?.value,
           status: l.driverStatus ?? null,
           location_updated_at: l.locationUpdatedTime?.value ? Number(l.locationUpdatedTime.value) : null,
+          latitude: typeof l.latitude === "number" ? l.latitude : null,
+          longitude: typeof l.longitude === "number" ? l.longitude : null,
+          heading: typeof l.course === "number" ? l.course : null,
+          waypoints: Array.isArray(l.waypointsLocation)
+            ? l.waypointsLocation.map((w) => ({ lat: w.latitude, lng: w.longitude, type: w.checkpointType }))
+            : null,
         }))
         .filter((s) => s.driver_uuid);
 

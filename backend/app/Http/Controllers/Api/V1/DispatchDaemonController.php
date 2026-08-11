@@ -88,6 +88,10 @@ class DispatchDaemonController extends Controller
             'statuses.*.driver_uuid' => ['required', 'string'],
             'statuses.*.status' => ['nullable', 'string'],
             'statuses.*.location_updated_at' => ['nullable', 'numeric'],
+            'statuses.*.latitude' => ['nullable', 'numeric'],
+            'statuses.*.longitude' => ['nullable', 'numeric'],
+            'statuses.*.heading' => ['nullable', 'numeric'],
+            'statuses.*.waypoints' => ['nullable', 'array'],
         ]);
 
         $tenantId = (int) $this->find($session)->tenant_id;

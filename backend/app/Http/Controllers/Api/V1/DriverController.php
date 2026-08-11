@@ -24,6 +24,32 @@ class DriverController extends Controller
         return DriverResource::collection($drivers);
     }
 
+    /**
+     * Drivers with a live position for the fleet map. Only engaged drivers
+     * (EN_ROUTE / ON_TRIP) have real coordinates — Uber redacts idle/offline
+     * drivers to 0,0, which the ingestor stores as null — so the map naturally
+     * shows only active trips, each with its pickup/dropoff waypoints.
+     */
+    public function live(): JsonResponse
+    {
+        $drivers = Driver::query()
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->get()
+            ->map(fn (Driver $d) => [
+                'id' => $d->id,
+                'name' => $d->name,
+                'status' => $d->online_status,
+                'lat' => (float) $d->latitude,
+                'lng' => (float) $d->longitude,
+                'heading' => $d->heading !== null ? (float) $d->heading : null,
+                'waypoints' => $d->trip_waypoints,
+                'location_updated_at' => $d->location_updated_at,
+            ]);
+
+        return response()->json(['data' => $drivers]);
+    }
+
     /** Work stats for one driver, computed from our own offers/acceptance data. */
     public function stats(Request $request, Driver $driver, DriverStatsService $stats): JsonResponse
     {
@@ -63,6 +89,10 @@ class DriverController extends Controller
             'statuses.*.driver_uuid' => ['required', 'string'],
             'statuses.*.status' => ['nullable', 'string'],
             'statuses.*.location_updated_at' => ['nullable', 'numeric'], // ms epoch
+            'statuses.*.latitude' => ['nullable', 'numeric'],
+            'statuses.*.longitude' => ['nullable', 'numeric'],
+            'statuses.*.heading' => ['nullable', 'numeric'],
+            'statuses.*.waypoints' => ['nullable', 'array'],
         ]);
 
         $result = $ingestor->ingest((int) $request->user()->tenant_id, $data['statuses']);

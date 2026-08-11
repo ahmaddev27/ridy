@@ -384,10 +384,9 @@ async function fetchDriverStatuses(driverUuids) {
         orgId: { uuid: { value: orgUuid } },
         driverIds: ids.map((u) => ({ value: u })),
         filters: { allowedStatuses: [] },
-        responseSelector: {
-          includeStats: false,
-          locationDetailsOptions: { fieldMask: { paths: ["location_updated_time", "driver_status"] } },
-        },
+        // No fieldMask → Uber returns coordinates + course + trip waypoints for
+        // engaged drivers (idle/offline come back as 0,0), powering the live map.
+        responseSelector: { includeStats: true },
       }),
     });
     if (!res.ok) return { ok: false, reason: `supplier_http_${res.status}` };
@@ -402,6 +401,12 @@ async function fetchDriverStatuses(driverUuids) {
     driver_uuid: l.driverId?.value,
     status: l.driverStatus ?? null,
     location_updated_at: l.locationUpdatedTime?.value ? Number(l.locationUpdatedTime.value) : null,
+    latitude: typeof l.latitude === "number" ? l.latitude : null,
+    longitude: typeof l.longitude === "number" ? l.longitude : null,
+    heading: typeof l.course === "number" ? l.course : null,
+    waypoints: Array.isArray(l.waypointsLocation)
+      ? l.waypointsLocation.map((w) => ({ lat: w.latitude, lng: w.longitude, type: w.checkpointType }))
+      : null,
   })).filter((s) => s.driver_uuid);
 
   try {
