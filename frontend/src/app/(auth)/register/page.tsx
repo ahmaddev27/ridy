@@ -21,6 +21,7 @@ export default function RegisterPage() {
   const [step, setStep] = useState<"form" | "otp">("form");
   const [company, setCompany] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -30,7 +31,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      await startRegistration({ company_name: company, name, email, password });
+      await startRegistration({ company_name: company, name, phone, email, password });
       toast.success(r("codeSent"), { description: email });
       setStep("otp");
     } catch (err) {
@@ -82,6 +83,7 @@ export default function RegisterPage() {
               <p className="text-sm text-slate-400">{r("subtitle")}</p>
               <Field label={r("company")} value={company} onChange={setCompany} />
               <Field label={r("name")} value={name} onChange={setName} />
+              <Field label={r("phone")} type="tel" value={phone} onChange={setPhone} />
               <Field label={r("email")} type="email" value={email} onChange={setEmail} />
               <Field label={r("password")} type="password" value={password} onChange={setPassword} />
               <Button type="submit" disabled={busy} className="w-full">

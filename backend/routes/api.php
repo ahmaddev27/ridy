@@ -6,8 +6,10 @@ use App\Http\Controllers\Api\V1\Admin\CompanyUserController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Api\V1\Admin\OverviewController;
 use App\Http\Controllers\Api\V1\Admin\SettingsController;
+use App\Http\Controllers\Api\V1\Admin\SubscriptionController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\CompanyActivationController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DeviceTokenController;
 use App\Http\Controllers\Api\V1\DispatchDaemonController;
@@ -41,6 +43,9 @@ Route::prefix('v1')->group(function () {
     Route::post('password/forgot', [PasswordResetController::class, 'start'])->middleware('throttle:6,1');
     Route::post('password/verify', [PasswordResetController::class, 'verify'])->middleware('throttle:12,1');
     Route::post('password/reset', [PasswordResetController::class, 'reset'])->middleware('throttle:12,1');
+
+    // Company owner enters the admin-generated activation code (3 tries -> ban).
+    Route::post('company/activate', [CompanyActivationController::class, 'activate'])->middleware('throttle:10,1');
 
     // Internal — the dispatch daemon. Authenticated by a shared secret
     // (VerifyDispatchSecret), not a user session.
@@ -136,6 +141,11 @@ Route::prefix('v1')->group(function () {
         Route::get('companies/{tenant}/users', [CompanyUserController::class, 'index']);
         Route::post('companies/{tenant}/users', [CompanyUserController::class, 'store']);
         Route::post('companies/{tenant}/users/{user}/reset-password', [CompanyUserController::class, 'resetPassword']);
+
+        // Subscriptions: generate an activation code, review + lift bans.
+        Route::get('banned-companies', [SubscriptionController::class, 'banned']);
+        Route::post('companies/{tenant}/activation', [SubscriptionController::class, 'generate']);
+        Route::post('companies/{tenant}/reactivate', [SubscriptionController::class, 'reactivate']);
 
         Route::get('companies/{tenant}/session', [CompanySessionController::class, 'show']);
         Route::post('companies/{tenant}/session/relink', [CompanySessionController::class, 'forceRelink']);

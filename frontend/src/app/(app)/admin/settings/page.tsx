@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Save, Mail, Globe } from "lucide-react";
+import { Loader2, Save, Mail, Globe, LifeBuoy } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -24,6 +24,8 @@ export default function SettingsPage() {
   const [fromAddress, setFromAddress] = useState("");
   const [fromName, setFromName] = useState("");
   const [proxy, setProxy] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
+  const [supportWhatsapp, setSupportWhatsapp] = useState("");
 
   async function load() {
     const s = await getSettings();
@@ -34,6 +36,8 @@ export default function SettingsPage() {
     setEncryption(s.smtp_encryption ?? "tls");
     setFromAddress(s.mail_from_address ?? "");
     setFromName(s.mail_from_name ?? "");
+    setSupportEmail(s.support_email ?? "");
+    setSupportWhatsapp(s.support_whatsapp ?? "");
   }
 
   useEffect(() => {
@@ -53,6 +57,19 @@ export default function SettingsPage() {
         ...(password ? { smtp_password: password } : {}),
       });
       setPassword("");
+      toast.success(c("saved"));
+      await load();
+    } catch (e) {
+      toast.error(c("saveFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveSupport() {
+    setBusy(true);
+    try {
+      await updateSettings({ support_email: supportEmail, support_whatsapp: supportWhatsapp });
       toast.success(c("saved"));
       await load();
     } catch (e) {
@@ -114,6 +131,25 @@ export default function SettingsPage() {
         </div>
         <div className="mt-4 flex justify-end">
           <Button onClick={saveSmtp} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {c("save")}
+          </Button>
+        </div>
+      </Card>
+
+      {/* Support contacts — shown to suspended companies */}
+      <Card className="mx-auto w-full max-w-2xl p-5">
+        <div className="mb-1 flex items-center gap-2">
+          <LifeBuoy className="h-4 w-4 text-slate-700" />
+          <h3 className="font-semibold text-slate-800">{c("support")}</h3>
+        </div>
+        <p className="mb-3 text-sm text-slate-500">{c("supportHint")}</p>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Field label={c("supportEmail")} type="email" value={supportEmail} onChange={setSupportEmail} />
+          <Field label={c("supportWhatsapp")} value={supportWhatsapp} onChange={setSupportWhatsapp} placeholder="+491700000000" />
+        </div>
+        <div className="mt-4 flex justify-end">
+          <Button onClick={saveSupport} disabled={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {c("save")}
           </Button>

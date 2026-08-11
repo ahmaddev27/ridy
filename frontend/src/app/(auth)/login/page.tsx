@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { login } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n/context";
+import { SuspendedScreen, type SuspendedInfo } from "@/components/auth/suspended-screen";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("manager@fleet.de");
   const [password, setPassword] = useState("password");
   const [submitting, setSubmitting] = useState(false);
+  const [suspended, setSuspended] = useState<SuspendedInfo | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,6 +28,18 @@ export default function LoginPage() {
       // Super-admins land on the platform panel; managers on their dashboard.
       router.push(u.roles.includes("super_admin") ? "/admin" : "/dashboard");
     } catch (err) {
+      // A suspended company (disabled/banned/expired) → the contact/activate screen.
+      if (err instanceof ApiError && err.status === 403 && err.data?.reason) {
+        setSuspended({
+          reason: err.data.reason as SuspendedInfo["reason"],
+          email,
+          password,
+          supportEmail: err.data.support_email as string | null,
+          supportWhatsapp: err.data.support_whatsapp as string | null,
+        });
+        setSubmitting(false);
+        return;
+      }
       const message =
         err instanceof ApiError && err.status === 422
           ? t("login.invalid")
@@ -46,6 +60,15 @@ export default function LoginPage() {
           </div>
         </div>
 
+        {suspended ? (
+          <SuspendedScreen
+            info={suspended}
+            onActivated={() => {
+              setSuspended(null);
+              onSubmit(new Event("submit") as unknown as React.FormEvent);
+            }}
+          />
+        ) : (
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h1 className="text-lg font-semibold text-slate-900">{t("login.title")}</h1>
           <p className="mt-1 text-sm text-slate-500">{t("login.subtitle")}</p>
@@ -80,6 +103,7 @@ export default function LoginPage() {
             </Button>
           </form>
         </div>
+        )}
 
         <p className="mt-4 text-center text-sm text-slate-500">
           {t("login.noAccount")}{" "}

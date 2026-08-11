@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 class Registration extends Model
 {
     protected $fillable = [
-        'email', 'company_name', 'name', 'password', 'otp', 'otp_expires_at', 'attempts',
+        'email', 'company_name', 'name', 'phone', 'password', 'otp', 'otp_expires_at', 'attempts',
     ];
 
     protected $hidden = ['password', 'otp'];

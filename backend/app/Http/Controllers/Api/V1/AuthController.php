@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\LoginRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -23,6 +24,19 @@ class AuthController extends Controller
             throw ValidationException::withMessages([
                 'email' => [__('auth.failed')],
             ]);
+        }
+
+        // A suspended company (disabled / banned / expired) cannot sign in — nor
+        // can its drivers. Super-admins (no tenant) are never gated.
+        $user->load('tenant');
+        $reason = $user->tenant?->stateReason();
+        if ($reason !== null) {
+            return response()->json([
+                'message' => 'account_suspended',
+                'reason' => $reason,
+                'support_email' => Settings::get('support_email'),
+                'support_whatsapp' => Settings::get('support_whatsapp'),
+            ], 403);
         }
 
         // Establish a session for the SPA cookie flow when a session is available.

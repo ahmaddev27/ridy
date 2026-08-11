@@ -28,6 +28,10 @@ class SettingsController extends Controller
 
             'has_global_proxy' => (bool) $globalProxy,
             'global_proxy_masked' => $globalProxy ? preg_replace('#//[^@/]*@#', '//••••@', $globalProxy) : null,
+
+            // Shown to suspended companies on the "contact support" screen.
+            'support_email' => Settings::get('support_email'),
+            'support_whatsapp' => Settings::get('support_whatsapp'),
         ]]);
     }
 
@@ -42,11 +46,13 @@ class SettingsController extends Controller
             'mail_from_address' => ['nullable', 'email'],
             'mail_from_name' => ['nullable', 'string', 'max:255'],
             'global_proxy_url' => ['nullable', 'string', 'max:1000'], // only when changing
+            'support_email' => ['nullable', 'email'],
+            'support_whatsapp' => ['nullable', 'string', 'max:32'],
         ]);
 
         $map = [
             'smtp_host', 'smtp_port', 'smtp_username', 'smtp_encryption',
-            'mail_from_address', 'mail_from_name',
+            'mail_from_address', 'mail_from_name', 'support_email', 'support_whatsapp',
         ];
         $values = [];
         foreach ($map as $key) {

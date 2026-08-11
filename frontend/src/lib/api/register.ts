@@ -3,6 +3,7 @@ import { apiFetch } from "./client";
 export async function startRegistration(input: {
   company_name: string;
   name: string;
+  phone: string;
   email: string;
   password: string;
 }): Promise<{ email: string }> {

@@ -12,10 +12,24 @@ export type Company = {
   driver_count: number;
   offer_count: number;
   email_verified: boolean;
+  state: "disabled" | "banned" | "expired" | null;
+  activated_at: string | null;
+  subscription_ends_at: string | null;
+  days_left: number | null;
+  banned: boolean;
   session_status: string | null;
   session_last_event_at: string | null;
   session_expires_at: string | null;
   users?: CompanyUser[] | null;
+};
+
+export type BannedCompany = {
+  id: number;
+  name: string;
+  banned_at: string | null;
+  owner_name: string | null;
+  owner_email: string | null;
+  owner_phone: string | null;
 };
 
 export type CompanyUser = {
@@ -50,6 +64,7 @@ export type UpdateCompanyInput = Partial<{
   status: string;
   uber_org_uuid: string;
   proxy_url: string; // empty string clears it (→ global proxy)
+  subscription_ends_at: string | null;
 }>;
 
 export type AdminOverview = {
@@ -77,6 +92,8 @@ export type PlatformSettings = {
   has_smtp_password: boolean;
   has_global_proxy: boolean;
   global_proxy_masked: string | null;
+  support_email: string | null;
+  support_whatsapp: string | null;
 };
 
 export type UpdateSettingsInput = Partial<{
@@ -88,6 +105,8 @@ export type UpdateSettingsInput = Partial<{
   mail_from_address: string;
   mail_from_name: string;
   global_proxy_url: string; // only when changing (empty clears)
+  support_email: string;
+  support_whatsapp: string;
 }>;
 
 export async function getOverview(): Promise<AdminOverview> {
@@ -133,6 +152,27 @@ export async function updateCompany(id: number, input: UpdateCompanyInput): Prom
 
 export async function disableCompany(id: number): Promise<void> {
   await apiFetch(`${base}/${id}`, { method: "DELETE", withCsrf: true });
+}
+
+/** Generate a 2-minute activation code for the company owner to enter. */
+export async function generateActivationCode(
+  id: number,
+  days: number,
+): Promise<{ code: string; days: number; expires_at: string }> {
+  const res = await apiFetch<{ data: { code: string; days: number; expires_at: string } }>(
+    `${base}/${id}/activation`,
+    { method: "POST", body: { days }, withCsrf: true },
+  );
+  return res.data;
+}
+
+export async function listBannedCompanies(): Promise<BannedCompany[]> {
+  const res = await apiFetch<{ data: BannedCompany[] }>("/api/v1/admin/banned-companies");
+  return res.data;
+}
+
+export async function reactivateCompany(id: number): Promise<void> {
+  await apiFetch(`${base}/${id}/reactivate`, { method: "POST", withCsrf: true });
 }
 
 /** Toggle a company between active and disabled (reversible, keeps all data). */
