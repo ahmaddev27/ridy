@@ -121,10 +121,11 @@ export async function getSettings(): Promise<PlatformSettings> {
   return res.data;
 }
 
-/** Send a test email to the admin's own address via the current provider. */
-export async function sendTestEmail(): Promise<{ sent: boolean; to?: string }> {
+/** Send a test email to `to` (or the admin's own address) via the current provider. */
+export async function sendTestEmail(to?: string): Promise<{ sent: boolean; to?: string }> {
   const res = await apiFetch<{ data: { sent: boolean; to?: string } }>("/api/v1/admin/settings/test-email", {
     method: "POST",
+    body: to ? { to } : {},
     withCsrf: true,
   });
   return res.data;

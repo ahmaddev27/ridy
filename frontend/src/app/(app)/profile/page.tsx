@@ -64,7 +64,7 @@ export default function ProfilePage() {
     <div className="space-y-6">
       <PageHeader tkey="profile" />
 
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 md:flex-row">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 md:flex-row">
         {/* Side tabs */}
         <nav className="flex gap-1 overflow-x-auto md:w-48 md:flex-col md:gap-0.5">
           {([
@@ -93,7 +93,7 @@ export default function ProfilePage() {
 
           {tab === "info" ? (
             <>
-              <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={c("name")} value={name} onChange={setName} />
                 <Field label={c("email")} type="email" value={email} onChange={setEmail} />
               </div>
@@ -106,7 +106,7 @@ export default function ProfilePage() {
             </>
           ) : (
             <>
-              <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={c("newPassword")} type="password" value={password} onChange={setPassword} placeholder={c("leaveEmpty")} />
                 <Field label={c("confirmPassword")} type="password" value={confirm} onChange={setConfirm} />
               </div>
