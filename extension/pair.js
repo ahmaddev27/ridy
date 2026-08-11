@@ -33,6 +33,15 @@ window.addEventListener("message", async (event) => {
   window.postMessage({ source: "ridy-pair-ack" }, "*");
 });
 
+// The dashboard's "connect" button signals an explicit connect intent right
+// before it opens the Uber tab. We flag it so the background worker auto-closes
+// that ONE tab after capturing — a manager who later opens supplier themselves
+// keeps their tab (it still syncs silently, but never closes on them).
+window.addEventListener("message", async (event) => {
+  if (event.source !== window || event.data?.source !== "ridy-connect-intent") return;
+  await api.runtime.sendMessage({ type: "connectIntent" }).catch(() => {});
+});
+
 // The Drivers page asks the extension to pull the roster from supplier.uber.com
 // (manager's real IP → Uber responds), then reports the result back to the page.
 window.addEventListener("message", async (event) => {
