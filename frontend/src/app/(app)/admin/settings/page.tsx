@@ -25,6 +25,8 @@ export default function SettingsPage() {
   const [fromName, setFromName] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
   const [supportWhatsapp, setSupportWhatsapp] = useState("");
+  const [provider, setProvider] = useState<"smtp" | "resend">("smtp");
+  const [resendKey, setResendKey] = useState("");
 
   async function load() {
     const s = await getSettings();
@@ -37,6 +39,7 @@ export default function SettingsPage() {
     setFromName(s.mail_from_name ?? "");
     setSupportEmail(s.support_email ?? "");
     setSupportWhatsapp(s.support_whatsapp ?? "");
+    setProvider(s.mail_provider ?? "smtp");
   }
 
   useEffect(() => {
@@ -47,6 +50,7 @@ export default function SettingsPage() {
     setBusy(true);
     try {
       await updateSettings({
+        mail_provider: provider,
         smtp_host: host,
         smtp_port: Number(port) || 587,
         smtp_username: username,
@@ -54,8 +58,10 @@ export default function SettingsPage() {
         mail_from_address: fromAddress,
         mail_from_name: fromName,
         ...(password ? { smtp_password: password } : {}),
+        ...(resendKey ? { resend_api_key: resendKey } : {}),
       });
       setPassword("");
+      setResendKey("");
       toast.success(c("saved"));
       await load();
     } catch (e) {
@@ -83,35 +89,71 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <PageHeader tkey="settings" />
 
-      {/* SMTP */}
+      {/* Email delivery */}
       <Card className="mx-auto w-full max-w-2xl p-5">
         <div className="mb-4 flex items-center gap-2">
           <Mail className="h-4 w-4 text-slate-700" />
-          <h3 className="font-semibold text-slate-800">{c("smtp")}</h3>
+          <h3 className="font-semibold text-slate-800">{c("email")}</h3>
         </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Field label={c("host")} value={host} onChange={setHost} />
-          <Field label={c("port")} value={port} onChange={setPort} />
-          <Field label={c("username")} value={username} onChange={setUsername} />
-          <Field
-            label={c("password")}
-            type="password"
-            value={password}
-            onChange={setPassword}
-            placeholder={settings?.has_smtp_password ? "••••••••" : ""}
-          />
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">{c("encryption")}</label>
-            <select
-              value={encryption}
-              onChange={(e) => setEncryption(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
-            >
-              <option value="tls">TLS</option>
-              <option value="ssl">SSL</option>
-              <option value="none">{c("none")}</option>
-            </select>
+
+        {/* Provider picker */}
+        <div className="mb-4">
+          <label className="mb-1 block text-sm font-medium text-slate-700">{c("provider")}</label>
+          <div className="flex gap-2">
+            {(["smtp", "resend"] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setProvider(p)}
+                className={
+                  "rounded-lg border px-4 py-2 text-sm font-medium transition-colors " +
+                  (provider === p ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50")
+                }
+              >
+                {p === "smtp" ? "SMTP" : "Resend API"}
+              </button>
+            ))}
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {provider === "smtp" ? (
+            <>
+              <Field label={c("host")} value={host} onChange={setHost} />
+              <Field label={c("port")} value={port} onChange={setPort} />
+              <Field label={c("username")} value={username} onChange={setUsername} />
+              <Field
+                label={c("password")}
+                type="password"
+                value={password}
+                onChange={setPassword}
+                placeholder={settings?.has_smtp_password ? "••••••••" : ""}
+              />
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">{c("encryption")}</label>
+                <select
+                  value={encryption}
+                  onChange={(e) => setEncryption(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
+                >
+                  <option value="tls">TLS</option>
+                  <option value="ssl">SSL</option>
+                  <option value="none">{c("none")}</option>
+                </select>
+              </div>
+            </>
+          ) : (
+            <div className="md:col-span-2">
+              <Field
+                label={c("resendKey")}
+                type="password"
+                value={resendKey}
+                onChange={setResendKey}
+                mono
+                placeholder={settings?.has_resend_key ? "••••••••  (leave blank to keep)" : "re_..."}
+              />
+            </div>
+          )}
           <Field label={c("fromName")} value={fromName} onChange={setFromName} />
           <Field label={c("fromAddress")} type="email" value={fromAddress} onChange={setFromAddress} />
         </div>

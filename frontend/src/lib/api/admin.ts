@@ -91,6 +91,8 @@ export type PlatformSettings = {
   mail_from_address: string | null;
   mail_from_name: string | null;
   has_smtp_password: boolean;
+  mail_provider: "smtp" | "resend";
+  has_resend_key: boolean;
   support_email: string | null;
   support_whatsapp: string | null;
 };
@@ -103,6 +105,8 @@ export type UpdateSettingsInput = Partial<{
   smtp_encryption: string;
   mail_from_address: string;
   mail_from_name: string;
+  mail_provider: "smtp" | "resend";
+  resend_api_key: string; // only when changing
   support_email: string;
   support_whatsapp: string;
 }>;
