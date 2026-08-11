@@ -128,6 +128,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       cancel: "Cancel",
     },
     dashboard: {
+      onlineTitle: "Online drivers", online: "Online", onTrip: "On trip", onlineNone: "No drivers online right now.", refresh: "Refresh",
       subTitle: "Subscription", subActive: "Active", subInactive: "Needs activation", subDaysLeft: "{n} days left", subActivated: "Activated", subEnds: "Renews / ends",
       statDrivers: "Drivers", statOnline: "Online now", statVehicles: "Vehicles", offersTrend: "Offers · last 7 days",
       statLinked: "Linked to Uber",
@@ -266,6 +267,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       cancel: "Abbrechen",
     },
     dashboard: {
+      onlineTitle: "Fahrer online", online: "Online", onTrip: "Auf Fahrt", onlineNone: "Gerade sind keine Fahrer online.", refresh: "Aktualisieren",
       subTitle: "Abonnement", subActive: "Aktiv", subInactive: "Aktivierung nötig", subDaysLeft: "{n} Tage übrig", subActivated: "Aktiviert", subEnds: "Verlängert / endet",
       statDrivers: "Fahrer", statOnline: "Jetzt online", statVehicles: "Fahrzeuge", offersTrend: "Angebote · letzte 7 Tage",
       statLinked: "Mit Uber verknüpft",
@@ -402,6 +404,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       cancel: "إلغاء",
     },
     dashboard: {
+      onlineTitle: "السواقون أونلاين", online: "أونلاين", onTrip: "على رحلة", onlineNone: "ما في سواقين أونلاين حالياً.", refresh: "تحديث",
       subTitle: "الاشتراك", subActive: "نشط", subInactive: "يحتاج تفعيل", subDaysLeft: "باقي {n} يوم", subActivated: "تاريخ التفعيل", subEnds: "التجديد / الانتهاء",
       statDrivers: "السائقون", statOnline: "أونلاين الآن", statVehicles: "المركبات", offersTrend: "العروض · آخر 7 أيام",
       statLinked: "مربوطون بأوبر",

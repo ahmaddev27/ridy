@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getDashboardSummary } from "@/lib/api/dashboard";
+import { OnlineDrivers } from "@/components/dashboard/online-drivers";
 
 function sessionTone(status: string | undefined): Status {
   if (status === "active") return "connected";
@@ -104,6 +105,9 @@ export default function DashboardPage() {
           )}
         </Card>
       )}
+
+      {/* Live online drivers */}
+      <OnlineDrivers />
 
       {/* Offers over the last 7 days */}
       <Card className="p-5">
