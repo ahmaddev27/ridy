@@ -1,0 +1,61 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\Admin;
+
+use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Fleet\Models\Driver;
+use App\Domain\Fleet\Models\Vehicle;
+use App\Domain\Tenancy\Models\Tenant;
+use App\Http\Controllers\Controller;
+use App\Http\Resources\DispatchOfferResource;
+use App\Http\Resources\DriverResource;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+
+/**
+ * Read-only drill-down into one company's fleet data for the super-admin. Runs
+ * cross-tenant (the admin group has no ResolveTenant), so every query drops the
+ * tenant global scope and filters by the explicit tenant id.
+ */
+class CompanyDataController extends Controller
+{
+    public function drivers(Tenant $tenant): AnonymousResourceCollection
+    {
+        $drivers = Driver::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->id)
+            ->orderBy('name')
+            ->get();
+
+        return DriverResource::collection($drivers);
+    }
+
+    public function offers(Tenant $tenant): AnonymousResourceCollection
+    {
+        $offers = DispatchOffer::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->id)
+            ->latest('received_at')
+            ->limit(100)
+            ->get();
+
+        return DispatchOfferResource::collection($offers);
+    }
+
+    public function vehicles(Tenant $tenant): JsonResponse
+    {
+        $vehicles = Vehicle::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->id)
+            ->orderBy('license_plate')
+            ->get()
+            ->map(fn (Vehicle $v) => [
+                'id' => $v->id,
+                'make' => $v->make,
+                'model' => $v->model,
+                'year' => $v->year,
+                'license_plate' => $v->license_plate,
+                'color' => $v->color,
+                'compliance_status' => $v->compliance_status,
+            ]);
+
+        return response()->json(['data' => $vehicles]);
+    }
+}

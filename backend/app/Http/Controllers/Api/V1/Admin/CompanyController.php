@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Tenancy\Models\Proxy;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\ProxyPool;
 use App\Http\Controllers\Controller;
@@ -94,17 +95,19 @@ class CompanyController extends Controller
     {
         $data = $tenantRequest->validated();
 
-        // Only touch proxy_url when the admin actually submitted the field; an
-        // empty string clears it (→ falls back to the global proxy).
-        if (array_key_exists('proxy_url', $data)) {
-            $tenant->proxy_url = $data['proxy_url'] !== '' ? $data['proxy_url'] : null;
+        // Proxy is managed via the pool: choosing a proxy binds the company to it
+        // (and copies its URL); clearing it releases the company.
+        if (array_key_exists('proxy_id', $data)) {
+            $proxy = $data['proxy_id'] ? Proxy::find($data['proxy_id']) : null;
+            $tenant->proxy_id = $proxy?->id;
+            $tenant->proxy_url = $proxy?->url;
         }
-        unset($data['proxy_url']);
+        unset($data['proxy_id']);
         $tenant->fill($data)->save();
 
         // Re-enabling a company (or extending its subscription) should place it back
         // on a pool proxy if it has none.
-        if ($tenant->isUsable() && $tenant->proxy_id === null && blank($tenant->proxy_url)) {
+        if ($tenant->isUsable() && $tenant->proxy_id === null) {
             app(ProxyPool::class)->assign($tenant);
         }
 
@@ -154,6 +157,7 @@ class CompanyController extends Controller
         ));
         $tenant->setAttribute('users_list', User::where('tenant_id', $tenant->id)->orderBy('name')->get());
         $tenant->setAttribute('email_verified', User::where('tenant_id', $tenant->id)->whereNotNull('email_verified_at')->exists());
+        $tenant->setAttribute('proxy_label', $tenant->proxy_id ? optional($tenant->proxy)->label : null);
 
         return CompanyResource::detail($tenant);
     }

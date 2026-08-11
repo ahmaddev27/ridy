@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Save, Mail, Globe, LifeBuoy } from "lucide-react";
+import { Loader2, Save, Mail, LifeBuoy } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -23,7 +23,6 @@ export default function SettingsPage() {
   const [encryption, setEncryption] = useState("tls");
   const [fromAddress, setFromAddress] = useState("");
   const [fromName, setFromName] = useState("");
-  const [proxy, setProxy] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
   const [supportWhatsapp, setSupportWhatsapp] = useState("");
 
@@ -79,19 +78,6 @@ export default function SettingsPage() {
     }
   }
 
-  async function saveProxy() {
-    setBusy(true);
-    try {
-      await updateSettings({ global_proxy_url: proxy });
-      setProxy("");
-      toast.success(c("saved"));
-      await load();
-    } catch (e) {
-      toast.error(c("saveFailed"), { description: e instanceof Error ? e.message : undefined });
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -150,35 +136,6 @@ export default function SettingsPage() {
         </div>
         <div className="mt-4 flex justify-end">
           <Button onClick={saveSupport} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {c("save")}
-          </Button>
-        </div>
-      </Card>
-
-      {/* Global proxy */}
-      <Card className="mx-auto w-full max-w-2xl p-5">
-        <div className="mb-1 flex items-center gap-2">
-          <Globe className="h-4 w-4 text-slate-700" />
-          <h3 className="font-semibold text-slate-800">{c("globalProxy")}</h3>
-        </div>
-        <p className="mb-3 text-sm text-slate-500">
-          {c("globalProxyHint")}
-          {settings?.has_global_proxy && (
-            <span className="ms-2 font-mono text-xs text-slate-400" dir="ltr">
-              ({settings.global_proxy_masked})
-            </span>
-          )}
-        </p>
-        <Field
-          label={c("proxyUrl")}
-          value={proxy}
-          onChange={setProxy}
-          mono
-          placeholder="http://user:pass@host:port"
-        />
-        <div className="mt-4 flex justify-end">
-          <Button onClick={saveProxy} disabled={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {c("save")}
           </Button>

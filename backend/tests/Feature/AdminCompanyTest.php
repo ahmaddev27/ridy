@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Tenancy\Models\Proxy;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
@@ -38,10 +39,11 @@ class AdminCompanyTest extends TestCase
         $this->getJson('/api/v1/admin/companies')->assertForbidden();
     }
 
-    public function test_super_admin_lists_companies_across_tenants_with_masked_proxy(): void
+    public function test_super_admin_lists_companies_with_pool_proxy_flag(): void
     {
         Sanctum::actingAs($this->superAdmin());
-        Tenant::create(['name' => 'Acme', 'country' => 'DE', 'proxy_url' => 'http://user:secret@host:12323']);
+        $proxy = Proxy::create(['label' => 'P1', 'url' => 'http://user:secret@host:12323', 'capacity' => 5]);
+        Tenant::create(['name' => 'Acme', 'country' => 'DE', 'proxy_id' => $proxy->id, 'proxy_url' => $proxy->url]);
         Tenant::create(['name' => 'Globex', 'country' => 'DE']);
 
         $res = $this->getJson('/api/v1/admin/companies')->assertOk();
@@ -49,8 +51,8 @@ class AdminCompanyTest extends TestCase
 
         $acme = collect($res->json('data'))->firstWhere('name', 'Acme');
         $this->assertTrue($acme['has_proxy']);
-        $this->assertNull($acme['proxy_url']); // never real in the list
-        $this->assertStringNotContainsString('secret', json_encode($acme)); // creds masked
+        $this->assertSame($proxy->id, $acme['proxy_id']);
+        $this->assertStringNotContainsString('secret', json_encode($acme)); // creds never exposed
     }
 
     public function test_create_company_with_first_manager_in_one_call(): void
@@ -68,17 +70,22 @@ class AdminCompanyTest extends TestCase
         $this->assertTrue($manager->hasRole('fleet_manager'));
     }
 
-    public function test_detail_returns_real_proxy_and_update_can_clear_it(): void
+    public function test_detail_shows_pool_proxy_and_update_can_bind_and_clear_it(): void
     {
         Sanctum::actingAs($this->superAdmin());
-        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE', 'proxy_url' => 'http://u:p@host:1']);
+        $proxy = Proxy::create(['label' => 'P1', 'url' => 'http://u:p@host:1', 'capacity' => 5]);
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
 
-        $this->getJson("/api/v1/admin/companies/{$tenant->id}")
+        // Bind to a pool proxy → its URL is copied onto the tenant.
+        $this->putJson("/api/v1/admin/companies/{$tenant->id}", ['proxy_id' => $proxy->id])
             ->assertOk()
-            ->assertJsonPath('data.proxy_url', 'http://u:p@host:1');
+            ->assertJsonPath('data.proxy_id', $proxy->id)
+            ->assertJsonPath('data.proxy_label', 'P1');
+        $this->assertSame('http://u:p@host:1', $tenant->fresh()->proxy_url);
 
-        // Empty string clears it (→ global proxy).
-        $this->putJson("/api/v1/admin/companies/{$tenant->id}", ['proxy_url' => ''])->assertOk();
+        // Null clears it.
+        $this->putJson("/api/v1/admin/companies/{$tenant->id}", ['proxy_id' => null])->assertOk();
+        $this->assertNull($tenant->fresh()->proxy_id);
         $this->assertNull($tenant->fresh()->proxy_url);
     }
 }
