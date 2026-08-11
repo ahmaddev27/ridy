@@ -47,6 +47,11 @@ export const api = {
     return call("POST", `/sessions/${sessionId}/roster`, { drivers });
   },
 
+  /** Forward live driver statuses pulled from supplier GetDriverLiveLocation. */
+  async statuses(sessionId, statuses) {
+    return call("POST", `/sessions/${sessionId}/statuses`, { statuses });
+  },
+
   /** Liveness heartbeat. */
   async heartbeat(sessionId) {
     return call("POST", `/sessions/${sessionId}/heartbeat`);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Dispatch\FleetSessionService;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
+use App\Domain\Fleet\DriverStatusIngestor;
 use App\Http\Controllers\Controller;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -70,6 +71,26 @@ class DispatchDaemonController extends Controller
         ])->save();
 
         return response()->json(['data' => ['status' => 'refreshed']]);
+    }
+
+    /**
+     * The daemon polls supplier GetDriverLiveLocation continuously and forwards
+     * the statuses here. Same effect as the manager's extension sync (updates
+     * presence + marks offers accepted on an ON_TRIP transition) but runs 24/7.
+     */
+    public function statuses(Request $request, int $session, DriverStatusIngestor $ingestor): JsonResponse
+    {
+        $data = $request->validate([
+            'statuses' => ['required', 'array'],
+            'statuses.*.driver_uuid' => ['required', 'string'],
+            'statuses.*.status' => ['nullable', 'string'],
+            'statuses.*.location_updated_at' => ['nullable', 'numeric'],
+        ]);
+
+        $tenantId = (int) $this->find($session)->tenant_id;
+        $result = $ingestor->ingest($tenantId, $data['statuses']);
+
+        return response()->json(['data' => $result]);
     }
 
     /** The daemon saw Uber reject the session; flag it for manager re-link. */
