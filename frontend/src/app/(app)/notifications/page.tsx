@@ -41,7 +41,7 @@ export default function NotificationsPage() {
         }
       />
 
-      <Card className="max-w-2xl overflow-hidden">
+      <Card className="w-full overflow-hidden">
         {loading ? (
           <div className="space-y-2 p-4">
             {[0, 1, 2].map((i) => (
