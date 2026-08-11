@@ -410,7 +410,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       cancel: "إلغاء",
     },
     dashboard: {
-      onlineTitle: "السواقون أونلاين", online: "أونلاين", onTrip: "على رحلة", onlineNone: "ما في سواقين أونلاين حالياً.", refresh: "تحديث",
+      onlineTitle: "السائقين أونلاين", online: "أونلاين", onTrip: "على رحلة", onlineNone: "ما في سائقين أونلاين حالياً.", refresh: "تحديث",
       subTitle: "الاشتراك", subActive: "نشط", subInactive: "يحتاج تفعيل", subDaysLeft: "باقي {n} يوم", subActivated: "تاريخ التفعيل", subEnds: "التجديد / الانتهاء",
       statDrivers: "السائقون", statOnline: "أونلاين الآن", statVehicles: "المركبات", offersTrend: "العروض · آخر 7 أيام",
       statLinked: "مربوطون بأوبر",

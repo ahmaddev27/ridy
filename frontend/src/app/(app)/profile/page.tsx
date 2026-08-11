@@ -66,22 +66,28 @@ export default function ProfilePage() {
 
       <div className="flex w-full flex-col gap-4 md:flex-row">
         {/* Side tabs */}
-        <nav className="flex gap-1 overflow-x-auto md:w-48 md:flex-col md:gap-0.5">
+        <nav className="flex gap-1 overflow-x-auto rounded-xl bg-slate-50 p-1 md:w-48 md:flex-col md:gap-1 md:bg-transparent md:p-0">
           {([
             { k: "info", icon: User },
             { k: "password", icon: KeyRound },
-          ] as const).map(({ k, icon: Icon }) => (
-            <button
-              key={k}
-              onClick={() => setTab(k)}
-              className={
-                "flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-start text-sm font-medium transition-colors " +
-                (tab === k ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100")
-              }
-            >
-              <Icon className="h-4 w-4" /> {c(`tab_${k}`)}
-            </button>
-          ))}
+          ] as const).map(({ k, icon: Icon }) => {
+            const active = tab === k;
+            return (
+              <button
+                key={k}
+                onClick={() => setTab(k)}
+                className={
+                  "group flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-start text-sm font-medium transition-all " +
+                  (active
+                    ? "bg-slate-900 text-white shadow-sm"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-900")
+                }
+              >
+                <Icon className={"h-4 w-4 shrink-0 " + (active ? "text-white" : "text-slate-400 group-hover:text-slate-600")} />
+                {c(`tab_${k}`)}
+              </button>
+            );
+          })}
         </nav>
 
         <Card className="min-w-0 flex-1 p-5">
