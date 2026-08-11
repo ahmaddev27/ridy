@@ -42,6 +42,11 @@ export class RamenStream {
     this.ramenPath = ramenPath;
     this.primary = primary;
     this.jar = new Map(session.cookies.map((c) => [c.name, c.value]));
+    // supplier.uber.com needs its own host-scoped cookies for roster/status. Fall
+    // back to the RAMEN jar for sessions captured before supplier cookies existed.
+    this.supplierJar = new Map(
+      (session.supplier_cookies?.length ? session.supplier_cookies : session.cookies).map((c) => [c.name, c.value]),
+    );
     this.seq = 0;
     this.stopped = false;
     this.reconnectDelay = config.reconnectMinDelay;
@@ -80,7 +85,7 @@ export class RamenStream {
       for (let page = 1; page <= 100; page++) {
         const res = await fetch(`${config.uberSupplierBase}/api/getDrivers?localeCode=en-GB`, {
           method: "POST",
-          headers: { ...this.headers(), "content-type": "application/json", "x-csrf-token": "x" },
+          headers: { ...this.supplierHeaders(), "content-type": "application/json", "x-csrf-token": "x" },
           dispatcher: this.dispatcher,
           body: JSON.stringify({
             orgUuid: { uuid: { value: this.session.uber_org_uuid } },
@@ -127,7 +132,7 @@ export class RamenStream {
     try {
       const res = await fetch(`${config.uberSupplierBase}/api/GetDriverLiveLocation?localeCode=en-GB`, {
         method: "POST",
-        headers: { ...this.headers(), "content-type": "application/json", "x-csrf-token": "x" },
+        headers: { ...this.supplierHeaders(), "content-type": "application/json", "x-csrf-token": "x" },
         dispatcher: this.dispatcher,
         body: JSON.stringify({
           orgId: { uuid: { value: this.session.uber_org_uuid } },
@@ -173,6 +178,11 @@ export class RamenStream {
       "x-uber-device-id": this.deviceId,
       cookie: [...this.jar].map(([n, v]) => `${n}=${v}`).join("; "),
     };
+  }
+
+  /** Headers for supplier.uber.com calls — same shape but with the supplier jar. */
+  supplierHeaders() {
+    return { ...this.headers(), cookie: [...this.supplierJar].map(([n, v]) => `${n}=${v}`).join("; ") };
   }
 
   url(path, seq) {

@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\Notification;
 class FleetSessionService
 {
     /**
-     * @param  array<int, array<string, mixed>>  $cookies  captured cookie jar
+     * @param  array<int, array<string, mixed>>  $cookies  captured cookie jar (vsdispatch scope, for RAMEN)
+     * @param  array<int, array<string, mixed>>|null  $supplierCookies  supplier.uber.com-scoped jar (roster/status)
      */
     public function capture(
         Tenant $tenant,
@@ -24,6 +25,7 @@ class FleetSessionService
         array $cookies,
         ?CarbonImmutable $expiresAt = null,
         ?string $uberOrgName = null,
+        ?array $supplierCookies = null,
     ): UberFleetSession {
         // Binding the tenant to its Uber org lets offers (which carry partnerUUID)
         // resolve back to this tenant during ingest. When Uber gives us the fleet
@@ -34,13 +36,20 @@ class FleetSessionService
         }
         $tenant->save();
 
+        $attributes = [
+            'cookies' => $cookies,
+            'expires_at' => $expiresAt,
+            'status' => UberFleetSession::STATUS_ACTIVE,
+        ];
+        // Only overwrite the supplier jar when the extension actually sent one, so
+        // an older extension (no supplier cookies) never wipes a good stored jar.
+        if ($supplierCookies !== null && $supplierCookies !== []) {
+            $attributes['supplier_cookies'] = $supplierCookies;
+        }
+
         $session = UberFleetSession::updateOrCreate(
             ['tenant_id' => $tenant->id, 'uber_org_uuid' => $uberOrgUuid],
-            [
-                'cookies' => $cookies,
-                'expires_at' => $expiresAt,
-                'status' => UberFleetSession::STATUS_ACTIVE,
-            ],
+            $attributes,
         );
 
         // Alert the fleet's managers that a fresh session is now live.

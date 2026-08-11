@@ -35,6 +35,9 @@ class DispatchDaemonController extends Controller
                 'tenant_id' => $s->tenant_id,
                 'uber_org_uuid' => $s->uber_org_uuid,
                 'cookies' => $s->cookies,
+                // supplier.uber.com-scoped jar for roster/status polls (RAMEN uses
+                // `cookies`). Null for sessions captured before this was added.
+                'supplier_cookies' => $s->supplier_cookies,
                 // Per-company residential proxy; daemon falls back to its global
                 // UBER_PROXY_URL when null.
                 'proxy_url' => $s->tenant?->getAttribute('proxy_url'),

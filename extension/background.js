@@ -18,6 +18,17 @@ async function readCookies() {
   return cookies.map((c) => ({ name: c.name, value: c.value }));
 }
 
+/**
+ * Capture the supplier.uber.com-scoped cookie set. supplier's roster/status APIs
+ * need their own host cookies, which differ from the vsdispatch (RAMEN) set — so
+ * the daemon can replay these to poll roster/status 24/7 without a browser open.
+ * Kept a SEPARATE jar so it never disturbs the working RAMEN handshake.
+ */
+async function readSupplierCookies() {
+  const cookies = await api.cookies.getAll({ url: "https://supplier.uber.com/" });
+  return cookies.map((c) => ({ name: c.name, value: c.value }));
+}
+
 /** A cheap fingerprint so we don't re-POST an unchanged session on every visit. */
 function fingerprint(orgUuid, cookies) {
   return orgUuid + "|" + cookies.length + "|" + cookies.map((c) => c.value.length).join(",");
@@ -54,8 +65,12 @@ async function capture(orgUuid, orgName, { manual = false } = {}) {
 
   const cookies = await readCookies();
   if (cookies.length === 0) return { ok: false, reason: "no_cookies" };
+  const supplierCookies = await readSupplierCookies();
 
-  const fp = fingerprint(orgUuid, cookies);
+  // Fold the supplier jar size into the fingerprint so already-linked managers
+  // re-sync once after this update (to backfill the supplier cookies), then stay
+  // quiet again while nothing changes.
+  const fp = fingerprint(orgUuid, cookies) + "|s" + supplierCookies.length;
   if (!manual && lastSync === fp) {
     return { ok: true, reason: "unchanged" }; // already synced this session
   }
@@ -68,7 +83,12 @@ async function capture(orgUuid, orgName, { manual = false } = {}) {
         Accept: "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ uber_org_uuid: orgUuid, cookies, uber_org_name: orgName || undefined }),
+      body: JSON.stringify({
+        uber_org_uuid: orgUuid,
+        cookies,
+        supplier_cookies: supplierCookies.length ? supplierCookies : undefined,
+        uber_org_name: orgName || undefined,
+      }),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));

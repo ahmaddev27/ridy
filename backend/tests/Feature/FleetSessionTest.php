@@ -83,6 +83,47 @@ class FleetSessionTest extends TestCase
         $this->assertSame('fleet_session_opened', $this->manager->fresh()->notifications()->first()->data['type']);
     }
 
+    public function test_supplier_cookies_are_stored_and_exposed_only_to_the_daemon(): void
+    {
+        Sanctum::actingAs($this->manager);
+
+        $this->postJson('/api/v1/fleet-session', [
+            'uber_org_uuid' => self::ORG,
+            'cookies' => [['name' => 'sid', 'value' => 'abc']],
+            'supplier_cookies' => [['name' => 'supplier-sid', 'value' => 'sup1'], ['name' => 'csrf', 'value' => 'sup2']],
+        ])->assertCreated();
+
+        $session = UberFleetSession::withoutGlobalScopes()->first();
+        $this->assertCount(2, $session->supplier_cookies);
+        $this->assertSame('supplier-sid', $session->supplier_cookies[0]['name']);
+
+        // The internal daemon endpoint surfaces the supplier jar so it can poll
+        // roster/status server-side; the manager-facing resource never does.
+        $daemon = $this->getJson('/api/v1/internal/dispatch/sessions', ['X-Dispatch-Secret' => config('services.dispatch.ingest_secret')]);
+        $daemon->assertOk()->assertJsonPath('data.0.supplier_cookies.0.value', 'sup1');
+    }
+
+    public function test_recapture_without_supplier_cookies_keeps_the_stored_jar(): void
+    {
+        Sanctum::actingAs($this->manager);
+
+        $this->postJson('/api/v1/fleet-session', [
+            'uber_org_uuid' => self::ORG,
+            'cookies' => [['name' => 'sid', 'value' => 'v1']],
+            'supplier_cookies' => [['name' => 'supplier-sid', 'value' => 'keep']],
+        ])->assertCreated();
+
+        // A later capture without supplier cookies (e.g. older extension) must not
+        // wipe the good jar.
+        $this->postJson('/api/v1/fleet-session', [
+            'uber_org_uuid' => self::ORG,
+            'cookies' => [['name' => 'sid', 'value' => 'v2']],
+        ])->assertCreated();
+
+        $session = UberFleetSession::withoutGlobalScopes()->first();
+        $this->assertSame('keep', $session->supplier_cookies[0]['value']);
+    }
+
     public function test_capture_requires_cookies(): void
     {
         Sanctum::actingAs($this->manager);

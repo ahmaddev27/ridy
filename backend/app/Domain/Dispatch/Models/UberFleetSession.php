@@ -21,16 +21,17 @@ class UberFleetSession extends Model
     public const STATUS_NEEDS_RELINK = 'needs_relink';
 
     protected $fillable = [
-        'tenant_id', 'uber_org_uuid', 'cookies', 'expires_at', 'status', 'last_event_at',
+        'tenant_id', 'uber_org_uuid', 'cookies', 'supplier_cookies', 'expires_at', 'status', 'last_event_at',
     ];
 
     protected $casts = [
         'cookies' => 'encrypted:array',
+        'supplier_cookies' => 'encrypted:array',
         'expires_at' => 'datetime',
         'last_event_at' => 'datetime',
     ];
 
-    protected $hidden = ['cookies'];
+    protected $hidden = ['cookies', 'supplier_cookies'];
 
     /**
      * A session with no cookies or a passed expiry can no longer hold the stream.
