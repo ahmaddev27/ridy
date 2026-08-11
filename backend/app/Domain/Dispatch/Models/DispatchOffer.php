@@ -19,7 +19,7 @@ class DispatchOffer extends Model
         'tenant_id', 'driver_uuid', 'driver_id', 'offer_uuid', 'real_offer_uuid',
         'partner_uuid', 'seq', 'rider_first_name', 'driver_first_name', 'driver_last_name',
         'pickup_address', 'dropoff_address', 'fare_formatted', 'accept_window_seconds',
-        'requested_at', 'offer_generated_at', 'received_at', 'raw_payload',
+        'requested_at', 'offer_generated_at', 'received_at', 'accepted_at', 'raw_payload',
         'pickup_lat', 'pickup_lng', 'dropoff_lat', 'dropoff_lng',
         'distance_m', 'route_geometry', 'geo_synced_at',
     ];
@@ -30,6 +30,7 @@ class DispatchOffer extends Model
         'requested_at' => 'datetime',
         'offer_generated_at' => 'datetime',
         'received_at' => 'datetime',
+        'accepted_at' => 'datetime',
         'raw_payload' => 'array',
         'pickup_lat' => 'float',
         'pickup_lng' => 'float',

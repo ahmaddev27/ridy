@@ -281,8 +281,8 @@ export default function OffersPage() {
                                 {o.fare_formatted ?? "—"}
                               </td>
                               <td className="px-4 py-3">
-                                <Badge status={o.linked ? "connected" : "gap"} dot>
-                                  {o.linked ? c("linked") : c("unlinked")}
+                                <Badge status={o.accepted ? "connected" : "neutral"} dot>
+                                  {o.accepted ? c("accepted") : c("notAccepted")}
                                 </Badge>
                               </td>
                             </tr>

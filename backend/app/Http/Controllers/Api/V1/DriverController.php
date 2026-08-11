@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Dispatch\UberSupplierClient;
@@ -51,16 +52,54 @@ class DriverController extends Controller
         ]);
 
         $updated = 0;
+        $accepted = 0;
         foreach ($data['statuses'] as $row) {
-            $updated += Driver::where('uber_driver_uuid', $row['driver_uuid'])->update([
+            $driver = Driver::where('uber_driver_uuid', $row['driver_uuid'])->first();
+            if ($driver === null) {
+                continue;
+            }
+
+            // Detect the ONLINE -> ON_TRIP transition: a driver who just started a
+            // trip took whatever offer we last sent them. Compare the incoming
+            // status against the one we currently hold, before overwriting it.
+            $wasOnTrip = str_contains(strtoupper((string) $driver->online_status), 'ON_TRIP');
+            $isOnTrip = str_contains(strtoupper((string) ($row['status'] ?? '')), 'ON_TRIP');
+
+            $driver->update([
                 'online_status' => $row['status'] ?? null,
                 'location_updated_at' => ! empty($row['location_updated_at'])
                     ? CarbonImmutable::createFromTimestampMs($row['location_updated_at']) : null,
                 'status_synced_at' => now(),
             ]);
+            $updated++;
+
+            if ($isOnTrip && ! $wasOnTrip) {
+                $accepted += $this->markLastOfferAccepted($row['driver_uuid']);
+            }
         }
 
-        return response()->json(['data' => ['updated' => $updated]]);
+        return response()->json(['data' => ['updated' => $updated, 'accepted' => $accepted]]);
+    }
+
+    /**
+     * Mark the driver's most recent, not-yet-accepted offer (within a short
+     * window) as accepted — the trip they just started. Returns 1 if one matched.
+     */
+    private function markLastOfferAccepted(string $driverUuid): int
+    {
+        $offer = DispatchOffer::where('driver_uuid', $driverUuid)
+            ->whereNull('accepted_at')
+            ->where('received_at', '>=', now()->subMinutes(5))
+            ->latest('received_at')
+            ->first();
+
+        if ($offer === null) {
+            return 0;
+        }
+
+        $offer->update(['accepted_at' => now()]);
+
+        return 1;
     }
 
     /**
