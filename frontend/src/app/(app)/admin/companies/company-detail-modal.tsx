@@ -20,8 +20,14 @@ import {
   generateActivationCode,
   reactivateCompany,
   listProxies,
+  getCompanyDrivers,
+  getCompanyOffers,
+  getCompanyVehicles,
   type Company,
   type Proxy,
+  type CompanyDriverRow,
+  type CompanyOfferRow,
+  type CompanyVehicleRow,
 } from "@/lib/api/admin";
 
 /** Super-admin company detail: edit, proxy, users, session controls. */
@@ -47,6 +53,7 @@ export function CompanyDetailModal({
   const [orgUuid, setOrgUuid] = useState("");
   const [proxyId, setProxyId] = useState("");
   const [proxies, setProxies] = useState<Proxy[]>([]);
+  const [tab, setTab] = useState<"details" | "drivers" | "offers" | "vehicles">("details");
 
   // Sub-actions.
   const [confirm, setConfirm] = useState<null | "disable" | "relink" | "deleteSession">(null);
@@ -147,6 +154,20 @@ export function CompanyDetailModal({
     }
   }
 
+  async function endSubscription() {
+    setBusy(true);
+    try {
+      await updateCompany(id, { subscription_ends_at: new Date().toISOString() });
+      toast.success(c("subEnded"));
+      await load();
+      onChanged();
+    } catch (e) {
+      toast.error(c("actionFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function doReactivate() {
     setBusy(true);
     try {
@@ -195,6 +216,22 @@ export function CompanyDetailModal({
           </button>
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-1 border-b border-slate-100 px-4">
+          {(["details", "drivers", "offers", "vehicles"] as const).map((tk) => (
+            <button
+              key={tk}
+              onClick={() => setTab(tk)}
+              className={
+                "border-b-2 px-3 py-2.5 text-sm font-medium transition-colors " +
+                (tab === tk ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-700")
+              }
+            >
+              {c(`tab_${tk}`)}
+            </button>
+          ))}
+        </div>
+
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-5">
           {error ? (
             <div className="text-sm text-rose-600">{error}</div>
@@ -202,6 +239,8 @@ export function CompanyDetailModal({
             <div className="flex items-center justify-center py-10 text-slate-400">
               <Loader2 className="h-5 w-5 animate-spin" />
             </div>
+          ) : tab !== "details" ? (
+            <CompanyDataTab id={id} tab={tab} />
           ) : (
             <>
               {/* Stats */}
@@ -267,6 +306,11 @@ export function CompanyDetailModal({
                   {company.banned && (
                     <Button onClick={doReactivate} disabled={busy}>
                       <ShieldCheck className="h-4 w-4" /> {c("reactivate")}
+                    </Button>
+                  )}
+                  {company.state === null && (
+                    <Button variant="secondary" onClick={endSubscription} disabled={busy}>
+                      {c("endSubscription")}
                     </Button>
                   )}
                 </div>
@@ -440,5 +484,94 @@ function Field({
         className={`w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200 ${mono ? "font-mono text-xs" : ""}`}
       />
     </div>
+  );
+}
+
+/** Lazy-loaded drill-down list for a company's drivers / offers / vehicles. */
+function CompanyDataTab({ id, tab }: { id: number; tab: "drivers" | "offers" | "vehicles" }) {
+  const { t, locale } = useI18n();
+  const c = (k: string) => t(`screens.companies.${k}`);
+  const [rows, setRows] = useState<CompanyDriverRow[] | CompanyOfferRow[] | CompanyVehicleRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    const p =
+      tab === "drivers" ? getCompanyDrivers(id) : tab === "offers" ? getCompanyOffers(id) : getCompanyVehicles(id);
+    p.then((r) => alive && setRows(r))
+      .catch(() => alive && setRows([]))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [id, tab]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-10 text-slate-400">
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </div>
+    );
+  }
+  if (rows.length === 0) {
+    return <p className="py-10 text-center text-sm text-slate-400">{c("noData")}</p>;
+  }
+
+  if (tab === "drivers") {
+    return (
+      <ul className="divide-y divide-slate-100">
+        {(rows as CompanyDriverRow[]).map((d) => (
+          <li key={d.id} className="flex items-center justify-between gap-2 py-2.5">
+            <div className="flex items-center gap-2">
+              <span className={`h-2 w-2 rounded-full ${d.online ? "bg-emerald-500" : "bg-slate-300"}`} />
+              <span className="text-sm font-medium text-slate-800">{d.name}</span>
+            </div>
+            <div className="flex items-center gap-3 text-xs text-slate-500">
+              {d.rating != null && <span>★ {d.rating}</span>}
+              {d.total_trips != null && <span>{d.total_trips.toLocaleString(locale)} {c("trips")}</span>}
+              <Badge status={d.uber_linked ? "connected" : "neutral"} dot>{d.uber_linked ? c("linked") : c("unlinked")}</Badge>
+            </div>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  if (tab === "offers") {
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <tbody className="divide-y divide-slate-100">
+            {(rows as CompanyOfferRow[]).map((o) => (
+              <tr key={o.id}>
+                <td className="whitespace-nowrap py-2.5 pe-3 text-slate-500">
+                  {o.received_at ? new Date(o.received_at).toLocaleString(locale) : "—"}
+                </td>
+                <td className="py-2.5 pe-3 font-medium text-slate-700">{o.driver_name ?? "—"}</td>
+                <td className="max-w-[220px] truncate py-2.5 pe-3 text-slate-500">{o.pickup_address ?? "—"}</td>
+                <td className="whitespace-nowrap py-2.5 pe-3 font-semibold text-slate-900">{o.fare_formatted ?? "—"}</td>
+                <td className="py-2.5">
+                  <Badge status={o.accepted ? "connected" : "neutral"} dot>{o.accepted ? c("accepted") : c("notAccepted")}</Badge>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="divide-y divide-slate-100">
+      {(rows as CompanyVehicleRow[]).map((v) => (
+        <li key={v.id} className="flex items-center justify-between gap-2 py-2.5 text-sm">
+          <span className="font-medium text-slate-800">
+            {[v.make, v.model, v.year].filter(Boolean).join(" ") || "—"}
+          </span>
+          <span className="font-mono text-xs text-slate-500" dir="ltr">{v.license_plate ?? "—"}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
