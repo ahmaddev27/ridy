@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { listCompanies, disableCompany, setCompanyActive, type Company } from "@/lib/api/admin";
+import { listCompanies, deleteCompany, setCompanyActive, type Company } from "@/lib/api/admin";
 import { CompanyDetailModal } from "./company-detail-modal";
 
 type Filter = "all" | "linked" | "proxy" | "expired" | "banned";
@@ -91,7 +91,7 @@ export default function CompaniesPage() {
     if (!confirmDel) return;
     setBusy(true);
     try {
-      await disableCompany(confirmDel.id);
+      await deleteCompany(confirmDel.id);
       toast.success(c("deletedToast"));
       await refetch();
     } catch (e) {

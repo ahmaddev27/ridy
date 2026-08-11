@@ -2,14 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Radio, MapPin, Search, Trash2, Loader2, ArrowRight, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { Radio, MapPin, Search, ArrowRight, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
-import { listOffersPaged, deleteOffer, bulkDeleteOffers, type DispatchOffer, type PageMeta } from "@/lib/api/offers";
+import { listOffersPaged, type DispatchOffer, type PageMeta } from "@/lib/api/offers";
 import { listDrivers, type Driver } from "@/lib/api/drivers";
 import { OfferDetailModal } from "./offer-detail-modal";
 
@@ -24,8 +23,6 @@ export default function OffersPage() {
   const [driverUuids, setDriverUuids] = useState<string[]>([]);
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
   const [driverFilterOpen, setDriverFilterOpen] = useState(false);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [busy, setBusy] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [perPage] = useState(50); // fixed; offers are grouped by day, not paged by size
@@ -54,7 +51,6 @@ export default function OffersPage() {
       });
       setOffers(items);
       setMeta(m);
-      if (!silent) setSelected(new Set());
     } catch (e) {
       if (!silent) setError(e instanceof Error ? e.message : "error");
     } finally {
@@ -130,40 +126,6 @@ export default function OffersPage() {
     return new Date(key).toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
   }
 
-  function toggle(id: number) {
-    setSelected((s) => {
-      const next = new Set(s);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  }
-
-  async function removeOne(id: number) {
-    setBusy(true);
-    try {
-      await deleteOffer(id);
-      toast.success(c("deletedToast"));
-      await load();
-    } catch (e) {
-      toast.error(c("deleteFailed"), { description: e instanceof Error ? e.message : undefined });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function removeSelected() {
-    if (selected.size === 0) return;
-    setBusy(true);
-    try {
-      const n = await bulkDeleteOffers([...selected]);
-      toast.success(c("deletedToast"), { description: `${n}` });
-      await load();
-    } catch (e) {
-      toast.error(c("deleteFailed"), { description: e instanceof Error ? e.message : undefined });
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -253,12 +215,6 @@ export default function OffersPage() {
           </button>
         )}
 
-        {selected.size > 0 && (
-          <Button variant="secondary" onClick={removeSelected} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-            {c("deleteSelected")} ({selected.size})
-          </Button>
-        )}
       </div>
 
       {error && (
@@ -300,11 +256,8 @@ export default function OffersPage() {
                             <tr
                               key={o.id}
                               onClick={() => setDetailId(o.id)}
-                              className={`cursor-pointer ${selected.has(o.id) ? "bg-slate-50" : "hover:bg-slate-50"}`}
+                              className="cursor-pointer hover:bg-slate-50"
                             >
-                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                                <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggle(o.id)} />
-                              </td>
                               <td className="whitespace-nowrap px-4 py-3 text-slate-500">
                                 {o.received_at ? new Date(o.received_at).toLocaleTimeString(locale) : "—"}
                               </td>
@@ -331,16 +284,6 @@ export default function OffersPage() {
                                 <Badge status={o.linked ? "connected" : "gap"} dot>
                                   {o.linked ? c("linked") : c("unlinked")}
                                 </Badge>
-                              </td>
-                              <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  onClick={() => removeOne(o.id)}
-                                  disabled={busy}
-                                  className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                                  title={c("delete")}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
                               </td>
                             </tr>
                           ))}
