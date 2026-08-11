@@ -47,21 +47,38 @@ class AppServiceProvider extends ServiceProvider
             if (! Schema::hasTable('settings')) {
                 return;
             }
+
+            $from = [
+                'mail.from.address' => Settings::get('mail_from_address', config('mail.from.address')),
+                'mail.from.name' => Settings::get('mail_from_name', config('mail.from.name')),
+            ];
+
+            // The super-admin picks the provider: Resend (API key) or SMTP.
+            $provider = Settings::get('mail_provider', 'smtp');
+            $resendKey = Settings::get('resend_api_key');
+
+            if ($provider === 'resend' && $resendKey) {
+                config(array_merge($from, [
+                    'mail.default' => 'resend',
+                    'services.resend.key' => $resendKey,
+                ]));
+
+                return;
+            }
+
             $host = Settings::get('smtp_host');
             if (! $host) {
                 return; // not configured — keep the .env / log mailer
             }
 
-            config([
+            config(array_merge($from, [
                 'mail.default' => 'smtp',
                 'mail.mailers.smtp.host' => $host,
                 'mail.mailers.smtp.port' => (int) Settings::get('smtp_port', '587'),
                 'mail.mailers.smtp.username' => Settings::get('smtp_username'),
                 'mail.mailers.smtp.password' => Settings::get('smtp_password'),
                 'mail.mailers.smtp.encryption' => Settings::get('smtp_encryption', 'tls'),
-                'mail.from.address' => Settings::get('mail_from_address', config('mail.from.address')),
-                'mail.from.name' => Settings::get('mail_from_name', config('mail.from.name')),
-            ]);
+            ]));
         } catch (Throwable $e) {
             // never let settings break the app boot
         }

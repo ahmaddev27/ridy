@@ -24,6 +24,9 @@ class SettingsController extends Controller
             'mail_from_name' => Settings::get('mail_from_name'),
             'has_smtp_password' => (bool) Settings::get('smtp_password'),
 
+            'mail_provider' => Settings::get('mail_provider', 'smtp'),
+            'has_resend_key' => (bool) Settings::get('resend_api_key'),
+
             // Shown to suspended companies on the "contact support" screen.
             'support_email' => Settings::get('support_email'),
             'support_whatsapp' => Settings::get('support_whatsapp'),
@@ -40,13 +43,15 @@ class SettingsController extends Controller
             'smtp_encryption' => ['nullable', 'in:tls,ssl,none'],
             'mail_from_address' => ['nullable', 'email'],
             'mail_from_name' => ['nullable', 'string', 'max:255'],
+            'mail_provider' => ['nullable', 'in:smtp,resend'],
+            'resend_api_key' => ['nullable', 'string', 'max:255'], // only when changing
             'support_email' => ['nullable', 'email'],
             'support_whatsapp' => ['nullable', 'string', 'max:32'],
         ]);
 
         $map = [
             'smtp_host', 'smtp_port', 'smtp_username', 'smtp_encryption',
-            'mail_from_address', 'mail_from_name', 'support_email', 'support_whatsapp',
+            'mail_from_address', 'mail_from_name', 'mail_provider', 'support_email', 'support_whatsapp',
         ];
         $values = [];
         foreach ($map as $key) {
@@ -54,10 +59,12 @@ class SettingsController extends Controller
                 $values[$key] = $data[$key] !== null ? (string) $data[$key] : null;
             }
         }
-        // The SMTP password is only overwritten when a non-empty value is
-        // submitted; an explicit empty string clears it.
-        if ($request->has('smtp_password')) {
-            $values['smtp_password'] = ($data['smtp_password'] ?? '') !== '' ? $data['smtp_password'] : null;
+        // Secrets are only overwritten when a non-empty value is submitted; an
+        // explicit empty string clears them.
+        foreach (['smtp_password', 'resend_api_key'] as $secret) {
+            if ($request->has($secret)) {
+                $values[$secret] = ($data[$secret] ?? '') !== '' ? $data[$secret] : null;
+            }
         }
 
         Settings::setMany($values);
