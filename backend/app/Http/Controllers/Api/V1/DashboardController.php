@@ -8,13 +8,15 @@ use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\Vehicle;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function summary(): JsonResponse
+    public function summary(Request $request): JsonResponse
     {
         $today = now()->startOfDay();
+        $tenant = $request->user()?->tenant;
 
         return response()->json(['data' => [
             'drivers' => Driver::count(),
@@ -28,6 +30,12 @@ class DashboardController extends Controller
                 ->orderByDesc('last_event_at')
                 ->first()
                 ?->only(['uber_org_uuid', 'status', 'last_event_at', 'expires_at']),
+            'subscription' => $tenant ? [
+                'state' => $tenant->stateReason(),
+                'activated_at' => $tenant->activated_at?->toIso8601String(),
+                'ends_at' => $tenant->subscription_ends_at?->toIso8601String(),
+                'days_left' => $tenant->daysLeft(),
+            ] : null,
         ]]);
     }
 

@@ -16,6 +16,12 @@ export type DashboardSummary = {
   unlinked_offers: number;
   offers_daily: { date: string; count: number }[];
   fleet_session: FleetSession;
+  subscription: {
+    state: "disabled" | "banned" | "expired" | "inactive" | null;
+    activated_at: string | null;
+    ends_at: string | null;
+    days_left: number | null;
+  } | null;
 };
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
