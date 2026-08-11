@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Reidey Uber Connector",
-  "version": "1.12.4",
+  "version": "1.13.0",
   "description": "Verbindet deine Uber-Flottensitzung mit Reidey — melde dich normal bei Uber an, die Sitzung wird automatisch erfasst.",
-  "permissions": ["cookies", "scripting", "storage"],
+  "permissions": ["cookies", "scripting", "storage", "alarms", "tabs"],
   "host_permissions": [
     "*://*.uber.com/*",
     "http://localhost:8090/*",
@@ -17,7 +17,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://vsdispatch.uber.com/*", "*://supplier.uber.com/*"],
+      "matches": ["*://vsdispatch.uber.com/*", "*://supplier.uber.com/*", "*://account.uber.com/*", "*://auth.uber.com/*"],
       "js": ["content.js"],
       "run_at": "document_start"
     },

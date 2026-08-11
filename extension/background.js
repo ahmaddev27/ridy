@@ -23,10 +23,33 @@ function fingerprint(orgUuid, cookies) {
   return orgUuid + "|" + cookies.length + "|" + cookies.map((c) => c.value.length).join(",");
 }
 
+/**
+ * Find the fleet org uuid from the manager's session without opening any page:
+ * hitting supplier.uber.com while logged in redirects to /orgs/<uuid>/…, and we
+ * read that uuid off the final URL. Uses the manager's own IP (real browser), so
+ * supplier responds (our server IP is blocked).
+ */
+async function discoverOrgUuid() {
+  try {
+    const res = await fetch("https://supplier.uber.com/", { credentials: "include", redirect: "follow" });
+    const m = res.url.match(/\/orgs\/([0-9a-f-]{36})/i);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
 async function capture(orgUuid, orgName, { manual = false } = {}) {
   const { apiUrl, token, lastSync } = await api.storage.local.get(["apiUrl", "token", "lastSync"]);
   if (!apiUrl || !token) {
     return { ok: false, reason: "not_paired" };
+  }
+
+  // When connecting from account.uber.com there's no org uuid on the page —
+  // discover it from the supplier redirect using the just-established session.
+  if (!orgUuid) {
+    orgUuid = await discoverOrgUuid();
+    if (!orgUuid) return { ok: false, reason: "no_org" }; // not signed in / no fleet yet
   }
 
   const cookies = await readCookies();
@@ -309,7 +332,8 @@ async function fetchDriverStatuses(driverUuids) {
   const { orgUuid, apiUrl, token } = await api.storage.local.get(["orgUuid", "apiUrl", "token"]);
   if (!orgUuid) return { ok: false, reason: "no_org_uuid" };
   if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
-  if (!Array.isArray(driverUuids) || driverUuids.length === 0) return { ok: false, reason: "no_drivers" };
+  // An empty list means "everyone" — used by the background poll.
+  const ids = Array.isArray(driverUuids) ? driverUuids : [];
 
   let locations;
   try {
@@ -319,7 +343,7 @@ async function fetchDriverStatuses(driverUuids) {
       headers: { accept: "*/*", "content-type": "application/json", "x-csrf-token": "x" },
       body: JSON.stringify({
         orgId: { uuid: { value: orgUuid } },
-        driverIds: driverUuids.map((u) => ({ value: u })),
+        driverIds: ids.map((u) => ({ value: u })),
         filters: { allowedStatuses: [] },
         responseSelector: {
           includeStats: false,
@@ -426,3 +450,29 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 });
+
+// ── Background polling (no page needed) ──────────────────────────────────────
+// The manager only ever sees the account.uber.com tab at connect time. After
+// that, the service worker itself polls Uber (supplier, via the manager's real
+// IP) on a timer so driver presence + offer acceptance stay fresh 24/7 without
+// opening any tab. chrome.alarms wakes the worker even after it sleeps.
+const POLL_ALARM = "ridy-poll";
+let pollTick = 0;
+
+async function backgroundPoll() {
+  const { apiUrl, token, orgUuid } = await api.storage.local.get(["apiUrl", "token", "orgUuid"]);
+  if (!apiUrl || !token || !orgUuid) return; // not connected yet
+
+  // Presence + acceptance every tick (catches ON_TRIP transitions promptly).
+  await fetchDriverStatuses([]).catch(() => {});
+  // Roster refresh roughly every 30 minutes.
+  if (pollTick % 30 === 0) await fetchRoster().catch(() => {});
+  pollTick++;
+}
+
+api.alarms?.create(POLL_ALARM, { periodInMinutes: 1 });
+api.alarms?.onAlarm.addListener((alarm) => {
+  if (alarm.name === POLL_ALARM) backgroundPoll();
+});
+// Also poll right after the worker (re)starts.
+backgroundPoll();
