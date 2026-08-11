@@ -387,9 +387,18 @@ async function postOffers(offers, seq) {
   }
 }
 
-api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "capture" && msg.orgUuid) {
-    capture(msg.orgUuid, msg.orgName, { manual: !!msg.manual }).then(sendResponse);
+    capture(msg.orgUuid, msg.orgName, { manual: !!msg.manual }).then((res) => {
+      sendResponse(res);
+      // After a FRESH connect, close the Uber tab we sent the manager to so the
+      // flow ends cleanly (open → sign in → "connected" → auto-close). We skip
+      // "unchanged" so we never close a tab the manager is actively using.
+      const tabId = sender?.tab?.id;
+      if (res?.ok && res.reason !== "unchanged" && tabId != null) {
+        setTimeout(() => api.tabs?.remove(tabId).catch(() => {}), 2500);
+      }
+    });
     return true; // async response
   }
   if (msg?.type === "roster" && Array.isArray(msg.drivers)) {
