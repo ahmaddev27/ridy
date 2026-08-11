@@ -54,6 +54,57 @@ export default function DashboardPage() {
         />
       </div>
 
+      {/* Subscription */}
+      {data?.subscription && (
+        <Card className="p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 className="mb-1 font-semibold text-slate-800">{k("subTitle")}</h3>
+              <div className="flex items-center gap-2">
+                <span
+                  className={
+                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold " +
+                    (data.subscription.state === null
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-700")
+                  }
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${data.subscription.state === null ? "bg-emerald-500" : "bg-amber-500"}`} />
+                  {data.subscription.state === null ? k("subActive") : k("subInactive")}
+                </span>
+                {data.subscription.days_left !== null && (
+                  <span className="text-sm text-slate-500">
+                    {k("subDaysLeft").replace("{n}", String(data.subscription.days_left))}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-6 text-sm">
+              <div>
+                <div className="text-xs text-slate-400">{k("subActivated")}</div>
+                <div className="font-medium text-slate-700">
+                  {data.subscription.activated_at ? new Date(data.subscription.activated_at).toLocaleDateString(locale) : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-400">{k("subEnds")}</div>
+                <div className="font-medium text-slate-700">
+                  {data.subscription.ends_at ? new Date(data.subscription.ends_at).toLocaleDateString(locale) : "—"}
+                </div>
+              </div>
+            </div>
+          </div>
+          {data.subscription.ends_at && data.subscription.days_left !== null && (
+            <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className={`h-full rounded-full ${data.subscription.days_left <= 3 ? "bg-rose-500" : data.subscription.days_left <= 7 ? "bg-amber-500" : "bg-emerald-500"}`}
+                style={{ width: `${Math.min(100, Math.max(4, (data.subscription.days_left / 30) * 100))}%` }}
+              />
+            </div>
+          )}
+        </Card>
+      )}
+
       {/* Offers over the last 7 days */}
       <Card className="p-5">
         <h3 className="mb-4 font-semibold text-slate-800">{k("offersTrend")}</h3>
