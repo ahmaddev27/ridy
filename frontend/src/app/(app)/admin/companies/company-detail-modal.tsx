@@ -6,6 +6,7 @@ import { X, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ban, Ticket, S
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import {
@@ -51,6 +52,10 @@ export function CompanyDetailModal({
   // Subscription/activation.
   const [days, setDays] = useState("30");
   const [genCode, setGenCode] = useState<string | null>(null);
+
+  // Password reset (in-app modal, not a native prompt).
+  const [resetFor, setResetFor] = useState<number | null>(null);
+  const [resetPwd, setResetPwd] = useState("");
 
   async function load() {
     try {
@@ -109,14 +114,18 @@ export function CompanyDetailModal({
     }
   }
 
-  async function resetPw(userId: number) {
-    const pw = window.prompt(c("resetPrompt"));
-    if (!pw) return;
+  async function submitReset() {
+    if (resetFor === null || resetPwd.length < 8) return;
+    setBusy(true);
     try {
-      await resetCompanyUserPassword(id, userId, pw);
+      await resetCompanyUserPassword(id, resetFor, resetPwd);
       toast.success(c("resetDone"));
+      setResetFor(null);
+      setResetPwd("");
     } catch (e) {
       toast.error(c("resetFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -302,7 +311,7 @@ export function CompanyDetailModal({
                           </a>
                         )}
                       </div>
-                      <Button variant="ghost" onClick={() => resetPw(u.id)}>
+                      <Button variant="ghost" onClick={() => { setResetFor(u.id); setResetPwd(""); }}>
                         <KeyRound className="h-4 w-4" /> {c("resetPassword")}
                       </Button>
                     </div>
@@ -343,6 +352,36 @@ export function CompanyDetailModal({
           )}
         </div>
       </div>
+
+      <Modal
+        open={resetFor !== null}
+        onClose={() => setResetFor(null)}
+        title={c("resetPassword")}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setResetFor(null)} disabled={busy}>
+              {c("cancel")}
+            </Button>
+            <Button onClick={submitReset} disabled={busy || resetPwd.length < 8}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+              {c("resetPassword")}
+            </Button>
+          </div>
+        }
+      >
+        <div className="text-start">
+          <label className="mb-1 block text-sm font-medium text-slate-700">{c("newPasswordLabel")}</label>
+          <input
+            type="password"
+            value={resetPwd}
+            onChange={(e) => setResetPwd(e.target.value)}
+            minLength={8}
+            autoFocus
+            placeholder={c("newPasswordHint")}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+          />
+        </div>
+      </Modal>
 
       <ConfirmModal
         open={confirm !== null}
