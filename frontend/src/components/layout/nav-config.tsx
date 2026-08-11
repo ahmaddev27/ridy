@@ -3,7 +3,6 @@ import {
   Bell,
   Users,
   Radio,
-  Link2,
   Plug,
   Car,
   Building2,
@@ -46,7 +45,6 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: "/drivers", label: "nav.drivers", icon: Users },
       { href: "/vehicles", label: "nav.vehicles", icon: Car },
-      { href: "/driver-linking", label: "nav.driverLinking", icon: Link2 },
       { href: "/connections", label: "nav.connections", icon: Plug },
     ],
   },
