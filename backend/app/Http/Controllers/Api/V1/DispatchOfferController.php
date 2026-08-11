@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Dispatch\DispatchOfferIngestor;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\TripGeocoder;
+use App\Domain\Fleet\DriverStatsService;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchOfferResource;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -15,13 +17,39 @@ class DispatchOfferController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        $offers = DispatchOffer::query()
+        $offers = $this->filtered($request)
             ->with('driver:id,name')
-            // Filter by the driver's Uber UUID (single, back-compat).
+            ->orderByDesc('received_at')
+            ->paginate(min(100, max(5, (int) $request->integer('per_page', 25))))
+            ->withQueryString();
+
+        return DispatchOfferResource::collection($offers);
+    }
+
+    /** Lightweight aggregates for the current filter set — powers the stat cards. */
+    public function stats(Request $request): JsonResponse
+    {
+        $total = $this->filtered($request)->count();
+        $accepted = $this->filtered($request)->whereNotNull('accepted_at')->count();
+        $earnings = $this->filtered($request)->whereNotNull('accepted_at')
+            ->pluck('fare_formatted')
+            ->sum(fn ($f) => DriverStatsService::parseFare($f));
+
+        return response()->json(['data' => [
+            'total' => $total,
+            'accepted' => $accepted,
+            'declined' => $total - $accepted,
+            'acceptance_rate' => $total > 0 ? (int) round($accepted / $total * 100) : 0,
+            'earnings' => round($earnings, 2),
+        ]]);
+    }
+
+    /** The offer query with the list's filters applied (search/driver/date). */
+    private function filtered(Request $request): Builder
+    {
+        return DispatchOffer::query()
             ->when($request->filled('driver_uuid'), fn ($q) => $q->where('driver_uuid', $request->string('driver_uuid')))
-            // Filter by any of several drivers (multi-select).
             ->when($request->filled('driver_uuids'), fn ($q) => $q->whereIn('driver_uuid', (array) $request->input('driver_uuids')))
-            // Free-text search across rider, driver name and both addresses.
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%'.$request->string('search').'%';
                 $q->where(function ($sub) use ($term) {
@@ -32,14 +60,8 @@ class DispatchOfferController extends Controller
                         ->orWhere('dropoff_address', 'like', $term);
                 });
             })
-            // Date-range filter over the capture time (offers are kept forever).
             ->when($request->filled('from'), fn ($q) => $q->whereDate('received_at', '>=', $request->date('from')))
-            ->when($request->filled('to'), fn ($q) => $q->whereDate('received_at', '<=', $request->date('to')))
-            ->orderByDesc('received_at')
-            ->paginate(min(100, max(5, (int) $request->integer('per_page', 25))))
-            ->withQueryString();
-
-        return DispatchOfferResource::collection($offers);
+            ->when($request->filled('to'), fn ($q) => $q->whereDate('received_at', '<=', $request->date('to')));
     }
 
     /**

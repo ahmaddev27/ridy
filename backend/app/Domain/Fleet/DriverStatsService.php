@@ -24,7 +24,7 @@ class DriverStatsService
         $accepted = $offers->whereNotNull('accepted_at');
         $acceptedCount = $accepted->count();
 
-        $earnings = $accepted->sum(fn ($o) => $this->parseFare($o->fare_formatted));
+        $earnings = $accepted->sum(fn ($o) => self::parseFare($o->fare_formatted));
         $km = round($accepted->sum('distance_m') / 1000, 1);
 
         return [
@@ -42,7 +42,7 @@ class DriverStatsService
      * Parse a formatted fare ("10,77 €", "€12.93", "8.50") to a float. Fleet
      * fares are small, so the last separator is always the decimal point.
      */
-    private function parseFare(?string $formatted): float
+    public static function parseFare(?string $formatted): float
     {
         $n = preg_replace('/[^0-9.,]/', '', (string) $formatted);
         if ($n === '') {

@@ -20,7 +20,10 @@ export function apiErrorMessage(err: unknown, t: (key: string) => string): strin
 
 /** Map a known error code to its localized text; pass through real sentences. */
 function localizeCode(codeOrMessage: string, t: (key: string) => string): string {
-  const known = ["otp_incorrect", "otp_expired", "otp_too_many", "otp_none"];
+  const known = [
+    "otp_incorrect", "otp_expired", "otp_too_many", "otp_none",
+    "activation_expired", "activation_no_company",
+  ];
   if (known.includes(codeOrMessage)) return t(`errors.${codeOrMessage}`);
   return codeOrMessage;
 }

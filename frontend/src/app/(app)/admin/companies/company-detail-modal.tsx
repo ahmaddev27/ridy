@@ -332,14 +332,29 @@ export function CompanyDetail({
             </Section>
           ) : (
             <>
-              {/* Status — at the top */}
-              <div className="flex flex-wrap items-center gap-3">
+              {/* Status — a toggle switch at the top */}
+              <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-slate-700">{c("colStatus")}</span>
-                <select value={status} onChange={(e) => setStatus(e.target.value)}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900">
-                  <option value="active">{c("statusActive")}</option>
-                  <option value="disabled">{c("statusDisabled")}</option>
-                </select>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={status === "active"}
+                  onClick={() => setStatus(status === "active" ? "disabled" : "active")}
+                  className={
+                    "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors " +
+                    (status === "active" ? "bg-emerald-500" : "bg-slate-300")
+                  }
+                >
+                  <span
+                    className={
+                      "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform " +
+                      (status === "active" ? "translate-x-[22px] rtl:-translate-x-[22px]" : "translate-x-0.5 rtl:-translate-x-0.5")
+                    }
+                  />
+                </button>
+                <span className={"text-sm font-medium " + (status === "active" ? "text-emerald-600" : "text-slate-500")}>
+                  {status === "active" ? c("statusActive") : c("statusDisabled")}
+                </span>
               </div>
 
               {/* Stats */}
