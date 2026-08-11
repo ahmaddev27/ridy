@@ -10,7 +10,9 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-xl border border-slate-200 bg-white",
+        // Softer radius + a very subtle tinted shadow so cards feel elevated on
+        // the warm canvas without a hard border (Metronic-style surfaces).
+        "rounded-2xl border border-slate-200/70 bg-white shadow-[0_2px_10px_-2px_rgba(30,34,43,0.06)]",
         className,
       )}
     >
@@ -39,8 +41,8 @@ export function StatCard({
 
   return (
     <Card className="p-4">
-      <div className="text-sm text-slate-500">{label}</div>
-      <div className={cn("mt-1 text-2xl font-bold", valueTone)}>{value}</div>
+      <div className="text-sm font-medium text-slate-500">{label}</div>
+      <div className={cn("mt-1 text-2xl font-bold tabular-nums tracking-tight", valueTone)}>{value}</div>
       {hint && <div className="mt-1 text-xs text-slate-400">{hint}</div>}
     </Card>
   );

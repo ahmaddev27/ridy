@@ -8,10 +8,20 @@
 html {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
 }
 
 body {
   font-family: var(--font-sans);
+  /* Warm, soft neutral canvas (Metronic-style) so white cards read as elevated. */
+  background-color: #f6f6f4;
+  color: #1e222b;
+}
+
+/* Tabular figures for data so numbers align in tables and stat tiles. */
+table,
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Arabic: use Tajawal and slightly larger line-height for legibility. */
@@ -29,7 +39,7 @@ html[lang="ar"] body,
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #d6d3cd;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-track {
