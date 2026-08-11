@@ -59,23 +59,23 @@
 
   async function tryCapture() {
     if (done) return;
+    // On account.uber.com there is no org uuid on the page — the background
+    // worker discovers it from the supplier redirect, so send null and let it try.
     const orgUuid = findOrgUuid();
-    if (!orgUuid) return; // not logged in yet
 
-    done = true; // attempt once per page load
-    const res = await api.runtime.sendMessage({ type: "capture", orgUuid, orgName: findOrgName() });
+    done = true; // one attempt in flight at a time
+    const res = await api.runtime.sendMessage({ type: "capture", orgUuid: orgUuid || null, orgName: findOrgName() });
 
     if (res?.ok) {
-      // Confirm whether it was freshly captured or already connected.
       toast(
         res.reason === "unchanged" ? "Reidey: bereits verbunden ✓" : "Reidey: Uber-Sitzung verbunden ✓",
         true,
       );
     } else if (res && !res.ok) {
-      done = false; // allow a later retry (e.g. after pairing)
+      done = false; // retry — still signing in, or the org isn't resolvable yet
       if (res.reason === "not_paired") {
         toast("Reidey: Bitte zuerst die Erweiterung im Dashboard koppeln.", false);
-      } else if (res.reason !== "no_cookies") {
+      } else if (!["no_cookies", "no_org"].includes(res.reason)) {
         toast(`Reidey: ${res.reason}`, false);
       }
     }
