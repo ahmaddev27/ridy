@@ -59,6 +59,7 @@ class FleetSessionController extends Controller
             $cookies,
             $request->filled('expires_at') ? CarbonImmutable::parse($request->string('expires_at')) : null,
             $request->filled('uber_org_name') ? (string) $request->string('uber_org_name') : null,
+            $request->filled('supplier_cookies') ? $request->array('supplier_cookies') : null,
         );
 
         return response()->json(['data' => $session->only([

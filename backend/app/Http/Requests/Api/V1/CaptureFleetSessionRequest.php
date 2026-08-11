@@ -22,6 +22,10 @@ class CaptureFleetSessionRequest extends FormRequest
             'cookies' => ['required', 'array', 'min:1'],
             'cookies.*.name' => ['required', 'string'],
             'cookies.*.value' => ['required', 'string'],
+            // supplier.uber.com-scoped jar (optional — older extensions omit it).
+            'supplier_cookies' => ['nullable', 'array'],
+            'supplier_cookies.*.name' => ['required_with:supplier_cookies', 'string'],
+            'supplier_cookies.*.value' => ['required_with:supplier_cookies', 'string'],
             'expires_at' => ['nullable', 'date'],
         ];
     }
