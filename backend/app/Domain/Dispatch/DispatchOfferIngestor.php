@@ -8,7 +8,9 @@ use App\Domain\Notifications\DispatchNotifier;
 use App\Domain\Tenancy\TenantContext;
 use App\Support\RidyLog;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Arr;
+use Throwable;
 
 /**
  * Turns a single raw offer from the Uber RAMEN stream into a stored, driver-routed
@@ -47,31 +49,47 @@ class DispatchOfferIngestor
             ? Driver::where('uber_driver_uuid', $driverUuid)->first()
             : null;
 
-        $record = DispatchOffer::create([
-            'tenant_id' => $tenantId,
-            'driver_uuid' => $driverUuid,
-            'driver_id' => $driver?->id,
-            'offer_uuid' => $offerUuid,
-            'real_offer_uuid' => Arr::get($offer, 'realOfferUUID'),
-            'partner_uuid' => Arr::get($offer, 'partnerUUID'),
-            'seq' => $seq,
-            'rider_first_name' => Arr::get($offer, 'riderFirstName'),
-            'driver_first_name' => Arr::get($offer, 'driverInfo.firstName'),
-            'driver_last_name' => Arr::get($offer, 'driverInfo.lastName'),
-            'pickup_address' => Arr::get($offer, 'pickupAddress'),
-            'dropoff_address' => Arr::get($offer, 'dropoffAddress'),
-            'fare_formatted' => Arr::get($offer, 'formattedUFP'),
-            'accept_window_seconds' => Arr::get($offer, 'acceptWindowInSeconds'),
-            'requested_at' => $this->millisToDate(Arr::get($offer, 'requestAt')),
-            'offer_generated_at' => $this->millisToDate(Arr::get($offer, 'offerGeneratedAtMs')),
-            'received_at' => CarbonImmutable::now(),
-            'raw_payload' => $offer,
-        ]);
+        try {
+            $record = DispatchOffer::create([
+                'tenant_id' => $tenantId,
+                'driver_uuid' => $driverUuid,
+                'driver_id' => $driver?->id,
+                'offer_uuid' => $offerUuid,
+                'real_offer_uuid' => Arr::get($offer, 'realOfferUUID'),
+                'partner_uuid' => Arr::get($offer, 'partnerUUID'),
+                'seq' => $seq,
+                'rider_first_name' => Arr::get($offer, 'riderFirstName'),
+                'driver_first_name' => Arr::get($offer, 'driverInfo.firstName'),
+                'driver_last_name' => Arr::get($offer, 'driverInfo.lastName'),
+                'pickup_address' => Arr::get($offer, 'pickupAddress'),
+                'dropoff_address' => Arr::get($offer, 'dropoffAddress'),
+                'fare_formatted' => Arr::get($offer, 'formattedUFP'),
+                'accept_window_seconds' => Arr::get($offer, 'acceptWindowInSeconds'),
+                'requested_at' => $this->millisToDate(Arr::get($offer, 'requestAt')),
+                'offer_generated_at' => $this->millisToDate(Arr::get($offer, 'offerGeneratedAtMs')),
+                'received_at' => CarbonImmutable::now(),
+                'raw_payload' => $offer,
+            ]);
+        } catch (QueryException $e) {
+            // The same offer arrives near-simultaneously on two RAMEN channels; the
+            // loser hits the unique(tenant_id, offer_uuid) index. That's a duplicate,
+            // not an error — never lose the batch over it.
+            $dupe = DispatchOffer::where('offer_uuid', $offerUuid)->first();
+            if ($dupe !== null) {
+                return ['status' => 'duplicate', 'offer_id' => $dupe->id, 'driver_id' => $dupe->driver_id];
+            }
+            throw $e;
+        }
 
         // Notify the driver's devices as soon as the offer is routed. The 5-second
-        // accept window makes this notification time-sensitive.
+        // accept window makes this notification time-sensitive — but a push failure
+        // must never lose the offer.
         if ($driver !== null) {
-            $this->notifier->notify($record);
+            try {
+                $this->notifier->notify($record);
+            } catch (Throwable $e) {
+                RidyLog::event('dispatch_offer.notify_failed', ['offer_id' => $record->id, 'error' => $e->getMessage()]);
+            }
         }
 
         $status = $driver !== null ? 'routed' : 'unlinked_driver';
