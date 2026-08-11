@@ -65,6 +65,11 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       linkedToastDesc: "{count} earlier offers were assigned.",
       linkFailed: "Linking failed",
     },
+    map: {
+      activeTrips: "active trips", enRoute: "En route to pickup", onTrip: "On trip", active: "Active",
+      pickup: "Pickup", dropoff: "Dropoff", updated: "Updated",
+      emptyTitle: "No active trips", emptyDesc: "Drivers appear here once they're on the way to a rider or on a trip.",
+    },
     connections: {
       title: "Uber connection",
       subtitle: "Connect the Uber fleet session so the dispatch stream receives offers.",
@@ -207,6 +212,11 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       linkedToastDesc: "{count} frühere Angebote wurden zugeordnet.",
       linkFailed: "Verknüpfung fehlgeschlagen",
     },
+    map: {
+      activeTrips: "aktive Touren", enRoute: "Auf dem Weg zur Abholung", onTrip: "Auf Tour", active: "Aktiv",
+      pickup: "Abholung", dropoff: "Ziel", updated: "Aktualisiert",
+      emptyTitle: "Keine aktiven Touren", emptyDesc: "Fahrer erscheinen hier, sobald sie zur Abholung unterwegs oder auf Tour sind.",
+    },
     connections: {
       title: "Uber-Verbindung",
       subtitle: "Verbinde die Uber-Flottensitzung, damit der Dispatch-Stream Angebote empfängt.",
@@ -346,6 +356,11 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       linkedToast: "تم ربط السائق",
       linkedToastDesc: "تم إسناد {count} عروض سابقة.",
       linkFailed: "فشل الربط",
+    },
+    map: {
+      activeTrips: "رحلة نشطة", enRoute: "بالطريق للاستلام", onTrip: "على رحلة", active: "نشط",
+      pickup: "الاستلام", dropoff: "التنزيل", updated: "آخر تحديث",
+      emptyTitle: "ما في رحلات نشطة", emptyDesc: "السائقين بيبانوا هون لما يكونوا طالعين ياخدوا راكب أو على رحلة.",
     },
     connections: {
       title: "ربط أوبر",

@@ -18,6 +18,7 @@ const en = {
     dashboard: "Dashboard",
     offers: "Offers",
     connections: "Uber Connection",
+    map: "Live map",
     driverLinking: "Driver Linking",
     notifications: "Notifications",
     drivers: "Drivers",
@@ -33,6 +34,7 @@ const en = {
   pages: {
     dashboard: { title: "Dashboard", subtitle: "Uber dispatch overview — drivers, live offers and fleet session." },
     connections: { title: "Uber Connection", subtitle: "Connect the Uber fleet session for the dispatch stream." },
+    map: { title: "Live map", subtitle: "Live positions of drivers currently on a trip, with pickup and dropoff." },
     vehicles: { title: "Vehicles", subtitle: "Your fleet’s vehicles synced from Uber." },
     drivers: { title: "Drivers", subtitle: "Fleet drivers and their Uber link status." },
     assignments: { title: "Assignments", subtitle: "Which driver was in which vehicle, and when — used to attribute trips." },
@@ -116,6 +118,7 @@ const de: typeof en = {
     dashboard: "Übersicht",
     offers: "Angebote",
     connections: "Uber-Verbindung",
+    map: "Live-Karte",
     driverLinking: "Fahrer verknüpfen",
     notifications: "Benachrichtigungen",
     drivers: "Fahrer",
@@ -131,6 +134,7 @@ const de: typeof en = {
   pages: {
     dashboard: { title: "Übersicht", subtitle: "Uber-Dispatch-Übersicht — Fahrer, Live-Angebote und Flottensitzung." },
     connections: { title: "Uber-Verbindung", subtitle: "Verbinde die Uber-Flottensitzung für den Dispatch-Stream." },
+    map: { title: "Live-Karte", subtitle: "Live-Positionen der Fahrer auf Tour, mit Abhol- und Zielpunkt." },
     vehicles: { title: "Fahrzeuge", subtitle: "Fahrzeuge deiner Flotte aus Uber." },
     drivers: { title: "Fahrer", subtitle: "Flottenfahrer und ihr Uber-Verknüpfungsstatus." },
     assignments: { title: "Zuordnungen", subtitle: "Welcher Fahrer in welchem Fahrzeug war — zur Zuordnung der Fahrten." },
@@ -214,6 +218,7 @@ const ar: typeof en = {
     dashboard: "لوحة التحكّم",
     offers: "العروض",
     connections: "ربط أوبر",
+    map: "الخريطة الحية",
     driverLinking: "ربط السائقين",
     notifications: "الإشعارات",
     drivers: "السائقون",
@@ -229,6 +234,7 @@ const ar: typeof en = {
   pages: {
     dashboard: { title: "لوحة التحكّم", subtitle: "نظرة عامة على إرساليات أوبر — السائقون والعروض الحيّة وجلسة الأسطول." },
     connections: { title: "ربط أوبر", subtitle: "اربط جلسة أسطول أوبر لاستقبال تيار الإرساليات." },
+    map: { title: "الخريطة الحية", subtitle: "مواقع السائقين على رحلة الآن، مع نقطة الاستلام والتنزيل." },
     vehicles: { title: "المركبات", subtitle: "مركبات أسطولك المزامَنة من أوبر." },
     drivers: { title: "السائقون", subtitle: "سائقو الأسطول وحالة ربطهم بأوبر." },
     assignments: { title: "الإسنادات", subtitle: "أي سائق كان بأي مركبة ومتى." },
