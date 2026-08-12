@@ -84,7 +84,7 @@ export function OtpInput({
           autoFocus={autoFocus && i === 0}
           disabled={disabled}
           aria-label={`Digit ${i + 1}`}
-          className="h-12 w-11 rounded-lg border border-slate-300 text-center font-mono text-xl font-semibold text-slate-900 outline-none transition-colors focus:border-slate-900 focus:ring-2 focus:ring-slate-200 disabled:opacity-50"
+          className="h-12 w-11 rounded-lg border border-line-strong text-center font-mono text-xl font-semibold text-ink outline-none transition-colors focus:border-ink focus:ring-2 focus:ring-line disabled:opacity-50"
         />
       ))}
     </div>

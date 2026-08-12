@@ -21,8 +21,8 @@ export function PageHeader({
   return (
     <div className="flex items-start justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">{resolvedTitle}</h1>
-        {resolvedSubtitle && <p className="mt-1 text-sm text-slate-500">{resolvedSubtitle}</p>}
+        <h1 className="text-2xl font-bold text-ink">{resolvedTitle}</h1>
+        {resolvedSubtitle && <p className="mt-1 text-sm text-ink-muted">{resolvedSubtitle}</p>}
       </div>
       {action}
     </div>

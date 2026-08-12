@@ -45,11 +45,11 @@ export default function NotificationsPage() {
         {loading ? (
           <div className="space-y-2 p-4">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded bg-slate-100" />
+              <div key={i} className="h-12 animate-pulse rounded bg-surface-2" />
             ))}
           </div>
         ) : error ? (
-          <div className="p-6 text-sm text-rose-600">{t("screens.notifications.loadError")} {error}</div>
+          <div className="p-6 text-sm text-danger-fg">{t("screens.notifications.loadError")} {error}</div>
         ) : items.length === 0 ? (
           <EmptyState
             icon={Bell}
@@ -57,27 +57,27 @@ export default function NotificationsPage() {
             description={t("screens.notifications.emptyDesc")}
           />
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-line">
             {items.map((n) => (
               <div
                 key={n.id}
                 className={cn(
                   "flex items-start gap-3 p-4",
-                  !n.read && "bg-slate-100/30",
+                  !n.read && "bg-surface-2/30",
                 )}
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger-bg text-danger-fg">
                   <UserX className="h-4 w-4" />
                 </span>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-slate-800">{n.title}</p>
-                  <p className="text-sm text-slate-500">{n.body}</p>
+                  <p className="text-sm font-medium text-ink">{n.title}</p>
+                  <p className="text-sm text-ink-muted">{n.body}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-ink-subtle">
                     {n.created_at ? new Date(n.created_at).toLocaleString() : ""}
                   </span>
-                  {!n.read && <span className="h-2 w-2 rounded-full bg-slate-900" />}
+                  {!n.read && <span className="h-2 w-2 rounded-full bg-primary" />}
                 </div>
               </div>
             ))}

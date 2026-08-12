@@ -73,13 +73,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-surface-2 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <Logo size={72} className="text-slate-900" />
+          <Logo size={72} className="text-ink" />
           <div className="leading-tight">
-            <div className="text-lg font-bold text-slate-900">Reidey</div>
-            <div className="text-xs text-slate-400">Fleet Management</div>
+            <div className="text-lg font-bold text-ink">Reidey</div>
+            <div className="text-xs text-ink-subtle">Fleet Management</div>
           </div>
         </div>
 
@@ -92,19 +92,19 @@ export default function LoginPage() {
             }}
           />
         ) : activateMode ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h1 className="text-lg font-semibold text-slate-900">{t("suspended.activateTitle")}</h1>
-            <p className="mt-1 text-sm text-slate-500">{t("suspended.activateHint")}</p>
+          <div className="rounded-xl border border-line bg-surface p-6 shadow-sm">
+            <h1 className="text-lg font-semibold text-ink">{t("suspended.activateTitle")}</h1>
+            <p className="mt-1 text-sm text-ink-muted">{t("suspended.activateHint")}</p>
             <form className="mt-5 space-y-4" onSubmit={onActivate}>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("login.email")}</label>
+                <label className="mb-1.5 block text-sm font-medium text-ink">{t("login.email")}</label>
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200" />
+                  className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line" />
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("login.password")}</label>
+                <label className="mb-1.5 block text-sm font-medium text-ink">{t("login.password")}</label>
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200" />
+                  className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line" />
               </div>
               <div className="py-1">
                 <OtpInput value={code} onChange={setCode} autoFocus />
@@ -114,30 +114,30 @@ export default function LoginPage() {
                 {t("suspended.activateCta")}
               </Button>
               <button type="button" onClick={() => setActivateMode(false)}
-                className="w-full text-center text-xs font-medium text-slate-500 hover:text-slate-800">
+                className="w-full text-center text-xs font-medium text-ink-muted hover:text-ink">
                 {t("suspended.backToLogin")}
               </button>
             </form>
           </div>
         ) : (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h1 className="text-lg font-semibold text-slate-900">{t("login.title")}</h1>
-          <p className="mt-1 text-sm text-slate-500">{t("login.subtitle")}</p>
+        <div className="rounded-xl border border-line bg-surface p-6 shadow-sm">
+          <h1 className="text-lg font-semibold text-ink">{t("login.title")}</h1>
+          <p className="mt-1 text-sm text-ink-muted">{t("login.subtitle")}</p>
 
           <form className="mt-5 space-y-4" onSubmit={onSubmit}>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("login.email")}</label>
+              <label className="mb-1.5 block text-sm font-medium text-ink">{t("login.email")}</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
               />
             </div>
             <div>
               <div className="mb-1.5 flex items-center justify-between">
-                <label className="block text-sm font-medium text-slate-700">{t("login.password")}</label>
-                <Link href="/forgot-password" className="text-xs font-medium text-slate-500 hover:text-slate-800">
+                <label className="block text-sm font-medium text-ink">{t("login.password")}</label>
+                <Link href="/forgot-password" className="text-xs font-medium text-ink-muted hover:text-ink">
                   {t("login.forgotCta")}
                 </Link>
               </div>
@@ -145,7 +145,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
               />
             </div>
             <Button type="submit" className="w-full" disabled={submitting}>
@@ -153,16 +153,16 @@ export default function LoginPage() {
               {submitting ? t("login.signingIn") : t("login.signIn")}
             </Button>
             <button type="button" onClick={() => setActivateMode(true)}
-              className="w-full text-center text-xs font-medium text-slate-500 hover:text-slate-800">
+              className="w-full text-center text-xs font-medium text-ink-muted hover:text-ink">
               {t("suspended.haveCode")}
             </button>
           </form>
         </div>
         )}
 
-        <p className="mt-4 text-center text-sm text-slate-500">
+        <p className="mt-4 text-center text-sm text-ink-muted">
           {t("login.noAccount")}{" "}
-          <Link href="/register" className="font-medium text-slate-900 hover:underline">
+          <Link href="/register" className="font-medium text-ink hover:underline">
             {t("login.registerCta")}
           </Link>
         </p>

@@ -46,14 +46,14 @@ export default function AdminDashboardPage() {
 
       {/* Offers over time */}
       <Card className="p-5">
-        <h3 className="mb-4 font-semibold text-slate-800">{c("offersChart")}</h3>
-        {chart.length > 0 ? <AreaChart data={chart} /> : <div className="h-[180px] animate-pulse rounded-lg bg-slate-100" />}
+        <h3 className="mb-4 font-semibold text-ink">{c("offersChart")}</h3>
+        {chart.length > 0 ? <AreaChart data={chart} /> : <div className="h-[180px] animate-pulse rounded-lg bg-surface-2" />}
       </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Session breakdown */}
         <Card className="p-5">
-          <h3 className="mb-4 font-semibold text-slate-800">{c("sessionBreakdown")}</h3>
+          <h3 className="mb-4 font-semibold text-ink">{c("sessionBreakdown")}</h3>
           <div className="space-y-3">
             <Bar label={c("stActive")} value={breakdown?.active ?? 0} total={sessionsTotal(breakdown)} color="#059669" />
             <Bar label={c("stNeedsRelink")} value={breakdown?.needs_relink ?? 0} total={sessionsTotal(breakdown)} color="#d97706" />
@@ -64,19 +64,19 @@ export default function AdminDashboardPage() {
 
         {/* Top companies */}
         <Card className="p-5">
-          <h3 className="mb-4 font-semibold text-slate-800">{c("topCompanies")}</h3>
+          <h3 className="mb-4 font-semibold text-ink">{c("topCompanies")}</h3>
           {top.length === 0 ? (
-            <p className="text-sm text-slate-400">—</p>
+            <p className="text-sm text-ink-subtle">—</p>
           ) : (
             <div className="space-y-3">
               {top.map((tc) => (
                 <div key={tc.company_id}>
                   <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-medium text-slate-700">{tc.company}</span>
-                    <span className="text-slate-400">{tc.offers}</span>
+                    <span className="font-medium text-ink">{tc.company}</span>
+                    <span className="text-ink-subtle">{tc.offers}</span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-slate-900" style={{ width: `${(tc.offers / topMax) * 100}%` }} />
+                  <div className="h-2 overflow-hidden rounded-full bg-surface-2">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${(tc.offers / topMax) * 100}%` }} />
                   </div>
                 </div>
               ))}
@@ -89,22 +89,22 @@ export default function AdminDashboardPage() {
       <Card className="p-5">
         <div className="mb-3 flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-amber-500" />
-          <h3 className="font-semibold text-slate-800">{c("alerts")}</h3>
+          <h3 className="font-semibold text-ink">{c("alerts")}</h3>
         </div>
         {alerts.length === 0 && expiringProxies.length === 0 ? (
-          <p className="text-sm text-slate-400">{c("noAlerts")}</p>
+          <p className="text-sm text-ink-subtle">{c("noAlerts")}</p>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-line">
             {expiringProxies.map((p) => (
               <li key={`px-${p.id}`} className="flex items-center justify-between gap-3 py-2.5">
                 <span className="flex items-center gap-2 text-sm">
-                  <Plug className="h-4 w-4 text-rose-500" />
-                  <span className="font-medium text-slate-800">{p.label}</span>
-                  <span className="text-slate-400">
+                  <Plug className="h-4 w-4 text-danger-fg" />
+                  <span className="font-medium text-ink">{p.label}</span>
+                  <span className="text-ink-subtle">
                     — {p.days_left < 0 ? c("proxyExpired") : c("proxyExpiring").replace("{n}", String(p.days_left))}
                   </span>
                 </span>
-                <Link href="/admin/proxies" className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-900 hover:bg-slate-100">
+                <Link href="/admin/proxies" className="rounded-lg px-2.5 py-1 text-xs font-medium text-ink hover:bg-surface-2">
                   {c("resolve")}
                 </Link>
               </li>
@@ -113,10 +113,10 @@ export default function AdminDashboardPage() {
               <li key={i} className="flex items-center justify-between gap-3 py-2.5">
                 <span className="flex items-center gap-2 text-sm">
                   <AlertIcon type={a.type} />
-                  <span className="font-medium text-slate-800">{a.company}</span>
-                  <span className="text-slate-400">— {c(`alert_${a.type}`)}</span>
+                  <span className="font-medium text-ink">{a.company}</span>
+                  <span className="text-ink-subtle">— {c(`alert_${a.type}`)}</span>
                 </span>
-                <Link href="/admin/companies" className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-900 hover:bg-slate-100">
+                <Link href="/admin/companies" className="rounded-lg px-2.5 py-1 text-xs font-medium text-ink hover:bg-surface-2">
                   {c("resolve")}
                 </Link>
               </li>
@@ -149,13 +149,13 @@ function Kpi({
   icon?: React.ComponentType<{ className?: string }>;
 }) {
   const valueColor =
-    tone === "positive" ? "text-emerald-600" : tone === "warning" ? "text-amber-600" : "text-slate-900";
+    tone === "positive" ? "text-success-fg" : tone === "warning" ? "text-warning-fg" : "text-ink";
   const iconTone =
-    tone === "positive" ? "bg-emerald-50 text-emerald-600" : tone === "warning" ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-500";
+    tone === "positive" ? "bg-success-bg text-success-fg" : tone === "warning" ? "bg-warning-bg text-warning-fg" : "bg-surface-2 text-ink-muted";
   return (
     <Link
       href={href}
-      className="group rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_2px_10px_-2px_rgba(30,34,43,0.06)] transition hover:border-slate-300 hover:shadow-md"
+      className="group rounded-2xl border border-line/70 bg-surface p-4 shadow-[0_2px_10px_-2px_rgba(30,34,43,0.06)] transition hover:border-line-strong hover:shadow-md"
     >
       <div className="flex items-start justify-between">
         {Icon && (
@@ -163,11 +163,11 @@ function Kpi({
             <Icon className="h-[18px] w-[18px]" />
           </span>
         )}
-        <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:text-slate-500 rtl:rotate-180" />
+        <ArrowRight className="h-4 w-4 text-ink-subtle transition group-hover:text-ink-muted rtl:rotate-180" />
       </div>
-      <div className="mt-3 text-sm text-slate-500">{label}</div>
+      <div className="mt-3 text-sm text-ink-muted">{label}</div>
       <div className={`mt-0.5 text-2xl font-bold tabular-nums ${valueColor}`}>{value ?? "…"}</div>
-      {sub && <div className="mt-0.5 text-xs text-slate-400">{sub}</div>}
+      {sub && <div className="mt-0.5 text-xs text-ink-subtle">{sub}</div>}
     </Link>
   );
 }
@@ -176,13 +176,13 @@ function Bar({ label, value, total, color }: { label: string; value: number; tot
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-sm">
-        <span className="flex items-center gap-2 text-slate-600">
+        <span className="flex items-center gap-2 text-ink-muted">
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
           {label}
         </span>
-        <span className="font-medium text-slate-700">{value}</span>
+        <span className="font-medium text-ink">{value}</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+      <div className="h-2 overflow-hidden rounded-full bg-surface-2">
         <div className="h-full rounded-full" style={{ width: `${(value / total) * 100}%`, background: color }} />
       </div>
     </div>
@@ -190,7 +190,7 @@ function Bar({ label, value, total, color }: { label: string; value: number; tot
 }
 
 function AlertIcon({ type }: { type: string }) {
-  if (type === "no_proxy") return <Plug className="h-4 w-4 text-rose-500" />;
-  if (type === "no_session") return <Building2 className="h-4 w-4 text-slate-400" />;
+  if (type === "no_proxy") return <Plug className="h-4 w-4 text-danger-fg" />;
+  if (type === "no_session") return <Building2 className="h-4 w-4 text-ink-subtle" />;
   return <Radio className="h-4 w-4 text-amber-500" />;
 }

@@ -12,21 +12,21 @@ export type Status =
   | "neutral";
 
 const styles: Record<Status, string> = {
-  matched: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-  personal: "bg-rose-50 text-rose-700 ring-rose-600/20",
-  ambiguous: "bg-amber-50 text-amber-700 ring-amber-600/20",
-  gap: "bg-slate-100 text-slate-600 ring-slate-500/20",
-  private: "bg-violet-50 text-violet-700 ring-violet-600/20",
-  connected: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-  expiring: "bg-amber-50 text-amber-700 ring-amber-600/20",
-  error: "bg-rose-50 text-rose-700 ring-rose-600/20",
-  neutral: "bg-slate-100 text-slate-600 ring-slate-500/20",
+  matched: "bg-success-bg text-success-fg ring-success-ring/20",
+  personal: "bg-danger-bg text-danger-fg ring-danger-ring/20",
+  ambiguous: "bg-warning-bg text-warning-fg ring-warning-ring/20",
+  gap: "bg-surface-2 text-ink-muted ring-line",
+  private: "bg-accent-bg text-accent-fg ring-accent-ring/20",
+  connected: "bg-success-bg text-success-fg ring-success-ring/20",
+  expiring: "bg-warning-bg text-warning-fg ring-warning-ring/20",
+  error: "bg-danger-bg text-danger-fg ring-danger-ring/20",
+  neutral: "bg-surface-2 text-ink-muted ring-line",
 };
 
 const dotColors: Partial<Record<Status, string>> = {
-  connected: "bg-emerald-500",
-  expiring: "bg-amber-500",
-  error: "bg-rose-500",
+  connected: "bg-success-ring",
+  expiring: "bg-warning-ring",
+  error: "bg-danger-ring",
 };
 
 export function Badge({
@@ -52,7 +52,7 @@ export function Badge({
         <span
           className={cn(
             "h-1.5 w-1.5 rounded-full",
-            dotColors[status] ?? "bg-slate-400",
+            dotColors[status] ?? "bg-ink-subtle",
           )}
         />
       )}

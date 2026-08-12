@@ -135,33 +135,37 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
   }, []);
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_2px_10px_-2px_rgba(30,34,43,0.06)]">
+    <div className="relative overflow-hidden rounded-2xl border border-line/70 bg-surface shadow-[0_2px_10px_-2px_rgba(30,34,43,0.06)]">
       <div ref={containerRef} className={`w-full ${heightClass}`} style={{ zIndex: 0 }} />
 
-      <div className="pointer-events-none absolute top-3 z-[1000] flex flex-wrap gap-2 px-3 ltr:left-3 rtl:right-3">
-        <div className="pointer-events-auto flex items-center gap-3 rounded-xl bg-white/95 px-3 py-2 text-xs shadow-md backdrop-blur">
-          <Legend color="#f59e0b" label={c("enRoute")} />
-          <Legend color="#10b981" label={c("onTrip")} />
+      {/* Legend — pinned bottom-left so it never rides over the zoom control
+          (top-left) or the driver list (top-right). Colors come straight from
+          PRESENCE_COLOR so they always match the markers and badges. */}
+      <div className="pointer-events-none absolute bottom-3 z-[1000] flex flex-wrap gap-2 px-3 ltr:left-3 rtl:right-3">
+        <div className="pointer-events-auto flex items-center gap-3 rounded-xl bg-surface/95 px-3 py-2 text-xs shadow-md backdrop-blur">
+          {(["online", "en_route", "on_trip"] as const).map((p) => (
+            <Legend key={p} color={PRESENCE_COLOR[p]} label={c(PRESENCE_LABEL_KEY[p])} />
+          ))}
         </div>
       </div>
 
       {/* Driver list — click to zoom onto one */}
       {drivers.length > 0 && (
-        <div className="pointer-events-auto absolute top-3 z-[1000] max-h-[calc(100%-1.5rem)] w-56 overflow-y-auto rounded-xl bg-white/95 p-1.5 shadow-md backdrop-blur ltr:right-3 rtl:left-3">
+        <div className="pointer-events-auto absolute top-3 z-[1000] max-h-[calc(100%-1.5rem)] w-56 overflow-y-auto rounded-xl bg-surface/95 p-1.5 shadow-md backdrop-blur ltr:right-3 rtl:left-3">
           {drivers.map((dr) => {
             const p: Presence = presence(dr.status);
             return (
               <button
                 key={dr.id}
                 onClick={() => focusDriver(dr)}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start transition-colors hover:bg-slate-100"
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start transition-colors hover:bg-surface-2"
               >
                 <span className="relative shrink-0">
                   {dr.picture ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={dr.picture} alt="" className="h-9 w-9 rounded-full object-cover" />
                   ) : (
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-ink-muted">
                       {dr.name.slice(0, 2).toUpperCase()}
                     </span>
                   )}
@@ -171,8 +175,8 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
                   />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-slate-800">{dr.name}</span>
-                  {dr.phone && <span className="block truncate text-[11px] text-slate-400" dir="ltr">{dr.phone}</span>}
+                  <span className="block truncate text-sm font-medium text-ink">{dr.name}</span>
+                  {dr.phone && <span className="block truncate text-[11px] text-ink-subtle" dir="ltr">{dr.phone}</span>}
                 </span>
                 <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${PRESENCE_TONE[p]}`}>
                   {c(PRESENCE_LABEL_KEY[p])}
@@ -185,15 +189,15 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
       {count === 0 && (
         <div className="pointer-events-none absolute inset-0 z-[999] flex items-center justify-center">
-          <div className="rounded-xl bg-white/95 px-5 py-4 text-center shadow-lg backdrop-blur">
-            <p className="font-semibold text-slate-800">{c("emptyTitle")}</p>
-            <p className="mt-1 text-sm text-slate-500">{c("emptyDesc")}</p>
+          <div className="rounded-xl bg-surface/95 px-5 py-4 text-center shadow-lg backdrop-blur">
+            <p className="font-semibold text-ink">{c("emptyTitle")}</p>
+            <p className="mt-1 text-sm text-ink-muted">{c("emptyDesc")}</p>
           </div>
         </div>
       )}
 
       {updatedAt && (
-        <p className="pointer-events-none absolute bottom-2 z-[1000] flex items-center gap-1.5 rounded-lg bg-white/90 px-2 py-1 text-[11px] text-slate-400 ltr:right-2 rtl:left-2">
+        <p className="pointer-events-none absolute bottom-2 z-[1000] flex items-center gap-1.5 rounded-lg bg-surface/90 px-2 py-1 text-[11px] text-ink-subtle ltr:right-2 rtl:left-2">
           <RefreshCw className="h-3 w-3" /> {updatedAt.toLocaleTimeString(latnLocale(locale))}
         </p>
       )}
@@ -203,7 +207,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
 function Legend({ color, label }: { color: string; label: string }) {
   return (
-    <span className="flex items-center gap-1.5 text-slate-600">
+    <span className="flex items-center gap-1.5 text-ink-muted">
       <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} /> {label}
     </span>
   );

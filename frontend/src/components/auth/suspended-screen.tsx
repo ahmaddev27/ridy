@@ -53,11 +53,11 @@ export function SuspendedScreen({
   const wa = info.supportWhatsapp?.replace(/[^\d]/g, "");
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+    <div className="rounded-xl border border-line bg-surface p-6 shadow-sm">
+      <div className="mb-3 rounded-lg bg-danger-bg px-3 py-2 text-sm font-medium text-danger-fg">
         {s(`reason_${info.reason}`)}
       </div>
-      <p className="text-sm text-slate-500">{s("contactHint")}</p>
+      <p className="text-sm text-ink-muted">{s("contactHint")}</p>
 
       <div className="mt-4 flex flex-col gap-2">
         {wa && (
@@ -73,7 +73,7 @@ export function SuspendedScreen({
         {info.supportEmail && (
           <a
             href={`mailto:${info.supportEmail}`}
-            className="flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="flex items-center justify-center gap-2 rounded-lg border border-line-strong px-3 py-2.5 text-sm font-semibold text-ink hover:bg-surface-2"
           >
             <Mail className="h-4 w-4" /> {s("email")}
           </a>
@@ -81,9 +81,9 @@ export function SuspendedScreen({
       </div>
 
       {canActivate && (
-        <form onSubmit={activate} className="mt-6 space-y-3 border-t border-slate-100 pt-5">
-          <p className="text-sm font-medium text-slate-700">{s("activateTitle")}</p>
-          <p className="text-xs text-slate-400">{s("activateHint")}</p>
+        <form onSubmit={activate} className="mt-6 space-y-3 border-t border-line pt-5">
+          <p className="text-sm font-medium text-ink">{s("activateTitle")}</p>
+          <p className="text-xs text-ink-subtle">{s("activateHint")}</p>
           <div className="py-1">
             <OtpInput value={code} onChange={setCode} autoFocus />
           </div>

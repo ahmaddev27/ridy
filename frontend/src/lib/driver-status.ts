@@ -25,10 +25,10 @@ export const PRESENCE_COLOR: Record<Presence, string> = {
 
 /** Badge background/text classes per state. */
 export const PRESENCE_TONE: Record<Presence, string> = {
-  online: "bg-emerald-50 text-emerald-700",
-  en_route: "bg-amber-50 text-amber-700",
-  on_trip: "bg-sky-50 text-sky-700",
-  offline: "bg-slate-100 text-slate-500",
+  online: "bg-success-bg text-success-fg",
+  en_route: "bg-warning-bg text-warning-fg",
+  on_trip: "bg-info-bg text-info-fg",
+  offline: "bg-surface-2 text-ink-muted",
 };
 
 /** i18n key (under screens.map) for a state's label. */

@@ -98,19 +98,19 @@ export function Select({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-start text-sm outline-none transition-colors hover:border-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+        className="flex w-full items-center justify-between gap-2 rounded-lg border border-line-strong bg-surface px-3 py-2 text-start text-sm outline-none transition-colors hover:border-line-strong focus:border-ink focus:ring-2 focus:ring-line disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-subtle"
       >
-        <span className={`truncate ${selected ? "text-slate-800" : "text-slate-400"}`}>
+        <span className={`truncate ${selected ? "text-ink" : "text-ink-subtle"}`}>
           {selected ? selected.label : placeholder}
         </span>
-        <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`h-4 w-4 shrink-0 text-ink-subtle transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-line bg-surface shadow-lg">
           {showSearch && (
-            <div className="flex items-center gap-2 border-b border-slate-100 px-2.5 py-2">
-              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+            <div className="flex items-center gap-2 border-b border-line px-2.5 py-2">
+              <Search className="h-4 w-4 shrink-0 text-ink-subtle" />
               <input
                 ref={searchRef}
                 value={query}
@@ -119,13 +119,13 @@ export function Select({
                   setActive(0);
                 }}
                 placeholder="…"
-                className="w-full bg-transparent text-sm outline-none placeholder:text-slate-300"
+                className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-subtle"
               />
             </div>
           )}
           <ul role="listbox" className="max-h-60 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-slate-400">—</li>
+              <li className="px-3 py-2 text-sm text-ink-subtle">—</li>
             ) : (
               filtered.map((opt, i) => {
                 const isSelected = opt.value === value;
@@ -137,12 +137,12 @@ export function Select({
                       disabled={opt.disabled}
                       onClick={() => pick(opt)}
                       onMouseEnter={() => setActive(i)}
-                      className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-start text-sm transition-colors disabled:cursor-not-allowed disabled:text-slate-300 ${
-                        isActive && !opt.disabled ? "bg-slate-100" : ""
-                      } ${isSelected ? "font-medium text-slate-900" : "text-slate-700"}`}
+                      className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-start text-sm transition-colors disabled:cursor-not-allowed disabled:text-ink-subtle ${
+                        isActive && !opt.disabled ? "bg-surface-2" : ""
+                      } ${isSelected ? "font-medium text-ink" : "text-ink-muted"}`}
                     >
                       <span className="truncate">{opt.label}</span>
-                      {isSelected && <Check className="h-4 w-4 shrink-0 text-slate-900" />}
+                      {isSelected && <Check className="h-4 w-4 shrink-0 text-ink" />}
                     </button>
                   </li>
                 );

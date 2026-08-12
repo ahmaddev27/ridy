@@ -106,32 +106,32 @@ export default function ReportsPage() {
 
       {/* Plans — resellers issue codes against these */}
       <Card className="overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-100 p-4">
+        <div className="flex items-center justify-between border-b border-line p-4">
           <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 text-slate-700" />
-            <h3 className="font-semibold text-slate-800">{c("plansTitle")}</h3>
+            <Package className="h-4 w-4 text-ink" />
+            <h3 className="font-semibold text-ink">{c("plansTitle")}</h3>
           </div>
           <Button variant="secondary" onClick={() => setEditingPlan("new")}>
             <Plus className="h-4 w-4" /> {c("addPlan")}
           </Button>
         </div>
         {plans.length === 0 ? (
-          <p className="p-5 text-center text-sm text-slate-400">{c("noPlans")}</p>
+          <p className="p-5 text-center text-sm text-ink-subtle">{c("noPlans")}</p>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-line">
             {plans.map((p) => (
               <div key={p.id} className="flex items-center justify-between gap-3 px-5 py-3">
                 <div className="flex items-center gap-3">
-                  <span className="font-medium text-slate-800">{p.name}</span>
+                  <span className="font-medium text-ink">{p.name}</span>
                   {!p.active && (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">{c("planInactive")}</span>
+                    <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-ink-muted">{c("planInactive")}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-4 text-sm">
-                  <span className="font-semibold tabular-nums text-slate-800">{money(p.price)}</span>
-                  <span className="tabular-nums text-slate-500">{p.duration_days} {c("planDays")}</span>
-                  <button onClick={() => setEditingPlan(p)} className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Pencil className="h-4 w-4" /></button>
-                  <button onClick={() => setDeletingPlan(p)} className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
+                  <span className="font-semibold tabular-nums text-ink">{money(p.price)}</span>
+                  <span className="tabular-nums text-ink-muted">{p.duration_days} {c("planDays")}</span>
+                  <button onClick={() => setEditingPlan(p)} className="rounded p-1.5 text-ink-subtle hover:bg-surface-2 hover:text-ink"><Pencil className="h-4 w-4" /></button>
+                  <button onClick={() => setDeletingPlan(p)} className="rounded p-1.5 text-ink-subtle hover:bg-danger-bg hover:text-danger-fg"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </div>
             ))}
@@ -143,20 +143,20 @@ export default function ReportsPage() {
         {/* Revenue by month */}
         <Card className="p-5">
           <div className="mb-4 flex items-center gap-2">
-            <Wallet className="h-4 w-4 text-slate-700" />
-            <h3 className="font-semibold text-slate-800">{c("revenueTitle")}</h3>
+            <Wallet className="h-4 w-4 text-ink" />
+            <h3 className="font-semibold text-ink">{c("revenueTitle")}</h3>
           </div>
           {!summary || summary.revenue_by_month.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-400">{c("revenueEmpty")}</p>
+            <p className="py-6 text-center text-sm text-ink-subtle">{c("revenueEmpty")}</p>
           ) : (
             <div className="space-y-2.5">
               {summary.revenue_by_month.map((r) => (
                 <div key={r.month} className="flex items-center gap-3">
-                  <span className="w-16 shrink-0 text-xs tabular-nums text-slate-500">{r.month}</span>
-                  <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-100">
+                  <span className="w-16 shrink-0 text-xs tabular-nums text-ink-muted">{r.month}</span>
+                  <div className="h-3 flex-1 overflow-hidden rounded-full bg-surface-2">
                     <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(r.total / maxRevenue) * 100}%` }} />
                   </div>
-                  <span className="w-20 shrink-0 text-end text-xs font-semibold tabular-nums text-slate-700">{money(r.total)}</span>
+                  <span className="w-20 shrink-0 text-end text-xs font-semibold tabular-nums text-ink">{money(r.total)}</span>
                 </div>
               ))}
             </div>
@@ -166,19 +166,19 @@ export default function ReportsPage() {
         {/* Expiring subscriptions */}
         <Card className="p-5">
           <div className="mb-4 flex items-center gap-2">
-            <Clock className="h-4 w-4 text-slate-700" />
-            <h3 className="font-semibold text-slate-800">{c("expiringTitle")}</h3>
+            <Clock className="h-4 w-4 text-ink" />
+            <h3 className="font-semibold text-ink">{c("expiringTitle")}</h3>
           </div>
           {!summary || summary.expiring.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-400">{c("expiringEmpty")}</p>
+            <p className="py-6 text-center text-sm text-ink-subtle">{c("expiringEmpty")}</p>
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-line">
               {summary.expiring.map((e) => (
                 <li key={e.id} className="flex items-center justify-between py-2.5 text-sm">
-                  <span className="font-medium text-slate-800">{e.name}</span>
+                  <span className="font-medium text-ink">{e.name}</span>
                   <span className="flex items-center gap-3">
-                    <span className="text-slate-500">{e.ends_at ? new Date(e.ends_at).toLocaleDateString(latnLocale(locale)) : "—"}</span>
-                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                    <span className="text-ink-muted">{e.ends_at ? new Date(e.ends_at).toLocaleDateString(latnLocale(locale)) : "—"}</span>
+                    <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs font-semibold text-warning-fg">
                       {c("daysLeft").replace("{n}", String(e.days_left ?? 0))}
                     </span>
                   </span>
@@ -191,8 +191,8 @@ export default function ReportsPage() {
 
       {/* Invoices */}
       <Card className="overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
-          <h3 className="font-semibold text-slate-800">{c("invoicesTitle")}</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
+          <h3 className="font-semibold text-ink">{c("invoicesTitle")}</h3>
           <div className="flex flex-wrap items-center gap-2">
             <Select
               className="w-52"
@@ -211,7 +211,7 @@ export default function ReportsPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-400 [&_th]:text-start">
+              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
                 <tr>
                   <th className="px-4 py-3 font-semibold">{c("colInvoice")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colCompany")}</th>
@@ -223,30 +223,30 @@ export default function ReportsPage() {
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {invoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-mono text-xs text-slate-500">#{inv.id}</td>
-                    <td className="px-4 py-3 font-medium text-slate-800">{inv.company_name ?? "—"}</td>
-                    <td className="px-4 py-3 tabular-nums text-slate-600">{inv.days}</td>
-                    <td className="px-4 py-3 font-semibold tabular-nums text-slate-800">{inv.amount !== null ? money(inv.amount) : "—"}</td>
+                  <tr key={inv.id} className="hover:bg-surface-2">
+                    <td className="px-4 py-3 font-mono text-xs text-ink-muted">#{inv.id}</td>
+                    <td className="px-4 py-3 font-medium text-ink">{inv.company_name ?? "—"}</td>
+                    <td className="px-4 py-3 tabular-nums text-ink-muted">{inv.days}</td>
+                    <td className="px-4 py-3 font-semibold tabular-nums text-ink">{inv.amount !== null ? money(inv.amount) : "—"}</td>
                     <td className="px-4 py-3">
                       <span
                         className={
                           "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold " +
-                          (inv.paid ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")
+                          (inv.paid ? "bg-success-bg text-success-fg" : "bg-warning-bg text-warning-fg")
                         }
                       >
                         {inv.paid ? c("paid") : c("unpaid")}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{new Date(inv.starts_at).toLocaleDateString(latnLocale(locale))}</td>
-                    <td className="px-4 py-3 text-slate-500">{new Date(inv.ends_at).toLocaleDateString(latnLocale(locale))}</td>
+                    <td className="px-4 py-3 text-ink-muted">{new Date(inv.starts_at).toLocaleDateString(latnLocale(locale))}</td>
+                    <td className="px-4 py-3 text-ink-muted">{new Date(inv.ends_at).toLocaleDateString(latnLocale(locale))}</td>
                     <td className="px-4 py-3 text-end">
                       {!inv.paid && (
                         <button
                           onClick={() => setSettling(inv)}
-                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg"
                         >
                           <CheckCircle2 className="h-4 w-4" /> {c("settle")}
                         </button>
@@ -315,7 +315,7 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | null; onClose: () 
     }
   }
 
-  const inputCls = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200";
+  const inputCls = "w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line";
 
   return (
     <Modal
@@ -333,20 +333,20 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | null; onClose: () 
     >
       <div className="space-y-3 text-start">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">{c("planName")}</label>
+          <label className="mb-1 block text-sm font-medium text-ink">{c("planName")}</label>
           <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">{c("planPrice")}</label>
+            <label className="mb-1 block text-sm font-medium text-ink">{c("planPrice")}</label>
             <input type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} className={inputCls} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">{c("planDuration")}</label>
+            <label className="mb-1 block text-sm font-medium text-ink">{c("planDuration")}</label>
             <input type="number" min={1} value={days} onChange={(e) => setDays(e.target.value)} className={inputCls} />
           </div>
         </div>
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-muted">
           <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="h-4 w-4" />
           {c("planActive")}
         </label>
@@ -408,9 +408,9 @@ function SettleModal({
       }
     >
       <div className="space-y-3 text-start">
-        <p className="text-sm text-slate-500">{c("settleIntro")}</p>
+        <p className="text-sm text-ink-muted">{c("settleIntro")}</p>
         {payments.length === 0 ? (
-          <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-400">{c("noPayments")}</p>
+          <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink-subtle">{c("noPayments")}</p>
         ) : (
           <Select
             value={paymentId}

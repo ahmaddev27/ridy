@@ -66,7 +66,7 @@ export default function ProfilePage() {
 
       <div className="flex w-full flex-col gap-4 md:flex-row">
         {/* Side tabs */}
-        <nav className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200/70 bg-slate-50 p-1.5 md:h-fit md:w-48 md:flex-col md:gap-1">
+        <nav className="flex gap-1 overflow-x-auto rounded-xl border border-line/70 bg-surface-2 p-1.5 md:h-fit md:w-48 md:flex-col md:gap-1">
           {([
             { k: "info", icon: User },
             { k: "password", icon: KeyRound },
@@ -79,11 +79,11 @@ export default function ProfilePage() {
                 className={
                   "group flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-start text-sm font-medium transition-all " +
                   (active
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-900")
+                    ? "bg-primary text-primary-ink shadow-sm"
+                    : "text-ink-muted hover:bg-surface-2 hover:text-ink")
                 }
               >
-                <Icon className={"h-4 w-4 shrink-0 " + (active ? "text-white" : "text-slate-400 group-hover:text-slate-600")} />
+                <Icon className={"h-4 w-4 shrink-0 " + (active ? "text-white" : "text-ink-subtle group-hover:text-ink-muted")} />
                 {c(`tab_${k}`)}
               </button>
             );
@@ -92,8 +92,8 @@ export default function ProfilePage() {
 
         <Card className="min-w-0 flex-1 p-5">
           {user?.tenant && (
-            <p className="mb-4 text-sm text-slate-400">
-              {c("company")}: <span className="font-medium text-slate-600">{user.tenant.name}</span>
+            <p className="mb-4 text-sm text-ink-subtle">
+              {c("company")}: <span className="font-medium text-ink-muted">{user.tenant.name}</span>
             </p>
           )}
 
@@ -145,14 +145,14 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+      <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
       <input
         type={type}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         autoComplete="off"
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+        className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
       />
     </div>
   );

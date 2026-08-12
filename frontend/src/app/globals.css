@@ -1,8 +1,86 @@
 @import "tailwindcss";
 
+/* Enable a class-based dark mode: `dark:` variants apply when a `.dark` ancestor
+   exists (Tailwind v4 defaults `dark:` to prefers-color-scheme otherwise). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     sans-serif;
+}
+
+/* Semantic color tokens. Raw values live on :root / .dark so they swap at runtime;
+   the @theme inline block below exposes them as Tailwind utilities (bg-surface,
+   text-ink, border-line, …) that follow the active theme automatically. */
+:root {
+  --canvas: #f6f6f4; /* page background */
+  --surface: #ffffff; /* cards, panels (was bg-white) */
+  --surface-2: #f1f1ef; /* subtle raised fills (was bg-slate-50/100) */
+  --ink: #1e222b; /* primary text (slate-900/800) */
+  --ink-muted: #5a616e; /* secondary text (slate-500/600) */
+  --ink-subtle: #8b909b; /* tertiary text (slate-400) */
+  --line: #e4e4e1; /* borders (slate-200) */
+  --line-strong: #d6d3cd; /* stronger borders (slate-300) */
+  --primary: #1e222b; /* primary button fill */
+  --primary-ink: #ffffff; /* text on primary */
+  --overlay: rgb(15 18 23 / 0.4); /* modal/drawer scrim */
+
+  /* Status tones: soft background + strong foreground + ring. */
+  --success-bg: #ecfdf5; --success-fg: #047857; --success-ring: #059669;
+  --danger-bg: #fff1f2; --danger-fg: #be123c; --danger-ring: #e11d48;
+  --warning-bg: #fffbeb; --warning-fg: #b45309; --warning-ring: #d97706;
+  --info-bg: #eff6ff; --info-fg: #1d4ed8; --info-ring: #2563eb;
+  --accent-bg: #f5f3ff; --accent-fg: #6d28d9; --accent-ring: #7c3aed;
+}
+
+.dark {
+  --canvas: #0f1115;
+  --surface: #181b21;
+  --surface-2: #20242b;
+  --ink: #e6e8ec;
+  --ink-muted: #a2a8b3;
+  --ink-subtle: #6b7280;
+  --line: #2c313a;
+  --line-strong: #3a4049;
+  --primary: #e6e8ec;
+  --primary-ink: #12151a;
+  --overlay: rgb(0 0 0 / 0.6);
+
+  --success-bg: #052e26; --success-fg: #6ee7b7; --success-ring: #059669;
+  --danger-bg: #3a1116; --danger-fg: #fda4af; --danger-ring: #e11d48;
+  --warning-bg: #2c210a; --warning-fg: #fcd34d; --warning-ring: #d97706;
+  --info-bg: #11213b; --info-fg: #93c5fd; --info-ring: #2563eb;
+  --accent-bg: #201a38; --accent-fg: #c4b5fd; --accent-ring: #7c3aed;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
+  --color-overlay: var(--overlay);
+
+  --color-success-bg: var(--success-bg);
+  --color-success-fg: var(--success-fg);
+  --color-success-ring: var(--success-ring);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-ring: var(--danger-ring);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-ring: var(--warning-ring);
+  --color-info-bg: var(--info-bg);
+  --color-info-fg: var(--info-fg);
+  --color-info-ring: var(--info-ring);
+  --color-accent-bg: var(--accent-bg);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-ring: var(--accent-ring);
 }
 
 html {
@@ -13,9 +91,8 @@ html {
 
 body {
   font-family: var(--font-sans);
-  /* Warm, soft neutral canvas (Metronic-style) so white cards read as elevated. */
-  background-color: #f6f6f4;
-  color: #1e222b;
+  background-color: var(--canvas);
+  color: var(--ink);
 }
 
 /* Tabular figures for data so numbers align in tables and stat tiles. */
@@ -39,7 +116,7 @@ html[lang="ar"] body,
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d6d3cd;
+  background: var(--line-strong);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-track {

@@ -12,7 +12,7 @@ export function Card({
       className={cn(
         // Softer radius + a very subtle tinted shadow so cards feel elevated on
         // the warm canvas without a hard border (Metronic-style surfaces).
-        "rounded-2xl border border-slate-200/70 bg-white shadow-[0_2px_10px_-2px_rgba(30,34,43,0.06)]",
+        "rounded-2xl border border-line bg-surface shadow-[0_2px_10px_-2px_rgba(30,34,43,0.06)]",
         className,
       )}
     >
@@ -35,17 +35,17 @@ export function StatCard({
   icon?: React.ComponentType<{ className?: string }>;
 }) {
   const valueTone = {
-    default: "text-slate-900",
-    positive: "text-emerald-600",
-    negative: "text-rose-700",
-    warning: "text-amber-600",
+    default: "text-ink",
+    positive: "text-success-fg",
+    negative: "text-danger-fg",
+    warning: "text-warning-fg",
   }[tone];
 
   const iconTone = {
-    default: "bg-slate-100 text-slate-500",
-    positive: "bg-emerald-50 text-emerald-600",
-    negative: "bg-rose-50 text-rose-600",
-    warning: "bg-amber-50 text-amber-600",
+    default: "bg-surface-2 text-ink-muted",
+    positive: "bg-success-bg text-success-fg",
+    negative: "bg-danger-bg text-danger-fg",
+    warning: "bg-warning-bg text-warning-fg",
   }[tone];
 
   return (
@@ -57,9 +57,9 @@ export function StatCard({
           </span>
         )}
         <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-slate-500">{label}</div>
+          <div className="truncate text-sm font-medium text-ink-muted">{label}</div>
           <div className={cn("mt-0.5 text-2xl font-bold tabular-nums tracking-tight", valueTone)}>{value}</div>
-          {hint && <div className="mt-1 text-xs text-slate-400">{hint}</div>}
+          {hint && <div className="mt-1 text-xs text-ink-subtle">{hint}</div>}
         </div>
       </div>
     </Card>

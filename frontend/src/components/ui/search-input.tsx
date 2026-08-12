@@ -18,12 +18,12 @@ type SearchInputProps = {
 export function SearchInput({ value, onChange, placeholder, className }: SearchInputProps) {
   return (
     <div className={cn("relative w-full max-w-sm", className)}>
-      <Search className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ltr:left-3 rtl:right-3" />
+      <Search className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle ltr:left-3 rtl:right-3" />
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-slate-200 bg-white py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200 ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3"
+        className="w-full rounded-lg border border-line bg-surface py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3"
       />
     </div>
   );

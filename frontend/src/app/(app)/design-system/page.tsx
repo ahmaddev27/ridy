@@ -12,10 +12,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useI18n } from "@/lib/i18n/context";
 
 const swatches: [string, string, string][] = [
-  ["swatchPrimary", "bg-slate-900", "slate-900"],
-  ["swatchText", "bg-slate-900", "slate-900"],
+  ["swatchPrimary", "bg-primary", "slate-900"],
+  ["swatchText", "bg-primary", "slate-900"],
   ["swatchMuted", "bg-slate-500", "slate-500"],
-  ["swatchSurface", "border border-slate-200 bg-slate-50", "slate-50"],
+  ["swatchSurface", "border border-line bg-surface-2", "slate-50"],
   ["swatchMatched", "bg-emerald-500", "emerald-500"],
   ["swatchPersonal", "bg-rose-500", "rose-500"],
   ["swatchReview", "bg-amber-500", "amber-500"],
@@ -26,7 +26,7 @@ const swatches: [string, string, string][] = [
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card className="p-5">
-      <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">
+      <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-ink-subtle">
         {title}
       </h3>
       {children}
@@ -52,7 +52,7 @@ export default function DesignSystemPage() {
             <div key={token}>
               <div className={`h-12 rounded-lg ${cls}`} />
               <p className="mt-1 text-xs font-medium">{t(`screens.designSystem.${nameKey}`)}</p>
-              <p className="text-[10px] text-slate-400">{token}</p>
+              <p className="text-[10px] text-ink-subtle">{token}</p>
             </div>
           ))}
         </div>
@@ -62,11 +62,11 @@ export default function DesignSystemPage() {
         {/* Typography */}
         <Section title={t("screens.designSystem.typography")}>
           <div className="space-y-2">
-            <p className="text-3xl font-bold text-slate-900">{t("screens.designSystem.heading1")}</p>
-            <p className="text-2xl font-bold text-slate-900">{t("screens.designSystem.heading2")}</p>
-            <p className="text-lg font-semibold text-slate-800">{t("screens.designSystem.heading3")}</p>
-            <p className="text-sm text-slate-600">{t("screens.designSystem.bodyText")}</p>
-            <p className="text-xs text-slate-400">{t("screens.designSystem.captionText")}</p>
+            <p className="text-3xl font-bold text-ink">{t("screens.designSystem.heading1")}</p>
+            <p className="text-2xl font-bold text-ink">{t("screens.designSystem.heading2")}</p>
+            <p className="text-lg font-semibold text-ink">{t("screens.designSystem.heading3")}</p>
+            <p className="text-sm text-ink-muted">{t("screens.designSystem.bodyText")}</p>
+            <p className="text-xs text-ink-subtle">{t("screens.designSystem.captionText")}</p>
           </div>
         </Section>
 
@@ -104,26 +104,26 @@ export default function DesignSystemPage() {
           <div className="space-y-3">
             <input
               placeholder={t("screens.designSystem.textInput")}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+              className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
             />
-            <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900">
+            <select className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink">
               <option>{t("screens.designSystem.selectOption")}</option>
               <option>Uber</option>
               <option>Bolt</option>
             </select>
-            <div className="flex flex-wrap items-center gap-5 text-sm text-slate-600">
+            <div className="flex flex-wrap items-center gap-5 text-sm text-ink-muted">
               <label className="flex items-center gap-2">
-                <input type="checkbox" defaultChecked className="rounded border-slate-300 text-slate-900" />
+                <input type="checkbox" defaultChecked className="rounded border-line-strong text-ink" />
                 {t("screens.designSystem.checkbox")}
               </label>
               <label className="flex items-center gap-2">
-                <input type="radio" name="dsr" defaultChecked className="border-slate-300 text-slate-900" />
+                <input type="radio" name="dsr" defaultChecked className="border-line-strong text-ink" />
                 {t("screens.designSystem.radio")}
               </label>
               <span className="flex items-center gap-2">
                 {t("screens.designSystem.switchLabel")}
                 <span className="inline-flex h-5 w-9 items-center rounded-full bg-emerald-500 p-0.5">
-                  <span className="ml-auto h-4 w-4 rounded-full bg-white" />
+                  <span className="ml-auto h-4 w-4 rounded-full bg-surface" />
                 </span>
               </span>
             </div>
@@ -161,13 +161,13 @@ export default function DesignSystemPage() {
         {/* Progress + skeleton */}
         <Section title={t("screens.designSystem.progressSkeleton")}>
           <div className="space-y-2">
-            <div className="h-2 w-full rounded-full bg-slate-100"><div className="h-2 w-[70%] rounded-full bg-slate-900" /></div>
-            <div className="h-2 w-full rounded-full bg-slate-100"><div className="h-2 w-[40%] rounded-full bg-emerald-500" /></div>
+            <div className="h-2 w-full rounded-full bg-surface-2"><div className="h-2 w-[70%] rounded-full bg-primary" /></div>
+            <div className="h-2 w-full rounded-full bg-surface-2"><div className="h-2 w-[40%] rounded-full bg-emerald-500" /></div>
           </div>
           <div className="mt-4 space-y-2">
-            <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
-            <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-            <div className="h-4 w-1/2 animate-pulse rounded bg-slate-100" />
+            <div className="h-4 w-2/3 animate-pulse rounded bg-surface-2" />
+            <div className="h-4 w-full animate-pulse rounded bg-surface-2" />
+            <div className="h-4 w-1/2 animate-pulse rounded bg-surface-2" />
           </div>
         </Section>
 
@@ -182,17 +182,17 @@ export default function DesignSystemPage() {
 
         {/* Tabs + pagination */}
         <Section title={t("screens.designSystem.tabsPagination")}>
-          <div className="flex gap-5 border-b border-slate-200 text-sm">
-            <button className="border-b-2 border-slate-900 pb-2 font-semibold text-slate-800">{t("screens.designSystem.tabActive")}</button>
-            <button className="border-b-2 border-transparent pb-2 font-semibold text-slate-500">{t("screens.designSystem.tabTwo")}</button>
-            <button className="border-b-2 border-transparent pb-2 font-semibold text-slate-500">{t("screens.designSystem.tabThree")}</button>
+          <div className="flex gap-5 border-b border-line text-sm">
+            <button className="border-b-2 border-ink pb-2 font-semibold text-ink">{t("screens.designSystem.tabActive")}</button>
+            <button className="border-b-2 border-transparent pb-2 font-semibold text-ink-muted">{t("screens.designSystem.tabTwo")}</button>
+            <button className="border-b-2 border-transparent pb-2 font-semibold text-ink-muted">{t("screens.designSystem.tabThree")}</button>
           </div>
           <div className="mt-4 flex items-center gap-1 text-sm">
-            <button className="rounded-md border border-slate-200 px-2.5 py-1 text-slate-500 hover:bg-slate-50">‹</button>
-            <button className="rounded-md bg-slate-900 px-2.5 py-1 text-white">1</button>
-            <button className="rounded-md border border-slate-200 px-2.5 py-1 text-slate-600 hover:bg-slate-50">2</button>
-            <button className="rounded-md border border-slate-200 px-2.5 py-1 text-slate-600 hover:bg-slate-50">3</button>
-            <button className="rounded-md border border-slate-200 px-2.5 py-1 text-slate-500 hover:bg-slate-50">›</button>
+            <button className="rounded-md border border-line px-2.5 py-1 text-ink-muted hover:bg-surface-2">‹</button>
+            <button className="rounded-md bg-primary px-2.5 py-1 text-primary-ink">1</button>
+            <button className="rounded-md border border-line px-2.5 py-1 text-ink-muted hover:bg-surface-2">2</button>
+            <button className="rounded-md border border-line px-2.5 py-1 text-ink-muted hover:bg-surface-2">3</button>
+            <button className="rounded-md border border-line px-2.5 py-1 text-ink-muted hover:bg-surface-2">›</button>
           </div>
         </Section>
       </div>
@@ -231,10 +231,10 @@ function Alert({
   children: React.ReactNode;
 }) {
   const styles = {
-    info: "border-slate-300 bg-slate-100 text-indigo-800",
-    success: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    warning: "border-amber-200 bg-amber-50 text-amber-800",
-    error: "border-rose-200 bg-rose-50 text-rose-800",
+    info: "border-line-strong bg-surface-2 text-indigo-800",
+    success: "border-emerald-200 bg-success-bg text-emerald-800",
+    warning: "border-amber-200 bg-warning-bg text-amber-800",
+    error: "border-rose-200 bg-danger-bg text-rose-800",
   }[tone];
   return <div className={`rounded-lg border p-3 ${styles}`}>{children}</div>;
 }

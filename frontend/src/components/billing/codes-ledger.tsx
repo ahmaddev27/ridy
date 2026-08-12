@@ -93,11 +93,11 @@ export function CodesLedger({ fetchCodes, exportCodes, showCollector = false }: 
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-sm">
-          <span className="mb-1 block text-slate-500">{c("filterStatus")}</span>
+          <span className="mb-1 block text-ink-muted">{c("filterStatus")}</span>
           <select
             value={status}
             onChange={(e) => onFilterChange(setStatus)(e.target.value as CodeStatus | "")}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-900"
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
           >
             <option value="">{c("allStatuses")}</option>
             <option value="pending">{c("st_pending")}</option>
@@ -106,12 +106,12 @@ export function CodesLedger({ fetchCodes, exportCodes, showCollector = false }: 
           </select>
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-slate-500">{c("from")}</span>
-          <input type="date" value={from} onChange={(e) => onFilterChange(setFrom)(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 outline-none focus:border-slate-900" />
+          <span className="mb-1 block text-ink-muted">{c("from")}</span>
+          <input type="date" value={from} onChange={(e) => onFilterChange(setFrom)(e.target.value)} className="rounded-lg border border-line px-3 py-2 text-sm text-ink-muted outline-none focus:border-ink" />
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-slate-500">{c("to")}</span>
-          <input type="date" value={to} onChange={(e) => onFilterChange(setTo)(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 outline-none focus:border-slate-900" />
+          <span className="mb-1 block text-ink-muted">{c("to")}</span>
+          <input type="date" value={to} onChange={(e) => onFilterChange(setTo)(e.target.value)} className="rounded-lg border border-line px-3 py-2 text-sm text-ink-muted outline-none focus:border-ink" />
         </label>
         <Button variant="ghost" onClick={resetFilters} className="text-sm">{c("clearFilters")}</Button>
         {exportCodes && (
@@ -126,7 +126,7 @@ export function CodesLedger({ fetchCodes, exportCodes, showCollector = false }: 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-start text-xs uppercase text-slate-400">
+            <tr className="border-b border-line text-start text-xs uppercase text-ink-subtle">
               <th className="px-2 py-2 text-start font-medium">{c("colCode")}</th>
               <th className="px-2 py-2 text-start font-medium">{c("colPlan")}</th>
               <th className="px-2 py-2 text-start font-medium">{c("colCompany")}</th>
@@ -139,29 +139,29 @@ export function CodesLedger({ fetchCodes, exportCodes, showCollector = false }: 
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className="border-b border-slate-50 last:border-0">
-                <td className="px-2 py-2 font-mono font-semibold tracking-wider text-slate-800" dir="ltr">{r.code}</td>
-                <td className="px-2 py-2 text-slate-600">{r.plan ?? c("none")}</td>
-                <td className="px-2 py-2 text-slate-600">{r.company ?? c("none")}</td>
-                {showCollector && <td className="px-2 py-2 text-slate-600">{r.collector ?? c("none")}</td>}
-                <td className="px-2 py-2 text-slate-600">
+              <tr key={r.id} className="border-b border-line last:border-0">
+                <td className="px-2 py-2 font-mono font-semibold tracking-wider text-ink" dir="ltr">{r.code}</td>
+                <td className="px-2 py-2 text-ink-muted">{r.plan ?? c("none")}</td>
+                <td className="px-2 py-2 text-ink-muted">{r.company ?? c("none")}</td>
+                {showCollector && <td className="px-2 py-2 text-ink-muted">{r.collector ?? c("none")}</td>}
+                <td className="px-2 py-2 text-ink-muted">
                   {money(r.amount)}
-                  <span className={`ms-1.5 text-xs ${r.paid ? "text-emerald-600" : "text-slate-400"}`}>· {r.paid ? c("paid") : c("unpaid")}</span>
+                  <span className={`ms-1.5 text-xs ${r.paid ? "text-success-fg" : "text-ink-subtle"}`}>· {r.paid ? c("paid") : c("unpaid")}</span>
                 </td>
                 <td className="px-2 py-2"><Badge status={STATUS_TONE[r.status]}>{c(`st_${r.status}`)}</Badge></td>
-                <td className="px-2 py-2 text-slate-500" dir="ltr">{date(r.created_at)}</td>
-                <td className="px-2 py-2 text-slate-500" dir="ltr">{date(r.expires_at)}</td>
+                <td className="px-2 py-2 text-ink-muted" dir="ltr">{date(r.created_at)}</td>
+                <td className="px-2 py-2 text-ink-muted" dir="ltr">{date(r.expires_at)}</td>
               </tr>
             ))}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={showCollector ? 8 : 7} className="px-2 py-8 text-center text-slate-400">{c("empty")}</td></tr>
+              <tr><td colSpan={showCollector ? 8 : 7} className="px-2 py-8 text-center text-ink-subtle">{c("empty")}</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between text-sm text-slate-500">
+      <div className="flex items-center justify-between text-sm text-ink-muted">
         <span>{c("totalN").replace("{n}", toLatinDigits(String(meta.total)))}</span>
         <div className="flex items-center gap-2">
           <span>{c("pageOf").replace("{n}", toLatinDigits(String(meta.current_page))).replace("{m}", toLatinDigits(String(meta.last_page)))}</span>

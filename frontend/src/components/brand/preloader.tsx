@@ -9,7 +9,7 @@ import { Logo } from "./logo";
  */
 export function Preloader() {
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-white">
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-surface">
       <style>{`
         @keyframes reidey-breathe { 0%,100% { opacity:.55; transform:scale(.97) } 50% { opacity:1; transform:scale(1) } }
         .reidey-mark { animation: reidey-breathe 1.6s ease-in-out infinite; }
@@ -19,12 +19,12 @@ export function Preloader() {
         .reidey-word { animation: reidey-pulse 1.6s ease-in-out infinite; }
       `}</style>
 
-      <div className="reidey-mark text-slate-900">
+      <div className="reidey-mark text-ink">
         <Logo size={128} />
       </div>
 
       {/* Track with a car running across it */}
-      <div className="relative h-1 w-40 overflow-visible rounded-full bg-slate-200">
+      <div className="relative h-1 w-40 overflow-visible rounded-full bg-surface-2">
         <svg className="reidey-car" width={26} height={16} viewBox="0 0 26 16" fill="none" aria-hidden>
           <rect x={1} y={5} width={24} height={8} rx={3} fill="#0f172a" />
           <rect x={6} y={1} width={12} height={6} rx={2.4} fill="#0f172a" />
@@ -33,7 +33,7 @@ export function Preloader() {
         </svg>
       </div>
 
-      <div className="reidey-word text-sm font-bold tracking-[0.2em] text-slate-700">REIDEY</div>
+      <div className="reidey-word text-sm font-bold tracking-[0.2em] text-ink">REIDEY</div>
     </div>
   );
 }

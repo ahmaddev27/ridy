@@ -31,7 +31,7 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
     <nav className="flex-1 space-y-7 overflow-y-auto px-4 py-6 text-sm">
       {groups.map((group) => (
         <div key={group.title} className="space-y-1">
-          <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
             {t(group.title)}
           </p>
           {group.items.map((item) => {
@@ -49,7 +49,7 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
                 onClick={onNavigate}
                 className={cn(
                   "flex items-center justify-between rounded-xl px-3 py-2.5 font-medium transition-colors",
-                  active ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100",
+                  active ? "bg-primary text-primary-ink shadow-sm" : "text-ink-muted hover:bg-surface-2",
                 )}
               >
                 <span className="flex items-center gap-3">
@@ -57,7 +57,7 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
                   {t(item.label)}
                 </span>
                 {item.badge && (
-                  <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-800">
+                  <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-semibold text-ink">
                     {item.badge}
                   </span>
                 )}

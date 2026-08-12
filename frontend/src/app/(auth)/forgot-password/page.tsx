@@ -82,29 +82,29 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-surface-2 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <Logo size={72} className="text-slate-900" />
+          <Logo size={72} className="text-ink" />
           <div className="leading-tight">
-            <div className="text-lg font-bold text-slate-900">Reidey</div>
-            <div className="text-xs text-slate-400">Fleet Management</div>
+            <div className="text-lg font-bold text-ink">Reidey</div>
+            <div className="text-xs text-ink-subtle">Fleet Management</div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-xl border border-line bg-surface p-6 shadow-sm">
           {step === "email" && (
             <form onSubmit={submitEmail} className="space-y-3">
-              <h1 className="text-lg font-semibold text-slate-900">{r("title")}</h1>
-              <p className="text-sm text-slate-400">{r("subtitle")}</p>
+              <h1 className="text-lg font-semibold text-ink">{r("title")}</h1>
+              <p className="text-sm text-ink-subtle">{r("subtitle")}</p>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">{r("email")}</label>
+                <label className="mb-1 block text-sm font-medium text-ink">{r("email")}</label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                  className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
                 />
               </div>
               <Button type="submit" disabled={busy} className="w-full">
@@ -116,8 +116,8 @@ export default function ForgotPasswordPage() {
 
           {step === "code" && (
             <form onSubmit={submitCode} className="space-y-3">
-              <h1 className="text-lg font-semibold text-slate-900">{r("resetTitle")}</h1>
-              <p className="text-sm text-slate-400">{r("resetSubtitle").replace("{email}", email)}</p>
+              <h1 className="text-lg font-semibold text-ink">{r("resetTitle")}</h1>
+              <p className="text-sm text-ink-subtle">{r("resetSubtitle").replace("{email}", email)}</p>
               <div className="py-2">
                 <OtpInput value={otp} onChange={setOtp} autoFocus />
               </div>
@@ -125,7 +125,7 @@ export default function ForgotPasswordPage() {
                 {busy && <Loader2 className="h-4 w-4 animate-spin" />}
                 {r("verifyCta")}
               </Button>
-              <button type="button" onClick={resend} className="w-full text-center text-xs font-medium text-slate-500 hover:text-slate-800">
+              <button type="button" onClick={resend} className="w-full text-center text-xs font-medium text-ink-muted hover:text-ink">
                 {r("resend")}
               </button>
             </form>
@@ -133,10 +133,10 @@ export default function ForgotPasswordPage() {
 
           {step === "password" && (
             <form onSubmit={submitPassword} className="space-y-3">
-              <h1 className="text-lg font-semibold text-slate-900">{r("newTitle")}</h1>
-              <p className="text-sm text-slate-400">{r("newSubtitle")}</p>
+              <h1 className="text-lg font-semibold text-ink">{r("newTitle")}</h1>
+              <p className="text-sm text-ink-subtle">{r("newSubtitle")}</p>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">{r("newPassword")}</label>
+                <label className="mb-1 block text-sm font-medium text-ink">{r("newPassword")}</label>
                 <input
                   type="password"
                   value={password}
@@ -144,18 +144,18 @@ export default function ForgotPasswordPage() {
                   required
                   minLength={8}
                   autoFocus
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                  className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">{r("confirmPassword")}</label>
+                <label className="mb-1 block text-sm font-medium text-ink">{r("confirmPassword")}</label>
                 <input
                   type="password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   required
                   minLength={8}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                  className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
                 />
               </div>
               <Button type="submit" disabled={busy || password.length < 8} className="w-full">
@@ -166,8 +166,8 @@ export default function ForgotPasswordPage() {
           )}
         </div>
 
-        <p className="mt-4 text-center text-sm text-slate-500">
-          <Link href="/login" className="font-medium text-slate-900 hover:underline">
+        <p className="mt-4 text-center text-sm text-ink-muted">
+          <Link href="/login" className="font-medium text-ink hover:underline">
             {r("backToLogin")}
           </Link>
         </p>

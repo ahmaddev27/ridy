@@ -130,7 +130,7 @@ export default function EmailTemplatesPage() {
             key={tpl.key}
             onClick={() => loadInto(tpl)}
             className={`rounded-lg px-4 py-2 text-sm font-medium ${
-              tpl.key === activeKey ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+              tpl.key === activeKey ? "bg-primary text-primary-ink" : "bg-surface text-ink-muted hover:bg-surface-2 border border-line"
             }`}
           >
             {c(`type_${tpl.key}`)}
@@ -144,22 +144,22 @@ export default function EmailTemplatesPage() {
           <Field label={c("subject")} value={subject} onChange={setSubject} />
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">{c("body")}</label>
+            <label className="mb-1 block text-sm font-medium text-ink">{c("body")}</label>
             {/* Toolbar */}
-            <div className="flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 border-slate-300 bg-slate-50 p-1.5">
+            <div className="flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 border-line-strong bg-surface-2 p-1.5">
               <ToolBtn onClick={() => exec("bold")} title="Bold"><Bold className="h-4 w-4" /></ToolBtn>
               <ToolBtn onClick={() => exec("formatBlock", "H2")} title="Heading"><Heading className="h-4 w-4" /></ToolBtn>
               <ToolBtn onClick={addLink} title="Link"><Link2 className="h-4 w-4" /></ToolBtn>
-              <label className="cursor-pointer rounded p-1.5 text-slate-600 hover:bg-slate-200" title={c("insertImage")}>
+              <label className="cursor-pointer rounded p-1.5 text-ink-muted hover:bg-surface-2" title={c("insertImage")}>
                 <ImageIcon className="h-4 w-4" />
                 <input type="file" accept="image/*" className="hidden" onChange={onImage} />
               </label>
-              <span className="mx-1 h-5 w-px bg-slate-300" />
+              <span className="mx-1 h-5 w-px bg-line-strong" />
               {(active?.variables ?? []).map((v) => (
                 <button
                   key={v}
                   onClick={() => insertVariable(v)}
-                  className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-800 hover:bg-slate-200"
+                  className="flex items-center gap-1 rounded bg-surface-2 px-2 py-1 text-xs font-medium text-ink hover:bg-surface-2"
                   title={c("insertVariable")}
                 >
                   <Braces className="h-3 w-3" /> {v}
@@ -171,19 +171,19 @@ export default function EmailTemplatesPage() {
               contentEditable
               onInput={schedulePreview}
               suppressContentEditableWarning
-              className="min-h-[220px] rounded-b-lg border border-slate-300 p-3 text-sm leading-relaxed outline-none focus:border-slate-900 [&_a]:text-slate-900 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-bold"
+              className="min-h-[220px] rounded-b-lg border border-line-strong p-3 text-sm leading-relaxed outline-none focus:border-ink [&_a]:text-ink [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-bold"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">{c("accent")}</label>
-              <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)} className="h-9 w-full rounded-lg border border-slate-300" />
+              <label className="mb-1 block text-sm font-medium text-ink">{c("accent")}</label>
+              <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)} className="h-9 w-full rounded-lg border border-line-strong" />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">{c("logo")}</label>
-              <div className="flex h-9 items-center gap-2 rounded-lg border border-dashed border-slate-200 px-3 text-xs text-slate-400">
-                <span className="flex h-5 w-5 items-center justify-center rounded bg-slate-900 text-[10px] font-bold text-white">R</span>
+              <label className="mb-1 block text-sm font-medium text-ink">{c("logo")}</label>
+              <div className="flex h-9 items-center gap-2 rounded-lg border border-dashed border-line px-3 text-xs text-ink-subtle">
+                <span className="flex h-5 w-5 items-center justify-center rounded bg-primary text-[10px] font-bold text-primary-ink">R</span>
                 {c("logoAuto")}
               </div>
             </div>
@@ -201,8 +201,8 @@ export default function EmailTemplatesPage() {
 
         {/* Live preview */}
         <Card className="p-5">
-          <h3 className="mb-3 text-sm font-semibold text-slate-500">{c("preview")}</h3>
-          <iframe title="preview" className="h-[520px] w-full rounded-lg border border-slate-200" srcDoc={preview} />
+          <h3 className="mb-3 text-sm font-semibold text-ink-muted">{c("preview")}</h3>
+          <iframe title="preview" className="h-[520px] w-full rounded-lg border border-line" srcDoc={preview} />
         </Card>
       </div>
     </div>
@@ -211,7 +211,7 @@ export default function EmailTemplatesPage() {
 
 function ToolBtn({ onClick, title, children }: { onClick: () => void; title: string; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} title={title} className="rounded p-1.5 text-slate-600 hover:bg-slate-200">
+    <button onClick={onClick} title={title} className="rounded p-1.5 text-ink-muted hover:bg-surface-2">
       {children}
     </button>
   );
@@ -220,11 +220,11 @@ function ToolBtn({ onClick, title, children }: { onClick: () => void; title: str
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+      <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+        className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
       />
     </div>
   );

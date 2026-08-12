@@ -53,7 +53,7 @@ export function ExtensionBanner() {
   const message = t(`extBanner.${state}`);
 
   return (
-    <div className="flex items-center gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+    <div className="flex items-center gap-3 border-b border-amber-200 bg-warning-bg px-4 py-2 text-sm text-amber-800">
       <AlertTriangle className="h-4 w-4 shrink-0" />
       <span className="flex-1">{message}</span>
       <Link
@@ -62,7 +62,7 @@ export function ExtensionBanner() {
       >
         {t("extBanner.action")}
       </Link>
-      <button onClick={() => setDismissed(true)} className="rounded p-1 text-amber-500 hover:bg-amber-100" aria-label="Dismiss">
+      <button onClick={() => setDismissed(true)} className="rounded p-1 text-amber-500 hover:bg-warning-bg" aria-label="Dismiss">
         <X className="h-4 w-4" />
       </button>
     </div>

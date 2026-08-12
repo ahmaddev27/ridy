@@ -132,8 +132,8 @@ export default function CompaniesPage() {
             className={
               "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors " +
               (filter === f
-                ? "border-slate-900 bg-slate-900 text-white"
-                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50")
+                ? "border-ink bg-primary text-primary-ink"
+                : "border-line bg-surface text-ink-muted hover:bg-surface-2")
             }
           >
             {c(`filter_${f}`)} <span className="opacity-60">{counts[f]}</span>
@@ -145,17 +145,17 @@ export default function CompaniesPage() {
         {loading ? (
           <div className="space-y-2 p-4">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded bg-slate-100" />
+              <div key={i} className="h-14 animate-pulse rounded bg-surface-2" />
             ))}
           </div>
         ) : error ? (
-          <div className="p-6 text-sm text-rose-600">{c("loadError")} — {error}</div>
+          <div className="p-6 text-sm text-danger-fg">{c("loadError")} — {error}</div>
         ) : companies.length === 0 ? (
           <EmptyState icon={Building2} title={c("emptyTitle")} description={c("emptyDesc")} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-400 [&_th]:text-start">
+              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
                 <tr>
                   <th className="px-4 py-3 font-semibold">{c("colName")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colStatus")}</th>
@@ -166,16 +166,16 @@ export default function CompaniesPage() {
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {companies.map((co) => (
                   <tr
                     key={co.id}
                     onClick={() => router.push(`/admin/companies/${co.id}`)}
-                    className="cursor-pointer hover:bg-slate-50"
+                    className="cursor-pointer hover:bg-surface-2"
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-800">{co.name}</div>
-                      <div className="text-xs text-slate-400">{co.country ?? "—"}</div>
+                      <div className="font-medium text-ink">{co.name}</div>
+                      <div className="text-xs text-ink-subtle">{co.country ?? "—"}</div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col items-start gap-1">
@@ -183,11 +183,11 @@ export default function CompaniesPage() {
                           {co.status === "active" ? c("statusActive") : c("statusDisabled")}
                         </Badge>
                         {co.email_verified ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-success-fg">
                             <MailCheck className="h-3 w-3" /> {c("emailVerified")}
                           </span>
                         ) : (
-                          <span className="text-[11px] text-slate-400">{c("emailUnverified")}</span>
+                          <span className="text-[11px] text-ink-subtle">{c("emailUnverified")}</span>
                         )}
                       </div>
                     </td>
@@ -197,18 +197,18 @@ export default function CompaniesPage() {
                           {c(`session_${co.session_status}`)}
                         </Badge>
                       ) : (
-                        <span className="text-slate-400">{c("noSession")}</span>
+                        <span className="text-ink-subtle">{c("noSession")}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{co.driver_count.toLocaleString(latnLocale(locale))}</td>
-                    <td className="px-4 py-3 text-slate-600">{co.offer_count.toLocaleString(latnLocale(locale))}</td>
+                    <td className="px-4 py-3 text-ink-muted">{co.driver_count.toLocaleString(latnLocale(locale))}</td>
+                    <td className="px-4 py-3 text-ink-muted">{co.offer_count.toLocaleString(latnLocale(locale))}</td>
                     <td className="px-4 py-3">
                       {co.has_proxy ? (
-                        <span className="rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                        <span className="rounded bg-success-bg px-2 py-0.5 text-[11px] font-semibold text-success-fg">
                           {c("proxyDedicated")}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-400">{c("proxyGlobal")}</span>
+                        <span className="text-xs text-ink-subtle">{c("proxyGlobal")}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
@@ -218,8 +218,8 @@ export default function CompaniesPage() {
                           className={
                             "rounded p-1.5 " +
                             (co.status === "active"
-                              ? "text-slate-400 hover:bg-amber-50 hover:text-amber-600"
-                              : "text-slate-400 hover:bg-emerald-50 hover:text-emerald-600")
+                              ? "text-ink-subtle hover:bg-warning-bg hover:text-warning-fg"
+                              : "text-ink-subtle hover:bg-success-bg hover:text-success-fg")
                           }
                           title={co.status === "active" ? c("disableCompany") : c("enableCompany")}
                         >
@@ -231,7 +231,7 @@ export default function CompaniesPage() {
                         </button>
                         <button
                           onClick={() => setConfirmDel(co)}
-                          className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                          className="rounded p-1.5 text-ink-subtle hover:bg-danger-bg hover:text-danger-fg"
                           title={c("deleteCompany")}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -247,8 +247,8 @@ export default function CompaniesPage() {
 
         {/* Pagination */}
         {filtered.length > perPage && (
-          <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-sm">
-            <span className="text-slate-500">
+          <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm">
+            <span className="text-ink-muted">
               {(pageClamped - 1) * perPage + 1}–{Math.min(pageClamped * perPage, filtered.length)} {c("of")}{" "}
               {filtered.length}
             </span>
@@ -256,17 +256,17 @@ export default function CompaniesPage() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={pageClamped <= 1}
-                className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+                className="rounded-lg border border-line p-1.5 text-ink-muted hover:bg-surface-2 disabled:opacity-40"
               >
                 <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
               </button>
-              <span className="px-2 text-slate-600">
+              <span className="px-2 text-ink-muted">
                 {pageClamped} / {lastPage}
               </span>
               <button
                 onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
                 disabled={pageClamped >= lastPage}
-                className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+                className="rounded-lg border border-line p-1.5 text-ink-muted hover:bg-surface-2 disabled:opacity-40"
               >
                 <ChevronRight className="h-4 w-4 rtl:rotate-180" />
               </button>
