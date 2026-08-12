@@ -119,7 +119,7 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
                     <StatCard
                       icon={Gauge}
                       label={c("pricePerKm")}
-                      value={offer.trip.price_per_km != null ? `${offer.trip.price_per_km.toFixed(2)} €/km` : "—"}
+                      value={pricePerKm(offer) != null ? `${pricePerKm(offer)!.toFixed(2)} €/km` : "—"}
                     />
                     <StatCard icon={Wallet} label={c("colFare")} value={toLatinDigits(offer.fare_formatted) || "—"} />
                   </div>
@@ -130,9 +130,6 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
               <dl className="divide-y divide-slate-100">
                 <Row icon={User} label={c("colDriver")}>{offer.driver_name ?? "—"}</Row>
                 <Row icon={CircleDollarSign} label={c("colFare")}>{toLatinDigits(offer.fare_formatted) || "—"}</Row>
-                <Row icon={Clock} label={c("acceptWindow") || "Accept window"}>
-                  {offer.accept_window_seconds != null ? `${offer.accept_window_seconds}s` : "—"}
-                </Row>
                 <Row icon={Clock} label={c("colTime")}>
                   {offer.received_at ? new Date(offer.received_at).toLocaleString(latnLocale(locale)) : "—"}
                 </Row>
@@ -170,6 +167,24 @@ function Row({
  * waypoints in arrays that vary by offer type, so we look through common keys
  * and fall back to the flat pickup/dropoff fields.
  */
+/** Parse a formatted fare ("4,78 €" / "$4.78") into a number, handling German commas. */
+function parseFareNum(s: string | null | undefined): number | null {
+  if (!s) return null;
+  let n = s.replace(/[^0-9.,]/g, "");
+  if (n.includes(",") && n.includes(".")) n = n.lastIndexOf(",") > n.lastIndexOf(".") ? n.replace(/\./g, "") : n.replace(/,/g, "");
+  n = n.replace(",", ".");
+  const v = parseFloat(n);
+  return Number.isFinite(v) ? v : null;
+}
+
+/** Price per km — prefer the backend value; else compute from fare + distance. */
+function pricePerKm(offer: DispatchOfferDetail): number | null {
+  if (!offer.trip) return null;
+  if (offer.trip.price_per_km != null) return offer.trip.price_per_km;
+  const fare = parseFareNum(offer.fare_formatted);
+  return fare != null && offer.trip.distance_km ? fare / offer.trip.distance_km : null;
+}
+
 function extractStops(raw: Record<string, unknown> | null | undefined): string[] {
   if (!raw) return [];
   const arrayKeys = ["waypoints", "wayPoints", "stops", "legs", "route"];
