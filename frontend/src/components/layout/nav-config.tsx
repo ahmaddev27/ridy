@@ -54,16 +54,30 @@ export const navGroups: NavGroup[] = [
     ],
   },
 
-  // ── Super-admin surface (hidden from company managers) ─────────────────────
+  // ── Super-admin surface (hidden from company managers), split into sections ──
   {
-    title: "navGroups.admin",
+    title: "navGroups.overview",
+    requiresRole: "super_admin",
+    items: [{ href: "/admin", label: "nav.adminDashboard", icon: LayoutDashboard }],
+  },
+  {
+    title: "navGroups.customers",
     requiresRole: "super_admin",
     items: [
-      { href: "/admin", label: "nav.adminDashboard", icon: LayoutDashboard },
       { href: "/admin/companies", label: "nav.companies", icon: Building2 },
       { href: "/admin/users", label: "nav.users", icon: UserCog },
       { href: "/admin/collectors", label: "nav.collectors", icon: Banknote },
-      { href: "/admin/reports", label: "nav.subscriptions", icon: FileBarChart },
+    ],
+  },
+  {
+    title: "navGroups.billing",
+    requiresRole: "super_admin",
+    items: [{ href: "/admin/reports", label: "nav.subscriptions", icon: FileBarChart }],
+  },
+  {
+    title: "navGroups.system",
+    requiresRole: "super_admin",
+    items: [
       { href: "/admin/proxies", label: "nav.proxies", icon: Plug },
       { href: "/admin/email-templates", label: "nav.emailTemplates", icon: Mail },
       { href: "/admin/settings", label: "nav.settings", icon: Settings },
