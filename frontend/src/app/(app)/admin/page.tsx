@@ -17,6 +17,7 @@ export default function AdminDashboardPage() {
 
   const s = data?.stats;
   const alerts = data?.alerts ?? [];
+  const expiringProxies = data?.expiring_proxies ?? [];
   const breakdown = data?.session_breakdown;
   const chart = (data?.offers_daily ?? []).map((d) => ({
     label: new Date(d.date).toLocaleDateString(latnLocale(locale), { month: "numeric", day: "numeric" }),
@@ -90,10 +91,24 @@ export default function AdminDashboardPage() {
           <AlertTriangle className="h-4 w-4 text-amber-500" />
           <h3 className="font-semibold text-slate-800">{c("alerts")}</h3>
         </div>
-        {alerts.length === 0 ? (
+        {alerts.length === 0 && expiringProxies.length === 0 ? (
           <p className="text-sm text-slate-400">{c("noAlerts")}</p>
         ) : (
           <ul className="divide-y divide-slate-100">
+            {expiringProxies.map((p) => (
+              <li key={`px-${p.id}`} className="flex items-center justify-between gap-3 py-2.5">
+                <span className="flex items-center gap-2 text-sm">
+                  <Plug className="h-4 w-4 text-rose-500" />
+                  <span className="font-medium text-slate-800">{p.label}</span>
+                  <span className="text-slate-400">
+                    — {p.days_left < 0 ? c("proxyExpired") : c("proxyExpiring").replace("{n}", String(p.days_left))}
+                  </span>
+                </span>
+                <Link href="/admin/proxies" className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-900 hover:bg-slate-100">
+                  {c("resolve")}
+                </Link>
+              </li>
+            ))}
             {alerts.map((a, i) => (
               <li key={i} className="flex items-center justify-between gap-3 py-2.5">
                 <span className="flex items-center gap-2 text-sm">

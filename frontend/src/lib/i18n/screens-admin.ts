@@ -4,7 +4,7 @@ type Dict = Record<string, unknown>;
 
 const en: Dict = {
   banned: { reactivate: "Reactivate", reactivated: "Company reactivated", failed: "Action failed", emptyTitle: "No banned companies", emptyDesc: "Companies locked out will appear here.", colCompany: "Company", colOwner: "Owner", colPhone: "Phone" },
-  proxies: { add: "Add proxy", edit: "Edit proxy", delete: "Delete", cancel: "Cancel", save: "Save", saved: "Proxy saved", failed: "Action failed", deleted: "Proxy deleted", deleteConfirm: "Delete proxy {label}? Assigned companies fall back to the global proxy.", nearFull: "Near full", emptyTitle: "No proxies", emptyDesc: "Add a residential proxy so new companies get assigned automatically.", colLabel: "Label", colUrl: "URL", colUsage: "Usage", fieldLabel: "Label", fieldUrl: "Proxy URL", fieldCapacity: "Capacity (companies)", fieldNotes: "Notes" },
+  proxies: { add: "Add proxy", edit: "Edit proxy", delete: "Delete", cancel: "Cancel", save: "Save", saved: "Proxy saved", failed: "Action failed", deleted: "Proxy deleted", deleteConfirm: "Delete proxy {label}? Assigned companies fall back to the global proxy.", nearFull: "Near full", emptyTitle: "No proxies", emptyDesc: "Add a residential proxy so new companies get assigned automatically.", colLabel: "Label", colUrl: "URL", colUsage: "Usage", fieldLabel: "Label", fieldUrl: "Proxy URL", fieldCapacity: "Capacity (companies)", fieldExpires: "Our expiry date", fieldNotes: "Notes", expiresIn: "{n}d left", expired: "Expired" },
   collectors: {
     add: "Add collector", edit: "Edit collector", delete: "Delete", cancel: "Cancel", save: "Save", saved: "Saved", failed: "Action failed", deleted: "Deleted",
     deleteConfirm: "Delete collector {name}?", hasPayments: "This collector has payments — clear them first.",
@@ -51,7 +51,7 @@ const en: Dict = {
     sessionsAttention: "Need attention", drivers: "Drivers", offers: "Offers",
     alerts: "Alerts", noAlerts: "Everything looks healthy.", resolve: "Resolve",
     alert_no_session: "no Uber session", alert_expired: "session expired",
-    alert_needs_relink: "needs re-link", alert_no_proxy: "no proxy assigned",
+    alert_needs_relink: "needs re-link", alert_no_proxy: "no proxy assigned", proxyExpiring: "proxy expires in {n}d", proxyExpired: "proxy expired",
     activeShort: "active", offersChart: "Offers (14 days)", sessionBreakdown: "Sessions by status",
     topCompanies: "Top companies", stActive: "Active", stNeedsRelink: "Needs re-link", stExpired: "Expired", stNoSession: "No session",
   },
@@ -141,7 +141,7 @@ const en: Dict = {
 
 const de: Dict = {
   banned: { reactivate: "Reaktivieren", reactivated: "Firma reaktiviert", failed: "Aktion fehlgeschlagen", emptyTitle: "Keine gesperrten Firmen", emptyDesc: "Gesperrte Firmen erscheinen hier.", colCompany: "Firma", colOwner: "Inhaber", colPhone: "Telefon" },
-  proxies: { add: "Proxy hinzufügen", edit: "Proxy bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", saved: "Proxy gespeichert", failed: "Aktion fehlgeschlagen", deleted: "Proxy gelöscht", deleteConfirm: "Proxy {label} löschen? Zugewiesene Firmen nutzen den globalen Proxy.", nearFull: "Fast voll", emptyTitle: "Keine Proxys", emptyDesc: "Füge einen Residential-Proxy hinzu, damit neue Firmen automatisch zugewiesen werden.", colLabel: "Label", colUrl: "URL", colUsage: "Auslastung", fieldLabel: "Label", fieldUrl: "Proxy-URL", fieldCapacity: "Kapazität (Firmen)", fieldNotes: "Notizen" },
+  proxies: { add: "Proxy hinzufügen", edit: "Proxy bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", saved: "Proxy gespeichert", failed: "Aktion fehlgeschlagen", deleted: "Proxy gelöscht", deleteConfirm: "Proxy {label} löschen? Zugewiesene Firmen nutzen den globalen Proxy.", nearFull: "Fast voll", emptyTitle: "Keine Proxys", emptyDesc: "Füge einen Residential-Proxy hinzu, damit neue Firmen automatisch zugewiesen werden.", colLabel: "Label", colUrl: "URL", colUsage: "Auslastung", fieldLabel: "Label", fieldUrl: "Proxy-URL", fieldCapacity: "Kapazität (Firmen)", fieldExpires: "Unser Ablaufdatum", fieldNotes: "Notizen", expiresIn: "{n}T übrig", expired: "Abgelaufen" },
   collectors: {
     add: "Inkasso hinzufügen", edit: "Inkasso bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", saved: "Gespeichert", failed: "Aktion fehlgeschlagen", deleted: "Gelöscht",
     deleteConfirm: "Inkassostelle {name} löschen?", hasPayments: "Diese Inkassostelle hat Zahlungen — zuerst löschen.",
@@ -188,7 +188,7 @@ const de: Dict = {
     sessionsAttention: "Handlungsbedarf", drivers: "Fahrer", offers: "Angebote",
     alerts: "Warnungen", noAlerts: "Alles in Ordnung.", resolve: "Beheben",
     alert_no_session: "keine Uber-Sitzung", alert_expired: "Sitzung abgelaufen",
-    alert_needs_relink: "neu verbinden nötig", alert_no_proxy: "kein Proxy zugewiesen",
+    alert_needs_relink: "neu verbinden nötig", alert_no_proxy: "kein Proxy zugewiesen", proxyExpiring: "Proxy läuft in {n}T ab", proxyExpired: "Proxy abgelaufen",
     activeShort: "aktiv", offersChart: "Angebote (14 Tage)", sessionBreakdown: "Sitzungen nach Status",
     topCompanies: "Top-Firmen", stActive: "Aktiv", stNeedsRelink: "Neu verbinden", stExpired: "Abgelaufen", stNoSession: "Keine Sitzung",
   },
@@ -276,7 +276,7 @@ const de: Dict = {
 
 const ar: Dict = {
   banned: { reactivate: "إعادة تفعيل", reactivated: "تمت إعادة تفعيل الشركة", failed: "فشل الإجراء", emptyTitle: "لا شركات محظورة", emptyDesc: "الشركات المحظورة تظهر هنا.", colCompany: "الشركة", colOwner: "المالك", colPhone: "الجوال" },
-  proxies: { add: "إضافة بروكسي", edit: "تعديل البروكسي", delete: "حذف", cancel: "إلغاء", save: "حفظ", saved: "تم حفظ البروكسي", failed: "فشل الإجراء", deleted: "تم حذف البروكسي", deleteConfirm: "حذف البروكسي {label}؟ الشركات المرتبطة ترجع للبروكسي العام.", nearFull: "قربت تمتلئ", emptyTitle: "لا بروكسيات", emptyDesc: "أضف بروكسي سكني عشان الشركات الجديدة تتوزّع تلقائياً.", colLabel: "الاسم", colUrl: "الرابط", colUsage: "الاستخدام", fieldLabel: "الاسم", fieldUrl: "رابط البروكسي", fieldCapacity: "السعة (شركات)", fieldNotes: "ملاحظات" },
+  proxies: { add: "إضافة بروكسي", edit: "تعديل البروكسي", delete: "حذف", cancel: "إلغاء", save: "حفظ", saved: "تم حفظ البروكسي", failed: "فشل الإجراء", deleted: "تم حذف البروكسي", deleteConfirm: "حذف البروكسي {label}؟ الشركات المرتبطة ترجع للبروكسي العام.", nearFull: "قربت تمتلئ", emptyTitle: "لا بروكسيات", emptyDesc: "أضف بروكسي سكني عشان الشركات الجديدة تتوزّع تلقائياً.", colLabel: "الاسم", colUrl: "الرابط", colUsage: "الاستخدام", fieldLabel: "الاسم", fieldUrl: "رابط البروكسي", fieldCapacity: "السعة (شركات)", fieldExpires: "تاريخ انتهاء اشتراكنا", fieldNotes: "ملاحظات", expiresIn: "باقي {n}ي", expired: "منتهٍ" },
   collectors: {
     add: "إضافة محصّل", edit: "تعديل المحصّل", delete: "حذف", cancel: "إلغاء", save: "حفظ", saved: "تم الحفظ", failed: "فشل الإجراء", deleted: "تم الحذف",
     deleteConfirm: "حذف المحصّل {name}؟", hasPayments: "هذا المحصّل عليه دفعات — احذف الدفعات أولاً.",
@@ -323,7 +323,7 @@ const ar: Dict = {
     sessionsAttention: "تحتاج انتباه", drivers: "السائقون", offers: "العروض",
     alerts: "التنبيهات", noAlerts: "كل شي تمام.", resolve: "معالجة",
     alert_no_session: "لا جلسة أوبر", alert_expired: "الجلسة منتهية",
-    alert_needs_relink: "تحتاج إعادة ربط", alert_no_proxy: "لا بروكسي مخصّص",
+    alert_needs_relink: "تحتاج إعادة ربط", alert_no_proxy: "لا بروكسي مخصّص", proxyExpiring: "البروكسي بينتهي خلال {n}ي", proxyExpired: "البروكسي منتهٍ",
     activeShort: "نشطة", offersChart: "العروض (14 يوم)", sessionBreakdown: "الجلسات حسب الحالة",
     topCompanies: "أعلى الشركات", stActive: "نشطة", stNeedsRelink: "تحتاج ربط", stExpired: "منتهية", stNoSession: "لا جلسة",
   },

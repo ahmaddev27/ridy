@@ -78,6 +78,7 @@ export type AdminOverview = {
     sessions_need_attention: number;
   };
   alerts: { company_id: number; company: string; type: string }[];
+  expiring_proxies: { id: number; label: string; expires_at: string | null; days_left: number }[];
   session_breakdown: { active: number; expired: number; needs_relink: number; no_session: number };
   offers_daily: { date: string; count: number }[];
   top_companies: { company_id: number; company: string; offers: number; drivers: number }[];
@@ -234,9 +235,12 @@ export type Proxy = {
   free: number;
   near_full: boolean;
   notes: string | null;
+  expires_at: string | null;
+  days_left: number | null;
+  expiring: boolean;
 };
 
-export type ProxyInput = { label: string; url?: string; capacity: number; notes?: string };
+export type ProxyInput = { label: string; url?: string; capacity: number; notes?: string; expires_at?: string };
 
 const proxyBase = "/api/v1/admin/proxies";
 
