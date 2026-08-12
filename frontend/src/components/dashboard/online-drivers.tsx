@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Users, RefreshCw } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n/context";
@@ -79,7 +80,8 @@ export function OnlineDrivers() {
           {online.map((d) => {
             const p = presence(d);
             return (
-              <li key={d.id} className="flex items-center gap-3 px-5 py-3">
+              <li key={d.id}>
+                <Link href={`/drivers/${d.id}`} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-slate-50">
                 <div className="relative">
                   {d.picture_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -102,6 +104,7 @@ export function OnlineDrivers() {
                 >
                   {p === "on_trip" ? k("onTrip") : k("online")}
                 </span>
+                </Link>
               </li>
             );
           })}

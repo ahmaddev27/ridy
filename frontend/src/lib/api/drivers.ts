@@ -24,6 +24,11 @@ export async function listDrivers(): Promise<Driver[]> {
   return res.data;
 }
 
+export async function getDriver(id: number): Promise<Driver> {
+  const res = await apiFetch<{ data: Driver }>(`/api/v1/drivers/${id}`);
+  return res.data;
+}
+
 export type DriverStats = {
   offers: number;
   accepted: number;

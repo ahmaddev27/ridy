@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Radio, MapPin, Search, ArrowRight, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { Radio, MapPin, Search, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Inbox, CheckCircle2, XCircle, Gauge, Wallet } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
@@ -230,11 +230,11 @@ export default function OffersPage() {
       {/* Stat cards for the current filter */}
       {stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard label={c("statTotal")} value={stats.total.toLocaleString(locale)} />
-          <StatCard label={c("statAccepted")} value={stats.accepted.toLocaleString(locale)} tone="positive" />
-          <StatCard label={c("statNotTaken")} value={stats.declined.toLocaleString(locale)} />
-          <StatCard label={c("statRate")} value={`${stats.acceptance_rate}%`} tone={stats.acceptance_rate >= 50 ? "positive" : "default"} />
-          <StatCard label={c("statEarnings")} value={`€${stats.earnings.toFixed(2)}`} tone="positive" />
+          <StatCard icon={Inbox} label={c("statTotal")} value={stats.total.toLocaleString(locale)} />
+          <StatCard icon={CheckCircle2} label={c("statAccepted")} value={stats.accepted.toLocaleString(locale)} tone="positive" />
+          <StatCard icon={XCircle} label={c("statNotTaken")} value={stats.declined.toLocaleString(locale)} />
+          <StatCard icon={Gauge} label={c("statRate")} value={`${stats.acceptance_rate}%`} tone={stats.acceptance_rate >= 50 ? "positive" : "default"} />
+          <StatCard icon={Wallet} label={c("statEarnings")} value={`€${stats.earnings.toFixed(2)}`} tone="positive" />
         </div>
       )}
 
