@@ -265,12 +265,14 @@ export type Collector = {
   name: string;
   phone: string | null;
   address: string | null;
+  email: string | null;
+  has_login: boolean;
   payments_count: number;
   total_collected: number;
   last_paid_on: string | null;
 };
 
-export type CollectorInput = { name: string; phone?: string; address?: string };
+export type CollectorInput = { name: string; phone?: string; address?: string; email?: string; password?: string };
 
 export type CollectorPayment = {
   id: number;

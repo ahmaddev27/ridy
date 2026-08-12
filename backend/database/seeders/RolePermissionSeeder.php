@@ -24,6 +24,8 @@ class RolePermissionSeeder extends Seeder
             'companies.users.manage',
             'companies.sessions.manage',
             'platform.view',
+            // Reseller — issues activation codes against a plan for a company.
+            'codes.generate',
         ];
 
         foreach ($permissions as $permission) {
@@ -37,6 +39,8 @@ class RolePermissionSeeder extends Seeder
             'fleet_manager' => ['offers.view', 'drivers.manage', 'connections.manage', 'audit.view'],
             'driver' => ['offers.view'],
             'viewer' => ['offers.view'],
+            // A reseller only generates activation codes — no fleet/admin access.
+            'reseller' => ['codes.generate'],
         ];
 
         foreach ($roles as $role => $grantedPermissions) {

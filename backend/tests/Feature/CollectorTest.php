@@ -64,6 +64,29 @@ class CollectorTest extends TestCase
         $this->assertSame(2, $row['payments_count']);
     }
 
+    public function test_creating_a_collector_with_login_makes_a_reseller_user(): void
+    {
+        Sanctum::actingAs($this->superAdmin());
+
+        $this->postJson('/api/v1/admin/collectors', ['name' => 'Ali', 'email' => 'ali@reseller.de', 'password' => 'secret123'])
+            ->assertCreated()
+            ->assertJsonPath('data.has_login', true)
+            ->assertJsonPath('data.email', 'ali@reseller.de');
+
+        $collector = Collector::first();
+        $this->assertNotNull($collector->user_id);
+        $this->assertTrue($collector->user->hasRole('reseller'));
+    }
+
+    public function test_reseller_can_sign_in_with_the_created_login(): void
+    {
+        Sanctum::actingAs($this->superAdmin());
+        $this->postJson('/api/v1/admin/collectors', ['name' => 'Ali', 'email' => 'ali@reseller.de', 'password' => 'secret123'])->assertCreated();
+
+        // The reseller can authenticate with those credentials.
+        $this->postJson('/api/v1/login', ['email' => 'ali@reseller.de', 'password' => 'secret123'])->assertOk();
+    }
+
     public function test_deleting_a_collector_with_payments_is_blocked(): void
     {
         Sanctum::actingAs($this->superAdmin());
