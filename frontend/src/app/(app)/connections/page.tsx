@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { latnLocale } from "@/lib/utils";
 import { toast } from "sonner";
 import { Loader2, Plug, LogIn, ChevronDown, Puzzle, Copy, AlertTriangle, Download, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -276,7 +277,7 @@ export default function ConnectionsPage() {
             <div className="flex justify-between">
               <span className="text-slate-500">{c("lastEvent")}</span>
               <span className="text-slate-600">
-                {data.last_event_at ? new Date(data.last_event_at).toLocaleString(locale) : "—"}
+                {data.last_event_at ? new Date(data.last_event_at).toLocaleString(latnLocale(locale)) : "—"}
               </span>
             </div>
             <div className="flex justify-end pt-2">

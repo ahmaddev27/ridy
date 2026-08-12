@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { latnLocale } from "@/lib/utils";
 import { toast } from "sonner";
 import { Wallet, Clock, Download, ReceiptText, CheckCircle2, Loader2, AlertCircle, Package, Plus, Pencil, Trash2 } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/card";
@@ -59,7 +60,7 @@ export default function ReportsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
-  const money = (n: number) => new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  const money = (n: number) => new Intl.NumberFormat(latnLocale(locale), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
   const maxRevenue = Math.max(1, ...(summary?.revenue_by_month.map((r) => r.total) ?? [0]));
 
   async function doDeletePlan() {
@@ -176,7 +177,7 @@ export default function ReportsPage() {
                 <li key={e.id} className="flex items-center justify-between py-2.5 text-sm">
                   <span className="font-medium text-slate-800">{e.name}</span>
                   <span className="flex items-center gap-3">
-                    <span className="text-slate-500">{e.ends_at ? new Date(e.ends_at).toLocaleDateString(locale) : "—"}</span>
+                    <span className="text-slate-500">{e.ends_at ? new Date(e.ends_at).toLocaleDateString(latnLocale(locale)) : "—"}</span>
                     <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
                       {c("daysLeft").replace("{n}", String(e.days_left ?? 0))}
                     </span>
@@ -239,8 +240,8 @@ export default function ReportsPage() {
                         {inv.paid ? c("paid") : c("unpaid")}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{new Date(inv.starts_at).toLocaleDateString(locale)}</td>
-                    <td className="px-4 py-3 text-slate-500">{new Date(inv.ends_at).toLocaleDateString(locale)}</td>
+                    <td className="px-4 py-3 text-slate-500">{new Date(inv.starts_at).toLocaleDateString(latnLocale(locale))}</td>
+                    <td className="px-4 py-3 text-slate-500">{new Date(inv.ends_at).toLocaleDateString(latnLocale(locale))}</td>
                     <td className="px-4 py-3 text-end">
                       {!inv.paid && (
                         <button
@@ -368,7 +369,7 @@ function SettleModal({
   const [payments, setPayments] = useState<CollectorPayment[]>([]);
   const [paymentId, setPaymentId] = useState("");
   const [busy, setBusy] = useState(false);
-  const money = (n: number) => new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  const money = (n: number) => new Intl.NumberFormat(latnLocale(locale), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
   useEffect(() => {
     // Only this company's payments can settle its invoice.
@@ -417,7 +418,7 @@ function SettleModal({
             placeholder={c("selectPayment")}
             options={payments.map((p) => ({
               value: String(p.id),
-              label: `${money(p.amount)} · ${new Date(p.paid_on).toLocaleDateString(locale)} · ${p.collector_name ?? ""}`,
+              label: `${money(p.amount)} · ${new Date(p.paid_on).toLocaleDateString(latnLocale(locale))} · ${p.collector_name ?? ""}`,
             }))}
           />
         )}

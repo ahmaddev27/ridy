@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { latnLocale } from "@/lib/utils";
 import { Users, Wifi, Link2, Car, Radio, AlertTriangle } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
@@ -72,13 +73,13 @@ export default function DashboardPage() {
                 <div>
                   <div className="text-xs text-slate-400">{k("subActivated")}</div>
                   <div className="font-medium text-slate-700">
-                    {data.subscription.activated_at ? new Date(data.subscription.activated_at).toLocaleDateString(locale) : "—"}
+                    {data.subscription.activated_at ? new Date(data.subscription.activated_at).toLocaleDateString(latnLocale(locale)) : "—"}
                   </div>
                 </div>
                 <div>
                   <div className="text-xs text-slate-400">{k("subEnds")}</div>
                   <div className="font-medium text-slate-700">
-                    {data.subscription.ends_at ? new Date(data.subscription.ends_at).toLocaleDateString(locale) : "—"}
+                    {data.subscription.ends_at ? new Date(data.subscription.ends_at).toLocaleDateString(latnLocale(locale)) : "—"}
                   </div>
                 </div>
               </div>

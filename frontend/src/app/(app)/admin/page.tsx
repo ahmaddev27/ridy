@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { latnLocale } from "@/lib/utils";
 import { AlertTriangle, Building2, Radio, Plug, ArrowRight, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
@@ -18,7 +19,7 @@ export default function AdminDashboardPage() {
   const alerts = data?.alerts ?? [];
   const breakdown = data?.session_breakdown;
   const chart = (data?.offers_daily ?? []).map((d) => ({
-    label: new Date(d.date).toLocaleDateString(locale, { month: "numeric", day: "numeric" }),
+    label: new Date(d.date).toLocaleDateString(latnLocale(locale), { month: "numeric", day: "numeric" }),
     value: d.count,
   }));
   const top = data?.top_companies ?? [];

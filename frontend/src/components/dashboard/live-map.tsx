@@ -1,6 +1,7 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
+import { latnLocale } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap, LayerGroup } from "leaflet";
 import { Radio, RefreshCw, Car } from "lucide-react";
@@ -190,7 +191,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
       {updatedAt && (
         <p className="pointer-events-none absolute bottom-2 z-[1000] flex items-center gap-1.5 rounded-lg bg-white/90 px-2 py-1 text-[11px] text-slate-400 ltr:right-2 rtl:left-2">
-          <RefreshCw className="h-3 w-3" /> {updatedAt.toLocaleTimeString(locale)}
+          <RefreshCw className="h-3 w-3" /> {updatedAt.toLocaleTimeString(latnLocale(locale))}
         </p>
       )}
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { latnLocale } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug } from "lucide-react";
@@ -614,7 +615,7 @@ function CompanyDataTab({ id, tab }: { id: number; tab: "drivers" | "vehicles" }
             </div>
             <div className="flex items-center gap-3 text-xs text-slate-500">
               {d.rating != null && <span>★ {d.rating}</span>}
-              {d.total_trips != null && <span>{d.total_trips.toLocaleString(locale)} {c("trips")}</span>}
+              {d.total_trips != null && <span>{d.total_trips.toLocaleString(latnLocale(locale))} {c("trips")}</span>}
               <Badge status={d.uber_linked ? "connected" : "neutral"} dot>{d.uber_linked ? c("linked") : c("unlinked")}</Badge>
             </div>
           </li>
@@ -701,7 +702,7 @@ function CompanyOffersTab({ id }: { id: number }) {
             >
               <ChevronDown className={`h-4 w-4 text-slate-400 transition ${open ? "" : "-rotate-90"}`} />
               <span className="font-semibold text-slate-800">
-                {day === new Date().toDateString() ? c("today") : day === "—" ? "—" : new Date(day).toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" })}
+                {day === new Date().toDateString() ? c("today") : day === "—" ? "—" : new Date(day).toLocaleDateString(latnLocale(locale), { weekday: "long", day: "numeric", month: "long" })}
               </span>
               <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-600">{dayOffers.length}</span>
             </button>
@@ -712,7 +713,7 @@ function CompanyOffersTab({ id }: { id: number }) {
                     {dayOffers.map((o) => (
                       <tr key={o.id}>
                         <td className="whitespace-nowrap px-4 py-2.5 text-slate-500">
-                          {o.received_at ? new Date(o.received_at).toLocaleTimeString(locale) : "—"}
+                          {o.received_at ? new Date(o.received_at).toLocaleTimeString(latnLocale(locale)) : "—"}
                         </td>
                         <td className="px-4 py-2.5 font-medium text-slate-700">{o.driver_name ?? "—"}</td>
                         <td className="max-w-[220px] truncate px-4 py-2.5 text-slate-500">{o.pickup_address ?? "—"}</td>

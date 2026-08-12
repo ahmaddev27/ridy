@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { latnLocale } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Building2, Search, Trash2, ChevronLeft, ChevronRight, MailCheck, Power, PowerOff } from "lucide-react";
@@ -202,8 +203,8 @@ export default function CompaniesPage() {
                         <span className="text-slate-400">{c("noSession")}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{co.driver_count.toLocaleString(locale)}</td>
-                    <td className="px-4 py-3 text-slate-600">{co.offer_count.toLocaleString(locale)}</td>
+                    <td className="px-4 py-3 text-slate-600">{co.driver_count.toLocaleString(latnLocale(locale))}</td>
+                    <td className="px-4 py-3 text-slate-600">{co.offer_count.toLocaleString(latnLocale(locale))}</td>
                     <td className="px-4 py-3">
                       {co.has_proxy ? (
                         <span className="rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { latnLocale, toLatinDigits } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { X, MapPin, Flag, User, CircleDollarSign, Clock, Loader2, Route, Gauge, Wallet } from "lucide-react";
 import { StatCard } from "@/components/ui/card";
@@ -55,7 +56,7 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
           <div className="flex items-center gap-2">
             {offer?.fare_formatted && (
               <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-700">
-                {offer.fare_formatted}
+                {toLatinDigits(offer.fare_formatted)}
               </span>
             )}
             <button
@@ -120,7 +121,7 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
                       label={c("pricePerKm")}
                       value={offer.trip.price_per_km != null ? `${offer.trip.price_per_km.toFixed(2)} €/km` : "—"}
                     />
-                    <StatCard icon={Wallet} label={c("colFare")} value={offer.fare_formatted ?? "—"} />
+                    <StatCard icon={Wallet} label={c("colFare")} value={toLatinDigits(offer.fare_formatted) || "—"} />
                   </div>
                 </div>
               )}
@@ -128,12 +129,12 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
               {/* Known fields */}
               <dl className="divide-y divide-slate-100">
                 <Row icon={User} label={c("colDriver")}>{offer.driver_name ?? "—"}</Row>
-                <Row icon={CircleDollarSign} label={c("colFare")}>{offer.fare_formatted ?? "—"}</Row>
+                <Row icon={CircleDollarSign} label={c("colFare")}>{toLatinDigits(offer.fare_formatted) || "—"}</Row>
                 <Row icon={Clock} label={c("acceptWindow") || "Accept window"}>
                   {offer.accept_window_seconds != null ? `${offer.accept_window_seconds}s` : "—"}
                 </Row>
                 <Row icon={Clock} label={c("colTime")}>
-                  {offer.received_at ? new Date(offer.received_at).toLocaleString(locale) : "—"}
+                  {offer.received_at ? new Date(offer.received_at).toLocaleString(latnLocale(locale)) : "—"}
                 </Row>
               </dl>
             </>
