@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Tenancy\Models\Proxy;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
 use Carbon\CarbonImmutable;
@@ -48,9 +49,24 @@ class OverviewController extends Controller
             }
         }
 
+        // Our own proxy subscriptions expiring within 5 days — renew before the
+        // companies on them lose their exit IP.
+        $expiringProxies = Proxy::query()
+            ->whereNotNull('expires_at')
+            ->whereDate('expires_at', '<=', CarbonImmutable::now()->addDays(5))
+            ->orderBy('expires_at')
+            ->get()
+            ->map(fn (Proxy $p) => [
+                'id' => $p->id,
+                'label' => $p->label,
+                'expires_at' => $p->expires_at?->toDateString(),
+                'days_left' => (int) CarbonImmutable::now()->startOfDay()->diffInDays($p->expires_at->startOfDay(), false),
+            ]);
+
         return response()->json(['data' => [
             'stats' => $stats,
             'alerts' => $alerts,
+            'expiring_proxies' => $expiringProxies,
             'session_breakdown' => [
                 'active' => $sessions->where('status', 'active')->count(),
                 'expired' => $sessions->where('status', 'expired')->count(),

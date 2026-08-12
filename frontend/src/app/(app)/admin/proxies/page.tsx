@@ -72,7 +72,21 @@ export default function ProxiesPage() {
               <tbody className="divide-y divide-slate-100">
                 {proxies.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-800">{p.label}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-slate-800">{p.label}</div>
+                      {p.expires_at && (
+                        <div
+                          className={
+                            "mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold " +
+                            (p.expiring ? "bg-rose-50 text-rose-600" : "bg-slate-100 text-slate-500")
+                          }
+                        >
+                          {p.days_left !== null && p.days_left < 0
+                            ? c("expired")
+                            : c("expiresIn").replace("{n}", String(p.days_left ?? 0))}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-500">
                       <bdi dir="ltr">{p.url_masked}</bdi>
                     </td>
@@ -136,13 +150,14 @@ function ProxyModal({ proxy, onClose, onSaved }: { proxy: Proxy | null; onClose:
   const [url, setUrl] = useState("");
   const [capacity, setCapacity] = useState(String(proxy?.capacity ?? 10));
   const [notes, setNotes] = useState(proxy?.notes ?? "");
+  const [expiresAt, setExpiresAt] = useState(proxy?.expires_at ?? "");
   const [busy, setBusy] = useState(false);
 
   async function save() {
     if (!label.trim() || (!proxy && !url.trim())) return;
     setBusy(true);
     try {
-      const input = { label: label.trim(), capacity: Number(capacity) || 1, notes: notes.trim() || undefined, ...(url.trim() ? { url: url.trim() } : {}) };
+      const input = { label: label.trim(), capacity: Number(capacity) || 1, notes: notes.trim() || undefined, expires_at: expiresAt || undefined, ...(url.trim() ? { url: url.trim() } : {}) };
       if (proxy) await updateProxy(proxy.id, input);
       else await createProxy(input);
       toast.success(c("saved"));
@@ -179,6 +194,7 @@ function ProxyModal({ proxy, onClose, onSaved }: { proxy: Proxy | null; onClose:
           placeholder={proxy ? "••••••  (leave blank to keep)" : "http://user:pass@host:port"}
         />
         <Field label={c("fieldCapacity")} type="number" value={capacity} onChange={setCapacity} />
+        <Field label={c("fieldExpires")} type="date" value={expiresAt} onChange={setExpiresAt} />
         <Field label={c("fieldNotes")} value={notes} onChange={setNotes} />
       </div>
     </Modal>

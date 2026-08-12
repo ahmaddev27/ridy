@@ -56,6 +56,7 @@ class ProxyController extends Controller
             'url' => [$creating ? 'required' : 'nullable', 'string', 'max:1000'],
             'capacity' => ['required', 'integer', 'min:1', 'max:10000'],
             'notes' => ['nullable', 'string', 'max:500'],
+            'expires_at' => ['nullable', 'date'],
         ]);
     }
 
@@ -63,6 +64,10 @@ class ProxyController extends Controller
     private function present(Proxy $p): array
     {
         $used = $p->usedCount();
+
+        $daysLeft = $p->expires_at !== null
+            ? (int) now()->startOfDay()->diffInDays($p->expires_at->startOfDay(), false)
+            : null;
 
         return [
             'id' => $p->id,
@@ -73,6 +78,9 @@ class ProxyController extends Controller
             'free' => max(0, $p->capacity - $used),
             'near_full' => $p->capacity > 0 && $used / $p->capacity >= 0.8,
             'notes' => $p->notes,
+            'expires_at' => $p->expires_at?->toDateString(),
+            'days_left' => $daysLeft,
+            'expiring' => $daysLeft !== null && $daysLeft <= 5,
         ];
     }
 }
