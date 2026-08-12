@@ -315,13 +315,21 @@ function CollectorModal({ collector, onClose, onSaved }: { collector: Collector 
   const [name, setName] = useState(collector?.name ?? "");
   const [phone, setPhone] = useState(collector?.phone ?? "");
   const [address, setAddress] = useState(collector?.address ?? "");
+  const [email, setEmail] = useState(collector?.email ?? "");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function save() {
     if (!name.trim()) return;
     setBusy(true);
     try {
-      const input = { name: name.trim(), phone: phone.trim() || undefined, address: address.trim() || undefined };
+      const input = {
+        name: name.trim(),
+        phone: phone.trim() || undefined,
+        address: address.trim() || undefined,
+        email: email.trim() || undefined,
+        password: password.trim() || undefined,
+      };
       if (collector) await updateCollector(collector.id, input);
       else await createCollector(input);
       toast.success(c("saved"));
@@ -352,6 +360,14 @@ function CollectorModal({ collector, onClose, onSaved }: { collector: Collector 
         <Field label={c("fieldName")} value={name} onChange={setName} />
         <Field label={c("fieldPhone")} value={phone} onChange={setPhone} mono />
         <Field label={c("fieldAddress")} value={address} onChange={setAddress} />
+        <div className="border-t border-slate-100 pt-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">{c("loginSection")}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={c("fieldEmail")} value={email} onChange={setEmail} mono />
+            <Field label={c("fieldPassword")} value={password} onChange={setPassword} type="password" placeholder={collector?.has_login ? "••••••" : ""} />
+          </div>
+          <p className="mt-1 text-xs text-slate-400">{c("loginHint")}</p>
+        </div>
       </div>
     </Modal>
   );
@@ -451,12 +467,14 @@ function Field({
   onChange,
   type = "text",
   mono = false,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
   mono?: boolean;
+  placeholder?: string;
 }) {
   return (
     <div>
@@ -464,6 +482,7 @@ function Field({
       <input
         type={type}
         value={value}
+        placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         autoComplete="off"
         className={`w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200 ${mono ? "font-mono text-xs" : ""}`}
