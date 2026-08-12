@@ -10,6 +10,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getDashboardSummary } from "@/lib/api/dashboard";
 import { OnlineDrivers } from "@/components/dashboard/online-drivers";
+import { LiveMap } from "@/components/dashboard/live-map";
 
 function sessionTone(status: string | undefined): Status {
   if (status === "active") return "connected";
@@ -109,68 +110,76 @@ export default function DashboardPage() {
       {/* Live online drivers */}
       <OnlineDrivers />
 
-      {/* Offers over the last 7 days */}
-      <Card className="p-5">
-        <h3 className="mb-4 font-semibold text-slate-800">{k("offersTrend")}</h3>
-        {loading ? (
-          <div className="h-[180px] animate-pulse rounded-lg bg-slate-100" />
-        ) : (
-          <AreaChart
-            color="#0f172a"
-            data={(data?.offers_daily ?? []).map((d) => ({
-              label: new Date(d.date).toLocaleDateString(locale, { weekday: "short" }),
-              value: d.count,
-            }))}
-          />
-        )}
-      </Card>
+      {/* Offers trend · fleet session · drivers — side by side on wide screens */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="p-5">
+          <h3 className="mb-4 font-semibold text-slate-800">{k("offersTrend")}</h3>
+          {loading ? (
+            <div className="h-[180px] animate-pulse rounded-lg bg-slate-100" />
+          ) : (
+            <AreaChart
+              color="#0f172a"
+              data={(data?.offers_daily ?? []).map((d) => ({
+                label: new Date(d.date).toLocaleDateString(locale, { weekday: "short" }),
+                value: d.count,
+              }))}
+            />
+          )}
+        </Card>
 
-      <Card className="p-5">
-        <h3 className="mb-4 font-semibold text-slate-800">{k("sessionTitle")}</h3>
-        {loading ? (
-          <div className="h-8 w-48 animate-pulse rounded bg-slate-100" />
-        ) : session === null ? (
-          <p className="text-sm text-slate-400">{k("sessionNone")}</p>
-        ) : (
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500">{k("sessionStatus")}</span>
-              <Badge status={sessionTone(session.status)} dot>
-                {session.status}
-              </Badge>
+        <Card className="p-5">
+          <h3 className="mb-4 font-semibold text-slate-800">{k("sessionTitle")}</h3>
+          {loading ? (
+            <div className="h-8 w-48 animate-pulse rounded bg-slate-100" />
+          ) : session === null ? (
+            <p className="text-sm text-slate-400">{k("sessionNone")}</p>
+          ) : (
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">{k("sessionStatus")}</span>
+                <Badge status={sessionTone(session.status)} dot>
+                  {session.status}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="shrink-0 text-slate-500">{k("sessionOrg")}</span>
+                <span className="truncate font-mono text-xs text-slate-600">{session.uber_org_uuid}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">{k("sessionLastEvent")}</span>
+                <span className="text-slate-600">
+                  {session.last_event_at ? new Date(session.last_event_at).toLocaleString(locale) : "—"}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500">{k("sessionOrg")}</span>
-              <span className="font-mono text-xs text-slate-600">{session.uber_org_uuid}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500">{k("sessionLastEvent")}</span>
-              <span className="text-slate-600">
-                {session.last_event_at ? new Date(session.last_event_at).toLocaleString(locale) : "—"}
-              </span>
-            </div>
+          )}
+        </Card>
+
+        <Card>
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
+            <h3 className="font-semibold text-slate-800">{k("driversTitle")}</h3>
+            <Link
+              href="/drivers"
+              className="flex items-center gap-1 text-sm font-medium text-slate-900 hover:text-slate-800"
+            >
+              {k("manageDrivers")} <ArrowRight className="h-4 w-4 rtl:rotate-180" />
+            </Link>
           </div>
-        )}
-      </Card>
+          <div className="px-5 py-4 text-sm text-slate-500">
+            {loading
+              ? t("common.loading")
+              : k("driversSummary")
+                  .replace("{linked}", String(data?.linked_drivers ?? 0))
+                  .replace("{total}", String(data?.drivers ?? 0))}
+          </div>
+        </Card>
+      </div>
 
-      <Card>
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
-          <h3 className="font-semibold text-slate-800">{k("driversTitle")}</h3>
-          <Link
-            href="/drivers"
-            className="flex items-center gap-1 text-sm font-medium text-slate-900 hover:text-slate-800"
-          >
-            {k("manageDrivers")} <ArrowRight className="h-4 w-4 rtl:rotate-180" />
-          </Link>
-        </div>
-        <div className="px-5 py-4 text-sm text-slate-500">
-          {loading
-            ? t("common.loading")
-            : k("driversSummary")
-                .replace("{linked}", String(data?.linked_drivers ?? 0))
-                .replace("{total}", String(data?.drivers ?? 0))}
-        </div>
-      </Card>
+      {/* Live fleet map — embedded (same component as the standalone page) */}
+      <div>
+        <h3 className="mb-3 font-semibold text-slate-800">{t("pages.map.title")}</h3>
+        <LiveMap heightClass="h-[420px]" />
+      </div>
     </div>
   );
 }
