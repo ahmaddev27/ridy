@@ -3,7 +3,7 @@
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap, LayerGroup } from "leaflet";
-import { Radio, RefreshCw } from "lucide-react";
+import { Radio, RefreshCw, Car } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { getLiveDrivers, type LiveDriver } from "@/lib/api/drivers";
 
@@ -42,6 +42,12 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
   const [count, setCount] = useState<number | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [drivers, setDrivers] = useState<LiveDriver[]>([]);
+
+  /** Pan + zoom the map onto one driver (from the side list). */
+  function focusDriver(dr: LiveDriver) {
+    mapRef.current?.setView([dr.lat, dr.lng], 16, { animate: true });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -101,6 +107,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
       }
 
       setCount(drivers.length);
+      setDrivers(drivers);
       setUpdatedAt(new Date());
 
       if (firstFitRef.current && points.length > 0) {
@@ -147,6 +154,30 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
           <Legend color="#10b981" label={c("onTrip")} />
         </div>
       </div>
+
+      {/* Driver list — click to zoom onto one */}
+      {drivers.length > 0 && (
+        <div className="pointer-events-auto absolute top-3 z-[1000] max-h-[calc(100%-1.5rem)] w-56 overflow-y-auto rounded-xl bg-white/95 p-1.5 shadow-md backdrop-blur ltr:right-3 rtl:left-3">
+          {drivers.map((dr) => (
+            <button
+              key={dr.id}
+              onClick={() => focusDriver(dr)}
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start transition-colors hover:bg-slate-100"
+            >
+              <span
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                style={{ background: `${STATUS_COLOR(dr.status)}1a`, color: STATUS_COLOR(dr.status) }}
+              >
+                <Car className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-slate-800">{dr.name}</span>
+                <span className="block text-[11px] text-slate-400">{statusLabel(dr.status, c)}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {count === 0 && (
         <div className="pointer-events-none absolute inset-0 z-[999] flex items-center justify-center">
