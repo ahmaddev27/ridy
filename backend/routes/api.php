@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\ProxyController;
 use App\Http\Controllers\Api\V1\Admin\SettingsController;
 use App\Http\Controllers\Api\V1\Admin\SubscriptionController;
+use App\Http\Controllers\Api\V1\Admin\UserDirectoryController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CompanyActivationController;
@@ -158,6 +159,9 @@ Route::prefix('v1')->group(function () {
         Route::post('proxies', [ProxyController::class, 'store']);
         Route::put('proxies/{proxy}', [ProxyController::class, 'update']);
         Route::delete('proxies/{proxy}', [ProxyController::class, 'destroy']);
+
+        // Platform-wide user directory (managers, resellers, admins).
+        Route::get('users', [UserDirectoryController::class, 'index']);
 
         Route::get('companies', [CompanyController::class, 'index']);
         Route::post('companies', [CompanyController::class, 'store']);

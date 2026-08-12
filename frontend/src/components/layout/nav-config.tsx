@@ -12,6 +12,7 @@ import {
   Banknote,
   MapPin,
   FileBarChart,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
 
@@ -60,6 +61,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: "/admin", label: "nav.adminDashboard", icon: LayoutDashboard },
       { href: "/admin/companies", label: "nav.companies", icon: Building2 },
+      { href: "/admin/users", label: "nav.users", icon: UserCog },
       { href: "/admin/collectors", label: "nav.collectors", icon: Banknote },
       { href: "/admin/reports", label: "nav.subscriptions", icon: FileBarChart },
       { href: "/admin/proxies", label: "nav.proxies", icon: Plug },
