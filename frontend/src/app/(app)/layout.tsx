@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { ExtensionBanner } from "@/components/layout/extension-banner";
 import { OfferAlerts } from "@/components/offer-alerts";
+import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
 
 export default function AppLayout({
   children,
@@ -14,6 +15,7 @@ export default function AppLayout({
     <AuthProvider>
       <AppGuard>
         <OfferAlerts />
+        <OnboardingTour />
         {/* Fixed-height shell: the sidebar and topbar stay put; only the main
             content scrolls, so the sidebar never scrolls away or leaves white. */}
         <div className="flex h-screen overflow-hidden">
