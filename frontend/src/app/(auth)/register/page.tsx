@@ -66,21 +66,21 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-surface-2 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <Logo size={72} className="text-slate-900" />
+          <Logo size={72} className="text-ink" />
           <div className="leading-tight">
-            <div className="text-lg font-bold text-slate-900">Reidey</div>
-            <div className="text-xs text-slate-400">Fleet Management</div>
+            <div className="text-lg font-bold text-ink">Reidey</div>
+            <div className="text-xs text-ink-subtle">Fleet Management</div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-xl border border-line bg-surface p-6 shadow-sm">
           {step === "form" ? (
             <form onSubmit={submitForm} className="space-y-3">
-              <h1 className="text-lg font-semibold text-slate-900">{r("title")}</h1>
-              <p className="text-sm text-slate-400">{r("subtitle")}</p>
+              <h1 className="text-lg font-semibold text-ink">{r("title")}</h1>
+              <p className="text-sm text-ink-subtle">{r("subtitle")}</p>
               <Field label={r("company")} value={company} onChange={setCompany} />
               <Field label={r("name")} value={name} onChange={setName} />
               <Field label={r("phone")} type="tel" value={phone} onChange={setPhone} />
@@ -93,8 +93,8 @@ export default function RegisterPage() {
             </form>
           ) : (
             <form onSubmit={submitOtp} className="space-y-3">
-              <h1 className="text-lg font-semibold text-slate-900">{r("verifyTitle")}</h1>
-              <p className="text-sm text-slate-400">{r("verifySubtitle").replace("{email}", email)}</p>
+              <h1 className="text-lg font-semibold text-ink">{r("verifyTitle")}</h1>
+              <p className="text-sm text-ink-subtle">{r("verifySubtitle").replace("{email}", email)}</p>
               <div className="py-2">
                 <OtpInput value={otp} onChange={setOtp} autoFocus />
               </div>
@@ -102,16 +102,16 @@ export default function RegisterPage() {
                 {busy && <Loader2 className="h-4 w-4 animate-spin" />}
                 {r("verify")}
               </Button>
-              <button type="button" onClick={resend} className="w-full text-center text-xs font-medium text-slate-500 hover:text-slate-800">
+              <button type="button" onClick={resend} className="w-full text-center text-xs font-medium text-ink-muted hover:text-ink">
                 {r("resend")}
               </button>
             </form>
           )}
         </div>
 
-        <p className="mt-4 text-center text-sm text-slate-500">
+        <p className="mt-4 text-center text-sm text-ink-muted">
           {r("haveAccount")}{" "}
-          <Link href="/login" className="font-medium text-slate-900 hover:underline">
+          <Link href="/login" className="font-medium text-ink hover:underline">
             {r("signIn")}
           </Link>
         </p>
@@ -134,13 +134,13 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+      <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+        className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
       />
     </div>
   );

@@ -135,7 +135,7 @@ export default function CollectorsPage() {
         {loading ? (
           <div className="space-y-2 p-4">
             {[0, 1].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded bg-slate-100" />
+              <div key={i} className="h-14 animate-pulse rounded bg-surface-2" />
             ))}
           </div>
         ) : collectors.length === 0 ? (
@@ -143,7 +143,7 @@ export default function CollectorsPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-400 [&_th]:text-start">
+              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
                 <tr>
                   <th className="px-4 py-3 font-semibold">{c("colName")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colPhone")}</th>
@@ -153,22 +153,22 @@ export default function CollectorsPage() {
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {collectors.map((col) => (
-                  <tr key={col.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-800">{col.name}</td>
-                    <td className="px-4 py-3 text-slate-500" dir="ltr">{col.phone || c("noneShort")}</td>
-                    <td className="px-4 py-3 font-semibold text-slate-800">{money(col.total_collected)}</td>
-                    <td className="px-4 py-3 text-slate-600">{col.payments_count}</td>
-                    <td className="px-4 py-3 text-slate-500">
+                  <tr key={col.id} className="hover:bg-surface-2">
+                    <td className="px-4 py-3 font-medium text-ink">{col.name}</td>
+                    <td className="px-4 py-3 text-ink-muted" dir="ltr">{col.phone || c("noneShort")}</td>
+                    <td className="px-4 py-3 font-semibold text-ink">{money(col.total_collected)}</td>
+                    <td className="px-4 py-3 text-ink-muted">{col.payments_count}</td>
+                    <td className="px-4 py-3 text-ink-muted">
                       {col.last_paid_on ? new Date(col.last_paid_on).toLocaleDateString(latnLocale(locale)) : c("noneShort")}
                     </td>
                     <td className="px-4 py-3 text-end">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => setEditing(col)} className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" title={c("edit")}>
+                        <button onClick={() => setEditing(col)} className="rounded p-1.5 text-ink-subtle hover:bg-surface-2 hover:text-ink" title={c("edit")}>
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button onClick={() => setConfirmDel(col)} className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title={c("delete")}>
+                        <button onClick={() => setConfirmDel(col)} className="rounded p-1.5 text-ink-subtle hover:bg-danger-bg hover:text-danger-fg" title={c("delete")}>
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -183,8 +183,8 @@ export default function CollectorsPage() {
 
       {/* Payment ledger */}
       <Card className="overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
-          <h3 className="font-semibold text-slate-800">{c("ledgerTitle")}</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
+          <h3 className="font-semibold text-ink">{c("ledgerTitle")}</h3>
           <div className="flex flex-wrap items-center gap-2">
             <Select
               className="w-44"
@@ -202,18 +202,18 @@ export default function CollectorsPage() {
               type="date"
               value={filters.from ?? ""}
               onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value || undefined }))}
-              className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-slate-900"
+              className="rounded-lg border border-line-strong px-2 py-1.5 text-sm outline-none focus:border-ink"
               title={c("from")}
             />
             <input
               type="date"
               value={filters.to ?? ""}
               onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value || undefined }))}
-              className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-slate-900"
+              className="rounded-lg border border-line-strong px-2 py-1.5 text-sm outline-none focus:border-ink"
               title={c("to")}
             />
             {(filters.collector_id || filters.tenant_id || filters.from || filters.to) && (
-              <button onClick={() => setFilters({})} className="text-xs text-slate-500 hover:text-slate-800">
+              <button onClick={() => setFilters({})} className="text-xs text-ink-muted hover:text-ink">
                 {c("clearFilters")}
               </button>
             )}
@@ -229,7 +229,7 @@ export default function CollectorsPage() {
         {ledgerLoading ? (
           <div className="space-y-2 p-4">
             {[0, 1].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded bg-slate-100" />
+              <div key={i} className="h-12 animate-pulse rounded bg-surface-2" />
             ))}
           </div>
         ) : payments.length === 0 ? (
@@ -237,7 +237,7 @@ export default function CollectorsPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-400 [&_th]:text-start">
+              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
                 <tr>
                   <th className="px-4 py-3 font-semibold">{c("colDate")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colCompany")}</th>
@@ -247,26 +247,26 @@ export default function CollectorsPage() {
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {payments.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 text-slate-500">{new Date(p.paid_on).toLocaleDateString(latnLocale(locale))}</td>
-                    <td className="px-4 py-3 font-medium text-slate-800">{p.company_name ?? c("noneShort")}</td>
-                    <td className="px-4 py-3 text-slate-600">{p.collector_name ?? c("noneShort")}</td>
-                    <td className="px-4 py-3 font-semibold text-slate-800">{money(p.amount)}</td>
-                    <td className="px-4 py-3 text-slate-500">{p.note || c("noneShort")}</td>
+                  <tr key={p.id} className="hover:bg-surface-2">
+                    <td className="px-4 py-3 text-ink-muted">{new Date(p.paid_on).toLocaleDateString(latnLocale(locale))}</td>
+                    <td className="px-4 py-3 font-medium text-ink">{p.company_name ?? c("noneShort")}</td>
+                    <td className="px-4 py-3 text-ink-muted">{p.collector_name ?? c("noneShort")}</td>
+                    <td className="px-4 py-3 font-semibold text-ink">{money(p.amount)}</td>
+                    <td className="px-4 py-3 text-ink-muted">{p.note || c("noneShort")}</td>
                     <td className="px-4 py-3 text-end">
-                      <button onClick={() => setConfirmDelPay(p)} className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title={c("delete")}>
+                      <button onClick={() => setConfirmDelPay(p)} className="rounded p-1.5 text-ink-subtle hover:bg-danger-bg hover:text-danger-fg" title={c("delete")}>
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="border-t border-slate-200 bg-slate-50">
+              <tfoot className="border-t border-line bg-surface-2">
                 <tr>
-                  <td className="px-4 py-3 font-semibold text-slate-600" colSpan={3}>{c("ledgerSum")}</td>
-                  <td className="px-4 py-3 font-bold text-slate-900">{money(sum)}</td>
+                  <td className="px-4 py-3 font-semibold text-ink-muted" colSpan={3}>{c("ledgerSum")}</td>
+                  <td className="px-4 py-3 font-bold text-ink">{money(sum)}</td>
                   <td colSpan={2} />
                 </tr>
               </tfoot>
@@ -361,13 +361,13 @@ function CollectorModal({ collector, onClose, onSaved }: { collector: Collector 
         <Field label={c("fieldName")} value={name} onChange={setName} />
         <Field label={c("fieldPhone")} value={phone} onChange={setPhone} mono />
         <Field label={c("fieldAddress")} value={address} onChange={setAddress} />
-        <div className="border-t border-slate-100 pt-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">{c("loginSection")}</p>
+        <div className="border-t border-line pt-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">{c("loginSection")}</p>
           <div className="grid grid-cols-2 gap-3">
             <Field label={c("fieldEmail")} value={email} onChange={setEmail} mono />
             <Field label={c("fieldPassword")} value={password} onChange={setPassword} type="password" placeholder={collector?.has_login ? "••••••" : ""} />
           </div>
-          <p className="mt-1 text-xs text-slate-400">{c("loginHint")}</p>
+          <p className="mt-1 text-xs text-ink-subtle">{c("loginHint")}</p>
         </div>
       </div>
     </Modal>
@@ -417,7 +417,7 @@ function PaymentModal({
     }
   }
 
-  const selectClass = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200";
+  const selectClass = "w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line";
 
   return (
     <Modal
@@ -435,7 +435,7 @@ function PaymentModal({
     >
       <div className="space-y-3 text-start">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">{c("fieldCompany")}</label>
+          <label className="mb-1 block text-sm font-medium text-ink">{c("fieldCompany")}</label>
           <Select
             value={tenantId}
             onChange={setTenantId}
@@ -444,7 +444,7 @@ function PaymentModal({
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">{c("fieldCollector")}</label>
+          <label className="mb-1 block text-sm font-medium text-ink">{c("fieldCollector")}</label>
           <Select
             value={collectorId}
             onChange={setCollectorId}
@@ -479,14 +479,14 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+      <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
       <input
         type={type}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         autoComplete="off"
-        className={`w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200 ${mono ? "font-mono text-xs" : ""}`}
+        className={`w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ${mono ? "font-mono text-xs" : ""}`}
       />
     </div>
   );

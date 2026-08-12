@@ -197,21 +197,21 @@ export default function ConnectionsPage() {
       {/* Extension not installed: warning + install card with download */}
       {extInstalled === false && (
         <>
-          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-warning-bg p-4">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
             <div className="flex-1">
               <p className="font-semibold text-amber-900">{c("extMissingTitle")}</p>
-              <p className="mt-0.5 text-sm text-amber-700">{c("extMissingBody")}</p>
+              <p className="mt-0.5 text-sm text-warning-fg">{c("extMissingBody")}</p>
             </div>
           </div>
 
           <Card className="p-5">
             <div className="mb-1 flex items-center gap-2">
-              <Download className="h-4 w-4 text-slate-700" />
-              <h3 className="font-semibold text-slate-800">{c("installTitle")}</h3>
+              <Download className="h-4 w-4 text-ink" />
+              <h3 className="font-semibold text-ink">{c("installTitle")}</h3>
             </div>
-            <p className="mb-3 text-sm text-slate-500">{c("installBody")}</p>
-            <ol className="mb-4 ml-4 list-decimal space-y-1 text-sm text-slate-600">
+            <p className="mb-3 text-sm text-ink-muted">{c("installBody")}</p>
+            <ol className="mb-4 ml-4 list-decimal space-y-1 text-sm text-ink-muted">
               <li>{c("installStep1")}</li>
               <li>{c("installStep2")}</li>
               <li>{c("installStep3")}</li>
@@ -228,11 +228,11 @@ export default function ConnectionsPage() {
       {/* Extension installed but outdated: prompt to update (unpacked builds
           don't auto-update, so the manager must download and reload). */}
       {extInstalled && isExtensionOutdated(extVersion) && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-warning-bg p-4">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
           <div className="flex-1">
             <p className="font-semibold text-amber-900">{c("extUpdateTitle")}</p>
-            <p className="mt-0.5 text-sm text-amber-700">
+            <p className="mt-0.5 text-sm text-warning-fg">
               {c("extUpdateBody")
                 .replace("{installed}", extVersion ?? "?")
                 .replace("{latest}", LATEST_EXTENSION_VERSION)}
@@ -249,9 +249,9 @@ export default function ConnectionsPage() {
       {/* Current session */}
       <Card className="p-5">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-slate-800">{c("current")}</h3>
+          <h3 className="font-semibold text-ink">{c("current")}</h3>
           {loading ? (
-            <span className="h-5 w-24 animate-pulse rounded bg-slate-100" />
+            <span className="h-5 w-24 animate-pulse rounded bg-surface-2" />
           ) : data ? (
             <Badge status={statusTone[data.status] ?? "neutral"} dot>
               {c(
@@ -271,12 +271,12 @@ export default function ConnectionsPage() {
         {data && (
           <div className="mt-4 space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-slate-500">{c("orgUuid")}</span>
-              <span className="font-mono text-xs text-slate-600">{data.uber_org_uuid}</span>
+              <span className="text-ink-muted">{c("orgUuid")}</span>
+              <span className="font-mono text-xs text-ink-muted">{data.uber_org_uuid}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">{c("lastEvent")}</span>
-              <span className="text-slate-600">
+              <span className="text-ink-muted">{c("lastEvent")}</span>
+              <span className="text-ink-muted">
                 {data.last_event_at ? new Date(data.last_event_at).toLocaleString(latnLocale(locale)) : "—"}
               </span>
             </div>
@@ -292,10 +292,10 @@ export default function ConnectionsPage() {
       {/* Recommended: browser extension */}
       <Card className="p-5">
         <div className="mb-1 flex items-center gap-2">
-          <Puzzle className="h-4 w-4 text-slate-700" />
-          <h3 className="font-semibold text-slate-800">{c("extensionTitle")}</h3>
+          <Puzzle className="h-4 w-4 text-ink" />
+          <h3 className="font-semibold text-ink">{c("extensionTitle")}</h3>
         </div>
-        <p className="mb-4 text-sm text-slate-500">{c("extensionHint")}</p>
+        <p className="mb-4 text-sm text-ink-muted">{c("extensionHint")}</p>
 
         {/* One button: mint token -> auto-pair extension -> open Uber. */}
         <Button onClick={connectViaExtension} disabled={extBusy || awaitingLink || extInstalled === false}>
@@ -303,7 +303,7 @@ export default function ConnectionsPage() {
           {c("openUber")}
         </Button>
         {awaitingLink && (
-          <p className="mt-2 flex items-center gap-1.5 text-sm text-slate-500">
+          <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-muted">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> {c("awaitingLink")}
           </p>
         )}
@@ -311,20 +311,20 @@ export default function ConnectionsPage() {
         {/* Fallback for when the extension isn't installed yet: the raw token. */}
         {extToken && (
           <details className="mt-4">
-            <summary className="cursor-pointer text-xs text-slate-500">{c("tokenManualFallback")}</summary>
-            <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
-              <code className="flex-1 overflow-x-auto whitespace-nowrap text-xs text-slate-700">
+            <summary className="cursor-pointer text-xs text-ink-muted">{c("tokenManualFallback")}</summary>
+            <div className="mt-2 flex items-center gap-2 rounded-lg border border-line bg-surface-2 p-2">
+              <code className="flex-1 overflow-x-auto whitespace-nowrap text-xs text-ink">
                 {extToken}
               </code>
               <button
                 onClick={() => navigator.clipboard.writeText(extToken)}
-                className="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-200"
+                className="shrink-0 rounded p-1 text-ink-muted hover:bg-surface-2"
                 title="Copy"
               >
                 <Copy className="h-4 w-4" />
               </button>
             </div>
-            <p className="mt-1.5 text-xs text-slate-400">{c("tokenHint")}</p>
+            <p className="mt-1.5 text-xs text-ink-subtle">{c("tokenHint")}</p>
           </details>
         )}
       </Card>
@@ -333,31 +333,31 @@ export default function ConnectionsPage() {
       <Card className="p-5">
         <button
           onClick={() => setShowAdvanced((v) => !v)}
-          className="flex w-full items-center justify-between text-sm font-medium text-slate-600"
+          className="flex w-full items-center justify-between text-sm font-medium text-ink-muted"
         >
           {c("advanced")}
           <ChevronDown className={`h-4 w-4 transition ${showAdvanced ? "rotate-180" : ""}`} />
         </button>
         {showAdvanced && (
           <div className="mt-4 space-y-3">
-            <p className="text-sm text-slate-500">{c("captureHint")}</p>
+            <p className="text-sm text-ink-muted">{c("captureHint")}</p>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">{c("orgUuid")}</label>
+              <label className="mb-1.5 block text-sm font-medium text-ink">{c("orgUuid")}</label>
               <input
                 value={orgUuid}
                 onChange={(e) => setOrgUuid(e.target.value)}
                 placeholder="7b118561-0f8e-4816-a93f-d6e9c770cfd0"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
+                className="w-full rounded-lg border border-line-strong px-3 py-2 font-mono text-sm outline-none focus:border-black focus:ring-2 focus:ring-line"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">{c("cookiesLabel")}</label>
+              <label className="mb-1.5 block text-sm font-medium text-ink">{c("cookiesLabel")}</label>
               <textarea
                 value={cookiesRaw}
                 onChange={(e) => setCookiesRaw(e.target.value)}
                 rows={6}
                 placeholder='[{"name":"sid","value":"..."}]'
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
+                className="w-full rounded-lg border border-line-strong px-3 py-2 font-mono text-xs outline-none focus:border-black focus:ring-2 focus:ring-line"
               />
             </div>
             <div className="flex justify-end">

@@ -157,39 +157,39 @@ export default function OffersPage() {
         <div className="relative">
           <button
             onClick={() => setDriverFilterOpen((o) => !o)}
-            className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 outline-none hover:bg-slate-50"
+            className="flex items-center gap-2 rounded-lg border border-line-strong px-3 py-2 text-sm text-ink-muted outline-none hover:bg-surface-2"
           >
             {driverUuids.length === 0
               ? c("filterAll")
               : `${driverUuids.length} ${c("driversSelected")}`}
-            <ChevronDown className="h-4 w-4 text-slate-400" />
+            <ChevronDown className="h-4 w-4 text-ink-subtle" />
           </button>
           {driverFilterOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setDriverFilterOpen(false)} />
-              <div className="absolute z-20 mt-1 max-h-72 w-64 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+              <div className="absolute z-20 mt-1 max-h-72 w-64 overflow-y-auto rounded-lg border border-line bg-surface p-1 shadow-lg">
                 {driverUuids.length > 0 && (
                   <button
                     onClick={() => setDriverUuids([])}
-                    className="w-full rounded px-2 py-1.5 text-start text-xs font-medium text-slate-900 hover:bg-slate-100"
+                    className="w-full rounded px-2 py-1.5 text-start text-xs font-medium text-ink hover:bg-surface-2"
                   >
                     {c("clearSelection")}
                   </button>
                 )}
                 {allDrivers.length === 0 ? (
-                  <p className="px-2 py-2 text-xs text-slate-400">{c("noDrivers")}</p>
+                  <p className="px-2 py-2 text-xs text-ink-subtle">{c("noDrivers")}</p>
                 ) : (
                   allDrivers.map((d) => (
                     <label
                       key={d.id}
-                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-slate-50"
+                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-surface-2"
                     >
                       <input
                         type="checkbox"
                         checked={selectedDriverSet.has(d.uber_driver_uuid ?? "")}
                         onChange={() => d.uber_driver_uuid && toggleDriver(d.uber_driver_uuid)}
                       />
-                      <span className="truncate text-slate-700">{d.name}</span>
+                      <span className="truncate text-ink">{d.name}</span>
                     </label>
                   ))
                 )}
@@ -204,15 +204,15 @@ export default function OffersPage() {
           value={from}
           onChange={(e) => setFrom(e.target.value)}
           title={c("dateFrom")}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 outline-none focus:border-black"
+          className="rounded-lg border border-line-strong px-3 py-2 text-sm text-ink-muted outline-none focus:border-black"
         />
-        <span className="text-slate-400">–</span>
+        <span className="text-ink-subtle">–</span>
         <input
           type="date"
           value={to}
           onChange={(e) => setTo(e.target.value)}
           title={c("dateTo")}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 outline-none focus:border-black"
+          className="rounded-lg border border-line-strong px-3 py-2 text-sm text-ink-muted outline-none focus:border-black"
         />
         {(from || to) && (
           <button
@@ -220,7 +220,7 @@ export default function OffersPage() {
               setFrom("");
               setTo("");
             }}
-            className="text-xs font-medium text-slate-900 hover:underline"
+            className="text-xs font-medium text-ink hover:underline"
           >
             {c("clearDates")}
           </button>
@@ -240,7 +240,7 @@ export default function OffersPage() {
       )}
 
       {error && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+        <div className="rounded-lg border border-rose-200 bg-danger-bg p-3 text-sm text-danger-fg">
           {c("loadError")} — {error}
         </div>
       )}
@@ -249,7 +249,7 @@ export default function OffersPage() {
         {loading ? (
           <div className="space-y-2 p-4">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded bg-slate-100" />
+              <div key={i} className="h-12 animate-pulse rounded bg-surface-2" />
             ))}
           </div>
         ) : offers.length === 0 ? (
@@ -259,47 +259,47 @@ export default function OffersPage() {
             {groupedByDay.map(([key, dayOffers]) => {
               const open = openDays.has(key);
               return (
-                <div key={key} className="border-b border-slate-100 last:border-0">
+                <div key={key} className="border-b border-line last:border-0">
                   <button
                     onClick={() => toggleDay(key)}
-                    className="flex w-full items-center gap-2 px-4 py-3 text-start hover:bg-slate-50"
+                    className="flex w-full items-center gap-2 px-4 py-3 text-start hover:bg-surface-2"
                   >
-                    <ChevronDown className={`h-4 w-4 text-slate-400 transition ${open ? "" : "-rotate-90"}`} />
-                    <span className="font-semibold text-slate-800">{dayLabel(key)}</span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-800">
+                    <ChevronDown className={`h-4 w-4 text-ink-subtle transition ${open ? "" : "-rotate-90"}`} />
+                    <span className="font-semibold text-ink">{dayLabel(key)}</span>
+                    <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-ink">
                       {dayOffers.length} {c("offersCount")}
                     </span>
                   </button>
                   {open && (
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-line">
                           {dayOffers.map((o) => (
                             <tr
                               key={o.id}
                               onClick={() => setDetailId(o.id)}
-                              className="cursor-pointer hover:bg-slate-50"
+                              className="cursor-pointer hover:bg-surface-2"
                             >
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                              <td className="whitespace-nowrap px-4 py-3 text-ink-muted">
                                 {o.received_at ? new Date(o.received_at).toLocaleTimeString(latnLocale(locale)) : "—"}
                               </td>
                               <td className="px-4 py-3">
-                                <div className="font-medium text-slate-800">{o.driver_name ?? "—"}</div>
-                                <div className="font-mono text-[10px] text-slate-400">{o.driver_uuid}</div>
+                                <div className="font-medium text-ink">{o.driver_name ?? "—"}</div>
+                                <div className="font-mono text-[10px] text-ink-subtle">{o.driver_uuid}</div>
                               </td>
-                              <td className="px-4 py-3 text-slate-600">
+                              <td className="px-4 py-3 text-ink-muted">
                                 <div className="flex items-start gap-1.5">
-                                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success-fg" />
                                   <div className="min-w-0">
                                     <div className="truncate">{o.pickup_address ?? "—"}</div>
-                                    <div className="flex items-center gap-1 truncate text-slate-400">
+                                    <div className="flex items-center gap-1 truncate text-ink-subtle">
                                       <ArrowRight className="h-3 w-3 shrink-0 rtl:rotate-180" />
                                       <span className="truncate">{o.dropoff_address ?? "—"}</span>
                                     </div>
                                   </div>
                                 </div>
                               </td>
-                              <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
+                              <td className="whitespace-nowrap px-4 py-3 font-semibold text-ink">
                                 {toLatinDigits(o.fare_formatted) || "—"}
                               </td>
                               <td className="px-4 py-3">
@@ -321,8 +321,8 @@ export default function OffersPage() {
 
         {/* Pagination */}
         {meta && meta.total > 0 && (
-          <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-sm">
-            <span className="text-slate-500">
+          <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm">
+            <span className="text-ink-muted">
               {(meta.current_page - 1) * meta.per_page + 1}–
               {Math.min(meta.current_page * meta.per_page, meta.total)} {c("of")} {meta.total}
             </span>
@@ -330,18 +330,18 @@ export default function OffersPage() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={meta.current_page <= 1}
-                className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+                className="rounded-lg border border-line p-1.5 text-ink-muted hover:bg-surface-2 disabled:opacity-40"
                 aria-label={c("prev")}
               >
                 <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
               </button>
-              <span className="px-2 text-slate-600">
+              <span className="px-2 text-ink-muted">
                 {meta.current_page} / {meta.last_page}
               </span>
               <button
                 onClick={() => setPage((p) => Math.min(meta.last_page, p + 1))}
                 disabled={meta.current_page >= meta.last_page}
-                className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+                className="rounded-lg border border-line p-1.5 text-ink-muted hover:bg-surface-2 disabled:opacity-40"
                 aria-label={c("next")}
               >
                 <ChevronRight className="h-4 w-4 rtl:rotate-180" />

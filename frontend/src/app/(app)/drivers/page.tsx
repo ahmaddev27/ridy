@@ -84,11 +84,11 @@ export default function DriversPage() {
         {loading ? (
           <div className="space-y-2 p-4">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded bg-slate-100" />
+              <div key={i} className="h-14 animate-pulse rounded bg-surface-2" />
             ))}
           </div>
         ) : error ? (
-          <div className="p-6 text-sm text-rose-600">{t("screens.drivers.loadError")} — {error}</div>
+          <div className="p-6 text-sm text-danger-fg">{t("screens.drivers.loadError")} — {error}</div>
         ) : drivers.length === 0 ? (
           <EmptyState
             icon={Users}
@@ -98,7 +98,7 @@ export default function DriversPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-400 [&_th]:text-start">
+              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
                 <tr>
                   <th className="px-4 py-3 font-semibold">{t("screens.drivers.colName")}</th>
                   <th className="px-4 py-3 font-semibold">{t("screens.drivers.colPhone")}</th>
@@ -108,12 +108,12 @@ export default function DriversPage() {
                   <th className="px-4 py-3 font-semibold">Uber</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {drivers.map((d) => (
                   <tr
                     key={d.id}
                     onClick={() => router.push(`/drivers/${d.id}`)}
-                    className="cursor-pointer hover:bg-slate-50"
+                    className="cursor-pointer hover:bg-surface-2"
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -126,30 +126,30 @@ export default function DriversPage() {
                               className="h-9 w-9 rounded-full object-cover"
                             />
                           ) : (
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-500">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-ink-muted">
                               {d.name.slice(0, 1)}
                             </div>
                           )}
                           {/* Live online/offline dot */}
                           <span
                             className={`absolute -end-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-white ${
-                              d.online ? "bg-emerald-500" : "bg-slate-300"
+                              d.online ? "bg-emerald-500" : "bg-ink-subtle"
                             }`}
                             title={d.online ? t("screens.drivers.online") : t("screens.drivers.offline")}
                           />
                         </div>
                         <div>
-                          <div className="font-medium text-slate-800">{d.name}</div>
+                          <div className="font-medium text-ink">{d.name}</div>
                           {d.uber_email && (
-                            <div className="text-xs text-slate-400">{d.uber_email}</div>
+                            <div className="text-xs text-ink-subtle">{d.uber_email}</div>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{d.phone ?? "—"}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{d.phone ?? "—"}</td>
                     <td className="px-4 py-3">
                       {d.rating != null ? (
-                        <span className="inline-flex items-center gap-1 text-slate-700">
+                        <span className="inline-flex items-center gap-1 text-ink">
                           <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                           {d.rating.toFixed(2)}
                         </span>
@@ -157,7 +157,7 @@ export default function DriversPage() {
                         "—"
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                    <td className="whitespace-nowrap px-4 py-3 text-ink-muted">
                       {d.total_trips != null ? d.total_trips.toLocaleString() : "—"}
                     </td>
                     <td className="px-4 py-3">
@@ -168,7 +168,7 @@ export default function DriversPage() {
                     <td className="px-4 py-3">
                       <span
                         className={`rounded px-2 py-0.5 text-[11px] font-bold ${
-                          d.uber_linked ? "bg-black text-white" : "bg-slate-200 text-slate-400"
+                          d.uber_linked ? "bg-black text-white" : "bg-surface-2 text-ink-subtle"
                         }`}
                       >
                         {d.uber_linked ? t("screens.drivers.linked") : t("screens.drivers.notLinked")}

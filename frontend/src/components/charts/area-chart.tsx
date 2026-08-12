@@ -68,7 +68,7 @@ export function AreaChart({ data, height = 180, color = "#4f46e5" }: { data: Poi
 
         {/* Sparse x labels: first, middle, last */}
         {[0, Math.floor(data.length / 2), data.length - 1].map((i) => (
-          <text key={i} x={x(i)} y={H - 6} textAnchor="middle" className="fill-slate-400" fontSize="10">
+          <text key={i} x={x(i)} y={H - 6} textAnchor="middle" className="fill-ink-subtle" fontSize="10">
             {data[i]?.label}
           </text>
         ))}
@@ -76,7 +76,7 @@ export function AreaChart({ data, height = 180, color = "#4f46e5" }: { data: Poi
 
       {hover !== null && (
         <div
-          className="pointer-events-none absolute -translate-x-1/2 -translate-y-full rounded-lg bg-slate-900 px-2 py-1 text-xs text-white shadow-lg"
+          className="pointer-events-none absolute -translate-x-1/2 -translate-y-full rounded-lg bg-primary px-2 py-1 text-xs text-primary-ink shadow-lg"
           style={{ left: `${(x(hover) / W) * 100}%`, top: `${(y(data[hover].value) / H) * 100}%` }}
         >
           <span className="font-semibold">{data[hover].value}</span> · {data[hover].label}

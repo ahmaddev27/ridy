@@ -16,7 +16,7 @@ export function AppGuard({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-slate-400">
+      <div className="flex min-h-screen items-center justify-center text-ink-subtle">
         <Loader2 className="h-5 w-5 animate-spin" />
       </div>
     );

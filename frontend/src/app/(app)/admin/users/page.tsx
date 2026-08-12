@@ -13,20 +13,20 @@ import { useAsync } from "@/hooks/use-async";
 import { listUsers, deleteUser, type PlatformUser } from "@/lib/api/admin";
 
 const ROLE_TONE: Record<string, string> = {
-  super_admin: "bg-slate-900 text-white",
+  super_admin: "bg-primary text-primary-ink",
   reseller: "bg-indigo-50 text-indigo-700",
-  fleet_manager: "bg-sky-50 text-sky-700",
-  owner: "bg-sky-50 text-sky-700",
-  driver: "bg-emerald-50 text-emerald-700",
-  viewer: "bg-slate-100 text-slate-600",
+  fleet_manager: "bg-info-bg text-sky-700",
+  owner: "bg-info-bg text-sky-700",
+  driver: "bg-success-bg text-success-fg",
+  viewer: "bg-surface-2 text-ink-muted",
 };
 
 const STATUS_TONE: Record<string, string> = {
-  active: "bg-emerald-50 text-emerald-700",
-  disabled: "bg-slate-100 text-slate-600",
-  banned: "bg-rose-50 text-rose-700",
-  expired: "bg-amber-50 text-amber-700",
-  inactive: "bg-amber-50 text-amber-700",
+  active: "bg-success-bg text-success-fg",
+  disabled: "bg-surface-2 text-ink-muted",
+  banned: "bg-danger-bg text-danger-fg",
+  expired: "bg-warning-bg text-warning-fg",
+  inactive: "bg-warning-bg text-warning-fg",
 };
 
 export default function UsersPage() {
@@ -91,7 +91,7 @@ export default function UsersPage() {
                 onClick={() => toggleRole(r)}
                 className={
                   "rounded-full px-3 py-1 text-xs font-semibold transition-colors " +
-                  (on ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")
+                  (on ? "bg-primary text-primary-ink" : "bg-surface-2 text-ink-muted hover:bg-surface-2")
                 }
               >
                 {c(`role_${r}`)}
@@ -105,7 +105,7 @@ export default function UsersPage() {
         {loading ? (
           <div className="space-y-2 p-4">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded bg-slate-100" />
+              <div key={i} className="h-12 animate-pulse rounded bg-surface-2" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -113,7 +113,7 @@ export default function UsersPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-400 [&_th]:text-start">
+              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
                 <tr>
                   <th className="px-4 py-3 font-semibold">{c("colUser")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colPhone")}</th>
@@ -123,22 +123,22 @@ export default function UsersPage() {
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {filtered.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50">
+                  <tr key={u.id} className="hover:bg-surface-2">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-800">{u.name}</div>
-                      <div className="text-xs text-slate-400">{u.email}</div>
+                      <div className="font-medium text-ink">{u.name}</div>
+                      <div className="text-xs text-ink-subtle">{u.email}</div>
                     </td>
-                    <td className="px-4 py-3 text-slate-500"><bdi dir="ltr">{u.phone || c("none")}</bdi></td>
+                    <td className="px-4 py-3 text-ink-muted"><bdi dir="ltr">{u.phone || c("none")}</bdi></td>
                     <td className="px-4 py-3">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ROLE_TONE[u.role] ?? "bg-slate-100 text-slate-600"}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ROLE_TONE[u.role] ?? "bg-surface-2 text-ink-muted"}`}>
                         {c(`role_${u.role}`)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{u.company || c("none")}</td>
+                    <td className="px-4 py-3 text-ink-muted">{u.company || c("none")}</td>
                     <td className="px-4 py-3">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_TONE[u.status] ?? "bg-slate-100 text-slate-600"}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_TONE[u.status] ?? "bg-surface-2 text-ink-muted"}`}>
                         {c(`st_${u.status}`)}
                       </span>
                     </td>
@@ -146,7 +146,7 @@ export default function UsersPage() {
                       {u.role !== "super_admin" && (
                         <button
                           onClick={() => setConfirmDel(u)}
-                          className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                          className="rounded p-1.5 text-ink-subtle hover:bg-danger-bg hover:text-danger-fg"
                           title={c("delete")}
                         >
                           <Trash2 className="h-4 w-4" />

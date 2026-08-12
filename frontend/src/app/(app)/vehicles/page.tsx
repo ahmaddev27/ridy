@@ -72,7 +72,7 @@ export default function VehiclesPage() {
         {loading ? (
           <div className="space-y-2 p-4">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded bg-slate-100" />
+              <div key={i} className="h-14 animate-pulse rounded bg-surface-2" />
             ))}
           </div>
         ) : vehicles.length === 0 ? (
@@ -80,7 +80,7 @@ export default function VehiclesPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-400 [&_th]:text-start">
+              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
                 <tr>
                   <th className="px-4 py-3 font-semibold">{v("colVehicle")}</th>
                   <th className="px-4 py-3 font-semibold">{v("colYear")}</th>
@@ -91,35 +91,35 @@ export default function VehiclesPage() {
                   <th className="px-4 py-3 font-semibold">{v("colAssignment")}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {vehicles.map((car) => (
-                  <tr key={car.id} className="hover:bg-slate-50">
+                  <tr key={car.id} className="hover:bg-surface-2">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {car.image_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={car.image_url} alt="" className="h-9 w-12 rounded object-cover" />
                         ) : (
-                          <div className="flex h-9 w-12 items-center justify-center rounded bg-slate-100">
-                            <Car className="h-4 w-4 text-slate-400" />
+                          <div className="flex h-9 w-12 items-center justify-center rounded bg-surface-2">
+                            <Car className="h-4 w-4 text-ink-subtle" />
                           </div>
                         )}
-                        <span className="font-medium text-slate-800">
+                        <span className="font-medium text-ink">
                           {[car.make, car.model].filter(Boolean).join(" ") || "—"}
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{car.year || "—"}</td>
+                    <td className="px-4 py-3 text-ink-muted">{car.year || "—"}</td>
                     <td className="px-4 py-3">
-                      <span dir="ltr" className="font-mono text-slate-700">{car.license_plate ?? "—"}</span>
+                      <span dir="ltr" className="font-mono text-ink">{car.license_plate ?? "—"}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span dir="ltr" className="font-mono text-xs text-slate-400">{car.vin ?? "—"}</span>
+                      <span dir="ltr" className="font-mono text-xs text-ink-subtle">{car.vin ?? "—"}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1.5 text-slate-600">
+                      <span className="inline-flex items-center gap-1.5 text-ink-muted">
                         {car.color_hex && (
-                          <span className="h-3 w-3 rounded-full border border-slate-200" style={{ background: car.color_hex }} />
+                          <span className="h-3 w-3 rounded-full border border-line" style={{ background: car.color_hex }} />
                         )}
                         {car.color ?? "—"}
                       </span>
@@ -131,9 +131,9 @@ export default function VehiclesPage() {
                     </td>
                     <td className="px-4 py-3">
                       {car.assigned_driver ? (
-                        <span className="text-slate-700">{car.assigned_driver}</span>
+                        <span className="text-ink">{car.assigned_driver}</span>
                       ) : (
-                        <span className="text-slate-400">{v("unassigned")}</span>
+                        <span className="text-ink-subtle">{v("unassigned")}</span>
                       )}
                     </td>
                   </tr>

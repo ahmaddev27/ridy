@@ -116,13 +116,13 @@ export default function SettingsPage() {
       {/* Email delivery */}
       <Card className="w-full p-5">
         <div className="mb-4 flex items-center gap-2">
-          <Mail className="h-4 w-4 text-slate-700" />
-          <h3 className="font-semibold text-slate-800">{c("email")}</h3>
+          <Mail className="h-4 w-4 text-ink" />
+          <h3 className="font-semibold text-ink">{c("email")}</h3>
         </div>
 
         {/* Provider picker */}
         <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-slate-700">{c("provider")}</label>
+          <label className="mb-1 block text-sm font-medium text-ink">{c("provider")}</label>
           <div className="flex gap-2">
             {(["smtp", "resend"] as const).map((p) => (
               <button
@@ -131,7 +131,7 @@ export default function SettingsPage() {
                 onClick={() => setProvider(p)}
                 className={
                   "rounded-lg border px-4 py-2 text-sm font-medium transition-colors " +
-                  (provider === p ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50")
+                  (provider === p ? "border-ink bg-primary text-primary-ink" : "border-line text-ink-muted hover:bg-surface-2")
                 }
               >
                 {p === "smtp" ? "SMTP" : "Resend API"}
@@ -154,7 +154,7 @@ export default function SettingsPage() {
                 placeholder={settings?.has_smtp_password ? "••••••••" : ""}
               />
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">{c("encryption")}</label>
+                <label className="mb-1 block text-sm font-medium text-ink">{c("encryption")}</label>
                 <Select
                   value={encryption}
                   onChange={setEncryption}
@@ -196,10 +196,10 @@ export default function SettingsPage() {
       {/* Support contacts — shown to suspended companies */}
       <Card className="w-full p-5">
         <div className="mb-1 flex items-center gap-2">
-          <LifeBuoy className="h-4 w-4 text-slate-700" />
-          <h3 className="font-semibold text-slate-800">{c("support")}</h3>
+          <LifeBuoy className="h-4 w-4 text-ink" />
+          <h3 className="font-semibold text-ink">{c("support")}</h3>
         </div>
-        <p className="mb-3 text-sm text-slate-500">{c("supportHint")}</p>
+        <p className="mb-3 text-sm text-ink-muted">{c("supportHint")}</p>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <Field label={c("supportEmail")} type="email" value={supportEmail} onChange={setSupportEmail} />
           <Field label={c("supportWhatsapp")} value={supportWhatsapp} onChange={setSupportWhatsapp} placeholder="+491700000000" />
@@ -226,16 +226,16 @@ export default function SettingsPage() {
         }
       >
         <div className="text-start">
-          <label className="mb-1 block text-sm font-medium text-slate-700">{c("testTo")}</label>
+          <label className="mb-1 block text-sm font-medium text-ink">{c("testTo")}</label>
           <input
             type="email"
             value={testTo}
             onChange={(e) => setTestTo(e.target.value)}
             autoFocus
             placeholder={settings ? "you@example.com" : ""}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+            className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
           />
-          <p className="mt-2 text-xs text-slate-400">{c("testHint")}</p>
+          <p className="mt-2 text-xs text-ink-subtle">{c("testHint")}</p>
         </div>
       </Modal>
     </div>
@@ -259,14 +259,14 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+      <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
       <input
         type={type}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         autoComplete="off"
-        className={`w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200 ${mono ? "font-mono text-xs" : ""}`}
+        className={`w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ${mono ? "font-mono text-xs" : ""}`}
       />
     </div>
   );

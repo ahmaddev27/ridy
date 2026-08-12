@@ -21,7 +21,7 @@ export default function DashboardPage() {
       <PageHeader tkey="dashboard" />
 
       {error && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+        <div className="rounded-lg border border-rose-200 bg-danger-bg p-3 text-sm text-danger-fg">
           {k("loadError")} — {error}
         </div>
       )}
@@ -56,12 +56,12 @@ export default function DashboardPage() {
           <Card className="flex items-center gap-5 p-5">
             <SubscriptionRing subscription={data.subscription} activeLabel={k("subActive")} inactiveLabel={k("subInactive")} daysLabel={k("subDaysShort")} />
             <div className="min-w-0">
-              <h3 className="font-semibold text-slate-800">{k("subTitle")}</h3>
+              <h3 className="font-semibold text-ink">{k("subTitle")}</h3>
               <div className="mt-1.5 flex items-center gap-2">
                 <span
                   className={
                     "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold " +
-                    (data.subscription.state === null ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")
+                    (data.subscription.state === null ? "bg-success-bg text-success-fg" : "bg-warning-bg text-warning-fg")
                   }
                 >
                   <span className={`h-1.5 w-1.5 rounded-full ${data.subscription.state === null ? "bg-emerald-500" : "bg-amber-500"}`} />
@@ -70,14 +70,14 @@ export default function DashboardPage() {
               </div>
               <div className="mt-3 flex gap-5 text-sm">
                 <div>
-                  <div className="text-xs text-slate-400">{k("subActivated")}</div>
-                  <div className="font-medium text-slate-700">
+                  <div className="text-xs text-ink-subtle">{k("subActivated")}</div>
+                  <div className="font-medium text-ink">
                     {data.subscription.activated_at ? new Date(data.subscription.activated_at).toLocaleDateString(latnLocale(locale)) : "—"}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-slate-400">{k("subEnds")}</div>
-                  <div className="font-medium text-slate-700">
+                  <div className="text-xs text-ink-subtle">{k("subEnds")}</div>
+                  <div className="font-medium text-ink">
                     {data.subscription.ends_at ? new Date(data.subscription.ends_at).toLocaleDateString(latnLocale(locale)) : "—"}
                   </div>
                 </div>
@@ -88,7 +88,7 @@ export default function DashboardPage() {
 
         {/* Live fleet map — drivers list + statuses live inside it */}
         <div className="lg:col-span-2">
-          <h3 className="mb-3 font-semibold text-slate-800">{t("pages.map.title")}</h3>
+          <h3 className="mb-3 font-semibold text-ink">{t("pages.map.title")}</h3>
           <LiveMap heightClass="h-[460px]" />
         </div>
       </div>
@@ -149,8 +149,8 @@ function SubscriptionRing({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold tabular-nums text-slate-900">{left}</span>
-        <span className="text-[10px] font-medium text-slate-400">{daysLabel}</span>
+        <span className="text-2xl font-bold tabular-nums text-ink">{left}</span>
+        <span className="text-[10px] font-medium text-ink-subtle">{daysLabel}</span>
       </div>
     </div>
   );

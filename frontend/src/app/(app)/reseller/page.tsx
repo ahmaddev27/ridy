@@ -91,19 +91,19 @@ export default function ResellerPage() {
 
       {code ? (
         <Card className="p-6 text-center">
-          <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-500" />
-          <p className="mt-3 text-sm text-slate-500">{c("codeFor").replace("{company}", code.company).replace("{plan}", code.plan)}</p>
+          <CheckCircle2 className="mx-auto h-10 w-10 text-success-fg" />
+          <p className="mt-3 text-sm text-ink-muted">{c("codeFor").replace("{company}", code.company).replace("{plan}", code.plan)}</p>
           <div className="mt-4 flex items-center justify-center gap-2">
-            <span className="rounded-xl bg-slate-900 px-6 py-3 font-mono text-3xl font-bold tracking-[0.3em] text-white" dir="ltr">{code.code}</span>
+            <span className="rounded-xl bg-primary px-6 py-3 font-mono text-3xl font-bold tracking-[0.3em] text-primary-ink" dir="ltr">{code.code}</span>
             <button
               onClick={() => { navigator.clipboard.writeText(code.code); toast.success(c("copied")); }}
-              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              className="rounded-lg p-2 text-ink-subtle hover:bg-surface-2 hover:text-ink"
               title={c("copy")}
             >
               <Copy className="h-5 w-5" />
             </button>
           </div>
-          <p className="mt-3 text-sm text-slate-500">
+          <p className="mt-3 text-sm text-ink-muted">
             {money(code.price)} · {c("daysN").replace("{n}", String(code.days))} · {c("validHint")}
           </p>
           <Button className="mt-5" onClick={reset}>{c("newCode")}</Button>
@@ -112,50 +112,50 @@ export default function ResellerPage() {
         <Card className="space-y-5 p-6">
           {/* Plan */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">{c("plan")}</label>
+            <label className="mb-1.5 block text-sm font-medium text-ink">{c("plan")}</label>
             <Select
               value={planId}
               onChange={setPlanId}
               placeholder={c("selectPlan")}
               options={plans.map((p) => ({ value: String(p.id), label: `${p.name} · ${money(p.price)} · ${c("daysN").replace("{n}", String(p.duration_days))}` }))}
             />
-            {plans.length === 0 && <p className="mt-1 text-xs text-amber-600">{c("noPlans")}</p>}
+            {plans.length === 0 && <p className="mt-1 text-xs text-warning-fg">{c("noPlans")}</p>}
           </div>
 
           {/* Company search */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">{c("company")}</label>
+            <label className="mb-1.5 block text-sm font-medium text-ink">{c("company")}</label>
             {company ? (
-              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <div className="flex items-center justify-between rounded-lg border border-line bg-surface-2 px-3 py-2.5">
                 <span className="flex items-center gap-2 text-sm">
-                  <Building2 className="h-4 w-4 text-slate-500" />
-                  <span className="font-medium text-slate-800">{company.name}</span>
-                  {company.phone && <span className="text-slate-400" dir="ltr">{company.phone}</span>}
+                  <Building2 className="h-4 w-4 text-ink-muted" />
+                  <span className="font-medium text-ink">{company.name}</span>
+                  {company.phone && <span className="text-ink-subtle" dir="ltr">{company.phone}</span>}
                 </span>
-                <button onClick={() => setCompany(null)} className="text-xs font-medium text-slate-500 hover:text-slate-800">{c("change")}</button>
+                <button onClick={() => setCompany(null)} className="text-xs font-medium text-ink-muted hover:text-ink">{c("change")}</button>
               </div>
             ) : (
               <div className="relative">
-                <Search className="absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ltr:left-3 rtl:right-3" />
+                <Search className="absolute top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle ltr:left-3 rtl:right-3" />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={c("searchCompany")}
-                  className="w-full rounded-lg border border-slate-200 bg-white py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200 ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3"
+                  className="w-full rounded-lg border border-line bg-surface py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3"
                 />
                 {(searching || results.length > 0) && (
-                  <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                  <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-line bg-surface shadow-lg">
                     {searching ? (
-                      <div className="flex items-center justify-center py-4 text-slate-400"><Loader2 className="h-4 w-4 animate-spin" /></div>
+                      <div className="flex items-center justify-center py-4 text-ink-subtle"><Loader2 className="h-4 w-4 animate-spin" /></div>
                     ) : (
                       results.map((r) => (
                         <button
                           key={r.id}
                           onClick={() => { setCompany(r); setResults([]); }}
-                          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-start text-sm hover:bg-slate-50"
+                          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-start text-sm hover:bg-surface-2"
                         >
-                          <span className="font-medium text-slate-800">{r.name}</span>
-                          {r.phone && <span className="text-xs text-slate-400" dir="ltr">{r.phone}</span>}
+                          <span className="font-medium text-ink">{r.name}</span>
+                          {r.phone && <span className="text-xs text-ink-subtle" dir="ltr">{r.phone}</span>}
                         </button>
                       ))
                     )}
@@ -167,7 +167,7 @@ export default function ResellerPage() {
 
           {/* Summary + generate */}
           {selectedPlan && company && (
-            <div className="rounded-lg bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
+            <div className="rounded-lg bg-surface-2 px-3 py-2.5 text-sm text-ink-muted">
               {c("summary").replace("{company}", company.name).replace("{plan}", selectedPlan.name).replace("{price}", money(selectedPlan.price))}
             </div>
           )}
@@ -182,8 +182,8 @@ export default function ResellerPage() {
       {/* The reseller's own codes and their lifecycle. */}
       <section className="space-y-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">{c("myCodesTitle")}</h2>
-          <p className="text-sm text-slate-500">{c("myCodesDesc")}</p>
+          <h2 className="text-lg font-semibold text-ink">{c("myCodesTitle")}</h2>
+          <p className="text-sm text-ink-muted">{c("myCodesDesc")}</p>
         </div>
         <CodesLedger key={code?.code ?? "list"} fetchCodes={getResellerCodes} />
       </section>

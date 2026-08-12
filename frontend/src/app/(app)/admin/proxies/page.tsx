@@ -53,7 +53,7 @@ export default function ProxiesPage() {
         {loading ? (
           <div className="space-y-2 p-4">
             {[0, 1].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded bg-slate-100" />
+              <div key={i} className="h-14 animate-pulse rounded bg-surface-2" />
             ))}
           </div>
         ) : proxies.length === 0 ? (
@@ -61,7 +61,7 @@ export default function ProxiesPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-400 [&_th]:text-start">
+              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
                 <tr>
                   <th className="px-4 py-3 font-semibold">{c("colLabel")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colUrl")}</th>
@@ -70,16 +70,16 @@ export default function ProxiesPage() {
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {proxies.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50">
+                  <tr key={p.id} className="hover:bg-surface-2">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-800">{p.label}</div>
+                      <div className="font-medium text-ink">{p.label}</div>
                       {p.expires_at && (
                         <div
                           className={
                             "mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold " +
-                            (p.expiring ? "bg-rose-50 text-rose-600" : "bg-slate-100 text-slate-500")
+                            (p.expiring ? "bg-danger-bg text-danger-fg" : "bg-surface-2 text-ink-muted")
                           }
                         >
                           {p.days_left !== null && p.days_left < 0
@@ -88,32 +88,32 @@ export default function ProxiesPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                    <td className="px-4 py-3 font-mono text-xs text-ink-muted">
                       <bdi dir="ltr">{p.url_masked}</bdi>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="h-2 w-28 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-2 w-28 overflow-hidden rounded-full bg-surface-2">
                           <div
                             className={`h-full rounded-full ${p.near_full ? "bg-amber-500" : "bg-emerald-500"}`}
                             style={{ width: `${Math.min(100, (p.used / Math.max(1, p.capacity)) * 100)}%` }}
                           />
                         </div>
-                        <bdi dir="ltr" className="whitespace-nowrap text-xs text-slate-600">{p.used} / {p.capacity}</bdi>
+                        <bdi dir="ltr" className="whitespace-nowrap text-xs text-ink-muted">{p.used} / {p.capacity}</bdi>
                         {p.near_full && (
-                          <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-amber-600">
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-warning-fg">
                             <AlertTriangle className="h-3 w-3" /> {c("nearFull")}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="max-w-[220px] truncate px-4 py-3 text-slate-500" title={p.notes ?? ""}>{p.notes || "—"}</td>
+                    <td className="max-w-[220px] truncate px-4 py-3 text-ink-muted" title={p.notes ?? ""}>{p.notes || "—"}</td>
                     <td className="px-4 py-3 text-end">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => setEditing(p)} className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" title={c("edit")}>
+                        <button onClick={() => setEditing(p)} className="rounded p-1.5 text-ink-subtle hover:bg-surface-2 hover:text-ink" title={c("edit")}>
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button onClick={() => setConfirmDel(p)} className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title={c("delete")}>
+                        <button onClick={() => setConfirmDel(p)} className="rounded p-1.5 text-ink-subtle hover:bg-danger-bg hover:text-danger-fg" title={c("delete")}>
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -220,14 +220,14 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+      <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
       <input
         type={type}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         autoComplete="off"
-        className={`w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200 ${mono ? "font-mono text-xs" : ""}`}
+        className={`w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ${mono ? "font-mono text-xs" : ""}`}
       />
     </div>
   );
