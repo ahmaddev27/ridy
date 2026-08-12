@@ -59,6 +59,17 @@ class ResellerTest extends TestCase
         $this->getJson('/api/v1/reseller/companies/search?q=915100')->assertOk()->assertJsonCount(1, 'data');
     }
 
+    public function test_reseller_cannot_read_tenant_scoped_fleet_data(): void
+    {
+        [$user] = $this->reseller();
+        Sanctum::actingAs($user);
+
+        // No tenant → must be denied, never shown other companies' data.
+        $this->getJson('/api/v1/drivers')->assertForbidden();
+        $this->getJson('/api/v1/dispatch/offers')->assertForbidden();
+        $this->getJson('/api/v1/dashboard/summary')->assertForbidden();
+    }
+
     public function test_non_reseller_cannot_generate(): void
     {
         $this->seed(RolePermissionSeeder::class);
