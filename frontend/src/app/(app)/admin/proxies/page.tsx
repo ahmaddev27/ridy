@@ -66,6 +66,7 @@ export default function ProxiesPage() {
                   <th className="px-4 py-3 font-semibold">{c("colLabel")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colUrl")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colUsage")}</th>
+                  <th className="px-4 py-3 font-semibold">{c("fieldNotes")}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -106,6 +107,7 @@ export default function ProxiesPage() {
                         )}
                       </div>
                     </td>
+                    <td className="max-w-[220px] truncate px-4 py-3 text-slate-500" title={p.notes ?? ""}>{p.notes || "—"}</td>
                     <td className="px-4 py-3 text-end">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => setEditing(p)} className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" title={c("edit")}>
