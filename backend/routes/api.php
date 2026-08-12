@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PasswordResetController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\RegistrationController;
+use App\Http\Controllers\Api\V1\ResellerController;
 use App\Http\Controllers\Api\V1\UberLoginController;
 use App\Http\Controllers\Api\V1\VehicleController;
 use App\Http\Middleware\ResolveTenant;
@@ -131,6 +132,14 @@ Route::prefix('v1')->group(function () {
 
     // Platform owner (super-admin). Deliberately WITHOUT ResolveTenant so the
     // tenant context stays empty and the global scope no-ops → cross-tenant.
+    // Reseller (a collector with a login) issues activation codes on a plan.
+    // No ResolveTenant — resellers are platform-level, not tenant users.
+    Route::middleware('auth:sanctum')->prefix('reseller')->group(function () {
+        Route::get('plans', [ResellerController::class, 'plans']);
+        Route::get('companies/search', [ResellerController::class, 'searchCompanies']);
+        Route::post('activation', [ResellerController::class, 'generate']);
+    });
+
     Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(function () {
         Route::get('overview', OverviewController::class);
         Route::get('settings', [SettingsController::class, 'show']);
