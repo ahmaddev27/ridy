@@ -16,30 +16,6 @@ function escapeHtml(s: string): string {
 const STATUS_COLOR = (status: string | null): string => PRESENCE_COLOR[presence(status)];
 const statusLabel = (status: string | null, c: (k: string) => string): string => c(PRESENCE_LABEL_KEY[presence(status)]);
 
-/** A glossy top-view car marker, shaded with the status color. */
-function carMarkerHtml(color: string): string {
-  const gid = "g" + color.replace("#", "");
-  return (
-    `<div style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))">` +
-    `<svg width="36" height="36" viewBox="0 0 48 48" fill="none">` +
-    `<defs>` +
-    `<linearGradient id="${gid}" x1="10" y1="4" x2="38" y2="44" gradientUnits="userSpaceOnUse">` +
-    `<stop stop-color="${color}"/><stop offset="1" stop-color="${color}" stop-opacity="0.72"/>` +
-    `</linearGradient>` +
-    `</defs>` +
-    // Tyres
-    `<rect x="8" y="12" width="4" height="8" rx="2" fill="#1f2937"/><rect x="36" y="12" width="4" height="8" rx="2" fill="#1f2937"/>` +
-    `<rect x="8" y="28" width="4" height="8" rx="2" fill="#1f2937"/><rect x="36" y="28" width="4" height="8" rx="2" fill="#1f2937"/>` +
-    // Body
-    `<path d="M17 4.5h14c2.2 0 4 1.5 4.3 3.6L37 19v20c0 1.9-1.5 3.5-3.5 3.5S30 40.9 30 39v-.5H18V39c0 1.9-1.5 3.5-3.5 3.5S11 40.9 11 39V19l1.7-10.9C13 6 14.8 4.5 17 4.5z" fill="url(#${gid})" stroke="rgba(0,0,0,.15)" stroke-width="0.6"/>` +
-    // Windshield / roof glass
-    `<path d="M17 8.5h14c1 0 1.8.7 2 1.7l.8 4.3c.15.9-.5 1.7-1.4 1.7H15.6c-.9 0-1.55-.8-1.4-1.7l.8-4.3c.2-1 1-1.7 2-1.7z" fill="#0f172a" opacity="0.88"/>` +
-    `<rect x="16" y="30" width="16" height="6" rx="2" fill="#0f172a" opacity="0.5"/>` +
-    // Roof highlight
-    `<rect x="20" y="19" width="8" height="9" rx="2" fill="#ffffff" opacity="0.16"/>` +
-    `</svg></div>`
-  );
-}
 
 /**
  * The live fleet map. Self-contained (own Leaflet instance + polling) so it can
@@ -92,11 +68,14 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
         // A soft halo ring around each driver so they stand out on the map.
         L.circleMarker([d.lat, d.lng], { radius: 24, color, weight: 2, opacity: 0.5, fillColor: color, fillOpacity: 0.12 }).addTo(layer);
 
+        // Realistic top-view car photo, rotated to the driver's heading. The
+        // status color rides on the halo ring behind it.
+        const rot = typeof d.heading === "number" ? d.heading : 0;
         const icon = L.divIcon({
           className: "",
-          iconSize: [34, 34],
-          iconAnchor: [17, 17],
-          html: carMarkerHtml(color),
+          iconSize: [42, 42],
+          iconAnchor: [21, 21],
+          html: `<img src="/markers/car.png" alt="" style="width:42px;height:42px;transform:rotate(${rot}deg);filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))"/>`,
         });
         L.marker([d.lat, d.lng], { icon })
           .bindPopup(`<b>${escapeHtml(d.name)}</b><br>${escapeHtml(statusLabel(d.status, c))}`)
