@@ -25,11 +25,11 @@ export function Preloader() {
 
       {/* Track with a car running across it */}
       <div className="relative h-1 w-40 overflow-visible rounded-full bg-surface-2">
-        <svg className="reidey-car" width={26} height={16} viewBox="0 0 26 16" fill="none" aria-hidden>
-          <rect x={1} y={5} width={24} height={8} rx={3} fill="#0f172a" />
-          <rect x={6} y={1} width={12} height={6} rx={2.4} fill="#0f172a" />
-          <circle cx={8} cy={14} r={2.4} fill="#0f172a" stroke="#fff" strokeWidth={1.2} />
-          <circle cx={18} cy={14} r={2.4} fill="#0f172a" stroke="#fff" strokeWidth={1.2} />
+        <svg className="reidey-car text-ink" width={26} height={16} viewBox="0 0 26 16" fill="none" aria-hidden>
+          <rect x={1} y={5} width={24} height={8} rx={3} fill="currentColor" />
+          <rect x={6} y={1} width={12} height={6} rx={2.4} fill="currentColor" />
+          <circle cx={8} cy={14} r={2.4} className="fill-current stroke-surface" strokeWidth={1.2} />
+          <circle cx={18} cy={14} r={2.4} className="fill-current stroke-surface" strokeWidth={1.2} />
         </svg>
       </div>
 
