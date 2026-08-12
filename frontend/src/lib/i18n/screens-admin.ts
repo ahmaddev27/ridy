@@ -19,6 +19,13 @@ const en: Dict = {
     selectCollector: "— Select collector —", selectCompany: "— Select company —",
     deletePaymentConfirm: "Delete this payment?", paymentSaved: "Payment recorded", exportFailed: "Export failed",
   },
+  users: {
+    colUser: "User", colPhone: "Phone", colRole: "Role", colCompany: "Company", colStatus: "Status",
+    emptyTitle: "No users", emptyDesc: "Users appear here as companies register and resellers are added.",
+    role_super_admin: "Admin", role_fleet_manager: "Manager", role_owner: "Owner", role_reseller: "Reseller", role_driver: "Driver", role_viewer: "Viewer", role_user: "User",
+    st_active: "Active", st_disabled: "Disabled", st_banned: "Banned", st_expired: "Expired", st_inactive: "Not activated",
+    searchPlaceholder: "Search name, email, phone…", none: "—",
+  },
   subscriptions: {
     totalRevenue: "Total revenue", activeSubs: "Active subscriptions", expiringSoon: "Expiring soon",
     revenueTitle: "Revenue by month", revenueEmpty: "No payments recorded yet.",
@@ -148,6 +155,13 @@ const de: Dict = {
     selectCollector: "— Inkasso wählen —", selectCompany: "— Firma wählen —",
     deletePaymentConfirm: "Diese Zahlung löschen?", paymentSaved: "Zahlung erfasst", exportFailed: "Export fehlgeschlagen",
   },
+  users: {
+    colUser: "Benutzer", colPhone: "Telefon", colRole: "Rolle", colCompany: "Firma", colStatus: "Status",
+    emptyTitle: "Keine Benutzer", emptyDesc: "Benutzer erscheinen hier, wenn Firmen sich registrieren und Vertriebler hinzugefügt werden.",
+    role_super_admin: "Admin", role_fleet_manager: "Manager", role_owner: "Inhaber", role_reseller: "Vertriebler", role_driver: "Fahrer", role_viewer: "Betrachter", role_user: "Benutzer",
+    st_active: "Aktiv", st_disabled: "Deaktiviert", st_banned: "Gesperrt", st_expired: "Abgelaufen", st_inactive: "Nicht aktiviert",
+    searchPlaceholder: "Name, E-Mail, Telefon suchen…", none: "—",
+  },
   subscriptions: {
     totalRevenue: "Gesamtumsatz", activeSubs: "Aktive Abos", expiringSoon: "Läuft bald ab",
     revenueTitle: "Umsatz pro Monat", revenueEmpty: "Noch keine Zahlungen erfasst.",
@@ -274,6 +288,13 @@ const ar: Dict = {
     fieldCollector: "المحصّل", fieldCompany: "الشركة (الفليت الي دفع)", fieldAmount: "المبلغ", fieldDate: "تاريخ الدفعة", fieldNote: "ملاحظة",
     selectCollector: "— اختر المحصّل —", selectCompany: "— اختر الشركة —",
     deletePaymentConfirm: "حذف هالدفعة؟", paymentSaved: "تم تسجيل الدفعة", exportFailed: "فشل التصدير",
+  },
+  users: {
+    colUser: "المستخدم", colPhone: "الجوال", colRole: "النوع", colCompany: "الشركة", colStatus: "الحالة",
+    emptyTitle: "لا مستخدمين", emptyDesc: "المستخدمون بيبانوا هون مع تسجيل الشركات وإضافة الموزّعين.",
+    role_super_admin: "أدمن", role_fleet_manager: "مدير", role_owner: "مالك", role_reseller: "موزّع", role_driver: "سائق", role_viewer: "مشاهد", role_user: "مستخدم",
+    st_active: "نشط", st_disabled: "معطّل", st_banned: "محظور", st_expired: "منتهٍ", st_inactive: "غير مفعّل",
+    searchPlaceholder: "ابحث بالاسم/الإيميل/الجوال…", none: "—",
   },
   subscriptions: {
     totalRevenue: "إجمالي الإيرادات", activeSubs: "اشتراكات نشطة", expiringSoon: "قربت تنتهي",

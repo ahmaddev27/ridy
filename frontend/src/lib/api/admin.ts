@@ -458,3 +458,20 @@ export async function updatePlan(id: number, input: PlanInput): Promise<Plan> {
 export async function deletePlan(id: number): Promise<void> {
   await apiFetch(`${planBase}/${id}`, { method: "DELETE", withCsrf: true });
 }
+
+// ── User directory ───────────────────────────────────────────────────────────
+export type PlatformUser = {
+  id: number;
+  name: string;
+  email: string;
+  phone: string | null;
+  role: string;
+  company: string | null;
+  company_id: number | null;
+  status: string;
+};
+
+export async function listUsers(): Promise<PlatformUser[]> {
+  const res = await apiFetch<{ data: PlatformUser[] }>("/api/v1/admin/users");
+  return res.data;
+}
