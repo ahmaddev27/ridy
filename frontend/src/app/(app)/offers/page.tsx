@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
 import { toast } from "sonner";
-import { Radio, MapPin, Search, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Inbox, CheckCircle2, XCircle, Gauge, Wallet } from "lucide-react";
+import { Radio, MapPin, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Inbox, CheckCircle2, XCircle, Gauge, Wallet } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { SearchInput } from "@/components/ui/search-input";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -151,15 +152,7 @@ export default function OffersPage() {
 
       {/* Toolbar: search + driver filter + bulk delete */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={c("searchPlaceholder")}
-            className="w-full rounded-lg border border-slate-300 py-2 ps-9 pe-3 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
-          />
-        </div>
+        <SearchInput value={search} onChange={setSearch} placeholder={c("searchPlaceholder")} className="flex-1" />
         {/* Multi-select driver filter — lists every company driver */}
         <div className="relative">
           <button

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Billing\Models\Plan;
 use App\Domain\Billing\Models\SubscriptionPeriod;
 use App\Domain\Collections\Models\Collector;
 use App\Domain\Collections\Models\CollectorPayment;
@@ -31,13 +32,14 @@ class BillingReportTest extends TestCase
         $admin = $this->superAdmin();
         $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
         User::create(['name' => 'O', 'email' => 'o@acme.de', 'password' => Hash::make('password'), 'tenant_id' => $tenant->id]);
+        $plan = Plan::create(['name' => 'Monthly', 'price' => 120, 'duration_days' => 30, 'active' => true]);
 
-        // Admin generates the code with amount + already-paid.
+        // Admin generates the code on a plan, marked already-paid.
         Sanctum::actingAs($admin);
-        $code = $this->postJson("/api/v1/admin/companies/{$tenant->id}/activation", ['days' => 30, 'amount' => 120, 'paid' => true])
+        $code = $this->postJson("/api/v1/admin/companies/{$tenant->id}/activation", ['plan_id' => $plan->id, 'paid' => true])
             ->assertOk()->json('data.code');
 
-        // Company consumes it → the invoice is created, paid, with the amount.
+        // Company consumes it → the invoice is created, paid, with the plan amount.
         $this->postJson('/api/v1/company/activate', ['email' => 'o@acme.de', 'password' => 'password', 'code' => $code])->assertOk();
 
         $invoice = SubscriptionPeriod::first();

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Billing\Models\Plan;
+use App\Domain\Billing\Models\SubscriptionCode;
+use App\Domain\Billing\SubscriptionCodeQuery;
 use App\Domain\Collections\Models\Collector;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Concerns\GeneratesOtp;
@@ -22,7 +24,27 @@ class ResellerController extends Controller
 {
     use GeneratesOtp;
 
-    private const CODE_TTL_MINUTES = 2;
+    private const CODE_TTL_MINUTES = 10;
+
+    /** The reseller's own issued codes (with lifecycle status), filtered + paged. */
+    public function codes(Request $request, SubscriptionCodeQuery $query): JsonResponse
+    {
+        abort_unless($request->user()->can('codes.generate'), 403);
+
+        $collector = Collector::where('user_id', $request->user()->id)->first();
+        if ($collector === null) {
+            return response()->json(['data' => [], 'meta' => ['current_page' => 1, 'last_page' => 1, 'total' => 0]]);
+        }
+
+        // Force the reseller's own collector — they never see other resellers' codes.
+        $request->merge(['collector_id' => $collector->id]);
+        $codes = $query->forRequest($request)->paginate(min($request->integer('per_page', 20), 100));
+
+        return response()->json([
+            'data' => collect($codes->items())->map(fn ($c) => $query->present($c)),
+            'meta' => ['current_page' => $codes->currentPage(), 'last_page' => $codes->lastPage(), 'total' => $codes->total()],
+        ]);
+    }
 
     /** The active plans a reseller may sell. */
     public function plans(): JsonResponse
@@ -82,15 +104,29 @@ class ResellerController extends Controller
         }
 
         $code = $this->newOtp();
+        $expiresAt = CarbonImmutable::now()->addMinutes(self::CODE_TTL_MINUTES);
+
+        // The fleet pays the collector for the code up front, so it's always paid.
         $tenant->forceFill([
             'activation_code' => $code,
-            'activation_code_expires_at' => CarbonImmutable::now()->addMinutes(self::CODE_TTL_MINUTES),
+            'activation_code_expires_at' => $expiresAt,
             'activation_days' => $plan->duration_days,
             'activation_amount' => $plan->price,
-            'activation_paid' => false,
+            'activation_paid' => true,
             'activation_collector_id' => $collector->id,
             'activation_attempts' => 0,
         ])->save();
+
+        SubscriptionCode::create([
+            'code' => $code,
+            'plan_id' => $plan->id,
+            'tenant_id' => $tenant->id,
+            'collector_id' => $collector->id,
+            'amount' => $plan->price,
+            'paid' => true,
+            'expires_at' => $expiresAt,
+            'created_by' => $request->user()->id,
+        ]);
 
         return response()->json(['data' => [
             'code' => $code,

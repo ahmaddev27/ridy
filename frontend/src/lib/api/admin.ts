@@ -1,4 +1,5 @@
 import { apiFetch, apiDownload } from "./client";
+import { codesQueryString, type CodeFilters, type CodesPage } from "./reseller";
 
 export type Company = {
   id: number;
@@ -172,13 +173,12 @@ export async function deleteCompany(id: number): Promise<void> {
 /** Generate a 2-minute activation code for the company owner to enter. */
 export async function generateActivationCode(
   id: number,
-  days: number,
-  amount?: number,
+  planId: number,
   paid?: boolean,
-): Promise<{ code: string; days: number; expires_at: string }> {
-  const res = await apiFetch<{ data: { code: string; days: number; expires_at: string } }>(
+): Promise<{ code: string; plan: string; days: number; price: number; paid: boolean; expires_at: string }> {
+  const res = await apiFetch<{ data: { code: string; plan: string; days: number; price: number; paid: boolean; expires_at: string } }>(
     `${base}/${id}/activation`,
-    { method: "POST", body: { days, amount, paid }, withCsrf: true },
+    { method: "POST", body: { plan_id: planId, paid }, withCsrf: true },
   );
   return res.data;
 }
@@ -439,6 +439,15 @@ export async function settleInvoice(invoiceId: number, collectorPaymentId: numbe
     { method: "POST", body: { collector_payment_id: collectorPaymentId }, withCsrf: true },
   );
   return res.data;
+}
+
+// ── Activation codes ledger (all resellers + admin-issued) ───────────────────
+export async function listSubscriptionCodes(filters: CodeFilters = {}): Promise<CodesPage> {
+  return apiFetch(`/api/v1/admin/subscription-codes${codesQueryString(filters)}`);
+}
+
+export async function exportSubscriptionCodes(filters: CodeFilters = {}): Promise<Blob> {
+  return apiDownload(`/api/v1/admin/subscription-codes/export${codesQueryString(filters)}`);
 }
 
 // ── Subscription plans ───────────────────────────────────────────────────────

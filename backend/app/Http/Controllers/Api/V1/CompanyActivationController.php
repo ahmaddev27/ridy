@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Billing\Models\SubscriptionCode;
 use App\Domain\Billing\Models\SubscriptionPeriod;
 use App\Domain\Tenancy\ProxyPool;
 use App\Http\Controllers\Concerns\GeneratesOtp;
@@ -62,6 +63,7 @@ class CompanyActivationController extends Controller
         $amount = $tenant->activation_amount; // set by the admin/reseller at code generation
         $paid = (bool) $tenant->activation_paid;
         $soldBy = $tenant->activation_collector_id; // the reseller who issued the code
+        $usedCode = $tenant->activation_code; // captured before we clear it, to close the ledger entry
         $startsAt = CarbonImmutable::now();
         $endsAt = $startsAt->addDays($days);
 
@@ -82,7 +84,7 @@ class CompanyActivationController extends Controller
         // Record the period as an invoice. Marked paid immediately if the admin
         // said so at code generation; otherwise it stays open until a collector
         // payment settles it. sold_by tags the reseller who issued the code.
-        SubscriptionPeriod::create([
+        $period = SubscriptionPeriod::create([
             'tenant_id' => $tenant->id,
             'days' => $days,
             'amount' => $amount,
@@ -91,6 +93,18 @@ class CompanyActivationController extends Controller
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,
         ]);
+
+        // Close the ledger entry: mark the issued code activated and link it to
+        // the period it created.
+        $ledgerEntry = SubscriptionCode::where('tenant_id', $tenant->id)
+            ->where('code', $usedCode)
+            ->whereNull('activated_at')
+            ->latest('id')
+            ->first();
+        $ledgerEntry?->forceFill([
+            'activated_at' => $startsAt,
+            'subscription_period_id' => $period->id,
+        ])->save();
 
         // Now that it's active, place it on a proxy from the pool.
         app(ProxyPool::class)->assign($tenant);

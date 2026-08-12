@@ -143,6 +143,7 @@ Route::prefix('v1')->group(function () {
         Route::get('plans', [ResellerController::class, 'plans']);
         Route::get('companies/search', [ResellerController::class, 'searchCompanies']);
         Route::post('activation', [ResellerController::class, 'generate']);
+        Route::get('codes', [ResellerController::class, 'codes']);
     });
 
     Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(function () {
@@ -214,5 +215,9 @@ Route::prefix('v1')->group(function () {
         Route::get('subscription-invoices', [BillingReportController::class, 'invoices']);
         Route::get('subscription-invoices/export', [BillingReportController::class, 'invoicesExport']);
         Route::post('subscription-invoices/{invoice}/settle', [BillingReportController::class, 'settle']);
+
+        // Issued activation codes ledger (all resellers).
+        Route::get('subscription-codes', [BillingReportController::class, 'codes']);
+        Route::get('subscription-codes/export', [BillingReportController::class, 'codesExport']);
     });
 });

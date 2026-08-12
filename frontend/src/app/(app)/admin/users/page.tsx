@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Search, Users as UsersIcon, Trash2 } from "lucide-react";
+import { Users as UsersIcon, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { SearchInput } from "@/components/ui/search-input";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
@@ -79,15 +80,7 @@ export default function UsersPage() {
       <PageHeader tkey="users" />
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative max-w-sm flex-1">
-          <Search className="absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 ltr:left-3 rtl:right-3" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={c("searchPlaceholder")}
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200 ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3"
-          />
-        </div>
+        <SearchInput value={q} onChange={setQ} placeholder={c("searchPlaceholder")} className="flex-1" />
         {/* Multi-select role filter */}
         <div className="flex flex-wrap items-center gap-1.5">
           {availableRoles.map((r) => {
