@@ -25,11 +25,13 @@ import {
   getCompanyDrivers,
   getCompanyOffers,
   getCompanyVehicles,
+  listSubscriptionInvoices,
   type Company,
   type Proxy,
   type CompanyDriverRow,
   type CompanyOfferRow,
   type CompanyVehicleRow,
+  type SubscriptionInvoice,
 } from "@/lib/api/admin";
 
 /** Super-admin company detail as a full page: edit, proxy, users, session,
@@ -64,6 +66,13 @@ export function CompanyDetail({
   const [days, setDays] = useState("30");
   const [amount, setAmount] = useState("");
   const [paid, setPaid] = useState(true);
+  const [invoices, setInvoices] = useState<SubscriptionInvoice[]>([]);
+
+  // The company's subscription history (invoices), loaded for the subscription tab.
+  useEffect(() => {
+    if (tab !== "subscription") return;
+    listSubscriptionInvoices(id).then((r) => setInvoices(r.data)).catch(() => setInvoices([]));
+  }, [tab, id]);
   const [genCode, setGenCode] = useState<string | null>(null);
 
   // Password reset (in-app modal, not a native prompt).
@@ -325,6 +334,43 @@ export function CompanyDetail({
                     <span className="ms-2 text-xs text-emerald-600">{c("codeValid")}</span>
                   </div>
                 )}
+
+                {/* Subscription history (invoices) for this company */}
+                <div className="mt-2">
+                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">{c("subHistory")}</h4>
+                  {invoices.length === 0 ? (
+                    <p className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-400">{c("subHistoryEmpty")}</p>
+                  ) : (
+                    <div className="overflow-hidden rounded-lg border border-slate-200">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-400 [&_th]:px-3 [&_th]:py-2 [&_th]:text-start">
+                          <tr>
+                            <th>{c("subHistPeriod")}</th>
+                            <th>{c("days")}</th>
+                            <th>{c("amount")}</th>
+                            <th>{c("subHistStatus")}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 [&_td]:px-3 [&_td]:py-2">
+                          {invoices.map((inv) => (
+                            <tr key={inv.id}>
+                              <td className="text-slate-600" dir="ltr">
+                                {new Date(inv.starts_at).toLocaleDateString()} → {new Date(inv.ends_at).toLocaleDateString()}
+                              </td>
+                              <td className="tabular-nums text-slate-600">{inv.days}</td>
+                              <td className="font-semibold tabular-nums text-slate-800">{inv.amount != null ? `€${inv.amount.toFixed(2)}` : "—"}</td>
+                              <td>
+                                <span className={"rounded-full px-2 py-0.5 text-xs font-semibold " + (inv.paid ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")}>
+                                  {inv.paid ? c("subPaid") : c("subUnpaid")}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
             </Section>
           ) : tab === "managers" ? (
             <Section title={c("managers")}>
