@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Bell, ChevronDown, LogOut, Volume2, VolumeX, Menu, X, Sun, Moon } from "lucide-react";
+import { Search, Bell, ChevronDown, LogOut, Volume2, VolumeX, Menu, X, Sun, Moon, HelpCircle } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/context";
 import { useTheme } from "@/lib/theme/context";
+import { ONBOARDING_EVENT } from "@/components/onboarding/onboarding-tour";
 import { useAsync } from "@/hooks/use-async";
 import { listNotifications } from "@/lib/api/notifications";
 import { cn } from "@/lib/utils";
@@ -117,6 +118,18 @@ export function Topbar() {
         >
           {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </button>
+
+        {/* Replay the onboarding tour (managers only) */}
+        {isManager && (
+          <button
+            onClick={() => window.dispatchEvent(new Event(ONBOARDING_EVENT))}
+            className="rounded-lg p-2 text-ink-muted hover:bg-surface-2"
+            title={t("topbar.tour")}
+            aria-label={t("topbar.tour")}
+          >
+            <HelpCircle className="h-5 w-5" />
+          </button>
+        )}
 
         {/* Offer-sound mute toggle (managers only) */}
         {isManager && (

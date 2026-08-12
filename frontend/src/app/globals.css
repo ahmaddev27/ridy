@@ -13,6 +13,9 @@
    the @theme inline block below exposes them as Tailwind utilities (bg-surface,
    text-ink, border-line, …) that follow the active theme automatically. */
 :root {
+  /* Make native controls (date pickers, calendar icons, native scrollbars)
+     follow the theme so they aren't dark-on-dark in dark mode. */
+  color-scheme: light;
   --canvas: #f6f6f4; /* page background */
   --surface: #ffffff; /* cards, panels (was bg-white) */
   --surface-2: #f1f1ef; /* subtle raised fills (was bg-slate-50/100) */
@@ -34,6 +37,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --canvas: #0f1115;
   --surface: #181b21;
   --surface-2: #20242b;
