@@ -25,10 +25,10 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
   });
 
   return (
-    <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4 text-sm">
+    <nav className="flex-1 space-y-7 overflow-y-auto px-4 py-6 text-sm">
       {groups.map((group) => (
-        <div key={group.title}>
-          <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        <div key={group.title} className="space-y-1">
+          <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
             {t(group.title)}
           </p>
           {group.items.map((item) => {
@@ -45,8 +45,8 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
                 href={item.href}
                 onClick={onNavigate}
                 className={cn(
-                  "flex items-center justify-between rounded-lg px-3 py-2 font-medium transition-colors",
-                  active ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50",
+                  "flex items-center justify-between rounded-xl px-3 py-2.5 font-medium transition-colors",
+                  active ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100",
                 )}
               >
                 <span className="flex items-center gap-3">

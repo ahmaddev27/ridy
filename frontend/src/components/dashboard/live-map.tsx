@@ -16,13 +16,16 @@ function escapeHtml(s: string): string {
 const STATUS_COLOR = (status: string | null): string => PRESENCE_COLOR[presence(status)];
 const statusLabel = (status: string | null, c: (k: string) => string): string => c(PRESENCE_LABEL_KEY[presence(status)]);
 
-/** A car marker (white pin, colored by status) as a Leaflet divIcon HTML string. */
+/** A realistic top-view car marker, filled with the status color. */
 function carMarkerHtml(color: string): string {
   return (
-    `<span style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9999px;background:#fff;border:2px solid ${color};box-shadow:0 1px 5px rgba(0,0,0,.35)">` +
-    `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">` +
-    `<path d="M19 17h2l-1.5-5.5A2 2 0 0 0 17.6 10H6.4a2 2 0 0 0-1.9 1.5L3 17h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>` +
-    `</svg></span>`
+    `<div style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))">` +
+    `<svg width="34" height="34" viewBox="0 0 48 48" fill="none">` +
+    `<path d="M17 5h14c2.1 0 3.8 1.4 4.1 3.4L37 19v20c0 1.7-1.3 3-3 3h-2c-1.7 0-3-1.3-3-3v-1H19v1c0 1.7-1.3 3-3 3h-2c-1.7 0-3-1.3-3-3V19l1.9-10.6C13.2 6.4 14.9 5 17 5z" fill="${color}"/>` +
+    `<rect x="16" y="9" width="16" height="8" rx="2.5" fill="#ffffff" opacity="0.92"/>` +
+    `<rect x="16" y="31" width="16" height="5" rx="2" fill="#000000" opacity="0.18"/>` +
+    `<circle cx="15" cy="23" r="2" fill="#ffffff" opacity="0.9"/><circle cx="33" cy="23" r="2" fill="#ffffff" opacity="0.9"/>` +
+    `</svg></div>`
   );
 }
 
@@ -79,8 +82,8 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
         const icon = L.divIcon({
           className: "",
-          iconSize: [30, 30],
-          iconAnchor: [15, 15],
+          iconSize: [34, 34],
+          iconAnchor: [17, 17],
           html: carMarkerHtml(color),
         });
         L.marker([d.lat, d.lng], { icon })

@@ -50,8 +50,8 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Subscription gauge (compact) */}
-      <div className="flex">
+      {/* Subscription + live map — one row, side by side */}
+      <div className="grid items-start gap-6 lg:grid-cols-3">
         {data?.subscription && (
           <Card className="flex items-center gap-5 p-5">
             <SubscriptionRing subscription={data.subscription} activeLabel={k("subActive")} inactiveLabel={k("subInactive")} daysLabel={k("subDaysShort")} />
@@ -85,12 +85,12 @@ export default function DashboardPage() {
             </div>
           </Card>
         )}
-      </div>
 
-      {/* Live fleet map — drivers list + statuses live inside it now */}
-      <div>
-        <h3 className="mb-3 font-semibold text-slate-800">{t("pages.map.title")}</h3>
-        <LiveMap heightClass="h-[520px]" />
+        {/* Live fleet map — drivers list + statuses live inside it */}
+        <div className="lg:col-span-2">
+          <h3 className="mb-3 font-semibold text-slate-800">{t("pages.map.title")}</h3>
+          <LiveMap heightClass="h-[460px]" />
+        </div>
       </div>
     </div>
   );
