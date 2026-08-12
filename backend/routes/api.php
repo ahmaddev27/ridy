@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Admin\CompanySessionController;
 use App\Http\Controllers\Api\V1\Admin\CompanyUserController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Api\V1\Admin\OverviewController;
+use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\ProxyController;
 use App\Http\Controllers\Api\V1\Admin\SettingsController;
 use App\Http\Controllers\Api\V1\Admin\SubscriptionController;
@@ -183,6 +184,12 @@ Route::prefix('v1')->group(function () {
         Route::get('collector-payments/export', [CollectorPaymentController::class, 'export']);
         Route::post('collector-payments', [CollectorPaymentController::class, 'store']);
         Route::delete('collector-payments/{payment}', [CollectorPaymentController::class, 'destroy']);
+
+        // Subscription plans (resellers sell these).
+        Route::get('plans', [PlanController::class, 'index']);
+        Route::post('plans', [PlanController::class, 'store']);
+        Route::put('plans/{plan}', [PlanController::class, 'update']);
+        Route::delete('plans/{plan}', [PlanController::class, 'destroy']);
 
         // Billing: subscription revenue reports + auto-generated invoices.
         Route::get('reports/billing-summary', [BillingReportController::class, 'summary']);

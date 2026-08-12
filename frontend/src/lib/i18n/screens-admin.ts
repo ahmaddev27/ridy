@@ -29,6 +29,8 @@ const en: Dict = {
     outstanding: "Outstanding", colAmount: "Amount", colStatus: "Status", paid: "Paid", unpaid: "Unpaid",
     settle: "Mark paid", settleTitle: "Settle invoice", settleIntro: "Link the collector payment that covers this invoice:",
     selectPayment: "— Select payment —", noPayments: "No payments for this company yet.", settled: "Invoice settled", settleFailed: "Could not settle", cancel: "Cancel", save: "Save",
+    plansTitle: "Plans", addPlan: "Add plan", editPlan: "Edit plan", planName: "Name", planPrice: "Price", planDuration: "Duration (days)", planActive: "Active", planInactive: "Inactive",
+    noPlans: "No plans yet — add one so resellers can issue codes.", deletePlan: "Delete", deletePlanConfirm: "Delete plan {name}?", planSaved: "Plan saved", planDeleted: "Plan deleted", planDays: "days", failed: "Action failed",
   },
   emailTemplates: {
     type_company_registration: "Company registration", type_company_otp: "Company sign-up code", type_password_otp: "Password reset code", type_driver_invite: "Driver invite",
@@ -156,6 +158,8 @@ const de: Dict = {
     outstanding: "Offen", colAmount: "Betrag", colStatus: "Status", paid: "Bezahlt", unpaid: "Offen",
     settle: "Als bezahlt", settleTitle: "Rechnung begleichen", settleIntro: "Verknüpfe die Inkasso-Zahlung, die diese Rechnung deckt:",
     selectPayment: "— Zahlung wählen —", noPayments: "Noch keine Zahlungen für diese Firma.", settled: "Rechnung beglichen", settleFailed: "Konnte nicht begleichen", cancel: "Abbrechen", save: "Speichern",
+    plansTitle: "Pakete", addPlan: "Paket hinzufügen", editPlan: "Paket bearbeiten", planName: "Name", planPrice: "Preis", planDuration: "Dauer (Tage)", planActive: "Aktiv", planInactive: "Inaktiv",
+    noPlans: "Noch keine Pakete — füge eins hinzu, damit Vertriebler Codes ausstellen können.", deletePlan: "Löschen", deletePlanConfirm: "Paket {name} löschen?", planSaved: "Paket gespeichert", planDeleted: "Paket gelöscht", planDays: "Tage", failed: "Aktion fehlgeschlagen",
   },
   emailTemplates: {
     type_company_registration: "Firmenregistrierung", type_company_otp: "Firmen-Anmeldecode", type_password_otp: "Passwort-Reset-Code", type_driver_invite: "Fahrer-Einladung",
@@ -281,6 +285,8 @@ const ar: Dict = {
     outstanding: "غير مدفوع", colAmount: "المبلغ", colStatus: "الحالة", paid: "مدفوعة", unpaid: "غير مدفوعة",
     settle: "تعليم مدفوع", settleTitle: "تسوية الفاتورة", settleIntro: "اربط دفعة المحصّل اللي بتغطّي هالفاتورة:",
     selectPayment: "— اختر الدفعة —", noPayments: "ما في دفعات لهالشركة بعد.", settled: "تمت تسوية الفاتورة", settleFailed: "تعذّرت التسوية", cancel: "إلغاء", save: "حفظ",
+    plansTitle: "الباقات", addPlan: "إضافة باقة", editPlan: "تعديل الباقة", planName: "الاسم", planPrice: "السعر", planDuration: "المدة (أيام)", planActive: "مفعّلة", planInactive: "معطّلة",
+    noPlans: "ما في باقات بعد — أضف باقة عشان الموزّعين يقدروا يولّدوا أكواد.", deletePlan: "حذف", deletePlanConfirm: "حذف الباقة {name}؟", planSaved: "تم حفظ الباقة", planDeleted: "تم حذف الباقة", planDays: "يوم", failed: "فشل الإجراء",
   },
   emailTemplates: {
     type_company_registration: "تسجيل شركة", type_company_otp: "رمز تسجيل الشركة", type_password_otp: "رمز استعادة كلمة المرور", type_driver_invite: "دعوة سائق",
