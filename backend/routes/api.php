@@ -67,10 +67,14 @@ Route::prefix('v1')->group(function () {
         Route::post('sessions/{session}/statuses', [DispatchDaemonController::class, 'statuses']);
     });
 
-    Route::middleware(['auth:sanctum', ResolveTenant::class])->group(function () {
+    // Session basics every authenticated user needs — including tenant-less ones
+    // (resellers). NOT tenant-scoped, so they never hit the no-tenant guard.
+    Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
+    });
 
+    Route::middleware(['auth:sanctum', ResolveTenant::class])->group(function () {
         // Dashboard
         Route::get('dashboard/summary', [DashboardController::class, 'summary']);
 

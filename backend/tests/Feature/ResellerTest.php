@@ -70,6 +70,15 @@ class ResellerTest extends TestCase
         $this->getJson('/api/v1/dashboard/summary')->assertForbidden();
     }
 
+    public function test_reseller_can_still_load_their_session(): void
+    {
+        [$user] = $this->reseller();
+        Sanctum::actingAs($user);
+
+        // /me must work for a tenant-less user, or they can't even sign in.
+        $this->getJson('/api/v1/me')->assertOk()->assertJsonPath('data.email', 'ali@r.de');
+    }
+
     public function test_non_reseller_cannot_generate(): void
     {
         $this->seed(RolePermissionSeeder::class);
