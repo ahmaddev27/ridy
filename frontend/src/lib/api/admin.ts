@@ -172,10 +172,12 @@ export async function deleteCompany(id: number): Promise<void> {
 export async function generateActivationCode(
   id: number,
   days: number,
+  amount?: number,
+  paid?: boolean,
 ): Promise<{ code: string; days: number; expires_at: string }> {
   const res = await apiFetch<{ data: { code: string; days: number; expires_at: string } }>(
     `${base}/${id}/activation`,
-    { method: "POST", body: { days }, withCsrf: true },
+    { method: "POST", body: { days, amount, paid }, withCsrf: true },
   );
   return res.data;
 }
@@ -392,7 +394,7 @@ export async function deleteCompanySession(id: number): Promise<void> {
 export type BillingSummary = {
   revenue_by_month: { month: string; total: number }[];
   expiring: { id: number; name: string; ends_at: string | null; days_left: number | null }[];
-  totals: { total_revenue: number; active_subscriptions: number; expiring_soon: number };
+  totals: { total_revenue: number; outstanding: number; active_subscriptions: number; expiring_soon: number };
 };
 
 export type SubscriptionInvoice = {
@@ -400,6 +402,10 @@ export type SubscriptionInvoice = {
   tenant_id: number;
   company_name: string | null;
   days: number;
+  amount: number | null;
+  paid: boolean;
+  paid_at: string | null;
+  collector_payment_id: number | null;
   starts_at: string;
   ends_at: string;
 };
@@ -419,4 +425,12 @@ export async function listSubscriptionInvoices(
 export async function exportSubscriptionInvoices(tenantId?: number): Promise<Blob> {
   const qs = tenantId ? `?tenant_id=${tenantId}` : "";
   return apiDownload(`/api/v1/admin/subscription-invoices/export${qs}`);
+}
+
+export async function settleInvoice(invoiceId: number, collectorPaymentId: number): Promise<SubscriptionInvoice> {
+  const res = await apiFetch<{ data: SubscriptionInvoice }>(
+    `/api/v1/admin/subscription-invoices/${invoiceId}/settle`,
+    { method: "POST", body: { collector_payment_id: collectorPaymentId }, withCsrf: true },
+  );
+  return res.data;
 }

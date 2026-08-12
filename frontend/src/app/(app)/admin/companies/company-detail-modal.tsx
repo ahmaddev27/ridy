@@ -62,6 +62,8 @@ export function CompanyDetail({
 
   // Subscription/activation.
   const [days, setDays] = useState("30");
+  const [amount, setAmount] = useState("");
+  const [paid, setPaid] = useState(true);
   const [genCode, setGenCode] = useState<string | null>(null);
 
   // Password reset (in-app modal, not a native prompt).
@@ -141,7 +143,7 @@ export function CompanyDetail({
   async function genActivation() {
     setBusy(true);
     try {
-      const res = await generateActivationCode(id, Number(days) || 30);
+      const res = await generateActivationCode(id, Number(days) || 30, amount ? Number(amount) : undefined, paid);
       setGenCode(res.code);
       toast.success(c("codeGenerated"));
       await load();
@@ -275,8 +277,8 @@ export function CompanyDetail({
                 </div>
 
                 <p className="text-xs text-slate-400">{c("activationHint")}</p>
-                <div className="flex items-end gap-2">
-                  <div className="w-28">
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="w-24">
                     <label className="mb-1 block text-xs font-medium text-slate-600">{c("days")}</label>
                     <input
                       type="number"
@@ -286,6 +288,22 @@ export function CompanyDetail({
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
                     />
                   </div>
+                  <div className="w-28">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">{c("amount")}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
+                    />
+                  </div>
+                  <label className="flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm text-slate-600">
+                    <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} className="h-4 w-4" />
+                    {c("markPaid")}
+                  </label>
                   <Button variant="secondary" onClick={genActivation} disabled={busy}>
                     <Ticket className="h-4 w-4" /> {c("generateCode")}
                   </Button>
