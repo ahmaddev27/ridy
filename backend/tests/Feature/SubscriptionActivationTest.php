@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Billing\Models\Plan;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Models\User;
 use App\Support\Settings;
@@ -125,8 +126,9 @@ class SubscriptionActivationTest extends TestCase
     {
         Sanctum::actingAs($this->superAdmin());
         $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE', 'status' => 'active']);
+        $plan = Plan::create(['name' => 'Monthly', 'price' => 50, 'duration_days' => 30, 'active' => true]);
 
-        $this->postJson("/api/v1/admin/companies/{$tenant->id}/activation", ['days' => 30])
+        $this->postJson("/api/v1/admin/companies/{$tenant->id}/activation", ['plan_id' => $plan->id])
             ->assertOk()->assertJsonPath('data.days', 30);
         $this->assertNotNull($tenant->refresh()->activation_code);
 

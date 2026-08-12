@@ -9,10 +9,12 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale } from "@/lib/utils";
+import { CodesLedger } from "@/components/billing/codes-ledger";
 import {
   getResellerPlans,
   searchResellerCompanies,
   generateResellerCode,
+  getResellerCodes,
   type ResellerPlan,
   type ResellerCompany,
   type GeneratedCode,
@@ -83,7 +85,8 @@ export default function ResellerPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <div className="space-y-8">
+      <div className="mx-auto max-w-xl space-y-6">
       <PageHeader tkey="reseller" />
 
       {code ? (
@@ -138,7 +141,7 @@ export default function ResellerPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={c("searchCompany")}
-                  className="w-full rounded-lg border border-slate-300 py-2.5 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200 ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3"
+                  className="w-full rounded-lg border border-slate-200 bg-white py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200 ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3"
                 />
                 {(searching || results.length > 0) && (
                   <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
@@ -174,6 +177,16 @@ export default function ResellerPage() {
           </Button>
         </Card>
       )}
+      </div>
+
+      {/* The reseller's own codes and their lifecycle. */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800">{c("myCodesTitle")}</h2>
+          <p className="text-sm text-slate-500">{c("myCodesDesc")}</p>
+        </div>
+        <CodesLedger key={code?.code ?? "list"} fetchCodes={getResellerCodes} />
+      </section>
     </div>
   );
 }

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Billing\Models\Plan;
+use App\Domain\Billing\Models\SubscriptionCode;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\ProxyPool;
 use App\Http\Controllers\Concerns\GeneratesOtp;
@@ -10,6 +12,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Super-admin control over company subscriptions: generate a short-lived
@@ -20,33 +23,56 @@ class SubscriptionController extends Controller
 {
     use GeneratesOtp;
 
-    private const CODE_TTL_MINUTES = 2;
+    private const CODE_TTL_MINUTES = 10;
 
-    /** Generate an activation code valid ~2 minutes for the owner to enter. */
+    /**
+     * Generate a plan-based activation code the owner enters. Price + duration
+     * come from the plan; "paid" is optional (admin may comp a subscription).
+     */
     public function generate(Request $request, Tenant $tenant): JsonResponse
     {
         $data = $request->validate([
-            'days' => ['required', 'integer', 'min:1', 'max:3650'],
-            // The invoice amount + whether it's already paid, carried onto the
-            // period when the company activates with this code.
-            'amount' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
+            'plan_id' => ['required', 'integer'],
             'paid' => ['boolean'],
         ]);
 
+        $plan = Plan::where('active', true)->find($data['plan_id']);
+        if ($plan === null) {
+            throw ValidationException::withMessages(['plan_id' => 'plan_unavailable']);
+        }
+
+        $paid = (bool) ($data['paid'] ?? false);
         $code = $this->newOtp();
+        $expiresAt = CarbonImmutable::now()->addMinutes(self::CODE_TTL_MINUTES);
+
         $tenant->forceFill([
             'activation_code' => $code,
-            'activation_code_expires_at' => CarbonImmutable::now()->addMinutes(self::CODE_TTL_MINUTES),
-            'activation_days' => $data['days'],
-            'activation_amount' => $data['amount'] ?? null,
-            'activation_paid' => (bool) ($data['paid'] ?? false),
+            'activation_code_expires_at' => $expiresAt,
+            'activation_days' => $plan->duration_days,
+            'activation_amount' => $plan->price,
+            'activation_paid' => $paid,
+            'activation_collector_id' => null, // admin-issued, no reseller
             'activation_attempts' => 0,
         ])->save();
 
+        SubscriptionCode::create([
+            'code' => $code,
+            'plan_id' => $plan->id,
+            'tenant_id' => $tenant->id,
+            'collector_id' => null,
+            'amount' => $plan->price,
+            'paid' => $paid,
+            'expires_at' => $expiresAt,
+            'created_by' => $request->user()->id,
+        ]);
+
         return response()->json(['data' => [
             'code' => $code,
-            'days' => $data['days'],
-            'expires_at' => $tenant->activation_code_expires_at->toIso8601String(),
+            'plan' => $plan->name,
+            'days' => $plan->duration_days,
+            'price' => (float) $plan->price,
+            'paid' => $paid,
+            'expires_at' => $expiresAt->toIso8601String(),
         ]]);
     }
 

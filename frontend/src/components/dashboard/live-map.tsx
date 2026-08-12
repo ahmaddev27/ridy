@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 import { latnLocale } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap, LayerGroup } from "leaflet";
-import { Radio, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { getLiveDrivers, type LiveDriver } from "@/lib/api/drivers";
 import { presence, PRESENCE_COLOR, PRESENCE_TONE, PRESENCE_LABEL_KEY, type Presence } from "@/lib/driver-status";
@@ -139,11 +139,6 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
       <div ref={containerRef} className={`w-full ${heightClass}`} style={{ zIndex: 0 }} />
 
       <div className="pointer-events-none absolute top-3 z-[1000] flex flex-wrap gap-2 px-3 ltr:left-3 rtl:right-3">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-white/95 px-3 py-2 text-sm shadow-md backdrop-blur">
-          <Radio className="h-4 w-4 text-slate-600" />
-          <span className="font-semibold text-slate-800">{count ?? "…"}</span>
-          <span className="text-slate-500">{c("activeTrips")}</span>
-        </div>
         <div className="pointer-events-auto flex items-center gap-3 rounded-xl bg-white/95 px-3 py-2 text-xs shadow-md backdrop-blur">
           <Legend color="#f59e0b" label={c("enRoute")} />
           <Legend color="#10b981" label={c("onTrip")} />

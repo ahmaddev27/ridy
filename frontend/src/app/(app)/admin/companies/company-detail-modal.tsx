@@ -27,12 +27,14 @@ import {
   getCompanyOffers,
   getCompanyVehicles,
   listSubscriptionInvoices,
+  listPlans,
   type Company,
   type Proxy,
   type CompanyDriverRow,
   type CompanyOfferRow,
   type CompanyVehicleRow,
   type SubscriptionInvoice,
+  type Plan,
 } from "@/lib/api/admin";
 
 /** Super-admin company detail as a full page: edit, proxy, users, session,
@@ -63,16 +65,17 @@ export function CompanyDetail({
   const [confirm, setConfirm] = useState<null | "disable" | "relink" | "deleteSession">(null);
   const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
 
-  // Subscription/activation.
-  const [days, setDays] = useState("30");
-  const [amount, setAmount] = useState("");
+  // Subscription/activation — a code is generated against a plan, paid optional.
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [planId, setPlanId] = useState("");
   const [paid, setPaid] = useState(true);
   const [invoices, setInvoices] = useState<SubscriptionInvoice[]>([]);
 
-  // The company's subscription history (invoices), loaded for the subscription tab.
+  // The company's subscription history + the plans to choose from, for the tab.
   useEffect(() => {
     if (tab !== "subscription") return;
     listSubscriptionInvoices(id).then((r) => setInvoices(r.data)).catch(() => setInvoices([]));
+    listPlans().then(setPlans).catch(() => setPlans([]));
   }, [tab, id]);
   const [genCode, setGenCode] = useState<string | null>(null);
 
@@ -153,7 +156,7 @@ export function CompanyDetail({
   async function genActivation() {
     setBusy(true);
     try {
-      const res = await generateActivationCode(id, Number(days) || 30, amount ? Number(amount) : undefined, paid);
+      const res = await generateActivationCode(id, Number(planId), paid);
       setGenCode(res.code);
       toast.success(c("codeGenerated"));
       await load();
@@ -288,33 +291,24 @@ export function CompanyDetail({
 
                 <p className="text-xs text-slate-400">{c("activationHint")}</p>
                 <div className="flex flex-wrap items-end gap-2">
-                  <div className="w-24">
-                    <label className="mb-1 block text-xs font-medium text-slate-600">{c("days")}</label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={days}
-                      onChange={(e) => setDays(e.target.value)}
+                  <div className="min-w-[200px] flex-1">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">{c("plan")}</label>
+                    <select
+                      value={planId}
+                      onChange={(e) => setPlanId(e.target.value)}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
-                    />
-                  </div>
-                  <div className="w-28">
-                    <label className="mb-1 block text-xs font-medium text-slate-600">{c("amount")}</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900"
-                    />
+                    >
+                      <option value="">{c("selectPlan")}</option>
+                      {plans.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name} · €{p.price.toFixed(2)} · {c("daysN").replace("{n}", String(p.duration_days))}</option>
+                      ))}
+                    </select>
                   </div>
                   <label className="flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm text-slate-600">
                     <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} className="h-4 w-4" />
                     {c("markPaid")}
                   </label>
-                  <Button variant="secondary" onClick={genActivation} disabled={busy}>
+                  <Button variant="secondary" onClick={genActivation} disabled={busy || !planId}>
                     <Ticket className="h-4 w-4" /> {c("generateCode")}
                   </Button>
                   {company.banned && (

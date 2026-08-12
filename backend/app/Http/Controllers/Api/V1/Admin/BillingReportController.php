@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Billing\Models\SubscriptionCode;
 use App\Domain\Billing\Models\SubscriptionPeriod;
+use App\Domain\Billing\SubscriptionCodeQuery;
 use App\Domain\Collections\Models\CollectorPayment;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
@@ -99,6 +101,47 @@ class BillingReportController extends Controller
             }
             fclose($out);
         }, 'subscription-invoices.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /** Every issued activation code with its lifecycle status, filtered + paged. */
+    public function codes(Request $request, SubscriptionCodeQuery $query): JsonResponse
+    {
+        $codes = $query->forRequest($request)->paginate(min($request->integer('per_page', 25), 100));
+
+        return response()->json([
+            'data' => collect($codes->items())->map(fn (SubscriptionCode $c) => $query->present($c)),
+            'meta' => [
+                'current_page' => $codes->currentPage(),
+                'last_page' => $codes->lastPage(),
+                'total' => $codes->total(),
+            ],
+        ]);
+    }
+
+    public function codesExport(Request $request, SubscriptionCodeQuery $query): StreamedResponse
+    {
+        $rows = $query->forRequest($request)->get();
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM for Excel
+            fputcsv($out, ['Code', 'Plan', 'Company', 'Collector', 'Amount', 'Paid', 'Status', 'Created', 'Activated', 'Expires']);
+            foreach ($rows as $c) {
+                fputcsv($out, [
+                    $c->code,
+                    $c->plan?->name,
+                    $c->tenant?->name,
+                    $c->collector?->name,
+                    $c->amount !== null ? number_format((float) $c->amount, 2, '.', '') : '',
+                    $c->paid ? 'yes' : 'no',
+                    $c->status(),
+                    $c->created_at?->toDateString(),
+                    $c->activated_at?->toDateString() ?? '',
+                    $c->expires_at?->toDateString(),
+                ]);
+            }
+            fclose($out);
+        }, 'subscription-codes.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /**

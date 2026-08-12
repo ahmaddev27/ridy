@@ -4,8 +4,9 @@ import { useMemo, useState } from "react";
 import { latnLocale } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Building2, Search, Trash2, ChevronLeft, ChevronRight, MailCheck, Power, PowerOff } from "lucide-react";
+import { Building2, Trash2, ChevronLeft, ChevronRight, MailCheck, Power, PowerOff } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { SearchInput } from "@/components/ui/search-input";
 import { Badge, type Status } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -109,18 +110,14 @@ export default function CompaniesPage() {
 
       {/* Toolbar: search + rows-per-page */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-[220px] flex-1">
-          <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder={c("searchPlaceholder")}
-            className="w-full rounded-lg border border-slate-300 py-2 ps-9 pe-3 text-sm outline-none focus:border-black focus:ring-2 focus:ring-slate-200"
-          />
-        </div>
+        <SearchInput
+          value={search}
+          onChange={(v) => {
+            setSearch(v);
+            setPage(1);
+          }}
+          placeholder={c("searchPlaceholder")}
+        />
       </div>
 
       {/* Filter chips */}
