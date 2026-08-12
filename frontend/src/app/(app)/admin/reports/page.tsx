@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Wallet, Clock, Download, ReceiptText, CheckCircle2, Loader2 } from "lucide-react";
+import { Wallet, Clock, Download, ReceiptText, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -70,10 +70,10 @@ export default function ReportsPage() {
 
       {/* Headline totals */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label={c("totalRevenue")} value={summary ? money(summary.totals.total_revenue) : "…"} tone="positive" />
-        <StatCard label={c("outstanding")} value={summary ? money(summary.totals.outstanding) : "…"} tone={summary?.totals.outstanding ? "warning" : "default"} />
-        <StatCard label={c("activeSubs")} value={summary?.totals.active_subscriptions ?? "…"} />
-        <StatCard label={c("expiringSoon")} value={summary?.totals.expiring_soon ?? "…"} tone="warning" />
+        <StatCard icon={Wallet} label={c("totalRevenue")} value={summary ? money(summary.totals.total_revenue) : "…"} tone="positive" />
+        <StatCard icon={AlertCircle} label={c("outstanding")} value={summary ? money(summary.totals.outstanding) : "…"} tone={summary?.totals.outstanding ? "warning" : "default"} />
+        <StatCard icon={CheckCircle2} label={c("activeSubs")} value={summary?.totals.active_subscriptions ?? "…"} tone="positive" />
+        <StatCard icon={Clock} label={c("expiringSoon")} value={summary?.totals.expiring_soon ?? "…"} tone="warning" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

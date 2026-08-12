@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, Building2, Radio, Plug, ArrowRight } from "lucide-react";
+import { AlertTriangle, Building2, Radio, Plug, ArrowRight, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { AreaChart } from "@/components/charts/area-chart";
@@ -30,15 +30,16 @@ export default function AdminDashboardPage() {
 
       {/* Clickable KPI cards → their pages */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi href="/admin/companies" label={c("companies")} value={s?.companies} sub={`${s?.active_companies ?? 0} ${c("activeShort")}`} />
-        <Kpi href="/admin/companies" label={c("sessionsActive")} value={s?.sessions_active} tone="positive" />
+        <Kpi icon={Building2} href="/admin/companies" label={c("companies")} value={s?.companies} sub={`${s?.active_companies ?? 0} ${c("activeShort")}`} />
+        <Kpi icon={Radio} href="/admin/companies" label={c("sessionsActive")} value={s?.sessions_active} tone="positive" />
         <Kpi
+          icon={AlertTriangle}
           href="/admin/companies"
           label={c("sessionsAttention")}
           value={s?.sessions_need_attention}
           tone={s && s.sessions_need_attention > 0 ? "warning" : "default"}
         />
-        <Kpi href="/admin/companies" label={c("drivers")} value={s?.drivers} sub={`${s?.offers ?? 0} ${c("offers")}`} />
+        <Kpi icon={Users} href="/admin/companies" label={c("drivers")} value={s?.drivers} sub={`${s?.offers ?? 0} ${c("offers")}`} />
       </div>
 
       {/* Offers over time */}
@@ -122,25 +123,34 @@ function Kpi({
   value,
   sub,
   tone = "default",
+  icon: Icon,
 }: {
   href: string;
   label: string;
   value?: number;
   sub?: string;
   tone?: "default" | "positive" | "warning";
+  icon?: React.ComponentType<{ className?: string }>;
 }) {
   const valueColor =
     tone === "positive" ? "text-emerald-600" : tone === "warning" ? "text-amber-600" : "text-slate-900";
+  const iconTone =
+    tone === "positive" ? "bg-emerald-50 text-emerald-600" : tone === "warning" ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-500";
   return (
     <Link
       href={href}
-      className="group rounded-xl border border-slate-200 bg-white p-4 transition hover:border-slate-400 hover:shadow-sm"
+      className="group rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_2px_10px_-2px_rgba(30,34,43,0.06)] transition hover:border-slate-300 hover:shadow-md"
     >
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-slate-500">{label}</span>
+      <div className="flex items-start justify-between">
+        {Icon && (
+          <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${iconTone}`}>
+            <Icon className="h-[18px] w-[18px]" />
+          </span>
+        )}
         <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:text-slate-500 rtl:rotate-180" />
       </div>
-      <div className={`mt-1 text-2xl font-bold ${valueColor}`}>{value ?? "…"}</div>
+      <div className="mt-3 text-sm text-slate-500">{label}</div>
+      <div className={`mt-0.5 text-2xl font-bold tabular-nums ${valueColor}`}>{value ?? "…"}</div>
       {sub && <div className="mt-0.5 text-xs text-slate-400">{sub}</div>}
     </Link>
   );

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio } from "lucide-react";
+import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/card";
@@ -217,7 +217,7 @@ export function CompanyDetail({
 
       {/* Side tabs (start side = right in RTL, left in LTR) + content */}
       <div className="flex flex-col gap-4 md:flex-row">
-        <nav className="flex gap-1 overflow-x-auto rounded-xl bg-slate-50 p-1 md:w-56 md:flex-col md:gap-1 md:bg-transparent md:p-0">
+        <nav className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200/70 bg-slate-50 p-1.5 md:h-fit md:w-56 md:flex-col md:gap-1">
           {([
             { k: "details", icon: Info },
             { k: "subscription", icon: Ticket },
@@ -391,9 +391,9 @@ export function CompanyDetail({
 
               {/* Stats */}
               <div className="grid grid-cols-3 gap-3">
-                <StatCard label={c("colDrivers")} value={company.driver_count} />
-                <StatCard label={c("colOffers")} value={company.offer_count} />
-                <StatCard label={c("colSession")} value={company.session_status ? c(`session_${company.session_status}`) : c("noSession")} />
+                <StatCard icon={Users} label={c("colDrivers")} value={company.driver_count} />
+                <StatCard icon={Radio} label={c("colOffers")} value={company.offer_count} />
+                <StatCard icon={Plug} label={c("colSession")} value={company.session_status ? c(`session_${company.session_status}`) : c("noSession")} />
               </div>
 
               {/* Edit info */}
