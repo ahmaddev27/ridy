@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { latnLocale, toLatinDigits } from "@/lib/utils";
 import { toast } from "sonner";
 import { Radio, MapPin, Search, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Inbox, CheckCircle2, XCircle, Gauge, Wallet } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -133,7 +134,7 @@ export default function OffersPage() {
   function dayLabel(key: string): string {
     if (key === new Date().toDateString()) return c("today");
     if (key === "—") return "—";
-    return new Date(key).toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
+    return new Date(key).toLocaleDateString(latnLocale(locale), { weekday: "long", day: "numeric", month: "long" });
   }
 
 
@@ -230,9 +231,9 @@ export default function OffersPage() {
       {/* Stat cards for the current filter */}
       {stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard icon={Inbox} label={c("statTotal")} value={stats.total.toLocaleString(locale)} />
-          <StatCard icon={CheckCircle2} label={c("statAccepted")} value={stats.accepted.toLocaleString(locale)} tone="positive" />
-          <StatCard icon={XCircle} label={c("statNotTaken")} value={stats.declined.toLocaleString(locale)} />
+          <StatCard icon={Inbox} label={c("statTotal")} value={stats.total.toLocaleString(latnLocale(locale))} />
+          <StatCard icon={CheckCircle2} label={c("statAccepted")} value={stats.accepted.toLocaleString(latnLocale(locale))} tone="positive" />
+          <StatCard icon={XCircle} label={c("statNotTaken")} value={stats.declined.toLocaleString(latnLocale(locale))} />
           <StatCard icon={Gauge} label={c("statRate")} value={`${stats.acceptance_rate}%`} tone={stats.acceptance_rate >= 50 ? "positive" : "default"} />
           <StatCard icon={Wallet} label={c("statEarnings")} value={`€${stats.earnings.toFixed(2)}`} tone="positive" />
         </div>
@@ -280,7 +281,7 @@ export default function OffersPage() {
                               className="cursor-pointer hover:bg-slate-50"
                             >
                               <td className="whitespace-nowrap px-4 py-3 text-slate-500">
-                                {o.received_at ? new Date(o.received_at).toLocaleTimeString(locale) : "—"}
+                                {o.received_at ? new Date(o.received_at).toLocaleTimeString(latnLocale(locale)) : "—"}
                               </td>
                               <td className="px-4 py-3">
                                 <div className="font-medium text-slate-800">{o.driver_name ?? "—"}</div>
@@ -299,7 +300,7 @@ export default function OffersPage() {
                                 </div>
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
-                                {o.fare_formatted ?? "—"}
+                                {toLatinDigits(o.fare_formatted) || "—"}
                               </td>
                               <td className="px-4 py-3">
                                 <Badge status={o.accepted ? "connected" : "neutral"} dot>

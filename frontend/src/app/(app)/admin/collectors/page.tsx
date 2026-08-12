@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { latnLocale } from "@/lib/utils";
 import { toast } from "sonner";
 import { Plus, Loader2, Banknote, Trash2, Pencil, Download, ReceiptText } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -116,7 +117,7 @@ export default function CollectorsPage() {
     }
   }
 
-  const money = (n: number) => new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  const money = (n: number) => new Intl.NumberFormat(latnLocale(locale), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
   return (
     <div className="space-y-6">
@@ -160,7 +161,7 @@ export default function CollectorsPage() {
                     <td className="px-4 py-3 font-semibold text-slate-800">{money(col.total_collected)}</td>
                     <td className="px-4 py-3 text-slate-600">{col.payments_count}</td>
                     <td className="px-4 py-3 text-slate-500">
-                      {col.last_paid_on ? new Date(col.last_paid_on).toLocaleDateString(locale) : c("noneShort")}
+                      {col.last_paid_on ? new Date(col.last_paid_on).toLocaleDateString(latnLocale(locale)) : c("noneShort")}
                     </td>
                     <td className="px-4 py-3 text-end">
                       <div className="flex items-center justify-end gap-1">
@@ -249,7 +250,7 @@ export default function CollectorsPage() {
               <tbody className="divide-y divide-slate-100">
                 {payments.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 text-slate-500">{new Date(p.paid_on).toLocaleDateString(locale)}</td>
+                    <td className="px-4 py-3 text-slate-500">{new Date(p.paid_on).toLocaleDateString(latnLocale(locale))}</td>
                     <td className="px-4 py-3 font-medium text-slate-800">{p.company_name ?? c("noneShort")}</td>
                     <td className="px-4 py-3 text-slate-600">{p.collector_name ?? c("noneShort")}</td>
                     <td className="px-4 py-3 font-semibold text-slate-800">{money(p.amount)}</td>
