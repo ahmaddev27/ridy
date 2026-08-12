@@ -20,7 +20,10 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
   // from them; the account group shows to everyone.
   const groups = navGroups.filter((g) => {
     if (g.requiresRole && !user?.roles.includes(g.requiresRole)) return false;
-    if (g.hideForRole && user?.roles.includes(g.hideForRole)) return false;
+    if (g.hideForRole) {
+      const hidden = Array.isArray(g.hideForRole) ? g.hideForRole : [g.hideForRole];
+      if (hidden.some((r) => user?.roles.includes(r))) return false;
+    }
     return true;
   });
 

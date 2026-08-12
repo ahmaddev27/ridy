@@ -13,6 +13,7 @@ import {
   MapPin,
   FileBarChart,
   UserCog,
+  Ticket,
   type LucideIcon,
 } from "lucide-react";
 
@@ -30,13 +31,20 @@ export type NavItem = {
  * Together they give a clean split: company groups are hidden from the
  * super-admin, and admin groups are hidden from company managers.
  */
-export type NavGroup = { title: string; items: NavItem[]; requiresRole?: string; hideForRole?: string };
+export type NavGroup = { title: string; items: NavItem[]; requiresRole?: string; hideForRole?: string | string[] };
 
 export const navGroups: NavGroup[] = [
-  // ── Company manager surface (hidden from the super-admin) ──────────────────
+  // ── Reseller surface (only resellers) ──────────────────────────────────────
+  {
+    title: "navGroups.reseller",
+    requiresRole: "reseller",
+    items: [{ href: "/reseller", label: "nav.generateCode", icon: Ticket }],
+  },
+
+  // ── Company manager surface (hidden from super-admin + resellers) ──────────
   {
     title: "navGroups.overview",
-    hideForRole: "super_admin",
+    hideForRole: ["super_admin", "reseller"],
     items: [
       { href: "/dashboard", label: "nav.dashboard", icon: LayoutDashboard },
       { href: "/offers", label: "nav.offers", icon: Radio },
@@ -45,7 +53,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     title: "navGroups.fleet",
-    hideForRole: "super_admin",
+    hideForRole: ["super_admin", "reseller"],
     items: [
       { href: "/drivers", label: "nav.drivers", icon: Users },
       { href: "/vehicles", label: "nav.vehicles", icon: Car },

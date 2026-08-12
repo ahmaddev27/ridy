@@ -27,7 +27,7 @@ export default function LoginPage() {
 
   async function goAfterLogin() {
     const u = await login(email, password);
-    router.push(u.roles.includes("super_admin") ? "/admin" : "/dashboard");
+    router.push(u.roles.includes("super_admin") ? "/admin" : u.roles.includes("reseller") ? "/reseller" : "/dashboard");
   }
 
   async function onActivate(e: React.FormEvent) {
@@ -49,7 +49,7 @@ export default function LoginPage() {
     try {
       const u = await login(email, password);
       // Super-admins land on the platform panel; managers on their dashboard.
-      router.push(u.roles.includes("super_admin") ? "/admin" : "/dashboard");
+      router.push(u.roles.includes("super_admin") ? "/admin" : u.roles.includes("reseller") ? "/reseller" : "/dashboard");
     } catch (err) {
       // A suspended company (disabled/banned/expired) → the contact/activate screen.
       if (err instanceof ApiError && err.status === 403 && err.data?.reason) {

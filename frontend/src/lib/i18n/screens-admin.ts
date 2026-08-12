@@ -27,6 +27,13 @@ const en: Dict = {
     searchPlaceholder: "Search name, email, phone…", none: "—",
     filterRole: "Role", allRoles: "All roles", delete: "Delete", deleteConfirm: "Delete user {name}? Their login is removed permanently.", deleted: "User deleted", deleteFailed: "Could not delete", cancel: "Cancel",
   },
+  reseller: {
+    plan: "Plan", selectPlan: "— Select plan —", noPlans: "No plans available yet — ask the admin.",
+    company: "Company", searchCompany: "Search by company name or phone…", change: "Change",
+    summary: "Issue a code for {company} on {plan} ({price}).", generate: "Generate code",
+    generated: "Code generated", failed: "Could not generate", codeFor: "{plan} for {company}",
+    copied: "Copied", copy: "Copy", daysN: "{n} days", validHint: "valid for 2 minutes", newCode: "New code",
+  },
   subscriptions: {
     totalRevenue: "Total revenue", activeSubs: "Active subscriptions", expiringSoon: "Expiring soon",
     revenueTitle: "Revenue by month", revenueEmpty: "No payments recorded yet.",
@@ -164,6 +171,13 @@ const de: Dict = {
     searchPlaceholder: "Name, E-Mail, Telefon suchen…", none: "—",
     filterRole: "Rolle", allRoles: "Alle Rollen", delete: "Löschen", deleteConfirm: "Benutzer {name} löschen? Der Login wird dauerhaft entfernt.", deleted: "Benutzer gelöscht", deleteFailed: "Konnte nicht löschen", cancel: "Abbrechen",
   },
+  reseller: {
+    plan: "Paket", selectPlan: "— Paket wählen —", noPlans: "Noch keine Pakete — frag den Admin.",
+    company: "Firma", searchCompany: "Nach Firmenname oder Telefon suchen…", change: "Ändern",
+    summary: "Code für {company} auf {plan} ({price}) ausstellen.", generate: "Code erstellen",
+    generated: "Code erstellt", failed: "Konnte nicht erstellen", codeFor: "{plan} für {company}",
+    copied: "Kopiert", copy: "Kopieren", daysN: "{n} Tage", validHint: "2 Minuten gültig", newCode: "Neuer Code",
+  },
   subscriptions: {
     totalRevenue: "Gesamtumsatz", activeSubs: "Aktive Abos", expiringSoon: "Läuft bald ab",
     revenueTitle: "Umsatz pro Monat", revenueEmpty: "Noch keine Zahlungen erfasst.",
@@ -298,6 +312,13 @@ const ar: Dict = {
     st_active: "نشط", st_disabled: "معطّل", st_banned: "محظور", st_expired: "منتهٍ", st_inactive: "غير مفعّل",
     searchPlaceholder: "ابحث بالاسم/الإيميل/الجوال…", none: "—",
     filterRole: "النوع", allRoles: "كل الأنواع", delete: "حذف", deleteConfirm: "حذف المستخدم {name}؟ بينحذف حسابه نهائياً.", deleted: "تم حذف المستخدم", deleteFailed: "تعذّر الحذف", cancel: "إلغاء",
+  },
+  reseller: {
+    plan: "الباقة", selectPlan: "— اختر الباقة —", noPlans: "ما في باقات متاحة — اسأل الأدمن.",
+    company: "الشركة", searchCompany: "ابحث باسم الشركة أو الجوال…", change: "تغيير",
+    summary: "إصدار كود لـ{company} على {plan} ({price}).", generate: "توليد الكود",
+    generated: "تم توليد الكود", failed: "تعذّر التوليد", codeFor: "{plan} لـ{company}",
+    copied: "تم النسخ", copy: "نسخ", daysN: "{n} يوم", validHint: "صالح دقيقتين", newCode: "كود جديد",
   },
   subscriptions: {
     totalRevenue: "إجمالي الإيرادات", activeSubs: "اشتراكات نشطة", expiringSoon: "قربت تنتهي",
