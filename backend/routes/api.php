@@ -162,6 +162,7 @@ Route::prefix('v1')->group(function () {
 
         // Platform-wide user directory (managers, resellers, admins).
         Route::get('users', [UserDirectoryController::class, 'index']);
+        Route::delete('users/{user}', [UserDirectoryController::class, 'destroy']);
 
         Route::get('companies', [CompanyController::class, 'index']);
         Route::post('companies', [CompanyController::class, 'store']);

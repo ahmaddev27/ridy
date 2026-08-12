@@ -475,3 +475,7 @@ export async function listUsers(): Promise<PlatformUser[]> {
   const res = await apiFetch<{ data: PlatformUser[] }>("/api/v1/admin/users");
   return res.data;
 }
+
+export async function deleteUser(id: number): Promise<void> {
+  await apiFetch(`/api/v1/admin/users/${id}`, { method: "DELETE", withCsrf: true });
+}

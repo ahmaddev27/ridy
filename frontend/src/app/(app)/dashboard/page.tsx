@@ -8,7 +8,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getDashboardSummary } from "@/lib/api/dashboard";
-import { OnlineDrivers } from "@/components/dashboard/online-drivers";
 import { LiveMap } from "@/components/dashboard/live-map";
 
 export default function DashboardPage() {
@@ -51,8 +50,8 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Subscription gauge + online drivers — split half-and-half */}
-      <div className="grid items-start gap-6 lg:grid-cols-2">
+      {/* Subscription gauge (compact) */}
+      <div className="flex">
         {data?.subscription && (
           <Card className="flex items-center gap-5 p-5">
             <SubscriptionRing subscription={data.subscription} activeLabel={k("subActive")} inactiveLabel={k("subInactive")} daysLabel={k("subDaysShort")} />
@@ -86,14 +85,12 @@ export default function DashboardPage() {
             </div>
           </Card>
         )}
-
-        <OnlineDrivers />
       </div>
 
-      {/* Live fleet map — embedded (same component as the standalone page) */}
+      {/* Live fleet map — drivers list + statuses live inside it now */}
       <div>
         <h3 className="mb-3 font-semibold text-slate-800">{t("pages.map.title")}</h3>
-        <LiveMap heightClass="h-[420px]" />
+        <LiveMap heightClass="h-[520px]" />
       </div>
     </div>
   );

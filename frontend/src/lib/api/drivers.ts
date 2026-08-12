@@ -64,6 +64,8 @@ export type LiveWaypoint = { lat: number; lng: number; type: string | null };
 export type LiveDriver = {
   id: number;
   name: string;
+  phone: string | null;
+  picture: string | null;
   status: string | null;
   lat: number;
   lng: number;

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 /**
  * Super-admin directory of every platform user — managers, resellers, admins —
@@ -32,5 +33,17 @@ class UserDirectoryController extends Controller
             ]);
 
         return response()->json(['data' => $users]);
+    }
+
+    public function destroy(Request $request, User $user): JsonResponse
+    {
+        // Never let an admin delete themselves or another super-admin by accident.
+        if ($user->id === $request->user()->id || $user->hasRole('super_admin')) {
+            return response()->json(['message' => 'cannot_delete_admin'], 422);
+        }
+
+        $user->delete();
+
+        return response()->json(['data' => ['deleted' => true]]);
     }
 }
