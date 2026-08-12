@@ -21,6 +21,8 @@ class Tenant extends Model
         'activation_code_expires_at' => 'datetime',
         'activation_attempts' => 'integer',
         'activation_days' => 'integer',
+        'activation_amount' => 'decimal:2',
+        'activation_paid' => 'boolean',
     ];
 
     // Contains proxy credentials + the activation code — never expose in responses.
