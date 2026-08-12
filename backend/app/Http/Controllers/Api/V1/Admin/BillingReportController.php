@@ -24,11 +24,13 @@ class BillingReportController extends Controller
     {
         $days = min(max($request->integer('expiring_days', 14), 1), 365);
 
-        // Group payments by calendar month in PHP so the SQL stays portable
-        // across sqlite (local) and MySQL (prod).
-        $byMonth = CollectorPayment::query()
-            ->get(['paid_on', 'amount'])
-            ->groupBy(fn (CollectorPayment $p) => $p->paid_on->format('Y-m'))
+        // Revenue = paid invoices, grouped by the month they were paid. Grouping
+        // happens in PHP so the SQL stays portable across sqlite (local) and
+        // MySQL (prod).
+        $byMonth = SubscriptionPeriod::query()
+            ->whereNotNull('paid_at')
+            ->get(['paid_at', 'amount'])
+            ->groupBy(fn (SubscriptionPeriod $p) => $p->paid_at->format('Y-m'))
             ->map(fn ($group) => (float) $group->sum('amount'))
             ->sortKeys();
 
@@ -52,7 +54,8 @@ class BillingReportController extends Controller
                 'revenue_by_month' => $revenue,
                 'expiring' => $expiring,
                 'totals' => [
-                    'total_revenue' => (float) CollectorPayment::sum('amount'),
+                    'total_revenue' => (float) SubscriptionPeriod::whereNotNull('paid_at')->sum('amount'),
+                    'outstanding' => (float) SubscriptionPeriod::whereNull('paid_at')->sum('amount'),
                     'active_subscriptions' => Tenant::query()->usable()->count(),
                     'expiring_soon' => $expiring->count(),
                 ],
@@ -82,9 +85,17 @@ class BillingReportController extends Controller
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM for Excel
-            fputcsv($out, ['Invoice', 'Company', 'Days', 'Starts', 'Ends']);
+            fputcsv($out, ['Invoice', 'Company', 'Days', 'Amount', 'Status', 'Starts', 'Ends']);
             foreach ($rows as $p) {
-                fputcsv($out, [$p->id, $p->tenant?->name, $p->days, $p->starts_at->toDateString(), $p->ends_at->toDateString()]);
+                fputcsv($out, [
+                    $p->id,
+                    $p->tenant?->name,
+                    $p->days,
+                    $p->amount !== null ? number_format((float) $p->amount, 2, '.', '') : '',
+                    $p->isPaid() ? 'paid' : 'unpaid',
+                    $p->starts_at->toDateString(),
+                    $p->ends_at->toDateString(),
+                ]);
             }
             fclose($out);
         }, 'subscription-invoices.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
@@ -102,6 +113,26 @@ class BillingReportController extends Controller
             ->orderByDesc('id');
     }
 
+    /** Settle an open invoice by linking the collector payment that covers it. */
+    public function settle(Request $request, SubscriptionPeriod $invoice): JsonResponse
+    {
+        $data = $request->validate([
+            'collector_payment_id' => ['required', 'integer', 'exists:collector_payments,id'],
+        ]);
+
+        $payment = CollectorPayment::findOrFail($data['collector_payment_id']);
+        if ((int) $payment->tenant_id !== (int) $invoice->tenant_id) {
+            return response()->json(['message' => 'payment_company_mismatch'], 422);
+        }
+
+        $invoice->forceFill([
+            'collector_payment_id' => $payment->id,
+            'paid_at' => $payment->paid_on,
+        ])->save();
+
+        return response()->json(['data' => $this->present($invoice->fresh())]);
+    }
+
     /** @return array<string, mixed> */
     private function present(SubscriptionPeriod $p): array
     {
@@ -110,6 +141,10 @@ class BillingReportController extends Controller
             'tenant_id' => $p->tenant_id,
             'company_name' => $p->tenant?->name,
             'days' => $p->days,
+            'amount' => $p->amount !== null ? (float) $p->amount : null,
+            'paid' => $p->isPaid(),
+            'paid_at' => $p->paid_at?->toDateString(),
+            'collector_payment_id' => $p->collector_payment_id,
             'starts_at' => $p->starts_at->toDateString(),
             'ends_at' => $p->ends_at->toDateString(),
         ];

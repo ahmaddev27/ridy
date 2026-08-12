@@ -59,6 +59,8 @@ class CompanyActivationController extends Controller
         }
 
         $days = (int) $tenant->activation_days;
+        $amount = $tenant->activation_amount; // set by the admin at code generation
+        $paid = (bool) $tenant->activation_paid;
         $startsAt = CarbonImmutable::now();
         $endsAt = $startsAt->addDays($days);
 
@@ -70,13 +72,19 @@ class CompanyActivationController extends Controller
             'activation_code' => null,
             'activation_code_expires_at' => null,
             'activation_days' => null,
+            'activation_amount' => null,
+            'activation_paid' => false,
             'activation_attempts' => 0,
         ])->save();
 
-        // Record the paid period as an invoice for billing reports.
+        // Record the period as an invoice. Marked paid immediately if the admin
+        // said so at code generation; otherwise it stays open until a collector
+        // payment settles it.
         SubscriptionPeriod::create([
             'tenant_id' => $tenant->id,
             'days' => $days,
+            'amount' => $amount,
+            'paid_at' => $paid ? $startsAt : null,
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,
         ]);

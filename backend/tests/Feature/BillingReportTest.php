@@ -26,37 +26,66 @@ class BillingReportTest extends TestCase
         return $admin;
     }
 
-    public function test_activating_a_company_generates_an_invoice(): void
+    public function test_generate_with_amount_then_activation_creates_a_paid_invoice(): void
     {
-        $this->seed(RolePermissionSeeder::class);
+        $admin = $this->superAdmin();
         $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
-        $tenant->forceFill([
-            'activation_code' => '654321',
-            'activation_code_expires_at' => now()->addMinutes(2),
-            'activation_days' => 30,
-        ])->save();
         User::create(['name' => 'O', 'email' => 'o@acme.de', 'password' => Hash::make('password'), 'tenant_id' => $tenant->id]);
 
-        $this->postJson('/api/v1/company/activate', ['email' => 'o@acme.de', 'password' => 'password', 'code' => '654321'])->assertOk();
+        // Admin generates the code with amount + already-paid.
+        Sanctum::actingAs($admin);
+        $code = $this->postJson("/api/v1/admin/companies/{$tenant->id}/activation", ['days' => 30, 'amount' => 120, 'paid' => true])
+            ->assertOk()->json('data.code');
+
+        // Company consumes it → the invoice is created, paid, with the amount.
+        $this->postJson('/api/v1/company/activate', ['email' => 'o@acme.de', 'password' => 'password', 'code' => $code])->assertOk();
 
         $invoice = SubscriptionPeriod::first();
-        $this->assertNotNull($invoice);
         $this->assertSame(30, $invoice->days);
-        $this->assertSame($tenant->id, $invoice->tenant_id);
+        $this->assertSame('120.00', $invoice->amount);
+        $this->assertTrue($invoice->isPaid());
     }
 
-    public function test_summary_reports_revenue_and_expiring(): void
+    public function test_unpaid_invoice_is_settled_by_linking_a_collector_payment(): void
+    {
+        Sanctum::actingAs($this->superAdmin());
+        $acme = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $invoice = SubscriptionPeriod::create(['tenant_id' => $acme->id, 'days' => 30, 'amount' => 90, 'starts_at' => now(), 'ends_at' => now()->addDays(30)]);
+        $collector = Collector::create(['name' => 'Ali']);
+        $payment = CollectorPayment::create(['collector_id' => $collector->id, 'tenant_id' => $acme->id, 'amount' => 90, 'paid_on' => '2026-08-10']);
+
+        $this->postJson("/api/v1/admin/subscription-invoices/{$invoice->id}/settle", ['collector_payment_id' => $payment->id])
+            ->assertOk()->assertJsonPath('data.paid', true);
+
+        $this->assertTrue($invoice->fresh()->isPaid());
+        $this->assertSame($payment->id, $invoice->fresh()->collector_payment_id);
+    }
+
+    public function test_settle_rejects_a_payment_from_another_company(): void
+    {
+        Sanctum::actingAs($this->superAdmin());
+        $acme = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $globex = Tenant::create(['name' => 'Globex', 'country' => 'DE']);
+        $invoice = SubscriptionPeriod::create(['tenant_id' => $acme->id, 'days' => 30, 'amount' => 90, 'starts_at' => now(), 'ends_at' => now()->addDays(30)]);
+        $collector = Collector::create(['name' => 'Ali']);
+        $payment = CollectorPayment::create(['collector_id' => $collector->id, 'tenant_id' => $globex->id, 'amount' => 90, 'paid_on' => '2026-08-10']);
+
+        $this->postJson("/api/v1/admin/subscription-invoices/{$invoice->id}/settle", ['collector_payment_id' => $payment->id])
+            ->assertStatus(422);
+        $this->assertFalse($invoice->fresh()->isPaid());
+    }
+
+    public function test_summary_revenue_counts_only_paid_invoices(): void
     {
         Sanctum::actingAs($this->superAdmin());
         $acme = Tenant::create(['name' => 'Acme', 'country' => 'DE', 'status' => 'active', 'activated_at' => now(), 'subscription_ends_at' => now()->addDays(5)]);
-        $collector = Collector::create(['name' => 'Ali']);
-        CollectorPayment::create(['collector_id' => $collector->id, 'tenant_id' => $acme->id, 'amount' => 150, 'paid_on' => '2026-08-03']);
-        CollectorPayment::create(['collector_id' => $collector->id, 'tenant_id' => $acme->id, 'amount' => 50, 'paid_on' => '2026-08-09']);
+        SubscriptionPeriod::create(['tenant_id' => $acme->id, 'days' => 30, 'amount' => 150, 'paid_at' => '2026-08-03', 'starts_at' => now(), 'ends_at' => now()->addDays(30)]);
+        SubscriptionPeriod::create(['tenant_id' => $acme->id, 'days' => 30, 'amount' => 60, 'paid_at' => null, 'starts_at' => now(), 'ends_at' => now()->addDays(30)]);
 
         $res = $this->getJson('/api/v1/admin/reports/billing-summary')->assertOk();
-        $res->assertJsonPath('data.totals.total_revenue', 200)
+        $res->assertJsonPath('data.totals.total_revenue', 150)
+            ->assertJsonPath('data.totals.outstanding', 60)
             ->assertJsonPath('data.revenue_by_month.0.month', '2026-08')
-            ->assertJsonPath('data.revenue_by_month.0.total', 200)
             ->assertJsonPath('data.expiring.0.name', 'Acme');
     }
 
@@ -64,12 +93,14 @@ class BillingReportTest extends TestCase
     {
         Sanctum::actingAs($this->superAdmin());
         $acme = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
-        SubscriptionPeriod::create(['tenant_id' => $acme->id, 'days' => 30, 'starts_at' => now(), 'ends_at' => now()->addDays(30)]);
+        SubscriptionPeriod::create(['tenant_id' => $acme->id, 'days' => 30, 'amount' => 120, 'starts_at' => now(), 'ends_at' => now()->addDays(30)]);
 
-        $this->getJson('/api/v1/admin/subscription-invoices')->assertOk()->assertJsonPath('data.0.company_name', 'Acme');
+        $this->getJson('/api/v1/admin/subscription-invoices')->assertOk()
+            ->assertJsonPath('data.0.company_name', 'Acme')
+            ->assertJsonPath('data.0.paid', false);
 
         $csv = $this->get('/api/v1/admin/subscription-invoices/export');
         $csv->assertOk();
-        $this->assertStringContainsString('Acme', $csv->streamedContent());
+        $this->assertStringContainsString('unpaid', $csv->streamedContent());
     }
 }

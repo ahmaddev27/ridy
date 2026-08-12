@@ -27,6 +27,10 @@ class SubscriptionController extends Controller
     {
         $data = $request->validate([
             'days' => ['required', 'integer', 'min:1', 'max:3650'],
+            // The invoice amount + whether it's already paid, carried onto the
+            // period when the company activates with this code.
+            'amount' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
+            'paid' => ['boolean'],
         ]);
 
         $code = $this->newOtp();
@@ -34,6 +38,8 @@ class SubscriptionController extends Controller
             'activation_code' => $code,
             'activation_code_expires_at' => CarbonImmutable::now()->addMinutes(self::CODE_TTL_MINUTES),
             'activation_days' => $data['days'],
+            'activation_amount' => $data['amount'] ?? null,
+            'activation_paid' => (bool) ($data['paid'] ?? false),
             'activation_attempts' => 0,
         ])->save();
 

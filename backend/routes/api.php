@@ -187,5 +187,6 @@ Route::prefix('v1')->group(function () {
         Route::get('reports/billing-summary', [BillingReportController::class, 'summary']);
         Route::get('subscription-invoices', [BillingReportController::class, 'invoices']);
         Route::get('subscription-invoices/export', [BillingReportController::class, 'invoicesExport']);
+        Route::post('subscription-invoices/{invoice}/settle', [BillingReportController::class, 'settle']);
     });
 });
