@@ -434,3 +434,25 @@ export async function settleInvoice(invoiceId: number, collectorPaymentId: numbe
   );
   return res.data;
 }
+
+// ── Subscription plans ───────────────────────────────────────────────────────
+export type Plan = { id: number; name: string; price: number; duration_days: number; active: boolean };
+export type PlanInput = { name: string; price: number; duration_days: number; active?: boolean };
+
+const planBase = "/api/v1/admin/plans";
+
+export async function listPlans(): Promise<Plan[]> {
+  const res = await apiFetch<{ data: Plan[] }>(planBase);
+  return res.data;
+}
+export async function createPlan(input: PlanInput): Promise<Plan> {
+  const res = await apiFetch<{ data: Plan }>(planBase, { method: "POST", body: input, withCsrf: true });
+  return res.data;
+}
+export async function updatePlan(id: number, input: PlanInput): Promise<Plan> {
+  const res = await apiFetch<{ data: Plan }>(`${planBase}/${id}`, { method: "PUT", body: input, withCsrf: true });
+  return res.data;
+}
+export async function deletePlan(id: number): Promise<void> {
+  await apiFetch(`${planBase}/${id}`, { method: "DELETE", withCsrf: true });
+}

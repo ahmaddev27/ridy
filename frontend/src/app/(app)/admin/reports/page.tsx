@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Wallet, Clock, Download, ReceiptText, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
+import { Wallet, Clock, Download, ReceiptText, CheckCircle2, Loader2, AlertCircle, Package, Plus, Pencil, Trash2 } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Select } from "@/components/ui/select";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
@@ -18,8 +19,13 @@ import {
   settleInvoice,
   listCompanies,
   listCollectorPayments,
+  listPlans,
+  createPlan,
+  updatePlan,
+  deletePlan,
   type SubscriptionInvoice,
   type CollectorPayment,
+  type Plan,
 } from "@/lib/api/admin";
 
 export default function ReportsPage() {
@@ -27,7 +33,13 @@ export default function ReportsPage() {
   const c = (k: string) => t(`screens.subscriptions.${k}`);
   const { data: summary, refetch: refetchSummary } = useAsync(getBillingSummary);
   const { data: companiesData } = useAsync(listCompanies);
+  const { data: plansData, refetch: refetchPlans } = useAsync(listPlans);
   const companies = companiesData ?? [];
+  const plans = plansData ?? [];
+
+  const [editingPlan, setEditingPlan] = useState<Plan | "new" | null>(null);
+  const [deletingPlan, setDeletingPlan] = useState<Plan | null>(null);
+  const [planBusy, setPlanBusy] = useState(false);
 
   const [tenantId, setTenantId] = useState<number | undefined>(undefined);
   const [invoices, setInvoices] = useState<SubscriptionInvoice[]>([]);
@@ -49,6 +61,21 @@ export default function ReportsPage() {
 
   const money = (n: number) => new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
   const maxRevenue = Math.max(1, ...(summary?.revenue_by_month.map((r) => r.total) ?? [0]));
+
+  async function doDeletePlan() {
+    if (!deletingPlan) return;
+    setPlanBusy(true);
+    try {
+      await deletePlan(deletingPlan.id);
+      toast.success(c("planDeleted"));
+      await refetchPlans();
+    } catch (e) {
+      toast.error(c("failed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setPlanBusy(false);
+      setDeletingPlan(null);
+    }
+  }
 
   async function doExport() {
     try {
@@ -75,6 +102,41 @@ export default function ReportsPage() {
         <StatCard icon={CheckCircle2} label={c("activeSubs")} value={summary?.totals.active_subscriptions ?? "…"} tone="positive" />
         <StatCard icon={Clock} label={c("expiringSoon")} value={summary?.totals.expiring_soon ?? "…"} tone="warning" />
       </div>
+
+      {/* Plans — resellers issue codes against these */}
+      <Card className="overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-100 p-4">
+          <div className="flex items-center gap-2">
+            <Package className="h-4 w-4 text-slate-700" />
+            <h3 className="font-semibold text-slate-800">{c("plansTitle")}</h3>
+          </div>
+          <Button variant="secondary" onClick={() => setEditingPlan("new")}>
+            <Plus className="h-4 w-4" /> {c("addPlan")}
+          </Button>
+        </div>
+        {plans.length === 0 ? (
+          <p className="p-5 text-center text-sm text-slate-400">{c("noPlans")}</p>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {plans.map((p) => (
+              <div key={p.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                <div className="flex items-center gap-3">
+                  <span className="font-medium text-slate-800">{p.name}</span>
+                  {!p.active && (
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">{c("planInactive")}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="font-semibold tabular-nums text-slate-800">{money(p.price)}</span>
+                  <span className="tabular-nums text-slate-500">{p.duration_days} {c("planDays")}</span>
+                  <button onClick={() => setEditingPlan(p)} className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Pencil className="h-4 w-4" /></button>
+                  <button onClick={() => setDeletingPlan(p)} className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Revenue by month */}
@@ -206,7 +268,89 @@ export default function ReportsPage() {
           }}
         />
       )}
+
+      {editingPlan && (
+        <PlanModal plan={editingPlan === "new" ? null : editingPlan} onClose={() => setEditingPlan(null)} onSaved={refetchPlans} />
+      )}
+
+      <ConfirmModal
+        open={deletingPlan !== null}
+        danger
+        title={c("deletePlan")}
+        message={c("deletePlanConfirm").replace("{name}", deletingPlan?.name ?? "")}
+        confirmLabel={c("deletePlan")}
+        cancelLabel={c("cancel")}
+        busy={planBusy}
+        onConfirm={doDeletePlan}
+        onCancel={() => setDeletingPlan(null)}
+      />
     </div>
+  );
+}
+
+function PlanModal({ plan, onClose, onSaved }: { plan: Plan | null; onClose: () => void; onSaved: () => void }) {
+  const { t } = useI18n();
+  const c = (k: string) => t(`screens.subscriptions.${k}`);
+  const [name, setName] = useState(plan?.name ?? "");
+  const [price, setPrice] = useState(plan ? String(plan.price) : "");
+  const [days, setDays] = useState(plan ? String(plan.duration_days) : "30");
+  const [active, setActive] = useState(plan?.active ?? true);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    if (!name.trim() || !(Number(days) > 0)) return;
+    setBusy(true);
+    try {
+      const input = { name: name.trim(), price: Number(price) || 0, duration_days: Number(days), active };
+      if (plan) await updatePlan(plan.id, input);
+      else await createPlan(input);
+      toast.success(c("planSaved"));
+      onSaved();
+      onClose();
+    } catch (e) {
+      toast.error(c("failed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const inputCls = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200";
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={plan ? c("editPlan") : c("addPlan")}
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose} disabled={busy}>{c("cancel")}</Button>
+          <Button onClick={save} disabled={busy || !name.trim()}>
+            {busy && <Loader2 className="h-4 w-4 animate-spin" />}{c("save")}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-3 text-start">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">{c("planName")}</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">{c("planPrice")}</label>
+            <input type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">{c("planDuration")}</label>
+            <input type="number" min={1} value={days} onChange={(e) => setDays(e.target.value)} className={inputCls} />
+          </div>
+        </div>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="h-4 w-4" />
+          {c("planActive")}
+        </label>
+      </div>
+    </Modal>
   );
 }
 
