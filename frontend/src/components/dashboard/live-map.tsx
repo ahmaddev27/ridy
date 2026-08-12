@@ -16,15 +16,27 @@ function escapeHtml(s: string): string {
 const STATUS_COLOR = (status: string | null): string => PRESENCE_COLOR[presence(status)];
 const statusLabel = (status: string | null, c: (k: string) => string): string => c(PRESENCE_LABEL_KEY[presence(status)]);
 
-/** A realistic top-view car marker, filled with the status color. */
+/** A glossy top-view car marker, shaded with the status color. */
 function carMarkerHtml(color: string): string {
+  const gid = "g" + color.replace("#", "");
   return (
-    `<div style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))">` +
-    `<svg width="34" height="34" viewBox="0 0 48 48" fill="none">` +
-    `<path d="M17 5h14c2.1 0 3.8 1.4 4.1 3.4L37 19v20c0 1.7-1.3 3-3 3h-2c-1.7 0-3-1.3-3-3v-1H19v1c0 1.7-1.3 3-3 3h-2c-1.7 0-3-1.3-3-3V19l1.9-10.6C13.2 6.4 14.9 5 17 5z" fill="${color}"/>` +
-    `<rect x="16" y="9" width="16" height="8" rx="2.5" fill="#ffffff" opacity="0.92"/>` +
-    `<rect x="16" y="31" width="16" height="5" rx="2" fill="#000000" opacity="0.18"/>` +
-    `<circle cx="15" cy="23" r="2" fill="#ffffff" opacity="0.9"/><circle cx="33" cy="23" r="2" fill="#ffffff" opacity="0.9"/>` +
+    `<div style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))">` +
+    `<svg width="36" height="36" viewBox="0 0 48 48" fill="none">` +
+    `<defs>` +
+    `<linearGradient id="${gid}" x1="10" y1="4" x2="38" y2="44" gradientUnits="userSpaceOnUse">` +
+    `<stop stop-color="${color}"/><stop offset="1" stop-color="${color}" stop-opacity="0.72"/>` +
+    `</linearGradient>` +
+    `</defs>` +
+    // Tyres
+    `<rect x="8" y="12" width="4" height="8" rx="2" fill="#1f2937"/><rect x="36" y="12" width="4" height="8" rx="2" fill="#1f2937"/>` +
+    `<rect x="8" y="28" width="4" height="8" rx="2" fill="#1f2937"/><rect x="36" y="28" width="4" height="8" rx="2" fill="#1f2937"/>` +
+    // Body
+    `<path d="M17 4.5h14c2.2 0 4 1.5 4.3 3.6L37 19v20c0 1.9-1.5 3.5-3.5 3.5S30 40.9 30 39v-.5H18V39c0 1.9-1.5 3.5-3.5 3.5S11 40.9 11 39V19l1.7-10.9C13 6 14.8 4.5 17 4.5z" fill="url(#${gid})" stroke="rgba(0,0,0,.15)" stroke-width="0.6"/>` +
+    // Windshield / roof glass
+    `<path d="M17 8.5h14c1 0 1.8.7 2 1.7l.8 4.3c.15.9-.5 1.7-1.4 1.7H15.6c-.9 0-1.55-.8-1.4-1.7l.8-4.3c.2-1 1-1.7 2-1.7z" fill="#0f172a" opacity="0.88"/>` +
+    `<rect x="16" y="30" width="16" height="6" rx="2" fill="#0f172a" opacity="0.5"/>` +
+    // Roof highlight
+    `<rect x="20" y="19" width="8" height="9" rx="2" fill="#ffffff" opacity="0.16"/>` +
     `</svg></div>`
   );
 }
