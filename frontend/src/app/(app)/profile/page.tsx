@@ -66,7 +66,7 @@ export default function ProfilePage() {
 
       <div className="flex w-full flex-col gap-4 md:flex-row">
         {/* Side tabs */}
-        <nav className="flex gap-1 overflow-x-auto rounded-xl bg-slate-50 p-1 md:w-48 md:flex-col md:gap-1 md:bg-transparent md:p-0">
+        <nav className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200/70 bg-slate-50 p-1.5 md:h-fit md:w-48 md:flex-col md:gap-1">
           {([
             { k: "info", icon: User },
             { k: "password", icon: KeyRound },

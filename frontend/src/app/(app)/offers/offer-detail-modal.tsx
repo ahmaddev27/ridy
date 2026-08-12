@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { X, MapPin, Flag, User, CircleDollarSign, Clock, Loader2 } from "lucide-react";
+import { X, MapPin, Flag, User, CircleDollarSign, Clock, Loader2, Route, Gauge, Wallet } from "lucide-react";
 import { StatCard } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n/context";
 import { getOffer, type DispatchOfferDetail } from "@/lib/api/offers";
@@ -111,14 +111,16 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
                   />
                   <div className="grid grid-cols-3 gap-3">
                     <StatCard
+                      icon={Route}
                       label={c("distance")}
                       value={offer.trip.distance_km != null ? `${offer.trip.distance_km} km` : "—"}
                     />
                     <StatCard
+                      icon={Gauge}
                       label={c("pricePerKm")}
                       value={offer.trip.price_per_km != null ? `${offer.trip.price_per_km.toFixed(2)} €/km` : "—"}
                     />
-                    <StatCard label={c("colFare")} value={offer.fare_formatted ?? "—"} />
+                    <StatCard icon={Wallet} label={c("colFare")} value={offer.fare_formatted ?? "—"} />
                   </div>
                 </div>
               )}
