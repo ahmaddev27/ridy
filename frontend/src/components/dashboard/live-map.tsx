@@ -67,6 +67,9 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
         const color = STATUS_COLOR(d.status);
         points.push([d.lat, d.lng]);
 
+        // A soft halo ring around each driver so they stand out on the map.
+        L.circleMarker([d.lat, d.lng], { radius: 22, color, weight: 2, opacity: 0.5, fillColor: color, fillOpacity: 0.12 }).addTo(layer);
+
         const icon = L.divIcon({
           className: "",
           iconSize: [18, 18],
@@ -102,7 +105,9 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
       if (firstFitRef.current && points.length > 0) {
         firstFitRef.current = false;
-        map.fitBounds(points, { padding: [50, 50], maxZoom: 14 });
+        // Zoom in close on the drivers (tighter than a country-wide view).
+        map.fitBounds(points, { padding: [60, 60], maxZoom: 15 });
+        if (points.length === 1) map.setView(points[0], 15);
       }
     }
 
