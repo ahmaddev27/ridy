@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Users, Wifi, Link2, Car, Radio, AlertTriangle } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/card";
 import { AreaChart } from "@/components/charts/area-chart";
@@ -58,32 +59,24 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Subscription */}
+      {/* Subscription — compact radial gauge */}
       {data?.subscription && (
-        <Card className="p-5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h3 className="mb-1 font-semibold text-slate-800">{k("subTitle")}</h3>
-              <div className="flex items-center gap-2">
-                <span
-                  className={
-                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold " +
-                    (data.subscription.state === null
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-amber-50 text-amber-700")
-                  }
-                >
-                  <span className={`h-1.5 w-1.5 rounded-full ${data.subscription.state === null ? "bg-emerald-500" : "bg-amber-500"}`} />
-                  {data.subscription.state === null ? k("subActive") : k("subInactive")}
-                </span>
-                {data.subscription.days_left !== null && (
-                  <span className="text-sm text-slate-500">
-                    {k("subDaysLeft").replace("{n}", String(data.subscription.days_left))}
-                  </span>
-                )}
-              </div>
+        <Card className="inline-flex w-full items-center gap-5 p-5 sm:w-auto">
+          <SubscriptionRing subscription={data.subscription} activeLabel={k("subActive")} inactiveLabel={k("subInactive")} daysLabel={k("subDaysShort")} />
+          <div className="min-w-0">
+            <h3 className="font-semibold text-slate-800">{k("subTitle")}</h3>
+            <div className="mt-1.5 flex items-center gap-2">
+              <span
+                className={
+                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold " +
+                  (data.subscription.state === null ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")
+                }
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${data.subscription.state === null ? "bg-emerald-500" : "bg-amber-500"}`} />
+                {data.subscription.state === null ? k("subActive") : k("subInactive")}
+              </span>
             </div>
-            <div className="flex gap-6 text-sm">
+            <div className="mt-3 flex gap-5 text-sm">
               <div>
                 <div className="text-xs text-slate-400">{k("subActivated")}</div>
                 <div className="font-medium text-slate-700">
@@ -98,14 +91,6 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-          {data.subscription.ends_at && data.subscription.days_left !== null && (
-            <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                className={`h-full rounded-full ${data.subscription.days_left <= 3 ? "bg-rose-500" : data.subscription.days_left <= 7 ? "bg-amber-500" : "bg-emerald-500"}`}
-                style={{ width: `${Math.min(100, Math.max(4, (data.subscription.days_left / 30) * 100))}%` }}
-              />
-            </div>
-          )}
         </Card>
       )}
 
@@ -162,6 +147,66 @@ export default function DashboardPage() {
       <div>
         <h3 className="mb-3 font-semibold text-slate-800">{t("pages.map.title")}</h3>
         <LiveMap heightClass="h-[420px]" />
+      </div>
+    </div>
+  );
+}
+
+type SubInfo = {
+  state: "disabled" | "banned" | "expired" | "inactive" | null;
+  days_left: number | null;
+  activated_at: string | null;
+  ends_at: string | null;
+};
+
+/** Compact radial gauge of the subscription — animates its fill on mount. */
+function SubscriptionRing({
+  subscription,
+  daysLabel,
+}: {
+  subscription: SubInfo;
+  activeLabel: string;
+  inactiveLabel: string;
+  daysLabel: string;
+}) {
+  const left = Math.max(0, subscription.days_left ?? 0);
+  const total =
+    subscription.activated_at && subscription.ends_at
+      ? Math.max(1, Math.round((new Date(subscription.ends_at).getTime() - new Date(subscription.activated_at).getTime()) / 86_400_000))
+      : 30;
+  const frac = Math.min(1, left / total);
+
+  const r = 34;
+  const circ = 2 * Math.PI * r;
+  const color = left <= 3 ? "#e11d48" : left <= 7 ? "#d97706" : "#059669";
+
+  // Animate from empty to the target the first time it mounts (fills on reload).
+  const [offset, setOffset] = useState(circ);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setOffset(circ * (1 - frac)));
+    return () => cancelAnimationFrame(id);
+  }, [circ, frac]);
+
+  return (
+    <div className="relative h-24 w-24 shrink-0">
+      <svg viewBox="0 0 80 80" className="h-24 w-24 -rotate-90">
+        <circle cx="40" cy="40" r={r} fill="none" stroke="#e2e8f0" strokeWidth="7" />
+        <circle
+          cx="40"
+          cy="40"
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth="7"
+          strokeLinecap="round"
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 900ms cubic-bezier(0.22,1,0.36,1)" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-bold tabular-nums text-slate-900">{left}</span>
+        <span className="text-[10px] font-medium text-slate-400">{daysLabel}</span>
       </div>
     </div>
   );
