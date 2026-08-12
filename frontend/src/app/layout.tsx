@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Inter, Tajawal } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "sonner";
 import { I18nProvider } from "@/lib/i18n/context";
 import { ThemeProvider } from "@/lib/theme/context";
+import { ThemedToaster } from "@/components/ui/themed-toaster";
 import { InitialLoader } from "@/components/brand/initial-loader";
 
 // Runs before paint to set the `.dark` class from the saved/system preference,
@@ -34,9 +34,9 @@ export default function RootLayout({
       <body className="min-h-full bg-canvas text-ink antialiased">
         <ThemeProvider>
           <I18nProvider>{children}</I18nProvider>
+          <ThemedToaster />
         </ThemeProvider>
         <InitialLoader />
-        <Toaster position="bottom-right" richColors closeButton />
       </body>
     </html>
   );
