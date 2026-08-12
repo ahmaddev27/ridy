@@ -50,6 +50,12 @@ class DriverController extends Controller
         return response()->json(['data' => $drivers]);
     }
 
+    /** A single driver (tenant-scoped by route-model binding) for the profile page. */
+    public function show(Driver $driver): DriverResource
+    {
+        return new DriverResource($driver);
+    }
+
     /** Work stats for one driver, computed from our own offers/acceptance data. */
     public function stats(Request $request, Driver $driver, DriverStatsService $stats): JsonResponse
     {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Users, Star, RefreshCw } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,16 +12,15 @@ import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { listDrivers, syncDrivers, type Driver } from "@/lib/api/drivers";
 import { syncRosterViaExtension, fetchDriverStatusesViaExtension } from "@/lib/extension";
-import { DriverDetailModal } from "./driver-detail-modal";
 
 export default function DriversPage() {
   const { t } = useI18n();
+  const router = useRouter();
   // Poll the (cheap, DB-backed) roster list so linked/status changes surface
   // without a manual refresh. The heavier Uber pull still runs only on mount.
   const { data, loading, error, refetch } = useAsync(listDrivers, { refetchInterval: 15000 });
   const drivers = data ?? [];
   const [syncing, setSyncing] = useState(false);
-  const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const didAutoSync = useRef(false);
 
   async function runSync() {
@@ -112,7 +112,7 @@ export default function DriversPage() {
                 {drivers.map((d) => (
                   <tr
                     key={d.id}
-                    onClick={() => setSelectedDriver(d)}
+                    onClick={() => router.push(`/drivers/${d.id}`)}
                     className="cursor-pointer hover:bg-slate-50"
                   >
                     <td className="px-4 py-3">
@@ -181,10 +181,6 @@ export default function DriversPage() {
           </div>
         )}
       </Card>
-
-      {selectedDriver && (
-        <DriverDetailModal driver={selectedDriver} onClose={() => setSelectedDriver(null)} />
-      )}
     </div>
   );
 }

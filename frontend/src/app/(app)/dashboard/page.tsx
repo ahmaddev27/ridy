@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { Users, Wifi, Link2, Car, Radio, AlertTriangle } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/card";
 import { AreaChart } from "@/components/charts/area-chart";
 import { Badge, type Status } from "@/components/ui/badge";
@@ -36,20 +35,23 @@ export default function DashboardPage() {
       )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <StatCard label={k("statDrivers")} value={loading ? "…" : (data?.drivers ?? 0)} />
+        <StatCard icon={Users} label={k("statDrivers")} value={loading ? "…" : (data?.drivers ?? 0)} />
         <StatCard
+          icon={Wifi}
           label={k("statOnline")}
           value={loading ? "…" : (data?.online_drivers ?? 0)}
           tone={data?.online_drivers ? "positive" : "default"}
         />
         <StatCard
+          icon={Link2}
           label={k("statLinked")}
           value={loading ? "…" : (data?.linked_drivers ?? 0)}
           tone="positive"
         />
-        <StatCard label={k("statVehicles")} value={loading ? "…" : (data?.vehicles ?? 0)} />
-        <StatCard label={k("statOffersToday")} value={loading ? "…" : (data?.offers_today ?? 0)} />
+        <StatCard icon={Car} label={k("statVehicles")} value={loading ? "…" : (data?.vehicles ?? 0)} />
+        <StatCard icon={Radio} label={k("statOffersToday")} value={loading ? "…" : (data?.offers_today ?? 0)} />
         <StatCard
+          icon={AlertTriangle}
           label={k("statUnlinked")}
           value={loading ? "…" : (data?.unlinked_offers ?? 0)}
           tone={data?.unlinked_offers ? "warning" : "default"}
@@ -107,10 +109,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Live online drivers */}
-      <OnlineDrivers />
-
-      {/* Offers trend · fleet session · drivers — side by side on wide screens */}
+      {/* Offers trend · fleet session · online drivers — side by side on wide screens */}
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="p-5">
           <h3 className="mb-4 font-semibold text-slate-800">{k("offersTrend")}</h3>
@@ -155,24 +154,8 @@ export default function DashboardPage() {
           )}
         </Card>
 
-        <Card>
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
-            <h3 className="font-semibold text-slate-800">{k("driversTitle")}</h3>
-            <Link
-              href="/drivers"
-              className="flex items-center gap-1 text-sm font-medium text-slate-900 hover:text-slate-800"
-            >
-              {k("manageDrivers")} <ArrowRight className="h-4 w-4 rtl:rotate-180" />
-            </Link>
-          </div>
-          <div className="px-5 py-4 text-sm text-slate-500">
-            {loading
-              ? t("common.loading")
-              : k("driversSummary")
-                  .replace("{linked}", String(data?.linked_drivers ?? 0))
-                  .replace("{total}", String(data?.drivers ?? 0))}
-          </div>
-        </Card>
+        {/* Online drivers — replaces the old drivers/offers summary card */}
+        <OnlineDrivers />
       </div>
 
       {/* Live fleet map — embedded (same component as the standalone page) */}
