@@ -39,6 +39,8 @@ class DriverController extends Controller
             ->map(fn (Driver $d) => [
                 'id' => $d->id,
                 'name' => $d->name,
+                'phone' => $d->phone,
+                'picture' => $d->uber_picture_url,
                 'status' => $d->online_status,
                 'lat' => (float) $d->latitude,
                 'lng' => (float) $d->longitude,

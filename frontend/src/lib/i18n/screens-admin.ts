@@ -22,9 +22,10 @@ const en: Dict = {
   users: {
     colUser: "User", colPhone: "Phone", colRole: "Role", colCompany: "Company", colStatus: "Status",
     emptyTitle: "No users", emptyDesc: "Users appear here as companies register and resellers are added.",
-    role_super_admin: "Admin", role_fleet_manager: "Manager", role_owner: "Owner", role_reseller: "Reseller", role_driver: "Driver", role_viewer: "Viewer", role_user: "User",
+    role_super_admin: "Admin", role_fleet_manager: "Fleet Manager", role_owner: "Owner", role_reseller: "Reseller", role_driver: "Driver", role_viewer: "Viewer", role_user: "User",
     st_active: "Active", st_disabled: "Disabled", st_banned: "Banned", st_expired: "Expired", st_inactive: "Not activated",
     searchPlaceholder: "Search name, email, phone…", none: "—",
+    filterRole: "Role", allRoles: "All roles", delete: "Delete", deleteConfirm: "Delete user {name}? Their login is removed permanently.", deleted: "User deleted", deleteFailed: "Could not delete", cancel: "Cancel",
   },
   subscriptions: {
     totalRevenue: "Total revenue", activeSubs: "Active subscriptions", expiringSoon: "Expiring soon",
@@ -158,9 +159,10 @@ const de: Dict = {
   users: {
     colUser: "Benutzer", colPhone: "Telefon", colRole: "Rolle", colCompany: "Firma", colStatus: "Status",
     emptyTitle: "Keine Benutzer", emptyDesc: "Benutzer erscheinen hier, wenn Firmen sich registrieren und Vertriebler hinzugefügt werden.",
-    role_super_admin: "Admin", role_fleet_manager: "Manager", role_owner: "Inhaber", role_reseller: "Vertriebler", role_driver: "Fahrer", role_viewer: "Betrachter", role_user: "Benutzer",
+    role_super_admin: "Admin", role_fleet_manager: "Fleet Manager", role_owner: "Inhaber", role_reseller: "Vertriebler", role_driver: "Fahrer", role_viewer: "Betrachter", role_user: "Benutzer",
     st_active: "Aktiv", st_disabled: "Deaktiviert", st_banned: "Gesperrt", st_expired: "Abgelaufen", st_inactive: "Nicht aktiviert",
     searchPlaceholder: "Name, E-Mail, Telefon suchen…", none: "—",
+    filterRole: "Rolle", allRoles: "Alle Rollen", delete: "Löschen", deleteConfirm: "Benutzer {name} löschen? Der Login wird dauerhaft entfernt.", deleted: "Benutzer gelöscht", deleteFailed: "Konnte nicht löschen", cancel: "Abbrechen",
   },
   subscriptions: {
     totalRevenue: "Gesamtumsatz", activeSubs: "Aktive Abos", expiringSoon: "Läuft bald ab",
@@ -292,9 +294,10 @@ const ar: Dict = {
   users: {
     colUser: "المستخدم", colPhone: "الجوال", colRole: "النوع", colCompany: "الشركة", colStatus: "الحالة",
     emptyTitle: "لا مستخدمين", emptyDesc: "المستخدمون بيبانوا هون مع تسجيل الشركات وإضافة الموزّعين.",
-    role_super_admin: "أدمن", role_fleet_manager: "مدير", role_owner: "مالك", role_reseller: "موزّع", role_driver: "سائق", role_viewer: "مشاهد", role_user: "مستخدم",
+    role_super_admin: "أدمن", role_fleet_manager: "مدير أسطول", role_owner: "مالك", role_reseller: "موزّع", role_driver: "سائق", role_viewer: "مشاهد", role_user: "مستخدم",
     st_active: "نشط", st_disabled: "معطّل", st_banned: "محظور", st_expired: "منتهٍ", st_inactive: "غير مفعّل",
     searchPlaceholder: "ابحث بالاسم/الإيميل/الجوال…", none: "—",
+    filterRole: "النوع", allRoles: "كل الأنواع", delete: "حذف", deleteConfirm: "حذف المستخدم {name}؟ بينحذف حسابه نهائياً.", deleted: "تم حذف المستخدم", deleteFailed: "تعذّر الحذف", cancel: "إلغاء",
   },
   subscriptions: {
     totalRevenue: "إجمالي الإيرادات", activeSubs: "اشتراكات نشطة", expiringSoon: "قربت تنتهي",

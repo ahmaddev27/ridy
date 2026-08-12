@@ -4,26 +4,26 @@ import "leaflet/dist/leaflet.css";
 import { latnLocale } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap, LayerGroup } from "leaflet";
-import { Radio, RefreshCw, Car } from "lucide-react";
+import { Radio, RefreshCw } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { getLiveDrivers, type LiveDriver } from "@/lib/api/drivers";
-
-const STATUS_COLOR = (status: string | null): string => {
-  const s = (status ?? "").toUpperCase();
-  if (s.includes("ON_TRIP")) return "#10b981"; // rider aboard
-  if (s.includes("EN_ROUTE")) return "#f59e0b"; // heading to pickup
-  return "#64748b";
-};
+import { presence, PRESENCE_COLOR, PRESENCE_TONE, PRESENCE_LABEL_KEY, type Presence } from "@/lib/driver-status";
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch] ?? ch);
 }
 
-function statusLabel(status: string | null, c: (k: string) => string): string {
-  const s = (status ?? "").toUpperCase();
-  if (s.includes("ON_TRIP")) return c("onTrip");
-  if (s.includes("EN_ROUTE")) return c("enRoute");
-  return c("active");
+const STATUS_COLOR = (status: string | null): string => PRESENCE_COLOR[presence(status)];
+const statusLabel = (status: string | null, c: (k: string) => string): string => c(PRESENCE_LABEL_KEY[presence(status)]);
+
+/** A car marker (white pin, colored by status) as a Leaflet divIcon HTML string. */
+function carMarkerHtml(color: string): string {
+  return (
+    `<span style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9999px;background:#fff;border:2px solid ${color};box-shadow:0 1px 5px rgba(0,0,0,.35)">` +
+    `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">` +
+    `<path d="M19 17h2l-1.5-5.5A2 2 0 0 0 17.6 10H6.4a2 2 0 0 0-1.9 1.5L3 17h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>` +
+    `</svg></span>`
+  );
 }
 
 /**
@@ -75,13 +75,13 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
         points.push([d.lat, d.lng]);
 
         // A soft halo ring around each driver so they stand out on the map.
-        L.circleMarker([d.lat, d.lng], { radius: 22, color, weight: 2, opacity: 0.5, fillColor: color, fillOpacity: 0.12 }).addTo(layer);
+        L.circleMarker([d.lat, d.lng], { radius: 24, color, weight: 2, opacity: 0.5, fillColor: color, fillOpacity: 0.12 }).addTo(layer);
 
         const icon = L.divIcon({
           className: "",
-          iconSize: [18, 18],
-          iconAnchor: [9, 9],
-          html: `<span style="display:block;width:18px;height:18px;border-radius:9999px;background:${color};border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)"></span>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
+          html: carMarkerHtml(color),
         });
         L.marker([d.lat, d.lng], { icon })
           .bindPopup(`<b>${escapeHtml(d.name)}</b><br>${escapeHtml(statusLabel(d.status, c))}`)
@@ -159,24 +159,38 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
       {/* Driver list — click to zoom onto one */}
       {drivers.length > 0 && (
         <div className="pointer-events-auto absolute top-3 z-[1000] max-h-[calc(100%-1.5rem)] w-56 overflow-y-auto rounded-xl bg-white/95 p-1.5 shadow-md backdrop-blur ltr:right-3 rtl:left-3">
-          {drivers.map((dr) => (
-            <button
-              key={dr.id}
-              onClick={() => focusDriver(dr)}
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start transition-colors hover:bg-slate-100"
-            >
-              <span
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                style={{ background: `${STATUS_COLOR(dr.status)}1a`, color: STATUS_COLOR(dr.status) }}
+          {drivers.map((dr) => {
+            const p: Presence = presence(dr.status);
+            return (
+              <button
+                key={dr.id}
+                onClick={() => focusDriver(dr)}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start transition-colors hover:bg-slate-100"
               >
-                <Car className="h-4 w-4" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-slate-800">{dr.name}</span>
-                <span className="block text-[11px] text-slate-400">{statusLabel(dr.status, c)}</span>
-              </span>
-            </button>
-          ))}
+                <span className="relative shrink-0">
+                  {dr.picture ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={dr.picture} alt="" className="h-9 w-9 rounded-full object-cover" />
+                  ) : (
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
+                      {dr.name.slice(0, 2).toUpperCase()}
+                    </span>
+                  )}
+                  <span
+                    className="absolute -bottom-0.5 h-3 w-3 rounded-full border-2 border-white ltr:-right-0.5 rtl:-left-0.5"
+                    style={{ background: PRESENCE_COLOR[p] }}
+                  />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-slate-800">{dr.name}</span>
+                  {dr.phone && <span className="block truncate text-[11px] text-slate-400" dir="ltr">{dr.phone}</span>}
+                </span>
+                <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${PRESENCE_TONE[p]}`}>
+                  {c(PRESENCE_LABEL_KEY[p])}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
 
