@@ -40,8 +40,12 @@ export type DriverStats = {
 };
 
 /** Work stats computed from our own captured offers/acceptance data. */
-export async function getDriverStats(id: number): Promise<DriverStats> {
-  const res = await apiFetch<{ data: DriverStats }>(`/api/v1/drivers/${id}/stats`);
+export async function getDriverStats(id: number, from?: string, to?: string): Promise<DriverStats> {
+  const p = new URLSearchParams();
+  if (from) p.set("from", from);
+  if (to) p.set("to", to);
+  const qs = p.toString();
+  const res = await apiFetch<{ data: DriverStats }>(`/api/v1/drivers/${id}/stats${qs ? `?${qs}` : ""}`);
   return res.data;
 }
 

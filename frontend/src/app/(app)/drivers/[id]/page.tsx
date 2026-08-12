@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ChevronLeft, Phone, Mail, MessageSquare, Star, Car, UserCheck, Loader2, Wallet, Clock, MapPin, Gauge } from "lucide-react";
+import { ChevronLeft, Phone, Mail, Star, Car, UserCheck, Loader2, Wallet, Clock, MapPin, Gauge } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n/context";
 import { getDriver, getDriverStats, type Driver, type DriverStats } from "@/lib/api/drivers";
 import { fetchDriverMetricsViaExtension, type DriverMetrics } from "@/lib/extension";
 
-type RangeKey = "today" | "yesterday" | "7" | "30";
+type RangeKey = "today" | "yesterday" | "7" | "30" | "custom";
 
 function num(v: number | string | null | undefined): number | null {
   if (v == null) return null;
@@ -60,23 +60,41 @@ export default function DriverProfilePage() {
   const [stats, setStats] = useState<DriverStats | null>(null);
   const [tab, setTab] = useState<"performance" | "details">("performance");
   const [range, setRange] = useState<RangeKey>("today");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [metrics, setMetrics] = useState<DriverMetrics | null>(null);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
 
   useEffect(() => {
     getDriver(id).then(setDriver).catch(() => setDriver(null));
-    getDriverStats(id).then(setStats).catch(() => setStats(null));
   }, [id]);
 
+  // The active window (ms for Uber metrics, Y-M-D for our stats), from a preset
+  // or a custom from→to range.
+  const win = useMemo(() => {
+    if (range === "custom") {
+      const fromMs = customFrom ? new Date(customFrom).getTime() : Date.now() - 7 * 86_400_000;
+      const toMs = customTo ? new Date(customTo).getTime() + 86_400_000 : Date.now(); // include the "to" day
+      return { fromMs, toMs, fromDate: customFrom || undefined, toDate: customTo || undefined };
+    }
+    const { from, to } = rangeMs(range);
+    return { fromMs: from, toMs: to, fromDate: new Date(from).toISOString().slice(0, 10), toDate: new Date(to).toISOString().slice(0, 10) };
+  }, [range, customFrom, customTo]);
+
+  // Our own stats respect the same window.
+  useEffect(() => {
+    getDriverStats(id, win.fromDate, win.toDate).then(setStats).catch(() => setStats(null));
+  }, [id, win.fromDate, win.toDate]);
+
+  // Uber performance metrics for the window (via the extension).
   useEffect(() => {
     if (!driver?.uber_driver_uuid) return;
-    const { from, to } = rangeMs(range);
     setLoadingMetrics(true);
     setMetrics(null);
-    fetchDriverMetricsViaExtension(driver.uber_driver_uuid, from, to)
+    fetchDriverMetricsViaExtension(driver.uber_driver_uuid, win.fromMs, win.toMs)
       .then(setMetrics)
       .finally(() => setLoadingMetrics(false));
-  }, [driver?.uber_driver_uuid, range]);
+  }, [driver?.uber_driver_uuid, win.fromMs, win.toMs]);
 
   const derived = useMemo(() => {
     if (!metrics) return null;
@@ -101,46 +119,30 @@ export default function DriverProfilePage() {
         <ChevronLeft className="h-4 w-4 rtl:rotate-180" /> {d("backToDrivers")}
       </Link>
 
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-4">
-          {driver?.picture_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={driver.picture_url} alt="" className="h-20 w-20 rounded-full object-cover ring-2 ring-white shadow" />
-          ) : (
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-200 text-2xl font-semibold text-slate-700">
-              {driver?.name?.slice(0, 1) ?? "?"}
+      {/* Header — grounded in a card */}
+      <Card className="flex items-center gap-4 p-5">
+        {driver?.picture_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={driver.picture_url} alt="" className="h-20 w-20 rounded-full object-cover ring-2 ring-white shadow" />
+        ) : (
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-200 text-2xl font-semibold text-slate-700">
+            {driver?.name?.slice(0, 1) ?? "?"}
+          </div>
+        )}
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">{driver?.name ?? "…"}</h1>
+          {status && (
+            <div className="mt-1 flex items-center gap-2 text-sm">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                {driver?.active ? d("active") : d("inactive")}
+              </span>
+              <span className="text-slate-300">·</span>
+              <span className={`font-medium ${status.tone}`}>{status.text}</span>
             </div>
           )}
-          <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
-              {driver?.name ?? "…"}
-              {driver?.phone && <Phone className="h-4 w-4 text-blue-500" />}
-            </h1>
-            {status && (
-              <div className="mt-1 flex items-center gap-2 text-sm">
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                  {driver?.active ? d("active") : d("inactive")}
-                </span>
-                <span className="text-slate-300">·</span>
-                <span className={`font-medium ${status.tone}`}>{status.text}</span>
-              </div>
-            )}
-          </div>
+          {driver?.phone && <p className="mt-1 text-sm text-slate-400" dir="ltr">{driver.phone}</p>}
         </div>
-        <div className="flex items-center gap-2">
-          {driver?.uber_email && (
-            <a href={`mailto:${driver.uber_email}`} className="rounded-full border border-slate-200 p-2.5 text-slate-500 hover:bg-slate-50" title={d("email")}>
-              <Mail className="h-4 w-4" />
-            </a>
-          )}
-          {driver?.phone && (
-            <a href={`tel:${driver.phone}`} className="rounded-full border border-slate-200 p-2.5 text-slate-500 hover:bg-slate-50" title={d("colPhone")}>
-              <MessageSquare className="h-4 w-4" />
-            </a>
-          )}
-        </div>
-      </div>
+      </Card>
 
       {/* Tabs (Uber-style underline) */}
       <div className="flex gap-6 border-b border-slate-200">
@@ -172,6 +174,7 @@ export default function DriverProfilePage() {
                 { k: "yesterday", label: d("yesterday") },
                 { k: "7", label: `7${d("daysShort")}` },
                 { k: "30", label: `30${d("daysShort")}` },
+                { k: "custom", label: d("customRange") },
               ] as const).map(({ k, label }) => (
                 <button
                   key={k}
@@ -183,6 +186,20 @@ export default function DriverProfilePage() {
               ))}
             </div>
           </div>
+
+          {/* Custom from → to */}
+          {range === "custom" && (
+            <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-medium text-slate-500">{d("from")}</span>
+                <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-slate-900" />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-medium text-slate-500">{d("to")}</span>
+                <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-slate-900" />
+              </label>
+            </div>
+          )}
 
           {!driver?.uber_driver_uuid ? (
             <Card className="p-6 text-center text-sm text-slate-400">{d("notLinkedNoMetrics")}</Card>
