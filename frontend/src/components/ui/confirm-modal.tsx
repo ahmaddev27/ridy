@@ -40,36 +40,36 @@ export function ConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4 backdrop-blur-sm"
       onClick={() => !busy && onCancel()}
     >
       <div
-        className="w-full max-w-sm overflow-hidden rounded-2xl bg-white text-start shadow-xl"
+        className="w-full max-w-sm overflow-hidden rounded-2xl bg-surface text-start shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-5">
           <div className="flex items-start gap-3">
             <span
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                danger ? "bg-rose-100 text-rose-600" : "bg-slate-200 text-slate-900"
+                danger ? "bg-danger-bg text-danger-fg" : "bg-surface-2 text-ink"
               }`}
             >
               <AlertTriangle className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="font-semibold text-slate-900">{title}</h2>
-              <p className="mt-1 text-sm text-slate-500">{message}</p>
+              <h2 className="font-semibold text-ink">{title}</h2>
+              <p className="mt-1 text-sm text-ink-muted">{message}</p>
             </div>
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3">
           <Button variant="secondary" onClick={onCancel} disabled={busy}>
             {cancelLabel}
           </Button>
           <Button
             onClick={onConfirm}
             disabled={busy}
-            className={danger ? "bg-rose-600 hover:bg-rose-700" : undefined}
+            className={danger ? "bg-danger-ring text-white hover:opacity-90" : undefined}
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
             {confirmLabel}

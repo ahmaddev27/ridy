@@ -3,7 +3,12 @@ import { Inter, Tajawal } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { I18nProvider } from "@/lib/i18n/context";
+import { ThemeProvider } from "@/lib/theme/context";
 import { InitialLoader } from "@/components/brand/initial-loader";
+
+// Runs before paint to set the `.dark` class from the saved/system preference,
+// avoiding a light→dark flash on load. Kept tiny and dependency-free.
+const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();`;
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 // Arabic UI font — applied via CSS when the document is in Arabic/RTL.
@@ -23,8 +28,13 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${inter.variable} ${tajawal.variable} h-full`}>
-      <body className="min-h-full bg-slate-50 text-slate-900 antialiased">
-        <I18nProvider>{children}</I18nProvider>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="min-h-full bg-canvas text-ink antialiased">
+        <ThemeProvider>
+          <I18nProvider>{children}</I18nProvider>
+        </ThemeProvider>
         <InitialLoader />
         <Toaster position="bottom-right" richColors closeButton />
       </body>
