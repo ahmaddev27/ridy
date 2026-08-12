@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Spatie\Permission\Models\Role;
 
 /**
  * Super-admin management of cash collectors. A collector may optionally have a
@@ -103,6 +104,8 @@ class CollectorController extends Controller
             'password' => Hash::make($password ?: Str::random(24)),
             'tenant_id' => null,
         ]);
+        // Ensure the role exists even if the seeder hasn't been (re-)run on this env.
+        Role::findOrCreate('reseller');
         $user->assignRole('reseller');
         $collector->update(['user_id' => $user->id]);
     }
