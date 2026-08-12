@@ -26,6 +26,13 @@ export default function OffersPage() {
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
   const [driverFilterOpen, setDriverFilterOpen] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
+
+  // Deep link: /offers?offer=<id> (from the new-offer alert) opens that offer.
+  useEffect(() => {
+    const id = Number(new URLSearchParams(window.location.search).get("offer"));
+    if (id > 0) setDetailId(id);
+  }, []);
+
   const [page, setPage] = useState(1);
   const [perPage] = useState(50); // fixed; offers are grouped by day, not paged by size
   // Collapsible day groups — today starts open, the rest collapsed.

@@ -79,7 +79,7 @@ export function OfferAlerts() {
             {line3 && <div className="line-clamp-2 break-words text-xs text-slate-400">{line3}</div>}
           </div>
         ),
-        action: { label: t("common.view"), onClick: () => router.push("/offers") },
+        action: { label: t("common.view"), onClick: () => router.push(`/offers?offer=${o.id}`) },
         duration: 9000,
       });
     }
