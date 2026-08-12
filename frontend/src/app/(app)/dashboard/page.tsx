@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { Users, Wifi, Link2, Car, Radio, AlertTriangle } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/card";
-import { AreaChart } from "@/components/charts/area-chart";
-import { Badge, type Status } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
@@ -12,17 +10,10 @@ import { getDashboardSummary } from "@/lib/api/dashboard";
 import { OnlineDrivers } from "@/components/dashboard/online-drivers";
 import { LiveMap } from "@/components/dashboard/live-map";
 
-function sessionTone(status: string | undefined): Status {
-  if (status === "active") return "connected";
-  if (status === "needs_relink" || status === "expired") return "error";
-  return "neutral";
-}
-
 export default function DashboardPage() {
   const { t, locale } = useI18n();
   const { data, loading, error } = useAsync(getDashboardSummary, { refetchInterval: 10000 });
 
-  const session = data?.fleet_session ?? null;
   const k = (key: string) => t(`screens.dashboard.${key}`);
 
   return (
@@ -59,87 +50,42 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Subscription — compact radial gauge */}
-      {data?.subscription && (
-        <Card className="inline-flex w-full items-center gap-5 p-5 sm:w-auto">
-          <SubscriptionRing subscription={data.subscription} activeLabel={k("subActive")} inactiveLabel={k("subInactive")} daysLabel={k("subDaysShort")} />
-          <div className="min-w-0">
-            <h3 className="font-semibold text-slate-800">{k("subTitle")}</h3>
-            <div className="mt-1.5 flex items-center gap-2">
-              <span
-                className={
-                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold " +
-                  (data.subscription.state === null ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")
-                }
-              >
-                <span className={`h-1.5 w-1.5 rounded-full ${data.subscription.state === null ? "bg-emerald-500" : "bg-amber-500"}`} />
-                {data.subscription.state === null ? k("subActive") : k("subInactive")}
-              </span>
-            </div>
-            <div className="mt-3 flex gap-5 text-sm">
-              <div>
-                <div className="text-xs text-slate-400">{k("subActivated")}</div>
-                <div className="font-medium text-slate-700">
-                  {data.subscription.activated_at ? new Date(data.subscription.activated_at).toLocaleDateString(locale) : "—"}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-400">{k("subEnds")}</div>
-                <div className="font-medium text-slate-700">
-                  {data.subscription.ends_at ? new Date(data.subscription.ends_at).toLocaleDateString(locale) : "—"}
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Offers trend · fleet session · online drivers — side by side on wide screens */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="p-5">
-          <h3 className="mb-4 font-semibold text-slate-800">{k("offersTrend")}</h3>
-          {loading ? (
-            <div className="h-[180px] animate-pulse rounded-lg bg-slate-100" />
-          ) : (
-            <AreaChart
-              color="#0f172a"
-              data={(data?.offers_daily ?? []).map((d) => ({
-                label: new Date(d.date).toLocaleDateString(locale, { weekday: "short" }),
-                value: d.count,
-              }))}
-            />
-          )}
-        </Card>
-
-        <Card className="p-5">
-          <h3 className="mb-4 font-semibold text-slate-800">{k("sessionTitle")}</h3>
-          {loading ? (
-            <div className="h-8 w-48 animate-pulse rounded bg-slate-100" />
-          ) : session === null ? (
-            <p className="text-sm text-slate-400">{k("sessionNone")}</p>
-          ) : (
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">{k("sessionStatus")}</span>
-                <Badge status={sessionTone(session.status)} dot>
-                  {session.status}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="shrink-0 text-slate-500">{k("sessionOrg")}</span>
-                <span className="truncate font-mono text-xs text-slate-600">{session.uber_org_uuid}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">{k("sessionLastEvent")}</span>
-                <span className="text-slate-600">
-                  {session.last_event_at ? new Date(session.last_event_at).toLocaleString(locale) : "—"}
+      {/* Subscription gauge + online drivers — split half-and-half */}
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        {data?.subscription && (
+          <Card className="flex items-center gap-5 p-5">
+            <SubscriptionRing subscription={data.subscription} activeLabel={k("subActive")} inactiveLabel={k("subInactive")} daysLabel={k("subDaysShort")} />
+            <div className="min-w-0">
+              <h3 className="font-semibold text-slate-800">{k("subTitle")}</h3>
+              <div className="mt-1.5 flex items-center gap-2">
+                <span
+                  className={
+                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold " +
+                    (data.subscription.state === null ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")
+                  }
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${data.subscription.state === null ? "bg-emerald-500" : "bg-amber-500"}`} />
+                  {data.subscription.state === null ? k("subActive") : k("subInactive")}
                 </span>
               </div>
+              <div className="mt-3 flex gap-5 text-sm">
+                <div>
+                  <div className="text-xs text-slate-400">{k("subActivated")}</div>
+                  <div className="font-medium text-slate-700">
+                    {data.subscription.activated_at ? new Date(data.subscription.activated_at).toLocaleDateString(locale) : "—"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400">{k("subEnds")}</div>
+                  <div className="font-medium text-slate-700">
+                    {data.subscription.ends_at ? new Date(data.subscription.ends_at).toLocaleDateString(locale) : "—"}
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
-        </Card>
+          </Card>
+        )}
 
-        {/* Online drivers — replaces the old drivers/offers summary card */}
         <OnlineDrivers />
       </div>
 
