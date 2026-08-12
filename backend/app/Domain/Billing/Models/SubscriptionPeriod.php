@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class SubscriptionPeriod extends Model
 {
-    protected $fillable = ['tenant_id', 'days', 'amount', 'paid_at', 'collector_payment_id', 'starts_at', 'ends_at'];
+    protected $fillable = ['tenant_id', 'days', 'amount', 'paid_at', 'collector_payment_id', 'sold_by_collector_id', 'starts_at', 'ends_at'];
 
     protected $casts = [
         'days' => 'integer',
