@@ -14,6 +14,7 @@ import {
   FileBarChart,
   UserCog,
   Ticket,
+  ReceiptText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -59,6 +60,7 @@ export const navGroups: NavGroup[] = [
       { href: "/vehicles", label: "nav.vehicles", icon: Car },
       { href: "/map", label: "nav.map", icon: MapPin },
       { href: "/connections", label: "nav.connections", icon: Plug },
+      { href: "/subscription", label: "nav.mySubscription", icon: ReceiptText },
     ],
   },
 

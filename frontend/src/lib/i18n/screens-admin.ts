@@ -42,7 +42,7 @@ const en: Dict = {
     colCode: "Code", colPlan: "Plan", colCompany: "Company", colCollector: "Collector", colAmount: "Amount",
     colStatus: "Status", colCreated: "Created", colActivated: "Activated", colExpires: "Expires",
     paid: "Paid", unpaid: "Unpaid", none: "—", empty: "No codes match.",
-    prev: "Previous", next: "Next", pageOf: "Page {n} of {m}", totalN: "{n} codes", regenerate: "Regenerate",
+    prev: "Previous", next: "Next", pageOf: "Page {n} of {m}", totalN: "{n} codes", regenerate: "Regenerate", colPeriod: "Period", free: "Free", emptyDesc: "Your subscriptions will appear here.",
   },
   subscriptions: {
     totalRevenue: "Total revenue", activeSubs: "Active subscriptions", expiringSoon: "Expiring soon",
@@ -203,7 +203,7 @@ const de: Dict = {
     colCode: "Code", colPlan: "Paket", colCompany: "Firma", colCollector: "Kassierer", colAmount: "Betrag",
     colStatus: "Status", colCreated: "Erstellt", colActivated: "Aktiviert", colExpires: "Läuft ab",
     paid: "Bezahlt", unpaid: "Offen", none: "—", empty: "Keine Codes gefunden.",
-    prev: "Zurück", next: "Weiter", pageOf: "Seite {n} von {m}", totalN: "{n} Codes", regenerate: "Neu erzeugen",
+    prev: "Zurück", next: "Weiter", pageOf: "Seite {n} von {m}", totalN: "{n} Codes", regenerate: "Neu erzeugen", colPeriod: "Zeitraum", free: "Gratis", emptyDesc: "Deine Abos erscheinen hier.",
   },
   subscriptions: {
     totalRevenue: "Gesamtumsatz", activeSubs: "Aktive Abos", expiringSoon: "Läuft bald ab",
@@ -362,7 +362,7 @@ const ar: Dict = {
     colCode: "الكود", colPlan: "الباقة", colCompany: "الشركة", colCollector: "المحصّل", colAmount: "القيمة",
     colStatus: "الحالة", colCreated: "التاريخ", colActivated: "تاريخ التفعيل", colExpires: "الانتهاء",
     paid: "مدفوع", unpaid: "غير مدفوع", none: "—", empty: "لا توجد أكواد مطابقة.",
-    prev: "السابق", next: "التالي", pageOf: "صفحة {n} من {m}", totalN: "{n} كود", regenerate: "إعادة توليد",
+    prev: "السابق", next: "التالي", pageOf: "صفحة {n} من {m}", totalN: "{n} كود", regenerate: "إعادة توليد", colPeriod: "الفترة", free: "مجاني", emptyDesc: "ستظهر اشتراكاتك هنا.",
   },
   subscriptions: {
     totalRevenue: "إجمالي الإيرادات", activeSubs: "اشتراكات نشطة", expiringSoon: "قربت تنتهي",

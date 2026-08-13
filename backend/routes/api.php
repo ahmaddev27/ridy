@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\Admin\UserDirectoryController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CompanyActivationController;
+use App\Http\Controllers\Api\V1\CompanySubscriptionController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DeviceTokenController;
 use App\Http\Controllers\Api\V1\DispatchDaemonController;
@@ -77,6 +78,9 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', ResolveTenant::class])->group(function () {
         // Dashboard
         Route::get('dashboard/summary', [DashboardController::class, 'summary']);
+
+        // The company's own subscription history (codes/plans/collector/status).
+        Route::get('subscription/history', [CompanySubscriptionController::class, 'index']);
 
         // Fleet drivers
         Route::get('drivers', [DriverController::class, 'index']);
