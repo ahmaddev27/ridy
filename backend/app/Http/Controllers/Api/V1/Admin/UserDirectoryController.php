@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Collections\Models\Collector;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -42,6 +43,10 @@ class UserDirectoryController extends Controller
             return response()->json(['message' => 'cannot_delete_admin'], 422);
         }
 
+        // A reseller login and its collector are one entity — remove both, so the
+        // collector never lingers after its user is deleted. Issued codes survive
+        // (their collector_id is nulled by the FK).
+        Collector::where('user_id', $user->id)->delete();
         $user->delete();
 
         return response()->json(['data' => ['deleted' => true]]);

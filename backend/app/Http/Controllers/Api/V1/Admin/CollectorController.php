@@ -56,12 +56,10 @@ class CollectorController extends Controller
 
     public function destroy(Collector $collector): JsonResponse
     {
-        // Block deletion while the collector has issued codes, so their billing
-        // attribution is never lost by accident.
-        if ($collector->subscriptionCodes()->exists()) {
-            return response()->json(['message' => 'collector_has_payments'], 422);
-        }
-
+        // A collector and its reseller login are one entity — remove both. Issued
+        // codes survive (their collector_id is nulled by the FK), so the billing
+        // records are kept even though the seller attribution is dropped.
+        $collector->user?->delete();
         $collector->delete();
 
         return response()->json(['data' => ['deleted' => true]]);
