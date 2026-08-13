@@ -9,7 +9,7 @@ import { Logo } from "./logo";
  */
 export function Preloader() {
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-surface">
+    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-6 bg-surface">
       <style>{`
         @keyframes reidey-breathe { 0%,100% { opacity:.55; transform:scale(.97) } 50% { opacity:1; transform:scale(1) } }
         .reidey-mark { animation: reidey-breathe 1.6s ease-in-out infinite; }
