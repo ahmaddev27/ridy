@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { latnLocale } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug } from "lucide-react";
+import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import {
   forceRelink,
   deleteCompanySession,
   generateActivationCode,
+  grantFreeSubscription,
   reactivateCompany,
   listProxies,
   getCompanyDrivers,
@@ -69,6 +70,7 @@ export function CompanyDetail({
   const [plans, setPlans] = useState<Plan[]>([]);
   const [planId, setPlanId] = useState("");
   const [paid, setPaid] = useState(true);
+  const [freeDays, setFreeDays] = useState("30");
   const [invoices, setInvoices] = useState<SubscriptionInvoice[]>([]);
 
   // The company's subscription history + the plans to choose from, for the tab.
@@ -159,6 +161,19 @@ export function CompanyDetail({
       const res = await generateActivationCode(id, Number(planId), paid);
       setGenCode(res.code);
       toast.success(c("codeGenerated"));
+      await load();
+    } catch (e) {
+      toast.error(c("codeFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function grantFree() {
+    setBusy(true);
+    try {
+      await grantFreeSubscription(id, Number(freeDays) || 1);
+      toast.success(c("freeGranted"));
       await load();
     } catch (e) {
       toast.error(c("codeFailed"), { description: e instanceof Error ? e.message : undefined });
@@ -322,6 +337,25 @@ export function CompanyDetail({
                     </Button>
                   )}
                 </div>
+
+                {/* Free subscription — activates the company with no code/invoice. */}
+                <div className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-line bg-surface-2/40 p-3">
+                  <div className="w-28">
+                    <label className="mb-1 block text-xs font-medium text-ink-muted">{c("freeDays")}</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={freeDays}
+                      onChange={(e) => setFreeDays(e.target.value)}
+                      className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
+                    />
+                  </div>
+                  <Button variant="secondary" onClick={grantFree} disabled={busy || !(Number(freeDays) > 0)}>
+                    <Gift className="h-4 w-4" /> {c("grantFree")}
+                  </Button>
+                  <p className="flex-1 text-xs text-ink-subtle">{c("freeHint")}</p>
+                </div>
+
                 {genCode && (
                   <div className="rounded-lg border border-emerald-200 bg-success-bg px-3 py-2 text-sm text-emerald-800">
                     {c("codeIs")}{" "}

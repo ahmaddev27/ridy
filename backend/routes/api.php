@@ -187,6 +187,7 @@ Route::prefix('v1')->group(function () {
         // Subscriptions: generate an activation code, review + lift bans.
         Route::get('banned-companies', [SubscriptionController::class, 'banned']);
         Route::post('companies/{tenant}/activation', [SubscriptionController::class, 'generate']);
+        Route::post('companies/{tenant}/free-subscription', [SubscriptionController::class, 'grantFree']);
         Route::post('companies/{tenant}/reactivate', [SubscriptionController::class, 'reactivate']);
 
         Route::get('companies/{tenant}/session', [CompanySessionController::class, 'show']);
