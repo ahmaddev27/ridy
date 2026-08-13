@@ -2,29 +2,33 @@
 
 namespace App\Domain\Fleet;
 
-use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Dispatch\OfferLifecycle;
+use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
 use Carbon\CarbonImmutable;
 
 /**
- * Applies a batch of live driver statuses to a tenant's roster and, when a driver
- * transitions to ON_TRIP, marks the offer they just took as accepted. Shared by
- * the manager's extension sync and the daemon's continuous poll, so both paths
- * behave identically.
+ * Applies a batch of live driver statuses to a tenant's roster and drives each
+ * driver's in-flight offer through its lifecycle — inferred from the status
+ * transitions (we observe Uber, we don't control the trip):
+ *
+ *   idle → EN_ROUTE      accept the pending offer      (driver → heading to pickup)
+ *   → ON_TRIP            start it                       (driver → on trip)
+ *   engaged → idle       complete (if started) or cancel (if only accepted)
+ *
+ * Shared by the manager's extension sync and the daemon's continuous poll.
  */
 class DriverStatusIngestor
 {
-    /** Offers older than this when the trip starts aren't attributed to it. */
-    private const ATTRIBUTION_MINUTES = 10;
+    public function __construct(private readonly OfferLifecycle $lifecycle) {}
 
     /**
-     * @param  array<int, array{driver_uuid: string, status?: ?string, location_updated_at?: ?int}>  $statuses
-     * @return array{updated: int, accepted: int}
+     * @param  array<int, array<string, mixed>>  $statuses
+     * @return array{updated: int, accepted: int, started: int, completed: int, canceled: int}
      */
     public function ingest(int $tenantId, array $statuses): array
     {
-        $updated = 0;
-        $accepted = 0;
+        $counts = ['updated' => 0, 'accepted' => 0, 'started' => 0, 'completed' => 0, 'canceled' => 0];
 
         foreach ($statuses as $row) {
             $uuid = $row['driver_uuid'] ?? null;
@@ -40,12 +44,8 @@ class DriverStatusIngestor
                 continue;
             }
 
-            // A driver is "engaged" the moment they accept an offer: EN_ROUTE (on
-            // the way to the rider) comes BEFORE ON_TRIP (rider aboard). Treating
-            // both as engaged catches the acceptance at the earliest signal and
-            // never misses a short trip that flips through EN_ROUTE quickly.
-            $wasEngaged = $this->isEngaged($driver->online_status);
-            $isEngaged = $this->isEngaged($row['status'] ?? '');
+            $was = $this->level($driver->online_status);
+            $now = $this->level($row['status'] ?? '');
 
             // Uber returns 0,0 for offline/idle drivers, so keep real coordinates
             // only (null otherwise) — that also drops offline drivers off the map.
@@ -62,14 +62,74 @@ class DriverStatusIngestor
                 'heading' => $lat !== null ? ($row['heading'] ?? null) : null,
                 'trip_waypoints' => $lat !== null && ! empty($row['waypoints']) ? $row['waypoints'] : null,
             ]);
-            $updated++;
+            $counts['updated']++;
 
-            if ($isEngaged && ! $wasEngaged) {
-                $accepted += $this->markLastOfferAccepted($tenantId, $uuid);
-            }
+            $this->applyTransition($tenantId, $uuid, $was, $now, $counts);
         }
 
-        return ['updated' => $updated, 'accepted' => $accepted];
+        // Keep pending→rejected fresh without depending on cron (the poll runs often).
+        $this->lifecycle->expirePending($tenantId);
+
+        return $counts;
+    }
+
+    /**
+     * Move the driver's in-flight offer based on the engagement-level edge.
+     *
+     * @param  array<string, int>  $counts
+     */
+    private function applyTransition(int $tenantId, string $uuid, int $was, int $now, array &$counts): void
+    {
+        // idle → engaged: attribute the pending offer and accept it.
+        if ($was === 0 && $now >= 1) {
+            $pending = $this->lifecycle->pendingOfferFor($tenantId, $uuid);
+            if ($pending !== null && $this->lifecycle->accept($pending)) {
+                $counts['accepted']++;
+                // Jumped straight to ON_TRIP (skipped EN_ROUTE) — start it too.
+                if ($now === 2 && $this->lifecycle->start($pending)) {
+                    $counts['started']++;
+                }
+            }
+
+            return;
+        }
+
+        // EN_ROUTE → ON_TRIP: the accepted offer's trip has begun.
+        if ($was === 1 && $now === 2) {
+            $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
+            if ($active !== null && $this->lifecycle->start($active)) {
+                $counts['started']++;
+            }
+
+            return;
+        }
+
+        // engaged → idle: the offer is done (completed if it started, else canceled).
+        if ($was >= 1 && $now === 0) {
+            $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
+            if ($active === null) {
+                return;
+            }
+            if ($active->status === OfferStatus::Started && $this->lifecycle->complete($active)) {
+                $counts['completed']++;
+            } elseif ($active->status === OfferStatus::Accepted && $this->lifecycle->cancel($active)) {
+                $counts['canceled']++;
+            }
+        }
+    }
+
+    /** Engagement level of a raw Uber status: 2 = on trip, 1 = heading to pickup, 0 = idle. */
+    private function level(?string $status): int
+    {
+        $s = strtoupper((string) $status);
+        if (str_contains($s, 'ON_TRIP')) {
+            return 2;
+        }
+        if (str_contains($s, 'EN_ROUTE')) {
+            return 1;
+        }
+
+        return 0;
     }
 
     /** A usable coordinate, or null for the 0,0 Uber returns when there's no live fix. */
@@ -78,32 +138,5 @@ class DriverStatusIngestor
         $n = is_numeric($value) ? (float) $value : 0.0;
 
         return abs($n) < 0.0001 ? null : $n;
-    }
-
-    /** True when the driver has accepted a job — heading to the rider or on the trip. */
-    private function isEngaged(?string $status): bool
-    {
-        $s = strtoupper((string) $status);
-
-        return str_contains($s, 'ON_TRIP') || str_contains($s, 'EN_ROUTE');
-    }
-
-    private function markLastOfferAccepted(int $tenantId, string $driverUuid): int
-    {
-        $offer = DispatchOffer::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('driver_uuid', $driverUuid)
-            ->whereNull('accepted_at')
-            ->where('received_at', '>=', now()->subMinutes(self::ATTRIBUTION_MINUTES))
-            ->latest('received_at')
-            ->first();
-
-        if ($offer === null) {
-            return 0;
-        }
-
-        $offer->update(['accepted_at' => now()]);
-
-        return 1;
     }
 }

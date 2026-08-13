@@ -3,6 +3,7 @@
 namespace App\Domain\Fleet;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
 use Carbon\CarbonImmutable;
 
@@ -18,14 +19,15 @@ class DriverStatsService
     {
         $offers = DispatchOffer::where('driver_uuid', $driver->uber_driver_uuid)
             ->whereBetween('received_at', [$from, $to])
-            ->get(['fare_formatted', 'distance_m', 'accepted_at']);
+            ->get(['fare_amount', 'distance_m', 'accepted_at', 'status']);
 
         $total = $offers->count();
-        $accepted = $offers->whereNotNull('accepted_at');
-        $acceptedCount = $accepted->count();
+        $acceptedCount = $offers->whereNotNull('accepted_at')->count();
+        // Earnings + trips count COMPLETED rides only (a real, finished trip).
+        $completed = $offers->where('status', OfferStatus::Completed);
 
-        $earnings = $accepted->sum(fn ($o) => self::parseFare($o->fare_formatted));
-        $km = round($accepted->sum('distance_m') / 1000, 1);
+        $earnings = $completed->sum(fn ($o) => (float) $o->fare_amount);
+        $km = round($completed->sum('distance_m') / 1000, 1);
 
         return [
             'offers' => $total,
@@ -33,7 +35,7 @@ class DriverStatsService
             'declined' => $total - $acceptedCount,
             'acceptance_rate' => $total > 0 ? (int) round($acceptedCount / $total * 100) : 0,
             'earnings' => round($earnings, 2),
-            'trips' => $acceptedCount,
+            'trips' => $completed->count(),
             'km' => $km,
         ];
     }

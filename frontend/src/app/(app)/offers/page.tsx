@@ -6,11 +6,21 @@ import { toast } from "sonner";
 import { Radio, MapPin, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Inbox, CheckCircle2, XCircle, Gauge, Wallet } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { SearchInput } from "@/components/ui/search-input";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type Status } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
-import { listOffersPaged, getOfferStats, type DispatchOffer, type PageMeta, type OfferStats } from "@/lib/api/offers";
+import { listOffersPaged, getOfferStats, type DispatchOffer, type OfferStatus, type PageMeta, type OfferStats } from "@/lib/api/offers";
+
+/** Offer lifecycle status → badge tone. */
+const OFFER_TONE: Record<OfferStatus, Status> = {
+  pending: "expiring",
+  accepted: "info",
+  started: "private",
+  completed: "connected",
+  rejected: "neutral",
+  canceled: "personal",
+};
 import { StatCard } from "@/components/ui/card";
 import { listDrivers, type Driver } from "@/lib/api/drivers";
 import { OfferDetailModal } from "./offer-detail-modal";
@@ -303,9 +313,10 @@ export default function OffersPage() {
                                 {toLatinDigits(o.fare_formatted) || "—"}
                               </td>
                               <td className="px-4 py-3">
-                                <Badge status={o.accepted ? "connected" : "neutral"} dot>
-                                  {o.accepted ? c("accepted") : c("notAccepted")}
-                                </Badge>
+                                {(() => {
+                                  const st = o.status ?? (o.accepted ? "accepted" : "pending");
+                                  return <Badge status={OFFER_TONE[st]} dot>{c(`st_${st}`)}</Badge>;
+                                })()}
                               </td>
                             </tr>
                           ))}

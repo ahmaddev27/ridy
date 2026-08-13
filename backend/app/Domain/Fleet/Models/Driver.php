@@ -40,6 +40,24 @@ class Driver extends Model
         'trip_waypoints' => 'array',
     ];
 
+    /**
+     * Engagement level for the app: 0 = available (online, no trip), 1 = heading
+     * to pickup (EN_ROUTE), 2 = on trip (ON_TRIP). Derived from the raw status;
+     * the offer lifecycle only advances an offer when a real one is attributed.
+     */
+    public function engagementStatus(): int
+    {
+        $s = strtoupper((string) $this->online_status);
+        if (str_contains($s, 'ON_TRIP')) {
+            return 2;
+        }
+        if (str_contains($s, 'EN_ROUTE')) {
+            return 1;
+        }
+
+        return 0;
+    }
+
     /** True when Uber reports a live status for the driver that isn't an offline one. */
     public function isOnline(): bool
     {

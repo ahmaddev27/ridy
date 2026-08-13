@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\DriverStatsService;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
@@ -28,17 +29,19 @@ class DriverStatsTest extends TestCase
         ], $o));
     }
 
-    public function test_stats_sum_earnings_and_km_from_accepted_offers(): void
+    public function test_stats_sum_earnings_and_km_from_completed_offers(): void
     {
         $tenant = Tenant::create(['name' => 'YA', 'country' => 'DE']);
         app(TenantContext::class)->set($tenant->id);
         $driver = Driver::create(['tenant_id' => $tenant->id, 'name' => 'Basel', 'uber_driver_uuid' => self::UUID]);
 
-        // Accepted: German + English fare formats; distances in metres.
-        $this->offer($tenant->id, ['fare_formatted' => '10,77 €', 'distance_m' => 5000, 'accepted_at' => now()]);
-        $this->offer($tenant->id, ['fare_formatted' => '€12.93', 'distance_m' => 3000, 'accepted_at' => now()]);
+        // Completed trips — earnings + km come from these only.
+        $this->offer($tenant->id, ['fare_amount' => 10.77, 'distance_m' => 5000, 'accepted_at' => now(), 'status' => OfferStatus::Completed]);
+        $this->offer($tenant->id, ['fare_amount' => 12.93, 'distance_m' => 3000, 'accepted_at' => now(), 'status' => OfferStatus::Completed]);
+        // Accepted but canceled (never completed): counts as taken, NOT as earnings.
+        $this->offer($tenant->id, ['fare_amount' => 50, 'distance_m' => 9000, 'accepted_at' => now(), 'status' => OfferStatus::Canceled]);
         // Not accepted:
-        $this->offer($tenant->id, ['fare_formatted' => '99,99 €', 'distance_m' => 9000, 'accepted_at' => null]);
+        $this->offer($tenant->id, ['fare_amount' => 99.99, 'distance_m' => 9000, 'accepted_at' => null, 'status' => OfferStatus::Rejected]);
 
         $stats = app(DriverStatsService::class)->forDriver(
             $driver,
@@ -46,11 +49,11 @@ class DriverStatsTest extends TestCase
             CarbonImmutable::now()->addDay(),
         );
 
-        $this->assertSame(3, $stats['offers']);
-        $this->assertSame(2, $stats['accepted']);
-        $this->assertSame(67, $stats['acceptance_rate']);       // 2/3
-        $this->assertSame(23.7, $stats['earnings']);            // 10.77 + 12.93
-        $this->assertSame(8.0, $stats['km']);                  // (5000+3000)/1000
-        $this->assertSame(2, $stats['trips']);
+        $this->assertSame(4, $stats['offers']);
+        $this->assertSame(3, $stats['accepted']);               // 2 completed + 1 canceled were taken
+        $this->assertSame(75, $stats['acceptance_rate']);       // 3/4
+        $this->assertSame(23.7, $stats['earnings']);            // completed only: 10.77 + 12.93
+        $this->assertSame(8.0, $stats['km']);                   // completed only: (5000+3000)/1000
+        $this->assertSame(2, $stats['trips']);                  // completed count
     }
 }

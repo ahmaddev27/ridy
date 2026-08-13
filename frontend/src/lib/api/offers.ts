@@ -1,5 +1,7 @@
 import { apiFetch } from "./client";
 
+export type OfferStatus = "pending" | "accepted" | "started" | "completed" | "rejected" | "canceled";
+
 export type DispatchOffer = {
   id: number;
   offer_uuid: string;
@@ -7,8 +9,13 @@ export type DispatchOffer = {
   driver_id: number | null;
   driver_name: string | null;
   linked: boolean;
+  status: OfferStatus | null;
   accepted: boolean;
   accepted_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  rejected_at: string | null;
+  canceled_at: string | null;
   rider_first_name: string | null;
   pickup_address: string | null;
   dropoff_address: string | null;
@@ -69,6 +76,7 @@ export type OfferStats = {
   total: number;
   accepted: number;
   declined: number;
+  completed: number;
   acceptance_rate: number;
   earnings: number;
 };

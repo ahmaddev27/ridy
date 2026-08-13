@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Dispatch\DispatchOfferIngestor;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\TripGeocoder;
-use App\Domain\Fleet\DriverStatsService;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchOfferResource;
 use App\Support\RidyLog;
@@ -31,15 +30,18 @@ class DispatchOfferController extends Controller
     public function stats(Request $request): JsonResponse
     {
         $total = $this->filtered($request)->count();
-        $accepted = $this->filtered($request)->whereNotNull('accepted_at')->count();
-        $earnings = $this->filtered($request)->whereNotNull('accepted_at')
-            ->pluck('fare_formatted')
-            ->sum(fn ($f) => DriverStatsService::parseFare($f));
+        // "Taken" = ever accepted, even if later canceled. Pending offers fold into
+        // "not taken" (declined) per the product decision. Earnings count COMPLETED
+        // trips only, summed from the numeric fare column.
+        $accepted = $this->filtered($request)->taken()->count();
+        $completed = $this->filtered($request)->completed()->count();
+        $earnings = (float) $this->filtered($request)->completed()->sum('fare_amount');
 
         return response()->json(['data' => [
             'total' => $total,
             'accepted' => $accepted,
             'declined' => $total - $accepted,
+            'completed' => $completed,
             'acceptance_rate' => $total > 0 ? (int) round($accepted / $total * 100) : 0,
             'earnings' => round($earnings, 2),
         ]]);

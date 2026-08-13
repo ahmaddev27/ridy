@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Dispatch\OfferLifecycle;
+use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
@@ -152,5 +154,132 @@ class OfferAcceptanceTest extends TestCase
         ])->assertOk()->assertJsonPath('data.accepted', 0);
 
         $this->assertNull($offer->fresh()->accepted_at);
+    }
+
+    // ── Full lifecycle ───────────────────────────────────────────────────────
+
+    private function postStatus(string $s): void
+    {
+        $this->postJson('/api/v1/drivers/statuses', [
+            'statuses' => [['driver_uuid' => self::DRIVER_UUID, 'status' => "MONITORING_SUPPLY_STATUS_{$s}"]],
+        ])->assertOk();
+    }
+
+    public function test_en_route_accepts_then_on_trip_starts(): void
+    {
+        $this->driver();
+        $offer = $this->offer();
+
+        $this->postStatus('EN_ROUTE');
+        $this->assertSame(OfferStatus::Accepted, $offer->fresh()->status);
+
+        $this->postStatus('ON_TRIP');
+        $started = $offer->fresh();
+        $this->assertSame(OfferStatus::Started, $started->status);
+        $this->assertNotNull($started->started_at);
+    }
+
+    public function test_completed_when_engaged_driver_returns_idle(): void
+    {
+        $this->driver();
+        $offer = $this->offer();
+
+        $this->postStatus('EN_ROUTE');   // accepted
+        $this->postStatus('ON_TRIP');    // started
+        $this->postStatus('ONLINE');     // back to available → completed
+
+        $done = $offer->fresh();
+        $this->assertSame(OfferStatus::Completed, $done->status);
+        $this->assertNotNull($done->completed_at);
+    }
+
+    public function test_canceled_when_accepted_then_idle_without_a_trip(): void
+    {
+        $this->driver();
+        $offer = $this->offer();
+
+        $this->postStatus('EN_ROUTE');   // accepted
+        $this->postStatus('OFFLINE');    // dropped before the trip began → canceled
+
+        $c = $offer->fresh();
+        $this->assertSame(OfferStatus::Canceled, $c->status);
+        $this->assertNotNull($c->canceled_at);
+    }
+
+    public function test_pending_offer_past_its_window_is_rejected(): void
+    {
+        $this->driver();
+        $offer = $this->offer(['received_at' => now()->subMinutes(2), 'accept_window_seconds' => 5]);
+
+        app(OfferLifecycle::class)->expirePending($this->tenant->id);
+
+        $this->assertSame(OfferStatus::Rejected, $offer->fresh()->status);
+    }
+
+    public function test_invalid_transition_is_a_noop(): void
+    {
+        $this->driver();
+        $offer = $this->offer(); // pending
+
+        // Can't jump straight to completed from pending.
+        $this->assertFalse(app(OfferLifecycle::class)->complete($offer));
+        $this->assertSame(OfferStatus::Pending, $offer->fresh()->status);
+    }
+
+    public function test_completing_is_idempotent_and_earnings_count_once(): void
+    {
+        $this->driver();
+        $offer = $this->offer(['fare_amount' => 12.50]);
+
+        $this->postStatus('EN_ROUTE');
+        $this->postStatus('ON_TRIP');
+        $this->postStatus('ONLINE');   // completed
+
+        // A duplicated engage→idle cycle must not re-complete or re-earn.
+        $lifecycle = app(OfferLifecycle::class);
+        $this->assertFalse($lifecycle->complete($offer->fresh()));
+
+        $earnings = (float) DispatchOffer::completed()->sum('fare_amount');
+        $this->assertSame(12.5, $earnings);
+    }
+
+    public function test_stats_fold_pending_into_not_taken_and_earn_from_completed(): void
+    {
+        $this->offer(['accepted_at' => now(), 'status' => OfferStatus::Completed, 'fare_amount' => 20]);
+        $this->offer(['accepted_at' => now(), 'status' => OfferStatus::Canceled, 'fare_amount' => 8]);
+        $this->offer(['status' => OfferStatus::Rejected]);
+        $this->offer(['status' => OfferStatus::Pending]);
+
+        $this->getJson('/api/v1/dispatch/offers/stats')->assertOk()
+            ->assertJsonPath('data.total', 4)
+            ->assertJsonPath('data.accepted', 2)     // completed + canceled were taken
+            ->assertJsonPath('data.declined', 2)     // rejected + pending
+            ->assertJsonPath('data.completed', 1)
+            ->assertJsonPath('data.acceptance_rate', 50)
+            ->assertJsonPath('data.earnings', 20);   // completed only
+    }
+
+    public function test_acceptance_rate_is_zero_with_no_offers(): void
+    {
+        $this->getJson('/api/v1/dispatch/offers/stats')->assertOk()
+            ->assertJsonPath('data.total', 0)
+            ->assertJsonPath('data.acceptance_rate', 0)
+            ->assertJsonPath('data.earnings', 0);
+    }
+
+    public function test_a_next_offer_is_accepted_after_completing_the_first(): void
+    {
+        $this->driver();
+        $first = $this->offer();
+
+        $this->postStatus('EN_ROUTE');
+        $this->postStatus('ON_TRIP');
+        $this->postStatus('ONLINE');   // first completed
+        $this->assertSame(OfferStatus::Completed, $first->fresh()->status);
+
+        // A second offer arrives and the driver takes it.
+        $second = $this->offer();
+        $this->postStatus('EN_ROUTE');
+        $this->assertSame(OfferStatus::Accepted, $second->fresh()->status);
     }
 }
