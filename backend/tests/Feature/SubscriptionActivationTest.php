@@ -142,6 +142,23 @@ class SubscriptionActivationTest extends TestCase
         $this->assertSame('active', $tenant->status);
     }
 
+    public function test_admin_grants_a_free_subscription_with_no_code_or_invoice(): void
+    {
+        Sanctum::actingAs($this->superAdmin());
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE', 'status' => 'disabled']);
+
+        $this->postJson("/api/v1/admin/companies/{$tenant->id}/free-subscription", ['days' => 14])
+            ->assertOk()->assertJsonPath('data.free', true)->assertJsonPath('data.days', 14);
+
+        $tenant->refresh();
+        $this->assertSame('active', $tenant->status);
+        $this->assertTrue($tenant->subscription_ends_at->isFuture());
+        // No billing record and no code were created.
+        $this->assertDatabaseCount('subscription_periods', 0);
+        $this->assertDatabaseCount('subscription_codes', 0);
+        $this->assertNull($tenant->activation_code);
+    }
+
     public function test_admin_banned_list_includes_the_owner_phone(): void
     {
         Sanctum::actingAs($this->superAdmin());

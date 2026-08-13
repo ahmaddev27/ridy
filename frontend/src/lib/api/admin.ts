@@ -183,6 +183,18 @@ export async function generateActivationCode(
   return res.data;
 }
 
+/** Grant a free subscription for N days — activates the company, no code/invoice. */
+export async function grantFreeSubscription(
+  id: number,
+  days: number,
+): Promise<{ free: boolean; days: number; subscription_ends_at: string; days_left: number | null }> {
+  const res = await apiFetch<{ data: { free: boolean; days: number; subscription_ends_at: string; days_left: number | null } }>(
+    `${base}/${id}/free-subscription`,
+    { method: "POST", body: { days }, withCsrf: true },
+  );
+  return res.data;
+}
+
 export async function listBannedCompanies(): Promise<BannedCompany[]> {
   const res = await apiFetch<{ data: BannedCompany[] }>("/api/v1/admin/banned-companies");
   return res.data;

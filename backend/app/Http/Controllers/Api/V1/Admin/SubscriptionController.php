@@ -76,6 +76,42 @@ class SubscriptionController extends Controller
         ]]);
     }
 
+    /**
+     * Grant a company a free subscription for N days — activates it exactly like a
+     * paid one (dashboard + driver app), but with no code and no invoice. Extends
+     * an existing active subscription instead of shortening it.
+     */
+    public function grantFree(Request $request, Tenant $tenant): JsonResponse
+    {
+        $data = $request->validate([
+            'days' => ['required', 'integer', 'min:1', 'max:3650'],
+        ]);
+
+        $now = CarbonImmutable::now();
+        $base = $tenant->subscription_ends_at !== null && $tenant->subscription_ends_at->isAfter($now)
+            ? CarbonImmutable::parse($tenant->subscription_ends_at)
+            : $now;
+        $endsAt = $base->addDays($data['days']);
+
+        $tenant->forceFill([
+            'status' => 'active',
+            'banned_at' => null,
+            'activated_at' => $tenant->activated_at ?? $now,
+            'subscription_ends_at' => $endsAt,
+            'activation_attempts' => 0,
+        ])->save();
+
+        // Place it on a proxy from the pool, same as a real activation.
+        app(ProxyPool::class)->assign($tenant);
+
+        return response()->json(['data' => [
+            'free' => true,
+            'days' => $data['days'],
+            'subscription_ends_at' => $endsAt->toDateString(),
+            'days_left' => $tenant->fresh()->daysLeft(),
+        ]]);
+    }
+
     /** Companies locked out after 3 wrong activation codes — with owner phones. */
     public function banned(): JsonResponse
     {
