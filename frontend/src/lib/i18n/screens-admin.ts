@@ -75,6 +75,9 @@ const en: Dict = {
     alert_needs_relink: "needs re-link", alert_no_proxy: "no proxy assigned", proxyExpiring: "proxy expires in {n}d", proxyExpired: "proxy expired",
     activeShort: "active", offersChart: "Offers (14 days)", sessionBreakdown: "Sessions by status",
     topCompanies: "Top companies", stActive: "Active", stNeedsRelink: "Needs re-link", stExpired: "Expired", stNoSession: "No session",
+    billingTitle: "Billing & subscriptions", totalRevenue: "Total revenue", monthlyRevenue: "This month", outstanding: "Outstanding",
+    activeSubs: "Active subscriptions", expiringSoon: "Expiring soon", revenueChart: "Revenue by month", revenueEmpty: "No revenue recorded yet.",
+    healthTitle: "Session health", offersTotal: "offers total",
   },
   settings: {
     email: "Email delivery", sendTest: "Send test", testTo: "Recipient email", testHint: "Leave empty to send to your own admin email.", cancel: "Cancel", testSent: "Test email sent", testFailed: "Test email failed", provider: "Provider", resendKey: "Resend API key", smtp: "Email (SMTP)", host: "Host", port: "Port", username: "Username",
@@ -233,6 +236,9 @@ const de: Dict = {
     alert_needs_relink: "neu verbinden nötig", alert_no_proxy: "kein Proxy zugewiesen", proxyExpiring: "Proxy läuft in {n}T ab", proxyExpired: "Proxy abgelaufen",
     activeShort: "aktiv", offersChart: "Angebote (14 Tage)", sessionBreakdown: "Sitzungen nach Status",
     topCompanies: "Top-Firmen", stActive: "Aktiv", stNeedsRelink: "Neu verbinden", stExpired: "Abgelaufen", stNoSession: "Keine Sitzung",
+    billingTitle: "Abrechnung & Abos", totalRevenue: "Gesamtumsatz", monthlyRevenue: "Dieser Monat", outstanding: "Offen",
+    activeSubs: "Aktive Abos", expiringSoon: "Läuft bald ab", revenueChart: "Umsatz pro Monat", revenueEmpty: "Noch kein Umsatz.",
+    healthTitle: "Sitzungsstatus", offersTotal: "Angebote gesamt",
   },
   settings: {
     email: "E-Mail-Versand", sendTest: "Test senden", testTo: "Empfänger-E-Mail", testHint: "Leer lassen, um an deine Admin-E-Mail zu senden.", cancel: "Abbrechen", testSent: "Test-E-Mail gesendet", testFailed: "Test-E-Mail fehlgeschlagen", provider: "Anbieter", resendKey: "Resend-API-Schlüssel", smtp: "E-Mail (SMTP)", host: "Host", port: "Port", username: "Benutzername",
@@ -389,6 +395,9 @@ const ar: Dict = {
     alert_needs_relink: "تحتاج إعادة ربط", alert_no_proxy: "لا بروكسي مخصّص", proxyExpiring: "البروكسي بينتهي خلال {n}ي", proxyExpired: "البروكسي منتهٍ",
     activeShort: "نشطة", offersChart: "العروض (14 يوم)", sessionBreakdown: "الجلسات حسب الحالة",
     topCompanies: "أعلى الشركات", stActive: "نشطة", stNeedsRelink: "تحتاج ربط", stExpired: "منتهية", stNoSession: "لا جلسة",
+    billingTitle: "الفوترة والاشتراكات", totalRevenue: "إجمالي الإيرادات", monthlyRevenue: "هذا الشهر", outstanding: "مستحقّات",
+    activeSubs: "اشتراكات نشطة", expiringSoon: "قرب الانتهاء", revenueChart: "الإيرادات شهرياً", revenueEmpty: "لا إيرادات بعد.",
+    healthTitle: "حالة الجلسات", offersTotal: "إجمالي العروض",
   },
   settings: {
     email: "إرسال البريد", sendTest: "إرسال تجريبي", testTo: "إيميل المستلم", testHint: "اتركه فاضي ليُرسَل لإيميل الأدمن تبعك.", cancel: "إلغاء", testSent: "تم إرسال إيميل التجربة", testFailed: "فشل إيميل التجربة", provider: "المزوّد", resendKey: "مفتاح Resend API", smtp: "البريد (SMTP)", host: "المضيف", port: "المنفذ", username: "اسم المستخدم",
