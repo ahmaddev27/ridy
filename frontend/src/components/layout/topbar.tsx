@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Bell, ChevronDown, LogOut, Volume2, VolumeX, Menu, X, Sun, Moon, HelpCircle } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Volume2, VolumeX, Menu, X, Sun, Moon, HelpCircle } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/context";
 import { useTheme } from "@/lib/theme/context";
@@ -82,15 +82,6 @@ export function Topbar() {
         >
           <Menu className="h-5 w-5" />
         </button>
-
-        {/* Search */}
-      <div className="relative hidden max-w-md flex-1 sm:block">
-        <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
-        <input
-          placeholder={t("topbar.search")}
-          className="w-full rounded-lg border border-line bg-surface-2 py-2 ps-9 pe-3 text-sm text-ink outline-none focus:border-ink focus:bg-surface focus:ring-2 focus:ring-line"
-        />
-      </div>
 
       <div className="ms-auto flex items-center gap-2">
         {/* Locale switch (functional) */}
