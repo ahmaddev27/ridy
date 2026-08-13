@@ -39,6 +39,8 @@ class SubscriptionCodeQuery
             'id' => $c->id,
             'code' => $c->code,
             'plan' => $c->plan?->name,
+            'plan_id' => $c->plan_id,
+            'tenant_id' => $c->tenant_id,
             'company' => $c->tenant?->name,
             'collector' => $c->collector?->name,
             'amount' => $c->amount !== null ? (float) $c->amount : null,

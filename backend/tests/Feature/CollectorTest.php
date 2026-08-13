@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Billing\Models\Plan;
+use App\Domain\Billing\Models\SubscriptionCode;
 use App\Domain\Collections\Models\Collector;
 use App\Domain\Collections\Models\CollectorPayment;
 use App\Domain\Tenancy\Models\Tenant;
@@ -50,14 +52,17 @@ class CollectorTest extends TestCase
         $this->assertDatabaseHas('collectors', ['name' => 'Ali', 'phone' => '+4915100']);
     }
 
-    public function test_index_reports_total_collected_per_collector(): void
+    public function test_index_reports_total_collected_from_issued_paid_codes(): void
     {
         Sanctum::actingAs($this->superAdmin());
         $collector = Collector::create(['name' => 'Ali']);
         $acme = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $plan = Plan::create(['name' => 'M', 'price' => 1, 'duration_days' => 30]);
 
-        CollectorPayment::create(['collector_id' => $collector->id, 'tenant_id' => $acme->id, 'amount' => 100.50, 'paid_on' => '2026-08-01']);
-        CollectorPayment::create(['collector_id' => $collector->id, 'tenant_id' => $acme->id, 'amount' => 200, 'paid_on' => '2026-08-05']);
+        SubscriptionCode::create(['code' => '111111', 'plan_id' => $plan->id, 'tenant_id' => $acme->id, 'collector_id' => $collector->id, 'amount' => 100.50, 'paid' => true, 'expires_at' => now()->addMinutes(10)]);
+        SubscriptionCode::create(['code' => '222222', 'plan_id' => $plan->id, 'tenant_id' => $acme->id, 'collector_id' => $collector->id, 'amount' => 200, 'paid' => true, 'expires_at' => now()->addMinutes(10)]);
+        // An unpaid code must not count toward the collected total.
+        SubscriptionCode::create(['code' => '333333', 'plan_id' => $plan->id, 'tenant_id' => $acme->id, 'collector_id' => $collector->id, 'amount' => 50, 'paid' => false, 'expires_at' => now()->addMinutes(10)]);
 
         $row = collect($this->getJson('/api/v1/admin/collectors')->assertOk()->json('data'))->firstWhere('name', 'Ali');
         $this->assertSame(300.5, $row['total_collected']);
@@ -87,12 +92,12 @@ class CollectorTest extends TestCase
         $this->postJson('/api/v1/login', ['email' => 'ali@reseller.de', 'password' => 'secret123'])->assertOk();
     }
 
-    public function test_deleting_a_collector_with_payments_is_blocked(): void
+    public function test_deleting_a_collector_with_issued_codes_is_blocked(): void
     {
         Sanctum::actingAs($this->superAdmin());
         $collector = Collector::create(['name' => 'Ali']);
         $acme = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
-        CollectorPayment::create(['collector_id' => $collector->id, 'tenant_id' => $acme->id, 'amount' => 50, 'paid_on' => '2026-08-01']);
+        SubscriptionCode::create(['code' => '111111', 'tenant_id' => $acme->id, 'collector_id' => $collector->id, 'amount' => 50, 'paid' => true, 'expires_at' => now()->addMinutes(10)]);
 
         $this->deleteJson("/api/v1/admin/collectors/{$collector->id}")
             ->assertStatus(422)

@@ -37,6 +37,8 @@ export type CodeRow = {
   id: number;
   code: string;
   plan: string | null;
+  plan_id: number | null;
+  tenant_id: number;
   company: string | null;
   collector: string | null;
   amount: number | null;
