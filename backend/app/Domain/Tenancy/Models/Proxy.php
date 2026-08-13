@@ -11,11 +11,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Proxy extends Model
 {
-    protected $fillable = ['label', 'url', 'capacity', 'notes', 'expires_at'];
+    protected $fillable = ['label', 'url', 'capacity', 'price', 'source', 'notes', 'expires_at'];
 
     protected $hidden = ['url'];
 
-    protected $casts = ['capacity' => 'integer', 'expires_at' => 'date'];
+    protected $casts = ['capacity' => 'integer', 'price' => 'decimal:2', 'expires_at' => 'date'];
 
     public function tenants(): HasMany
     {
