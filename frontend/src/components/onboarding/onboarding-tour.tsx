@@ -116,7 +116,7 @@ export function OnboardingTour() {
   const isLast = index === STEPS.length - 1;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-overlay p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-overlay p-4 backdrop-blur-sm">
       <div className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-surface shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-line px-5 py-3">
