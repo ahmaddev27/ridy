@@ -9,6 +9,7 @@ export type Status =
   | "connected"
   | "expiring"
   | "error"
+  | "info"
   | "neutral";
 
 const styles: Record<Status, string> = {
@@ -20,6 +21,7 @@ const styles: Record<Status, string> = {
   connected: "bg-success-bg text-success-fg ring-success-ring/20",
   expiring: "bg-warning-bg text-warning-fg ring-warning-ring/20",
   error: "bg-danger-bg text-danger-fg ring-danger-ring/20",
+  info: "bg-info-bg text-info-fg ring-info-ring/20",
   neutral: "bg-surface-2 text-ink-muted ring-line",
 };
 
@@ -27,6 +29,7 @@ const dotColors: Partial<Record<Status, string>> = {
   connected: "bg-success-ring",
   expiring: "bg-warning-ring",
   error: "bg-danger-ring",
+  info: "bg-info-ring",
 };
 
 export function Badge({
