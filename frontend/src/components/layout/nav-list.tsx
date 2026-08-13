@@ -49,7 +49,9 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
                 onClick={onNavigate}
                 className={cn(
                   "flex items-center justify-between rounded-xl px-3 py-2.5 font-medium transition-colors",
-                  active ? "bg-primary text-primary-ink shadow-sm" : "text-ink-muted hover:bg-surface-2",
+                  active
+                    ? "bg-primary text-primary-ink shadow-sm dark:bg-surface-2 dark:text-ink dark:ring-1 dark:ring-inset dark:ring-line-strong dark:shadow-none"
+                    : "text-ink-muted hover:bg-surface-2",
                 )}
               >
                 <span className="flex items-center gap-3">
