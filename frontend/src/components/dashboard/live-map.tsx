@@ -16,6 +16,39 @@ function escapeHtml(s: string): string {
 const STATUS_COLOR = (status: string | null): string => PRESENCE_COLOR[presence(status)];
 const statusLabel = (status: string | null, c: (k: string) => string): string => c(PRESENCE_LABEL_KEY[presence(status)]);
 
+type DriverMarker = {
+  marker: import("leaflet").Marker;
+  halo: import("leaflet").CircleMarker;
+  wp: import("leaflet").LayerGroup;
+  raf: number | null;
+};
+
+/**
+ * Glide a driver's marker + halo from its current point to the new one over a
+ * short duration (client-side only — no polling change, no server load), so cars
+ * slide smoothly between position updates instead of teleporting.
+ */
+function animateTo(entry: DriverMarker, from: import("leaflet").LatLng, to: [number, number]) {
+  if (entry.raf) cancelAnimationFrame(entry.raf);
+  const dLat = to[0] - from.lat;
+  const dLng = to[1] - from.lng;
+  if (Math.abs(dLat) < 1e-6 && Math.abs(dLng) < 1e-6) {
+    entry.marker.setLatLng(to);
+    entry.halo.setLatLng(to);
+    return;
+  }
+  const DURATION = 1400;
+  const start = performance.now();
+  const step = (now: number) => {
+    const t = Math.min(1, (now - start) / DURATION);
+    const at: [number, number] = [from.lat + dLat * t, from.lng + dLng * t];
+    entry.marker.setLatLng(at);
+    entry.halo.setLatLng(at);
+    entry.raf = t < 1 ? requestAnimationFrame(step) : null;
+  };
+  entry.raf = requestAnimationFrame(step);
+}
+
 
 /**
  * The live fleet map. Self-contained (own Leaflet instance + polling) so it can
@@ -31,6 +64,9 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
   const layerRef = useRef<LayerGroup | null>(null);
   const LRef = useRef<typeof import("leaflet") | null>(null);
   const firstFitRef = useRef(true);
+  // One persistent marker per driver, so positions animate (tween) between polls
+  // instead of the whole layer being cleared and redrawn (which made cars "jump").
+  const markersRef = useRef<Map<number, DriverMarker>>(new Map());
 
   const [count, setCount] = useState<number | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
@@ -58,46 +94,61 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
       }
       if (cancelled) return;
 
-      layer.clearLayers();
+      const registry = markersRef.current;
       const points: [number, number][] = [];
+      const seen = new Set<number>();
 
       for (const d of drivers) {
         const color = STATUS_COLOR(d.status);
-        points.push([d.lat, d.lng]);
+        const to: [number, number] = [d.lat, d.lng];
+        points.push(to);
+        seen.add(d.id);
 
-        // A soft halo ring around each driver so they stand out on the map.
-        L.circleMarker([d.lat, d.lng], { radius: 24, color, weight: 2, opacity: 0.5, fillColor: color, fillOpacity: 0.12 }).addTo(layer);
-
-        // Realistic top-view car photo, rotated to the driver's heading. The
-        // status color rides on the halo ring behind it.
         const rot = typeof d.heading === "number" ? d.heading : 0;
-        const icon = L.divIcon({
-          className: "",
-          iconSize: [42, 42],
-          iconAnchor: [21, 21],
-          html: `<img src="/markers/car.png" alt="" style="width:42px;height:42px;transform:rotate(${rot}deg);filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))"/>`,
-        });
-        L.marker([d.lat, d.lng], { icon })
-          .bindPopup(`<b>${escapeHtml(d.name)}</b><br>${escapeHtml(statusLabel(d.status, c))}`)
-          .addTo(layer);
+        const carHtml = `<img src="/markers/car.png" alt="" style="width:42px;height:42px;transform:rotate(${rot}deg);filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))"/>`;
+        const popup = `<b>${escapeHtml(d.name)}</b><br>${escapeHtml(statusLabel(d.status, c))}`;
 
+        let entry = registry.get(d.id);
+        if (!entry) {
+          // First sighting — create the halo + car marker at the position.
+          const halo = L.circleMarker(to, { radius: 24, color, weight: 2, opacity: 0.5, fillColor: color, fillOpacity: 0.12 }).addTo(layer);
+          const marker = L.marker(to, {
+            icon: L.divIcon({ className: "", iconSize: [42, 42], iconAnchor: [21, 21], html: carHtml }),
+          }).bindPopup(popup).addTo(layer);
+          entry = { marker, halo, wp: L.layerGroup().addTo(layer), raf: null };
+          registry.set(d.id, entry);
+        } else {
+          // Existing — glide from the current spot to the new one; refresh style.
+          entry.halo.setStyle({ color, fillColor: color });
+          entry.marker.setIcon(L.divIcon({ className: "", iconSize: [42, 42], iconAnchor: [21, 21], html: carHtml }));
+          entry.marker.getPopup()?.setContent(popup);
+          animateTo(entry, entry.marker.getLatLng(), to);
+        }
+
+        // Waypoints (pickup/dropoff route) are cheap to redraw each poll.
+        entry.wp.clearLayers();
         const wp = d.waypoints ?? [];
         if (wp.length >= 2) {
           const line = wp.map((w) => [w.lat, w.lng]) as [number, number][];
-          L.polyline(line, { color, weight: 3, opacity: 0.5, dashArray: "6 6" }).addTo(layer);
+          L.polyline(line, { color, weight: 3, opacity: 0.5, dashArray: "6 6" }).addTo(entry.wp);
           for (const w of wp) {
             const isPickup = (w.type ?? "").toUpperCase().includes("PICKUP");
-            L.circleMarker([w.lat, w.lng], {
-              radius: 5,
-              color: "#fff",
-              weight: 2,
-              fillColor: isPickup ? "#2563eb" : "#dc2626",
-              fillOpacity: 1,
-            })
+            L.circleMarker([w.lat, w.lng], { radius: 5, color: "#fff", weight: 2, fillColor: isPickup ? "#2563eb" : "#dc2626", fillOpacity: 1 })
               .bindPopup(isPickup ? c("pickup") : c("dropoff"))
-              .addTo(layer);
+              .addTo(entry.wp);
             points.push([w.lat, w.lng]);
           }
+        }
+      }
+
+      // Remove drivers that dropped off the feed.
+      for (const [id, entry] of registry) {
+        if (!seen.has(id)) {
+          if (entry.raf) cancelAnimationFrame(entry.raf);
+          layer.removeLayer(entry.marker);
+          layer.removeLayer(entry.halo);
+          layer.removeLayer(entry.wp);
+          registry.delete(id);
         }
       }
 
@@ -128,6 +179,11 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
     return () => {
       cancelled = true;
       clearInterval(timer);
+      // Stop any in-flight marker animations before tearing down the map.
+      for (const entry of markersRef.current.values()) {
+        if (entry.raf) cancelAnimationFrame(entry.raf);
+      }
+      markersRef.current.clear();
       mapRef.current?.remove();
       mapRef.current = null;
     };
