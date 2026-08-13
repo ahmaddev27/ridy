@@ -150,7 +150,7 @@ class BillingReportController extends Controller
     private function invoiceQuery(Request $request): Builder
     {
         return SubscriptionPeriod::query()
-            ->with('tenant:id,name')
+            ->with(['tenant:id,name', 'code.plan:id,name', 'code.collector:id,name'])
             ->when($request->filled('tenant_id'), fn (Builder $q) => $q->where('tenant_id', $request->integer('tenant_id')))
             ->orderByDesc('starts_at')
             ->orderByDesc('id');
@@ -179,6 +179,8 @@ class BillingReportController extends Controller
     /** @return array<string, mixed> */
     private function present(SubscriptionPeriod $p): array
     {
+        $code = $p->code;
+
         return [
             'id' => $p->id,
             'tenant_id' => $p->tenant_id,
@@ -190,6 +192,21 @@ class BillingReportController extends Controller
             'collector_payment_id' => $p->collector_payment_id,
             'starts_at' => $p->starts_at->toDateString(),
             'ends_at' => $p->ends_at->toDateString(),
+            // The activation code that produced this invoice + its plan, so the
+            // Subscriptions table can show a code badge + plan and open a detail modal.
+            'plan' => $code?->plan?->name,
+            'code' => $code ? [
+                'id' => $code->id,
+                'code' => $code->code,
+                'plan' => $code->plan?->name,
+                'collector' => $code->collector?->name,
+                'amount' => $code->amount !== null ? (float) $code->amount : null,
+                'paid' => (bool) $code->paid,
+                'status' => $code->status(),
+                'created_at' => $code->created_at?->toIso8601String(),
+                'activated_at' => $code->activated_at?->toDateString(),
+                'expires_at' => $code->expires_at?->toIso8601String(),
+            ] : null,
         ];
     }
 }

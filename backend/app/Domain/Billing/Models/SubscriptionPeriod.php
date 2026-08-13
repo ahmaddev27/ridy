@@ -6,6 +6,7 @@ use App\Domain\Collections\Models\CollectorPayment;
 use App\Domain\Tenancy\Models\Tenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * A paid subscription period ("invoice"), created when a company activates or
@@ -37,5 +38,11 @@ class SubscriptionPeriod extends Model
     public function collectorPayment(): BelongsTo
     {
         return $this->belongsTo(CollectorPayment::class);
+    }
+
+    /** The activation code that created this period (linked when it was used). */
+    public function code(): HasOne
+    {
+        return $this->hasOne(SubscriptionCode::class);
     }
 }
