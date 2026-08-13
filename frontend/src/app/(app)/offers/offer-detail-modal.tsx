@@ -177,12 +177,14 @@ function parseFareNum(s: string | null | undefined): number | null {
   return Number.isFinite(v) ? v : null;
 }
 
-/** Price per km — prefer the backend value; else compute from fare + distance. */
+/** Price per km — prefer the backend value; else compute from any known fare + distance. */
 function pricePerKm(offer: DispatchOfferDetail): number | null {
-  if (!offer.trip) return null;
-  if (offer.trip.price_per_km != null) return offer.trip.price_per_km;
-  const fare = parseFareNum(offer.fare_formatted);
-  return fare != null && offer.trip.distance_km ? fare / offer.trip.distance_km : null;
+  const trip = offer.trip;
+  if (!trip || !trip.distance_km) return null;
+  if (trip.price_per_km != null) return trip.price_per_km;
+  // Fall back to the numeric fare (from the offer) or the parsed formatted fare.
+  const fare = trip.fare_amount ?? parseFareNum(offer.fare_formatted);
+  return fare != null ? fare / trip.distance_km : null;
 }
 
 function extractStops(raw: Record<string, unknown> | null | undefined): string[] {
