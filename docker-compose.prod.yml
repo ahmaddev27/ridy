@@ -6,6 +6,31 @@
 #
 #   docker compose -f docker-compose.prod.yml up -d --build
 
+# Shared Laravel environment for the backend + the scheduler (kept in one place
+# via a YAML anchor so the two never drift).
+x-app-env: &app-env
+  APP_NAME: Ridy
+  APP_ENV: production
+  APP_KEY: ${APP_KEY}
+  APP_DEBUG: "false"
+  APP_URL: https://${DOMAIN}
+  FRONTEND_URL: https://${DOMAIN}
+  SANCTUM_STATEFUL_DOMAINS: ${DOMAIN}
+  SESSION_DOMAIN: ${DOMAIN}
+  SESSION_DRIVER: database
+  CACHE_STORE: database
+  QUEUE_CONNECTION: database
+  DB_CONNECTION: mysql
+  DB_HOST: mysql
+  DB_PORT: 3306
+  DB_DATABASE: ${DB_DATABASE}
+  DB_USERNAME: ${DB_USERNAME}
+  DB_PASSWORD: ${DB_PASSWORD}
+  DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
+  FCM_SERVER_KEY: ${FCM_SERVER_KEY}
+  # Fixed OTP for testing — leave OTP_TEST_CODE unset in prod for random codes.
+  OTP_TEST_CODE: ${OTP_TEST_CODE:-}
+
 services:
   # --- Caddy — TLS edge + reverse proxy -------------------------------------
   caddy:
@@ -53,27 +78,25 @@ services:
       mysql:
         condition: service_healthy
     environment:
-      APP_NAME: Ridy
-      APP_ENV: production
-      APP_KEY: ${APP_KEY}
-      APP_DEBUG: "false"
-      APP_URL: https://${DOMAIN}
-      FRONTEND_URL: https://${DOMAIN}
-      SANCTUM_STATEFUL_DOMAINS: ${DOMAIN}
-      SESSION_DOMAIN: ${DOMAIN}
-      SESSION_DRIVER: database
-      CACHE_STORE: database
-      QUEUE_CONNECTION: database
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_DATABASE: ${DB_DATABASE}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
-      FCM_SERVER_KEY: ${FCM_SERVER_KEY}
-      # Fixed OTP for testing — leave OTP_TEST_CODE unset in prod for random codes.
-      OTP_TEST_CODE: ${OTP_TEST_CODE:-}
+      <<: *app-env
+    volumes:
+      - ./backend:/var/www
+      - /var/www/vendor
+
+  # --- Scheduler — runs Laravel's cron (offers:expire-pending, …) -----------
+  # Reuses the backend image but runs `schedule:work` instead of PHP-FPM, so no
+  # host crontab is needed. One long-running process ticks every minute.
+  scheduler:
+    build:
+      context: .
+      dockerfile: ./docker/backend.Dockerfile
+    restart: unless-stopped
+    command: php artisan schedule:work
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      <<: *app-env
     volumes:
       - ./backend:/var/www
       - /var/www/vendor
