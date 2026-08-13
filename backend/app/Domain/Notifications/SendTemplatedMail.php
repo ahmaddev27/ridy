@@ -19,8 +19,15 @@ class SendTemplatedMail
             return; // template missing — nothing to send
         }
 
-        Mail::html($rendered['html'], function ($message) use ($email, $rendered) {
+        $logo = public_path('email/reidey-logo.png');
+        $embedLogo = str_contains($rendered['html'], 'cid:reidey-logo.png') && is_file($logo);
+
+        Mail::html($rendered['html'], function ($message) use ($email, $rendered, $embedLogo, $logo) {
             $message->to($email)->subject($rendered['subject']);
+            // Inline the brand logo by Content-ID so it renders without a reachable URL.
+            if ($embedLogo) {
+                $message->embedData(file_get_contents($logo), 'reidey-logo.png', 'image/png');
+            }
         });
     }
 }
