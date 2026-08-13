@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, RefreshCw, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge, type Status } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ type Props = {
   exportCodes?: (filters: CodeFilters) => Promise<Blob>;
   /** Admin view shows who issued the code; a reseller's own list doesn't. */
   showCollector?: boolean;
+  /** When set, expired codes get a "regenerate" button that issues a fresh one. */
+  onRegenerate?: (row: CodeRow) => Promise<void>;
 };
 
 const STATUS_TONE: Record<CodeStatus, Status> = {
@@ -28,7 +30,7 @@ const STATUS_TONE: Record<CodeStatus, Status> = {
  * Shared by the reseller's own list and the admin-wide ledger — the only
  * difference is the data source and whether the collector column shows.
  */
-export function CodesLedger({ fetchCodes, exportCodes, showCollector = false }: Props) {
+export function CodesLedger({ fetchCodes, exportCodes, showCollector = false, onRegenerate }: Props) {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.codes.${k}`);
 
@@ -39,6 +41,8 @@ export function CodesLedger({ fetchCodes, exportCodes, showCollector = false }: 
   const [rows, setRows] = useState<CodeRow[]>([]);
   const [meta, setMeta] = useState<CodesPage["meta"]>({ current_page: 1, last_page: 1, total: 0 });
   const [loading, setLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [regenId, setRegenId] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -55,7 +59,18 @@ export function CodesLedger({ fetchCodes, exportCodes, showCollector = false }: 
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, from, to, page]);
+  }, [status, from, to, page, refreshKey]);
+
+  async function regenerate(row: CodeRow) {
+    if (!onRegenerate) return;
+    setRegenId(row.id);
+    try {
+      await onRegenerate(row);
+      setRefreshKey((k) => k + 1); // reflect the fresh code in the list
+    } finally {
+      setRegenId(null);
+    }
+  }
 
   const money = (n: number | null) =>
     n === null ? c("none") : new Intl.NumberFormat(latnLocale(locale), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
@@ -135,6 +150,7 @@ export function CodesLedger({ fetchCodes, exportCodes, showCollector = false }: 
               <th className="px-2 py-2 text-start font-medium">{c("colStatus")}</th>
               <th className="px-2 py-2 text-start font-medium">{c("colCreated")}</th>
               <th className="px-2 py-2 text-start font-medium">{c("colExpires")}</th>
+              {onRegenerate && <th className="px-2 py-2" />}
             </tr>
           </thead>
           <tbody>
@@ -151,10 +167,25 @@ export function CodesLedger({ fetchCodes, exportCodes, showCollector = false }: 
                 <td className="px-2 py-2"><Badge status={STATUS_TONE[r.status]}>{c(`st_${r.status}`)}</Badge></td>
                 <td className="px-2 py-2 text-ink-muted" dir="ltr">{date(r.created_at)}</td>
                 <td className="px-2 py-2 text-ink-muted" dir="ltr">{date(r.expires_at)}</td>
+                {onRegenerate && (
+                  <td className="px-2 py-2 text-end">
+                    {r.status === "expired" && r.plan_id !== null && (
+                      <button
+                        onClick={() => regenerate(r)}
+                        disabled={regenId !== null}
+                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-ink-muted hover:bg-surface-2 hover:text-ink disabled:opacity-50"
+                        title={c("regenerate")}
+                      >
+                        {regenId === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                        {c("regenerate")}
+                      </button>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={showCollector ? 8 : 7} className="px-2 py-8 text-center text-ink-subtle">{c("empty")}</td></tr>
+              <tr><td colSpan={(showCollector ? 8 : 7) + (onRegenerate ? 1 : 0)} className="px-2 py-8 text-center text-ink-subtle">{c("empty")}</td></tr>
             )}
           </tbody>
         </table>

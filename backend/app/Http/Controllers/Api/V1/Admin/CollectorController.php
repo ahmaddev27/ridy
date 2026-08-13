@@ -20,11 +20,15 @@ class CollectorController extends Controller
 {
     public function index(): JsonResponse
     {
+        // Totals come from the paid codes the collector issued — every code a
+        // reseller generates is a paid record (the fleet pays for it up front).
+        $paid = fn ($q) => $q->where('paid', true);
+
         $collectors = Collector::query()
             ->with('user:id,email')
-            ->withCount('payments')
-            ->withSum('payments as total_collected', 'amount')
-            ->withMax('payments as last_paid_on', 'paid_on')
+            ->withCount(['subscriptionCodes as payments_count' => $paid])
+            ->withSum(['subscriptionCodes as total_collected' => $paid], 'amount')
+            ->withMax(['subscriptionCodes as last_paid_on' => $paid], 'created_at')
             ->orderBy('name')
             ->get()
             ->map(fn (Collector $c) => $this->present($c));
@@ -52,9 +56,9 @@ class CollectorController extends Controller
 
     public function destroy(Collector $collector): JsonResponse
     {
-        // Deleting would cascade the whole payment ledger — block it so financial
-        // history is never lost by accident. The admin must clear payments first.
-        if ($collector->payments()->exists()) {
+        // Block deletion while the collector has issued codes, so their billing
+        // attribution is never lost by accident.
+        if ($collector->subscriptionCodes()->exists()) {
             return response()->json(['message' => 'collector_has_payments'], 422);
         }
 

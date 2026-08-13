@@ -185,7 +185,20 @@ export default function ResellerPage() {
           <h2 className="text-lg font-semibold text-ink">{c("myCodesTitle")}</h2>
           <p className="text-sm text-ink-muted">{c("myCodesDesc")}</p>
         </div>
-        <CodesLedger key={code?.code ?? "list"} fetchCodes={getResellerCodes} />
+        <CodesLedger
+          key={code?.code ?? "list"}
+          fetchCodes={getResellerCodes}
+          onRegenerate={async (row) => {
+            if (!row.plan_id) return;
+            try {
+              const res = await generateResellerCode(row.tenant_id, row.plan_id);
+              setCode(res);
+              toast.success(c("generated"));
+            } catch (e) {
+              toast.error(c("failed"), { description: e instanceof Error ? e.message : undefined });
+            }
+          }}
+        />
       </section>
     </div>
   );
