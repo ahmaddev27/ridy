@@ -83,7 +83,7 @@ export default function ProfilePage() {
                     : "text-ink-muted hover:bg-surface-2 hover:text-ink")
                 }
               >
-                <Icon className={"h-4 w-4 shrink-0 " + (active ? "text-white" : "text-ink-subtle group-hover:text-ink-muted")} />
+                <Icon className={"h-4 w-4 shrink-0 " + (active ? "text-primary-ink" : "text-ink-subtle group-hover:text-ink-muted")} />
                 {c(`tab_${k}`)}
               </button>
             );
