@@ -234,13 +234,15 @@ export type Proxy = {
   used: number;
   free: number;
   near_full: boolean;
+  price: number | null;
+  source: string | null;
   notes: string | null;
   expires_at: string | null;
   days_left: number | null;
   expiring: boolean;
 };
 
-export type ProxyInput = { label: string; url?: string; capacity: number; notes?: string; expires_at?: string };
+export type ProxyInput = { label: string; url?: string; capacity: number; price?: number; source?: string; notes?: string; expires_at?: string };
 
 const proxyBase = "/api/v1/admin/proxies";
 

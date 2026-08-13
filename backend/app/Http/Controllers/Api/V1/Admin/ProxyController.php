@@ -55,6 +55,8 @@ class ProxyController extends Controller
             'label' => ['required', 'string', 'max:255'],
             'url' => [$creating ? 'required' : 'nullable', 'string', 'max:1000'],
             'capacity' => ['required', 'integer', 'min:1', 'max:10000'],
+            'price' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
+            'source' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:500'],
             'expires_at' => ['nullable', 'date'],
         ]);
@@ -77,6 +79,8 @@ class ProxyController extends Controller
             'used' => $used,
             'free' => max(0, $p->capacity - $used),
             'near_full' => $p->capacity > 0 && $used / $p->capacity >= 0.8,
+            'price' => $p->price !== null ? (float) $p->price : null,
+            'source' => $p->source,
             'notes' => $p->notes,
             'expires_at' => $p->expires_at?->toDateString(),
             'days_left' => $daysLeft,

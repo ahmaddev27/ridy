@@ -66,6 +66,7 @@ export default function ProxiesPage() {
                   <th className="px-4 py-3 font-semibold">{c("colLabel")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colUrl")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colUsage")}</th>
+                  <th className="px-4 py-3 font-semibold">{c("colCost")}</th>
                   <th className="px-4 py-3 font-semibold">{c("fieldNotes")}</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -106,6 +107,14 @@ export default function ProxiesPage() {
                           </span>
                         )}
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {p.price != null ? (
+                        <div className="font-medium tabular-nums text-ink">€{p.price.toFixed(2)}</div>
+                      ) : (
+                        <span className="text-ink-subtle">—</span>
+                      )}
+                      {p.source && <div className="text-xs text-ink-subtle">{p.source}</div>}
                     </td>
                     <td className="max-w-[220px] truncate px-4 py-3 text-ink-muted" title={p.notes ?? ""}>{p.notes || "—"}</td>
                     <td className="px-4 py-3 text-end">
@@ -151,6 +160,8 @@ function ProxyModal({ proxy, onClose, onSaved }: { proxy: Proxy | null; onClose:
   const [label, setLabel] = useState(proxy?.label ?? "");
   const [url, setUrl] = useState("");
   const [capacity, setCapacity] = useState(String(proxy?.capacity ?? 10));
+  const [price, setPrice] = useState(proxy?.price != null ? String(proxy.price) : "");
+  const [source, setSource] = useState(proxy?.source ?? "");
   const [notes, setNotes] = useState(proxy?.notes ?? "");
   const [expiresAt, setExpiresAt] = useState(proxy?.expires_at ?? "");
   const [busy, setBusy] = useState(false);
@@ -159,7 +170,15 @@ function ProxyModal({ proxy, onClose, onSaved }: { proxy: Proxy | null; onClose:
     if (!label.trim() || (!proxy && !url.trim())) return;
     setBusy(true);
     try {
-      const input = { label: label.trim(), capacity: Number(capacity) || 1, notes: notes.trim() || undefined, expires_at: expiresAt || undefined, ...(url.trim() ? { url: url.trim() } : {}) };
+      const input = {
+        label: label.trim(),
+        capacity: Number(capacity) || 1,
+        price: price.trim() ? Number(price) : undefined,
+        source: source.trim() || undefined,
+        notes: notes.trim() || undefined,
+        expires_at: expiresAt || undefined,
+        ...(url.trim() ? { url: url.trim() } : {}),
+      };
       if (proxy) await updateProxy(proxy.id, input);
       else await createProxy(input);
       toast.success(c("saved"));
@@ -196,6 +215,10 @@ function ProxyModal({ proxy, onClose, onSaved }: { proxy: Proxy | null; onClose:
           placeholder={proxy ? "••••••  (leave blank to keep)" : "http://user:pass@host:port"}
         />
         <Field label={c("fieldCapacity")} type="number" value={capacity} onChange={setCapacity} />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={c("fieldPrice")} type="number" value={price} onChange={setPrice} placeholder="0.00" />
+          <Field label={c("fieldSource")} value={source} onChange={setSource} placeholder={c("sourcePlaceholder")} />
+        </div>
         <Field label={c("fieldExpires")} type="date" value={expiresAt} onChange={setExpiresAt} />
         <Field label={c("fieldNotes")} value={notes} onChange={setNotes} />
       </div>
