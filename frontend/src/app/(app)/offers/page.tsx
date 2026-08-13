@@ -167,7 +167,7 @@ export default function OffersPage() {
         <div className="relative">
           <button
             onClick={() => setDriverFilterOpen((o) => !o)}
-            className="flex items-center gap-2 rounded-lg border border-line-strong px-3 py-2 text-sm text-ink-muted outline-none hover:bg-surface-2"
+            className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none hover:bg-surface-2"
           >
             {driverUuids.length === 0
               ? c("filterAll")
@@ -214,7 +214,7 @@ export default function OffersPage() {
           value={from}
           onChange={(e) => setFrom(e.target.value)}
           title={c("dateFrom")}
-          className="rounded-lg border border-line-strong px-3 py-2 text-sm text-ink-muted outline-none focus:border-black"
+          className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line"
         />
         <span className="text-ink-subtle">–</span>
         <input
@@ -222,7 +222,7 @@ export default function OffersPage() {
           value={to}
           onChange={(e) => setTo(e.target.value)}
           title={c("dateTo")}
-          className="rounded-lg border border-line-strong px-3 py-2 text-sm text-ink-muted outline-none focus:border-black"
+          className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line"
         />
         {(from || to) && (
           <button
