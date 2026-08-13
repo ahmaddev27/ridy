@@ -243,20 +243,23 @@ export default function DriverProfilePage() {
         </div>
       ) : (
         /* Details tab */
-        <Card className="divide-y divide-line">
-          <DetailRow icon={Star} label={d("colRating")}>
-            {driver?.rating != null ? (
-              <span className="inline-flex items-center gap-1">
-                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {driver.rating.toFixed(2)}
-              </span>
-            ) : "—"}
-          </DetailRow>
-          <DetailRow icon={Car} label={d("colTrips")}>{driver?.total_trips != null ? driver.total_trips.toLocaleString() : "—"}</DetailRow>
-          <DetailRow icon={Phone} label={d("colPhone")}>{driver?.phone ? <span dir="ltr">{driver.phone}</span> : "—"}</DetailRow>
-          <DetailRow icon={Mail} label={d("email")}>{driver?.uber_email ? <span dir="ltr">{driver.uber_email}</span> : "—"}</DetailRow>
-          <DetailRow icon={UserCheck} label={d("linkMethod")}>
-            {driver?.uber_link_method ? d(`linkMethod_${driver.uber_link_method}`) : "—"}
-          </DetailRow>
+        <Card className="p-4 sm:p-5">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <InfoTile icon={Star} label={d("colRating")} tone="amber">
+              {driver?.rating != null ? (
+                <span className="inline-flex items-center gap-1">
+                  {driver.rating.toFixed(2)}
+                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                </span>
+              ) : "—"}
+            </InfoTile>
+            <InfoTile icon={Car} label={d("colTrips")}>{driver?.total_trips != null ? driver.total_trips.toLocaleString() : "—"}</InfoTile>
+            <InfoTile icon={Phone} label={d("colPhone")}>{driver?.phone ? <span dir="ltr">{driver.phone}</span> : "—"}</InfoTile>
+            <InfoTile icon={Mail} label={d("email")}>{driver?.uber_email ? <span dir="ltr">{driver.uber_email}</span> : "—"}</InfoTile>
+            <InfoTile icon={UserCheck} label={d("linkMethod")}>
+              {driver?.uber_link_method ? d(`linkMethod_${driver.uber_link_method}`) : "—"}
+            </InfoTile>
+          </div>
         </Card>
       )}
     </div>
@@ -298,13 +301,27 @@ function PerfCard({
   );
 }
 
-function DetailRow({ icon: Icon, label, children }: { icon: React.ComponentType<{ className?: string }>; label: string; children: React.ReactNode }) {
+function InfoTile({
+  icon: Icon,
+  label,
+  tone = "default",
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  tone?: "default" | "amber";
+  children: React.ReactNode;
+}) {
+  const chip = tone === "amber" ? "bg-warning-bg text-warning-fg" : "bg-surface-2 text-ink-muted";
   return (
-    <div className="flex items-center justify-between gap-4 px-5 py-3.5">
-      <dt className="flex items-center gap-2 text-sm text-ink-muted">
-        <Icon className="h-4 w-4 text-ink-subtle" /> {label}
-      </dt>
-      <dd className="min-w-0 truncate text-sm font-medium text-ink">{children}</dd>
+    <div className="flex items-center gap-3 rounded-xl border border-line bg-surface-2/40 p-3.5">
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${chip}`}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <div className="min-w-0">
+        <div className="text-[11px] font-medium uppercase tracking-wide text-ink-subtle">{label}</div>
+        <div className="truncate text-sm font-semibold text-ink">{children}</div>
+      </div>
     </div>
   );
 }
