@@ -92,18 +92,33 @@ class CollectorTest extends TestCase
         $this->postJson('/api/v1/login', ['email' => 'ali@reseller.de', 'password' => 'secret123'])->assertOk();
     }
 
-    public function test_deleting_a_collector_with_issued_codes_is_blocked(): void
+    public function test_deleting_a_collector_removes_its_login_and_keeps_codes(): void
     {
         Sanctum::actingAs($this->superAdmin());
-        $collector = Collector::create(['name' => 'Ali']);
+        // A collector with a reseller login + an issued code.
+        $this->postJson('/api/v1/admin/collectors', ['name' => 'Ali', 'email' => 'ali@reseller.de', 'password' => 'secret123'])->assertCreated();
+        $collector = Collector::first();
         $acme = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
-        SubscriptionCode::create(['code' => '111111', 'tenant_id' => $acme->id, 'collector_id' => $collector->id, 'amount' => 50, 'paid' => true, 'expires_at' => now()->addMinutes(10)]);
+        $code = SubscriptionCode::create(['code' => '111111', 'tenant_id' => $acme->id, 'collector_id' => $collector->id, 'amount' => 50, 'paid' => true, 'expires_at' => now()->addMinutes(10)]);
 
-        $this->deleteJson("/api/v1/admin/collectors/{$collector->id}")
-            ->assertStatus(422)
-            ->assertJsonPath('message', 'collector_has_payments');
+        $this->deleteJson("/api/v1/admin/collectors/{$collector->id}")->assertOk();
 
-        $this->assertDatabaseHas('collectors', ['id' => $collector->id]);
+        // The collector + its login are gone; the code survives with attribution nulled.
+        $this->assertDatabaseMissing('collectors', ['id' => $collector->id]);
+        $this->assertDatabaseMissing('users', ['email' => 'ali@reseller.de']);
+        $this->assertDatabaseHas('subscription_codes', ['id' => $code->id, 'collector_id' => null]);
+    }
+
+    public function test_deleting_a_reseller_user_also_removes_its_collector(): void
+    {
+        Sanctum::actingAs($this->superAdmin());
+        $this->postJson('/api/v1/admin/collectors', ['name' => 'Ali', 'email' => 'ali@reseller.de', 'password' => 'secret123'])->assertCreated();
+        $collector = Collector::first();
+
+        $this->deleteJson("/api/v1/admin/users/{$collector->user_id}")->assertOk();
+
+        $this->assertDatabaseMissing('users', ['email' => 'ali@reseller.de']);
+        $this->assertDatabaseMissing('collectors', ['id' => $collector->id]);
     }
 
     public function test_records_a_payment_and_filters_the_ledger_by_company(): void
