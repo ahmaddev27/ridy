@@ -2,8 +2,10 @@
 
 namespace App\Domain\Dispatch\Models;
 
+use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Concerns\BelongsToTenant;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -22,6 +24,7 @@ class DispatchOffer extends Model
         'requested_at', 'offer_generated_at', 'received_at', 'accepted_at', 'raw_payload',
         'pickup_lat', 'pickup_lng', 'dropoff_lat', 'dropoff_lng',
         'distance_m', 'route_geometry', 'geo_synced_at',
+        'status', 'fare_amount', 'started_at', 'completed_at', 'rejected_at', 'canceled_at',
     ];
 
     protected $casts = [
@@ -39,10 +42,27 @@ class DispatchOffer extends Model
         'distance_m' => 'integer',
         'route_geometry' => 'array',
         'geo_synced_at' => 'datetime',
+        'status' => OfferStatus::class,
+        'fare_amount' => 'decimal:2',
+        'started_at' => 'datetime',
+        'completed_at' => 'datetime',
+        'rejected_at' => 'datetime',
+        'canceled_at' => 'datetime',
     ];
 
     public function driver(): BelongsTo
     {
         return $this->belongsTo(Driver::class);
+    }
+
+    /** Offers that were ever accepted (taken), regardless of final state. */
+    public function scopeTaken(Builder $query): Builder
+    {
+        return $query->whereNotNull('accepted_at');
+    }
+
+    public function scopeCompleted(Builder $query): Builder
+    {
+        return $query->where('status', OfferStatus::Completed);
     }
 }

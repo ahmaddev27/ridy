@@ -3,6 +3,7 @@
 namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Fleet\DriverStatsService;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\DispatchNotifier;
 use App\Domain\Tenancy\TenantContext;
@@ -64,10 +65,12 @@ class DispatchOfferIngestor
                 'pickup_address' => Arr::get($offer, 'pickupAddress'),
                 'dropoff_address' => Arr::get($offer, 'dropoffAddress'),
                 'fare_formatted' => Arr::get($offer, 'formattedUFP'),
+                'fare_amount' => DriverStatsService::parseFare(Arr::get($offer, 'formattedUFP')) ?: null,
                 'accept_window_seconds' => Arr::get($offer, 'acceptWindowInSeconds'),
                 'requested_at' => $this->millisToDate(Arr::get($offer, 'requestAt')),
                 'offer_generated_at' => $this->millisToDate(Arr::get($offer, 'offerGeneratedAtMs')),
                 'received_at' => CarbonImmutable::now(),
+                'status' => OfferStatus::Pending,
                 'raw_payload' => $offer,
             ]);
         } catch (QueryException $e) {
