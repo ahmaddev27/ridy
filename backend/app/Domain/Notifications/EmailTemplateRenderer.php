@@ -88,11 +88,11 @@ HTML;
             return '<img src="'.$src.'" alt="Reidey" style="max-height:48px;margin-bottom:20px">';
         }
 
-        // Preview embeds the logo (renders regardless of a reachable host); real
-        // emails reference the hosted PNG (works in Gmail, which strips data URIs).
-        $src = $inlineAssets
-            ? $this->inlineLogo()
-            : htmlspecialchars($this->absoluteUrl('email/reidey-logo.png'), ENT_QUOTES);
+        // Preview embeds the logo as a data URI (renders offline in the browser).
+        // Real emails reference it by Content-ID — the Mailable attaches the PNG
+        // inline (see SendTemplatedMail), so it renders in every client without
+        // depending on a reachable APP_URL or proxy routing.
+        $src = $inlineAssets ? $this->inlineLogo() : 'cid:reidey-logo.png';
 
         return <<<HTML
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:20px;border-collapse:collapse">

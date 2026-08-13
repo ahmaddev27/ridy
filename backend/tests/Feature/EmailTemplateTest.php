@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Notifications\EmailTemplateRenderer;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -44,6 +45,21 @@ class EmailTemplateTest extends TestCase
         $this->assertStringContainsString('YA Mobility', $res->json('data.subject'));
         $this->assertStringContainsString('#ff0000', $html);
         $this->assertStringNotContainsString('{{driver_name}}', $html);
+    }
+
+    public function test_real_email_references_the_logo_by_cid_preview_inlines_it(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $this->artisan('migrate');
+        $renderer = app(EmailTemplateRenderer::class);
+
+        // Real email: logo by Content-ID (the Mailable attaches the PNG inline).
+        $real = $renderer->render('driver_invite', []);
+        $this->assertStringContainsString('cid:reidey-logo.png', $real['html']);
+
+        // Preview: inlined as a data URI so it renders in the browser.
+        $preview = $renderer->render('driver_invite', [], inlineAssets: true);
+        $this->assertStringContainsString('data:image/png;base64', $preview['html']);
     }
 
     public function test_manager_cannot_reach_templates(): void
