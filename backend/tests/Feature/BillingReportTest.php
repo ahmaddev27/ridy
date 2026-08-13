@@ -46,6 +46,13 @@ class BillingReportTest extends TestCase
         $this->assertSame(30, $invoice->days);
         $this->assertSame('120.00', $invoice->amount);
         $this->assertTrue($invoice->isPaid());
+
+        // The invoices list carries the linked code + plan for the Subscriptions page.
+        $this->getJson('/api/v1/admin/subscription-invoices')->assertOk()
+            ->assertJsonPath('data.0.plan', 'Monthly')
+            ->assertJsonPath('data.0.code.code', $code)
+            ->assertJsonPath('data.0.code.status', 'activated')
+            ->assertJsonPath('data.0.code.paid', true);
     }
 
     public function test_unpaid_invoice_is_settled_by_linking_a_collector_payment(): void

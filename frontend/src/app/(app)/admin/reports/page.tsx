@@ -11,6 +11,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Select } from "@/components/ui/select";
+import { Badge, type Status } from "@/components/ui/badge";
+import { CodeDetailModal } from "@/components/billing/code-detail-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import {
@@ -45,6 +47,14 @@ export default function ReportsPage() {
   const [tenantId, setTenantId] = useState<number | undefined>(undefined);
   const [invoices, setInvoices] = useState<SubscriptionInvoice[]>([]);
   const [settling, setSettling] = useState<SubscriptionInvoice | null>(null);
+  const [codeDetail, setCodeDetail] = useState<SubscriptionInvoice | null>(null);
+
+  // Code lifecycle → badge tone (matches the code-detail modal).
+  const CODE_TONE: Record<NonNullable<SubscriptionInvoice["code"]>["status"], Status> = {
+    activated: "matched",
+    pending: "expiring",
+    expired: "error",
+  };
 
   async function loadInvoices() {
     try {
@@ -215,6 +225,8 @@ export default function ReportsPage() {
                 <tr>
                   <th className="px-4 py-3 font-semibold">{c("colInvoice")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colCompany")}</th>
+                  <th className="px-4 py-3 font-semibold">{c("colPlan")}</th>
+                  <th className="px-4 py-3 font-semibold">{c("colCode")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colDays")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colAmount")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colStatus")}</th>
@@ -228,6 +240,18 @@ export default function ReportsPage() {
                   <tr key={inv.id} className="hover:bg-surface-2">
                     <td className="px-4 py-3 font-mono text-xs text-ink-muted">#{inv.id}</td>
                     <td className="px-4 py-3 font-medium text-ink">{inv.company_name ?? "—"}</td>
+                    <td className="px-4 py-3 text-ink-muted">{inv.plan ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      {inv.code ? (
+                        <button onClick={() => setCodeDetail(inv)} title={c("viewCode")} className="transition-opacity hover:opacity-80">
+                          <Badge status={CODE_TONE[inv.code.status]}>
+                            <span className="font-mono tracking-wider" dir="ltr">{inv.code.code}</span>
+                          </Badge>
+                        </button>
+                      ) : (
+                        <span className="text-ink-subtle">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 tabular-nums text-ink-muted">{inv.days}</td>
                     <td className="px-4 py-3 font-semibold tabular-nums text-ink">{inv.amount !== null ? money(inv.amount) : "—"}</td>
                     <td className="px-4 py-3">
@@ -269,6 +293,12 @@ export default function ReportsPage() {
           }}
         />
       )}
+
+      <CodeDetailModal
+        code={codeDetail?.code ?? null}
+        company={codeDetail?.company_name}
+        onClose={() => setCodeDetail(null)}
+      />
 
       {editingPlan && (
         <PlanModal plan={editingPlan === "new" ? null : editingPlan} onClose={() => setEditingPlan(null)} onSaved={refetchPlans} />

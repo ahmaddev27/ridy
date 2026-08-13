@@ -414,6 +414,23 @@ export type SubscriptionInvoice = {
   collector_payment_id: number | null;
   starts_at: string;
   ends_at: string;
+  // The activation code that produced this invoice + its plan (null for legacy rows).
+  plan: string | null;
+  code: InvoiceCode | null;
+};
+
+/** The code linked to an invoice, shown as a clickable badge + detail modal. */
+export type InvoiceCode = {
+  id: number;
+  code: string;
+  plan: string | null;
+  collector: string | null;
+  amount: number | null;
+  paid: boolean;
+  status: "pending" | "activated" | "expired";
+  created_at: string | null;
+  activated_at: string | null;
+  expires_at: string | null;
 };
 
 export async function getBillingSummary(): Promise<BillingSummary> {

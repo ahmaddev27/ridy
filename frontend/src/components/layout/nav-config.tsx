@@ -82,7 +82,6 @@ export const navGroups: NavGroup[] = [
     requiresRole: "super_admin",
     items: [
       { href: "/admin/reports", label: "nav.subscriptions", icon: FileBarChart },
-      { href: "/admin/codes", label: "nav.codes", icon: Ticket },
     ],
   },
   {
