@@ -51,7 +51,7 @@ export default function ConnectionsPage() {
   const [extToken, setExtToken] = useState<string | null>(null);
   const [extBusy, setExtBusy] = useState(false);
 
-  // Whether the Reidey extension is installed (null = still probing).
+  // Whether Reidey is installed (null = still probing).
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
   // The installed extension's reported version (null = unknown / not reported).
   const [extVersion, setExtVersion] = useState<string | null>(null);
