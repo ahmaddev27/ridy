@@ -46,11 +46,21 @@ export default function RegisterPage() {
     setBusy(true);
     try {
       await verifyRegistration(email, otp.trim());
-      // Verified → the company + account exist; sign in with the chosen password.
-      const user = await login(email, password);
-      router.push(user.roles.includes("super_admin") ? "/admin" : "/dashboard");
     } catch (err) {
       toast.error(r("verifyFailed"), { description: apiErrorMessage(err, t) });
+      setBusy(false);
+      return;
+    }
+
+    // Verified. A brand-new company isn't activated yet, so signing in is blocked
+    // (account_suspended). Instead of a dead-end, send them to the sign-in screen,
+    // which offers the activation-code entry ("have a code?").
+    try {
+      const user = await login(email, password);
+      router.push(user.roles.includes("super_admin") ? "/admin" : "/dashboard");
+    } catch {
+      toast.success(r("verifiedNeedsCode"));
+      router.push("/login");
     } finally {
       setBusy(false);
     }

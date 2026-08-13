@@ -55,6 +55,23 @@ class DispatchOffer extends Model
         return $this->belongsTo(Driver::class);
     }
 
+    /**
+     * The status to show. A stored PENDING whose accept window has elapsed reads
+     * as REJECTED even before the expiry sweep runs — so the UI is never stuck on
+     * "pending" (e.g. a new offer to an already-on-trip driver that was never taken).
+     */
+    public function displayStatus(): OfferStatus
+    {
+        if ($this->status === OfferStatus::Pending && $this->received_at !== null) {
+            $deadline = $this->received_at->addSeconds((int) ($this->accept_window_seconds ?? 0) + 30);
+            if ($deadline->isBefore(now())) {
+                return OfferStatus::Rejected;
+            }
+        }
+
+        return $this->status ?? OfferStatus::Pending;
+    }
+
     /** Offers that were ever accepted (taken), regardless of final state. */
     public function scopeTaken(Builder $query): Builder
     {

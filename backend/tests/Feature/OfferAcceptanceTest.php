@@ -206,6 +206,20 @@ class OfferAcceptanceTest extends TestCase
         $this->assertNotNull($c->canceled_at);
     }
 
+    public function test_pending_offer_past_window_reads_as_rejected_in_the_list(): void
+    {
+        $this->driver();
+        // A new offer to an already-on-trip driver that's never taken.
+        $offer = $this->offer(['received_at' => now()->subMinutes(5), 'accept_window_seconds' => 30]);
+
+        $res = $this->getJson('/api/v1/dispatch/offers')->assertOk();
+        $row = collect($res->json('data'))->firstWhere('id', $offer->id);
+
+        // Stored status is still pending (sweep hasn't run), but the UI shows rejected.
+        $this->assertSame('pending', $offer->fresh()->status->value);
+        $this->assertSame('rejected', $row['status']);
+    }
+
     public function test_pending_offer_past_its_window_is_rejected(): void
     {
         $this->driver();
