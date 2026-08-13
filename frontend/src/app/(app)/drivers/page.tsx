@@ -168,7 +168,7 @@ export default function DriversPage() {
                     <td className="px-4 py-3">
                       <span
                         className={`rounded px-2 py-0.5 text-[11px] font-bold ${
-                          d.uber_linked ? "bg-black text-white" : "bg-surface-2 text-ink-subtle"
+                          d.uber_linked ? "bg-primary text-primary-ink" : "bg-surface-2 text-ink-subtle"
                         }`}
                       >
                         {d.uber_linked ? t("screens.drivers.linked") : t("screens.drivers.notLinked")}
