@@ -63,15 +63,18 @@ class OfferLifecycle
     }
 
     /**
-     * The most recent still-pending offer for the driver, within the attribution
-     * window — the one a fresh engagement is attributed to.
+     * The most recent NOT-yet-taken offer for the driver, within the attribution
+     * window — the one a fresh engagement is attributed to. Matched by
+     * accepted_at IS NULL (not status), so an offer the expiry sweep already
+     * marked REJECTED is still attributable when the driver's acceptance is
+     * detected a poll or two later (accept() overturns the rejection).
      */
     public function pendingOfferFor(int $tenantId, string $driverUuid): ?DispatchOffer
     {
         return DispatchOffer::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('driver_uuid', $driverUuid)
-            ->where('status', OfferStatus::Pending)
+            ->whereNull('accepted_at')
             ->where('received_at', '>=', now()->subMinutes(self::ATTRIBUTION_MINUTES))
             ->latest('received_at')
             ->first();
