@@ -206,6 +206,27 @@ class OfferAcceptanceTest extends TestCase
         $this->assertNotNull($c->canceled_at);
     }
 
+    public function test_late_acceptance_overturns_a_timeout_rejection(): void
+    {
+        // The core prod bug: the expiry sweep marks an offer rejected within
+        // seconds of its short accept window, but the driver's acceptance is only
+        // detected a poll or two later — it must still attribute + overturn.
+        $this->driver();
+        $offer = $this->offer(['received_at' => now()->subMinutes(2), 'accept_window_seconds' => 10]);
+
+        app(OfferLifecycle::class)->expirePending();
+        $this->assertSame('rejected', $offer->fresh()->status->value);
+
+        // The driver actually took it — seen now as ON_TRIP.
+        $this->postJson('/api/v1/drivers/statuses', [
+            'statuses' => [['driver_uuid' => self::DRIVER_UUID, 'status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']],
+        ])->assertOk()->assertJsonPath('data.accepted', 1);
+
+        $fresh = $offer->fresh();
+        $this->assertNotNull($fresh->accepted_at);
+        $this->assertSame('started', $fresh->status->value);
+    }
+
     public function test_pending_offer_past_window_reads_as_rejected_in_the_list(): void
     {
         $this->driver();

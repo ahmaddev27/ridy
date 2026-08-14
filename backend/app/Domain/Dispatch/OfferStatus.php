@@ -33,7 +33,11 @@ enum OfferStatus: string
             self::Pending => [self::Accepted, self::Rejected],
             self::Accepted => [self::Started, self::Canceled],
             self::Started => [self::Completed],
-            self::Completed, self::Rejected, self::Canceled => [],
+            // A late-detected acceptance overturns a premature timeout rejection:
+            // our accept window is short, but the driver's engagement can be seen
+            // a poll or two later, after the expiry sweep already marked it rejected.
+            self::Rejected => [self::Accepted],
+            self::Completed, self::Canceled => [],
         };
     }
 
