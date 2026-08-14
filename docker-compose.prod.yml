@@ -42,6 +42,13 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    # Answer to the public domain on the internal network too, so containers
+    # (the dispatch daemon) reach the API via Caddy directly instead of the host's
+    # public IP — many VPS block that hairpin, which broke offer ingest.
+    networks:
+      default:
+        aliases:
+          - ${DOMAIN}
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS}
     volumes:
