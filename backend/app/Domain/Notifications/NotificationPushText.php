@@ -69,6 +69,15 @@ class NotificationPushText
      */
     public function for(string $type, array $params, string $locale): array
     {
+        // A super-admin broadcast carries its own free-form copy in params —
+        // there is no fixed per-type/locale template to look up.
+        if ($type === 'admin_broadcast') {
+            return [
+                'title' => (string) ($params['title'] ?? 'Reidey'),
+                'body' => (string) ($params['body'] ?? ''),
+            ];
+        }
+
         $entry = self::MAP[$type][$locale] ?? self::MAP[$type]['de'] ?? ['Reidey', ''];
 
         return [

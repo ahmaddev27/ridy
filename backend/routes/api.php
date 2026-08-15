@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Admin\AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\BillingReportController;
 use App\Http\Controllers\Api\V1\Admin\CollectorController;
 use App\Http\Controllers\Api\V1\Admin\CollectorPaymentController;
@@ -205,6 +206,9 @@ Route::prefix('v1')->group(function () {
         // Platform-wide user directory (managers, resellers, admins).
         Route::get('users', [UserDirectoryController::class, 'index']);
         Route::delete('users/{user}', [UserDirectoryController::class, 'destroy']);
+
+        // Broadcast a bell + push notification to a set of users (queued).
+        Route::post('notifications/broadcast', [AdminNotificationController::class, 'broadcast']);
 
         Route::get('companies', [CompanyController::class, 'index']);
         Route::post('companies', [CompanyController::class, 'store']);

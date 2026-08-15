@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Users as UsersIcon, Trash2 } from "lucide-react";
+import { Users as UsersIcon, Trash2, Megaphone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { SearchInput } from "@/components/ui/search-input";
 import { PageHeader } from "@/components/ui/page-header";
@@ -11,6 +11,7 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { listUsers, deleteUser, type PlatformUser } from "@/lib/api/admin";
+import { BroadcastModal } from "./broadcast-modal";
 
 const ROLE_TONE: Record<string, string> = {
   super_admin: "bg-primary text-primary-ink",
@@ -38,6 +39,8 @@ export default function UsersPage() {
   const [roles, setRoles] = useState<Set<string>>(new Set());
   const [confirmDel, setConfirmDel] = useState<PlatformUser | null>(null);
   const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
 
   // Distinct roles present, for the multi-select filter chips.
   const availableRoles = useMemo(() => Array.from(new Set(users.map((u) => u.role))), [users]);
@@ -50,6 +53,26 @@ export default function UsersPage() {
       return [u.name, u.email, u.phone, u.company].some((v) => (v ?? "").toLowerCase().includes(s));
     });
   }, [users, q, roles]);
+
+  function toggleSelected(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allVisibleSelected = filtered.length > 0 && filtered.every((u) => selected.has(u.id));
+
+  function toggleSelectAll() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) filtered.forEach((u) => next.delete(u.id));
+      else filtered.forEach((u) => next.add(u.id));
+      return next;
+    });
+  }
 
   function toggleRole(r: string) {
     setRoles((prev) => {
@@ -81,6 +104,14 @@ export default function UsersPage() {
 
       <div className="flex flex-wrap items-center gap-3">
         <SearchInput value={q} onChange={setQ} placeholder={c("searchPlaceholder")} className="flex-1" />
+        <button
+          onClick={() => setBroadcastOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-ink"
+        >
+          <Megaphone className="h-4 w-4" />
+          {c("broadcast.send")}
+          {selected.size > 0 && <span className="rounded-full bg-primary-ink/20 px-1.5 text-xs">{selected.size}</span>}
+        </button>
         {/* Multi-select role filter */}
         <div className="flex flex-wrap items-center gap-1.5">
           {availableRoles.map((r) => {
@@ -115,6 +146,15 @@ export default function UsersPage() {
             <table className="w-full text-sm">
               <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
                 <tr>
+                  <th className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleSelectAll}
+                      aria-label="select all"
+                      className="h-4 w-4 cursor-pointer accent-primary"
+                    />
+                  </th>
                   <th className="px-4 py-3 font-semibold">{c("colUser")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colPhone")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colRole")}</th>
@@ -126,6 +166,15 @@ export default function UsersPage() {
               <tbody className="divide-y divide-line">
                 {filtered.map((u) => (
                   <tr key={u.id} className="hover:bg-surface-2">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(u.id)}
+                        onChange={() => toggleSelected(u.id)}
+                        aria-label={`select ${u.name}`}
+                        className="h-4 w-4 cursor-pointer accent-primary"
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-ink">{u.name}</div>
                       <div className="text-xs text-ink-subtle">{u.email}</div>
@@ -171,6 +220,13 @@ export default function UsersPage() {
         busy={busy}
         onConfirm={doDelete}
         onCancel={() => setConfirmDel(null)}
+      />
+
+      <BroadcastModal
+        open={broadcastOpen}
+        onClose={() => setBroadcastOpen(false)}
+        selectedIds={Array.from(selected)}
+        t={(k) => c(`broadcast.${k}`)}
       />
     </div>
   );
