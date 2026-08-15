@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/context";
-import { listOffers, getOffer, type DispatchOffer } from "@/lib/api/offers";
+import { latnLocale } from "@/lib/utils";
+import { listOffers, getOffer, fareLabel, type DispatchOffer } from "@/lib/api/offers";
 
 /**
  * App-wide new-offer watcher. Polls the offers feed every few seconds and, for
@@ -16,7 +17,7 @@ import { listOffers, getOffer, type DispatchOffer } from "@/lib/api/offers";
  */
 export function OfferAlerts() {
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const router = useRouter();
   const seen = useRef<Set<number>>(new Set());
   const primed = useRef(false);
@@ -64,7 +65,7 @@ export function OfferAlerts() {
       }
 
       const line1 = [
-        o.fare_formatted,
+        fareLabel(o, latnLocale(locale)),
         distanceKm != null ? `${distanceKm} km` : null,
         pricePerKm != null ? `${pricePerKm.toFixed(2)} €/km` : null,
       ].filter(Boolean).join(" · ");

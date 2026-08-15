@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { X, MapPin, Flag, User, CircleDollarSign, Clock, Loader2, Route, Gauge, Wallet } from "lucide-react";
 import { StatCard } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n/context";
-import { getOffer, type DispatchOfferDetail } from "@/lib/api/offers";
+import { getOffer, fareLabel, type DispatchOfferDetail } from "@/lib/api/offers";
 
 // Leaflet touches `window`, so load the map client-side only.
 const TripMap = dynamic(() => import("./trip-map").then((m) => m.TripMap), {
@@ -54,9 +54,9 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
             <p className="mt-0.5 text-sm text-ink-subtle">{offer?.driver_name ?? "—"}</p>
           </div>
           <div className="flex items-center gap-2">
-            {offer?.fare_formatted && (
+            {(offer?.fare_amount != null || offer?.fare_formatted) && (
               <span className="rounded-lg bg-success-bg px-2.5 py-1 text-sm font-semibold text-success-fg">
-                {toLatinDigits(offer.fare_formatted)}
+                {toLatinDigits(fareLabel(offer, latnLocale(locale)))}
               </span>
             )}
             <button
@@ -121,7 +121,7 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
                       label={c("pricePerKm")}
                       value={pricePerKm(offer) != null ? `${pricePerKm(offer)!.toFixed(2)} €/km` : "—"}
                     />
-                    <StatCard icon={Wallet} label={c("colFare")} value={toLatinDigits(offer.fare_formatted) || "—"} />
+                    <StatCard icon={Wallet} label={c("colFare")} value={toLatinDigits(fareLabel(offer, latnLocale(locale)))} />
                   </div>
                 </div>
               )}
@@ -129,7 +129,7 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
               {/* Known fields */}
               <dl className="divide-y divide-line">
                 <Row icon={User} label={c("colDriver")}>{offer.driver_name ?? "—"}</Row>
-                <Row icon={CircleDollarSign} label={c("colFare")}>{toLatinDigits(offer.fare_formatted) || "—"}</Row>
+                <Row icon={CircleDollarSign} label={c("colFare")}>{toLatinDigits(fareLabel(offer, latnLocale(locale)))}</Row>
                 <Row icon={Clock} label={c("colTime")}>
                   {offer.received_at ? new Date(offer.received_at).toLocaleString(latnLocale(locale)) : "—"}
                 </Row>

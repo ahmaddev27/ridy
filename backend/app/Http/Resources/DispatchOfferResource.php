@@ -31,6 +31,7 @@ class DispatchOfferResource extends JsonResource
             'pickup_address' => $this->pickup_address,
             'dropoff_address' => $this->dropoff_address,
             'fare_formatted' => $this->fare_formatted,
+            'fare_amount' => $this->fare_amount !== null ? (float) $this->fare_amount : null,
             'accept_window_seconds' => $this->accept_window_seconds,
             'received_at' => $this->received_at?->toIso8601String(),
         ];
