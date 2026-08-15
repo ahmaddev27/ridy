@@ -158,6 +158,9 @@ Route::prefix('v1')->group(function () {
         // Notifications
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::post('notifications/read', [NotificationController::class, 'markRead']);
+        // Browser FCM token for dashboard web push.
+        Route::post('notifications/device', [NotificationController::class, 'registerDevice']);
+        Route::delete('notifications/device', [NotificationController::class, 'unregisterDevice']);
 
         // Governance
         Route::get('audit-logs', [AuditLogController::class, 'index']);

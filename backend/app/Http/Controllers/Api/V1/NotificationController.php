@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Notifications\Models\UserPushToken;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -34,6 +35,38 @@ class NotificationController extends Controller
     public function markRead(Request $request): Response
     {
         $request->user()->unreadNotifications->markAsRead();
+
+        return response()->noContent();
+    }
+
+    /**
+     * Register (idempotently) this browser's FCM token for web push, and remember
+     * the user's dashboard language so pushes are written in it.
+     */
+    public function registerDevice(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string', 'max:512'],
+            'locale' => ['nullable', 'in:de,en,ar'],
+        ]);
+
+        UserPushToken::updateOrCreate(
+            ['token' => $data['token']],
+            ['user_id' => $request->user()->id, 'platform' => 'web', 'last_used_at' => now()],
+        );
+
+        if (! empty($data['locale']) && $request->user()->locale !== $data['locale']) {
+            $request->user()->forceFill(['locale' => $data['locale']])->save();
+        }
+
+        return response()->json(['data' => ['registered' => true]]);
+    }
+
+    public function unregisterDevice(Request $request): Response
+    {
+        UserPushToken::where('user_id', $request->user()->id)
+            ->where('token', (string) $request->input('token'))
+            ->delete();
 
         return response()->noContent();
     }
