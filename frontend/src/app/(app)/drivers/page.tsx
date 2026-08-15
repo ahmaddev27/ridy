@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Users, Star, RefreshCw, Send, Smartphone, Loader2 } from "lucide-react";
+import { Users, Star, RefreshCw, Send, Smartphone, Loader2, Bell } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { listDrivers, syncDrivers, inviteDriver, type Driver } from "@/lib/api/drivers";
+import { listDrivers, syncDrivers, inviteDriver, testDriverPush, type Driver } from "@/lib/api/drivers";
 import { syncRosterViaExtension, fetchDriverStatusesViaExtension } from "@/lib/extension";
 
 export default function DriversPage() {
@@ -23,7 +23,24 @@ export default function DriversPage() {
   const drivers = data ?? [];
   const [syncing, setSyncing] = useState(false);
   const [invitingId, setInvitingId] = useState<number | null>(null);
+  const [testingId, setTestingId] = useState<number | null>(null);
   const didAutoSync = useRef(false);
+
+  async function testPush(d: Driver) {
+    setTestingId(d.id);
+    try {
+      const r = await testDriverPush(d.id);
+      toast.success(t("screens.drivers.appTestSent"));
+      if (r.devices === 0) toast.info(t("screens.drivers.appNoDevices"));
+    } catch (e) {
+      const msg = e instanceof Error && e.message === "no_devices"
+        ? t("screens.drivers.appNoDevices")
+        : t("screens.drivers.appTestError");
+      toast.error(msg);
+    } finally {
+      setTestingId(null);
+    }
+  }
 
   async function invite(d: Driver) {
     if (!d.email) {
@@ -196,10 +213,24 @@ export default function DriversPage() {
                     </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       {d.app_status === "active" ? (
-                        <Badge status="connected" dot>
-                          <Smartphone className="me-1 inline h-3 w-3" />
-                          {t("screens.drivers.appActive")}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge status="connected" dot>
+                            <Smartphone className="me-1 inline h-3 w-3" />
+                            {t("screens.drivers.appActive")}
+                          </Badge>
+                          <button
+                            onClick={() => testPush(d)}
+                            disabled={testingId === d.id}
+                            title={t("screens.drivers.appTest")}
+                            className="rounded-lg border border-line p-1.5 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50"
+                          >
+                            {testingId === d.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Bell className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        </div>
                       ) : (
                         <button
                           onClick={() => invite(d)}

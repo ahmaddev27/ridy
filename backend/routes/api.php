@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\V1\Driver\DriverOfferController;
 use App\Http\Controllers\Api\V1\DriverController;
 use App\Http\Controllers\Api\V1\DriverInviteController;
 use App\Http\Controllers\Api\V1\DriverMetricController;
+use App\Http\Controllers\Api\V1\DriverPushController;
 use App\Http\Controllers\Api\V1\ExtensionController;
 use App\Http\Controllers\Api\V1\FleetSessionController;
 use App\Http\Controllers\Api\V1\HealthController;
@@ -147,6 +148,8 @@ Route::prefix('v1')->group(function () {
 
         // Invite a driver to the mobile app (emailed activation link).
         Route::post('drivers/{driver}/invite', [DriverInviteController::class, 'send']);
+        // Send a diagnostic test push to the driver's registered devices.
+        Route::post('drivers/{driver}/test-push', [DriverPushController::class, 'test']);
 
         // Driver app registers its push device token
         Route::post('devices', [DeviceTokenController::class, 'store']);
