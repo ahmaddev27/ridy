@@ -80,7 +80,7 @@ class FleetSessionTest extends TestCase
         ])->assertCreated();
 
         $this->assertSame(1, $this->manager->fresh()->notifications()->count());
-        $this->assertSame('fleet_session_opened', $this->manager->fresh()->notifications()->first()->data['type']);
+        $this->assertSame('session_connected', $this->manager->fresh()->notifications()->first()->data['type']);
     }
 
     public function test_supplier_cookies_are_stored_and_exposed_only_to_the_daemon(): void

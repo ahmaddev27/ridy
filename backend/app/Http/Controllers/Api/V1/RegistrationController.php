@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Notifications\Notifier;
 use App\Domain\Notifications\SendTemplatedMail;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Concerns\GeneratesOtp;
@@ -57,7 +58,7 @@ class RegistrationController extends Controller
     }
 
     /** Step 2 — verify the OTP, create the company + owner, and clean up. */
-    public function verify(Request $request): JsonResponse
+    public function verify(Request $request, Notifier $notifier): JsonResponse
     {
         $data = $request->validate([
             'email' => ['required', 'email'],
@@ -79,7 +80,7 @@ class RegistrationController extends Controller
             throw ValidationException::withMessages(['otp' => 'otp_incorrect']);
         }
 
-        DB::transaction(function () use ($registration) {
+        $tenant = DB::transaction(function () use ($registration) {
             $tenant = Tenant::create([
                 'name' => $registration->company_name,
                 'country' => 'DE',
@@ -97,7 +98,12 @@ class RegistrationController extends Controller
             $user->assignRole('fleet_manager');
 
             $registration->delete();
+
+            return $tenant;
         });
+
+        // Let the platform admins know a new company just signed up.
+        $notifier->toAdmins('company_registered', ['company' => $tenant->name], '/admin/companies');
 
         return response()->json(['data' => ['verified' => true]]);
     }

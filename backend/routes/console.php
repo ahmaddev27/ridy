@@ -10,3 +10,6 @@ Artisan::command('inspire', function () {
 
 // Expire pending offers whose accept window elapsed (safety net for idle tenants).
 Schedule::command('offers:expire-pending')->everyMinute()->withoutOverlapping();
+
+// Daily heads-up notifications: subscriptions/proxies expiring or expired.
+Schedule::command('notifications:scan')->dailyAt('08:00')->withoutOverlapping();
