@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Fleet\Models\Driver;
 use App\Models\User;
 
 return [
@@ -42,6 +43,12 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        // Mobile driver app — Sanctum bearer tokens issued to Driver models.
+        'driver' => [
+            'driver' => 'sanctum',
+            'provider' => 'drivers',
+        ],
     ],
 
     /*
@@ -65,6 +72,11 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
+        ],
+
+        'drivers' => [
+            'driver' => 'eloquent',
+            'model' => Driver::class,
         ],
 
         // 'users' => [

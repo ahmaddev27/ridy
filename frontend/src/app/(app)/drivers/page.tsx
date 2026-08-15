@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Star, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import { Users, Star, RefreshCw, Send, Smartphone, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { listDrivers, syncDrivers, type Driver } from "@/lib/api/drivers";
+import { listDrivers, syncDrivers, inviteDriver, type Driver } from "@/lib/api/drivers";
 import { syncRosterViaExtension, fetchDriverStatusesViaExtension } from "@/lib/extension";
 
 export default function DriversPage() {
@@ -21,7 +22,25 @@ export default function DriversPage() {
   const { data, loading, error, refetch } = useAsync(listDrivers, { refetchInterval: 15000 });
   const drivers = data ?? [];
   const [syncing, setSyncing] = useState(false);
+  const [invitingId, setInvitingId] = useState<number | null>(null);
   const didAutoSync = useRef(false);
+
+  async function invite(d: Driver) {
+    if (!d.email) {
+      toast.error(t("screens.drivers.appNoEmail"));
+      return;
+    }
+    setInvitingId(d.id);
+    try {
+      await inviteDriver(d.id);
+      toast.success(t("screens.drivers.appInviteSent"));
+      await refetch();
+    } catch {
+      toast.error(t("screens.drivers.appInviteError"));
+    } finally {
+      setInvitingId(null);
+    }
+  }
 
   async function runSync() {
     setSyncing(true);
@@ -106,6 +125,7 @@ export default function DriversPage() {
                   <th className="px-4 py-3 font-semibold">{t("screens.drivers.colTrips")}</th>
                   <th className="px-4 py-3 font-semibold">{t("screens.drivers.colStatus")}</th>
                   <th className="px-4 py-3 font-semibold">Uber</th>
+                  <th className="px-4 py-3 font-semibold">{t("screens.drivers.colApp")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -173,6 +193,29 @@ export default function DriversPage() {
                       >
                         {d.uber_linked ? t("screens.drivers.linked") : t("screens.drivers.notLinked")}
                       </span>
+                    </td>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      {d.app_status === "active" ? (
+                        <Badge status="connected" dot>
+                          <Smartphone className="me-1 inline h-3 w-3" />
+                          {t("screens.drivers.appActive")}
+                        </Badge>
+                      ) : (
+                        <button
+                          onClick={() => invite(d)}
+                          disabled={invitingId === d.id}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50"
+                        >
+                          {invitingId === d.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5" />
+                          )}
+                          {d.app_status === "invited"
+                            ? t("screens.drivers.appResend")
+                            : t("screens.drivers.appInvite")}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

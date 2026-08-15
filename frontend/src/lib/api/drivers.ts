@@ -17,6 +17,9 @@ export type Driver = {
   online: boolean;
   online_status: string | null;
   location_updated_at: string | null;
+  email: string | null;
+  /** Mobile-app onboarding state. */
+  app_status: "none" | "invited" | "active";
 };
 
 export async function listDrivers(): Promise<Driver[]> {
@@ -53,6 +56,15 @@ export async function getDriverStats(id: number, from?: string, to?: string): Pr
 export async function syncDrivers(): Promise<{ synced: number; created?: number; reason?: string }> {
   const res = await apiFetch<{ data: { synced: number; created?: number; reason?: string } }>(
     "/api/v1/drivers/sync",
+    { method: "POST", withCsrf: true },
+  );
+  return res.data;
+}
+
+/** Invite a driver to the mobile app (emails an activation link). */
+export async function inviteDriver(id: number): Promise<{ app_status: string }> {
+  const res = await apiFetch<{ data: { app_status: string } }>(
+    `/api/v1/drivers/${id}/invite`,
     { method: "POST", withCsrf: true },
   );
   return res.data;

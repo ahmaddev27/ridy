@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Domain\Notifications\Contracts\PushSender;
 use App\Domain\Notifications\Push\FcmPushSender;
+use App\Domain\Notifications\Push\GoogleServiceAccountToken;
 use App\Domain\Notifications\Push\LogPushSender;
 use App\Support\Settings;
 use Illuminate\Support\Facades\Schema;
@@ -17,14 +18,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Real FCM when a server key is configured, otherwise log the push so the
-        // full flow works without a Firebase project.
+        // Real FCM when a service-account credentials file is present, otherwise
+        // log the push so the full flow works without a Firebase project.
         $this->app->bind(PushSender::class, function () {
-            $key = (string) config('services.fcm.server_key');
+            $credentials = (string) config('services.fcm.credentials');
+            if ($credentials === '' || ! is_file($credentials)) {
+                return new LogPushSender;
+            }
 
-            return $key !== ''
-                ? new FcmPushSender((string) config('services.fcm.endpoint'), $key)
-                : new LogPushSender;
+            $auth = new GoogleServiceAccountToken($credentials);
+            $projectId = (string) config('services.fcm.project_id') ?: $auth->credentials()['project_id'];
+
+            return new FcmPushSender($auth, $projectId);
         });
     }
 

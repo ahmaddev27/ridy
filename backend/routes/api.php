@@ -24,7 +24,11 @@ use App\Http\Controllers\Api\V1\DispatchDaemonController;
 use App\Http\Controllers\Api\V1\DispatchIngestController;
 use App\Http\Controllers\Api\V1\DispatchLinkController;
 use App\Http\Controllers\Api\V1\DispatchOfferController;
+use App\Http\Controllers\Api\V1\Driver\DriverAuthController;
+use App\Http\Controllers\Api\V1\Driver\DriverDeviceController;
+use App\Http\Controllers\Api\V1\Driver\DriverOfferController;
 use App\Http\Controllers\Api\V1\DriverController;
+use App\Http\Controllers\Api\V1\DriverInviteController;
 use App\Http\Controllers\Api\V1\DriverMetricController;
 use App\Http\Controllers\Api\V1\ExtensionController;
 use App\Http\Controllers\Api\V1\FleetSessionController;
@@ -55,6 +59,22 @@ Route::prefix('v1')->group(function () {
 
     // Company owner enters the admin-generated activation code (3 tries -> ban).
     Route::post('company/activate', [CompanyActivationController::class, 'activate'])->middleware('throttle:10,1');
+
+    // Mobile driver app. Public onboarding + Sanctum-guarded session. No tenant
+    // middleware: a driver's tenant is derived from the driver, not the request.
+    Route::prefix('driver')->group(function () {
+        Route::get('invite/{token}', [DriverAuthController::class, 'invite'])->middleware('throttle:20,1');
+        Route::post('activate', [DriverAuthController::class, 'activate'])->middleware('throttle:10,1');
+        Route::post('login', [DriverAuthController::class, 'login'])->middleware('throttle:10,1');
+
+        Route::middleware('auth:driver')->group(function () {
+            Route::get('me', [DriverAuthController::class, 'me']);
+            Route::post('logout', [DriverAuthController::class, 'logout']);
+            Route::post('devices', [DriverDeviceController::class, 'store']);
+            Route::delete('devices', [DriverDeviceController::class, 'destroy']);
+            Route::get('offers', [DriverOfferController::class, 'index']);
+        });
+    });
 
     // Internal — the dispatch daemon. Authenticated by a shared secret
     // (VerifyDispatchSecret), not a user session.
@@ -124,6 +144,9 @@ Route::prefix('v1')->group(function () {
         Route::get('dispatch/unlinked-drivers', [DispatchLinkController::class, 'unlinkedDrivers']);
         Route::post('drivers/{driver}/link-uber', [DispatchLinkController::class, 'linkManual']);
         Route::post('dispatch/auto-link', [DispatchLinkController::class, 'autoLink']);
+
+        // Invite a driver to the mobile app (emailed activation link).
+        Route::post('drivers/{driver}/invite', [DriverInviteController::class, 'send']);
 
         // Driver app registers its push device token
         Route::post('devices', [DeviceTokenController::class, 'store']);
