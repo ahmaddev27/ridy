@@ -465,7 +465,7 @@ export function CompanyDetail({
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <StatCard icon={Users} label={c("colDrivers")} value={company.driver_count} />
                 <StatCard icon={Radio} label={c("colOffers")} value={company.offer_count} />
                 <StatCard icon={Plug} label={c("colSession")} value={company.session_status ? c(`session_${company.session_status}`) : c("noSession")} />
