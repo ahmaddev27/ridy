@@ -1,4 +1,4 @@
-import { Plug, Building2, Ban, CheckCircle2, Gift, Clock, AlertTriangle, Ticket, Bell, type LucideIcon } from "lucide-react";
+import { Plug, Building2, Ban, CheckCircle2, Gift, Clock, AlertTriangle, Ticket, Bell, Megaphone, type LucideIcon } from "lucide-react";
 import type { AppNotification } from "@/lib/api/notifications";
 
 type Tone = "success" | "danger" | "warning" | "info" | "default";
@@ -15,6 +15,7 @@ const MAP: Record<string, { icon: LucideIcon; tone: Tone }> = {
   subscription_expired: { icon: AlertTriangle, tone: "danger" },
   proxy_expiring: { icon: Plug, tone: "warning" },
   code_activated: { icon: Ticket, tone: "success" },
+  admin_broadcast: { icon: Megaphone, tone: "info" },
 };
 
 const TONE_CHIP: Record<Tone, string> = {
@@ -38,6 +39,17 @@ export function notifContent(n: AppNotification, t: (k: string) => string) {
   const cfg = n.type ? MAP[n.type] : undefined;
   if (!cfg || !n.type) {
     return { icon: Bell, chip: TONE_CHIP.default, title: n.title ?? "", body: n.body ?? "", href: n.href };
+  }
+  // A super-admin broadcast carries its own free-form copy in params — there is
+  // no localized template to resolve, so render it verbatim.
+  if (n.type === "admin_broadcast") {
+    return {
+      icon: cfg.icon,
+      chip: TONE_CHIP[cfg.tone],
+      title: String(n.params.title ?? n.title ?? ""),
+      body: String(n.params.body ?? n.body ?? ""),
+      href: n.href,
+    };
   }
   return {
     icon: cfg.icon,

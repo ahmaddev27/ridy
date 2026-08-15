@@ -523,3 +523,24 @@ export async function listUsers(): Promise<PlatformUser[]> {
 export async function deleteUser(id: number): Promise<void> {
   await apiFetch(`/api/v1/admin/users/${id}`, { method: "DELETE", withCsrf: true });
 }
+
+// ── Broadcast notifications ──────────────────────────────────────────────────
+/** Target audience for a broadcast: everyone, a role, or a specific id list. */
+export type BroadcastInput = {
+  title: string;
+  body: string;
+  href?: string;
+  all?: boolean;
+  role?: string;
+  user_ids?: number[];
+};
+
+/** Send a bell + push notification to the chosen audience. Returns how many
+ *  recipients were queued. */
+export async function broadcastNotification(input: BroadcastInput): Promise<{ queued: number }> {
+  return apiFetch<{ queued: number }>("/api/v1/admin/notifications/broadcast", {
+    method: "POST",
+    body: input,
+    withCsrf: true,
+  });
+}

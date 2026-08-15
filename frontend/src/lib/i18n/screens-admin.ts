@@ -26,6 +26,14 @@ const en: Dict = {
     st_active: "Active", st_disabled: "Disabled", st_banned: "Banned", st_expired: "Expired", st_inactive: "Not activated",
     searchPlaceholder: "Search name, email, phone…", none: "—",
     filterRole: "Role", allRoles: "All roles", delete: "Delete", deleteConfirm: "Delete user {name}? Their login is removed permanently.", deleted: "User deleted", deleteFailed: "Could not delete", cancel: "Cancel",
+    broadcast: {
+      send: "Send notification", title: "Send notification", cancel: "Cancel", submit: "Send",
+      audience: "Recipients", audAll: "All users", audRole: "By role", audSelected: "Selected users",
+      roleLabel: "Role", selectRolePlaceholder: "— Select role —",
+      selectedCount: "{n} selected", selectHint: "Tick users in the table, then send.",
+      fieldTitle: "Title", fieldBody: "Message", fieldHref: "Link (optional)", hrefPlaceholder: "/admin/…",
+      queued: "Notification queued for {n} recipient(s)", failed: "Could not send", noRecipients: "Select at least one recipient.",
+    },
   },
   reseller: {
     plan: "Plan", selectPlan: "— Select plan —", noPlans: "No plans available yet — ask the admin.",
@@ -187,6 +195,14 @@ const de: Dict = {
     st_active: "Aktiv", st_disabled: "Deaktiviert", st_banned: "Gesperrt", st_expired: "Abgelaufen", st_inactive: "Nicht aktiviert",
     searchPlaceholder: "Name, E-Mail, Telefon suchen…", none: "—",
     filterRole: "Rolle", allRoles: "Alle Rollen", delete: "Löschen", deleteConfirm: "Benutzer {name} löschen? Der Login wird dauerhaft entfernt.", deleted: "Benutzer gelöscht", deleteFailed: "Konnte nicht löschen", cancel: "Abbrechen",
+    broadcast: {
+      send: "Benachrichtigung senden", title: "Benachrichtigung senden", cancel: "Abbrechen", submit: "Senden",
+      audience: "Empfänger", audAll: "Alle Benutzer", audRole: "Nach Rolle", audSelected: "Ausgewählte Benutzer",
+      roleLabel: "Rolle", selectRolePlaceholder: "— Rolle wählen —",
+      selectedCount: "{n} ausgewählt", selectHint: "Benutzer in der Tabelle markieren, dann senden.",
+      fieldTitle: "Titel", fieldBody: "Nachricht", fieldHref: "Link (optional)", hrefPlaceholder: "/admin/…",
+      queued: "Benachrichtigung für {n} Empfänger eingereiht", failed: "Senden fehlgeschlagen", noRecipients: "Mindestens einen Empfänger wählen.",
+    },
   },
   reseller: {
     plan: "Paket", selectPlan: "— Paket wählen —", noPlans: "Noch keine Pakete — frag den Admin.",
@@ -346,6 +362,14 @@ const ar: Dict = {
     st_active: "نشط", st_disabled: "معطّل", st_banned: "محظور", st_expired: "منتهٍ", st_inactive: "غير مفعّل",
     searchPlaceholder: "ابحث بالاسم/الإيميل/الجوال…", none: "—",
     filterRole: "النوع", allRoles: "كل الأنواع", delete: "حذف", deleteConfirm: "حذف المستخدم {name}؟ بينحذف حسابه نهائياً.", deleted: "تم حذف المستخدم", deleteFailed: "تعذّر الحذف", cancel: "إلغاء",
+    broadcast: {
+      send: "إرسال إشعار", title: "إرسال إشعار", cancel: "إلغاء", submit: "إرسال",
+      audience: "المستلمون", audAll: "كل المستخدمين", audRole: "حسب النوع", audSelected: "مستخدمون محدّدون",
+      roleLabel: "النوع", selectRolePlaceholder: "— اختر النوع —",
+      selectedCount: "{n} محدّد", selectHint: "علّم المستخدمين في الجدول ثم أرسل.",
+      fieldTitle: "العنوان", fieldBody: "الرسالة", fieldHref: "رابط (اختياري)", hrefPlaceholder: "/admin/…",
+      queued: "تم جدولة الإشعار لـ {n} مستلم", failed: "تعذّر الإرسال", noRecipients: "اختر مستلماً واحداً على الأقل.",
+    },
   },
   reseller: {
     plan: "الباقة", selectPlan: "— اختر الباقة —", noPlans: "ما في باقات متاحة — اسأل الأدمن.",
