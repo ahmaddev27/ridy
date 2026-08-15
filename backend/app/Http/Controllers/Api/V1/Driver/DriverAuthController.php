@@ -80,6 +80,22 @@ class DriverAuthController extends Controller
         return response()->json(['data' => $this->profile($request->user())]);
     }
 
+    /** The driver edits their own name, app language, and (optionally) password. */
+    public function update(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['sometimes', 'string', 'max:120'],
+            'locale' => ['sometimes', 'in:de,en,ar'],
+            'password' => ['sometimes', 'string', 'min:8'],
+        ]);
+
+        $driver = $request->user();
+        $driver->fill(array_intersect_key($data, array_flip(['name', 'locale', 'password'])));
+        $driver->save();
+
+        return response()->json(['data' => $this->profile($driver)]);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();

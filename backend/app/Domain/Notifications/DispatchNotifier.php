@@ -8,18 +8,20 @@ use App\Domain\Notifications\Models\DeviceToken;
 
 /**
  * Turns a routed dispatch offer into a push to every device of its linked driver.
- * The message carries the full offer detail so the app can render its own
- * countdown card, and is localized to the driver's chosen language.
+ *
+ * The message is deliberately data-only (no translated words) so it reads the
+ * same in every language and every value stays Latin:
+ *
+ *   Title:  "5.85 €€ | Peter"     (fare, €-quality by price/km, rider name)
+ *   Body:   "Birkerstraße 55, 42651 Solingen
+ *            -->
+ *            Eintrachtstraße 50, 42655 Solingen"
+ *
+ * The €-signs encode the per-km rate at a glance: 1 up to €1/km, 2 above €1,
+ * 3 at €3/km or more. Addresses drop the country and keep street + postcode + city.
  */
 class DispatchNotifier
 {
-    /** Notification title per driver locale. */
-    private const TITLES = [
-        'de' => 'Neues Uber-Angebot',
-        'en' => 'New Uber offer',
-        'ar' => 'عرض أوبر جديد',
-    ];
-
     public function __construct(private PushSender $sender) {}
 
     /**
@@ -31,14 +33,13 @@ class DispatchNotifier
             return 0; // unlinked offers have no one to notify
         }
 
-        $locale = $offer->driver?->locale ?: 'de';
-        $title = self::TITLES[$locale] ?? self::TITLES['de'];
+        $title = $this->buildTitle($offer);
         $body = $this->buildBody($offer);
         $data = [
             'offer_id' => (string) $offer->id,
             'offer_uuid' => (string) $offer->offer_uuid,
-            'pickup' => (string) ($offer->pickup_address ?? ''),
-            'dropoff' => (string) ($offer->dropoff_address ?? ''),
+            'pickup' => $this->cleanAddress($offer->pickup_address),
+            'dropoff' => $this->cleanAddress($offer->dropoff_address),
             'fare' => (string) ($offer->fare_formatted ?? ''),
             'fare_amount' => (string) ($offer->fare_amount ?? ''),
             'distance_m' => (string) ($offer->distance_m ?? ''),
@@ -58,13 +59,55 @@ class DispatchNotifier
         return $sent;
     }
 
+    /** "5.85 €€ | Peter" — fare, €-quality, rider. */
+    private function buildTitle(DispatchOffer $offer): string
+    {
+        $fare = $offer->fare_amount !== null
+            ? number_format((float) $offer->fare_amount, 2, '.', '')
+            : trim((string) $offer->fare_formatted);
+
+        $title = trim($fare.' '.$this->euroSigns($offer));
+        $rider = trim((string) $offer->rider_first_name);
+
+        return $rider !== '' ? $title.' | '.$rider : $title;
+    }
+
+    /** "pickup\n-->\ndropoff", country stripped. */
     private function buildBody(DispatchOffer $offer): string
     {
-        $parts = array_filter([
-            $offer->fare_formatted,
-            $offer->pickup_address,
-        ]);
+        $pickup = $this->cleanAddress($offer->pickup_address);
+        $dropoff = $this->cleanAddress($offer->dropoff_address);
 
-        return $parts ? implode(' · ', $parts) : 'Uber';
+        if ($pickup === '' && $dropoff === '') {
+            return 'Uber';
+        }
+
+        return trim($pickup."\n-->\n".$dropoff);
+    }
+
+    /** €/€€/€€€ by the trip's per-km rate. Falls back to one sign when unknown. */
+    private function euroSigns(DispatchOffer $offer): string
+    {
+        $fare = (float) ($offer->fare_amount ?? 0);
+        $km = $offer->distance_m ? $offer->distance_m / 1000 : 0.0;
+        if ($fare <= 0 || $km <= 0) {
+            return '€';
+        }
+
+        $perKm = $fare / $km;
+
+        return match (true) {
+            $perKm >= 3 => '€€€',
+            $perKm > 1 => '€€',
+            default => '€',
+        };
+    }
+
+    /** Keep "Street No, Postcode City"; drop the trailing country. */
+    private function cleanAddress(?string $address): string
+    {
+        $address = trim((string) $address);
+
+        return (string) preg_replace('/,\s*(Deutschland|Germany|Alemania|ألمانيا)\s*$/iu', '', $address);
     }
 }

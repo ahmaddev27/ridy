@@ -67,8 +67,10 @@ class DispatchNotificationTest extends TestCase
         app(DispatchOfferIngestor::class)->ingest($this->tenant->id, $this->offer());
 
         $this->assertCount(2, $this->sent);
-        $this->assertSame('Neues Uber-Angebot', $this->sent[0]['title']);
-        $this->assertStringContainsString('€7.41', $this->sent[0]['body']);
+        // Data-only title: fare + €-quality (one sign with no distance) + no rider.
+        $this->assertSame('7.41 €', $this->sent[0]['title']);
+        $this->assertStringContainsString('Alexanderplatz, Berlin', $this->sent[0]['body']);
+        $this->assertStringContainsString('-->', $this->sent[0]['body']);
         $this->assertSame('Alexanderplatz, Berlin', $this->sent[0]['data']['pickup']);
     }
 

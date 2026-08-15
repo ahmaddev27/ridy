@@ -111,6 +111,22 @@ class DriverAppTest extends TestCase
         ]);
     }
 
+    public function test_driver_updates_profile_name_locale_and_password(): void
+    {
+        $driver = $this->driver(['activated_at' => now(), 'locale' => 'de']);
+        Sanctum::actingAs($driver, guard: 'driver');
+
+        $this->patchJson('/api/v1/driver/me', [
+            'name' => 'Omar Updated',
+            'locale' => 'ar',
+            'password' => 'newsecret123',
+        ])->assertOk()->assertJsonPath('data.locale', 'ar')->assertJsonPath('data.name', 'Omar Updated');
+
+        $driver->refresh();
+        $this->assertSame('ar', $driver->locale);
+        $this->assertTrue(Hash::check('newsecret123', $driver->password));
+    }
+
     public function test_driver_offers_feed_returns_only_own_offers(): void
     {
         $mine = $this->driver(['activated_at' => now()]);

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, Pressable, ActivityIndicator, Linking } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { api, type Offer } from "@/lib/api";
-import { t } from "@/lib/i18n";
-import { colors, radius } from "@/lib/theme";
-import { fareLabel, distanceLabel } from "@/lib/format";
+import { t, isRTL } from "@/lib/i18n";
+import { useColors, radius, type Palette } from "@/lib/theme";
+import { fareLabel, distanceLabel, perKmLabel, cleanAddress } from "@/lib/format";
 import { StatusBadge } from "@/components/ui";
 
 /** Seconds left in the accept window, from the capture time + window length. */
@@ -32,6 +33,7 @@ export default function OfferScreen() {
   const [offer, setOffer] = useState<Offer | null>(null);
   const [error, setError] = useState(false);
   const secondsLeft = useCountdown(offer);
+  const colors = useColors();
 
   useEffect(() => {
     api
@@ -71,7 +73,7 @@ export default function OfferScreen() {
         <Text style={{ color: colors.ink, fontSize: 40, fontWeight: "900" }}>
           {fareLabel(offer.fare_formatted, offer.fare_amount)}
         </Text>
-        <StatusBadge status={status} label={status} />
+        <StatusBadge status={status} label={t(`status.${status}`)} />
       </View>
 
       {/* Countdown */}
@@ -93,9 +95,10 @@ export default function OfferScreen() {
 
       {/* Route */}
       <View style={{ marginTop: 24, gap: 14 }}>
-        <Row label={t("offers.pickup")} value={offer.pickup_address ?? "—"} glyph="↑" />
-        <Row label={t("offers.dropoff")} value={offer.dropoff_address ?? "—"} glyph="↓" />
-        <Row label={t("offer.distance")} value={distanceLabel(offer.distance_m)} glyph="•" />
+        <Row label={t("offers.pickup")} value={cleanAddress(offer.pickup_address)} icon="location-outline" tone={colors.success} colors={colors} />
+        <Row label={t("offers.dropoff")} value={cleanAddress(offer.dropoff_address)} icon="flag-outline" tone={colors.danger} colors={colors} />
+        <Row label={t("offer.distance")} value={distanceLabel(offer.distance_m)} icon="navigate-outline" tone={colors.inkSubtle} colors={colors} />
+        <Row label="€/km" value={perKmLabel(offer.fare_amount, offer.distance_m)} icon="cash-outline" tone={colors.inkSubtle} colors={colors} />
       </View>
 
       <Pressable
@@ -106,23 +109,24 @@ export default function OfferScreen() {
       </Pressable>
 
       <Pressable onPress={() => router.back()} style={{ paddingVertical: 12, alignItems: "center" }}>
-        <Text style={{ color: colors.inkSubtle }}>✕</Text>
+        <Ionicons name="close" size={22} color={colors.inkSubtle} />
       </Pressable>
     </Screen>
   );
 }
 
 function Screen({ children }: { children: React.ReactNode }) {
+  const colors = useColors();
   return <View style={{ flex: 1, backgroundColor: colors.canvas, padding: 24, paddingTop: 40 }}>{children}</View>;
 }
 
-function Row({ label, value, glyph }: { label: string; value: string; glyph: string }) {
+function Row({ label, value, icon, tone, colors }: { label: string; value: string; icon: keyof typeof Ionicons.glyphMap; tone: string; colors: Palette }) {
   return (
     <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-start" }}>
-      <Text style={{ color: colors.inkSubtle, fontSize: 18, width: 18 }}>{glyph}</Text>
+      <Ionicons name={icon} size={20} color={tone} style={{ marginTop: 2 }} />
       <View style={{ flex: 1 }}>
-        <Text style={{ color: colors.inkSubtle, fontSize: 12 }}>{label}</Text>
-        <Text style={{ color: colors.ink, fontSize: 16 }}>{value}</Text>
+        <Text style={{ color: colors.inkSubtle, fontSize: 12, textAlign: isRTL() ? "right" : "left" }}>{label}</Text>
+        <Text style={{ color: colors.ink, fontSize: 16, textAlign: isRTL() ? "right" : "left" }}>{value}</Text>
       </View>
     </View>
   );

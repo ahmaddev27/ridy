@@ -10,6 +10,7 @@ type AuthState = {
   driver: DriverProfile | null;
   login: (email: string, password: string) => Promise<void>;
   activate: (inviteToken: string, password: string) => Promise<void>;
+  updateProfile: (patch: { name?: string; locale?: string; password?: string }) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -58,6 +59,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await persist(res.data.token, res.data.driver);
   }
 
+  async function updateProfile(patch: { name?: string; locale?: string; password?: string }) {
+    const res = await api.updateProfile(patch);
+    applyDriver(res.data);
+  }
+
   async function logout() {
     try {
       await api.logout();
@@ -70,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ ready, driver, login, activate, logout }}>
+    <AuthContext.Provider value={{ ready, driver, login, activate, updateProfile, logout }}>
       {children}
     </AuthContext.Provider>
   );

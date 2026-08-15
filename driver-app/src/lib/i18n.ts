@@ -1,4 +1,5 @@
 import { getLocales } from "expo-localization";
+import { I18nManager } from "react-native";
 
 type Dict = Record<string, string>;
 
@@ -20,9 +21,21 @@ const de: Dict = {
   "offer.expired": "Abgelaufen",
   "offer.openUber": "In Uber öffnen",
   "offer.distance": "Distanz",
+  "status.pending": "Ausstehend",
+  "status.accepted": "Angenommen",
+  "status.started": "Läuft",
+  "status.completed": "Abgeschlossen",
+  "status.rejected": "Abgelehnt",
+  "status.canceled": "Storniert",
   "settings.title": "Einstellungen",
   "settings.logout": "Abmelden",
   "settings.language": "Sprache",
+  "settings.profile": "Profil",
+  "settings.name": "Name",
+  "settings.newPassword": "Neues Passwort (optional)",
+  "settings.save": "Speichern",
+  "settings.saved": "Gespeichert",
+  "settings.saveError": "Konnte nicht gespeichert werden",
   "common.seconds": "Sek.",
 };
 
@@ -44,9 +57,21 @@ const en: Dict = {
   "offer.expired": "Expired",
   "offer.openUber": "Open in Uber",
   "offer.distance": "Distance",
+  "status.pending": "Pending",
+  "status.accepted": "Accepted",
+  "status.started": "In progress",
+  "status.completed": "Completed",
+  "status.rejected": "Rejected",
+  "status.canceled": "Canceled",
   "settings.title": "Settings",
   "settings.logout": "Log out",
   "settings.language": "Language",
+  "settings.profile": "Profile",
+  "settings.name": "Name",
+  "settings.newPassword": "New password (optional)",
+  "settings.save": "Save",
+  "settings.saved": "Saved",
+  "settings.saveError": "Couldn’t save",
   "common.seconds": "s",
 };
 
@@ -68,9 +93,21 @@ const ar: Dict = {
   "offer.expired": "انتهى",
   "offer.openUber": "افتح في أوبر",
   "offer.distance": "المسافة",
+  "status.pending": "معلّق",
+  "status.accepted": "مقبول",
+  "status.started": "جارية",
+  "status.completed": "مكتمل",
+  "status.rejected": "غير مقبول",
+  "status.canceled": "ملغى",
   "settings.title": "الإعدادات",
   "settings.logout": "خروج",
   "settings.language": "اللغة",
+  "settings.profile": "الملف الشخصي",
+  "settings.name": "الاسم",
+  "settings.newPassword": "كلمة مرور جديدة (اختياري)",
+  "settings.save": "حفظ",
+  "settings.saved": "تم الحفظ",
+  "settings.saveError": "تعذّر الحفظ",
   "common.seconds": "ث",
 };
 
@@ -79,8 +116,23 @@ const DICTS: Record<string, Dict> = { de, en, ar };
 let current = (getLocales()[0]?.languageCode ?? "de").toLowerCase();
 if (!DICTS[current]) current = "de";
 
+/** Keep the native layout direction in sync with the chosen language. RTL flips
+ *  flexbox + text alignment app-wide (a full reload applies it everywhere). */
+export function applyDirection(code: string) {
+  const rtl = code === "ar";
+  I18nManager.allowRTL(true);
+  if (I18nManager.isRTL !== rtl) {
+    I18nManager.forceRTL(rtl);
+  }
+}
+
+applyDirection(current);
+
 export function setLocale(code: string) {
-  if (DICTS[code]) current = code;
+  if (DICTS[code]) {
+    current = code;
+    applyDirection(code);
+  }
 }
 
 export function getLocale(): string {

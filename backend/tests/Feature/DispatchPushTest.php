@@ -55,9 +55,42 @@ class DispatchPushTest extends TestCase
 
         $this->assertSame(2, $sent);
         $this->assertCount(2, $spy->calls);
-        $this->assertSame('عرض أوبر جديد', $spy->calls[0]['title']); // Arabic locale
+        // Data-only title: fare + € (no distance → one sign), no rider name here.
+        $this->assertSame('14.37 €', $spy->calls[0]['title']);
         $this->assertSame((string) $offer->id, $spy->calls[0]['data']['offer_id']);
         $this->assertSame('14.37', $spy->calls[0]['data']['fare_amount']);
+    }
+
+    public function test_notification_title_encodes_per_km_quality_rider_and_strips_country(): void
+    {
+        $driver = Driver::create(['name' => 'Omar']);
+        DeviceToken::create(['driver_id' => $driver->id, 'token' => 't1', 'tenant_id' => $driver->tenant_id]);
+
+        // €12 over 3 km = €4/km → three euro signs; rider named; country stripped.
+        $offer = DispatchOffer::create([
+            'driver_id' => $driver->id, 'driver_uuid' => 'u1', 'offer_uuid' => 'o2',
+            'rider_first_name' => 'Peter', 'fare_amount' => 12.00, 'distance_m' => 3000,
+            'pickup_address' => 'Birkerstraße 55, 42651 Solingen, Deutschland',
+            'dropoff_address' => 'Eintrachtstraße 50, 42655 Solingen, Deutschland',
+            'received_at' => now(), 'raw_payload' => [], 'status' => OfferStatus::Pending,
+        ]);
+
+        $spy = new class implements PushSender
+        {
+            public array $calls = [];
+
+            public function send(string $deviceToken, string $title, string $body, array $data = []): bool
+            {
+                $this->calls[] = compact('title', 'body');
+
+                return true;
+            }
+        };
+
+        (new DispatchNotifier($spy))->notify($offer);
+
+        $this->assertSame('12.00 €€€ | Peter', $spy->calls[0]['title']);
+        $this->assertSame("Birkerstraße 55, 42651 Solingen\n-->\nEintrachtstraße 50, 42655 Solingen", $spy->calls[0]['body']);
     }
 
     public function test_fcm_sender_posts_high_priority_v1_message(): void
