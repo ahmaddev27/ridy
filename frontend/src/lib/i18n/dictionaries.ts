@@ -96,6 +96,13 @@ const en = {
     signOut: "Sign out",
     tour: "Show the tour",
   },
+  push: {
+    enable: "Enable notifications",
+    enabled: "Notifications enabled",
+    denied: "Notifications are blocked — allow them in your browser settings.",
+    unsupported: "Your browser doesn’t support push notifications.",
+    failed: "Couldn’t enable notifications. Please try again.",
+  },
   notif: {
     session_connected: { title: "Uber connected", body: "{company} is now streaming offers." },
     session_needs_relink: { title: "Reconnect Uber", body: "Your Uber session stopped — reconnect to keep receiving offers." },
@@ -233,6 +240,13 @@ const de: typeof en = {
     search: "Fahrzeuge, Fahrer, Fahrten suchen…",
     signOut: "Abmelden",
     tour: "Tour anzeigen",
+  },
+  push: {
+    enable: "Benachrichtigungen aktivieren",
+    enabled: "Benachrichtigungen aktiviert",
+    denied: "Benachrichtigungen sind blockiert — erlaube sie in den Browsereinstellungen.",
+    unsupported: "Dein Browser unterstützt keine Push-Benachrichtigungen.",
+    failed: "Benachrichtigungen konnten nicht aktiviert werden. Bitte erneut versuchen.",
   },
   notif: {
     session_connected: { title: "Uber verbunden", body: "{company} streamt jetzt Angebote." },
@@ -372,6 +386,13 @@ const ar: typeof en = {
     search: "ابحث عن مركبات، سائقين، رحلات…",
     signOut: "تسجيل الخروج",
     tour: "عرض الجولة",
+  },
+  push: {
+    enable: "تفعيل الإشعارات",
+    enabled: "تم تفعيل الإشعارات",
+    denied: "الإشعارات محظورة — اسمح بها من إعدادات المتصفح.",
+    unsupported: "متصفحك لا يدعم إشعارات الدفع.",
+    failed: "تعذّر تفعيل الإشعارات. حاول مرة أخرى.",
   },
   notif: {
     session_connected: { title: "تم ربط أوبر", body: "{company} صارت تستقبل العروض." },

@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, ChevronDown, LogOut, Volume2, VolumeX, Menu, X, Sun, Moon, HelpCircle } from "lucide-react";
+import { toast } from "sonner";
+import { Bell, BellPlus, ChevronDown, LogOut, Volume2, VolumeX, Menu, X, Sun, Moon, HelpCircle } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/context";
+import { enableWebPush, listenForeground } from "@/lib/push/web-push";
 import { useTheme } from "@/lib/theme/context";
 import { ONBOARDING_EVENT } from "@/components/onboarding/onboarding-tour";
 import { useAsync } from "@/hooks/use-async";
@@ -48,6 +50,36 @@ export function Topbar() {
     });
   }
   const isManager = Boolean(user?.tenant);
+
+  // Web push: once authenticated, silently re-register the token if the user
+  // already granted permission, and listen for foreground messages. The button
+  // stays visible until permission is actually granted.
+  const [pushGranted, setPushGranted] = useState(true);
+  useEffect(() => {
+    if (!user) return;
+    if (typeof Notification === "undefined") return;
+
+    setPushGranted(Notification.permission === "granted");
+
+    let unsubscribe: (() => void) | undefined;
+    void enableWebPush(locale, true);
+    void listenForeground().then((fn) => {
+      unsubscribe = fn;
+    });
+    return () => unsubscribe?.();
+    // Re-run only when the account changes; locale is read at call time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  async function handleEnablePush() {
+    const result = await enableWebPush(locale);
+    if (result === "enabled") {
+      setPushGranted(true);
+      toast.success(t("push.enabled"));
+    } else {
+      toast.error(t(`push.${result}`));
+    }
+  }
 
   return (
     <>
@@ -131,6 +163,18 @@ export function Topbar() {
             aria-label={muted ? t("common.unmute") : t("common.mute")}
           >
             {muted ? <VolumeX className="h-5 w-5 text-ink-subtle" /> : <Volume2 className="h-5 w-5" />}
+          </button>
+        )}
+
+        {/* Enable web push — hidden once permission is granted */}
+        {!pushGranted && (
+          <button
+            onClick={handleEnablePush}
+            className="rounded-lg p-2 text-ink-muted hover:bg-surface-2"
+            title={t("push.enable")}
+            aria-label={t("push.enable")}
+          >
+            <BellPlus className="h-5 w-5" />
           </button>
         )}
 
