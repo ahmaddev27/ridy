@@ -5,12 +5,12 @@ import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator } from "react-native";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { registerForPush } from "@/lib/push";
-import { colors } from "@/lib/theme";
+import { useColors } from "@/lib/theme";
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <StatusBar style="light" />
+      <StatusBar style="auto" />
       <Gate />
     </AuthProvider>
   );
@@ -22,6 +22,7 @@ function Gate() {
   const { ready, driver } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const c = useColors();
 
   useEffect(() => {
     if (!ready) return;
@@ -47,14 +48,14 @@ function Gate() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.canvas, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator color={colors.ink} />
+      <View style={{ flex: 1, backgroundColor: c.canvas, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color={c.ink} />
       </View>
     );
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.canvas } }}>
       <Stack.Screen name="login" />
       <Stack.Screen name="activate" />
       <Stack.Screen name="(tabs)" />

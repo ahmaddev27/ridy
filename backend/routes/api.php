@@ -70,6 +70,7 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('auth:driver')->group(function () {
             Route::get('me', [DriverAuthController::class, 'me']);
+            Route::patch('me', [DriverAuthController::class, 'update']);
             Route::post('logout', [DriverAuthController::class, 'logout']);
             Route::post('devices', [DriverDeviceController::class, 'store']);
             Route::delete('devices', [DriverDeviceController::class, 'destroy']);

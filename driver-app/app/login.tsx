@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { View, Text, KeyboardAvoidingView, Platform } from "react-native";
 import { useAuth } from "@/lib/auth";
-import { t } from "@/lib/i18n";
-import { colors } from "@/lib/theme";
+import { t, isRTL } from "@/lib/i18n";
+import { useColors } from "@/lib/theme";
 import { Field, PrimaryButton } from "@/components/ui";
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const colors = useColors();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -29,8 +30,8 @@ export default function LoginScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={{ flex: 1, backgroundColor: colors.canvas, justifyContent: "center", padding: 24 }}
     >
-      <Text style={{ color: colors.ink, fontSize: 28, fontWeight: "800", marginBottom: 4 }}>Reidey</Text>
-      <Text style={{ color: colors.inkMuted, fontSize: 16, marginBottom: 28 }}>{t("login.title")}</Text>
+      <Text style={{ color: colors.ink, fontSize: 28, fontWeight: "800", marginBottom: 4, textAlign: isRTL() ? "right" : "left" }}>Reidey</Text>
+      <Text style={{ color: colors.inkMuted, fontSize: 16, marginBottom: 28, textAlign: isRTL() ? "right" : "left" }}>{t("login.title")}</Text>
 
       <View style={{ gap: 16 }}>
         <Field

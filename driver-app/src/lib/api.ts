@@ -74,6 +74,13 @@ export class ApiClient {
     return this.request<{ data: DriverProfile }>("/api/v1/driver/me");
   }
 
+  updateProfile(patch: { name?: string; locale?: string; password?: string }) {
+    return this.request<{ data: DriverProfile }>("/api/v1/driver/me", {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  }
+
   logout() {
     return this.request<{ message: string }>("/api/v1/driver/logout", { method: "POST" });
   }

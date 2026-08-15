@@ -20,7 +20,7 @@
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#12151a"
+        "backgroundColor": "#ffffff"
       },
       "permissions": [
         "POST_NOTIFICATIONS"
@@ -45,7 +45,7 @@
           "image": "./assets/splash.png",
           "imageWidth": 180,
           "resizeMode": "contain",
-          "backgroundColor": "#12151a"
+          "backgroundColor": "#ffffff"
         }
       ]
     ],

@@ -1,37 +1,34 @@
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { t } from "@/lib/i18n";
-import { colors } from "@/lib/theme";
-
-/** Minimal emoji tab icons keep the shell dependency-free. */
-function Icon({ glyph, color }: { glyph: string; color: string }) {
-  return <Text style={{ fontSize: 18, color }}>{glyph}</Text>;
-}
+import { useColors } from "@/lib/theme";
 
 export default function TabsLayout() {
+  const c = useColors();
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: colors.canvas },
-        headerTitleStyle: { color: colors.ink },
+        headerStyle: { backgroundColor: c.canvas },
+        headerTitleStyle: { color: c.ink, fontWeight: "700" },
         headerShadowVisible: false,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.line },
-        tabBarActiveTintColor: colors.ink,
-        tabBarInactiveTintColor: colors.inkSubtle,
+        tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.line, height: 58, paddingBottom: 6, paddingTop: 6 },
+        tabBarActiveTintColor: c.ink,
+        tabBarInactiveTintColor: c.inkSubtle,
+        tabBarLabelStyle: { fontSize: 12 },
       }}
     >
       <Tabs.Screen
         name="offers"
         options={{
           title: t("offers.title"),
-          tabBarIcon: ({ color }) => <Icon glyph="🔔" color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="notifications-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: t("settings.title"),
-          tabBarIcon: ({ color }) => <Icon glyph="⚙️" color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" size={size} color={color} />,
         }}
       />
     </Tabs>
