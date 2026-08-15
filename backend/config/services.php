@@ -60,9 +60,11 @@ return [
     ],
 
     'fcm' => [
-        // When empty, pushes are logged instead of sent (see AppServiceProvider).
-        'server_key' => env('FCM_SERVER_KEY'),
-        'endpoint' => env('FCM_ENDPOINT', 'https://fcm.googleapis.com/v1/projects/ridy/messages:send'),
+        // Path to the Google service-account JSON. When unset (or the file is
+        // missing) pushes are logged instead of sent — see AppServiceProvider.
+        'credentials' => env('FCM_CREDENTIALS'),
+        // Firebase project id. Falls back to the one in the credentials file.
+        'project_id' => env('FCM_PROJECT_ID'),
     ],
 
 ];

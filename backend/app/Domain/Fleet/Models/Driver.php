@@ -4,12 +4,18 @@ namespace App\Domain\Fleet\Models;
 
 use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\HasApiTokens;
 
-class Driver extends Model
+/**
+ * A fleet driver. Also the authenticatable identity for the mobile driver app
+ * (email + password, issued a Sanctum bearer token) once invited by a manager.
+ */
+class Driver extends Authenticatable
 {
-    use BelongsToTenant;
+    use BelongsToTenant, HasApiTokens, Notifiable;
 
     /**
      * Substrings of Uber's raw `driverStatus` that mean the driver is NOT taking
@@ -25,7 +31,10 @@ class Driver extends Model
         'uber_picture_url', 'uber_rating', 'uber_total_trips', 'uber_status', 'roster_synced_at',
         'online_status', 'location_updated_at', 'status_synced_at',
         'latitude', 'longitude', 'heading', 'trip_waypoints',
+        'email', 'password', 'locale', 'invite_token', 'invited_at', 'activated_at', 'last_login_at',
     ];
+
+    protected $hidden = ['password', 'invite_token'];
 
     protected $casts = [
         'external_ids' => 'array',
@@ -38,7 +47,27 @@ class Driver extends Model
         'longitude' => 'decimal:7',
         'heading' => 'decimal:2',
         'trip_waypoints' => 'array',
+        'password' => 'hashed',
+        'invited_at' => 'datetime',
+        'activated_at' => 'datetime',
+        'last_login_at' => 'datetime',
     ];
+
+    /** True once the driver has completed activation (set a password) for the app. */
+    public function isActivated(): bool
+    {
+        return $this->activated_at !== null;
+    }
+
+    /** App onboarding state for the manager dashboard. */
+    public function appStatus(): string
+    {
+        return match (true) {
+            $this->activated_at !== null => 'active',
+            $this->invited_at !== null => 'invited',
+            default => 'none',
+        };
+    }
 
     /**
      * Engagement level for the app: 0 = available (online, no trip), 1 = heading
