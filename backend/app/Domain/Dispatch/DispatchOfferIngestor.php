@@ -23,6 +23,7 @@ class DispatchOfferIngestor
     public function __construct(
         private TenantContext $context,
         private DispatchNotifier $notifier,
+        private TripGeocoder $geocoder,
     ) {}
 
     /**
@@ -88,6 +89,15 @@ class DispatchOfferIngestor
         // accept window makes this notification time-sensitive — but a push failure
         // must never lose the offer.
         if ($driver !== null) {
+            // Geocode now (same TripGeocoder the dashboard uses) so the push carries
+            // the trip distance + €/km. Cached addresses are instant; a failure just
+            // means no metrics line — it must never delay or lose the offer.
+            try {
+                $this->geocoder->enrich($record);
+            } catch (Throwable $e) {
+                RidyLog::event('dispatch_offer.geocode_failed', ['offer_id' => $record->id, 'error' => $e->getMessage()]);
+            }
+
             try {
                 $this->notifier->notify($record);
             } catch (Throwable $e) {

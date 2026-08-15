@@ -7,6 +7,7 @@ use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class DispatchIngestTest extends TestCase
@@ -22,6 +23,7 @@ class DispatchIngestTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Http::fake(); // no real geocoding calls from the synchronous enrich
         config(['services.dispatch.ingest_secret' => self::SECRET]);
     }
 
