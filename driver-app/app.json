@@ -6,11 +6,11 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
-    "splash": {
-      "backgroundColor": "#12151a"
-    },
-    "assetBundlePatterns": ["**/*"],
+    "newArchEnabled": false,
+    "icon": "./assets/icon.png",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "de.fleeteye.reidey.driver"
@@ -18,7 +18,13 @@
     "android": {
       "package": "de.fleeteye.reidey.driver",
       "googleServicesFile": "./google-services.json",
-      "permissions": ["POST_NOTIFICATIONS"]
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#12151a"
+      },
+      "permissions": [
+        "POST_NOTIFICATIONS"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -26,12 +32,31 @@
       [
         "expo-notifications",
         {
+          "icon": "./assets/notification-icon.png",
+          "color": "#059669",
           "sounds": []
+        }
+      ],
+      "expo-asset",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#12151a"
         }
       ]
     ],
     "extra": {
-      "apiUrl": "https://r.fleeteye.de"
+      "apiUrl": "https://r.fleeteye.de",
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "8b727090-7abd-4af7-bdcb-0ef0561780b1"
+      }
     }
   }
 }

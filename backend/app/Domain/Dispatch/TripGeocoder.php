@@ -21,7 +21,15 @@ class TripGeocoder
 
     private const UA = 'Reidey/1.0 (fleet dispatch; contact: ops@fleeteye.de)';
 
-    /** Geocode + route an offer once, caching on the row. Safe to call repeatedly. */
+    /** Give up (mark synced) after this many failed attempts, so we don't retry forever. */
+    private const MAX_ATTEMPTS = 5;
+
+    /**
+     * Geocode + route an offer once it succeeds, caching on the row. Safe to call
+     * repeatedly: a transient failure (rate-limited free services) leaves
+     * geo_synced_at null so a later call — or the backfill command — retries,
+     * only giving up after {@see MAX_ATTEMPTS}.
+     */
     public function enrich(DispatchOffer $offer): DispatchOffer
     {
         if ($offer->geo_synced_at !== null) {
@@ -40,9 +48,16 @@ class TripGeocoder
             $route = $this->route($pickup, $dropoff);
             $offer->distance_m = $route['distance_m'] ?? null;
             $offer->route_geometry = $route['geometry'] ?? null;
+            $offer->geo_synced_at = CarbonImmutable::now(); // success — done for good
+        } else {
+            // Couldn't resolve both ends (transient rate-limit or unknown address).
+            // Count the attempt and only give up after a few tries.
+            $offer->geo_attempts = (int) $offer->geo_attempts + 1;
+            if ($offer->geo_attempts >= self::MAX_ATTEMPTS) {
+                $offer->geo_synced_at = CarbonImmutable::now();
+            }
         }
 
-        $offer->geo_synced_at = CarbonImmutable::now();
         $offer->save();
 
         return $offer;
@@ -61,18 +76,24 @@ class TripGeocoder
             return $cached->lat !== null ? ['lat' => (float) $cached->lat, 'lng' => (float) $cached->lng] : null;
         }
 
-        $coords = null;
         try {
             $res = Http::withHeaders(['User-Agent' => self::UA])
                 ->timeout(6)
                 ->get(self::NOMINATIM, ['q' => $address, 'format' => 'json', 'limit' => 1]);
-            $hit = $res->ok() ? ($res->json()[0] ?? null) : null;
-            if ($hit && isset($hit['lat'], $hit['lon'])) {
-                $coords = ['lat' => (float) $hit['lat'], 'lng' => (float) $hit['lon']];
-            }
         } catch (\Throwable $e) {
-            // best-effort; cache the miss below so we don't hammer the service
+            return null; // transient (timeout/network) — do NOT cache, so a retry can succeed
         }
+
+        if (! $res->ok()) {
+            return null; // transient (rate-limited 429 / 5xx) — do NOT cache, retry later
+        }
+
+        // Definitive 200 response: a hit, or a genuine "not found" worth caching so
+        // we never re-query an address that truly doesn't resolve.
+        $hit = $res->json()[0] ?? null;
+        $coords = ($hit && isset($hit['lat'], $hit['lon']))
+            ? ['lat' => (float) $hit['lat'], 'lng' => (float) $hit['lon']]
+            : null;
 
         DB::table('geocode_cache')->updateOrInsert(
             ['query' => $address],

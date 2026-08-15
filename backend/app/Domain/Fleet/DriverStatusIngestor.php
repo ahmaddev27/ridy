@@ -72,8 +72,10 @@ class DriverStatusIngestor
             $this->applyTransition($tenantId, $uuid, $was, $now, $counts);
         }
 
-        // Keep pending→rejected fresh without depending on cron (the poll runs often).
+        // Keep pending→rejected fresh, and force-finalize anything that slipped
+        // past an unobserved edge — both cheap and indexed, so safe every poll.
         $this->lifecycle->expirePending($tenantId);
+        $this->lifecycle->finalizeStale($tenantId);
 
         return $counts;
     }
@@ -104,6 +106,25 @@ class DriverStatusIngestor
             $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
             if ($active !== null && $this->lifecycle->start($active)) {
                 $counts['started']++;
+            }
+
+            return;
+        }
+
+        // ON_TRIP → EN_ROUTE: back-to-back — the driver finished the current trip
+        // and is heading to the next pickup. Complete the current started offer,
+        // then accept the next offer that arrived DURING this trip (Uber only sends
+        // it once the driver is already on a trip). Not started yet — it's EN_ROUTE.
+        if ($was === 2 && $now === 1) {
+            $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
+            if ($active !== null && $active->status === OfferStatus::Started && $this->lifecycle->complete($active)) {
+                $counts['completed']++;
+            }
+            if ($active !== null && $active->received_at !== null) {
+                $next = $this->lifecycle->nextTakeableOfferAfter($tenantId, $uuid, $active->received_at);
+                if ($next !== null && $this->lifecycle->accept($next)) {
+                    $counts['accepted']++;
+                }
             }
 
             return;

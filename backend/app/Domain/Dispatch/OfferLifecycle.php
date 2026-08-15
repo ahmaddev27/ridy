@@ -4,6 +4,7 @@ namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -15,8 +16,14 @@ use Illuminate\Support\Facades\DB;
  */
 class OfferLifecycle
 {
-    /** Offers older than this when a trip starts aren't attributed to it. */
-    public const ATTRIBUTION_MINUTES = 10;
+    /** A freshly-arrived offer older than this isn't attributed to a new engagement. */
+    public const ATTRIBUTION_MINUTES = 15;
+
+    /** A STARTED offer still open after this is force-completed (safety net). */
+    public const MAX_TRIP_MINUTES = 100;
+
+    /** An ACCEPTED-but-never-started offer older than this is force-canceled. */
+    public const ACCEPTED_STALE_MINUTES = 20;
 
     /** PENDING → ACCEPTED. Stamps accepted_at (kept forever = "was ever taken"). */
     public function accept(DispatchOffer $offer): bool
@@ -78,6 +85,47 @@ class OfferLifecycle
             ->where('received_at', '>=', now()->subMinutes(self::ATTRIBUTION_MINUTES))
             ->latest('received_at')
             ->first();
+    }
+
+    /**
+     * The next not-yet-taken offer the driver picked up while already engaged —
+     * i.e. the back-to-back offer that arrived AFTER the current trip's offer. Not
+     * age-capped (a long trip can be 100 min), only bounded by "newer than the
+     * active offer", so it can never grab a stale one from before this trip.
+     */
+    public function nextTakeableOfferAfter(int $tenantId, string $driverUuid, CarbonInterface $after): ?DispatchOffer
+    {
+        return DispatchOffer::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('driver_uuid', $driverUuid)
+            ->whereNull('accepted_at')
+            ->where('received_at', '>', $after)
+            ->latest('received_at')
+            ->first();
+    }
+
+    /**
+     * Safety net for edges the poll never observed (driver went offline mid-trip,
+     * a long poll gap): force-complete STARTED offers past the max trip length and
+     * force-cancel ACCEPTED offers that never started. Returns rows changed.
+     */
+    public function finalizeStale(?int $tenantId = null): int
+    {
+        $now = CarbonImmutable::now();
+
+        $completed = DispatchOffer::withoutGlobalScopes()
+            ->where('status', OfferStatus::Started)
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->where('started_at', '<', $now->subMinutes(self::MAX_TRIP_MINUTES))
+            ->update(['status' => OfferStatus::Completed, 'completed_at' => $now]);
+
+        $canceled = DispatchOffer::withoutGlobalScopes()
+            ->where('status', OfferStatus::Accepted)
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->where('accepted_at', '<', $now->subMinutes(self::ACCEPTED_STALE_MINUTES))
+            ->update(['status' => OfferStatus::Canceled, 'canceled_at' => $now]);
+
+        return $completed + $canceled;
     }
 
     /**
