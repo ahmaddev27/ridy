@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\V1\DispatchIngestController;
 use App\Http\Controllers\Api\V1\DispatchLinkController;
 use App\Http\Controllers\Api\V1\DispatchOfferController;
 use App\Http\Controllers\Api\V1\Driver\DriverAuthController;
+use App\Http\Controllers\Api\V1\Driver\DriverDashboardController;
 use App\Http\Controllers\Api\V1\Driver\DriverDeviceController;
 use App\Http\Controllers\Api\V1\Driver\DriverOfferController;
 use App\Http\Controllers\Api\V1\DriverController;
@@ -74,6 +75,8 @@ Route::prefix('v1')->group(function () {
             Route::post('logout', [DriverAuthController::class, 'logout']);
             Route::post('devices', [DriverDeviceController::class, 'store']);
             Route::delete('devices', [DriverDeviceController::class, 'destroy']);
+            Route::get('home', [DriverDashboardController::class, 'home']);
+            Route::get('stats', [DriverDashboardController::class, 'stats']);
             Route::get('offers', [DriverOfferController::class, 'index']);
         });
     });

@@ -141,6 +141,37 @@ class DriverAppTest extends TestCase
         $this->assertCount(1, $res->json('data'));
     }
 
+    public function test_home_returns_today_summary_active_offer_and_recent(): void
+    {
+        $driver = $this->driver(['activated_at' => now()]);
+        $this->offer($driver, 'a')->update(['status' => OfferStatus::Completed, 'accepted_at' => now(), 'fare_amount' => 10]);
+        $this->offer($driver, 'b')->update(['status' => OfferStatus::Started, 'accepted_at' => now()]); // active
+        $this->offer($driver, 'c')->update(['status' => OfferStatus::Rejected]);
+
+        Sanctum::actingAs($driver, guard: 'driver');
+        $res = $this->getJson('/api/v1/driver/home')->assertOk();
+
+        $res->assertJsonPath('data.today.total', 3)
+            ->assertJsonPath('data.today.accepted', 2)   // completed + started were taken
+            ->assertJsonPath('data.today.completed', 1)
+            ->assertJsonPath('data.today.earnings', 10)
+            ->assertJsonPath('data.active_offer.offer_uuid', 'b');
+        $this->assertCount(3, $res->json('data.recent'));
+    }
+
+    public function test_offers_can_be_filtered_by_status(): void
+    {
+        $driver = $this->driver(['activated_at' => now()]);
+        $this->offer($driver, 'x')->update(['status' => OfferStatus::Completed]);
+        $this->offer($driver, 'y')->update(['status' => OfferStatus::Rejected]);
+
+        Sanctum::actingAs($driver, guard: 'driver');
+        $res = $this->getJson('/api/v1/driver/offers?status=completed')->assertOk();
+
+        $this->assertCount(1, $res->json('data'));
+        $this->assertSame('completed', $res->json('data.0.status'));
+    }
+
     private function offer(Driver $driver, string $uuid): DispatchOffer
     {
         return DispatchOffer::create([
