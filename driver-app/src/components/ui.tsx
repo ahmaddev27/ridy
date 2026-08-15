@@ -2,6 +2,41 @@ import { ActivityIndicator, Pressable, Text, TextInput, View, type TextInputProp
 import { useColors, radius } from "@/lib/theme";
 import { isRTL } from "@/lib/i18n";
 
+/** A compact metric tile used on Home + Profile stats. */
+export function StatCard({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  const c = useColors();
+  return (
+    <View
+      style={{
+        flexGrow: 1,
+        flexBasis: "30%",
+        minWidth: 100,
+        backgroundColor: c.surface,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        borderColor: c.line,
+        paddingVertical: 14,
+        paddingHorizontal: 14,
+        gap: 4,
+      }}
+    >
+      <Text style={{ color: tone ?? c.ink, fontSize: 22, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>
+        {value}
+      </Text>
+      <Text style={{ color: c.inkSubtle, fontSize: 12, textAlign: isRTL() ? "right" : "left" }}>{label}</Text>
+    </View>
+  );
+}
+
+export function SectionTitle({ children }: { children: string }) {
+  const c = useColors();
+  return (
+    <Text style={{ color: c.ink, fontSize: 15, fontWeight: "700", textAlign: isRTL() ? "right" : "left" }}>
+      {children}
+    </Text>
+  );
+}
+
 export function PrimaryButton({
   label,
   onPress,

@@ -37,6 +37,41 @@ const de: Dict = {
   "settings.saved": "Gespeichert",
   "settings.saveError": "Konnte nicht gespeichert werden",
   "common.seconds": "Sek.",
+  // Tabs
+  "tabs.home": "Startseite",
+  "tabs.offers": "Angebote",
+  "tabs.profile": "Profil",
+  // Home
+  "home.greeting": "Hallo",
+  "home.online": "Online",
+  "home.offline": "Offline",
+  "home.engagement.0": "Bereit",
+  "home.engagement.1": "Auf dem Weg",
+  "home.engagement.2": "Auf Fahrt",
+  "home.today": "Heute",
+  "home.activeOffer": "Aktives Angebot",
+  "home.recent": "Letzte Angebote",
+  "home.empty": "Noch keine Angebote heute",
+  // Stat cards
+  "stat.offers": "Angebote",
+  "stat.accepted": "Angenommen",
+  "stat.acceptanceRate": "Annahmequote",
+  "stat.earnings": "Einnahmen",
+  "stat.km": "km",
+  "stat.completed": "Abgeschlossen",
+  "stat.declined": "Abgelehnt",
+  // Offers filters
+  "offers.search": "Suchen",
+  "offers.from": "Von",
+  "offers.to": "Bis",
+  "offers.loadMore": "Mehr laden",
+  "filter.all": "Alle",
+  // Profile
+  "profile.stats": "Statistik",
+  "profile.settings": "Einstellungen",
+  "range.today": "Heute",
+  "range.7d": "7 Tage",
+  "range.30d": "30 Tage",
 };
 
 const en: Dict = {
@@ -73,6 +108,41 @@ const en: Dict = {
   "settings.saved": "Saved",
   "settings.saveError": "Couldn’t save",
   "common.seconds": "s",
+  // Tabs
+  "tabs.home": "Home",
+  "tabs.offers": "Offers",
+  "tabs.profile": "Profile",
+  // Home
+  "home.greeting": "Hi",
+  "home.online": "Online",
+  "home.offline": "Offline",
+  "home.engagement.0": "Idle",
+  "home.engagement.1": "En route",
+  "home.engagement.2": "On trip",
+  "home.today": "Today",
+  "home.activeOffer": "Active offer",
+  "home.recent": "Recent offers",
+  "home.empty": "No offers yet today",
+  // Stat cards
+  "stat.offers": "Offers",
+  "stat.accepted": "Accepted",
+  "stat.acceptanceRate": "Acceptance",
+  "stat.earnings": "Earnings",
+  "stat.km": "km",
+  "stat.completed": "Completed",
+  "stat.declined": "Declined",
+  // Offers filters
+  "offers.search": "Search",
+  "offers.from": "From",
+  "offers.to": "To",
+  "offers.loadMore": "Load more",
+  "filter.all": "All",
+  // Profile
+  "profile.stats": "Stats",
+  "profile.settings": "Settings",
+  "range.today": "Today",
+  "range.7d": "7 days",
+  "range.30d": "30 days",
 };
 
 const ar: Dict = {
@@ -109,6 +179,41 @@ const ar: Dict = {
   "settings.saved": "تم الحفظ",
   "settings.saveError": "تعذّر الحفظ",
   "common.seconds": "ث",
+  // Tabs
+  "tabs.home": "الرئيسية",
+  "tabs.offers": "العروض",
+  "tabs.profile": "البروفايل",
+  // Home
+  "home.greeting": "مرحباً",
+  "home.online": "متصل",
+  "home.offline": "غير متصل",
+  "home.engagement.0": "متفرّغ",
+  "home.engagement.1": "في الطريق",
+  "home.engagement.2": "في رحلة",
+  "home.today": "اليوم",
+  "home.activeOffer": "العرض الحالي",
+  "home.recent": "أحدث العروض",
+  "home.empty": "لا عروض اليوم بعد",
+  // Stat cards
+  "stat.offers": "العروض",
+  "stat.accepted": "المقبولة",
+  "stat.acceptanceRate": "نسبة القبول",
+  "stat.earnings": "الأرباح",
+  "stat.km": "كم",
+  "stat.completed": "المكتملة",
+  "stat.declined": "المرفوضة",
+  // Offers filters
+  "offers.search": "بحث",
+  "offers.from": "من",
+  "offers.to": "إلى",
+  "offers.loadMore": "تحميل المزيد",
+  "filter.all": "الكل",
+  // Profile
+  "profile.stats": "الإحصائيات",
+  "profile.settings": "الإعدادات",
+  "range.today": "اليوم",
+  "range.7d": "7 أيام",
+  "range.30d": "30 يوم",
 };
 
 const DICTS: Record<string, Dict> = { de, en, ar };

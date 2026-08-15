@@ -24,6 +24,41 @@ export type DriverProfile = {
   uber_linked: boolean;
 };
 
+/** Aggregate counters returned by the home + stats endpoints. */
+export type DriverStats = {
+  total: number;
+  accepted: number;
+  declined: number;
+  completed: number;
+  acceptance_rate: number;
+  earnings: number;
+  km: number;
+};
+
+export type HomeData = {
+  driver: { name: string; online: boolean; engagement: 0 | 1 | 2 };
+  today: DriverStats;
+  active_offer: Offer | null;
+  recent: Offer[];
+};
+
+/** Filters accepted by the paginated offers list. */
+export type OffersQuery = {
+  status?: string;
+  from?: string;
+  to?: string;
+  search?: string;
+  per_page?: number;
+  page?: number;
+};
+
+export type PaginationMeta = {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+};
+
 /** Thin fetch wrapper: JSON in/out, bearer token, unwraps the `{data}` envelope. */
 export class ApiClient {
   constructor(private token: string | null = null) {}
@@ -92,8 +127,25 @@ export class ApiClient {
     });
   }
 
-  offers() {
-    return this.request<{ data: Offer[] }>("/api/v1/driver/offers");
+  home() {
+    return this.request<{ data: HomeData }>("/api/v1/driver/home");
+  }
+
+  stats(from?: string, to?: string) {
+    const qs = new URLSearchParams();
+    if (from) qs.set("from", from);
+    if (to) qs.set("to", to);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return this.request<{ data: DriverStats }>(`/api/v1/driver/stats${suffix}`);
+  }
+
+  offers(params: OffersQuery = {}) {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") qs.set(key, String(value));
+    }
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return this.request<{ data: Offer[]; meta: PaginationMeta }>(`/api/v1/driver/offers${suffix}`);
   }
 }
 
