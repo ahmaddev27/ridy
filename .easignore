@@ -1,0 +1,8 @@
+# EAS Build only needs the Expo app in driver-app/. The rest of the monorepo is
+# irrelevant to the mobile build — and backend/storage/app/public is a Laravel
+# storage symlink that breaks the Windows tarball step (EPERM). Exclude it all.
+backend/
+frontend/
+extension/
+dispatch-daemon/
+docs/
