@@ -125,7 +125,7 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
                     dropoff={offer.trip.dropoff}
                     routeGeometry={offer.trip.route_geometry}
                   />
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <StatCard
                       icon={Route}
                       label={c("distance")}

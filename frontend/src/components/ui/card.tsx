@@ -58,7 +58,7 @@ export function StatCard({
         )}
         <div className="min-w-0">
           <div className="truncate text-sm font-medium text-ink-muted">{label}</div>
-          <div className={cn("mt-0.5 text-2xl font-bold tabular-nums tracking-tight", valueTone)}>{value}</div>
+          <div className={cn("mt-0.5 truncate text-xl font-bold tabular-nums tracking-tight sm:text-2xl", valueTone)}>{value}</div>
           {hint && <div className="mt-1 text-xs text-ink-subtle">{hint}</div>}
         </div>
       </div>
