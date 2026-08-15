@@ -6,6 +6,7 @@ import { api } from "./api";
 // Offers are time-critical — always show them, with sound, even in foreground.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
+    shouldShowAlert: true,
     shouldShowBanner: true,
     shouldShowList: true,
     shouldPlaySound: true,
