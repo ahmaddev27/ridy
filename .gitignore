@@ -32,3 +32,6 @@ docs/uber-console/roster-*.json
 # OS / editor cruft
 .DS_Store
 Thumbs.db
+
+# agent worktrees
+.claude/worktrees/
