@@ -7,9 +7,6 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": false,
-    "splash": {
-      "backgroundColor": "#12151a"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -34,7 +31,13 @@
         }
       ],
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#12151a"
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "https://r.fleeteye.de",
