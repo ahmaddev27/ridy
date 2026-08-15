@@ -1,0 +1,64 @@
+import { useEffect } from "react";
+import { Stack, useRouter, useSegments } from "expo-router";
+import * as Notifications from "expo-notifications";
+import { StatusBar } from "expo-status-bar";
+import { View, ActivityIndicator } from "react-native";
+import { AuthProvider, useAuth } from "@/lib/auth";
+import { registerForPush } from "@/lib/push";
+import { colors } from "@/lib/theme";
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <StatusBar style="light" />
+      <Gate />
+    </AuthProvider>
+  );
+}
+
+/** Routes the user between auth screens and the app based on session state, and
+ *  wires push registration + notification-tap navigation once signed in. */
+function Gate() {
+  const { ready, driver } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!ready) return;
+    const inAuth = segments[0] === "login" || segments[0] === "activate";
+    if (!driver && !inAuth) {
+      router.replace("/login");
+    } else if (driver && inAuth) {
+      router.replace("/offers");
+    }
+  }, [ready, driver, segments, router]);
+
+  // Once signed in: register for push and open the offer when a notification is tapped.
+  useEffect(() => {
+    if (!driver) return;
+    registerForPush();
+
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as { offer_id?: string };
+      if (data?.offer_id) router.push(`/offer/${data.offer_id}`);
+    });
+    return () => sub.remove();
+  }, [driver, router]);
+
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.canvas, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color={colors.ink} />
+      </View>
+    );
+  }
+
+  return (
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas } }}>
+      <Stack.Screen name="login" />
+      <Stack.Screen name="activate" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="offer/[id]" options={{ presentation: "modal" }} />
+    </Stack>
+  );
+}
