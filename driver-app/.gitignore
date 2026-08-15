@@ -4,5 +4,4 @@ dist/
 web-build/
 *.log
 .DS_Store
-google-services.json
 GoogleService-Info.plist

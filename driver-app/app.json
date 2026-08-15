@@ -10,7 +10,9 @@
     "splash": {
       "backgroundColor": "#12151a"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "de.fleeteye.reidey.driver"
@@ -18,7 +20,9 @@
     "android": {
       "package": "de.fleeteye.reidey.driver",
       "googleServicesFile": "./google-services.json",
-      "permissions": ["POST_NOTIFICATIONS"]
+      "permissions": [
+        "POST_NOTIFICATIONS"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -31,7 +35,13 @@
       ]
     ],
     "extra": {
-      "apiUrl": "https://r.fleeteye.de"
+      "apiUrl": "https://r.fleeteye.de",
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "8b727090-7abd-4af7-bdcb-0ef0561780b1"
+      }
     }
   }
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1055551156467",
+    "project_id": "reidey-225e8",
+    "storage_bucket": "reidey-225e8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1055551156467:android:96ddad0df4b8be3471c786",
+        "android_client_info": {
+          "package_name": "de.fleeteye.reidey.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDKn9gEA4NRY7hGFJHdq-3z04D67w8lilU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
