@@ -29,6 +29,8 @@ class DriverResource extends JsonResource
             'online' => $this->isOnline(),
             'online_status' => $this->online_status,
             'location_updated_at' => $this->location_updated_at?->toIso8601String(),
+            'email' => $this->email,
+            'app_status' => $this->appStatus(),
         ];
     }
 }

@@ -5,8 +5,19 @@ import { latnLocale, toLatinDigits } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { X, MapPin, Flag, User, CircleDollarSign, Clock, Loader2, Route, Gauge, Wallet } from "lucide-react";
 import { StatCard } from "@/components/ui/card";
+import { Badge, type Status } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/context";
-import { getOffer, fareLabel, type DispatchOfferDetail } from "@/lib/api/offers";
+import { getOffer, fareLabel, type DispatchOfferDetail, type OfferStatus } from "@/lib/api/offers";
+
+/** Offer lifecycle status → badge tone (mirrors the offers list). */
+const OFFER_TONE: Record<OfferStatus, Status> = {
+  pending: "expiring",
+  accepted: "info",
+  started: "private",
+  completed: "connected",
+  rejected: "neutral",
+  canceled: "personal",
+};
 
 // Leaflet touches `window`, so load the map client-side only.
 const TripMap = dynamic(() => import("./trip-map").then((m) => m.TripMap), {
@@ -54,6 +65,10 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
             <p className="mt-0.5 text-sm text-ink-subtle">{offer?.driver_name ?? "—"}</p>
           </div>
           <div className="flex items-center gap-2">
+            {offer && (() => {
+              const st = offer.status ?? (offer.accepted ? "accepted" : "pending");
+              return <Badge status={OFFER_TONE[st]} dot>{c(`st_${st}`)}</Badge>;
+            })()}
             {(offer?.fare_amount != null || offer?.fare_formatted) && (
               <span className="rounded-lg bg-success-bg px-2.5 py-1 text-sm font-semibold text-success-fg">
                 {toLatinDigits(fareLabel(offer, latnLocale(locale)))}
