@@ -70,6 +70,15 @@ export async function inviteDriver(id: number): Promise<{ app_status: string }> 
   return res.data;
 }
 
+/** Send a diagnostic test push to the driver's registered devices. */
+export async function testDriverPush(id: number): Promise<{ sent: number; devices: number }> {
+  const res = await apiFetch<{ data: { sent: number; devices: number } }>(
+    `/api/v1/drivers/${id}/test-push`,
+    { method: "POST", withCsrf: true },
+  );
+  return res.data;
+}
+
 // ── Live map ─────────────────────────────────────────────────────────────────
 export type LiveWaypoint = { lat: number; lng: number; type: string | null };
 
