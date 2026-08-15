@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Notifications\Contracts\PushSender;
+use App\Domain\Notifications\Models\UserPushToken;
 use App\Domain\Notifications\Notifier;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Models\User;
@@ -40,6 +42,52 @@ class NotifierTest extends TestCase
         $this->assertSame(1, $admin->fresh()->notifications()->count());
         $this->assertSame(0, $manager->fresh()->notifications()->count());
         $this->assertSame('Acme', $admin->fresh()->notifications()->first()->data['params']['company']);
+    }
+
+    /** Capture pushes instead of hitting FCM; returns [spy, manager]. */
+    private function spyManager(string $locale = 'de'): array
+    {
+        $spy = new class implements PushSender
+        {
+            public array $calls = [];
+
+            public function send(string $deviceToken, string $title, string $body, array $data = []): bool
+            {
+                $this->calls[] = compact('title', 'body', 'data');
+
+                return true;
+            }
+        };
+        $this->app->instance(PushSender::class, $spy);
+
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $manager = User::create(['name' => 'M', 'email' => 'm@a.de', 'password' => Hash::make('x'), 'tenant_id' => $tenant->id, 'locale' => $locale]);
+        $manager->assignRole('fleet_manager');
+        UserPushToken::create(['user_id' => $manager->id, 'token' => 'web-1']);
+
+        return [$spy, $manager, $tenant];
+    }
+
+    public function test_event_sends_localized_web_push_to_registered_users(): void
+    {
+        [$spy, , $tenant] = $this->spyManager('en');
+
+        app(Notifier::class)->toTenant($tenant->id, 'subscription_activated', ['days' => 30], '/mySubscription');
+
+        $this->assertCount(1, $spy->calls);
+        $this->assertSame('Subscription active', $spy->calls[0]['title']);
+        $this->assertSame('Your subscription runs for 30 days.', $spy->calls[0]['body']);
+        $this->assertSame('subscription_activated', $spy->calls[0]['data']['type']);
+    }
+
+    public function test_push_false_stores_the_bell_but_skips_web_push(): void
+    {
+        [$spy, $manager, $tenant] = $this->spyManager();
+
+        app(Notifier::class)->toTenant($tenant->id, 'offer', ['fare' => '€7'], '/offers', push: false);
+
+        $this->assertCount(0, $spy->calls, 'no external push for high-frequency events');
+        $this->assertSame(1, $manager->fresh()->notifications()->count(), 'still stored in the bell');
     }
 
     public function test_dedupe_skips_a_second_unread_of_the_same_type(): void
