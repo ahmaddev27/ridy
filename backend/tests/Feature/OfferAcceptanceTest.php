@@ -206,6 +206,25 @@ class OfferAcceptanceTest extends TestCase
         $this->assertNotNull($c->canceled_at);
     }
 
+    public function test_garbage_location_timestamp_does_not_break_the_batch(): void
+    {
+        // An offline driver carried a bad ms timestamp that parses to year 0001,
+        // which MySQL datetime rejects — it used to 500 the whole status batch.
+        $driver = $this->driver();
+
+        $this->postJson('/api/v1/drivers/statuses', [
+            'statuses' => [[
+                'driver_uuid' => self::DRIVER_UUID,
+                'status' => 'MONITORING_SUPPLY_STATUS_OFFLINE',
+                'location_updated_at' => -62135596800000, // → year 0001
+            ]],
+        ])->assertOk();
+
+        $driver->refresh();
+        $this->assertNull($driver->location_updated_at);
+        $this->assertSame('MONITORING_SUPPLY_STATUS_OFFLINE', $driver->online_status);
+    }
+
     public function test_late_acceptance_overturns_a_timeout_rejection(): void
     {
         // The core prod bug: the expiry sweep marks an offer rejected within

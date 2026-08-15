@@ -52,16 +52,21 @@ class DriverStatusIngestor
             $lat = $this->coord($row['latitude'] ?? null);
             $lng = $this->coord($row['longitude'] ?? null);
 
-            $driver->update([
-                'online_status' => $row['status'] ?? null,
-                'location_updated_at' => ! empty($row['location_updated_at'])
-                    ? CarbonImmutable::createFromTimestampMs($row['location_updated_at']) : null,
-                'status_synced_at' => now(),
-                'latitude' => $lat,
-                'longitude' => $lng,
-                'heading' => $lat !== null ? ($row['heading'] ?? null) : null,
-                'trip_waypoints' => $lat !== null && ! empty($row['waypoints']) ? $row['waypoints'] : null,
-            ]);
+            try {
+                $driver->update([
+                    'online_status' => $row['status'] ?? null,
+                    'location_updated_at' => $this->timestampMs($row['location_updated_at'] ?? null),
+                    'status_synced_at' => now(),
+                    'latitude' => $lat,
+                    'longitude' => $lng,
+                    'heading' => $lat !== null ? ($row['heading'] ?? null) : null,
+                    'trip_waypoints' => $lat !== null && ! empty($row['waypoints']) ? $row['waypoints'] : null,
+                ]);
+            } catch (\Throwable $e) {
+                // One malformed status row must never fail the whole batch (which
+                // would 500 the endpoint and drop every driver + acceptance).
+                continue;
+            }
             $counts['updated']++;
 
             $this->applyTransition($tenantId, $uuid, $was, $now, $counts);
@@ -130,6 +135,22 @@ class DriverStatusIngestor
         }
 
         return 0;
+    }
+
+    /**
+     * A millisecond timestamp as a datetime, or null. Offline drivers sometimes
+     * carry 0 / garbage values that parse to year 0001, which MySQL datetime
+     * rejects — those are treated as "no fix" (null).
+     */
+    private function timestampMs(mixed $value): ?CarbonImmutable
+    {
+        if (empty($value) || ! is_numeric($value) || (int) $value <= 0) {
+            return null;
+        }
+
+        $ts = CarbonImmutable::createFromTimestampMs((int) $value);
+
+        return $ts->year >= 2000 ? $ts : null;
     }
 
     /** A usable coordinate, or null for the 0,0 Uber returns when there's no live fix. */
