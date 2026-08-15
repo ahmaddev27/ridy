@@ -72,17 +72,43 @@ class DispatchNotifier
         return $rider !== '' ? $title.' | '.$rider : $title;
     }
 
-    /** "pickup\n-->\ndropoff", country stripped. */
+    /** "pickup\n-->\ndropoff" (+ "12.3 km · €1.26/km" when known), country stripped. */
     private function buildBody(DispatchOffer $offer): string
     {
         $pickup = $this->cleanAddress($offer->pickup_address);
         $dropoff = $this->cleanAddress($offer->dropoff_address);
 
-        if ($pickup === '' && $dropoff === '') {
-            return 'Uber';
+        $lines = [];
+        if ($pickup !== '' || $dropoff !== '') {
+            $lines[] = $pickup;
+            $lines[] = '-->';
+            $lines[] = $dropoff;
         }
 
-        return trim($pickup."\n-->\n".$dropoff);
+        $metrics = $this->buildMetrics($offer);
+        if ($metrics !== '') {
+            $lines[] = $metrics;
+        }
+
+        return $lines === [] ? 'Uber' : trim(implode("\n", $lines));
+    }
+
+    /** "12.3 km · €1.26/km" so the driver can judge worth — empty when distance is unknown. */
+    private function buildMetrics(DispatchOffer $offer): string
+    {
+        if (! $offer->distance_m) {
+            return '';
+        }
+
+        $km = $offer->distance_m / 1000;
+        $parts = [number_format($km, 1, '.', '').' km'];
+
+        $fare = (float) ($offer->fare_amount ?? 0);
+        if ($fare > 0 && $km > 0) {
+            $parts[] = '€'.number_format($fare / $km, 2, '.', '').'/km';
+        }
+
+        return implode(' · ', $parts);
     }
 
     /** €/€€/€€€ by the trip's per-km rate. Falls back to one sign when unknown. */
