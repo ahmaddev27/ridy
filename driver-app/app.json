@@ -6,7 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "backgroundColor": "#12151a"
     },
@@ -32,7 +32,9 @@
         {
           "sounds": []
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font"
     ],
     "extra": {
       "apiUrl": "https://r.fleeteye.de",
