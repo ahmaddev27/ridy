@@ -10,7 +10,7 @@ import { Badge, type Status } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
-import { listOffersPaged, getOfferStats, type DispatchOffer, type OfferStatus, type PageMeta, type OfferStats } from "@/lib/api/offers";
+import { listOffersPaged, getOfferStats, fareLabel, type DispatchOffer, type OfferStatus, type PageMeta, type OfferStats } from "@/lib/api/offers";
 
 /** Offer lifecycle status → badge tone. */
 const OFFER_TONE: Record<OfferStatus, Status> = {
@@ -310,7 +310,7 @@ export default function OffersPage() {
                                 </div>
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 font-semibold text-ink">
-                                {toLatinDigits(o.fare_formatted) || "—"}
+                                {toLatinDigits(fareLabel(o, latnLocale(locale)))}
                               </td>
                               <td className="px-4 py-3">
                                 {(() => {

@@ -20,9 +20,25 @@ export type DispatchOffer = {
   pickup_address: string | null;
   dropoff_address: string | null;
   fare_formatted: string | null;
+  fare_amount: number | null;
   accept_window_seconds: number | null;
   received_at: string | null;
 };
+
+/**
+ * A consistent fare label. Uber sends the fare in mixed formats ("€7.35",
+ * "7,35 €", "EUR7.35"), so prefer our parsed numeric amount formatted for the
+ * locale; fall back to normalizing the raw string (EUR/USD → symbol).
+ */
+export function fareLabel(
+  offer: { fare_amount: number | null; fare_formatted: string | null },
+  locale: string,
+): string {
+  if (offer.fare_amount != null) {
+    return new Intl.NumberFormat(locale, { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(offer.fare_amount);
+  }
+  return (offer.fare_formatted ?? "—").replace(/EUR/gi, "€").replace(/USD/gi, "$");
+}
 
 export type TripInfo = {
   pickup: { lat: number; lng: number } | null;
