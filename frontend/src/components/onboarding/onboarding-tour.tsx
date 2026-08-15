@@ -139,9 +139,13 @@ export function OnboardingTour() {
           onClick={() => !done && complete()}
           title={done ? undefined : o("tapToReveal")}
         >
-          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-ink">
-            {step.key === "welcome" ? <Logo size={30} /> : <Icon className="h-7 w-7" />}
-          </span>
+          {step.key === "welcome" ? (
+            <Logo size={72} className="mx-auto block text-ink" />
+          ) : (
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-ink">
+              <Icon className="h-7 w-7" />
+            </span>
+          )}
           <h2 className="mt-4 text-lg font-bold text-ink">{o(`${step.key}Title`)}</h2>
           <p className="mt-2 min-h-[4.5rem] text-sm leading-relaxed text-ink-muted">
             {out}
