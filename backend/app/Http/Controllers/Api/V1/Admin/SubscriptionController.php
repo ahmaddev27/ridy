@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Billing\Models\Plan;
 use App\Domain\Billing\Models\SubscriptionCode;
+use App\Domain\Notifications\Notifier;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\ProxyPool;
 use App\Http\Controllers\Concerns\GeneratesOtp;
@@ -81,7 +82,7 @@ class SubscriptionController extends Controller
      * paid one (dashboard + driver app), but with no code and no invoice. Extends
      * an existing active subscription instead of shortening it.
      */
-    public function grantFree(Request $request, Tenant $tenant): JsonResponse
+    public function grantFree(Request $request, Tenant $tenant, Notifier $notifier): JsonResponse
     {
         $data = $request->validate([
             'days' => ['required', 'integer', 'min:1', 'max:3650'],
@@ -103,6 +104,8 @@ class SubscriptionController extends Controller
 
         // Place it on a proxy from the pool, same as a real activation.
         app(ProxyPool::class)->assign($tenant);
+
+        $notifier->toTenant($tenant->id, 'subscription_free', ['days' => $data['days']], '/mySubscription');
 
         return response()->json(['data' => [
             'free' => true,

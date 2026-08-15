@@ -1,12 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { toast } from "sonner";
-import { Bell, UserX } from "lucide-react";
+import { Bell } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
-import { cn } from "@/lib/utils";
+import { cn, latnLocale } from "@/lib/utils";
+import { notifContent } from "@/lib/notif-content";
 import { useAsync } from "@/hooks/use-async";
 import { useI18n } from "@/lib/i18n/context";
 import {
@@ -15,7 +17,7 @@ import {
 } from "@/lib/api/notifications";
 
 export default function NotificationsPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { data, loading, error, refetch } = useAsync(listNotifications, { refetchInterval: 15000 });
   const items = data?.items ?? [];
   const unread = data?.unread ?? 0;
@@ -58,29 +60,32 @@ export default function NotificationsPage() {
           />
         ) : (
           <div className="divide-y divide-line">
-            {items.map((n) => (
-              <div
-                key={n.id}
-                className={cn(
-                  "flex items-start gap-3 p-4",
-                  !n.read && "bg-surface-2/30",
-                )}
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger-bg text-danger-fg">
-                  <UserX className="h-4 w-4" />
-                </span>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-ink">{n.title}</p>
-                  <p className="text-sm text-ink-muted">{n.body}</p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-xs text-ink-subtle">
-                    {n.created_at ? new Date(n.created_at).toLocaleString() : ""}
+            {items.map((n) => {
+              const { icon: Icon, chip, title, body, href } = notifContent(n, t);
+              const inner = (
+                <>
+                  <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", chip)}>
+                    <Icon className="h-4 w-4" />
                   </span>
-                  {!n.read && <span className="h-2 w-2 rounded-full bg-primary" />}
-                </div>
-              </div>
-            ))}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-ink">{title}</p>
+                    <p className="text-sm text-ink-muted">{body}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="whitespace-nowrap text-xs text-ink-subtle">
+                      {n.created_at ? new Date(n.created_at).toLocaleString(latnLocale(locale)) : ""}
+                    </span>
+                    {!n.read && <span className="h-2 w-2 rounded-full bg-primary" />}
+                  </div>
+                </>
+              );
+              const cls = cn("flex items-start gap-3 p-4 text-start transition-colors", !n.read && "bg-surface-2/30", href && "hover:bg-surface-2");
+              return href ? (
+                <Link key={n.id} href={href} className={cls}>{inner}</Link>
+              ) : (
+                <div key={n.id} className={cls}>{inner}</div>
+              );
+            })}
           </div>
         )}
       </Card>

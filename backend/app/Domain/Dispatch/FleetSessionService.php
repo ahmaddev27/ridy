@@ -3,11 +3,9 @@
 namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\UberFleetSession;
-use App\Domain\Notifications\FleetSessionOpened;
+use App\Domain\Notifications\Notifier;
 use App\Domain\Tenancy\Models\Tenant;
-use App\Models\User;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\Notification;
 
 /**
  * Stores a captured Uber fleet browser session and binds the tenant to its Uber
@@ -15,6 +13,8 @@ use Illuminate\Support\Facades\Notification;
  */
 class FleetSessionService
 {
+    public function __construct(private readonly Notifier $notifier) {}
+
     /**
      * @param  array<int, array<string, mixed>>  $cookies  captured cookie jar (vsdispatch scope, for RAMEN)
      * @param  array<int, array<string, mixed>>|null  $supplierCookies  supplier.uber.com-scoped jar (roster/status)
@@ -53,8 +53,7 @@ class FleetSessionService
         );
 
         // Alert the fleet's managers that a fresh session is now live.
-        $managers = User::where('tenant_id', $tenant->id)->get();
-        Notification::send($managers, new FleetSessionOpened($session));
+        $this->notifier->toTenant($tenant->id, 'session_connected', ['company' => $tenant->name], '/connections');
 
         return $session;
     }
@@ -65,6 +64,13 @@ class FleetSessionService
      */
     public function markNeedsRelink(UberFleetSession $session): void
     {
+        $wasActive = $session->status === UberFleetSession::STATUS_ACTIVE;
         $session->forceFill(['status' => UberFleetSession::STATUS_NEEDS_RELINK])->save();
+
+        // Prompt the managers to reconnect — but only on the transition, and
+        // deduped, so a persistently-broken session doesn't spam the bell.
+        if ($wasActive) {
+            $this->notifier->toTenant($session->tenant_id, 'session_needs_relink', [], '/connections', dedupe: true);
+        }
     }
 }

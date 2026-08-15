@@ -14,9 +14,13 @@ class NotificationController extends Controller
         $items = $request->user()->notifications()->latest()->take(50)->get()
             ->map(fn ($n) => [
                 'id' => $n->id,
-                'title' => $n->data['title'] ?? '',
-                'body' => $n->data['body'] ?? '',
                 'type' => $n->data['type'] ?? null,
+                // Structured params the frontend renders in the user's language.
+                'params' => $n->data['params'] ?? [],
+                'href' => $n->data['href'] ?? null,
+                // Legacy pre-rendered strings (older notifications) as a fallback.
+                'title' => $n->data['title'] ?? null,
+                'body' => $n->data['body'] ?? null,
                 'read' => $n->read_at !== null,
                 'created_at' => $n->created_at?->toIso8601String(),
             ]);

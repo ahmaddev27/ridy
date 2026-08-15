@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Billing\Models\SubscriptionCode;
 use App\Domain\Billing\Models\SubscriptionPeriod;
+use App\Domain\Notifications\Notifier;
 use App\Domain\Tenancy\ProxyPool;
 use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Http\Controllers\Controller;
@@ -24,7 +25,7 @@ class CompanyActivationController extends Controller
 
     private const MAX_ATTEMPTS = 3;
 
-    public function activate(Request $request): JsonResponse
+    public function activate(Request $request, Notifier $notifier): JsonResponse
     {
         $data = $request->validate([
             'email' => ['required', 'email'],
@@ -53,6 +54,7 @@ class CompanyActivationController extends Controller
             $tenant->increment('activation_attempts');
             if ($tenant->activation_attempts >= self::MAX_ATTEMPTS) {
                 $tenant->forceFill(['banned_at' => CarbonImmutable::now()])->save();
+                $notifier->toAdmins('company_banned', ['company' => $tenant->name], '/admin/companies');
 
                 return response()->json(['message' => 'account_suspended', 'reason' => 'banned'], 403);
             }
@@ -108,6 +110,11 @@ class CompanyActivationController extends Controller
 
         // Now that it's active, place it on a proxy from the pool.
         app(ProxyPool::class)->assign($tenant);
+
+        // Notify the company managers, and the reseller whose code was activated.
+        $notifier->toTenant($tenant->id, 'subscription_activated', ['days' => $days], '/mySubscription');
+        $reseller = $ledgerEntry?->collector()->with('user')->first()?->user;
+        $notifier->toUser($reseller, 'code_activated', ['company' => $tenant->name, 'code' => $usedCode], '/reseller');
 
         return response()->json(['data' => ['activated' => true]]);
     }
