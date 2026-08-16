@@ -40,8 +40,10 @@ class AuthController extends Controller
         }
 
         // Establish a session for the SPA cookie flow when a session is available.
+        // "Remember me" issues a long-lived remember cookie, so the session
+        // survives browser restarts / session expiry.
         if ($request->hasSession()) {
-            Auth::guard('web')->login($user);
+            Auth::guard('web')->login($user, $request->boolean('remember'));
             $request->session()->regenerate();
         }
 

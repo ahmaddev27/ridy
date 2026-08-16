@@ -18,15 +18,16 @@ import { SuspendedScreen, type SuspendedInfo } from "@/components/auth/suspended
 export default function LoginPage() {
   const router = useRouter();
   const { t } = useI18n();
-  const [email, setEmail] = useState("manager@fleet.de");
-  const [password, setPassword] = useState("password");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [suspended, setSuspended] = useState<SuspendedInfo | null>(null);
   const [activateMode, setActivateMode] = useState(false);
   const [code, setCode] = useState("");
 
   async function goAfterLogin() {
-    const u = await login(email, password);
+    const u = await login(email, password, remember);
     router.push(u.roles.includes("super_admin") ? "/admin" : u.roles.includes("reseller") ? "/reseller" : "/dashboard");
   }
 
@@ -47,7 +48,7 @@ export default function LoginPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const u = await login(email, password);
+      const u = await login(email, password, remember);
       // Super-admins land on the platform panel; managers on their dashboard.
       router.push(u.roles.includes("super_admin") ? "/admin" : u.roles.includes("reseller") ? "/reseller" : "/dashboard");
     } catch (err) {
@@ -148,6 +149,15 @@ export default function LoginPage() {
                 className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
               />
             </div>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-muted select-none">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="h-4 w-4 rounded border-line-strong text-ink accent-ink focus:ring-2 focus:ring-line"
+              />
+              {t("login.remember")}
+            </label>
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {submitting ? t("login.signingIn") : t("login.signIn")}

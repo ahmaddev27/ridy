@@ -138,7 +138,7 @@ const en = {
   suspended: { reason_disabled: "Your company account is disabled.", reason_banned: "Your account is locked after too many wrong activation codes.", reason_expired: "Your subscription has expired.", reason_inactive: "Your company isn't activated yet. Enter the activation code from support to start.", contactHint: "Please contact support to restore access.", whatsapp: "Contact on WhatsApp", email: "Email support", activateTitle: "Have an activation code?", activateHint: "Enter the 6-digit code from support to renew.", activateCta: "Activate", activated: "Activated — signing you in…", activateFailed: "Activation failed", haveCode: "Have an activation code?", backToLogin: "Back to sign in" },
   login: {
     title: "Sign in",
-    forgotCta: "Forgot password?", noAccount: "New company?", registerCta: "Create an account",
+    forgotCta: "Forgot password?", remember: "Remember me", noAccount: "New company?", registerCta: "Create an account",
     subtitle: "Welcome back to your fleet dashboard.",
     email: "Email",
     password: "Password",
@@ -285,7 +285,7 @@ const de: typeof en = {
   suspended: { reason_disabled: "Dein Firmenkonto ist deaktiviert.", reason_banned: "Dein Konto ist nach zu vielen falschen Aktivierungscodes gesperrt.", reason_expired: "Dein Abonnement ist abgelaufen.", reason_inactive: "Deine Firma ist noch nicht aktiviert. Gib den Aktivierungscode vom Support ein.", contactHint: "Bitte kontaktiere den Support, um den Zugang wiederherzustellen.", whatsapp: "Über WhatsApp kontaktieren", email: "Support per E-Mail", activateTitle: "Hast du einen Aktivierungscode?", activateHint: "Gib den 6-stelligen Code vom Support ein, um zu verlängern.", activateCta: "Aktivieren", activated: "Aktiviert — du wirst angemeldet…", activateFailed: "Aktivierung fehlgeschlagen", haveCode: "Hast du einen Aktivierungscode?", backToLogin: "Zurück zur Anmeldung" },
   login: {
     title: "Anmelden",
-    forgotCta: "Passwort vergessen?", noAccount: "Neue Firma?", registerCta: "Konto erstellen",
+    forgotCta: "Passwort vergessen?", remember: "Angemeldet bleiben", noAccount: "Neue Firma?", registerCta: "Konto erstellen",
     subtitle: "Willkommen zurück in deinem Flotten-Dashboard.",
     email: "E-Mail",
     password: "Passwort",
@@ -433,7 +433,7 @@ const ar: typeof en = {
   suspended: { reason_disabled: "حساب شركتك معطّل.", reason_banned: "تم قفل حسابك بعد إدخال رمز التفعيل خطأ عدة مرات.", reason_expired: "انتهى اشتراكك.", reason_inactive: "شركتك لسا غير مفعّلة. أدخل كود التفعيل من الدعم للبدء.", contactHint: "تواصل مع الدعم لاستعادة الوصول.", whatsapp: "تواصل عبر واتساب", email: "راسل الدعم بالإيميل", activateTitle: "عندك رمز تفعيل؟", activateHint: "أدخل الرمز المكوّن من 6 أرقام من الدعم للتجديد.", activateCta: "تفعيل", activated: "تم التفعيل — يتم تسجيل دخولك…", activateFailed: "فشل التفعيل", haveCode: "عندك كود تفعيل؟", backToLogin: "العودة لتسجيل الدخول" },
   login: {
     title: "تسجيل الدخول",
-    forgotCta: "نسيت كلمة المرور؟", noAccount: "شركة جديدة؟", registerCta: "أنشئ حساب",
+    forgotCta: "نسيت كلمة المرور؟", remember: "تذكّرني", noAccount: "شركة جديدة؟", registerCta: "أنشئ حساب",
     subtitle: "أهلاً بعودتك إلى لوحة الأسطول.",
     email: "البريد الإلكتروني",
     password: "كلمة المرور",

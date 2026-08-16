@@ -9,10 +9,10 @@ export type AuthUser = {
   permissions: string[];
 };
 
-export async function login(email: string, password: string): Promise<AuthUser> {
+export async function login(email: string, password: string, remember = false): Promise<AuthUser> {
   const res = await apiFetch<{ data: AuthUser }>("/api/v1/login", {
     method: "POST",
-    body: { email, password },
+    body: { email, password, remember },
     withCsrf: true,
   });
   return res.data;
