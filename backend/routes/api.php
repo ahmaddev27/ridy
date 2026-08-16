@@ -43,6 +43,7 @@ use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\NotificationPrefsController;
 use App\Http\Controllers\Api\V1\PasswordResetController;
 use App\Http\Controllers\Api\V1\ProfileController;
+use App\Http\Controllers\Api\V1\PublicPlanController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\ResellerController;
 use App\Http\Controllers\Api\V1\UberLoginController;
@@ -56,6 +57,9 @@ Route::prefix('v1')->group(function () {
 
     // Public force-update gate for the mobile driver app (checked on launch).
     Route::get('app/version', [AppVersionController::class, 'check'])->middleware('throttle:60,1');
+
+    // Public plan catalogue for the marketing site's pricing section.
+    Route::get('plans', [PublicPlanController::class, 'index'])->middleware('throttle:60,1');
 
     // Public company self-registration (email OTP).
     Route::post('register', [RegistrationController::class, 'start'])->middleware('throttle:6,1');

@@ -16,6 +16,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { FaqItem } from "./_components/faq-item";
+import { Pricing } from "./_components/pricing";
 
 export const metadata = {
   title: "Reidey · Flottenmanagement für Fahrdienste",
@@ -235,6 +236,9 @@ export default function LandingPage() {
           </ol>
         </div>
       </section>
+
+      {/* Pricing (real plans from the backend) */}
+      <Pricing />
 
       {/* Trust strip */}
       <section className="border-t border-line bg-surface">
