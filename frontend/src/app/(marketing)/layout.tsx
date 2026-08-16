@@ -5,7 +5,6 @@ import { MobileNav } from "./_components/mobile-nav";
 
 const NAV_LINKS = [
   { href: "/#funktionen", label: "Funktionen" },
-  { href: "/#preise", label: "Preise" },
   { href: "/faq", label: "FAQ" },
   { href: "/datenschutz", label: "Datenschutz" },
 ];
@@ -15,8 +14,7 @@ const FOOTER_COLUMNS: { title: string; links: { href: string; label: string }[] 
     title: "Produkt",
     links: [
       { href: "/#funktionen", label: "Funktionen" },
-      { href: "/#preise", label: "Preise" },
-      { href: "/#ablauf", label: "Ablauf" },
+          { href: "/#ablauf", label: "Ablauf" },
       { href: "/faq", label: "FAQ" },
       { href: "/login", label: "Anmelden" },
     ],
@@ -45,7 +43,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-50 border-b border-line bg-canvas/85 backdrop-blur">
         <div className="relative mx-auto flex h-[64px] max-w-[1200px] items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2 text-ink" aria-label="Reidey Startseite">
-            <Logo size={28} className="text-ink" />
+            <Logo size={40} className="text-ink" />
             <span className="text-lg font-semibold tracking-tight">Reidey</span>
           </Link>
 
@@ -80,7 +78,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
           <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
             <div className="max-w-xs">
               <Link href="/" className="flex items-center gap-2.5 text-ink" aria-label="Reidey Startseite">
-                <Logo size={42} className="text-ink" />
+                <Logo size={84} className="text-ink" />
                 <span className="text-2xl font-semibold tracking-tight">Reidey</span>
               </Link>
               <p className="mt-4 text-sm leading-relaxed text-ink-muted">
