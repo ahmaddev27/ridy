@@ -1,180 +1,148 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, FlatList, Pressable, RefreshControl, ActivityIndicator } from "react-native";
+import { View, Text, FlatList, Pressable, RefreshControl, ActivityIndicator, TextInput } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { api, type Offer, type OffersQuery } from "@/lib/api";
-import { t, isRTL } from "@/lib/i18n";
+import { t, isRTL, getLocale } from "@/lib/i18n";
 import { useColors, radius } from "@/lib/theme";
-import { fareLabel, perKmLabel, cleanAddress } from "@/lib/format";
-import { Field, StatusBadge } from "@/components/ui";
+import { fareLabel, cleanAddress, distanceLabel, euroQuality } from "@/lib/format";
+import { StatusBadge, QualityMark } from "@/components/ui";
 
-const STATUS_FILTERS = ["all", "pending", "accepted", "started", "completed", "rejected", "canceled"] as const;
+const FILTERS = ["all", "pending", "accepted", "completed"] as const;
 const PER_PAGE = 20;
 
 export default function OffersScreen() {
-  const router = useRouter();
   const c = useColors();
+  const router = useRouter();
   const align = isRTL() ? "right" : "left";
 
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<(typeof STATUS_FILTERS)[number]>("all");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-
+  const [status, setStatus] = useState<(typeof FILTERS)[number]>("all");
   const [offers, setOffers] = useState<Offer[]>([]);
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const fetchPage = useCallback(
-    async (targetPage: number) => {
-      const params: OffersQuery = { per_page: PER_PAGE, page: targetPage };
+    async (target: number) => {
+      const params: OffersQuery = { per_page: PER_PAGE, page: target };
       if (status !== "all") params.status = status;
       if (search.trim()) params.search = search.trim();
-      if (from.trim()) params.from = from.trim();
-      if (to.trim()) params.to = to.trim();
       const res = await api.offers(params);
       setLastPage(res.meta?.last_page ?? 1);
-      setPage(res.meta?.current_page ?? targetPage);
-      setOffers((prev) => (targetPage === 1 ? res.data : [...prev, ...res.data]));
+      setTotal(res.meta?.total ?? res.data.length);
+      setPage(res.meta?.current_page ?? target);
+      setOffers((prev) => (target === 1 ? res.data : [...prev, ...res.data]));
     },
-    [status, search, from, to],
+    [status, search],
   );
 
   const reload = useCallback(async () => {
     setRefreshing(true);
-    try {
-      await fetchPage(1);
-    } catch {
-      /* keep the last list on transient errors */
-    } finally {
-      setRefreshing(false);
-    }
+    try { await fetchPage(1); } catch { /* keep */ } finally { setRefreshing(false); }
   }, [fetchPage]);
 
-  // Re-query whenever a filter changes (debounced for the free-text search).
   useEffect(() => {
-    const handle = setTimeout(reload, 300);
-    return () => clearTimeout(handle);
+    const h = setTimeout(reload, 300);
+    return () => clearTimeout(h);
   }, [reload]);
 
   async function loadMore() {
     if (loadingMore || refreshing || page >= lastPage) return;
     setLoadingMore(true);
-    try {
-      await fetchPage(page + 1);
-    } catch {
-      /* ignore */
-    } finally {
-      setLoadingMore(false);
-    }
+    try { await fetchPage(page + 1); } catch { /* */ } finally { setLoadingMore(false); }
   }
 
   return (
-    <FlatList
-      data={offers}
-      keyExtractor={(o) => String(o.id)}
-      style={{ backgroundColor: c.canvas }}
-      contentContainerStyle={{ padding: 16, gap: 10, flexGrow: 1 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={c.ink} />}
-      onEndReachedThreshold={0.4}
-      onEndReached={loadMore}
-      ListHeaderComponent={
-        <View style={{ gap: 12, marginBottom: 4 }}>
-          <Field label={t("offers.search")} value={search} onChangeText={setSearch} autoCapitalize="none" />
+    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: c.canvas }}>
+      <FlatList
+        data={offers}
+        keyExtractor={(o) => String(o.id)}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 12 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={c.ink} />}
+        onEndReachedThreshold={0.4}
+        onEndReached={loadMore}
+        ListHeaderComponent={
+          <View style={{ gap: 14, marginBottom: 2 }}>
+            <Text style={{ color: c.ink, fontSize: 30, fontWeight: "800", textAlign: align }}>{t("offers.title")}</Text>
 
-          {/* Status chips */}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-            {STATUS_FILTERS.map((s) => {
-              const activeChip = status === s;
-              const label = s === "all" ? t("filter.all") : t(`status.${s}`);
-              return (
-                <Pressable
-                  key={s}
-                  onPress={() => setStatus(s)}
-                  style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 7,
-                    borderRadius: 999,
-                    backgroundColor: activeChip ? c.primary : c.surface2,
-                    borderWidth: 1,
-                    borderColor: activeChip ? c.primary : c.line,
-                  }}
-                >
-                  <Text style={{ color: activeChip ? c.primaryInk : c.inkMuted, fontWeight: "600", fontSize: 13 }}>
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+            {/* Search */}
+            <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 10, backgroundColor: c.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: c.line, paddingHorizontal: 14, paddingVertical: 13 }}>
+              <Ionicons name="search" size={18} color={c.inkSubtle} />
+              <TextInput
+                value={search}
+                onChangeText={setSearch}
+                placeholder={t("offers.search")}
+                placeholderTextColor={c.inkSubtle}
+                style={{ flex: 1, color: c.ink, fontSize: 16, textAlign: align }}
+                autoCapitalize="none"
+              />
+            </View>
 
-          {/* Date range */}
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <View style={{ flex: 1 }}>
-              <Field label={t("offers.from")} value={from} onChangeText={setFrom} placeholder="2026-01-01" autoCapitalize="none" />
+            {/* Filter chips */}
+            <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", flexWrap: "wrap", gap: 10 }}>
+              {FILTERS.map((s) => {
+                const on = status === s;
+                const label = s === "all" ? t("home.all") : t(`status.${s}`);
+                const hue = s === "pending" ? c.pending : s === "accepted" ? c.accepted : s === "completed" ? c.completed : c.ink;
+                return (
+                  <Pressable
+                    key={s}
+                    onPress={() => setStatus(s)}
+                    style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: radius.pill, backgroundColor: on ? c.primary : c.surface, borderWidth: 1, borderColor: on ? c.primary : c.line }}
+                  >
+                    <Text style={{ color: on ? c.primaryInk : hue, fontWeight: "700", fontSize: 14 }}>{label}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
-            <View style={{ flex: 1 }}>
-              <Field label={t("offers.to")} value={to} onChangeText={setTo} placeholder="2026-12-31" autoCapitalize="none" />
-            </View>
+
+            {/* Count */}
+            {total > 0 && (
+              <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: align }}>
+                {total.toLocaleString(getLocale() === "ar" ? "en" : getLocale())} {t("offers.title")}
+              </Text>
+            )}
           </View>
-        </View>
-      }
-      ListEmptyComponent={
-        refreshing ? null : (
-          <View style={{ alignItems: "center", justifyContent: "center", paddingTop: 60 }}>
+        }
+        ListEmptyComponent={refreshing ? null : (
+          <View style={{ alignItems: "center", paddingTop: 60 }}>
             <Text style={{ color: c.inkSubtle }}>{t("offers.empty")}</Text>
           </View>
-        )
-      }
-      ListFooterComponent={
-        loadingMore ? (
-          <View style={{ paddingVertical: 16 }}>
-            <ActivityIndicator color={c.ink} />
-          </View>
-        ) : page < lastPage ? (
-          <Pressable
-            onPress={loadMore}
-            style={{ paddingVertical: 14, alignItems: "center", borderRadius: radius.md, borderWidth: 1, borderColor: c.line }}
-          >
-            <Text style={{ color: c.inkMuted, fontWeight: "600" }}>{t("offers.loadMore")}</Text>
-          </Pressable>
-        ) : null
-      }
-      renderItem={({ item }) => {
-        const s = item.status ?? "pending";
-        return (
-          <Pressable
-            onPress={() => router.push(`/offer/${item.id}`)}
-            style={{
-              backgroundColor: c.surface,
-              borderRadius: radius.lg,
-              borderWidth: 1,
-              borderColor: c.line,
-              padding: 16,
-              gap: 8,
-            }}
-          >
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "baseline", gap: 8 }}>
-                <Text style={{ color: c.ink, fontSize: 20, fontWeight: "800" }}>
-                  {fareLabel(item.fare_formatted, item.fare_amount)}
-                </Text>
-                <Text style={{ color: c.accent, fontSize: 13, fontWeight: "600" }}>
-                  {perKmLabel(item.fare_amount, item.distance_m)}
-                </Text>
-              </View>
-              <StatusBadge status={s} label={t(`status.${s}`)} />
-            </View>
-            <Text style={{ color: c.inkMuted, textAlign: align }} numberOfLines={1}>
-              ↑ {cleanAddress(item.pickup_address)}
-            </Text>
-            <Text style={{ color: c.inkSubtle, textAlign: align }} numberOfLines={1}>
-              ↓ {cleanAddress(item.dropoff_address)}
-            </Text>
-          </Pressable>
-        );
-      }}
-    />
+        )}
+        ListFooterComponent={loadingMore ? <ActivityIndicator color={c.ink} style={{ paddingVertical: 16 }} /> : null}
+        renderItem={({ item }) => <OfferCard offer={item} onPress={() => router.push(`/offer/${item.id}`)} />}
+      />
+    </SafeAreaView>
+  );
+}
+
+function OfferCard({ offer, onPress }: { offer: Offer; onPress: () => void }) {
+  const c = useColors();
+  const status = offer.status ?? "pending";
+  const dim = status === "rejected" || status === "canceled";
+  const q = euroQuality(offer.fare_amount, offer.distance_m);
+  const arrow = (d: string) => (isRTL() ? { textAlign: "right" as const } : { textAlign: "left" as const });
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 14, backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, padding: 16, opacity: dim ? 0.55 : 1 }}
+    >
+      <View style={{ minWidth: 96 }}>
+        <Text style={{ color: c.ink, fontSize: 21, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
+        <QualityMark mark={q.mark} good={q.good} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text numberOfLines={1} style={{ color: c.ink, fontSize: 15, ...arrow("p") }}>↑ {cleanAddress(offer.pickup_address)}</Text>
+        <Text numberOfLines={1} style={{ color: c.ink, fontSize: 15, ...arrow("d") }}>↓ {cleanAddress(offer.dropoff_address)}</Text>
+      </View>
+      <View style={{ alignItems: isRTL() ? "flex-start" : "flex-end", gap: 6 }}>
+        <StatusBadge status={status} label={t(`status.${status}`)} />
+        <Text style={{ color: c.inkSubtle, fontSize: 13 }}>{distanceLabel(offer.distance_m)}</Text>
+      </View>
+    </Pressable>
   );
 }

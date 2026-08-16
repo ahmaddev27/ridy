@@ -1,25 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, Pressable, ActivityIndicator, Linking } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Linking, ScrollView } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import Svg, { Circle } from "react-native-svg";
 import { api, type Offer } from "@/lib/api";
 import { t, isRTL } from "@/lib/i18n";
-import { useColors, radius, type Palette } from "@/lib/theme";
-import { fareLabel, distanceLabel, perKmLabel, cleanAddress } from "@/lib/format";
-import { StatusBadge } from "@/components/ui";
+import { useColors, radius } from "@/lib/theme";
+import { fareLabel, perKmLabel, distanceLabel, cleanAddress, euroQuality } from "@/lib/format";
+import { StatusBadge, QualityMark, RouteBlock, SectionLabel } from "@/components/ui";
 
-/** Seconds left in the accept window, from the capture time + window length. */
+const RING = 230;
+const STROKE = 12;
+const R = (RING - STROKE) / 2;
+const CIRC = 2 * Math.PI * R;
+
 function useCountdown(offer: Offer | null): number | null {
   const [now, setNow] = useState(() => Date.now());
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-
   useEffect(() => {
-    timer.current = setInterval(() => setNow(Date.now()), 250);
-    return () => {
-      if (timer.current) clearInterval(timer.current);
-    };
+    timer.current = setInterval(() => setNow(Date.now()), 200);
+    return () => { if (timer.current) clearInterval(timer.current); };
   }, []);
-
   return useMemo(() => {
     if (!offer?.received_at || !offer.accept_window_seconds) return null;
     const deadline = new Date(offer.received_at).getTime() + offer.accept_window_seconds * 1000;
@@ -30,104 +32,112 @@ function useCountdown(offer: Offer | null): number | null {
 export default function OfferScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const c = useColors();
   const [offer, setOffer] = useState<Offer | null>(null);
   const [error, setError] = useState(false);
   const secondsLeft = useCountdown(offer);
-  const colors = useColors();
+  const row = isRTL() ? "row-reverse" : "row";
 
   useEffect(() => {
-    api
-      .offers()
-      .then((r) => {
-        const found = r.data.find((o) => String(o.id) === String(id));
-        if (found) setOffer(found);
-        else setError(true);
-      })
-      .catch(() => setError(true));
+    api.offers().then((r) => {
+      const found = r.data.find((o) => String(o.id) === String(id));
+      found ? setOffer(found) : setError(true);
+    }).catch(() => setError(true));
   }, [id]);
 
-  if (error) {
-    return (
-      <Screen>
-        <Text style={{ color: colors.inkSubtle }}>{t("offer.expired")}</Text>
-      </Screen>
-    );
-  }
-  if (!offer) {
-    return (
-      <Screen>
-        <ActivityIndicator color={colors.ink} />
-      </Screen>
-    );
-  }
-
-  const status = offer.status ?? "pending";
-  const window = offer.accept_window_seconds ?? 0;
-  const pct = secondsLeft != null && window > 0 ? Math.max(0, Math.min(1, secondsLeft / window)) : 0;
+  const status = offer?.status ?? "pending";
+  const win = offer?.accept_window_seconds ?? 0;
+  const pct = secondsLeft != null && win > 0 ? Math.max(0, Math.min(1, secondsLeft / win)) : 0;
   const expired = secondsLeft != null && secondsLeft <= 0;
-  const barColor = pct > 0.5 ? colors.success : pct > 0.2 ? colors.warning : colors.danger;
+  const q = offer ? euroQuality(offer.fare_amount, offer.distance_m) : { mark: "€", good: false };
+  const ringColor = pct > 0.5 ? c.completed : pct > 0.25 ? c.pending : c.canceled;
 
   return (
-    <Screen>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={{ color: colors.ink, fontSize: 40, fontWeight: "900" }}>
-          {fareLabel(offer.fare_formatted, offer.fare_amount)}
-        </Text>
-        <StatusBadge status={status} label={t(`status.${status}`)} />
+    <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: c.canvas }}>
+      {/* Header */}
+      <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", paddingHorizontal: 16, paddingVertical: 10 }}>
+        <Pressable onPress={() => router.back()} hitSlop={10} style={{ position: "absolute", [isRTL() ? "right" : "left"]: 16 }}>
+          <Ionicons name={isRTL() ? "chevron-forward" : "chevron-back"} size={26} color={c.ink} />
+        </Pressable>
+        <Text style={{ color: c.ink, fontSize: 17, fontWeight: "700" }}>{t("offer.header")}</Text>
       </View>
 
-      {/* Countdown */}
-      {secondsLeft != null && (
-        <View style={{ gap: 8, marginTop: 20 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <Text style={{ color: colors.inkMuted }}>{expired ? t("offer.expired") : t("offer.expiresIn")}</Text>
-            {!expired && (
-              <Text style={{ color: barColor, fontWeight: "800", fontSize: 16 }}>
-                {Math.ceil(secondsLeft)} {t("common.seconds")}
+      {!offer ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          {error ? <Text style={{ color: c.inkSubtle }}>{t("offer.expired")}</Text> : <ActivityIndicator color={c.ink} />}
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 18 }}>
+          {/* Countdown ring */}
+          <View style={{ alignItems: "center", marginTop: 8 }}>
+            <View style={{ width: RING, height: RING, alignItems: "center", justifyContent: "center" }}>
+              <Svg width={RING} height={RING} style={{ position: "absolute", transform: [{ rotate: "-90deg" }] }}>
+                <Circle cx={RING / 2} cy={RING / 2} r={R} stroke={c.line} strokeWidth={STROKE} fill="none" />
+                {secondsLeft != null && (
+                  <Circle
+                    cx={RING / 2} cy={RING / 2} r={R}
+                    stroke={ringColor} strokeWidth={STROKE} fill="none" strokeLinecap="round"
+                    strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - pct)}
+                  />
+                )}
+              </Svg>
+              <Text style={{ color: c.ink, fontSize: 46, fontWeight: "800", letterSpacing: -1 }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
+              <Text style={{ color: c.inkMuted, fontSize: 15, marginTop: 2 }}>
+                {perKmLabel(offer.fare_amount, offer.distance_m)} · {distanceLabel(offer.distance_m)}
+              </Text>
+            </View>
+            {secondsLeft != null && (
+              <Text style={{ color: ringColor, fontSize: 17, fontWeight: "700", marginTop: 6 }}>
+                {expired ? t("offer.expired") : `${secondsLeft.toFixed(1)}s`}
               </Text>
             )}
           </View>
-          <View style={{ height: 8, borderRadius: 999, backgroundColor: colors.surface2, overflow: "hidden" }}>
-            <View style={{ height: "100%", width: `${pct * 100}%`, backgroundColor: barColor }} />
+
+          {/* Status row */}
+          <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 12 }}>
+            <StatusBadge status={status} label={t(`status.${status}`)} />
+            <QualityMark mark={q.mark} good={q.good} size={17} />
+            {offer.received_at && (
+              <Text style={{ color: c.inkSubtle, fontSize: 15 }}>
+                {new Date(offer.received_at).toLocaleTimeString("en-GB")}
+              </Text>
+            )}
           </View>
-        </View>
+
+          {/* Route card */}
+          <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, padding: 18 }}>
+            <RouteBlock
+              pickup={cleanAddress(offer.pickup_address)}
+              dropoff={cleanAddress(offer.dropoff_address)}
+              pickupLabel={t("offer.abholung")}
+              dropoffLabel={t("offer.ziel")}
+            />
+          </View>
+
+          {/* Metrics */}
+          <View style={{ flexDirection: row, backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
+            <View style={{ flex: 1, padding: 18, gap: 4, borderRightWidth: isRTL() ? 0 : 1, borderLeftWidth: isRTL() ? 1 : 0, borderColor: c.line }}>
+              <SectionLabel>{t("offer.strecke")}</SectionLabel>
+              <Text style={{ color: c.ink, fontSize: 22, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>{distanceLabel(offer.distance_m)}</Text>
+            </View>
+            <View style={{ flex: 1, padding: 18, gap: 4 }}>
+              <SectionLabel>{t("offer.qualitaet")}</SectionLabel>
+              <Text style={{ color: c.ink, fontSize: 22, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>{perKmLabel(offer.fare_amount, offer.distance_m)}</Text>
+            </View>
+          </View>
+
+          <View style={{ flex: 1 }} />
+
+          {/* CTA */}
+          <Pressable
+            onPress={() => Linking.openURL("uberdriver://").catch(() => Linking.openURL("https://drivers.uber.com"))}
+            style={{ backgroundColor: c.primary, borderRadius: radius.xl, paddingVertical: 18, alignItems: "center", marginTop: 8 }}
+          >
+            <Text style={{ color: c.primaryInk, fontSize: 17, fontWeight: "700" }}>{t("offer.openUber")}</Text>
+          </Pressable>
+          <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: "center", lineHeight: 19 }}>{t("offer.observe")}</Text>
+        </ScrollView>
       )}
-
-      {/* Route */}
-      <View style={{ marginTop: 24, gap: 14 }}>
-        <Row label={t("offers.pickup")} value={cleanAddress(offer.pickup_address)} icon="location-outline" tone={colors.success} colors={colors} />
-        <Row label={t("offers.dropoff")} value={cleanAddress(offer.dropoff_address)} icon="flag-outline" tone={colors.danger} colors={colors} />
-        <Row label={t("offer.distance")} value={distanceLabel(offer.distance_m)} icon="navigate-outline" tone={colors.inkSubtle} colors={colors} />
-        <Row label="€/km" value={perKmLabel(offer.fare_amount, offer.distance_m)} icon="cash-outline" tone={colors.inkSubtle} colors={colors} />
-      </View>
-
-      <Pressable
-        onPress={() => Linking.openURL("uberdriver://").catch(() => Linking.openURL("https://drivers.uber.com"))}
-        style={{ marginTop: "auto", backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 15, alignItems: "center" }}
-      >
-        <Text style={{ color: colors.primaryInk, fontWeight: "800", fontSize: 16 }}>{t("offer.openUber")}</Text>
-      </Pressable>
-
-      <Pressable onPress={() => router.back()} style={{ paddingVertical: 12, alignItems: "center" }}>
-        <Ionicons name="close" size={22} color={colors.inkSubtle} />
-      </Pressable>
-    </Screen>
-  );
-}
-
-function Screen({ children }: { children: React.ReactNode }) {
-  const colors = useColors();
-  return <View style={{ flex: 1, backgroundColor: colors.canvas, padding: 24, paddingTop: 40 }}>{children}</View>;
-}
-
-function Row({ label, value, icon, tone, colors }: { label: string; value: string; icon: keyof typeof Ionicons.glyphMap; tone: string; colors: Palette }) {
-  return (
-    <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-start" }}>
-      <Ionicons name={icon} size={20} color={tone} style={{ marginTop: 2 }} />
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: colors.inkSubtle, fontSize: 12, textAlign: isRTL() ? "right" : "left" }}>{label}</Text>
-        <Text style={{ color: colors.ink, fontSize: 16, textAlign: isRTL() ? "right" : "left" }}>{value}</Text>
-      </View>
-    </View>
+    </SafeAreaView>
   );
 }

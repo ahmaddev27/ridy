@@ -3,6 +3,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/toast";
 import { registerForPush } from "@/lib/push";
@@ -10,12 +11,14 @@ import { useColors } from "@/lib/theme";
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <StatusBar style="auto" />
-        <Gate />
-      </ToastProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <StatusBar style="auto" />
+          <Gate />
+        </ToastProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 

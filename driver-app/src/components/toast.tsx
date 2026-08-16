@@ -51,7 +51,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 function ToastView({ toast, opacity }: { toast: NonNullable<ToastState>; opacity: Animated.Value }) {
   const c = useColors();
-  const tone = toast.kind === "success" ? c.success : toast.kind === "error" ? c.danger : c.accent;
+  const tone = toast.kind === "success" ? c.completed : toast.kind === "error" ? c.danger : c.accent;
   return (
     <Animated.View
       pointerEvents="none"

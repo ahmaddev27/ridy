@@ -24,6 +24,15 @@ export function perKmLabel(fare_amount: number | null, meters: number | null): s
   return `${new Intl.NumberFormat(LATIN, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(perKm)} €/km`;
 }
 
+/** €-quality mark by price-per-km: € (≤1), €€ (>1), €€€ (≥3). `good` when ≥ €€. */
+export function euroQuality(fare_amount: number | null, meters: number | null): { mark: string; good: boolean } {
+  if (fare_amount == null || !meters) return { mark: "€", good: false };
+  const perKm = fare_amount / (meters / 1000);
+  if (perKm >= 3) return { mark: "€€€", good: true };
+  if (perKm > 1) return { mark: "€€", good: true };
+  return { mark: "€", good: false };
+}
+
 /** Keep "Street No, Postcode City" — drop the trailing country. */
 export function cleanAddress(addr: string | null): string {
   if (!addr) return "—";
