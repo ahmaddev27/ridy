@@ -14,12 +14,22 @@ use Illuminate\Console\Command;
  */
 class BackfillOfferGeo extends Command
 {
-    protected $signature = 'offers:backfill-geo {--limit=15}';
+    protected $signature = 'offers:backfill-geo {--limit=15} {--reset : Re-queue offers that already gave up but still have no distance}';
 
     protected $description = 'Retry trip geocoding for offers that are missing it.';
 
     public function handle(TripGeocoder $geocoder): int
     {
+        // Recover offers that exhausted their attempts (geo_synced_at stamped) but
+        // never got a distance, so the scheduled runs pick them up again.
+        if ($this->option('reset')) {
+            $requeued = DispatchOffer::withoutGlobalScopes()
+                ->whereNull('distance_m')
+                ->whereNotNull('geo_synced_at')
+                ->update(['geo_synced_at' => null, 'geo_attempts' => 0]);
+            $this->info("Re-queued {$requeued} stuck offer(s).");
+        }
+
         $offers = DispatchOffer::withoutGlobalScopes()
             ->whereNull('geo_synced_at')
             ->whereNotNull('pickup_address')

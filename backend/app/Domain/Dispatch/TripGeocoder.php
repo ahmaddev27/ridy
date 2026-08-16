@@ -21,8 +21,12 @@ class TripGeocoder
 
     private const UA = 'Reidey/1.0 (fleet dispatch; contact: ops@reidey.de)';
 
-    /** Give up (mark synced) after this many failed attempts, so we don't retry forever. */
-    private const MAX_ATTEMPTS = 5;
+    /**
+     * Give up (mark synced) only after this many failed attempts. The backfill
+     * runs every 5 minutes, so ~20 attempts span well over an hour of retries —
+     * enough to ride out the free services' rate-limit windows before conceding.
+     */
+    private const MAX_ATTEMPTS = 20;
 
     /**
      * Geocode + route an offer once it succeeds, caching on the row. Safe to call
@@ -79,7 +83,12 @@ class TripGeocoder
         try {
             $res = Http::withHeaders(['User-Agent' => self::UA])
                 ->timeout(6)
-                ->get(self::NOMINATIM, ['q' => $address, 'format' => 'json', 'limit' => 1]);
+                ->get(self::NOMINATIM, [
+                    'q' => $address,
+                    'format' => 'json',
+                    'limit' => 1,
+                    'countrycodes' => 'de', // fleet is German — bias + speed up resolution
+                ]);
         } catch (\Throwable $e) {
             return null; // transient (timeout/network) — do NOT cache, so a retry can succeed
         }
