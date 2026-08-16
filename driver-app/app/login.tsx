@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, KeyboardAvoidingView, Platform, Pressable } from "react-native";
+import { View, Text, KeyboardAvoidingView, Platform, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/lib/auth";
 import { t } from "@/lib/i18n";
@@ -33,20 +33,23 @@ export default function LoginScreen() {
         style={{ flex: 1, justifyContent: "center", padding: 24 }}
       >
         {/* Brand */}
-        <View style={{ alignItems: "center", marginBottom: 36 }}>
-          <Logo size={56} />
-          <Text style={{ color: c.ink, fontSize: 30, fontWeight: "800", marginTop: 18 }}>Reidey Driver</Text>
-          <Text style={{ color: c.inkMuted, fontSize: 16, marginTop: 6, textAlign: "center" }}>{t("signin.subtitle")}</Text>
+        <View style={{ alignItems: "center", marginBottom: 32 }}>
+          <Logo size={72} />
+          <Text style={{ color: c.ink, fontSize: 28, fontWeight: "800", marginTop: 16 }}>Reidey Driver</Text>
+          <Text style={{ color: c.inkMuted, fontSize: 15, marginTop: 6, textAlign: "center" }}>{t("signin.subtitle")}</Text>
         </View>
 
-        <View style={{ gap: 14 }}>
+        <View style={{ gap: 12 }}>
           <Field label={t("login.email")} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
           <Field label={t("login.password")} value={password} onChangeText={setPassword} secure />
           {error && <Text style={{ color: c.danger, fontSize: 14, textAlign: "center" }}>{error}</Text>}
           <View style={{ marginTop: 4 }}>
             <PrimaryButton label={t("login.submit")} onPress={submit} loading={loading} />
           </View>
-          <Pressable onPress={() => {}} style={{ alignSelf: "center", paddingVertical: 10 }}>
+          <Pressable
+            onPress={() => Alert.alert(t("signin.forgot"), t("signin.forgotHint"))}
+            style={{ alignSelf: "center", paddingVertical: 10 }}
+          >
             <Text style={{ color: c.inkMuted, fontSize: 15 }}>{t("signin.forgot")}</Text>
           </Pressable>
         </View>
