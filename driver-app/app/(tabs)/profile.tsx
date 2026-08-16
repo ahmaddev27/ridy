@@ -52,6 +52,7 @@ export default function ProfileScreen() {
 
 function Stats() {
   const c = useColors();
+  const { isOwner } = useAuth();
   const [range, setRange] = useState<(typeof RANGES)[number]["key"]>("today");
   const [data, setData] = useState<DriverStats | null>(null);
   const align = isRTL() ? "right" : "left";
@@ -59,9 +60,9 @@ function Stats() {
   const load = useCallback(async (r: (typeof RANGES)[number]) => {
     try {
       const from = r.days === 0 ? new Date().toISOString().slice(0, 10) : new Date(Date.now() - r.days * 864e5).toISOString().slice(0, 10);
-      setData((await api.stats(from)).data);
+      setData((await (isOwner ? api.fleetStats(from) : api.stats(from))).data);
     } catch { /* */ }
-  }, []);
+  }, [isOwner]);
 
   useEffect(() => { const r = RANGES.find((x) => x.key === range)!; load(r); }, [range, load]);
 
@@ -134,7 +135,7 @@ function GridCell({ label, value, unit, border }: { label: string; value: string
 
 function Settings() {
   const c = useColors();
-  const { driver, updateProfile, logout } = useAuth();
+  const { driver, isOwner, updateProfile, logout } = useAuth();
   const toast = useToast();
   const [locale, setLocaleState] = useState(getLocale());
   const [edit, setEdit] = useState<null | "name" | "password">(null);
@@ -149,7 +150,8 @@ function Settings() {
     const next = LANGS[(i + 1) % LANGS.length];
     setLocale(next.code);
     setLocaleState(next.code);
-    updateProfile({ locale: next.code }).catch(() => {});
+    // Owners have no editable driver profile; keep the language change local.
+    if (!isOwner) updateProfile({ locale: next.code }).catch(() => {});
   }
 
   async function save() {
@@ -185,11 +187,20 @@ function Settings() {
       {/* KONTO */}
       <SectionLabel>{t("profile.konto")}</SectionLabel>
       <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
-        <Row label={t("settings.name")} value={driver?.name ?? ""} onPress={() => { setName(driver?.name ?? ""); setEdit("name"); }} />
-        <Divider />
-        <Row label={t("settings.language")} value={LANGS.find((l) => l.code === locale)?.label ?? ""} onPress={cycleLang} />
-        <Divider />
-        <Row label={t("settings.newPassword").replace(" (optional)", "").replace(" (اختياري)", "").replace(" (optional)", "")} onPress={() => { setPassword(""); setEdit("password"); }} last />
+        {/* Owners monitor read-only; name/password are managed in the dashboard. */}
+        {!isOwner && (
+          <>
+            <Row label={t("settings.name")} value={driver?.name ?? ""} onPress={() => { setName(driver?.name ?? ""); setEdit("name"); }} />
+            <Divider />
+          </>
+        )}
+        <Row label={t("settings.language")} value={LANGS.find((l) => l.code === locale)?.label ?? ""} onPress={cycleLang} last={isOwner} />
+        {!isOwner && (
+          <>
+            <Divider />
+            <Row label={t("settings.newPassword").replace(" (optional)", "").replace(" (اختياري)", "").replace(" (optional)", "")} onPress={() => { setPassword(""); setEdit("password"); }} last />
+          </>
+        )}
       </View>
 
       {/* Logout */}

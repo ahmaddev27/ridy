@@ -101,6 +101,11 @@ const de: Dict = {
   "range.today": "Heute",
   "range.7d": "7 Tage",
   "range.30d": "30 Tage",
+  // Fleet-owner mode
+  "home.fleetTitle": "Flotte",
+  "fleet.driver": "Fahrer",
+  "fleet.onlineDrivers": "Fahrer online",
+  "fleet.activeNow": "Aktive Fahrten",
 };
 
 const en: Dict = {
@@ -200,6 +205,11 @@ const en: Dict = {
   "range.today": "Today",
   "range.7d": "7 days",
   "range.30d": "30 days",
+  // Fleet-owner mode
+  "home.fleetTitle": "Fleet",
+  "fleet.driver": "Driver",
+  "fleet.onlineDrivers": "drivers online",
+  "fleet.activeNow": "Active trips",
 };
 
 const ar: Dict = {
@@ -299,6 +309,11 @@ const ar: Dict = {
   "range.today": "اليوم",
   "range.7d": "7 أيام",
   "range.30d": "30 يوم",
+  // Fleet-owner mode
+  "home.fleetTitle": "الأسطول",
+  "fleet.driver": "السائق",
+  "fleet.onlineDrivers": "سائق متصل",
+  "fleet.activeNow": "الرحلات النشطة",
 };
 
 const DICTS: Record<string, Dict> = { de, en, ar };

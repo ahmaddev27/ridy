@@ -3,7 +3,7 @@ import { View, Text, ScrollView, RefreshControl, Pressable } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { api, type HomeData, type Offer } from "@/lib/api";
+import { api, type HomeData, type FleetHomeData, type Offer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius } from "@/lib/theme";
@@ -13,8 +13,9 @@ import { Logo, StatusBadge, QualityMark, RouteBlock, SectionLabel } from "@/comp
 export default function HomeScreen() {
   const c = useColors();
   const router = useRouter();
-  const { driver } = useAuth();
+  const { driver, isOwner } = useAuth();
   const [data, setData] = useState<HomeData | null>(null);
+  const [fleet, setFleet] = useState<FleetHomeData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const row = isRTL() ? "row-reverse" : "row";
   const align = isRTL() ? "right" : "left";
@@ -22,19 +23,24 @@ export default function HomeScreen() {
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      setData((await api.home()).data);
+      if (isOwner) setFleet((await api.fleetHome()).data);
+      else setData((await api.home()).data);
     } catch {
       /* keep last */
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [isOwner]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const greeting = new Date().getHours() >= 17 ? t("home.greetingEvening") : t("home.greetingDay");
-  const today = data?.today;
+  const today = isOwner ? fleet?.today : data?.today;
   const active = data?.active_offer ?? null;
+  // Owners see the company name as the headline; drivers see their own name.
+  const headline = isOwner ? (fleet?.owner.company_name ?? driver?.company_name ?? "…") : (data?.driver.name ?? "…");
+  const recent = isOwner ? fleet?.recent ?? [] : data?.recent ?? [];
+  const activeOffers = fleet?.active_offers ?? [];
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: c.canvas }}>
@@ -47,13 +53,18 @@ export default function HomeScreen() {
           <Logo size={30} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: c.ink, fontSize: 21, fontWeight: "800", textAlign: align }}>
-              {greeting}, {data?.driver.name ?? "…"}
+              {greeting}, {headline}
             </Text>
-            {driver?.company_name && (
+            {!isOwner && driver?.company_name && (
               <Text style={{ color: c.inkMuted, fontSize: 14, textAlign: align }}>{driver.company_name}</Text>
             )}
+            {isOwner && (
+              <Text style={{ color: c.inkMuted, fontSize: 14, textAlign: align }}>{t("home.fleetTitle")}</Text>
+            )}
           </View>
-          <OnlinePill online={!!data?.driver.online} />
+          {isOwner
+            ? <DriversPill count={fleet?.online_drivers ?? 0} />
+            : <OnlinePill online={!!data?.driver.online} />}
         </View>
 
         {/* Today stats — 2×2 grid */}
@@ -69,8 +80,19 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Active offer */}
-        {active && <ActiveOffer offer={active} onPress={() => router.push(`/offer/${active.id}`)} />}
+        {/* Driver: personal active offer. Owner: active trips across the fleet. */}
+        {!isOwner && active && <ActiveOffer offer={active} onPress={() => router.push(`/offer/${active.id}`)} />}
+
+        {isOwner && activeOffers.length > 0 && (
+          <>
+            <Text style={{ color: c.ink, fontSize: 17, fontWeight: "800", textAlign: align, marginTop: 4 }}>{t("fleet.activeNow")}</Text>
+            <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
+              {activeOffers.map((o, i) => (
+                <RecentRow key={o.id} offer={o} showDriver onPress={() => router.push(`/offer/${o.id}`)} last={i === activeOffers.length - 1} />
+              ))}
+            </View>
+          </>
+        )}
 
         {/* Recent */}
         <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
@@ -81,11 +103,11 @@ export default function HomeScreen() {
         </View>
 
         <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
-          {(data?.recent ?? []).length === 0 ? (
+          {recent.length === 0 ? (
             <Text style={{ color: c.inkSubtle, textAlign: "center", padding: 24 }}>{t("home.empty")}</Text>
           ) : (
-            data!.recent.map((o, i) => (
-              <RecentRow key={o.id} offer={o} onPress={() => router.push(`/offer/${o.id}`)} last={i === data!.recent.length - 1} />
+            recent.map((o, i) => (
+              <RecentRow key={o.id} offer={o} showDriver={isOwner} onPress={() => router.push(`/offer/${o.id}`)} last={i === recent.length - 1} />
             ))
           )}
         </View>
@@ -100,6 +122,16 @@ function OnlinePill({ online }: { online: boolean }) {
     <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 7, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7 }}>
       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: online ? c.completed : c.inkSubtle }} />
       <Text style={{ color: c.ink, fontSize: 14, fontWeight: "600" }}>{online ? t("home.online") : t("home.offline")}</Text>
+    </View>
+  );
+}
+
+function DriversPill({ count }: { count: number }) {
+  const c = useColors();
+  return (
+    <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 7, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7 }}>
+      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: count > 0 ? c.completed : c.inkSubtle }} />
+      <Text style={{ color: c.ink, fontSize: 14, fontWeight: "600" }}>{count} {t("fleet.onlineDrivers")}</Text>
     </View>
   );
 }
@@ -159,7 +191,7 @@ function ActiveOffer({ offer, onPress }: { offer: Offer; onPress: () => void }) 
   );
 }
 
-function RecentRow({ offer, onPress, last }: { offer: Offer; onPress: () => void; last: boolean }) {
+function RecentRow({ offer, onPress, last, showDriver }: { offer: Offer; onPress: () => void; last: boolean; showDriver?: boolean }) {
   const c = useColors();
   const row = isRTL() ? "row-reverse" : "row";
   const status = offer.status ?? "pending";
@@ -172,10 +204,22 @@ function RecentRow({ offer, onPress, last }: { offer: Offer; onPress: () => void
         <QualityMark mark={q.mark} good={q.good} />
       </View>
       <View style={{ flex: 1 }}>
+        {showDriver && offer.driver_name && <DriverTag name={offer.driver_name} />}
         <Text numberOfLines={1} style={{ color: c.inkMuted, fontSize: 14, textAlign: isRTL() ? "right" : "left" }}>{cleanAddress(offer.pickup_address)}</Text>
         <Text numberOfLines={1} style={{ color: c.ink, fontSize: 14, textAlign: isRTL() ? "right" : "left" }}>{cleanAddress(offer.dropoff_address)}</Text>
       </View>
       <StatusBadge status={status} label={t(`status.${status}`)} />
     </Pressable>
+  );
+}
+
+/** A small driver-name label used only in fleet-owner mode to attribute a row. */
+export function DriverTag({ name }: { name: string }) {
+  const c = useColors();
+  return (
+    <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 5, marginBottom: 3, alignSelf: isRTL() ? "flex-end" : "flex-start" }}>
+      <Ionicons name="person-circle-outline" size={14} color={c.inkSubtle} />
+      <Text numberOfLines={1} style={{ color: c.inkSubtle, fontSize: 12, fontWeight: "700", textAlign: isRTL() ? "right" : "left" }}>{name}</Text>
+    </View>
   );
 }

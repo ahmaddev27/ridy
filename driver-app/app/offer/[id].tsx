@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Circle } from "react-native-svg";
 import { api, type Offer } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius } from "@/lib/theme";
 import { fareLabel, perKmLabel, distanceLabel, cleanAddress, euroQuality } from "@/lib/format";
@@ -33,17 +34,19 @@ export default function OfferScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const c = useColors();
+  const { isOwner } = useAuth();
   const [offer, setOffer] = useState<Offer | null>(null);
   const [error, setError] = useState(false);
   const secondsLeft = useCountdown(offer);
   const row = isRTL() ? "row-reverse" : "row";
 
   useEffect(() => {
-    api.offers().then((r) => {
+    const fetcher = isOwner ? api.fleetOffers({ per_page: 50 }) : api.offers();
+    fetcher.then((r) => {
       const found = r.data.find((o) => String(o.id) === String(id));
       found ? setOffer(found) : setError(true);
     }).catch(() => setError(true));
-  }, [id]);
+  }, [id, isOwner]);
 
   function openMaps() {
     if (!offer) return;
@@ -111,6 +114,15 @@ export default function OfferScreen() {
               </Text>
             )}
           </View>
+
+          {/* Fleet-owner: attribute the offer to its driver. */}
+          {isOwner && offer.driver_name && (
+            <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 7 }}>
+              <Ionicons name="person-circle-outline" size={18} color={c.inkMuted} />
+              <Text style={{ color: c.ink, fontSize: 16, fontWeight: "700" }}>{offer.driver_name}</Text>
+              <Text style={{ color: c.inkSubtle, fontSize: 14 }}>· {t("fleet.driver")}</Text>
+            </View>
+          )}
 
           {/* Route card */}
           <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, padding: 18 }}>
