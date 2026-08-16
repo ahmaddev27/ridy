@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\V1\ExtensionController;
 use App\Http\Controllers\Api\V1\FleetSessionController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\NotificationPrefsController;
 use App\Http\Controllers\Api\V1\PasswordResetController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\RegistrationController;
@@ -172,6 +173,10 @@ Route::prefix('v1')->group(function () {
         // Browser FCM token for dashboard web push.
         Route::post('notifications/device', [NotificationController::class, 'registerDevice']);
         Route::delete('notifications/device', [NotificationController::class, 'unregisterDevice']);
+
+        // Per-category web-push + email notification preferences (bell always on).
+        Route::get('notification-prefs', [NotificationPrefsController::class, 'show']);
+        Route::put('notification-prefs', [NotificationPrefsController::class, 'update']);
 
         // Governance
         Route::get('audit-logs', [AuditLogController::class, 'index']);

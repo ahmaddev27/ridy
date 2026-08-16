@@ -34,3 +34,33 @@ export async function deleteNotification(id: string): Promise<void> {
 export async function clearNotifications(): Promise<void> {
   await apiFetch("/api/v1/notifications/clear", { method: "DELETE", withCsrf: true });
 }
+
+/** User-configurable notification categories (bell is always on, not listed). */
+export const NOTIFICATION_CATEGORIES = [
+  "sessions",
+  "subscription",
+  "platform",
+  "codes",
+] as const;
+
+export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
+export type NotificationChannel = "push" | "email";
+
+/** Per-channel, per-category toggles. Each value: true = channel enabled. */
+export type NotificationPrefs = Record<NotificationChannel, Record<NotificationCategory, boolean>>;
+
+export async function getNotificationPrefs(): Promise<NotificationPrefs> {
+  const res = await apiFetch<{ data: NotificationPrefs }>("/api/v1/notification-prefs");
+  return res.data;
+}
+
+export async function updateNotificationPrefs(
+  prefs: NotificationPrefs,
+): Promise<NotificationPrefs> {
+  const res = await apiFetch<{ data: NotificationPrefs }>("/api/v1/notification-prefs", {
+    method: "PUT",
+    body: prefs,
+    withCsrf: true,
+  });
+  return res.data;
+}

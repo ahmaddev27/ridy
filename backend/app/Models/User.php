@@ -16,7 +16,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'phone', 'password', 'tenant_id', 'locale'])]
+#[Fillable(['name', 'email', 'phone', 'password', 'tenant_id', 'locale', 'notification_prefs'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -33,7 +33,18 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'notification_prefs' => 'array',
         ];
+    }
+
+    /**
+     * Whether the user wants a given delivery channel for a notification category.
+     * Opt-out semantics: enabled unless the user has explicitly set it to false.
+     * The in-app bell is unaffected — it is always written.
+     */
+    public function wantsChannel(string $channel, string $category): bool
+    {
+        return ($this->notification_prefs[$channel][$category] ?? true) !== false;
     }
 
     public function tenant(): BelongsTo
