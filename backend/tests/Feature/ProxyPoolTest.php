@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Proxy;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\ProxyPool;
@@ -32,6 +33,8 @@ class ProxyPoolTest extends TestCase
         $tenant->refresh();
         $this->assertSame($proxy->id, $tenant->proxy_id);
         $this->assertSame('http://u:p@host:1', $tenant->proxy_url);
+        // Capacity is measured in drivers: one driver occupies one slot.
+        Driver::create(['tenant_id' => $tenant->id, 'name' => 'D1']);
         $this->assertSame(1, $proxy->usedCount());
     }
 
@@ -42,12 +45,13 @@ class ProxyPoolTest extends TestCase
         $b = $this->usableTenant('B');
 
         app(ProxyPool::class)->assign($a);
+        Driver::create(['tenant_id' => $a->id, 'name' => 'D']); // fills the 1-driver capacity
         app(ProxyPool::class)->assign($b); // no free slot
 
         $this->assertSame($proxy->id, $a->fresh()->proxy_id);
         $this->assertNull($b->fresh()->proxy_id);
 
-        // A's subscription expires → its slot frees → B can take it.
+        // A's subscription expires → its drivers stop counting → slot frees → B can take it.
         $a->forceFill(['subscription_ends_at' => CarbonImmutable::now()->subDay()])->save();
         $this->assertSame(0, $proxy->usedCount());
 

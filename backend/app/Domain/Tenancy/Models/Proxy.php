@@ -2,6 +2,7 @@
 
 namespace App\Domain\Tenancy\Models;
 
+use App\Domain\Fleet\Models\Driver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -22,10 +23,16 @@ class Proxy extends Model
         return $this->hasMany(Tenant::class);
     }
 
-    /** How many active (usable) companies currently occupy this proxy. */
+    /**
+     * How many drivers currently occupy this proxy — the sum of drivers across
+     * the active (usable) companies assigned to it. Capacity is measured in
+     * drivers, since that's what drives the proxy's real load.
+     */
     public function usedCount(): int
     {
-        return Tenant::usable()->where('proxy_id', $this->id)->count();
+        return Driver::withoutGlobalScopes()
+            ->whereIn('tenant_id', Tenant::usable()->where('proxy_id', $this->id)->select('id'))
+            ->count();
     }
 
     public function hasFreeSlot(): bool
