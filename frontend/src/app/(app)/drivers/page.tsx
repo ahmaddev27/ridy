@@ -231,10 +231,12 @@ export default function DriversPage() {
                             )}
                           </button>
                         </div>
-                      ) : d.app_status === "invited" ? (
+                      ) : d.app_status === "invited" || d.app_status === "invite_expired" ? (
                         <div className="flex items-center gap-2">
-                          <Badge status="expiring" dot>
-                            {t("screens.drivers.appInvited")}
+                          <Badge status={d.app_status === "invite_expired" ? "gap" : "expiring"} dot>
+                            {d.app_status === "invite_expired"
+                              ? t("screens.drivers.appInviteExpired")
+                              : t("screens.drivers.appInvited")}
                           </Badge>
                           <button
                             onClick={() => invite(d)}

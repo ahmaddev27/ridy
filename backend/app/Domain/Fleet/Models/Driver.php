@@ -2,6 +2,7 @@
 
 namespace App\Domain\Fleet\Models;
 
+use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -62,8 +63,15 @@ class Driver extends Authenticatable
     /** App onboarding state for the manager dashboard. */
     public function appStatus(): string
     {
+        // A still-pending invite that outlived the link TTL reads as "expired" — the
+        // manager must re-invite, since the old activation link no longer works.
+        $inviteExpired = $this->activated_at === null
+            && $this->invited_at !== null
+            && $this->invited_at->lt(now()->subDays(DriverInvitationService::INVITE_TTL_DAYS));
+
         return match (true) {
             $this->activated_at !== null => 'active',
+            $inviteExpired => 'invite_expired',
             $this->invited_at !== null => 'invited',
             default => 'none',
         };
