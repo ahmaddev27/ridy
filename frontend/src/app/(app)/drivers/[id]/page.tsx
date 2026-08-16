@@ -25,14 +25,40 @@ function eur(n: number | null): string {
   return n != null ? `€${n.toFixed(2)}` : "—";
 }
 
-/** Local-day window [from,to) in ms for the selected range. */
+// Uber measures a "day" as its business day: 04:00 → 04:00 in the fleet's
+// timezone (Europe/Berlin), NOT local midnight. Aligning our windows to the same
+// boundary is what makes the Uber performance cards match the Uber app exactly.
+const FLEET_TZ = "Europe/Berlin";
+const BIZ_START_HOUR = 4;
+const DAY_MS = 86_400_000;
+
+/** UTC ms for a given Berlin wall-clock time (handles the tz offset + DST). */
+function berlinWallMs(y: number, m: number, d: number, h: number): number {
+  const guess = Date.UTC(y, m - 1, d, h);
+  const asUtc = Date.parse(
+    new Date(guess).toLocaleString("sv-SE", { timeZone: FLEET_TZ }).replace(" ", "T") + "Z",
+  );
+  return guess - (asUtc - guess); // guess minus the Berlin offset at that instant
+}
+
+/** Start (ms) of the current Uber business day: the most recent 04:00 Berlin. */
+function businessDayStartMs(): number {
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: FLEET_TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false,
+  }).formatToParts(new Date());
+  const g = (type: string) => Number(parts.find((p) => p.type === type)!.value);
+  const start = berlinWallMs(g("year"), g("month"), g("day"), BIZ_START_HOUR);
+  // Before 04:00 Berlin we're still inside yesterday's business day.
+  return Date.now() >= start ? start : start - DAY_MS;
+}
+
+/** Business-day window [from,to) in ms for the selected range (Uber-aligned). */
 function rangeMs(key: RangeKey): { from: number; to: number } {
-  const now = new Date();
-  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const day = 86_400_000;
-  if (key === "today") return { from: midnight, to: now.getTime() };
-  if (key === "yesterday") return { from: midnight - day, to: midnight };
-  return { from: now.getTime() - Number(key) * day, to: now.getTime() };
+  const now = Date.now();
+  const bizStart = businessDayStartMs();
+  if (key === "today") return { from: bizStart, to: now };
+  if (key === "yesterday") return { from: bizStart - DAY_MS, to: bizStart };
+  return { from: now - Number(key) * DAY_MS, to: now };
 }
 
 /** Uber's earnings_label is already formatted (e.g. "€2,478.75"); prefer it. */
@@ -229,7 +255,8 @@ export default function DriverProfilePage() {
           {/* Our own captured data */}
           {stats && (
             <Card className="p-5">
-              <h4 className="mb-3 text-sm font-semibold text-ink">{d("ourData")}</h4>
+              <h4 className="text-sm font-semibold text-ink">{d("ourData")}</h4>
+              <p className="mb-3 mt-0.5 text-xs text-ink-subtle">{d("ourDataHint")}</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                 <MiniStat label={d("statEarnings")} value={`€${stats.earnings.toFixed(2)}`} />
                 <MiniStat label={d("statTrips")} value={String(stats.trips)} />
