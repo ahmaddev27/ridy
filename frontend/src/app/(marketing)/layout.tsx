@@ -79,9 +79,9 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
         <div className="mx-auto max-w-[1200px] px-4 py-14">
           <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
             <div className="max-w-xs">
-              <Link href="/" className="flex items-center gap-2 text-ink" aria-label="Reidey Startseite">
-                <Logo size={26} className="text-ink" />
-                <span className="text-base font-semibold tracking-tight">Reidey</span>
+              <Link href="/" className="flex items-center gap-2.5 text-ink" aria-label="Reidey Startseite">
+                <Logo size={42} className="text-ink" />
+                <span className="text-2xl font-semibold tracking-tight">Reidey</span>
               </Link>
               <p className="mt-4 text-sm leading-relaxed text-ink-muted">
                 Die Flottenmanagement-Plattform für moderne Fahrdienst-Flotten. Fahrer, Abläufe und Abrechnung an einem Ort.

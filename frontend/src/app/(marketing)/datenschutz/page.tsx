@@ -19,6 +19,15 @@ export default function DatenschutzPage() {
 
       <div className="mt-10 space-y-10 text-[15px] leading-relaxed text-ink-muted">
         <section>
+          <p>
+            Der Schutz Ihrer personenbezogenen Daten ist uns wichtig. Diese Erklärung informiert
+            Sie darüber, welche Daten wir im Zusammenhang mit der Nutzung von Reidey, unserer
+            Flottenmanagement-Plattform, verarbeiten, zu welchen Zwecken dies geschieht und welche
+            Rechte Ihnen zustehen.
+          </p>
+        </section>
+
+        <section>
           <h2 className="text-xl font-semibold text-ink">1. Verantwortlicher</h2>
           <p className="mt-3">
             Verantwortlicher im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:
@@ -35,103 +44,124 @@ export default function DatenschutzPage() {
             Telefon: [Telefon]
           </p>
           <p className="mt-3">
-            Datenschutzbeauftragter (falls bestellt): [Name / Kontakt DSB]
+            Einen Datenschutzbeauftragten erreichen Sie, sofern bestellt, unter: [Name / Kontakt
+            DSB].
           </p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-ink">2. Rolle als Auftragsverarbeiter</h2>
+          <h2 className="text-xl font-semibold text-ink">2. Erhobene Daten</h2>
           <p className="mt-3">
-            Reidey ist eine Flottenmanagement-Plattform. Personenbezogene Daten von Fahrern
-            verarbeiten wir im Auftrag und nach Weisung des jeweiligen Flottenbetreibers im Sinne
-            von Art. 28 DSGVO (Auftragsverarbeitung). Verantwortlich für diese Daten bleibt der
-            Flottenbetreiber. Für die eigenen Kontodaten des Flottenbetreibers sind wir selbst
+            Je nach Nutzung der Plattform verarbeiten wir folgende Kategorien personenbezogener
+            Daten:
+          </p>
+          <h3 className="mt-5 text-base font-semibold text-ink">Kontodaten der Flottenbetreiber</h3>
+          <p className="mt-2">
+            Name, E-Mail-Adresse, Zugangsdaten sowie Vertrags- und Abrechnungsdaten, die für die
+            Verwaltung des Kontos erforderlich sind.
+          </p>
+          <h3 className="mt-5 text-base font-semibold text-ink">Fahrerdaten</h3>
+          <p className="mt-2">
+            Name, E-Mail-Adresse, Zugangsdaten sowie weitere Angaben, die der Flottenbetreiber zur
+            Verwaltung seiner Fahrer hinterlegt. Diese Daten verarbeiten wir im Auftrag des
+            Betreibers.
+          </p>
+          <h3 className="mt-5 text-base font-semibold text-ink">Nutzungs- und Geräte-Metadaten</h3>
+          <p className="mt-2">
+            Technische Informationen wie Geräte- und Browserangaben, IP-Adresse, Zeitstempel und
+            Protokolldaten, die für den sicheren und stabilen Betrieb der Plattform erforderlich
+            sind.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-ink">
+            3. Zwecke und Rechtsgrundlagen nach Art. 6 DSGVO
+          </h2>
+          <p className="mt-3">
+            Wir verarbeiten personenbezogene Daten, um die Plattform bereitzustellen und zu
+            betreiben, den Vertrag zu erfüllen, mit Ihnen zu kommunizieren, die Abrechnung
+            abzuwickeln und die Sicherheit unserer Systeme zu gewährleisten. Die Verarbeitung
+            stützt sich auf folgende Rechtsgrundlagen:
+          </p>
+          <ul className="mt-3 list-disc space-y-1.5 pl-5">
+            <li>Art. 6 Abs. 1 lit. b DSGVO zur Erfüllung des Vertrags und vorvertraglicher Maßnahmen,</li>
+            <li>Art. 6 Abs. 1 lit. c DSGVO zur Erfüllung rechtlicher Verpflichtungen,</li>
+            <li>Art. 6 Abs. 1 lit. f DSGVO zur Wahrung berechtigter Interessen am sicheren Betrieb,</li>
+            <li>Art. 6 Abs. 1 lit. a DSGVO, soweit Sie in eine Verarbeitung eingewilligt haben.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-ink">4. Auftragsverarbeitung</h2>
+          <p className="mt-3">
+            Personenbezogene Daten von Fahrern verarbeiten wir ausschließlich im Auftrag und nach
+            Weisung des jeweiligen Flottenbetreibers gemäß Art. 28 DSGVO. Verantwortlicher für
+            diese Daten bleibt der Flottenbetreiber. Grundlage der Zusammenarbeit ist ein
+            Auftragsverarbeitungsvertrag, der die Rechte und Pflichten der Beteiligten regelt. Für
+            die eigenen Konto- und Vertragsdaten des Flottenbetreibers sind wir selbst
             Verantwortlicher.
           </p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-ink">3. Welche Daten wir verarbeiten</h2>
-          <h3 className="mt-4 text-base font-semibold text-ink">Kontodaten der Flottenbetreiber</h3>
-          <p className="mt-2">
-            Name, E-Mail-Adresse, Zugangsdaten, Abrechnungs- und Vertragsdaten.
-          </p>
-          <h3 className="mt-4 text-base font-semibold text-ink">Fahrerdaten (im Auftrag)</h3>
-          <p className="mt-2">
-            Name, E-Mail-Adresse, Zugangsdaten sowie Angaben, die der Flottenbetreiber zur
-            Verwaltung seiner Fahrer hinterlegt.
-          </p>
-          <h3 className="mt-4 text-base font-semibold text-ink">Nutzungs- und Geräte-Metadaten</h3>
-          <p className="mt-2">
-            Technische Informationen wie Geräte- und Browserangaben, Zeitstempel und Protokolldaten,
-            die für den sicheren Betrieb der Plattform erforderlich sind.
-          </p>
-          <h3 className="mt-4 text-base font-semibold text-ink">Cookies und Session</h3>
-          <p className="mt-2">
-            Für die Anmeldung und den Betrieb setzen wir technisch notwendige Cookies und
-            Session-Informationen ein.
-          </p>
-        </section>
-
-        <section>
-          <h2 className="text-xl font-semibold text-ink">4. Zwecke und Rechtsgrundlagen</h2>
+          <h2 className="text-xl font-semibold text-ink">
+            5. Speicherdauer und Datenminimierung
+          </h2>
           <p className="mt-3">
-            Wir verarbeiten personenbezogene Daten zur Bereitstellung und zum Betrieb der Plattform,
-            zur Vertragserfüllung, zur Kommunikation und zur Abrechnung. Rechtsgrundlagen sind:
+            Wir verarbeiten ausschließlich die Daten, die für den jeweiligen Zweck erforderlich
+            sind, und folgen dabei dem Grundsatz der Datenminimierung. Personenbezogene Daten
+            speichern wir nur so lange, wie es für die genannten Zwecke oder aufgrund gesetzlicher
+            Aufbewahrungspflichten notwendig ist. Sind die Daten für diese Zwecke nicht mehr
+            erforderlich, werden sie gelöscht oder anonymisiert.
           </p>
-          <ul className="mt-3 list-disc space-y-1.5 pl-5">
-            <li>Art. 6 Abs. 1 lit. b DSGVO (Erfüllung des Vertrags),</li>
-            <li>Art. 6 Abs. 1 lit. c DSGVO (rechtliche Verpflichtungen),</li>
-            <li>Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse am sicheren Betrieb),</li>
-            <li>Art. 28 DSGVO für die Verarbeitung im Auftrag der Flottenbetreiber.</li>
-          </ul>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-ink">5. Benachrichtigungen</h2>
+          <h2 className="text-xl font-semibold text-ink">
+            6. Empfänger und Hosting in der EU
+          </h2>
+          <p className="mt-3">
+            Das Hosting sowie die Verarbeitung erfolgen innerhalb der Europäischen Union. Wir
+            setzen sorgfältig ausgewählte Dienstleister ein, etwa für Hosting, Zustellung von
+            Benachrichtigungen und Support, und binden diese, soweit erforderlich, im Rahmen von
+            Auftragsverarbeitungsverträgen. Eine Übermittlung in Drittländer findet nur statt,
+            wenn hierfür geeignete Garantien nach Art. 44 ff. DSGVO bestehen.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-ink">
+            7. Push- und E-Mail-Benachrichtigungen
+          </h2>
           <p className="mt-3">
             Zur Zustellung von Push- und E-Mail-Benachrichtigungen verarbeiten wir die dafür
-            erforderlichen Kontakt- und Gerätekennungen. Für Push-Nachrichten kann ein
-            Zustelldienst (z. B. Firebase Cloud Messaging) eingesetzt werden. Dabei werden nur die
-            zur Zustellung notwendigen Daten übermittelt.
+            erforderlichen Kontakt- und Gerätekennungen, etwa E-Mail-Adresse und Geräte-Token. Für
+            die Zustellung von Push-Nachrichten kann ein spezialisierter Zustelldienst eingesetzt
+            werden. Dabei werden nur die zur Zustellung notwendigen Daten übermittelt. Sie können
+            Benachrichtigungen jederzeit in den Einstellungen Ihres Geräts oder Ihres Kontos
+            deaktivieren.
           </p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-ink">6. Empfänger und Hosting</h2>
-          <p className="mt-3">
-            Das Hosting und die Verarbeitung erfolgen innerhalb der Europäischen Union. Eingesetzte
-            Dienstleister werden sorgfältig ausgewählt und, soweit erforderlich, im Rahmen von
-            Auftragsverarbeitungsverträgen gebunden. Eine Übermittlung in Drittländer findet nur
-            statt, sofern hierfür geeignete Garantien nach Art. 44 ff. DSGVO bestehen.
-          </p>
-        </section>
-
-        <section>
-          <h2 className="text-xl font-semibold text-ink">7. Speicherdauer und Datenminimierung</h2>
-          <p className="mt-3">
-            Wir verarbeiten nur die Daten, die für den jeweiligen Zweck erforderlich sind
-            (Datenminimierung), und speichern sie nur so lange, wie es für die genannten Zwecke oder
-            aufgrund gesetzlicher Aufbewahrungspflichten notwendig ist. Anschließend werden die Daten
-            gelöscht oder anonymisiert.
-          </p>
-        </section>
-
-        <section>
-          <h2 className="text-xl font-semibold text-ink">8. Ihre Rechte</h2>
+          <h2 className="text-xl font-semibold text-ink">
+            8. Betroffenenrechte nach Art. 15 bis 21 DSGVO
+          </h2>
           <p className="mt-3">Nach der DSGVO stehen Ihnen folgende Rechte zu:</p>
           <ul className="mt-3 list-disc space-y-1.5 pl-5">
-            <li>Auskunft (Art. 15 DSGVO),</li>
-            <li>Berichtigung (Art. 16 DSGVO),</li>
-            <li>Löschung (Art. 17 DSGVO),</li>
-            <li>Einschränkung der Verarbeitung (Art. 18 DSGVO),</li>
-            <li>Datenübertragbarkeit (Art. 20 DSGVO),</li>
-            <li>Widerspruch gegen die Verarbeitung (Art. 21 DSGVO).</li>
+            <li>Recht auf Auskunft (Art. 15 DSGVO),</li>
+            <li>Recht auf Berichtigung (Art. 16 DSGVO),</li>
+            <li>Recht auf Löschung (Art. 17 DSGVO),</li>
+            <li>Recht auf Einschränkung der Verarbeitung (Art. 18 DSGVO),</li>
+            <li>Recht auf Datenübertragbarkeit (Art. 20 DSGVO),</li>
+            <li>Recht auf Widerspruch gegen die Verarbeitung (Art. 21 DSGVO).</li>
           </ul>
           <p className="mt-3">
-            Betrifft die Verarbeitung Fahrerdaten, die wir im Auftrag verarbeiten, richten Sie Ihr
-            Anliegen bitte an den jeweiligen Flottenbetreiber. Wir unterstützen den Betreiber bei
-            der Erfüllung dieser Rechte.
+            Betrifft Ihr Anliegen Fahrerdaten, die wir im Auftrag verarbeiten, wenden Sie sich
+            bitte an den jeweiligen Flottenbetreiber als Verantwortlichen. Wir unterstützen den
+            Betreiber bei der Erfüllung dieser Rechte. Im Übrigen erreichen Sie uns unter
+            [E-Mail].
           </p>
         </section>
 
@@ -141,16 +171,26 @@ export default function DatenschutzPage() {
             Sie haben das Recht, sich bei einer Datenschutz-Aufsichtsbehörde zu beschweren, wenn Sie
             der Ansicht sind, dass die Verarbeitung Ihrer personenbezogenen Daten gegen die DSGVO
             verstößt. Zuständig ist unter anderem die Aufsichtsbehörde Ihres gewöhnlichen
-            Aufenthaltsorts.
+            Aufenthaltsorts, Ihres Arbeitsplatzes oder des Orts des mutmaßlichen Verstoßes.
           </p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold text-ink">10. Kontakt</h2>
+          <h2 className="text-xl font-semibold text-ink">10. Cookies</h2>
           <p className="mt-3">
-            Bei Fragen zum Datenschutz erreichen Sie uns unter [E-Mail]. Für Anliegen rund um Ihre
-            Rechte wenden Sie sich bitte an den oben genannten Verantwortlichen bzw. den
-            Datenschutzbeauftragten.
+            Für die Anmeldung und den sicheren Betrieb der Plattform setzen wir technisch notwendige
+            Cookies und Session-Informationen ein. Diese sind für die Bereitstellung der Dienste
+            erforderlich und werden nicht zu Analyse- oder Marketingzwecken verwendet. Sofern wir
+            künftig darüber hinausgehende Cookies einsetzen, holen wir zuvor Ihre Einwilligung ein.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-ink">11. Änderungen dieser Erklärung</h2>
+          <p className="mt-3">
+            Wir passen diese Datenschutzerklärung an, wenn sich die Rechtslage, unsere Dienste oder
+            die Datenverarbeitung ändern. Es gilt jeweils die auf dieser Seite veröffentlichte
+            aktuelle Fassung. Bei Fragen zum Datenschutz erreichen Sie uns unter [E-Mail].
           </p>
         </section>
       </div>
