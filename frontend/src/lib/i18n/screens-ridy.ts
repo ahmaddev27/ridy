@@ -46,6 +46,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       dateFrom: "From date", dateTo: "To date", clearDates: "Clear dates",
       today: "Today", offersCount: "offers",
       driversSelected: "selected", clearSelection: "Clear selection", noDrivers: "No drivers",
+      exportExcel: "Export Excel", exportFailed: "Export failed",
     },
     driverLinking: {
       title: "Link drivers",
@@ -193,6 +194,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       dateFrom: "Von Datum", dateTo: "Bis Datum", clearDates: "Datum löschen",
       today: "Heute", offersCount: "Angebote",
       driversSelected: "ausgewählt", clearSelection: "Auswahl leeren", noDrivers: "Keine Fahrer",
+      exportExcel: "Excel exportieren", exportFailed: "Export fehlgeschlagen",
     },
     driverLinking: {
       title: "Fahrer verknüpfen",
@@ -338,6 +340,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       dateFrom: "من تاريخ", dateTo: "إلى تاريخ", clearDates: "مسح التواريخ",
       today: "اليوم", offersCount: "عرض",
       driversSelected: "محدد", clearSelection: "مسح التحديد", noDrivers: "لا سائقين",
+      exportExcel: "تصدير Excel", exportFailed: "فشل التصدير",
     },
     driverLinking: {
       title: "ربط السائقين",
