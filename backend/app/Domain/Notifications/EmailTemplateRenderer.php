@@ -89,10 +89,12 @@ HTML;
         }
 
         // Preview embeds the logo as a data URI (renders offline in the browser).
-        // Real emails reference it by Content-ID — the Mailable attaches the PNG
-        // inline (see SendTemplatedMail), so it renders in every client without
-        // depending on a reachable APP_URL or proxy routing.
-        $src = $inlineAssets ? $this->inlineLogo() : 'cid:reidey-logo.png';
+        // Real emails reference it by an absolute hosted URL (Caddy serves
+        // /email/* from Laravel public) — reliable across every transport,
+        // including API providers like Resend where inline cid attachments break.
+        $src = $inlineAssets
+            ? $this->inlineLogo()
+            : htmlspecialchars($this->absoluteUrl('email/reidey-logo.png'), ENT_QUOTES);
 
         return <<<HTML
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:20px;border-collapse:collapse">
