@@ -150,6 +150,8 @@ export const screensB: {
       actorSystem: "System",
     },
     notifications: {
+      title: "Notifications",
+      viewAll: "View all",
       markAllRead: "Mark all read",
       allMarkedRead: "All marked read",
       clearAll: "Clear all",
@@ -408,6 +410,8 @@ export const screensB: {
       actorSystem: "System",
     },
     notifications: {
+      title: "Benachrichtigungen",
+      viewAll: "Alle ansehen",
       markAllRead: "Alle als gelesen markieren",
       allMarkedRead: "Alle als gelesen markiert",
       clearAll: "Alle löschen",
@@ -535,6 +539,8 @@ export const screensB: {
       actorSystem: "النظام",
     },
     notifications: {
+      title: "الإشعارات",
+      viewAll: "عرض الكل",
       markAllRead: "تعليم الكل كمقروء",
       allMarkedRead: "تم تعليم الكل كمقروء",
       clearAll: "مسح الكل",
