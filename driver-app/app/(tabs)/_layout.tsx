@@ -1,10 +1,11 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { t } from "@/lib/i18n";
+import { t, useLocale } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
 
 export default function TabsLayout() {
   const c = useColors();
+  useLocale(); // re-render tab labels when the language changes
   return (
     <Tabs
       screenOptions={{

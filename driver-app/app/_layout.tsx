@@ -8,8 +8,12 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/toast";
 import { registerForPush } from "@/lib/push";
 import { useColors } from "@/lib/theme";
+import { useAppFonts } from "@/lib/fonts";
 
 export default function RootLayout() {
+  const fontsLoaded = useAppFonts();
+  if (!fontsLoaded) return null; // brief splash until Tajawal is ready
+
   return (
     <SafeAreaProvider>
       <AuthProvider>

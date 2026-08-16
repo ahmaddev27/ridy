@@ -62,6 +62,7 @@ export default function OfferScreen() {
   const expired = secondsLeft != null && secondsLeft <= 0;
   const q = offer ? euroQuality(offer.fare_amount, offer.distance_m) : { mark: "€", good: false };
   const ringColor = pct > 0.5 ? c.completed : pct > 0.25 ? c.pending : c.canceled;
+  const hasMetrics = offer?.distance_m != null; // geo-synced offers only; hide the "—" placeholders otherwise
 
   return (
     <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: c.canvas }}>
@@ -92,10 +93,12 @@ export default function OfferScreen() {
                   />
                 )}
               </Svg>
-              <Text style={{ color: c.ink, fontSize: 46, fontWeight: "800", letterSpacing: -1 }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
-              <Text style={{ color: c.inkMuted, fontSize: 15, marginTop: 2 }}>
-                {perKmLabel(offer.fare_amount, offer.distance_m)} · {distanceLabel(offer.distance_m)}
-              </Text>
+              <Text style={{ color: c.ink, fontSize: 44, fontWeight: "800", letterSpacing: -1 }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
+              {hasMetrics && (
+                <Text style={{ color: c.inkMuted, fontSize: 14, marginTop: 2 }}>
+                  {perKmLabel(offer.fare_amount, offer.distance_m)} · {distanceLabel(offer.distance_m)}
+                </Text>
+              )}
             </View>
             {secondsLeft != null && (
               <Text style={{ color: ringColor, fontSize: 17, fontWeight: "700", marginTop: 6 }}>
@@ -134,17 +137,19 @@ export default function OfferScreen() {
             />
           </View>
 
-          {/* Metrics */}
-          <View style={{ flexDirection: row, backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
-            <View style={{ flex: 1, padding: 18, gap: 4, borderRightWidth: isRTL() ? 0 : 1, borderLeftWidth: isRTL() ? 1 : 0, borderColor: c.line }}>
-              <SectionLabel>{t("offer.strecke")}</SectionLabel>
-              <Text style={{ color: c.ink, fontSize: 22, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>{distanceLabel(offer.distance_m)}</Text>
+          {/* Metrics — only when the offer has been geo-synced (otherwise the values are just "—"). */}
+          {hasMetrics && (
+            <View style={{ flexDirection: row, backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
+              <View style={{ flex: 1, padding: 16, gap: 4, borderRightWidth: isRTL() ? 0 : 1, borderLeftWidth: isRTL() ? 1 : 0, borderColor: c.line }}>
+                <SectionLabel>{t("offer.strecke")}</SectionLabel>
+                <Text style={{ color: c.ink, fontSize: 20, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>{distanceLabel(offer.distance_m)}</Text>
+              </View>
+              <View style={{ flex: 1, padding: 16, gap: 4 }}>
+                <SectionLabel>{t("offer.qualitaet")}</SectionLabel>
+                <Text style={{ color: c.ink, fontSize: 20, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>{perKmLabel(offer.fare_amount, offer.distance_m)}</Text>
+              </View>
             </View>
-            <View style={{ flex: 1, padding: 18, gap: 4 }}>
-              <SectionLabel>{t("offer.qualitaet")}</SectionLabel>
-              <Text style={{ color: c.ink, fontSize: 22, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>{perKmLabel(offer.fare_amount, offer.distance_m)}</Text>
-            </View>
-          </View>
+          )}
 
           <View style={{ flex: 1 }} />
 
@@ -152,19 +157,19 @@ export default function OfferScreen() {
           <View style={{ flexDirection: row, gap: 10, marginTop: 8 }}>
             <Pressable
               onPress={openMaps}
-              style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: radius.xl, paddingVertical: 18, paddingHorizontal: 18 }}
+              style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: radius.lg, paddingVertical: 13, paddingHorizontal: 16 }}
             >
-              <Ionicons name="map-outline" size={18} color={c.ink} />
-              <Text style={{ color: c.ink, fontSize: 16, fontWeight: "700" }}>{t("offer.openMaps")}</Text>
+              <Ionicons name="map-outline" size={16} color={c.ink} />
+              <Text style={{ color: c.ink, fontSize: 14, fontWeight: "700" }}>{t("offer.openMaps")}</Text>
             </Pressable>
             <Pressable
               onPress={() => Linking.openURL("uberdriver://").catch(() => Linking.openURL("https://drivers.uber.com"))}
-              style={{ flex: 1, backgroundColor: c.primary, borderRadius: radius.xl, paddingVertical: 18, alignItems: "center" }}
+              style={{ flex: 1, backgroundColor: c.primary, borderRadius: radius.lg, paddingVertical: 13, alignItems: "center" }}
             >
-              <Text style={{ color: c.primaryInk, fontSize: 17, fontWeight: "700" }}>{t("offer.openUber")}</Text>
+              <Text style={{ color: c.primaryInk, fontSize: 15, fontWeight: "700" }}>{t("offer.openUber")}</Text>
             </Pressable>
           </View>
-          <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: "center", lineHeight: 19 }}>{t("offer.observe")}</Text>
+          <Text style={{ color: c.inkSubtle, fontSize: 12, textAlign: "center", lineHeight: 18 }}>{t("offer.observe")}</Text>
         </ScrollView>
       )}
     </SafeAreaView>

@@ -1,5 +1,6 @@
 import { getLocales } from "expo-localization";
 import { I18nManager } from "react-native";
+import { useSyncExternalStore } from "react";
 
 type Dict = Record<string, string>;
 
@@ -55,6 +56,7 @@ const de: Dict = {
   "profile.pushNewSub": "Erlaubt · hohe Priorität",
   "signin.subtitle": "Melde dich mit deinen Flottendaten an",
   "signin.forgot": "Passwort vergessen?",
+  "signin.forgotHint": "Wende dich an deine Flotte, um dein Passwort zurückzusetzen. Der Zugang wird über die Einladung deines Unternehmens verwaltet.",
   "signin.inviteNote": "Zugang erhältst du per Einladung deiner Flotte.",
   "settings.title": "Einstellungen",
   "settings.logout": "Abmelden",
@@ -159,6 +161,7 @@ const en: Dict = {
   "profile.pushNewSub": "Allowed · high priority",
   "signin.subtitle": "Sign in with your fleet details",
   "signin.forgot": "Forgot password?",
+  "signin.forgotHint": "Contact your fleet to reset your password. Access is managed through your company's invitation.",
   "signin.inviteNote": "Access is granted by your fleet's invitation.",
   "settings.title": "Settings",
   "settings.logout": "Log out",
@@ -263,6 +266,7 @@ const ar: Dict = {
   "profile.pushNewSub": "مسموح · أولوية عالية",
   "signin.subtitle": "سجّل الدخول ببيانات أسطولك",
   "signin.forgot": "نسيت كلمة المرور؟",
+  "signin.forgotHint": "تواصل مع أسطولك لإعادة تعيين كلمة المرور. الوصول يُدار عبر دعوة شركتك.",
   "signin.inviteNote": "الوصول يكون عبر دعوة من أسطولك.",
   "settings.title": "الإعدادات",
   "settings.logout": "خروج",
@@ -333,15 +337,29 @@ export function applyDirection(code: string) {
 
 applyDirection(current);
 
+const listeners = new Set<() => void>();
+
 export function setLocale(code: string) {
-  if (DICTS[code]) {
+  if (DICTS[code] && code !== current) {
     current = code;
     applyDirection(code);
+    listeners.forEach((fn) => fn());
   }
 }
 
 export function getLocale(): string {
   return current;
+}
+
+/** Re-render a component whenever the app language changes (keeps tab labels etc. in sync). */
+export function useLocale(): string {
+  return useSyncExternalStore(
+    (fn) => {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+    () => current,
+  );
 }
 
 export function isRTL(): boolean {
