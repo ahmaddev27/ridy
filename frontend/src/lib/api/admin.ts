@@ -97,6 +97,10 @@ export type PlatformSettings = {
   has_resend_key: boolean;
   support_email: string | null;
   support_whatsapp: string | null;
+  app_min_android: string | null;
+  app_min_ios: string | null;
+  app_android_store_url: string | null;
+  app_ios_store_url: string | null;
 };
 
 export type UpdateSettingsInput = Partial<{
@@ -111,6 +115,10 @@ export type UpdateSettingsInput = Partial<{
   resend_api_key: string; // only when changing
   support_email: string;
   support_whatsapp: string;
+  app_min_android: string | null;
+  app_min_ios: string | null;
+  app_android_store_url: string | null;
+  app_ios_store_url: string | null;
 }>;
 
 export async function getOverview(): Promise<AdminOverview> {

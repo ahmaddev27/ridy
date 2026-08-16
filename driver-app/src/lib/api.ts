@@ -2,6 +2,13 @@ import Constants from "expo-constants";
 
 const BASE = (Constants.expoConfig?.extra?.apiUrl as string) ?? "https://r.fleeteye.de";
 
+/** Result of the launch-time force-update check. */
+export type AppVersionInfo = {
+  update_required: boolean;
+  min_supported: string | null;
+  store_url: string | null;
+};
+
 export type Offer = {
   id: number;
   offer_uuid: string;
@@ -104,6 +111,18 @@ export class ApiClient {
       throw new ApiError(res.status, body?.message ?? "request_failed", body);
     }
     return body as T;
+  }
+
+  /** Launch-time force-update gate. Fails open (never blocks the app on error). */
+  async appVersion(platform: "android" | "ios", version: string): Promise<AppVersionInfo> {
+    try {
+      const r = await this.request<{ data: AppVersionInfo }>(
+        `/api/v1/app/version?platform=${platform}&version=${encodeURIComponent(version)}`,
+      );
+      return r.data;
+    } catch {
+      return { update_required: false, min_supported: null, store_url: null };
+    }
   }
 
   invitePreview(token: string) {

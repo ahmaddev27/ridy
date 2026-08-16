@@ -9,6 +9,7 @@ import { ToastProvider } from "@/components/toast";
 import { registerForPush } from "@/lib/push";
 import { useColors } from "@/lib/theme";
 import { useAppFonts } from "@/lib/fonts";
+import { UpdateGate } from "@/components/update-gate";
 
 export default function RootLayout() {
   // Load Tajawal in the background; never block the first render on it, so a
@@ -21,7 +22,9 @@ export default function RootLayout() {
       <AuthProvider>
         <ToastProvider>
           <StatusBar style="auto" />
-          <Gate />
+          <UpdateGate>
+            <Gate />
+          </UpdateGate>
         </ToastProvider>
       </AuthProvider>
     </SafeAreaProvider>

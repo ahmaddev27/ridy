@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Save, Mail, LifeBuoy } from "lucide-react";
+import { Loader2, Save, Mail, LifeBuoy, Smartphone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -33,6 +33,12 @@ export default function SettingsPage() {
   const [testOpen, setTestOpen] = useState(false);
   const [testTo, setTestTo] = useState("");
 
+  // Mobile driver-app force-update form.
+  const [appMinAndroid, setAppMinAndroid] = useState("");
+  const [appMinIos, setAppMinIos] = useState("");
+  const [appAndroidStoreUrl, setAppAndroidStoreUrl] = useState("");
+  const [appIosStoreUrl, setAppIosStoreUrl] = useState("");
+
   async function load() {
     const s = await getSettings();
     setSettings(s);
@@ -45,6 +51,10 @@ export default function SettingsPage() {
     setSupportEmail(s.support_email ?? "");
     setSupportWhatsapp(s.support_whatsapp ?? "");
     setProvider(s.mail_provider ?? "smtp");
+    setAppMinAndroid(s.app_min_android ?? "");
+    setAppMinIos(s.app_min_ios ?? "");
+    setAppAndroidStoreUrl(s.app_android_store_url ?? "");
+    setAppIosStoreUrl(s.app_ios_store_url ?? "");
   }
 
   useEffect(() => {
@@ -108,6 +118,24 @@ export default function SettingsPage() {
     }
   }
 
+
+  async function saveMobileApp() {
+    setBusy(true);
+    try {
+      await updateSettings({
+        app_min_android: appMinAndroid.trim() || null,
+        app_min_ios: appMinIos.trim() || null,
+        app_android_store_url: appAndroidStoreUrl.trim() || null,
+        app_ios_store_url: appIosStoreUrl.trim() || null,
+      });
+      toast.success(c("saved"));
+      await load();
+    } catch (e) {
+      toast.error(c("saveFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -206,6 +234,27 @@ export default function SettingsPage() {
         </div>
         <div className="mt-4 flex justify-end">
           <Button onClick={saveSupport} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {c("save")}
+          </Button>
+        </div>
+      </Card>
+
+      {/* Mobile driver-app force-update */}
+      <Card className="w-full p-5">
+        <div className="mb-1 flex items-center gap-2">
+          <Smartphone className="h-4 w-4 text-ink" />
+          <h3 className="font-semibold text-ink">{c("mobileApp")}</h3>
+        </div>
+        <p className="mb-3 text-sm text-ink-muted">{c("mobileAppHint")}</p>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Field label={c("appMinAndroid")} value={appMinAndroid} onChange={setAppMinAndroid} placeholder="1.0.0" />
+          <Field label={c("appMinIos")} value={appMinIos} onChange={setAppMinIos} placeholder="1.0.0" />
+          <Field label={c("appAndroidStoreUrl")} type="url" value={appAndroidStoreUrl} onChange={setAppAndroidStoreUrl} placeholder="https://play.google.com/store/apps/details?id=…" />
+          <Field label={c("appIosStoreUrl")} type="url" value={appIosStoreUrl} onChange={setAppIosStoreUrl} placeholder="https://apps.apple.com/app/id…" />
+        </div>
+        <div className="mt-4 flex justify-end">
+          <Button onClick={saveMobileApp} disabled={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {c("save")}
           </Button>

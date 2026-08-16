@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\Admin\SettingsController;
 use App\Http\Controllers\Api\V1\Admin\SubscriptionController;
 use App\Http\Controllers\Api\V1\Admin\SystemHealthController;
 use App\Http\Controllers\Api\V1\Admin\UserDirectoryController;
+use App\Http\Controllers\Api\V1\AppVersionController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CompanyActivationController;
@@ -52,6 +53,9 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     Route::get('health', HealthController::class);
     Route::post('login', [AuthController::class, 'login']);
+
+    // Public force-update gate for the mobile driver app (checked on launch).
+    Route::get('app/version', [AppVersionController::class, 'check'])->middleware('throttle:60,1');
 
     // Public company self-registration (email OTP).
     Route::post('register', [RegistrationController::class, 'start'])->middleware('throttle:6,1');
