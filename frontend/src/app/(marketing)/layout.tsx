@@ -5,6 +5,7 @@ import { MobileNav } from "./_components/mobile-nav";
 
 const NAV_LINKS = [
   { href: "/#funktionen", label: "Funktionen" },
+  { href: "/#preise", label: "Preise" },
   { href: "/faq", label: "FAQ" },
   { href: "/datenschutz", label: "Datenschutz" },
 ];
@@ -14,6 +15,7 @@ const FOOTER_COLUMNS: { title: string; links: { href: string; label: string }[] 
     title: "Produkt",
     links: [
       { href: "/#funktionen", label: "Funktionen" },
+      { href: "/#preise", label: "Preise" },
       { href: "/#ablauf", label: "Ablauf" },
       { href: "/faq", label: "FAQ" },
       { href: "/login", label: "Anmelden" },
