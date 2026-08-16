@@ -3,6 +3,16 @@
 type Dict = Record<string, unknown>;
 
 const en: Dict = {
+  systemHealth: {
+    colCompany: "Company", colSubscription: "Subscription", colSession: "Uber session", colDaemon: "Daemon", colProxy: "Proxy",
+    ok: "OK", down: "Down", noSession: "No session", noProxy: "No proxy",
+    daysLeft: "{n}d left", expired: "Expired", openEnded: "Open-ended",
+    lastSeen: "Last seen {t}", lastHeartbeat: "Heartbeat {t}", never: "never", proxyExpires: "Expires {d}",
+    st_active: "Active", st_expired: "Expired", st_needs_relink: "Needs re-link",
+    st_disabled: "Disabled", st_banned: "Banned", st_inactive: "Not activated",
+    emptyTitle: "No companies", emptyDesc: "Companies appear here once they register.",
+    loadError: "Couldn’t load system health",
+  },
   banned: { reactivate: "Reactivate", reactivated: "Company reactivated", failed: "Action failed", emptyTitle: "No banned companies", emptyDesc: "Companies locked out will appear here.", colCompany: "Company", colOwner: "Owner", colPhone: "Phone" },
   proxies: { add: "Add proxy", edit: "Edit proxy", delete: "Delete", cancel: "Cancel", save: "Save", saved: "Proxy saved", failed: "Action failed", deleted: "Proxy deleted", deleteConfirm: "Delete proxy {label}? Assigned companies fall back to the global proxy.", nearFull: "Near full", emptyTitle: "No proxies", emptyDesc: "Add a residential proxy so new companies get assigned automatically.", colLabel: "Label", colUrl: "URL", colUsage: "Usage", colCost: "Cost", fieldLabel: "Label", fieldUrl: "Proxy URL", fieldCapacity: "Capacity (companies)", fieldExpires: "Our expiry date", fieldNotes: "Notes", fieldPrice: "Paid price (€)", fieldSource: "Purchase source", sourcePlaceholder: "e.g. Bright Data, IPRoyal…", expiresIn: "{n}d left", expired: "Expired" },
   collectors: {
@@ -172,6 +182,16 @@ const en: Dict = {
 };
 
 const de: Dict = {
+  systemHealth: {
+    colCompany: "Firma", colSubscription: "Abonnement", colSession: "Uber-Sitzung", colDaemon: "Daemon", colProxy: "Proxy",
+    ok: "OK", down: "Aus", noSession: "Keine Sitzung", noProxy: "Kein Proxy",
+    daysLeft: "{n}T übrig", expired: "Abgelaufen", openEnded: "Unbefristet",
+    lastSeen: "Zuletzt {t}", lastHeartbeat: "Heartbeat {t}", never: "nie", proxyExpires: "Läuft ab {d}",
+    st_active: "Aktiv", st_expired: "Abgelaufen", st_needs_relink: "Neu verbinden",
+    st_disabled: "Deaktiviert", st_banned: "Gesperrt", st_inactive: "Nicht aktiviert",
+    emptyTitle: "Keine Firmen", emptyDesc: "Firmen erscheinen hier nach der Registrierung.",
+    loadError: "Systemstatus konnte nicht geladen werden",
+  },
   banned: { reactivate: "Reaktivieren", reactivated: "Firma reaktiviert", failed: "Aktion fehlgeschlagen", emptyTitle: "Keine gesperrten Firmen", emptyDesc: "Gesperrte Firmen erscheinen hier.", colCompany: "Firma", colOwner: "Inhaber", colPhone: "Telefon" },
   proxies: { add: "Proxy hinzufügen", edit: "Proxy bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", saved: "Proxy gespeichert", failed: "Aktion fehlgeschlagen", deleted: "Proxy gelöscht", deleteConfirm: "Proxy {label} löschen? Zugewiesene Firmen nutzen den globalen Proxy.", nearFull: "Fast voll", emptyTitle: "Keine Proxys", emptyDesc: "Füge einen Residential-Proxy hinzu, damit neue Firmen automatisch zugewiesen werden.", colLabel: "Label", colUrl: "URL", colUsage: "Auslastung", colCost: "Kosten", fieldLabel: "Label", fieldUrl: "Proxy-URL", fieldCapacity: "Kapazität (Firmen)", fieldExpires: "Unser Ablaufdatum", fieldNotes: "Notizen", fieldPrice: "Gezahlter Preis (€)", fieldSource: "Bezugsquelle", sourcePlaceholder: "z. B. Bright Data, IPRoyal…", expiresIn: "{n}T übrig", expired: "Abgelaufen" },
   collectors: {
@@ -339,6 +359,16 @@ const de: Dict = {
 };
 
 const ar: Dict = {
+  systemHealth: {
+    colCompany: "الشركة", colSubscription: "الاشتراك", colSession: "جلسة أوبر", colDaemon: "الخدمة", colProxy: "البروكسي",
+    ok: "سليم", down: "متوقف", noSession: "لا جلسة", noProxy: "لا بروكسي",
+    daysLeft: "باقي {n}ي", expired: "منتهٍ", openEnded: "غير محدود",
+    lastSeen: "آخر ظهور {t}", lastHeartbeat: "نبضة {t}", never: "أبداً", proxyExpires: "ينتهي {d}",
+    st_active: "نشطة", st_expired: "منتهية", st_needs_relink: "تحتاج إعادة ربط",
+    st_disabled: "معطّلة", st_banned: "محظورة", st_inactive: "غير مفعّلة",
+    emptyTitle: "لا شركات", emptyDesc: "الشركات تظهر هنا بعد تسجيلها.",
+    loadError: "تعذّر تحميل حالة النظام",
+  },
   banned: { reactivate: "إعادة تفعيل", reactivated: "تمت إعادة تفعيل الشركة", failed: "فشل الإجراء", emptyTitle: "لا شركات محظورة", emptyDesc: "الشركات المحظورة تظهر هنا.", colCompany: "الشركة", colOwner: "المالك", colPhone: "الجوال" },
   proxies: { add: "إضافة بروكسي", edit: "تعديل البروكسي", delete: "حذف", cancel: "إلغاء", save: "حفظ", saved: "تم حفظ البروكسي", failed: "فشل الإجراء", deleted: "تم حذف البروكسي", deleteConfirm: "حذف البروكسي {label}؟ الشركات المرتبطة ترجع للبروكسي العام.", nearFull: "قربت تمتلئ", emptyTitle: "لا بروكسيات", emptyDesc: "أضف بروكسي سكني عشان الشركات الجديدة تتوزّع تلقائياً.", colLabel: "الاسم", colUrl: "الرابط", colUsage: "الاستخدام", colCost: "التكلفة", fieldLabel: "الاسم", fieldUrl: "رابط البروكسي", fieldCapacity: "السعة (شركات)", fieldExpires: "تاريخ انتهاء اشتراكنا", fieldNotes: "ملاحظات", fieldPrice: "السعر المدفوع (€)", fieldSource: "مصدر الشراء", sourcePlaceholder: "مثلاً Bright Data، IPRoyal…", expiresIn: "باقي {n}ي", expired: "منتهٍ" },
   collectors: {

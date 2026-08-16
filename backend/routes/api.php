@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\ProxyController;
 use App\Http\Controllers\Api\V1\Admin\SettingsController;
 use App\Http\Controllers\Api\V1\Admin\SubscriptionController;
+use App\Http\Controllers\Api\V1\Admin\SystemHealthController;
 use App\Http\Controllers\Api\V1\Admin\UserDirectoryController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
@@ -193,6 +194,7 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(function () {
         Route::get('overview', OverviewController::class);
+        Route::get('system-health', SystemHealthController::class);
         Route::get('settings', [SettingsController::class, 'show']);
         Route::put('settings', [SettingsController::class, 'update']);
         Route::post('settings/test-email', [SettingsController::class, 'testEmail']);

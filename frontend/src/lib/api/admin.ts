@@ -118,6 +118,21 @@ export async function getOverview(): Promise<AdminOverview> {
   return res.data;
 }
 
+// ── System health (per-tenant subsystem status board) ────────────────────────
+export type SystemHealthRow = {
+  id: number;
+  name: string;
+  subscription: { state: "disabled" | "banned" | "expired" | "inactive" | null; days_left: number | null };
+  session: { status: string | null; last_seen: string | null; ok: boolean };
+  daemon: { ok: boolean; last_heartbeat: string | null };
+  proxy: { label: string | null; expires_at: string | null; ok: boolean };
+};
+
+export async function getSystemHealth(): Promise<SystemHealthRow[]> {
+  const res = await apiFetch<{ data: SystemHealthRow[] }>("/api/v1/admin/system-health");
+  return res.data;
+}
+
 export async function getSettings(): Promise<PlatformSettings> {
   const res = await apiFetch<{ data: PlatformSettings }>("/api/v1/admin/settings");
   return res.data;

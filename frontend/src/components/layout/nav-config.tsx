@@ -15,6 +15,7 @@ import {
   UserCog,
   Ticket,
   ReceiptText,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 
@@ -90,6 +91,7 @@ export const navGroups: NavGroup[] = [
     title: "navGroups.system",
     requiresRole: "super_admin",
     items: [
+      { href: "/admin/system-health", label: "nav.systemHealth", icon: Activity },
       { href: "/admin/proxies", label: "nav.proxies", icon: Plug },
       { href: "/admin/email-templates", label: "nav.emailTemplates", icon: Mail },
       { href: "/admin/settings", label: "nav.settings", icon: Settings },
