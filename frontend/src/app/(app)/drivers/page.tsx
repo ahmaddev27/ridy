@@ -43,7 +43,9 @@ export default function DriversPage() {
   }
 
   async function invite(d: Driver) {
-    if (!d.email) {
+    // The backend falls back to the Uber email when there's no login email yet,
+    // so only block when neither exists.
+    if (!d.email && !d.uber_email) {
       toast.error(t("screens.drivers.appNoEmail"));
       return;
     }
