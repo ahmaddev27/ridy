@@ -1,3 +1,4 @@
+import { cloneElement, isValidElement } from "react";
 import { Text, TextInput, StyleSheet, type TextStyle } from "react-native";
 import {
   useFonts,
@@ -45,17 +46,19 @@ export function useAppFonts(): boolean {
     for (const Comp of [Text, TextInput] as const) {
       const proto = Comp as unknown as { render?: (...args: unknown[]) => unknown };
       const original = proto.render;
-      if (!original) continue;
+      if (typeof original !== "function") continue;
       proto.render = function patchedRender(...args: unknown[]) {
-        const el = original.apply(this, args) as {
-          props: { style?: unknown };
-        } & Record<string, unknown>;
-        const flat = (StyleSheet.flatten(el.props.style) ?? {}) as TextStyle;
-        const family = flat.fontFamily ?? familyForWeight(flat.fontWeight);
-        return {
-          ...el,
-          props: { ...el.props, style: [{ fontFamily: family }, el.props.style] },
-        };
+        const el = original.apply(this, args);
+        // Defensive: only ever augment a genuine element's style; never throw.
+        try {
+          if (!isValidElement(el)) return el;
+          const style = (el.props as { style?: unknown }).style;
+          const flat = (StyleSheet.flatten(style) ?? {}) as TextStyle;
+          const family = flat.fontFamily ?? familyForWeight(flat.fontWeight);
+          return cloneElement(el, { style: [{ fontFamily: family }, style] } as never);
+        } catch {
+          return el;
+        }
       };
     }
   }

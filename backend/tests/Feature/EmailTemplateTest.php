@@ -47,15 +47,17 @@ class EmailTemplateTest extends TestCase
         $this->assertStringNotContainsString('{{driver_name}}', $html);
     }
 
-    public function test_real_email_references_the_logo_by_cid_preview_inlines_it(): void
+    public function test_real_email_references_the_hosted_logo_preview_inlines_it(): void
     {
         $this->seed(RolePermissionSeeder::class);
         $this->artisan('migrate');
         $renderer = app(EmailTemplateRenderer::class);
 
-        // Real email: logo by Content-ID (the Mailable attaches the PNG inline).
+        // Real email: logo by absolute hosted URL (reliable across every transport,
+        // including API providers like Resend where inline cid attachments break).
         $real = $renderer->render('driver_invite', []);
-        $this->assertStringContainsString('cid:reidey-logo.png', $real['html']);
+        $this->assertStringContainsString('/email/reidey-logo.png', $real['html']);
+        $this->assertStringNotContainsString('cid:reidey-logo.png', $real['html']);
 
         // Preview: inlined as a data URI so it renders in the browser.
         $preview = $renderer->render('driver_invite', [], inlineAssets: true);

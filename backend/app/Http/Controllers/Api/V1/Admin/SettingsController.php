@@ -32,6 +32,12 @@ class SettingsController extends Controller
             // Shown to suspended companies on the "contact support" screen.
             'support_email' => Settings::get('support_email'),
             'support_whatsapp' => Settings::get('support_whatsapp'),
+
+            // Mobile driver-app force-update gate (min supported version + store links).
+            'app_min_android' => Settings::get('app_min_android'),
+            'app_min_ios' => Settings::get('app_min_ios'),
+            'app_android_store_url' => Settings::get('app_android_store_url'),
+            'app_ios_store_url' => Settings::get('app_ios_store_url'),
         ]]);
     }
 
@@ -49,11 +55,16 @@ class SettingsController extends Controller
             'resend_api_key' => ['nullable', 'string', 'max:255'], // only when changing
             'support_email' => ['nullable', 'email'],
             'support_whatsapp' => ['nullable', 'string', 'max:32'],
+            'app_min_android' => ['nullable', 'string', 'max:20'],
+            'app_min_ios' => ['nullable', 'string', 'max:20'],
+            'app_android_store_url' => ['nullable', 'url', 'max:255'],
+            'app_ios_store_url' => ['nullable', 'url', 'max:255'],
         ]);
 
         $map = [
             'smtp_host', 'smtp_port', 'smtp_username', 'smtp_encryption',
             'mail_from_address', 'mail_from_name', 'mail_provider', 'support_email', 'support_whatsapp',
+            'app_min_android', 'app_min_ios', 'app_android_store_url', 'app_ios_store_url',
         ];
         $values = [];
         foreach ($map as $key) {

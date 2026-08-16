@@ -104,6 +104,7 @@ const en: Dict = {
     save: "Save", saved: "Saved", saveFailed: "Couldn’t save",
     support: "Support contacts", supportHint: "Shown to suspended companies on the contact screen.", supportEmail: "Support email", supportWhatsapp: "Support WhatsApp", globalProxy: "Global proxy", globalProxyHint: "Used by companies with no dedicated proxy.",
     proxyUrl: "Proxy URL",
+    mobileApp: "Mobile app", mobileAppHint: "Drivers on an older app version are forced to update before they can continue.", appMinAndroid: "Minimum Android version", appMinIos: "Minimum iOS version", appAndroidStoreUrl: "Google Play URL", appIosStoreUrl: "App Store URL",
   },
   profile: {
     company: "Company", name: "Name", email: "Email", newPassword: "New password",
@@ -283,6 +284,7 @@ const de: Dict = {
     save: "Speichern", saved: "Gespeichert", saveFailed: "Speichern fehlgeschlagen",
     support: "Support-Kontakte", supportHint: "Wird gesperrten Firmen auf dem Kontaktbildschirm angezeigt.", supportEmail: "Support-E-Mail", supportWhatsapp: "Support-WhatsApp", globalProxy: "Globaler Proxy", globalProxyHint: "Für Firmen ohne eigenen Proxy.",
     proxyUrl: "Proxy-URL",
+    mobileApp: "Mobile App", mobileAppHint: "Fahrer mit einer älteren App-Version müssen aktualisieren, bevor sie fortfahren können.", appMinAndroid: "Mindest-Android-Version", appMinIos: "Mindest-iOS-Version", appAndroidStoreUrl: "Google-Play-URL", appIosStoreUrl: "App-Store-URL",
   },
   profile: {
     company: "Firma", name: "Name", email: "E-Mail", newPassword: "Neues Passwort",
@@ -460,6 +462,7 @@ const ar: Dict = {
     save: "حفظ", saved: "تم الحفظ", saveFailed: "تعذّر الحفظ",
     support: "جهات الدعم", supportHint: "تظهر للشركات المحظورة في شاشة التواصل.", supportEmail: "إيميل الدعم", supportWhatsapp: "واتساب الدعم", globalProxy: "البروكسي العام", globalProxyHint: "يُستعمل للشركات اللي مالها بروكسي خاص.",
     proxyUrl: "رابط البروكسي",
+    mobileApp: "تطبيق الموبايل", mobileAppHint: "السائقون على إصدار أقدم من التطبيق يُجبَرون على التحديث قبل المتابعة.", appMinAndroid: "أدنى إصدار أندرويد", appMinIos: "أدنى إصدار iOS", appAndroidStoreUrl: "رابط Google Play", appIosStoreUrl: "رابط App Store",
   },
   profile: {
     company: "الشركة", name: "الاسم", email: "البريد", newPassword: "كلمة مرور جديدة",

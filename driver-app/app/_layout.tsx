@@ -9,17 +9,22 @@ import { ToastProvider } from "@/components/toast";
 import { registerForPush } from "@/lib/push";
 import { useColors } from "@/lib/theme";
 import { useAppFonts } from "@/lib/fonts";
+import { UpdateGate } from "@/components/update-gate";
 
 export default function RootLayout() {
-  const fontsLoaded = useAppFonts();
-  if (!fontsLoaded) return null; // brief splash until Tajawal is ready
+  // Load Tajawal in the background; never block the first render on it, so a
+  // slow/failed font load can't leave the app on a blank white screen. Text
+  // re-renders with the font once it's ready.
+  useAppFonts();
 
   return (
     <SafeAreaProvider>
       <AuthProvider>
         <ToastProvider>
           <StatusBar style="auto" />
-          <Gate />
+          <UpdateGate>
+            <Gate />
+          </UpdateGate>
         </ToastProvider>
       </AuthProvider>
     </SafeAreaProvider>
