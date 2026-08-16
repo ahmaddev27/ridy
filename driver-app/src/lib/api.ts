@@ -61,6 +61,9 @@ export type PaginationMeta = {
 
 /** Thin fetch wrapper: JSON in/out, bearer token, unwraps the `{data}` envelope. */
 export class ApiClient {
+  /** Called when the company's subscription lapsed (403) or the token is dead (401). */
+  onSessionInvalid: ((reason: string | null) => void) | null = null;
+
   constructor(private token: string | null = null) {}
 
   setToken(token: string | null) {
@@ -80,6 +83,11 @@ export class ApiClient {
 
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
+      // A suspended company (403) or a dead token (401) ends the session — the app
+      // clears it and returns the driver to the sign-in screen with the reason.
+      if ((res.status === 403 && body?.message === "account_suspended") || res.status === 401) {
+        this.onSessionInvalid?.(body?.reason ?? null);
+      }
       throw new ApiError(res.status, body?.message ?? "request_failed", body);
     }
     return body as T;

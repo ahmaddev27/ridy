@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureDriverTenantActive;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\VerifyDispatchSecret;
 use Illuminate\Foundation\Application;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'dispatch.secret' => VerifyDispatchSecret::class,
             'super.admin' => EnsureSuperAdmin::class,
+            'driver.active' => EnsureDriverTenantActive::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

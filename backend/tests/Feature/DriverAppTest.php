@@ -141,6 +141,19 @@ class DriverAppTest extends TestCase
         $this->assertCount(1, $res->json('data'));
     }
 
+    public function test_suspended_company_blocks_the_driver_app(): void
+    {
+        $driver = $this->driver(['activated_at' => now()]);
+        // Company subscription lapsed.
+        $this->tenant->forceFill(['subscription_ends_at' => now()->subDay()])->save();
+
+        Sanctum::actingAs($driver, guard: 'driver');
+
+        $this->getJson('/api/v1/driver/home')->assertStatus(403)->assertJsonPath('message', 'account_suspended');
+        // Logout still works so the app can clear its token.
+        $this->postJson('/api/v1/driver/logout')->assertOk();
+    }
+
     public function test_home_returns_today_summary_active_offer_and_recent(): void
     {
         $driver = $this->driver(['activated_at' => now()]);

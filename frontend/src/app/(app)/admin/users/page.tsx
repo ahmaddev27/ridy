@@ -227,6 +227,7 @@ export default function UsersPage() {
         onClose={() => setBroadcastOpen(false)}
         selectedIds={Array.from(selected)}
         t={(k) => c(`broadcast.${k}`)}
+        roleLabel={(r) => c(`role_${r}`)}
       />
     </div>
   );
