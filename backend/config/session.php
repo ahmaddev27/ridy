@@ -156,7 +156,11 @@ return [
     |
     */
 
-    'domain' => env('SESSION_DOMAIN'),
+    // An empty SESSION_DOMAIN (used when serving several domains at once) must
+    // become null, not "", so the session cookie is host-only and valid on each
+    // domain. An empty-string domain breaks cookie scoping (login works but the
+    // next request is Unauthenticated).
+    'domain' => env('SESSION_DOMAIN') ?: null,
 
     /*
     |--------------------------------------------------------------------------
