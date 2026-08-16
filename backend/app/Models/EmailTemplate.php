@@ -24,5 +24,6 @@ class EmailTemplate extends Model
         'driver_invite' => ['company_name', 'driver_name', 'invite_link'],
         'company_otp' => ['name', 'otp'],
         'password_otp' => ['name', 'otp'],
+        'notification' => ['title', 'body', 'action_url', 'action_label'],
     ];
 }

@@ -52,6 +52,31 @@ class DriverAppTest extends TestCase
         $this->assertSame('invited', $driver->appStatus());
     }
 
+    public function test_invite_falls_back_to_the_uber_email(): void
+    {
+        // No login email yet, but an Uber email captured on linking.
+        $driver = $this->driver(['email' => null, 'uber_email' => 'omar.uber@gmail.com']);
+
+        $this->invitationService()->invite($driver);
+
+        $driver->refresh();
+        $this->assertSame('omar.uber@gmail.com', $driver->email, 'Uber email becomes the login email');
+        $this->assertNotNull($driver->invite_token);
+    }
+
+    public function test_expired_invite_link_is_rejected(): void
+    {
+        $driver = $this->driver();
+        $this->invitationService()->invite($driver);
+        // Age the invite past its TTL.
+        $driver->forceFill(['invited_at' => now()->subDays(8)])->save();
+
+        $this->postJson('/api/v1/driver/activate', [
+            'token' => $driver->fresh()->invite_token,
+            'password' => 'secret123',
+        ])->assertNotFound();
+    }
+
     public function test_activate_consumes_token_and_returns_bearer_token(): void
     {
         $driver = $this->driver();
