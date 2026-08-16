@@ -27,7 +27,12 @@ x-app-env: &app-env
   DB_USERNAME: ${DB_USERNAME}
   DB_PASSWORD: ${DB_PASSWORD}
   DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
-  FCM_SERVER_KEY: ${FCM_SERVER_KEY}
+  # FCM HTTP v1 (OAuth2 service-account) — used by FcmPushSender for driver + web
+  # push. Point FCM_CREDENTIALS at the mounted service-account JSON. Without it the
+  # app falls back to LogPushSender (pushes are only logged, not sent).
+  FCM_CREDENTIALS: ${FCM_CREDENTIALS:-}
+  FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+  FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
   # Fixed OTP for testing — leave OTP_TEST_CODE unset in prod for random codes.
   OTP_TEST_CODE: ${OTP_TEST_CODE:-}
 
