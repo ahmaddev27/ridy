@@ -3,7 +3,7 @@
 #                               cookies just work)
 #   everything else          -> the Next.js dashboard
 #
-# {$SITE_ADDRESS} comes from the environment (e.g. r.fleeteye.de). Set it to
+# {$SITE_ADDRESS} comes from the environment (e.g. reidey.de). Set it to
 # :80 for a quick HTTP-only test without a domain.
 
 {$SITE_ADDRESS} {

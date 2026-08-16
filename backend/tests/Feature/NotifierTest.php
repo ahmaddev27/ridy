@@ -114,13 +114,13 @@ class NotifierTest extends TestCase
         $rendered = app(EmailTemplateRenderer::class)->render('notification', [
             'title' => 'Subscription expired',
             'body' => 'Your subscription has expired.',
-            'action_url' => 'https://r.fleeteye.de/subscription',
+            'action_url' => 'https://reidey.de/subscription',
             'action_label' => 'Open',
         ]);
 
         $this->assertStringContainsString('Subscription expired', $rendered['subject']);
         $this->assertStringContainsString('Your subscription has expired.', $rendered['html']);
-        $this->assertStringContainsString('https://r.fleeteye.de/subscription', $rendered['html']);
+        $this->assertStringContainsString('https://reidey.de/subscription', $rendered['html']);
     }
 
     public function test_dedupe_skips_a_second_unread_of_the_same_type(): void

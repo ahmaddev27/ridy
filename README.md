@@ -7,7 +7,7 @@
 <p align="center"><strong>Catch every Uber offer in the 5-second window.</strong><br>
 A multi-tenant SaaS for German Uber fleet operators — it captures each company's live Uber dispatch <em>offer</em> stream server-side and pushes every offer to the right driver instantly.</p>
 
-<p align="center">Domain: <a href="https://r.fleeteye.de">r.fleeteye.de</a></p>
+<p align="center">Domain: <a href="https://reidey.de">reidey.de</a></p>
 
 ---
 

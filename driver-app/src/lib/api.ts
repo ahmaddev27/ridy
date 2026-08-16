@@ -1,6 +1,6 @@
 import Constants from "expo-constants";
 
-const BASE = (Constants.expoConfig?.extra?.apiUrl as string) ?? "https://r.fleeteye.de";
+const BASE = (Constants.expoConfig?.extra?.apiUrl as string) ?? "https://reidey.de";
 
 /** Result of the launch-time force-update check. */
 export type AppVersionInfo = {

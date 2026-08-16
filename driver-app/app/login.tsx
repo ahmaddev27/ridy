@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { View, Text, KeyboardAvoidingView, Platform, Pressable, Alert } from "react-native";
+import { View, KeyboardAvoidingView, Platform, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Text } from "@/components/typography";
 import { useAuth } from "@/lib/auth";
 import { t } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";

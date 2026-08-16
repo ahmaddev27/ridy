@@ -1,8 +1,6 @@
 import {
   ActivityIndicator,
   Pressable,
-  Text,
-  TextInput,
   View,
   type TextInputProps,
   type ViewStyle,
@@ -10,6 +8,7 @@ import {
 import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
+import { Text, TextInput } from "@/components/typography";
 import { useColors, radius, statusColors, type Palette } from "@/lib/theme";
 import { isRTL } from "@/lib/i18n";
 

@@ -19,7 +19,7 @@ class TripGeocoder
 
     private const OSRM = 'https://router.project-osrm.org/route/v1/driving';
 
-    private const UA = 'Reidey/1.0 (fleet dispatch; contact: ops@fleeteye.de)';
+    private const UA = 'Reidey/1.0 (fleet dispatch; contact: ops@reidey.de)';
 
     /** Give up (mark synced) after this many failed attempts, so we don't retry forever. */
     private const MAX_ATTEMPTS = 5;

@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
-import { View, Text, ScrollView, RefreshControl, Pressable } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { View, ScrollView, RefreshControl, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Text } from "@/components/typography";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { api, type HomeData, type FleetHomeData, type Offer } from "@/lib/api";
@@ -80,6 +81,9 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Weekly earnings — bars bucketed client-side by weekday of the current week. */}
+        <WeeklyChart offers={recent} />
+
         {/* Driver: personal active offer. Owner: active trips across the fleet. */}
         {!isOwner && active && <ActiveOffer offer={active} onPress={() => router.push(`/offer/${active.id}`)} />}
 
@@ -113,6 +117,74 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/** German weekday abbreviations, Monday-first, matching the design. */
+const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] as const;
+
+/** Monday-first weekday index (0 = Mon … 6 = Sun) for a given date. */
+function mondayIndex(d: Date): number {
+  return (d.getDay() + 6) % 7;
+}
+
+/**
+ * Weekly bar chart: buckets completed/taken offers' fares by weekday of the
+ * current week (Mon–Sun). Today's bar is highlighted in ink; the rest use the
+ * muted surface fill. Days with no data render a minimal baseline bar.
+ */
+function WeeklyChart({ offers }: { offers: Offer[] }) {
+  const c = useColors();
+
+  const totals = useMemo(() => {
+    const buckets = [0, 0, 0, 0, 0, 0, 0];
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(now.getDate() - mondayIndex(now));
+    const nextMonday = new Date(monday);
+    nextMonday.setDate(monday.getDate() + 7);
+
+    for (const o of offers) {
+      if (!o.received_at || o.fare_amount == null) continue;
+      if (o.status === "rejected" || o.status === "canceled") continue;
+      const at = new Date(o.received_at);
+      if (at < monday || at >= nextMonday) continue;
+      buckets[mondayIndex(at)] += o.fare_amount;
+    }
+    return buckets;
+  }, [offers]);
+
+  const max = Math.max(...totals, 1);
+  const todayIdx = mondayIndex(new Date());
+
+  return (
+    <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, padding: 18, gap: 14 }}>
+      <SectionLabel>{t("home.week")}</SectionLabel>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", height: 132, gap: 10 }}>
+        {WEEKDAYS.map((label, i) => {
+          const isToday = i === todayIdx;
+          const barHeight = 10 + (totals[i] / max) * 92;
+          return (
+            <View key={label} style={{ flex: 1, alignItems: "center", gap: 8 }}>
+              <View style={{ flex: 1, width: "100%", justifyContent: "flex-end", alignItems: "center" }}>
+                <View
+                  style={{
+                    height: barHeight,
+                    width: "100%",
+                    borderRadius: radius.sm,
+                    backgroundColor: isToday ? c.ink : c.surface2,
+                  }}
+                />
+              </View>
+              <Text style={{ color: isToday ? c.ink : c.inkMuted, fontSize: 12, fontWeight: isToday ? "700" : "500" }}>
+                {label}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 

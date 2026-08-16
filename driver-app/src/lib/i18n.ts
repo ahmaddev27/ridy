@@ -85,6 +85,7 @@ const de: Dict = {
   "home.today": "Heute",
   "home.activeOffer": "Aktives Angebot",
   "home.recent": "Letzte Angebote",
+  "home.week": "Diese Woche",
   "home.empty": "Noch keine Angebote heute",
   // Stat cards
   "stat.offers": "Angebote",
@@ -193,6 +194,7 @@ const en: Dict = {
   "home.today": "Today",
   "home.activeOffer": "Active offer",
   "home.recent": "Recent offers",
+  "home.week": "This week",
   "home.empty": "No offers yet today",
   // Stat cards
   "stat.offers": "Offers",
@@ -301,6 +303,7 @@ const ar: Dict = {
   "home.today": "اليوم",
   "home.activeOffer": "العرض الحالي",
   "home.recent": "أحدث العروض",
+  "home.week": "هذا الأسبوع",
   "home.empty": "لا عروض اليوم بعد",
   // Stat cards
   "stat.offers": "العروض",

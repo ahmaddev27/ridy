@@ -1,4 +1,4 @@
-# دليل النشر — Ridy على VPS جديد (`r.fleeteye.de`)
+# دليل النشر — Ridy على VPS جديد (`reidey.de`)
 
 > **الطريقة:** Docker Compose + Caddy (شهادة HTTPS تلقائية). أنت تنفّذ على السيرفر؛ المطوّر يوجّه.
 > **الملفات:** [docker-compose.prod.yml](../docker-compose.prod.yml) · [.env.prod.example](../.env.prod.example) · [docker/Caddyfile](../docker/Caddyfile)
@@ -27,7 +27,7 @@
 
 ## المتطلّبات
 
-- VPS لينكس (Ubuntu 22.04+ موصى) + دومين `r.fleeteye.de` يشير لـIP السيرفر (سجل DNS **A**).
+- VPS لينكس (Ubuntu 22.04+ موصى) + دومين `reidey.de` يشير لـIP السيرفر (سجل DNS **A**).
 - منفذا **80** و**443** مفتوحين (Caddy يحتاجهم للشهادة).
 
 ---
@@ -37,10 +37,10 @@
 في مزوّد الدومين، اعمل سجل **A**:
 
 ```
-r.fleeteye.de   A   <IP-السيرفر>
+reidey.de   A   <IP-السيرفر>
 ```
 
-تأكّد (من جهازك): `ping r.fleeteye.de` يرجّع IP السيرفر.
+تأكّد (من جهازك): `ping reidey.de` يرجّع IP السيرفر.
 
 ---
 
@@ -83,7 +83,7 @@ cp .env.prod.example .env
 nano .env            # املأ القيم
 ```
 
-**عبّئ:** `DOMAIN` + `SITE_ADDRESS` = `r.fleeteye.de` · كلمات مرور DB قوية · `DISPATCH_INGEST_SECRET` (أي نص عشوائي طويل).
+**عبّئ:** `DOMAIN` + `SITE_ADDRESS` = `reidey.de` · كلمات مرور DB قوية · `DISPATCH_INGEST_SECRET` (أي نص عشوائي طويل).
 
 ولّد `APP_KEY`:
 
@@ -120,8 +120,8 @@ docker compose -f docker-compose.prod.yml exec backend php artisan migrate --for
 
 ## 7. التحقّق
 
-- افتح `https://r.fleeteye.de` → لازم تشوف لوحة Ridy (بشهادة صالحة 🔒).
-- `https://r.fleeteye.de/api/v1/health` → `{"status":"ok"}`.
+- افتح `https://reidey.de` → لازم تشوف لوحة Ridy (بشهادة صالحة 🔒).
+- `https://reidey.de/api/v1/health` → `{"status":"ok"}`.
 
 ---
 
@@ -133,7 +133,7 @@ docker compose -f docker-compose.prod.yml exec backend php artisan migrate --for
 2. لوحة Ridy → **Uber-Verbindung** → «Uber öffnen & verbinden» → يسجّل دخول أوبر عادي → الجلسة تُلتقط.
 3. الـ`dispatch-daemon` يمسك التيار تلقائياً ويجيب العروض.
 
-> الإضافة معدّة أصلاً لـ`https://r.fleeteye.de` ضمن `host_permissions`.
+> الإضافة معدّة أصلاً لـ`https://reidey.de` ضمن `host_permissions`.
 
 ---
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { View, Text, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
+import { View, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
 import { useLocalSearchParams } from "expo-router";
+import { Text } from "@/components/typography";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { t, isRTL } from "@/lib/i18n";

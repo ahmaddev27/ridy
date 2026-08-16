@@ -29,9 +29,9 @@ npx expo run:android      # or run:ios
 
 ## Configuration
 
-- **API base URL** — `app.json` → `expo.extra.apiUrl` (defaults to `https://r.fleeteye.de`).
+- **API base URL** — `app.json` → `expo.extra.apiUrl` (defaults to `https://reidey.de`).
 - **Deep link** — scheme `reidey://`. The invitation email links to
-  `https://r.fleeteye.de/driver/activate?token=…`; wire your universal link (or
+  `https://reidey.de/driver/activate?token=…`; wire your universal link (or
   test with `npx uri-scheme open "reidey://activate?token=XYZ" --android`).
 - **FCM** — drop the Firebase Android `google-services.json` (and iOS
   `GoogleService-Info.plist`) into this folder. They are git-ignored.

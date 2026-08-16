@@ -19,8 +19,9 @@ const tajawal = Tajawal({
 });
 
 export const metadata: Metadata = {
-  title: "Reidey — Fleet Management",
-  description: "Capture live Uber fleet dispatch offers and route them to your drivers.",
+  title: "Reidey · Flottenmanagement",
+  description:
+    "Reidey ist die Flottenmanagement-Plattform für moderne Fahrdienst-Flotten: Fahrerverwaltung, Echtzeit-Benachrichtigungen, Live-Karte, Abrechnung und mehr.",
 };
 
 export default function RootLayout({

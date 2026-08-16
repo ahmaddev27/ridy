@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, ScrollView, Pressable, Modal } from "react-native";
+import { View, ScrollView, Pressable, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Text } from "@/components/typography";
 import { Ionicons } from "@expo/vector-icons";
 import { api, type DriverStats } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
