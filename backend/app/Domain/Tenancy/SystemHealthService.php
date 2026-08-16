@@ -4,7 +4,7 @@ namespace App\Domain\Tenancy;
 
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Tenancy\Models\Tenant;
-use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 
 /**
  * Builds the super-admin "System Health" report: one row per tenant with the
@@ -20,7 +20,7 @@ class SystemHealthService
     /** @return array<int, array<string, mixed>> */
     public function report(): array
     {
-        $now = CarbonImmutable::now();
+        $now = now();
 
         $tenants = Tenant::query()->with('proxy')->get();
         $sessions = UberFleetSession::withoutGlobalScopes()
@@ -41,7 +41,7 @@ class SystemHealthService
     }
 
     /** @return array<string, mixed> */
-    private function row(Tenant $tenant, ?UberFleetSession $session, CarbonImmutable $now): array
+    private function row(Tenant $tenant, ?UberFleetSession $session, CarbonInterface $now): array
     {
         $subscription = $this->subscription($tenant);
         $sessionHealth = $this->session($session, $now);
@@ -70,7 +70,7 @@ class SystemHealthService
     }
 
     /** @return array{status: string|null, last_seen: string|null, ok: bool} */
-    private function session(?UberFleetSession $session, CarbonImmutable $now): array
+    private function session(?UberFleetSession $session, CarbonInterface $now): array
     {
         if ($session === null) {
             return ['status' => null, 'last_seen' => null, 'ok' => false];
@@ -85,7 +85,7 @@ class SystemHealthService
     }
 
     /** @return array{ok: bool, last_heartbeat: string|null} */
-    private function daemon(?UberFleetSession $session, CarbonImmutable $now): array
+    private function daemon(?UberFleetSession $session, CarbonInterface $now): array
     {
         $lastHeartbeat = $session?->last_event_at;
 
@@ -96,7 +96,7 @@ class SystemHealthService
     }
 
     /** @return array{label: string|null, expires_at: string|null, ok: bool} */
-    private function proxy(Tenant $tenant, CarbonImmutable $now): array
+    private function proxy(Tenant $tenant, CarbonInterface $now): array
     {
         $proxy = $tenant->proxy;
 
@@ -113,7 +113,7 @@ class SystemHealthService
         ];
     }
 
-    private function isFresh(?CarbonImmutable $timestamp, CarbonImmutable $now): bool
+    private function isFresh(?CarbonInterface $timestamp, CarbonInterface $now): bool
     {
         if ($timestamp === null) {
             return false;
