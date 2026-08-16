@@ -19,7 +19,7 @@ export type Driver = {
   location_updated_at: string | null;
   email: string | null;
   /** Mobile-app onboarding state. */
-  app_status: "none" | "invited" | "active";
+  app_status: "none" | "invited" | "invite_expired" | "active";
 };
 
 export async function listDrivers(): Promise<Driver[]> {

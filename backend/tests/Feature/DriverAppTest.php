@@ -52,6 +52,16 @@ class DriverAppTest extends TestCase
         $this->assertSame('invited', $driver->appStatus());
     }
 
+    public function test_app_status_reports_expired_invite(): void
+    {
+        $driver = $this->driver();
+        $this->invitationService()->invite($driver);
+        $this->assertSame('invited', $driver->fresh()->appStatus());
+
+        $driver->forceFill(['invited_at' => now()->subDays(8)])->save();
+        $this->assertSame('invite_expired', $driver->fresh()->appStatus());
+    }
+
     public function test_invite_falls_back_to_the_uber_email(): void
     {
         // No login email yet, but an Uber email captured on linking.
