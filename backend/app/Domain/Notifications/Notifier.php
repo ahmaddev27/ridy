@@ -22,6 +22,24 @@ class Notifier
     /** Frequent/low-value events that stay in-app only — never emailed. */
     private const EMAIL_SKIP = ['session_connected'];
 
+    /**
+     * User-configurable notification categories (the bell is always on; these
+     * gate the web-push and email channels). "broadcast" is intentionally absent:
+     * admin broadcasts always deliver and are never shown as a toggle.
+     */
+    public const CATEGORIES = ['sessions', 'subscription', 'platform', 'codes'];
+
+    /** Notification type => preference category. subscription_* handled by prefix. */
+    private const TYPE_CATEGORY = [
+        'session_connected' => 'sessions',
+        'session_needs_relink' => 'sessions',
+        'company_registered' => 'platform',
+        'company_banned' => 'platform',
+        'proxy_expiring' => 'platform',
+        'code_activated' => 'codes',
+        'admin_broadcast' => 'broadcast',
+    ];
+
     /** Localized label for the email call-to-action button. */
     private const OPEN_LABEL = ['de' => 'Öffnen', 'en' => 'Open', 'ar' => 'فتح'];
 
@@ -63,10 +81,28 @@ class Notifier
             $user->notify(new AppNotification($type, $params, $href));
 
             if ($push) {
-                $this->webPush($user, $type, $params, $href);
-                $this->email($user, $type, $params, $href);
+                // Admin broadcasts always deliver, ignoring user channel prefs.
+                $forced = $type === 'admin_broadcast';
+                $category = self::categoryFor($type);
+
+                if ($forced || $user->wantsChannel('push', $category)) {
+                    $this->webPush($user, $type, $params, $href);
+                }
+                if ($forced || $user->wantsChannel('email', $category)) {
+                    $this->email($user, $type, $params, $href);
+                }
             }
         }
+    }
+
+    /** Resolve a notification type to its user-facing preference category. */
+    public static function categoryFor(string $type): string
+    {
+        if (str_starts_with($type, 'subscription_')) {
+            return 'subscription';
+        }
+
+        return self::TYPE_CATEGORY[$type] ?? 'platform';
     }
 
     /** Also deliver important events by email, in the user's language. */

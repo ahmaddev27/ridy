@@ -107,7 +107,7 @@ const en: Dict = {
   },
   profile: {
     company: "Company", name: "Name", email: "Email", newPassword: "New password",
-    leaveEmpty: "Leave empty to keep current", tab_info: "Personal info", tab_password: "Password", confirmPassword: "Confirm password", changePassword: "Change password", passwordChanged: "Password changed", mismatch: "Passwords do not match.", save: "Save", saved: "Saved", saveFailed: "Couldn’t save",
+    leaveEmpty: "Leave empty to keep current", tab_info: "Personal info", tab_password: "Password", tab_notifications: "Notifications", confirmPassword: "Confirm password", changePassword: "Change password", passwordChanged: "Password changed", mismatch: "Passwords do not match.", save: "Save", saved: "Saved", saveFailed: "Couldn’t save",
   },
   companies: {
     newCompany: "New company",
@@ -286,7 +286,7 @@ const de: Dict = {
   },
   profile: {
     company: "Firma", name: "Name", email: "E-Mail", newPassword: "Neues Passwort",
-    leaveEmpty: "Leer lassen, um beizubehalten", tab_info: "Persönliche Daten", tab_password: "Passwort", confirmPassword: "Passwort bestätigen", changePassword: "Passwort ändern", passwordChanged: "Passwort geändert", mismatch: "Passwörter stimmen nicht überein.", save: "Speichern", saved: "Gespeichert", saveFailed: "Speichern fehlgeschlagen",
+    leaveEmpty: "Leer lassen, um beizubehalten", tab_info: "Persönliche Daten", tab_password: "Passwort", tab_notifications: "Benachrichtigungen", confirmPassword: "Passwort bestätigen", changePassword: "Passwort ändern", passwordChanged: "Passwort geändert", mismatch: "Passwörter stimmen nicht überein.", save: "Speichern", saved: "Gespeichert", saveFailed: "Speichern fehlgeschlagen",
   },
   companies: {
     newCompany: "Neue Firma",
@@ -463,7 +463,7 @@ const ar: Dict = {
   },
   profile: {
     company: "الشركة", name: "الاسم", email: "البريد", newPassword: "كلمة مرور جديدة",
-    leaveEmpty: "اتركها فاضية للإبقاء على الحالية", tab_info: "المعلومات الشخصية", tab_password: "كلمة المرور", confirmPassword: "تأكيد كلمة المرور", changePassword: "تغيير كلمة المرور", passwordChanged: "تم تغيير كلمة المرور", mismatch: "كلمتا المرور غير متطابقتين.", save: "حفظ", saved: "تم الحفظ", saveFailed: "تعذّر الحفظ",
+    leaveEmpty: "اتركها فاضية للإبقاء على الحالية", tab_info: "المعلومات الشخصية", tab_password: "كلمة المرور", tab_notifications: "الإشعارات", confirmPassword: "تأكيد كلمة المرور", changePassword: "تغيير كلمة المرور", passwordChanged: "تم تغيير كلمة المرور", mismatch: "كلمتا المرور غير متطابقتين.", save: "حفظ", saved: "تم الحفظ", saveFailed: "تعذّر الحفظ",
   },
   companies: {
     newCompany: "شركة جديدة",
