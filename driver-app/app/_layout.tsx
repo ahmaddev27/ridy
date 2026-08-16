@@ -34,7 +34,7 @@ export default function RootLayout() {
 /** Routes the user between auth screens and the app based on session state, and
  *  wires push registration + notification-tap navigation once signed in. */
 function Gate() {
-  const { ready, driver } = useAuth();
+  const { ready, driver, isOwner } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const c = useColors();
@@ -52,14 +52,17 @@ function Gate() {
   // Once signed in: register for push and open the offer when a notification is tapped.
   useEffect(() => {
     if (!driver) return;
-    registerForPush();
+    // Owners are read-only fleet monitors on a User token; the /driver/devices
+    // endpoint (auth:driver guard) rejects it with 401, which would nuke the
+    // session and bounce them back to login. They don't receive driver push.
+    if (!isOwner) registerForPush();
 
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as { offer_id?: string };
       if (data?.offer_id) router.push(`/offer/${data.offer_id}`);
     });
     return () => sub.remove();
-  }, [driver, router]);
+  }, [driver, isOwner, router]);
 
   if (!ready) {
     return (

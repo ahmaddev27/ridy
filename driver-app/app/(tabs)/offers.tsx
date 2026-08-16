@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, FlatList, Pressable, RefreshControl, ActivityIndicator, TextInput } from "react-native";
+import { View, FlatList, Pressable, RefreshControl, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Text, TextInput } from "@/components/typography";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { api, type Offer, type OffersQuery } from "@/lib/api";

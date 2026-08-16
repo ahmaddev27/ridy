@@ -50,7 +50,7 @@
       ]
     ],
     "extra": {
-      "apiUrl": "https://r.fleeteye.de",
+      "apiUrl": "https://reidey.de",
       "router": {
         "origin": false
       },

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { View, Text, Linking, Platform } from "react-native";
+import { View, Linking, Platform } from "react-native";
 import Constants from "expo-constants";
+import { Text } from "@/components/typography";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
