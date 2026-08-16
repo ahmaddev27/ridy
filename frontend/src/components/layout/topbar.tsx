@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Bell, BellPlus, ChevronDown, LogOut, Volume2, VolumeX, Menu, X, Sun, Moon, HelpCircle } from "lucide-react";
+import { BellPlus, ChevronDown, LogOut, Volume2, VolumeX, Menu, X, Sun, Moon, HelpCircle } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/context";
 import { enableWebPush, listenForeground } from "@/lib/push/web-push";
@@ -11,6 +11,7 @@ import { useTheme } from "@/lib/theme/context";
 import { ONBOARDING_EVENT } from "@/components/onboarding/onboarding-tour";
 import { useAsync } from "@/hooks/use-async";
 import { listNotifications } from "@/lib/api/notifications";
+import { NotificationsBell } from "./notifications-bell";
 import { cn } from "@/lib/utils";
 import { SidebarBrand } from "./sidebar";
 import { NavList } from "./nav-list";
@@ -178,19 +179,8 @@ export function Topbar() {
           </button>
         )}
 
-        {/* Notifications */}
-        <button
-          onClick={() => router.push("/notifications")}
-          className="relative rounded-lg p-2 text-ink-muted hover:bg-surface-2"
-          aria-label="Notifications"
-        >
-          <Bell className="h-5 w-5" />
-          {unread > 0 && (
-            <span className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-ring px-1 text-[10px] font-bold text-white">
-              {unread > 9 ? "9+" : unread}
-            </span>
-          )}
-        </button>
+        {/* Notifications — bell with a hover dropdown of the latest 5 */}
+        <NotificationsBell items={notifications?.items ?? []} unread={unread} />
 
         {/* User menu */}
         <div className="relative">

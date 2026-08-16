@@ -105,7 +105,7 @@ class SubscriptionController extends Controller
         // Place it on a proxy from the pool, same as a real activation.
         app(ProxyPool::class)->assign($tenant);
 
-        $notifier->toTenant($tenant->id, 'subscription_free', ['days' => $data['days']], '/mySubscription');
+        $notifier->toTenant($tenant->id, 'subscription_free', ['days' => $data['days']], '/subscription');
 
         return response()->json(['data' => [
             'free' => true,

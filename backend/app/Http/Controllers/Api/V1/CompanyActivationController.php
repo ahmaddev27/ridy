@@ -112,7 +112,7 @@ class CompanyActivationController extends Controller
         app(ProxyPool::class)->assign($tenant);
 
         // Notify the company managers, and the reseller whose code was activated.
-        $notifier->toTenant($tenant->id, 'subscription_activated', ['days' => $days], '/mySubscription');
+        $notifier->toTenant($tenant->id, 'subscription_activated', ['days' => $days], '/subscription');
         $reseller = $ledgerEntry?->collector()->with('user')->first()?->user;
         $notifier->toUser($reseller, 'code_activated', ['company' => $tenant->name, 'code' => $usedCode], '/reseller');
 

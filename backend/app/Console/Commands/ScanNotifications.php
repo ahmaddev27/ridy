@@ -33,14 +33,14 @@ class ScanNotifications extends Command
             ->whereNotNull('subscription_ends_at')
             ->whereBetween('subscription_ends_at', [$now, $now->addDays(self::SUBSCRIPTION_WARN_DAYS)])
             ->get()
-            ->each(fn (Tenant $t) => $notifier->toTenant($t->id, 'subscription_expiring', ['days' => max(0, $t->daysLeft())], '/mySubscription', dedupe: true));
+            ->each(fn (Tenant $t) => $notifier->toTenant($t->id, 'subscription_expiring', ['days' => max(0, $t->daysLeft())], '/subscription', dedupe: true));
 
         // Subscriptions that expired in the last day.
         Tenant::query()
             ->whereNotNull('subscription_ends_at')
             ->whereBetween('subscription_ends_at', [$now->subDay(), $now])
             ->get()
-            ->each(fn (Tenant $t) => $notifier->toTenant($t->id, 'subscription_expired', [], '/mySubscription', dedupe: true));
+            ->each(fn (Tenant $t) => $notifier->toTenant($t->id, 'subscription_expired', [], '/subscription', dedupe: true));
 
         // Proxies about to expire (admin heads-up).
         Proxy::query()
