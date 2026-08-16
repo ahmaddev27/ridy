@@ -45,6 +45,14 @@ export default function OfferScreen() {
     }).catch(() => setError(true));
   }, [id]);
 
+  function openMaps() {
+    if (!offer) return;
+    const origin = encodeURIComponent(offer.pickup_address ?? "");
+    const dest = encodeURIComponent(offer.dropoff_address ?? "");
+    // Opens the maps app with the full pickup → drop-off route (falls back to browser).
+    Linking.openURL(`https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`);
+  }
+
   const status = offer?.status ?? "pending";
   const win = offer?.accept_window_seconds ?? 0;
   const pct = secondsLeft != null && win > 0 ? Math.max(0, Math.min(1, secondsLeft / win)) : 0;
@@ -128,13 +136,22 @@ export default function OfferScreen() {
 
           <View style={{ flex: 1 }} />
 
-          {/* CTA */}
-          <Pressable
-            onPress={() => Linking.openURL("uberdriver://").catch(() => Linking.openURL("https://drivers.uber.com"))}
-            style={{ backgroundColor: c.primary, borderRadius: radius.xl, paddingVertical: 18, alignItems: "center", marginTop: 8 }}
-          >
-            <Text style={{ color: c.primaryInk, fontSize: 17, fontWeight: "700" }}>{t("offer.openUber")}</Text>
-          </Pressable>
+          {/* CTA — Open in Uber (primary) + Open in Maps (route) */}
+          <View style={{ flexDirection: row, gap: 10, marginTop: 8 }}>
+            <Pressable
+              onPress={openMaps}
+              style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: radius.xl, paddingVertical: 18, paddingHorizontal: 18 }}
+            >
+              <Ionicons name="map-outline" size={18} color={c.ink} />
+              <Text style={{ color: c.ink, fontSize: 16, fontWeight: "700" }}>{t("offer.openMaps")}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => Linking.openURL("uberdriver://").catch(() => Linking.openURL("https://drivers.uber.com"))}
+              style={{ flex: 1, backgroundColor: c.primary, borderRadius: radius.xl, paddingVertical: 18, alignItems: "center" }}
+            >
+              <Text style={{ color: c.primaryInk, fontSize: 17, fontWeight: "700" }}>{t("offer.openUber")}</Text>
+            </Pressable>
+          </View>
           <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: "center", lineHeight: 19 }}>{t("offer.observe")}</Text>
         </ScrollView>
       )}
