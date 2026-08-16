@@ -8,34 +8,42 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: c.canvas },
-        headerTitleStyle: { color: c.ink, fontWeight: "700" },
-        headerShadowVisible: false,
-        tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.line, height: 58, paddingBottom: 6, paddingTop: 6 },
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: c.surface,
+          borderTopColor: c.line,
+          height: 64,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
         tabBarActiveTintColor: c.ink,
         tabBarInactiveTintColor: c.inkSubtle,
-        tabBarLabelStyle: { fontSize: 12 },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: t("tabs.home"),
-          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "home" : "home-outline"} size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="offers"
         options={{
           title: t("tabs.offers"),
-          tabBarIcon: ({ color, size }) => <Ionicons name="notifications-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="reorder-three-outline" size={size + 4} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: t("tabs.profile"),
-          tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "person" : "person-outline"} size={size} color={color} />
+          ),
         }}
       />
     </Tabs>

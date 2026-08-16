@@ -1,169 +1,181 @@
 import { useCallback, useState } from "react";
-import { View, Text, ScrollView, Pressable, RefreshControl } from "react-native";
+import { View, Text, ScrollView, RefreshControl, Pressable } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
-import { api, type HomeData } from "@/lib/api";
+import { Ionicons } from "@expo/vector-icons";
+import { api, type HomeData, type Offer } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius } from "@/lib/theme";
-import { fareLabel, distanceLabel, perKmLabel, cleanAddress } from "@/lib/format";
-import { StatCard, SectionTitle, StatusBadge } from "@/components/ui";
+import { fareLabel, perKmLabel, distanceLabel, cleanAddress, euroQuality } from "@/lib/format";
+import { Logo, StatusBadge, QualityMark, RouteBlock, SectionLabel } from "@/components/ui";
 
 export default function HomeScreen() {
-  const router = useRouter();
   const c = useColors();
-  const [home, setHome] = useState<HomeData | null>(null);
+  const router = useRouter();
+  const { driver } = useAuth();
+  const [data, setData] = useState<HomeData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const row = isRTL() ? "row-reverse" : "row";
   const align = isRTL() ? "right" : "left";
 
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      const res = await api.home();
-      setHome(res.data);
+      setData((await api.home()).data);
     } catch {
-      /* keep the last snapshot on transient errors */
+      /* keep last */
     } finally {
       setRefreshing(false);
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load]),
-  );
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const today = home?.today;
-  const active = home?.active_offer ?? null;
-  const recent = (home?.recent ?? []).slice(0, 5);
+  const greeting = new Date().getHours() >= 17 ? t("home.greetingEvening") : t("home.greetingDay");
+  const today = data?.today;
+  const active = data?.active_offer ?? null;
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: c.canvas }}
-      contentContainerStyle={{ padding: 16, gap: 20 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} tintColor={c.ink} />}
-    >
-      {/* Status pill */}
-      {home && (
-        <View style={{ gap: 12 }}>
-          <Text style={{ color: c.ink, fontSize: 22, fontWeight: "800", textAlign: align }}>
-            {t("home.greeting")}, {home.driver.name}
-          </Text>
-          <StatusPill online={home.driver.online} engagement={home.driver.engagement} />
+    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: c.canvas }}>
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 16 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} tintColor={c.ink} />}
+      >
+        {/* Header */}
+        <View style={{ flexDirection: row, alignItems: "center", gap: 12 }}>
+          <Logo size={30} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: c.ink, fontSize: 21, fontWeight: "800", textAlign: align }}>
+              {greeting}, {data?.driver.name ?? "…"}
+            </Text>
+            {driver?.company_name && (
+              <Text style={{ color: c.inkMuted, fontSize: 14, textAlign: align }}>{driver.company_name}</Text>
+            )}
+          </View>
+          <OnlinePill online={!!data?.driver.online} />
         </View>
-      )}
 
-      {/* Today's stats */}
-      {today && (
-        <View style={{ gap: 12 }}>
-          <SectionTitle>{t("home.today")}</SectionTitle>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-            <StatCard label={t("stat.offers")} value={String(today.total)} />
-            <StatCard label={t("stat.accepted")} value={String(today.accepted)} tone={c.success} />
-            <StatCard label={t("stat.acceptanceRate")} value={`${Math.round(today.acceptance_rate)}%`} />
-            <StatCard label={t("stat.earnings")} value={fareLabel(null, today.earnings)} tone={c.accent} />
-            <StatCard label={t("stat.km")} value={distanceLabel(today.km * 1000)} />
+        {/* Today stats — 2×2 grid */}
+        <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
+          <View style={{ flexDirection: row }}>
+            <GridCell label={t("home.st.offers")} value={String(today?.total ?? 0)} c={c} border />
+            <GridCell label={t("home.st.accept")} value={`${today?.acceptance_rate ?? 0}%`} c={c} />
+          </View>
+          <View style={{ height: 1, backgroundColor: c.line }} />
+          <View style={{ flexDirection: row }}>
+            <GridCell label={t("home.st.earnings")} value={fareLabel(null, today?.earnings ?? 0)} c={c} border />
+            <GridCell label={t("home.st.distance")} value={String(today?.km ?? 0)} unit="km" c={c} />
           </View>
         </View>
-      )}
 
-      {/* Active offer */}
-      {active && (
-        <View style={{ gap: 12 }}>
-          <SectionTitle>{t("home.activeOffer")}</SectionTitle>
-          <Pressable
-            onPress={() => router.push(`/offer/${active.id}`)}
-            style={{
-              backgroundColor: c.surface,
-              borderRadius: radius.lg,
-              borderWidth: 1,
-              borderColor: c.accent,
-              padding: 16,
-              gap: 10,
-            }}
-          >
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <Text style={{ color: c.ink, fontSize: 26, fontWeight: "900" }}>
-                {fareLabel(active.fare_formatted, active.fare_amount)}
-              </Text>
-              <Text style={{ color: c.accent, fontWeight: "700" }}>{perKmLabel(active.fare_amount, active.distance_m)}</Text>
-            </View>
-            <Text style={{ color: c.inkMuted }} numberOfLines={1}>
-              ↑ {cleanAddress(active.pickup_address)}
-            </Text>
-            <Text style={{ color: c.inkSubtle }} numberOfLines={1}>
-              ↓ {cleanAddress(active.dropoff_address)}
-            </Text>
-            <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: align }}>
-              {distanceLabel(active.distance_m)}
-            </Text>
+        {/* Active offer */}
+        {active && <ActiveOffer offer={active} onPress={() => router.push(`/offer/${active.id}`)} />}
+
+        {/* Recent */}
+        <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+          <Text style={{ color: c.ink, fontSize: 17, fontWeight: "800" }}>{t("home.recent")}</Text>
+          <Pressable onPress={() => router.push("/offers")}>
+            <Text style={{ color: c.inkMuted, fontSize: 15 }}>{t("home.all")}</Text>
           </Pressable>
         </View>
-      )}
 
-      {/* Recent offers */}
-      <View style={{ gap: 12 }}>
-        <SectionTitle>{t("home.recent")}</SectionTitle>
-        {recent.length === 0 ? (
-          <Text style={{ color: c.inkSubtle, textAlign: align }}>{t("home.empty")}</Text>
-        ) : (
-          recent.map((o) => {
-            const status = o.status ?? "pending";
-            return (
-              <Pressable
-                key={o.id}
-                onPress={() => router.push(`/offer/${o.id}`)}
-                style={{
-                  backgroundColor: c.surface,
-                  borderRadius: radius.lg,
-                  borderWidth: 1,
-                  borderColor: c.line,
-                  padding: 14,
-                  gap: 6,
-                }}
-              >
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ color: c.ink, fontSize: 18, fontWeight: "800" }}>
-                    {fareLabel(o.fare_formatted, o.fare_amount)}
-                  </Text>
-                  <StatusBadge status={status} label={t(`status.${status}`)} />
-                </View>
-                <Text style={{ color: c.inkMuted }} numberOfLines={1}>
-                  ↑ {cleanAddress(o.pickup_address)}
-                </Text>
-                <Text style={{ color: c.inkSubtle }} numberOfLines={1}>
-                  ↓ {cleanAddress(o.dropoff_address)}
-                </Text>
-              </Pressable>
-            );
-          })
-        )}
-      </View>
-    </ScrollView>
+        <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
+          {(data?.recent ?? []).length === 0 ? (
+            <Text style={{ color: c.inkSubtle, textAlign: "center", padding: 24 }}>{t("home.empty")}</Text>
+          ) : (
+            data!.recent.map((o, i) => (
+              <RecentRow key={o.id} offer={o} onPress={() => router.push(`/offer/${o.id}`)} last={i === data!.recent.length - 1} />
+            ))
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-function StatusPill({ online, engagement }: { online: boolean; engagement: 0 | 1 | 2 }) {
+function OnlinePill({ online }: { online: boolean }) {
   const c = useColors();
-  const dot = online ? c.success : c.inkSubtle;
-  const label = online ? t(`home.engagement.${engagement}`) : t("home.offline");
   return (
-    <View
-      style={{
-        flexDirection: isRTL() ? "row-reverse" : "row",
-        alignItems: "center",
-        gap: 8,
-        alignSelf: isRTL() ? "flex-end" : "flex-start",
-        backgroundColor: c.surface,
-        borderWidth: 1,
-        borderColor: c.line,
-        borderRadius: 999,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-      }}
-    >
-      <View style={{ width: 9, height: 9, borderRadius: 999, backgroundColor: dot }} />
-      <Text style={{ color: c.ink, fontWeight: "600" }}>{online ? t("home.online") : t("home.offline")}</Text>
-      {online && <Text style={{ color: c.inkSubtle }}>· {label}</Text>}
+    <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 7, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7 }}>
+      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: online ? c.completed : c.inkSubtle }} />
+      <Text style={{ color: c.ink, fontSize: 14, fontWeight: "600" }}>{online ? t("home.online") : t("home.offline")}</Text>
     </View>
+  );
+}
+
+function GridCell({ label, value, unit, c, border }: { label: string; value: string; unit?: string; c: ReturnType<typeof useColors>; border?: boolean }) {
+  const align = isRTL() ? "right" : "left";
+  return (
+    <View style={{ flex: 1, padding: 18, gap: 6, borderRightWidth: border && !isRTL() ? 1 : 0, borderLeftWidth: border && isRTL() ? 1 : 0, borderColor: c.line }}>
+      <SectionLabel>{label}</SectionLabel>
+      <Text style={{ color: c.ink, fontSize: 28, fontWeight: "800", textAlign: align }}>
+        {value}
+        {unit ? <Text style={{ fontSize: 16, fontWeight: "700", color: c.inkMuted }}> {unit}</Text> : null}
+      </Text>
+    </View>
+  );
+}
+
+function ActiveOffer({ offer, onPress }: { offer: Offer; onPress: () => void }) {
+  const c = useColors();
+  const row = isRTL() ? "row-reverse" : "row";
+  const q = euroQuality(offer.fare_amount, offer.distance_m);
+  const mins = offer.received_at ? Math.max(0, Math.round((Date.now() - new Date(offer.received_at).getTime()) / 60000)) : null;
+  const km = offer.distance_m ? offer.distance_m / 1000 : null;
+  const eta = km ? Math.round((km / 30) * 60) : null;
+
+  return (
+    <Pressable onPress={onPress} style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, padding: 18, gap: 14 }}>
+      <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
+        <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 8 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.started }} />
+          <Text style={{ color: c.started, fontSize: 15, fontWeight: "700" }}>{t("status.started")}</Text>
+        </View>
+        {mins != null && <Text style={{ color: c.inkSubtle, fontSize: 14 }}>{t("home.ago").replace("{n}", String(mins))}</Text>}
+      </View>
+
+      <View style={{ flexDirection: row, alignItems: "flex-end", justifyContent: "space-between" }}>
+        <Text style={{ color: c.ink, fontSize: 48, fontWeight: "800", letterSpacing: -1 }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
+        <View style={{ alignItems: isRTL() ? "flex-start" : "flex-end", gap: 2 }}>
+          <QualityMark mark={q.mark} good={q.good} size={18} />
+          <Text style={{ color: c.inkMuted, fontSize: 14 }}>{perKmLabel(offer.fare_amount, offer.distance_m)}</Text>
+        </View>
+      </View>
+
+      <RouteBlock pickup={cleanAddress(offer.pickup_address)} dropoff={cleanAddress(offer.dropoff_address)} />
+
+      <View style={{ height: 1, backgroundColor: c.line, marginTop: 2 }} />
+      <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
+        <Text style={{ color: c.inkMuted, fontSize: 15 }}>
+          {distanceLabel(offer.distance_m)}{eta ? ` · ${t("home.eta").replace("{n}", String(eta))}` : ""}
+        </Text>
+        <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 2 }}>
+          <Text style={{ color: c.ink, fontSize: 15, fontWeight: "700" }}>{t("home.details")}</Text>
+          <Ionicons name={isRTL() ? "chevron-back" : "chevron-forward"} size={16} color={c.ink} />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+function RecentRow({ offer, onPress, last }: { offer: Offer; onPress: () => void; last: boolean }) {
+  const c = useColors();
+  const row = isRTL() ? "row-reverse" : "row";
+  const status = offer.status ?? "pending";
+  const dim = status === "rejected" || status === "canceled";
+  const q = euroQuality(offer.fare_amount, offer.distance_m);
+  return (
+    <Pressable onPress={onPress} style={{ flexDirection: row, alignItems: "center", gap: 12, padding: 16, borderBottomWidth: last ? 0 : 1, borderColor: c.line, opacity: dim ? 0.55 : 1 }}>
+      <View style={{ minWidth: 84 }}>
+        <Text style={{ color: c.ink, fontSize: 18, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
+        <QualityMark mark={q.mark} good={q.good} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text numberOfLines={1} style={{ color: c.inkMuted, fontSize: 14, textAlign: isRTL() ? "right" : "left" }}>{cleanAddress(offer.pickup_address)}</Text>
+        <Text numberOfLines={1} style={{ color: c.ink, fontSize: 14, textAlign: isRTL() ? "right" : "left" }}>{cleanAddress(offer.dropoff_address)}</Text>
+      </View>
+      <StatusBadge status={status} label={t(`status.${status}`)} />
+    </Pressable>
   );
 }

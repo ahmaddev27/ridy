@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { View, Text, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, KeyboardAvoidingView, Platform, Pressable } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/lib/auth";
-import { t, isRTL } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
-import { Field, PrimaryButton } from "@/components/ui";
+import { Field, PrimaryButton, Logo } from "@/components/ui";
 
 export default function LoginScreen() {
   const { login } = useAuth();
-  const colors = useColors();
+  const c = useColors();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,31 +27,34 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{ flex: 1, backgroundColor: colors.canvas, justifyContent: "center", padding: 24 }}
-    >
-      <Text style={{ color: colors.ink, fontSize: 28, fontWeight: "800", marginBottom: 4, textAlign: isRTL() ? "right" : "left" }}>Reidey</Text>
-      <Text style={{ color: colors.inkMuted, fontSize: 16, marginBottom: 28, textAlign: isRTL() ? "right" : "left" }}>{t("login.title")}</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.canvas }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1, justifyContent: "center", padding: 24 }}
+      >
+        {/* Brand */}
+        <View style={{ alignItems: "center", marginBottom: 36 }}>
+          <Logo size={56} />
+          <Text style={{ color: c.ink, fontSize: 30, fontWeight: "800", marginTop: 18 }}>Reidey Driver</Text>
+          <Text style={{ color: c.inkMuted, fontSize: 16, marginTop: 6, textAlign: "center" }}>{t("signin.subtitle")}</Text>
+        </View>
 
-      <View style={{ gap: 16 }}>
-        <Field
-          label={t("login.email")}
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          autoComplete="email"
-        />
-        <Field
-          label={t("login.password")}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-        {error && <Text style={{ color: colors.danger, fontSize: 13 }}>{error}</Text>}
-        <PrimaryButton label={t("login.submit")} onPress={submit} loading={loading} />
-      </View>
-    </KeyboardAvoidingView>
+        <View style={{ gap: 14 }}>
+          <Field label={t("login.email")} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
+          <Field label={t("login.password")} value={password} onChangeText={setPassword} secure />
+          {error && <Text style={{ color: c.danger, fontSize: 14, textAlign: "center" }}>{error}</Text>}
+          <View style={{ marginTop: 4 }}>
+            <PrimaryButton label={t("login.submit")} onPress={submit} loading={loading} />
+          </View>
+          <Pressable onPress={() => {}} style={{ alignSelf: "center", paddingVertical: 10 }}>
+            <Text style={{ color: c.inkMuted, fontSize: 15 }}>{t("signin.forgot")}</Text>
+          </Pressable>
+        </View>
+
+        <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: "center", position: "absolute", bottom: 24, left: 24, right: 24, lineHeight: 19 }}>
+          {t("signin.inviteNote")}
+        </Text>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
