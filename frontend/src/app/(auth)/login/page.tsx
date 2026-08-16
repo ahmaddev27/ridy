@@ -75,11 +75,11 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface-2 p-4">
       <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center justify-center gap-2.5">
-          <Logo size={72} className="text-ink" />
+        <div className="mb-6 flex items-center justify-center gap-3">
+          <Logo size={104} className="text-ink" />
           <div className="leading-tight">
-            <div className="text-lg font-bold text-ink">Reidey</div>
-            <div className="text-xs text-ink-subtle">Fleet Management</div>
+            <div className="text-2xl font-bold text-ink">Reidey</div>
+            <div className="text-sm text-ink-subtle">Fleet Management</div>
           </div>
         </div>
 
