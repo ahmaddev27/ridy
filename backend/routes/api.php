@@ -133,6 +133,7 @@ Route::prefix('v1')->group(function () {
         // Dispatch offers feed
         Route::get('dispatch/offers', [DispatchOfferController::class, 'index']);
         Route::get('dispatch/offers/stats', [DispatchOfferController::class, 'stats']);
+        Route::get('dispatch/offers/export', [DispatchOfferController::class, 'export']);
         Route::get('dispatch/offers/{offer}', [DispatchOfferController::class, 'show']);
         // Extension forwards RAMEN offers captured in the manager's browser.
         Route::post('dispatch/offers/ingest', [DispatchOfferController::class, 'ingest']);

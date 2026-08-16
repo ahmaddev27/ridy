@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { apiFetch, apiDownload } from "./client";
 
 export type OfferStatus = "pending" | "accepted" | "started" | "completed" | "rejected" | "canceled";
 
@@ -112,6 +112,22 @@ export async function getOfferStats(params?: {
   const qs = q.toString();
   const res = await apiFetch<{ data: OfferStats }>(`/api/v1/dispatch/offers/stats${qs ? `?${qs}` : ""}`);
   return res.data;
+}
+
+/** Download the filtered offers as a CSV (Excel) file, carrying the session cookie. */
+export async function exportOffers(params?: {
+  search?: string;
+  driverUuids?: string[];
+  from?: string;
+  to?: string;
+}): Promise<Blob> {
+  const q = new URLSearchParams();
+  if (params?.search) q.set("search", params.search);
+  for (const uuid of params?.driverUuids ?? []) q.append("driver_uuids[]", uuid);
+  if (params?.from) q.set("from", params.from);
+  if (params?.to) q.set("to", params.to);
+  const qs = q.toString();
+  return apiDownload(`/api/v1/dispatch/offers/export${qs ? `?${qs}` : ""}`);
 }
 
 export async function listOffers(params?: {

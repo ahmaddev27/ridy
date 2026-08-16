@@ -3,14 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
 import { toast } from "sonner";
-import { Radio, MapPin, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Inbox, CheckCircle2, XCircle, Gauge, Wallet } from "lucide-react";
+import { Radio, MapPin, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Inbox, CheckCircle2, XCircle, Gauge, Wallet, Download } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { Badge, type Status } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
-import { listOffersPaged, getOfferStats, fareLabel, type DispatchOffer, type OfferStatus, type PageMeta, type OfferStats } from "@/lib/api/offers";
+import { listOffersPaged, getOfferStats, exportOffers, fareLabel, type DispatchOffer, type OfferStatus, type PageMeta, type OfferStats } from "@/lib/api/offers";
 
 /** Offer lifecycle status → badge tone. */
 const OFFER_TONE: Record<OfferStatus, Status> = {
@@ -122,6 +123,32 @@ export default function OffersPage() {
       .then((list) => setAllDrivers(list.filter((d) => d.uber_driver_uuid)))
       .catch(() => {});
   }, []);
+
+  const [exporting, setExporting] = useState(false);
+
+  // Download the current filter set as a CSV (opens in Excel). Uses an
+  // authenticated fetch (Sanctum cookie) then a temporary object URL to save.
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const blob = await exportOffers({
+        search: search.trim(),
+        driverUuids: driverUuids.length ? driverUuids : undefined,
+        from: from || undefined,
+        to: to || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `offers_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(c("exportFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const selectedDriverSet = useMemo(() => new Set(driverUuids), [driverUuids]);
   function toggleDriver(uuid: string) {
@@ -236,6 +263,15 @@ export default function OffersPage() {
           </button>
         )}
 
+        <Button
+          variant="secondary"
+          onClick={handleExport}
+          disabled={exporting}
+          className="ms-auto"
+        >
+          <Download className="h-4 w-4" />
+          {c("exportExcel")}
+        </Button>
       </div>
 
       {/* Stat cards for the current filter */}

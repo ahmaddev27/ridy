@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DispatchOfferController extends Controller
 {
@@ -24,6 +25,48 @@ class DispatchOfferController extends Controller
             ->withQueryString();
 
         return DispatchOfferResource::collection($offers);
+    }
+
+    /**
+     * Stream the manager's offers (current filters applied) as UTF-8 CSV that
+     * opens directly in Excel. Reuses the exact list filter so the export always
+     * mirrors what the table shows.
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $offers = $this->filtered($request)
+            ->with('driver:id,name')
+            ->orderByDesc('received_at')
+            ->get();
+
+        $filename = 'offers_'.now()->toDateString().'.csv';
+
+        return response()->streamDownload(function () use ($offers) {
+            $out = fopen('php://output', 'w');
+            // BOM so Excel reads UTF-8 (German/Arabic names, € symbol) correctly.
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['Date', 'Rider', 'Driver', 'Pickup', 'Dropoff', 'Fare (€)', 'Distance (km)', '€/km', 'Status']);
+
+            foreach ($offers as $offer) {
+                $distanceKm = $offer->distance_m !== null ? round($offer->distance_m / 1000, 2) : null;
+                $fare = $this->fareAmount($offer->fare_formatted);
+                $pricePerKm = ($fare !== null && $distanceKm) ? round($fare / $distanceKm, 2) : null;
+
+                fputcsv($out, [
+                    $offer->received_at?->toDateTimeString(),
+                    $offer->rider_first_name,
+                    $offer->driver?->name
+                        ?? (trim(($offer->driver_first_name ?? '').' '.($offer->driver_last_name ?? '')) ?: null),
+                    $offer->pickup_address,
+                    $offer->dropoff_address,
+                    $fare !== null ? number_format($fare, 2, '.', '') : null,
+                    $distanceKm !== null ? number_format($distanceKm, 2, '.', '') : null,
+                    $pricePerKm !== null ? number_format($pricePerKm, 2, '.', '') : null,
+                    $offer->displayStatus()->value,
+                ]);
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /** Lightweight aggregates for the current filter set — powers the stat cards. */
