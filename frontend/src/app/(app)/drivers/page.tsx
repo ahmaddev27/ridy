@@ -231,6 +231,24 @@ export default function DriversPage() {
                             )}
                           </button>
                         </div>
+                      ) : d.app_status === "invited" ? (
+                        <div className="flex items-center gap-2">
+                          <Badge status="expiring" dot>
+                            {t("screens.drivers.appInvited")}
+                          </Badge>
+                          <button
+                            onClick={() => invite(d)}
+                            disabled={invitingId === d.id}
+                            title={t("screens.drivers.appResend")}
+                            className="rounded-lg border border-line p-1.5 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50"
+                          >
+                            {invitingId === d.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Send className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        </div>
                       ) : (
                         <button
                           onClick={() => invite(d)}
@@ -242,9 +260,7 @@ export default function DriversPage() {
                           ) : (
                             <Send className="h-3.5 w-3.5" />
                           )}
-                          {d.app_status === "invited"
-                            ? t("screens.drivers.appResend")
-                            : t("screens.drivers.appInvite")}
+                          {t("screens.drivers.appInvite")}
                         </button>
                       )}
                     </td>
