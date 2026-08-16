@@ -63,8 +63,10 @@ export default function ConnectionsPage() {
   async function pairExtension(): Promise<void> {
     const token = await issueExtensionToken();
     setExtToken(token);
-    // Use 127.0.0.1 over localhost to dodge the IPv6 loopback pitfall.
-    const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace("localhost", "127.0.0.1");
+    // Same-origin in production (empty NEXT_PUBLIC_API_URL) -> use the domain the
+    // manager is actually on, so the extension pairs against whichever domain
+    // served the dashboard. Use 127.0.0.1 over localhost to dodge IPv6 loopback.
+    const apiUrl = (process.env.NEXT_PUBLIC_API_URL || window.location.origin).replace("localhost", "127.0.0.1");
     window.postMessage({ source: "ridy-pair", apiUrl, token }, "*");
   }
 

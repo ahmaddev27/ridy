@@ -17,7 +17,9 @@ RUN npm ci
 
 # The API base URL is baked into the client bundle at build time, so it must be
 # provided as a build arg (defaults to same-origin in production).
-ARG NEXT_PUBLIC_API_URL=https://reidey.de
+# Empty default = same-origin: the client calls relative /api paths, so the
+# dashboard works on any domain Caddy serves. Pass an absolute URL to override.
+ARG NEXT_PUBLIC_API_URL=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Copy the rest of the application and produce the optimized production build.

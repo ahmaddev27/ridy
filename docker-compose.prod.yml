@@ -15,8 +15,13 @@ x-app-env: &app-env
   APP_DEBUG: "false"
   APP_URL: https://${DOMAIN}
   FRONTEND_URL: https://${DOMAIN}
-  SANCTUM_STATEFUL_DOMAINS: ${DOMAIN}
-  SESSION_DOMAIN: ${DOMAIN}
+  # Comma-separated list so the dashboard's SPA-cookie auth is stateful on EVERY
+  # domain Caddy serves (e.g. "reidey.de,r.fleeteye.de"). Defaults to DOMAIN.
+  SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:-${DOMAIN}}
+  # Left empty on purpose: a host-only session cookie is issued per domain, so
+  # two unrelated apex domains each keep their own session (one shared cookie is
+  # impossible across different registrable domains).
+  SESSION_DOMAIN: ${SESSION_DOMAIN:-}
   SESSION_DRIVER: database
   CACHE_STORE: database
   QUEUE_CONNECTION: database
@@ -119,7 +124,10 @@ services:
       context: .
       dockerfile: ./docker/frontend.Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: https://${DOMAIN}
+        # Empty on purpose: the client bundle calls the API same-origin (relative
+        # /api paths), so the dashboard works on EVERY domain Caddy serves without
+        # a rebuild. Override only to force an absolute API base.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
     restart: unless-stopped
 
   # --- Dispatch daemon — holds the Uber RAMEN stream ------------------------

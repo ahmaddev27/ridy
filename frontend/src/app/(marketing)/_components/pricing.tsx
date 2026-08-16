@@ -25,7 +25,10 @@ function term(days: number): string {
 }
 
 async function fetchPlans(): Promise<Plan[]> {
-  const base = process.env.NEXT_PUBLIC_API_URL ?? "https://reidey.de";
+  // Server-side fetch needs an absolute URL. When the client bundle is built
+  // same-origin (empty NEXT_PUBLIC_API_URL), fall back to the canonical domain,
+  // which the frontend container can reach through Caddy.
+  const base = process.env.NEXT_PUBLIC_API_URL || "https://reidey.de";
   try {
     const res = await fetch(`${base}/api/v1/plans`, { cache: "no-store" });
     if (!res.ok) return [];
