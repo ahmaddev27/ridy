@@ -39,6 +39,22 @@ class NotificationController extends Controller
         return response()->noContent();
     }
 
+    /** Delete one of the user's own notifications. */
+    public function destroy(Request $request, string $id): Response
+    {
+        $request->user()->notifications()->whereKey($id)->delete();
+
+        return response()->noContent();
+    }
+
+    /** Clear all of the user's notifications. */
+    public function clear(Request $request): Response
+    {
+        $request->user()->notifications()->delete();
+
+        return response()->noContent();
+    }
+
     /**
      * Register (idempotently) this browser's FCM token for web push, and remember
      * the user's dashboard language so pushes are written in it.

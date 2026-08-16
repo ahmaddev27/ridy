@@ -71,14 +71,19 @@ Route::prefix('v1')->group(function () {
         Route::post('login', [DriverAuthController::class, 'login'])->middleware('throttle:10,1');
 
         Route::middleware('auth:driver')->group(function () {
-            Route::get('me', [DriverAuthController::class, 'me']);
-            Route::patch('me', [DriverAuthController::class, 'update']);
+            // Logout must work even when suspended (so the app can clear its token).
             Route::post('logout', [DriverAuthController::class, 'logout']);
-            Route::post('devices', [DriverDeviceController::class, 'store']);
-            Route::delete('devices', [DriverDeviceController::class, 'destroy']);
-            Route::get('home', [DriverDashboardController::class, 'home']);
-            Route::get('stats', [DriverDashboardController::class, 'stats']);
-            Route::get('offers', [DriverOfferController::class, 'index']);
+
+            // Everything else requires the driver's company to still be active.
+            Route::middleware('driver.active')->group(function () {
+                Route::get('me', [DriverAuthController::class, 'me']);
+                Route::patch('me', [DriverAuthController::class, 'update']);
+                Route::post('devices', [DriverDeviceController::class, 'store']);
+                Route::delete('devices', [DriverDeviceController::class, 'destroy']);
+                Route::get('home', [DriverDashboardController::class, 'home']);
+                Route::get('stats', [DriverDashboardController::class, 'stats']);
+                Route::get('offers', [DriverOfferController::class, 'index']);
+            });
         });
     });
 
@@ -162,6 +167,8 @@ Route::prefix('v1')->group(function () {
         // Notifications
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::post('notifications/read', [NotificationController::class, 'markRead']);
+        Route::delete('notifications/clear', [NotificationController::class, 'clear']);
+        Route::delete('notifications/{id}', [NotificationController::class, 'destroy']);
         // Browser FCM token for dashboard web push.
         Route::post('notifications/device', [NotificationController::class, 'registerDevice']);
         Route::delete('notifications/device', [NotificationController::class, 'unregisterDevice']);

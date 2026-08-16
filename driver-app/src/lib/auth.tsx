@@ -22,6 +22,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Restore a stored session on launch.
   useEffect(() => {
+    // A suspended company / dead token ends the session anywhere in the app.
+    api.onSessionInvalid = () => {
+      SecureStore.deleteItemAsync(TOKEN_KEY);
+      api.setToken(null);
+      setDriver(null);
+    };
+
     (async () => {
       const token = await SecureStore.getItemAsync(TOKEN_KEY);
       if (token) {

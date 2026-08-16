@@ -26,3 +26,11 @@ export async function listNotifications(): Promise<{
 export async function markAllNotificationsRead(): Promise<void> {
   await apiFetch("/api/v1/notifications/read", { method: "POST", withCsrf: true });
 }
+
+export async function deleteNotification(id: string): Promise<void> {
+  await apiFetch(`/api/v1/notifications/${id}`, { method: "DELETE", withCsrf: true });
+}
+
+export async function clearNotifications(): Promise<void> {
+  await apiFetch("/api/v1/notifications/clear", { method: "DELETE", withCsrf: true });
+}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { toast } from "sonner";
-import { Bell } from "lucide-react";
+import { Bell, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -14,6 +14,8 @@ import { useI18n } from "@/lib/i18n/context";
 import {
   listNotifications,
   markAllNotificationsRead,
+  deleteNotification,
+  clearNotifications,
 } from "@/lib/api/notifications";
 
 export default function NotificationsPage() {
@@ -32,14 +34,38 @@ export default function NotificationsPage() {
     }
   }
 
+  async function del(id: string) {
+    try {
+      await deleteNotification(id);
+      await refetch();
+    } catch {
+      toast.error(t("screens.notifications.updateError"));
+    }
+  }
+
+  async function clearAll() {
+    try {
+      await clearNotifications();
+      toast.info(t("screens.notifications.cleared"));
+      await refetch();
+    } catch {
+      toast.error(t("screens.notifications.updateError"));
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         tkey="notifications"
         action={
-          <Button variant="secondary" onClick={markAll} disabled={unread === 0}>
-            {t("screens.notifications.markAllRead")}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={markAll} disabled={unread === 0}>
+              {t("screens.notifications.markAllRead")}
+            </Button>
+            <Button variant="secondary" onClick={clearAll} disabled={items.length === 0}>
+              {t("screens.notifications.clearAll")}
+            </Button>
+          </div>
         }
       />
 
@@ -79,11 +105,25 @@ export default function NotificationsPage() {
                   </div>
                 </>
               );
-              const cls = cn("flex items-start gap-3 p-4 text-start transition-colors", !n.read && "bg-surface-2/30", href && "hover:bg-surface-2");
-              return href ? (
-                <Link key={n.id} href={href} className={cls}>{inner}</Link>
-              ) : (
-                <div key={n.id} className={cls}>{inner}</div>
+              const cls = cn("flex min-w-0 flex-1 items-start gap-3 text-start transition-colors", href && "hover:bg-surface-2");
+              return (
+                <div
+                  key={n.id}
+                  className={cn("flex items-stretch", !n.read && "bg-surface-2/30")}
+                >
+                  {href ? (
+                    <Link href={href} className={cn(cls, "p-4")}>{inner}</Link>
+                  ) : (
+                    <div className={cn(cls, "p-4")}>{inner}</div>
+                  )}
+                  <button
+                    onClick={() => del(n.id)}
+                    title={t("screens.notifications.delete")}
+                    className="shrink-0 px-4 text-ink-subtle transition-colors hover:text-danger-fg"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               );
             })}
           </div>

@@ -152,6 +152,9 @@ export const screensB: {
     notifications: {
       markAllRead: "Mark all read",
       allMarkedRead: "All marked read",
+      clearAll: "Clear all",
+      cleared: "Notifications cleared",
+      delete: "Delete",
       updateError: "Failed to update notifications",
       loadError: "Couldn't load notifications —",
       emptyTitle: "No notifications",
@@ -407,6 +410,9 @@ export const screensB: {
     notifications: {
       markAllRead: "Alle als gelesen markieren",
       allMarkedRead: "Alle als gelesen markiert",
+      clearAll: "Alle löschen",
+      cleared: "Benachrichtigungen gelöscht",
+      delete: "Löschen",
       updateError: "Benachrichtigungen konnten nicht aktualisiert werden",
       loadError: "Benachrichtigungen konnten nicht geladen werden —",
       emptyTitle: "Keine Benachrichtigungen",
@@ -531,6 +537,9 @@ export const screensB: {
     notifications: {
       markAllRead: "تعليم الكل كمقروء",
       allMarkedRead: "تم تعليم الكل كمقروء",
+      clearAll: "مسح الكل",
+      cleared: "تم مسح الإشعارات",
+      delete: "حذف",
       updateError: "فشل تحديث الإشعارات",
       loadError: "تعذّر تحميل الإشعارات —",
       emptyTitle: "لا إشعارات",

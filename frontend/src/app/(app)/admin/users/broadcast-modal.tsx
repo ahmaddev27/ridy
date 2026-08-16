@@ -15,12 +15,15 @@ export function BroadcastModal({
   onClose,
   selectedIds,
   t,
+  roleLabel,
 }: {
   open: boolean;
   onClose: () => void;
   selectedIds: number[];
   /** Translator scoped to `screens.users.broadcast.*`. */
   t: (k: string) => string;
+  /** Localized label for a role key (e.g. "super_admin" → "Admin"). */
+  roleLabel: (role: string) => string;
 }) {
   const [audience, setAudience] = useState<Audience>("selected");
   const [role, setRole] = useState<string>("");
@@ -122,7 +125,7 @@ export function BroadcastModal({
               <option value="">{t("selectRolePlaceholder")}</option>
               {ROLES.map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {roleLabel(r)}
                 </option>
               ))}
             </select>
