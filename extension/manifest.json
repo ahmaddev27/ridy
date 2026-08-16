@@ -10,8 +10,7 @@
     "http://127.0.0.1:8090/*",
     "http://localhost:3000/*",
     "http://127.0.0.1:3000/*",
-    "https://reidey.de/*",
-    "https://r.fleeteye.de/*"
+    "https://reidey.de/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -29,7 +28,7 @@
       "world": "MAIN"
     },
     {
-      "matches": ["http://localhost:3000/*", "http://127.0.0.1:3000/*", "https://reidey.de/*", "https://r.fleeteye.de/*"],
+      "matches": ["http://localhost:3000/*", "http://127.0.0.1:3000/*", "https://reidey.de/*"],
       "js": ["pair.js"],
       "run_at": "document_idle"
     }

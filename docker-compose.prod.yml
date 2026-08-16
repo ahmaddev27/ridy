@@ -15,8 +15,8 @@ x-app-env: &app-env
   APP_DEBUG: "false"
   APP_URL: https://${DOMAIN}
   FRONTEND_URL: https://${DOMAIN}
-  # Comma-separated list so the dashboard's SPA-cookie auth is stateful on EVERY
-  # domain Caddy serves (e.g. "reidey.de,r.fleeteye.de"). Defaults to DOMAIN.
+  # Domain(s) the dashboard's SPA-cookie auth is stateful on. Defaults to DOMAIN;
+  # set explicitly (comma-separated, no spaces) to serve more than one.
   SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:-${DOMAIN}}
   # Left empty on purpose: a host-only session cookie is issued per domain, so
   # two unrelated apex domains each keep their own session (one shared cookie is
