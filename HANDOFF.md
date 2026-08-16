@@ -17,7 +17,7 @@ Keep this principle when extending the product. Anything that would *act on* Ube
 
 **Why the odd plumbing.** Uber blocks datacenter IPs (RAMEN 404s, roster returns 0). So the stream is held either server-side through a **residential proxy** (the `dispatch-daemon`), or in the **manager's own browser** via a Chrome extension (real residential IP). Both are just *capture* transports; the Laravel backend is the brain and single source of truth.
 
-**Naming note.** The product is **Reidey** (domain `r.fleeteye.de`). You will see legacy names in code/comments/docs — `Ridy`, `DASHCAM`, `fleeteye`. They refer to the same system across its rename history.
+**Naming note.** The product is **Reidey** (domain `reidey.de`). You will see legacy names in code/comments/docs — `Ridy`, `DASHCAM`, `fleeteye`. They refer to the same system across its rename history.
 
 ---
 
@@ -224,7 +224,7 @@ Read `.env.example` (dev compose), `.env.prod.example` (prod compose), and `back
 
 ## 6. Deployment (prod: Docker Compose + Caddy on one VPS)
 
-Prod stack `docker-compose.prod.yml` (domain `r.fleeteye.de`). Services:
+Prod stack `docker-compose.prod.yml` (domain `reidey.de`). Services:
 
 | Service | What |
 | --- | --- |
@@ -272,13 +272,13 @@ docker compose -f docker-compose.prod.yml up -d --build dispatch-daemon
 ## 7. Driver-app build & release
 
 - **Stack:** Expo SDK 52, Expo Router (`app/`), React Native 0.76, `expo-notifications` (FCM), `expo-secure-store` (bearer token). Design handoff + screen mockups: `driver-app/README.md` and `driver-app/screens/*.png` (light, dark, RTL, empty/loading/permission/subscription-lapsed states). *(There is no `driver-app/HANDOFF.md`; the README is the handoff.)*
-- **Config** (`driver-app/app.json`): `scheme: "reidey"` (deep link `reidey://`), `android.package: de.fleeteye.reidey.driver`, `googleServicesFile: ./google-services.json`, `extra.apiUrl: https://r.fleeteye.de`, `extra.eas.projectId`.
+- **Config** (`driver-app/app.json`): `scheme: "reidey"` (deep link `reidey://`), `android.package: de.fleeteye.reidey.driver`, `googleServicesFile: ./google-services.json`, `extra.apiUrl: https://reidey.de`, `extra.eas.projectId`.
 - **FCM needs a dev/production build, not Expo Go.** Drop `google-services.json` (Android) / `GoogleService-Info.plist` (iOS) into `driver-app/` (git-ignored). Local dev build: `npx expo run:android`.
 - **EAS build** (`driver-app/eas.json`): profiles `preview` (internal, APK), `development` (dev client, APK), `production` (app-bundle, auto-increment). Preview APK:
   ```bash
   eas build -p android --profile preview
   ```
-- **Deep link.** The invite email links to `https://r.fleeteye.de/driver/activate?token=…` (the frontend `/driver/activate` landing page). Test the scheme with `npx uri-scheme open "reidey://activate?token=XYZ" --android`.
+- **Deep link.** The invite email links to `https://reidey.de/driver/activate?token=…` (the frontend `/driver/activate` landing page). Test the scheme with `npx uri-scheme open "reidey://activate?token=XYZ" --android`.
 
 ---
 

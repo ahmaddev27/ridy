@@ -28,7 +28,7 @@
 ## الإعداد (مرة واحدة)
 
 1. لوحة رايدي → **Uber-Verbindung** → **Kopplungs-Token generieren** → انسخ التوكن
-2. أيقونة الإضافة → Einstellungen → الصق **Reidey-URL** (`http://localhost:8090` أو `https://r.fleeteye.de`) + **Token** → Speichern
+2. أيقونة الإضافة → Einstellungen → الصق **Reidey-URL** (`http://localhost:8090` أو `https://reidey.de`) + **Token** → Speichern
 
 ---
 
@@ -38,7 +38,7 @@
 |---|---|---|---|
 | **Chrome Web Store** (unlisted) | لينك → «Add to Chrome» (ضغطة) | ✅ | حساب مطوّر $5 + رفع + مراجعة (~أيام) |
 | **Firefox AMO** (unlisted) | لينك → «Add to Firefox» | ✅ | رفع + توقيع مجاني |
-| **Firefox .xpi موقّع self-hosted** | لينك على `r.fleeteye.de/download` → تثبيت | ✅ | توقيع مجاني عبر AMO (بدون إدراج) |
+| **Firefox .xpi موقّع self-hosted** | لينك على `reidey.de/download` → تثبيت | ✅ | توقيع مجاني عبر AMO (بدون إدراج) |
 | **Enterprise force-install** | **صفر خطوات** (يتثبّت تلقائياً) | ✅ | الشركة تدير أجهزة Chrome (سياسة `ExtensionInstallForcelist`) |
 
 **التوصية:**

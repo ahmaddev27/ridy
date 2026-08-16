@@ -5,11 +5,11 @@ name: Deploy
 # from secrets, then builds + migrates. You never open the server manually.
 #
 # Required repo secrets (Settings -> Secrets and variables -> Actions):
-#   SSH_HOST                — server IP or hostname (e.g. r.fleeteye.de)
+#   SSH_HOST                — server IP or hostname (e.g. reidey.de)
 #   SSH_USER                — deploy user (e.g. fleeteye)
 #   SSH_KEY                 — the PRIVATE SSH key (contents)
 #   REPO_URL                — git URL the server pulls from (https with token or ssh)
-#   DOMAIN                  — r.fleeteye.de
+#   DOMAIN                  — reidey.de
 #   APP_KEY                 — base64 app key (php artisan key:generate --show); or leave blank to auto-generate
 #   DB_PASSWORD, DB_ROOT_PASSWORD, DISPATCH_INGEST_SECRET  — strong random strings
 #   FCM_SERVER_KEY          — optional (blank = pushes logged, not sent)

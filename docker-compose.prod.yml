@@ -1,4 +1,4 @@
-# Ridy — production stack for a fresh VPS (r.fleeteye.de).
+# Ridy — production stack for a fresh VPS (reidey.de).
 #
 # Services: caddy (TLS edge), backend (Laravel PHP-FPM), frontend (Next.js),
 # mysql, dispatch-daemon (Node RAMEN stream). Values come from a root .env
