@@ -41,10 +41,10 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-canvas text-ink">
       <header className="sticky top-0 z-50 border-b border-line bg-canvas/85 backdrop-blur">
-        <div className="relative mx-auto flex h-[64px] max-w-[1200px] items-center justify-between px-4">
+        <div className="relative mx-auto flex h-[76px] max-w-[1200px] items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2 text-ink" aria-label="Reidey Startseite">
-            <Logo size={40} className="text-ink" />
-            <span className="text-lg font-semibold tracking-tight">Reidey</span>
+            <Logo size={56} className="text-ink" />
+            <span className="text-xl font-semibold tracking-tight">Reidey</span>
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
