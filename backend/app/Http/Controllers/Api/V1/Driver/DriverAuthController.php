@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\V1\Driver;
 
 use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -56,7 +58,11 @@ class DriverAuthController extends Controller
         return $this->tokenResponse($driver);
     }
 
-    /** Email + password sign-in. */
+    /**
+     * Email + password sign-in. The same screen serves two identities: a driver
+     * (guard `driver`), or a company owner/manager signing in with their
+     * dashboard credentials to monitor the whole fleet read-only.
+     */
     public function login(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -65,14 +71,21 @@ class DriverAuthController extends Controller
         ]);
 
         $driver = Driver::withoutGlobalScopes()->where('email', $data['email'])->first();
-        if ($driver === null || $driver->activated_at === null || ! Hash::check($data['password'], (string) $driver->password)) {
-            throw ValidationException::withMessages(['email' => [__('auth.failed')]]);
+        if ($driver !== null && $driver->activated_at !== null && Hash::check($data['password'], (string) $driver->password)) {
+            $this->guardSuspendedTenant($driver->loadMissing('tenant')->tenant);
+            $driver->forceFill(['last_login_at' => now()])->save();
+
+            return $this->tokenResponse($driver);
         }
 
-        $this->guardSuspended($driver);
-        $driver->forceFill(['last_login_at' => now()])->save();
+        $owner = $this->findOwner($data['email'], $data['password']);
+        if ($owner !== null) {
+            $this->guardSuspendedTenant($owner->loadMissing('tenant')->tenant);
 
-        return $this->tokenResponse($driver);
+            return $this->ownerTokenResponse($owner);
+        }
+
+        throw ValidationException::withMessages(['email' => [__('auth.failed')]]);
     }
 
     public function me(Request $request): JsonResponse
@@ -103,10 +116,16 @@ class DriverAuthController extends Controller
         return response()->json(['message' => 'ok']);
     }
 
-    /** A suspended company (disabled / banned / expired) blocks its drivers too. */
+    /** A suspended company (disabled / banned / expired) blocks the driver app. */
     private function guardSuspended(Driver $driver): void
     {
-        $reason = $driver->loadMissing('tenant')->tenant?->stateReason();
+        $this->guardSuspendedTenant($driver->loadMissing('tenant')->tenant);
+    }
+
+    /** Abort with the app's "account suspended" contract when the tenant is blocked. */
+    private function guardSuspendedTenant(?Tenant $tenant): void
+    {
+        $reason = $tenant?->stateReason();
         if ($reason !== null) {
             abort(response()->json([
                 'message' => 'account_suspended',
@@ -117,12 +136,38 @@ class DriverAuthController extends Controller
         }
     }
 
+    /**
+     * A dashboard manager/owner signing into the driver app: must belong to a
+     * tenant and hold an app-relevant role. Returns null on any mismatch.
+     */
+    private function findOwner(string $email, string $password): ?User
+    {
+        $user = User::where('email', $email)->first();
+        if ($user === null
+            || $user->tenant_id === null
+            || ! $user->hasAnyRole(['fleet_manager', 'owner'])
+            || ! Hash::check($password, (string) $user->password)) {
+            return null;
+        }
+
+        return $user;
+    }
+
     private function tokenResponse(Driver $driver): JsonResponse
     {
         $token = $driver->createToken('driver-app')->plainTextToken;
 
         return response()->json([
-            'data' => ['token' => $token, 'driver' => $this->profile($driver)],
+            'data' => ['token' => $token, 'is_owner' => false, 'driver' => $this->profile($driver)],
+        ]);
+    }
+
+    private function ownerTokenResponse(User $owner): JsonResponse
+    {
+        $token = $owner->createToken('driver-app')->plainTextToken;
+
+        return response()->json([
+            'data' => ['token' => $token, 'is_owner' => true, 'owner' => $this->ownerProfile($owner)],
         ]);
     }
 
@@ -138,6 +183,23 @@ class DriverAuthController extends Controller
             'locale' => $driver->locale,
             'company_name' => $driver->tenant?->name,
             'uber_linked' => $driver->uber_driver_uuid !== null,
+            'is_owner' => false,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function ownerProfile(User $owner): array
+    {
+        $owner->loadMissing('tenant');
+
+        return [
+            'id' => $owner->id,
+            'name' => $owner->name,
+            'email' => $owner->email,
+            'locale' => $owner->locale,
+            'company_name' => $owner->tenant?->name,
+            'uber_linked' => false,
+            'is_owner' => true,
         ];
     }
 }

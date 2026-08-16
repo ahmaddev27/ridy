@@ -23,11 +23,12 @@ class DriverDashboardController extends Controller
         $todayStart = CarbonImmutable::now()->startOfDay();
 
         $active = $this->scoped($driver->id)
+            ->with('driver:id,name')
             ->whereIn('status', [OfferStatus::Accepted, OfferStatus::Started])
             ->latest('received_at')
             ->first();
 
-        $recent = $this->scoped($driver->id)->latest('received_at')->limit(5)->get();
+        $recent = $this->scoped($driver->id)->with('driver:id,name')->latest('received_at')->limit(5)->get();
 
         return response()->json(['data' => [
             'driver' => [

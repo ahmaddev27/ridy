@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\V1\Driver\DriverAuthController;
 use App\Http\Controllers\Api\V1\Driver\DriverDashboardController;
 use App\Http\Controllers\Api\V1\Driver\DriverDeviceController;
 use App\Http\Controllers\Api\V1\Driver\DriverOfferController;
+use App\Http\Controllers\Api\V1\Driver\FleetController;
 use App\Http\Controllers\Api\V1\DriverController;
 use App\Http\Controllers\Api\V1\DriverInviteController;
 use App\Http\Controllers\Api\V1\DriverMetricController;
@@ -86,6 +87,17 @@ Route::prefix('v1')->group(function () {
                 Route::get('stats', [DriverDashboardController::class, 'stats']);
                 Route::get('offers', [DriverOfferController::class, 'index']);
             });
+        });
+
+        // Fleet-owner mode: a dashboard manager/owner signs into the SAME app and
+        // monitors ALL their drivers read-only. Their token resolves on the `User`
+        // (auth:sanctum, not auth:driver); `driver.active` still blocks a suspended
+        // tenant, and FleetController rejects non-tenant callers.
+        Route::middleware(['auth:sanctum', 'driver.active'])->prefix('fleet')->group(function () {
+            Route::get('me', [FleetController::class, 'me']);
+            Route::get('home', [FleetController::class, 'home']);
+            Route::get('offers', [FleetController::class, 'offers']);
+            Route::get('stats', [FleetController::class, 'stats']);
         });
     });
 

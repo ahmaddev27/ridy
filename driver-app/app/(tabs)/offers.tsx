@@ -4,10 +4,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { api, type Offer, type OffersQuery } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { t, isRTL, getLocale } from "@/lib/i18n";
 import { useColors, radius } from "@/lib/theme";
 import { fareLabel, cleanAddress, distanceLabel, euroQuality } from "@/lib/format";
 import { StatusBadge, QualityMark } from "@/components/ui";
+import { DriverTag } from "./index";
 
 const FILTERS = ["all", "pending", "accepted", "completed"] as const;
 const PER_PAGE = 20;
@@ -15,6 +17,7 @@ const PER_PAGE = 20;
 export default function OffersScreen() {
   const c = useColors();
   const router = useRouter();
+  const { isOwner } = useAuth();
   const align = isRTL() ? "right" : "left";
 
   const [search, setSearch] = useState("");
@@ -31,13 +34,13 @@ export default function OffersScreen() {
       const params: OffersQuery = { per_page: PER_PAGE, page: target };
       if (status !== "all") params.status = status;
       if (search.trim()) params.search = search.trim();
-      const res = await api.offers(params);
+      const res = isOwner ? await api.fleetOffers(params) : await api.offers(params);
       setLastPage(res.meta?.last_page ?? 1);
       setTotal(res.meta?.total ?? res.data.length);
       setPage(res.meta?.current_page ?? target);
       setOffers((prev) => (target === 1 ? res.data : [...prev, ...res.data]));
     },
-    [status, search],
+    [status, search, isOwner],
   );
 
   const reload = useCallback(async () => {
@@ -114,13 +117,13 @@ export default function OffersScreen() {
           </View>
         )}
         ListFooterComponent={loadingMore ? <ActivityIndicator color={c.ink} style={{ paddingVertical: 16 }} /> : null}
-        renderItem={({ item }) => <OfferCard offer={item} onPress={() => router.push(`/offer/${item.id}`)} />}
+        renderItem={({ item }) => <OfferCard offer={item} showDriver={isOwner} onPress={() => router.push(`/offer/${item.id}`)} />}
       />
     </SafeAreaView>
   );
 }
 
-function OfferCard({ offer, onPress }: { offer: Offer; onPress: () => void }) {
+function OfferCard({ offer, onPress, showDriver }: { offer: Offer; onPress: () => void; showDriver?: boolean }) {
   const c = useColors();
   const status = offer.status ?? "pending";
   const dim = status === "rejected" || status === "canceled";
@@ -136,6 +139,7 @@ function OfferCard({ offer, onPress }: { offer: Offer; onPress: () => void }) {
         <QualityMark mark={q.mark} good={q.good} />
       </View>
       <View style={{ flex: 1 }}>
+        {showDriver && offer.driver_name && <DriverTag name={offer.driver_name} />}
         <Text numberOfLines={1} style={{ color: c.ink, fontSize: 15, ...arrow("p") }}>↑ {cleanAddress(offer.pickup_address)}</Text>
         <Text numberOfLines={1} style={{ color: c.ink, fontSize: 15, ...arrow("d") }}>↓ {cleanAddress(offer.dropoff_address)}</Text>
       </View>

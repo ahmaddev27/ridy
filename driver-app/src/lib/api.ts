@@ -6,6 +6,8 @@ export type Offer = {
   id: number;
   offer_uuid: string;
   status: string | null;
+  /** Present in fleet-owner mode so a row can be attributed to its driver. */
+  driver_name?: string | null;
   pickup_address: string | null;
   dropoff_address: string | null;
   fare_formatted: string | null;
@@ -22,6 +24,17 @@ export type DriverProfile = {
   locale: string | null;
   company_name: string | null;
   uber_linked: boolean;
+  /** True when the signed-in account is a company owner/manager (read-only monitor). */
+  is_owner?: boolean;
+};
+
+/** Tenant-wide home for a fleet owner: every driver's offers, no personal trip. */
+export type FleetHomeData = {
+  owner: { name: string; company_name: string | null };
+  online_drivers: number;
+  today: DriverStats;
+  active_offers: Offer[];
+  recent: Offer[];
 };
 
 /** Aggregate counters returned by the home + stats endpoints. */
@@ -107,7 +120,11 @@ export class ApiClient {
   }
 
   login(email: string, password: string) {
-    return this.request<{ data: { token: string; driver: DriverProfile } }>("/api/v1/driver/login", {
+    // The response branches on `is_owner`: a driver carries `driver`, a fleet
+    // owner/manager carries `owner` (same profile shape).
+    return this.request<{
+      data: { token: string; is_owner: boolean; driver?: DriverProfile; owner?: DriverProfile };
+    }>("/api/v1/driver/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
@@ -115,6 +132,31 @@ export class ApiClient {
 
   me() {
     return this.request<{ data: DriverProfile }>("/api/v1/driver/me");
+  }
+
+  fleetMe() {
+    return this.request<{ data: DriverProfile }>("/api/v1/driver/fleet/me");
+  }
+
+  fleetHome() {
+    return this.request<{ data: FleetHomeData }>("/api/v1/driver/fleet/home");
+  }
+
+  fleetStats(from?: string, to?: string) {
+    const qs = new URLSearchParams();
+    if (from) qs.set("from", from);
+    if (to) qs.set("to", to);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return this.request<{ data: DriverStats }>(`/api/v1/driver/fleet/stats${suffix}`);
+  }
+
+  fleetOffers(params: OffersQuery = {}) {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") qs.set(key, String(value));
+    }
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return this.request<{ data: Offer[]; meta: PaginationMeta }>(`/api/v1/driver/fleet/offers${suffix}`);
   }
 
   updateProfile(patch: { name?: string; locale?: string; password?: string }) {
