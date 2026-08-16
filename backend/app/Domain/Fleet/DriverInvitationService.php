@@ -16,24 +16,31 @@ use Illuminate\Validation\ValidationException;
  */
 class DriverInvitationService
 {
+    /** An unused invite link stops working after this — a leaked/old link can't be replayed. */
+    public const INVITE_TTL_DAYS = 7;
+
     /**
-     * Issue (or re-issue) an invitation and email the activation link. Requires
-     * the driver to have an email on file.
+     * Issue (or re-issue) an invitation and email the activation link. Falls back
+     * to the driver's Uber email (captured when they were linked) so a manager
+     * doesn't have to type it; the chosen address becomes the driver's login email.
      */
     public function invite(Driver $driver): void
     {
-        if (blank($driver->email)) {
+        $email = filled($driver->email) ? $driver->email : $driver->uber_email;
+
+        if (blank($email)) {
             throw ValidationException::withMessages([
-                'email' => [__('The driver has no email address to invite.')],
+                'email' => [__('The driver has no email address (none on file and none from Uber).')],
             ]);
         }
 
         $driver->forceFill([
+            'email' => $email, // remember the login address (may have come from Uber)
             'invite_token' => Str::random(48),
             'invited_at' => now(),
         ])->save();
 
-        SendTemplatedMail::to($driver->email, 'driver_invite', [
+        SendTemplatedMail::to($email, 'driver_invite', [
             'company_name' => (string) ($driver->tenant?->name ?? 'Reidey'),
             'driver_name' => (string) $driver->name,
             'invite_link' => $this->activationLink($driver->invite_token),
@@ -42,13 +49,14 @@ class DriverInvitationService
 
     /**
      * Resolve a pending invitation by its token. Returns null when the token is
-     * unknown or already consumed.
+     * unknown, already consumed, or the invite has expired ({@see INVITE_TTL_DAYS}).
      */
     public function findByToken(string $token): ?Driver
     {
         return Driver::withoutGlobalScopes()
             ->where('invite_token', $token)
             ->whereNull('activated_at')
+            ->where('invited_at', '>=', now()->subDays(self::INVITE_TTL_DAYS))
             ->first();
     }
 

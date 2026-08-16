@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Notifications\Contracts\PushSender;
+use App\Domain\Notifications\EmailTemplateRenderer;
 use App\Domain\Notifications\Models\UserPushToken;
 use App\Domain\Notifications\Notifier;
 use App\Domain\Tenancy\Models\Tenant;
@@ -10,6 +11,7 @@ use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class NotifierTest extends TestCase
@@ -88,6 +90,37 @@ class NotifierTest extends TestCase
 
         $this->assertCount(0, $spy->calls, 'no external push for high-frequency events');
         $this->assertSame(1, $manager->fresh()->notifications()->count(), 'still stored in the bell');
+    }
+
+    public function test_important_event_also_emails_the_user_in_their_language(): void
+    {
+        // The test mailer is the array transport (phpunit.xml) — inspect what it captured.
+        $transport = Mail::mailer()->getSymfonyTransport();
+
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $manager = User::create(['name' => 'M', 'email' => 'm@a.de', 'password' => Hash::make('x'), 'tenant_id' => $tenant->id, 'locale' => 'en']);
+        $manager->assignRole('fleet_manager');
+
+        app(Notifier::class)->toTenant($tenant->id, 'subscription_expired', [], '/subscription');
+
+        $messages = $transport->messages();
+        $this->assertCount(1, $messages);
+        $this->assertSame('Subscription expired', $messages[0]->getOriginalMessage()->getSubject());
+        $this->assertStringContainsString('m@a.de', $messages[0]->getEnvelope()->getRecipients()[0]->getAddress());
+    }
+
+    public function test_notification_email_template_renders_the_event_copy(): void
+    {
+        $rendered = app(EmailTemplateRenderer::class)->render('notification', [
+            'title' => 'Subscription expired',
+            'body' => 'Your subscription has expired.',
+            'action_url' => 'https://r.fleeteye.de/subscription',
+            'action_label' => 'Open',
+        ]);
+
+        $this->assertStringContainsString('Subscription expired', $rendered['subject']);
+        $this->assertStringContainsString('Your subscription has expired.', $rendered['html']);
+        $this->assertStringContainsString('https://r.fleeteye.de/subscription', $rendered['html']);
     }
 
     public function test_dedupe_skips_a_second_unread_of_the_same_type(): void

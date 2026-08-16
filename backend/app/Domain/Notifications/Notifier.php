@@ -19,6 +19,12 @@ use Throwable;
  */
 class Notifier
 {
+    /** Frequent/low-value events that stay in-app only — never emailed. */
+    private const EMAIL_SKIP = ['session_connected'];
+
+    /** Localized label for the email call-to-action button. */
+    private const OPEN_LABEL = ['de' => 'Öffnen', 'en' => 'Open', 'ar' => 'فتح'];
+
     public function __construct(
         private readonly PushSender $sender,
         private readonly NotificationPushText $text,
@@ -58,7 +64,31 @@ class Notifier
 
             if ($push) {
                 $this->webPush($user, $type, $params, $href);
+                $this->email($user, $type, $params, $href);
             }
+        }
+    }
+
+    /** Also deliver important events by email, in the user's language. */
+    private function email(User $user, string $type, array $params, ?string $href): void
+    {
+        if (in_array($type, self::EMAIL_SKIP, true) || blank($user->email)) {
+            return;
+        }
+
+        $locale = $user->locale ?: 'de';
+        $copy = $this->text->for($type, $params, $locale);
+        $base = rtrim((string) config('app.frontend_url', config('app.url')), '/');
+
+        try {
+            SendTemplatedMail::to($user->email, 'notification', [
+                'title' => $copy['title'],
+                'body' => $copy['body'],
+                'action_url' => $href ? $base.$href : $base,
+                'action_label' => self::OPEN_LABEL[$locale] ?? self::OPEN_LABEL['de'],
+            ]);
+        } catch (Throwable) {
+            // Email is best-effort; a mailer hiccup must never break the bell write.
         }
     }
 
