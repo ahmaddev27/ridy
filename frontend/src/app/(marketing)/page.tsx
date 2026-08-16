@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import {
   Users,
   Smartphone,
@@ -50,54 +49,61 @@ const FAQ_PREVIEW = [
 export default function LandingPage() {
   return (
     <>
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="mx-auto grid min-h-[100dvh] max-w-[1200px] grid-cols-1 items-center gap-12 px-4 pb-16 pt-24 lg:grid-cols-2 lg:gap-16">
-          <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-ink-muted">
-              <ShieldCheck size={14} strokeWidth={1.75} className="text-emerald-600 dark:text-emerald-400" />
-              DSGVO-konform, Hosting in der EU
-            </span>
-            <h1 className="mt-6 text-4xl font-bold leading-[1.1] tracking-tight text-ink sm:text-5xl lg:text-6xl">
-              Deine Flotte.
-              <br />
-              Voll im Griff.
-            </h1>
-            <p className="mt-5 max-w-md text-lg leading-relaxed text-ink-muted">
-              Verwalte deine Fahrer, deine Abläufe und deine Abrechnung an einem Ort.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-ink transition-opacity hover:opacity-90"
-              >
-                Kostenlos starten
-                <ArrowRight size={16} strokeWidth={1.75} />
-              </Link>
-              <Link
-                href="#funktionen"
-                className="inline-flex items-center justify-center rounded-full border border-line bg-surface px-6 py-3 text-sm font-semibold text-ink transition-colors hover:bg-surface-2"
-              >
-                Funktionen ansehen
-              </Link>
-            </div>
+      {/* Hero (typographic, no image) */}
+      <section className="relative isolate overflow-hidden">
+        {/* Subtle token-based backdrop: faint emerald radial glow */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(16,185,129,0.12),transparent_70%)]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-px bg-gradient-to-r from-transparent via-line to-transparent"
+        />
+        <div className="mx-auto flex min-h-[100dvh] max-w-[880px] flex-col items-center justify-center px-4 pb-20 pt-24 text-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-ink-muted">
+            <ShieldCheck size={14} strokeWidth={1.75} className="text-emerald-600 dark:text-emerald-400" />
+            DSGVO-konform, Hosting in der EU
+          </span>
+          <h1 className="mt-8 text-5xl font-bold leading-[1.05] tracking-tight text-ink sm:text-6xl lg:text-7xl">
+            Deine Flotte.
+            <br />
+            Voll im Griff.
+          </h1>
+          <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-ink-muted sm:text-xl">
+            Fahrer, Abläufe und Abrechnung an einem Ort. Klar, schnell und mehrsprachig.
+          </p>
+          <div className="mt-10 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-7 py-3.5 text-sm font-semibold text-primary-ink transition-opacity hover:opacity-90"
+            >
+              Kostenlos starten
+              <ArrowRight size={16} strokeWidth={1.75} />
+            </Link>
+            <Link
+              href="#funktionen"
+              className="inline-flex items-center justify-center rounded-full border border-line bg-surface px-7 py-3.5 text-sm font-semibold text-ink transition-colors hover:bg-surface-2"
+            >
+              Funktionen ansehen
+            </Link>
           </div>
 
-          <div className="relative">
-            <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
-              <Image
-                src="https://picsum.photos/seed/reidey-fleet/1200/900"
-                alt="Abstrakte Darstellung einer vernetzten Flotte"
-                width={1200}
-                height={900}
-                priority
-                className="h-full w-full object-cover"
-              />
-            </div>
-            <div
-              aria-hidden
-              className="pointer-events-none absolute -inset-4 -z-10 rounded-[2rem] bg-emerald-500/10 blur-2xl"
-            />
+          {/* Compact key highlights */}
+          <div className="mt-16 grid w-full max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
+            {[
+              { icon: Users, label: "Fahrerverwaltung" },
+              { icon: Bell, label: "Echtzeit-Benachrichtigungen" },
+              { icon: Map, label: "Live-Karte" },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center justify-center gap-2.5 rounded-xl border border-line bg-surface px-4 py-3 text-sm font-medium text-ink"
+              >
+                <item.icon size={18} strokeWidth={1.75} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+                {item.label}
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -114,80 +120,68 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-6">
-            {/* Large tinted cell */}
-            <article className="flex flex-col justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-7 md:col-span-4 md:row-span-2">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-600 text-white">
-                <Users size={22} strokeWidth={1.75} />
-              </div>
-              <div className="mt-8">
-                <h3 className="text-xl font-semibold text-ink">Fahrerverwaltung & Einladungen</h3>
-                <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-muted">
-                  Lade Fahrer per E-Mail ein, verwalte Profile, Rollen und Status. Jeder Fahrer legt sein eigenes Passwort fest und ist in wenigen Minuten startklar.
-                </p>
-              </div>
-            </article>
-
-            {/* Icon-forward small cell */}
-            <article className="rounded-xl border border-line bg-canvas p-7 md:col-span-2">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-2 text-emerald-600 dark:text-emerald-400">
-                <Smartphone size={22} strokeWidth={1.75} />
-              </div>
-              <h3 className="mt-5 text-lg font-semibold text-ink">Mobile Fahrer-App</h3>
-              <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-                Echtzeit-Benachrichtigungen direkt aufs Smartphone deiner Fahrer.
-              </p>
-            </article>
-
-            {/* Icon-forward small cell */}
-            <article className="rounded-xl border border-line bg-canvas p-7 md:col-span-2">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-2 text-emerald-600 dark:text-emerald-400">
-                <Map size={22} strokeWidth={1.75} />
-              </div>
-              <h3 className="mt-5 text-lg font-semibold text-ink">Live-Karte deiner Fahrer</h3>
-              <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-                Behalte den Überblick über deine eigene Flotte in Echtzeit.
-              </p>
-            </article>
-
-            {/* Wide tinted cell */}
-            <article className="flex items-start gap-5 rounded-xl border border-line bg-surface-2 p-7 md:col-span-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
-                <Bell size={22} strokeWidth={1.75} />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-ink">Benachrichtigungen</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-                  Push, E-Mail und In-App. Erreiche deine Fahrer zuverlässig, einzeln oder als Broadcast an die ganze Flotte.
-                </p>
-              </div>
-            </article>
-
-            <article className="rounded-xl border border-line bg-canvas p-7 md:col-span-3">
-              <div className="flex items-start gap-5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-emerald-600 dark:text-emerald-400">
-                  <CreditCard size={22} strokeWidth={1.75} />
+          <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                icon: Users,
+                title: "Fahrerverwaltung & Einladungen",
+                text: "Lade Fahrer per E-Mail ein, verwalte Profile, Rollen und Status. Jeder Fahrer ist in wenigen Minuten startklar.",
+                tinted: true,
+              },
+              {
+                icon: Bell,
+                title: "Benachrichtigungen",
+                text: "Push, E-Mail und In-App. Erreiche deine Fahrer zuverlässig, einzeln oder als Broadcast an die ganze Flotte.",
+                tinted: true,
+              },
+              {
+                icon: Smartphone,
+                title: "Mobile Fahrer-App",
+                text: "Echtzeit-Benachrichtigungen direkt aufs Smartphone deiner Fahrer.",
+                tinted: false,
+              },
+              {
+                icon: Map,
+                title: "Live-Karte deiner Fahrer",
+                text: "Behalte den Überblick über deine eigene Flotte in Echtzeit.",
+                tinted: false,
+              },
+              {
+                icon: CreditCard,
+                title: "Abonnements & Abrechnung",
+                text: "Verwalte Pläne, Zahlungen und den Status deiner Flotte an einem Ort.",
+                tinted: false,
+              },
+              {
+                icon: Languages,
+                title: "Mehrsprachig",
+                text: "Dashboard und App in Deutsch, Englisch und Arabisch, inklusive Rechts-nach-links-Darstellung.",
+                tinted: false,
+              },
+            ].map((feature) => (
+              <article
+                key={feature.title}
+                className={
+                  "flex flex-col rounded-xl border p-7 " +
+                  (feature.tinted
+                    ? "border-emerald-500/30 bg-emerald-500/10"
+                    : "border-line bg-canvas")
+                }
+              >
+                <div
+                  className={
+                    "flex h-11 w-11 items-center justify-center rounded-full " +
+                    (feature.tinted
+                      ? "bg-emerald-600 text-white"
+                      : "bg-surface-2 text-emerald-600 dark:text-emerald-400")
+                  }
+                >
+                  <feature.icon size={22} strokeWidth={1.75} />
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-ink">Abonnements & Abrechnung</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-                    Verwalte Pläne, Zahlungen und den Status deiner Flotte an einem Ort.
-                  </p>
-                </div>
-              </div>
-            </article>
-
-            <article className="flex items-center gap-5 rounded-xl border border-line bg-canvas p-7 md:col-span-6">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-2 text-emerald-600 dark:text-emerald-400">
-                <Languages size={22} strokeWidth={1.75} />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-ink">Mehrsprachig</h3>
-                <p className="mt-1 text-sm leading-relaxed text-ink-muted">
-                  Dashboard und App in Deutsch, Englisch und Arabisch, inklusive Rechts-nach-links-Darstellung.
-                </p>
-              </div>
-            </article>
+                <h3 className="mt-6 text-lg font-semibold text-ink">{feature.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-muted">{feature.text}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>
