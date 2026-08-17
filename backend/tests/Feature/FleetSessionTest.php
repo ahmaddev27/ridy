@@ -54,6 +54,24 @@ class FleetSessionTest extends TestCase
         $this->assertArrayNotHasKey('cookies', $this->getJson('/api/v1/fleet-session')->json('data'));
     }
 
+    public function test_capture_is_refused_when_org_is_linked_to_another_company(): void
+    {
+        // Another company already holds a session for this Uber org.
+        $other = Tenant::create(['name' => 'Other', 'country' => 'DE']);
+        UberFleetSession::withoutGlobalScopes()->create([
+            'tenant_id' => $other->id, 'uber_org_uuid' => self::ORG, 'cookies' => [['name' => 'a', 'value' => 'b']],
+        ]);
+
+        Sanctum::actingAs($this->manager);
+        $this->postJson('/api/v1/fleet-session', [
+            'uber_org_uuid' => self::ORG,
+            'cookies' => [['name' => 'sid', 'value' => 'abc']],
+        ])->assertStatus(409)->assertJsonPath('message', 'uber_org_already_linked');
+
+        // The other company's session is untouched; ours was never created.
+        $this->assertSame(1, UberFleetSession::withoutGlobalScopes()->count());
+    }
+
     public function test_recapturing_updates_the_same_session(): void
     {
         Sanctum::actingAs($this->manager);

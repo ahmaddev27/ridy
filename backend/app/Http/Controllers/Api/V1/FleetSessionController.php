@@ -45,6 +45,23 @@ class FleetSessionController extends Controller
     {
         $tenant = $request->user()->tenant;
         $manual = $request->boolean('manual');
+        $orgUuid = (string) $request->string('uber_org_uuid');
+
+        // One Uber account = one company. If another tenant already holds a
+        // session for this org, refuse: two streams on the same account duplicate
+        // offers/drivers, burn two proxies, and get the Uber account flagged for
+        // concurrent logins. Disconnecting the other company deletes its session
+        // and frees the account.
+        $ownedElsewhere = UberFleetSession::withoutGlobalScopes()
+            ->where('uber_org_uuid', $orgUuid)
+            ->where('tenant_id', '!=', $tenant->id)
+            ->exists();
+        if ($ownedElsewhere) {
+            return response()->json([
+                'message' => 'uber_org_already_linked',
+                'reason' => 'This Uber account is already linked to another company.',
+            ], 409);
+        }
 
         // After an operator disconnects, the extension keeps auto-capturing on
         // every Uber page load. Refuse those silent (non-manual) captures until
