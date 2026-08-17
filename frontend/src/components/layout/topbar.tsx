@@ -106,7 +106,7 @@ export function Topbar() {
         </div>
       )}
 
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-line bg-surface/80 px-4 backdrop-blur sm:px-5">
+      <header className="sticky top-0 z-[1100] flex h-16 items-center gap-3 border-b border-line bg-surface/80 px-4 backdrop-blur sm:px-5">
         {/* Mobile nav toggle */}
         <button
           onClick={() => setNavOpen(true)}
