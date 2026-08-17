@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as Notifications from "expo-notifications";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -11,11 +12,34 @@ import { useColors } from "@/lib/theme";
 import { useAppFonts } from "@/lib/fonts";
 import { UpdateGate } from "@/components/update-gate";
 
+// Hold the native splash screen up until the fonts are registered, so the very
+// first painted frame already has Tajawal + the Ionicons glyph font. Without
+// this the tab-bar icons render as blank glyphs and Arabic falls back to the
+// system font on first paint (and don't reliably recover in a release build).
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/** Fonts must be ready before the first paint, but a failed/slow load must never
+ *  hang on the splash forever — fall through after this budget with the system
+ *  font (text stays readable, icons re-register once loaded). */
+const FONT_TIMEOUT_MS = 4000;
+
 export default function RootLayout() {
-  // Load Tajawal in the background; never block the first render on it, so a
-  // slow/failed font load can't leave the app on a blank white screen. Text
-  // re-renders with the font once it's ready.
-  useAppFonts();
+  const fontsReady = useAppFonts();
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    const id = setTimeout(() => setTimedOut(true), FONT_TIMEOUT_MS);
+    return () => clearTimeout(id);
+  }, []);
+
+  const ready = fontsReady || timedOut;
+
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync().catch(() => {});
+  }, [ready]);
+
+  // Keep the native splash visible (return nothing) until fonts are ready.
+  if (!ready) return null;
 
   return (
     <SafeAreaProvider>

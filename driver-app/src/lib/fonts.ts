@@ -20,13 +20,18 @@ export function useAppFonts(): boolean {
   // slow/failed load of one family can never block the other from registering
   // (a single combined batch would drop the tab-bar icons and the Arabic text
   // together the moment any one file failed).
-  const [textLoaded] = useFonts({
+  const [textLoaded, textError] = useFonts({
     Tajawal_400Regular,
     Tajawal_500Medium,
     Tajawal_700Bold,
     Tajawal_800ExtraBold,
   });
-  const [iconsLoaded] = useFonts(Ionicons.font);
+  const [iconsLoaded, iconsError] = useFonts(Ionicons.font);
+
+  // Surface a load failure so a broken font asset is diagnosable from device
+  // logs instead of silently degrading to the system font / blank glyphs.
+  if (textError) console.warn("font.tajawal_load_failed", textError);
+  if (iconsError) console.warn("font.ionicons_load_failed", iconsError);
 
   return textLoaded && iconsLoaded;
 }
