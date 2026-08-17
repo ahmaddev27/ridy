@@ -20,7 +20,7 @@ use Illuminate\Console\Command;
  */
 class DiagnoseDispatch extends Command
 {
-    protected $signature = 'dispatch:diagnose {--hours=24 : Offer window to summarise}';
+    protected $signature = 'dispatch:diagnose {--hours=24 : Offer window to summarise} {--tenant= : Drill into one company (uuid match + status freshness)}';
 
     protected $description = 'Report per-company session health and offer status breakdown.';
 
@@ -31,6 +31,10 @@ class DiagnoseDispatch extends Command
     {
         $now = CarbonImmutable::now();
         $since = $now->subHours((int) $this->option('hours'));
+
+        if ($this->option('tenant') !== null) {
+            return $this->drillTenant((int) $this->option('tenant'), $since, $now);
+        }
 
         $tenants = Tenant::query()->orderBy('id')->get();
         if ($tenants->isEmpty()) {
@@ -89,6 +93,74 @@ class DiagnoseDispatch extends Command
 
         $this->newLine();
         $this->line('<fg=gray>A company with a stale/needs_relink session and 0% taken has a dead Uber session — re-link it. "Linked/Drv" below the roster count means unlinked drivers can never be matched.</>');
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Deep-dive one tenant to separate the two failure modes behind "0% taken"
+     * despite a live session: (a) the supplier status poll is stale — drivers'
+     * status_synced_at is old / everyone stuck idle, so no EN_ROUTE/ON_TRIP edge
+     * is ever seen; or (b) a uuid mismatch — the RAMEN offer.driver_uuid never
+     * equals any driver's uber_driver_uuid, so the offer is orphaned.
+     */
+    private function drillTenant(int $tenantId, CarbonImmutable $since, CarbonImmutable $now): int
+    {
+        $tenant = Tenant::query()->find($tenantId);
+        if ($tenant === null) {
+            $this->error("Tenant #{$tenantId} not found.");
+
+            return self::FAILURE;
+        }
+
+        $this->info("Drill: #{$tenant->id} {$tenant->name}");
+
+        // Session cookie jars — RAMEN uses `cookies`, the status/roster poll uses
+        // `supplier_cookies`. A missing supplier jar = offers arrive but status never moves.
+        $session = UberFleetSession::withoutGlobalScopes()->where('tenant_id', $tenantId)->latest('last_event_at')->first();
+        if ($session !== null) {
+            $ramen = is_array($session->cookies) ? count($session->cookies) : 0;
+            $supplier = is_array($session->supplier_cookies) ? count($session->supplier_cookies) : 0;
+            $this->line("Session #{$session->id} status={$session->status} ramen_cookies={$ramen} <fg=".($supplier > 0 ? 'green' : 'red').">supplier_cookies={$supplier}</>");
+        }
+
+        // Drivers: is the status poll actually landing? (status_synced_at freshness + observed statuses)
+        $drivers = Driver::withoutGlobalScopes()->where('tenant_id', $tenantId)->get();
+        $uuids = $drivers->pluck('uber_driver_uuid')->filter()->all();
+        $driverRows = $drivers->map(function (Driver $d) use ($now) {
+            $age = $d->status_synced_at ? (int) CarbonImmutable::parse($d->status_synced_at)->diffInMinutes($now).'m' : 'never';
+
+            return [
+                mb_strimwidth((string) ($d->first_name ?? $d->name ?? '—'), 0, 18, '…'),
+                $d->uber_driver_uuid ? substr($d->uber_driver_uuid, 0, 8).'…' : '<fg=red>UNLINKED</>',
+                $d->online_status ?? '—',
+                $age,
+            ];
+        })->all();
+        $this->table(['Driver', 'uber_uuid', 'online_status', 'status_synced'], $driverRows);
+
+        // Offer→driver uuid match: how many offers reference a uuid that exists on a driver?
+        $offers = DispatchOffer::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('received_at', '>=', $since)
+            ->get(['offer_uuid', 'driver_uuid', 'driver_id', 'status', 'accept_window_seconds', 'received_at']);
+
+        $orphans = $offers->reject(fn ($o) => in_array($o->driver_uuid, $uuids, true))->count();
+        $matched = $offers->count() - $orphans;
+        $this->line("Offers in window: {$offers->count()}  matched_to_driver={$matched}  <fg=".($orphans > 0 ? 'red' : 'gray').">orphan_uuid={$orphans}</>");
+
+        // A sample so the mismatch is visible if uuids come from different namespaces.
+        $sample = $offers->take(8)->map(fn ($o) => [
+            substr($o->offer_uuid, 0, 8).'…',
+            in_array($o->driver_uuid, $uuids, true) ? '<fg=green>'.substr($o->driver_uuid, 0, 8).'…</>' : '<fg=red>'.substr($o->driver_uuid, 0, 8).'…✗</>',
+            $o->status,
+            (int) $o->accept_window_seconds.'s',
+        ])->all();
+        $this->table(['offer_uuid', 'offer.driver_uuid', 'status', 'window'], $sample);
+
+        $engaged = $drivers->filter(fn ($d) => in_array(strtoupper((string) $d->online_status), ['EN_ROUTE', 'ON_TRIP']) || str_contains(strtoupper((string) $d->online_status), 'EN_ROUTE') || str_contains(strtoupper((string) $d->online_status), 'ON_TRIP'))->count();
+        $this->newLine();
+        $this->line('<fg=gray>Read it as: orphan_uuid over 0 → offer.driver_uuid never matches a driver (linking/namespace bug). All status_synced=never/old or every online_status idle → the supplier status poll is not landing (check supplier_cookies). Drivers currently engaged (EN_ROUTE/ON_TRIP): '.$engaged.'.</>');
 
         return self::SUCCESS;
     }
