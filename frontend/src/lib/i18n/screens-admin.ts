@@ -81,6 +81,7 @@ const en: Dict = {
   },
   emailTemplates: {
     type_company_registration: "Company registration", type_company_otp: "Company sign-up code", type_password_otp: "Password reset code", type_driver_invite: "Driver invite", type_notification: "Notification (generic)",
+    type_subscription_expiring: "Subscription expiring", type_subscription_expired: "Subscription expired", type_subscription_activated: "Subscription activated", type_subscription_free: "Free subscription granted", type_session_needs_relink: "Uber session needs relink", type_company_banned: "Company banned", type_company_registered: "Company registered", type_proxy_expiring: "Proxy expiring", type_code_activated: "Activation code used",
     subject: "Subject", body: "Body", accent: "Accent color", logo: "Logo", logoAuto: "Reidey logo (automatic)", footer: "Footer",
     upload: "Upload", remove: "Remove", insertImage: "Insert image", insertVariable: "Insert variable",
     preview: "Live preview", save: "Save", saved: "Saved", saveFailed: "Couldn’t save", uploadFailed: "Upload failed",
@@ -261,6 +262,7 @@ const de: Dict = {
   },
   emailTemplates: {
     type_company_registration: "Firmenregistrierung", type_company_otp: "Firmen-Anmeldecode", type_password_otp: "Passwort-Reset-Code", type_driver_invite: "Fahrer-Einladung", type_notification: "Benachrichtigung (allgemein)",
+    type_subscription_expiring: "Abo läuft bald ab", type_subscription_expired: "Abo abgelaufen", type_subscription_activated: "Abo aktiviert", type_subscription_free: "Kostenloses Abo gewährt", type_session_needs_relink: "Uber-Verbindung erneuern", type_company_banned: "Firma gesperrt", type_company_registered: "Firma registriert", type_proxy_expiring: "Proxy läuft bald ab", type_code_activated: "Aktivierungscode eingelöst",
     subject: "Betreff", body: "Inhalt", accent: "Akzentfarbe", logo: "Logo", logoAuto: "Reidey-Logo (automatisch)", footer: "Fußzeile",
     upload: "Hochladen", remove: "Entfernen", insertImage: "Bild einfügen", insertVariable: "Variable einfügen",
     preview: "Live-Vorschau", save: "Speichern", saved: "Gespeichert", saveFailed: "Speichern fehlgeschlagen", uploadFailed: "Upload fehlgeschlagen",
@@ -439,6 +441,7 @@ const ar: Dict = {
   },
   emailTemplates: {
     type_company_registration: "تسجيل شركة", type_company_otp: "رمز تسجيل الشركة", type_password_otp: "رمز استعادة كلمة المرور", type_driver_invite: "دعوة سائق", type_notification: "إشعار (عام)",
+    type_subscription_expiring: "الاشتراك على وشك الانتهاء", type_subscription_expired: "انتهى الاشتراك", type_subscription_activated: "تم تفعيل الاشتراك", type_subscription_free: "تم منح اشتراك مجاني", type_session_needs_relink: "جلسة Uber تحتاج إعادة ربط", type_company_banned: "تم حظر الشركة", type_company_registered: "تم تسجيل شركة", type_proxy_expiring: "البروكسي على وشك الانتهاء", type_code_activated: "تم استخدام رمز التفعيل",
     subject: "العنوان", body: "النص", accent: "لون التمييز", logo: "الشعار", logoAuto: "شعار Reidey (تلقائي)", footer: "التذييل",
     upload: "رفع", remove: "إزالة", insertImage: "إدراج صورة", insertVariable: "إدراج متغير",
     preview: "معاينة حية", save: "حفظ", saved: "تم الحفظ", saveFailed: "تعذّر الحفظ", uploadFailed: "فشل الرفع",

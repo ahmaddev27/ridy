@@ -25,5 +25,14 @@ class EmailTemplate extends Model
         'company_otp' => ['name', 'otp'],
         'password_otp' => ['name', 'otp'],
         'notification' => ['title', 'body', 'action_url', 'action_label'],
+        'subscription_expiring' => ['title', 'body', 'action_url', 'action_label'],
+        'subscription_expired' => ['title', 'body', 'action_url', 'action_label'],
+        'subscription_activated' => ['title', 'body', 'action_url', 'action_label'],
+        'subscription_free' => ['title', 'body', 'action_url', 'action_label'],
+        'session_needs_relink' => ['title', 'body', 'action_url', 'action_label'],
+        'company_banned' => ['title', 'body', 'action_url', 'action_label'],
+        'company_registered' => ['title', 'body', 'action_url', 'action_label'],
+        'proxy_expiring' => ['title', 'body', 'action_url', 'action_label'],
+        'code_activated' => ['title', 'body', 'action_url', 'action_label'],
     ];
 }

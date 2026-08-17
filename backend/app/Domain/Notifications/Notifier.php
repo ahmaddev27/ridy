@@ -4,6 +4,7 @@ namespace App\Domain\Notifications;
 
 use App\Domain\Notifications\Contracts\PushSender;
 use App\Domain\Notifications\Models\UserPushToken;
+use App\Models\EmailTemplate;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Throwable;
@@ -116,8 +117,11 @@ class Notifier
         $copy = $this->text->for($type, $params, $locale);
         $base = rtrim((string) config('app.frontend_url', config('app.url')), '/');
 
+        // Prefer a per-event template when one is seeded; else the generic one.
+        $key = EmailTemplate::whereKey($type)->exists() ? $type : 'notification';
+
         try {
-            SendTemplatedMail::to($user->email, 'notification', [
+            SendTemplatedMail::to($user->email, $key, [
                 'title' => $copy['title'],
                 'body' => $copy['body'],
                 'action_url' => $href ? $base.$href : $base,
