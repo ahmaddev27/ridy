@@ -80,7 +80,7 @@ const en: Dict = {
     noPlans: "No plans yet — add one so resellers can issue codes.", deletePlan: "Delete", deletePlanConfirm: "Delete plan {name}?", planSaved: "Plan saved", planDeleted: "Plan deleted", planDays: "days", failed: "Action failed",
   },
   emailTemplates: {
-    type_company_registration: "Company registration", type_company_otp: "Company sign-up code", type_password_otp: "Password reset code", type_driver_invite: "Driver invite",
+    type_company_registration: "Company registration", type_company_otp: "Company sign-up code", type_password_otp: "Password reset code", type_driver_invite: "Driver invite", type_notification: "Notification (generic)",
     subject: "Subject", body: "Body", accent: "Accent color", logo: "Logo", logoAuto: "Reidey logo (automatic)", footer: "Footer",
     upload: "Upload", remove: "Remove", insertImage: "Insert image", insertVariable: "Insert variable",
     preview: "Live preview", save: "Save", saved: "Saved", saveFailed: "Couldn’t save", uploadFailed: "Upload failed",
@@ -260,7 +260,7 @@ const de: Dict = {
     noPlans: "Noch keine Pakete — füge eins hinzu, damit Vertriebler Codes ausstellen können.", deletePlan: "Löschen", deletePlanConfirm: "Paket {name} löschen?", planSaved: "Paket gespeichert", planDeleted: "Paket gelöscht", planDays: "Tage", failed: "Aktion fehlgeschlagen",
   },
   emailTemplates: {
-    type_company_registration: "Firmenregistrierung", type_company_otp: "Firmen-Anmeldecode", type_password_otp: "Passwort-Reset-Code", type_driver_invite: "Fahrer-Einladung",
+    type_company_registration: "Firmenregistrierung", type_company_otp: "Firmen-Anmeldecode", type_password_otp: "Passwort-Reset-Code", type_driver_invite: "Fahrer-Einladung", type_notification: "Benachrichtigung (allgemein)",
     subject: "Betreff", body: "Inhalt", accent: "Akzentfarbe", logo: "Logo", logoAuto: "Reidey-Logo (automatisch)", footer: "Fußzeile",
     upload: "Hochladen", remove: "Entfernen", insertImage: "Bild einfügen", insertVariable: "Variable einfügen",
     preview: "Live-Vorschau", save: "Speichern", saved: "Gespeichert", saveFailed: "Speichern fehlgeschlagen", uploadFailed: "Upload fehlgeschlagen",
@@ -438,7 +438,7 @@ const ar: Dict = {
     noPlans: "ما في باقات بعد — أضف باقة عشان الموزّعين يقدروا يولّدوا أكواد.", deletePlan: "حذف", deletePlanConfirm: "حذف الباقة {name}؟", planSaved: "تم حفظ الباقة", planDeleted: "تم حذف الباقة", planDays: "يوم", failed: "فشل الإجراء",
   },
   emailTemplates: {
-    type_company_registration: "تسجيل شركة", type_company_otp: "رمز تسجيل الشركة", type_password_otp: "رمز استعادة كلمة المرور", type_driver_invite: "دعوة سائق",
+    type_company_registration: "تسجيل شركة", type_company_otp: "رمز تسجيل الشركة", type_password_otp: "رمز استعادة كلمة المرور", type_driver_invite: "دعوة سائق", type_notification: "إشعار (عام)",
     subject: "العنوان", body: "النص", accent: "لون التمييز", logo: "الشعار", logoAuto: "شعار Reidey (تلقائي)", footer: "التذييل",
     upload: "رفع", remove: "إزالة", insertImage: "إدراج صورة", insertVariable: "إدراج متغير",
     preview: "معاينة حية", save: "حفظ", saved: "تم الحفظ", saveFailed: "تعذّر الحفظ", uploadFailed: "فشل الرفع",
