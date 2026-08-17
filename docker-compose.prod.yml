@@ -15,12 +15,11 @@ x-app-env: &app-env
   APP_DEBUG: "false"
   APP_URL: https://${DOMAIN}
   FRONTEND_URL: https://${DOMAIN}
-  # Domain(s) the dashboard's SPA-cookie auth is stateful on. Defaults to DOMAIN;
-  # set explicitly (comma-separated, no spaces) to serve more than one.
-  SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:-${DOMAIN}}
-  # Left empty on purpose: a host-only session cookie is issued per domain, so
-  # two unrelated apex domains each keep their own session (one shared cookie is
-  # impossible across different registrable domains).
+  # SANCTUM_STATEFUL_DOMAINS is deliberately NOT set: Sanctum then derives the
+  # stateful host from APP_URL (= https://${DOMAIN}) automatically, so SPA-cookie
+  # login just works from the domain with zero extra config. Single source of
+  # truth = DOMAIN. (Override via .env only if you truly need extra hosts.)
+  # SESSION_DOMAIN empty -> host-only session cookie for the domain.
   SESSION_DOMAIN: ${SESSION_DOMAIN:-}
   SESSION_DRIVER: database
   CACHE_STORE: database
