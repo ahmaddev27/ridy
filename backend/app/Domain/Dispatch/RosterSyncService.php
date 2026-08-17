@@ -36,7 +36,7 @@ class RosterSyncService
                 continue;
             }
 
-            $driver = $this->canonicalDriver($uuid);
+            $driver = $this->canonicalDriver($tenantId, $uuid);
             $wasNew = $driver === null;
 
             $attributes = [
@@ -84,9 +84,16 @@ class RosterSyncService
      * roster never lists a driver twice. A pending invite/login on any extra is
      * carried onto the canonical so a merge never invalidates an active invite.
      */
-    private function canonicalDriver(string $uuid): ?Driver
+    private function canonicalDriver(int $tenantId, string $uuid): ?Driver
     {
-        $rows = Driver::where('uber_driver_uuid', $uuid)->orderBy('id')->get();
+        // Explicit tenant_id (not just the global scope) — this method DELETES
+        // rows, so it must never reach across tenants even if the tenant context
+        // were ever unset (the scope is a no-op then).
+        $rows = Driver::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('uber_driver_uuid', $uuid)
+            ->orderBy('id')
+            ->get();
         if ($rows->isEmpty()) {
             return null;
         }
