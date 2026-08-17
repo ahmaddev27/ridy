@@ -137,9 +137,11 @@ jobs:
               touch "$APP_DIR/.seeded"
             fi
 
-            # Clear any stale cached config first, then re-cache the fresh one, so
-            # a config change (domain, stateful hosts) can never be served stale.
-            $COMPOSE exec -T backend php artisan config:clear || true
+            # Clear ALL stale caches (config + routes + views + events), then
+            # re-cache config. Clearing routes is essential: a cached route file
+            # would keep serving the old middleware stack, so new route guards
+            # (e.g. fleet.connected) would silently not apply.
+            $COMPOSE exec -T backend php artisan optimize:clear || true
             $COMPOSE exec -T backend php artisan config:cache || true
             echo "Deploy complete: https://$DOMAIN"
         env:
