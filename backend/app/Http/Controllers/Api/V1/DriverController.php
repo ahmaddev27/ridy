@@ -14,6 +14,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Validation\Rule;
 
 class DriverController extends Controller
 {
@@ -55,6 +56,22 @@ class DriverController extends Controller
     /** A single driver (tenant-scoped by route-model binding) for the profile page. */
     public function show(Driver $driver): DriverResource
     {
+        return new DriverResource($driver);
+    }
+
+    /**
+     * Manager edits a driver's app login email (so a test account can be created
+     * and invited without an Uber email). Route-model binding keeps it within the
+     * manager's own tenant; the email stays globally unique across drivers.
+     */
+    public function update(Request $request, Driver $driver): DriverResource
+    {
+        $data = $request->validate([
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('drivers', 'email')->ignore($driver->id)],
+        ]);
+
+        $driver->forceFill(['email' => $data['email'] ?: null])->save();
+
         return new DriverResource($driver);
     }
 

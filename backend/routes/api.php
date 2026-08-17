@@ -139,6 +139,7 @@ Route::prefix('v1')->group(function () {
         Route::get('drivers', [DriverController::class, 'index']);
         Route::get('drivers/live', [DriverController::class, 'live']);
         Route::get('drivers/{driver}', [DriverController::class, 'show']);
+        Route::patch('drivers/{driver}', [DriverController::class, 'update']);
         Route::get('drivers/{driver}/stats', [DriverController::class, 'stats']);
         Route::post('drivers/sync', [DriverController::class, 'sync']);
         Route::post('drivers/roster', [DriverController::class, 'ingestRoster']);
