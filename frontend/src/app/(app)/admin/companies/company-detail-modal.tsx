@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { latnLocale } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift } from "lucide-react";
+import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import {
   resetCompanyUserPassword,
   forceRelink,
   deleteCompanySession,
+  startImpersonation,
   generateActivationCode,
   grantFreeSubscription,
   reactivateCompany,
@@ -207,6 +208,20 @@ export function CompanyDetail({
     } catch (e) {
       toast.error(c("actionFailed"), { description: e instanceof Error ? e.message : undefined });
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loginAsCompany() {
+    setBusy(true);
+    try {
+      await startImpersonation(id);
+      toast.success(c("impersonateStarted"));
+      // Full reload: the session identity changed, so every cached query must
+      // refetch as the manager. Client-side navigation would keep stale data.
+      window.location.assign("/");
+    } catch (e) {
+      toast.error(c("impersonateFailed"), { description: e instanceof Error ? e.message : undefined });
       setBusy(false);
     }
   }
@@ -506,6 +521,14 @@ export function CompanyDetail({
                     <Trash2 className="h-4 w-4" /> {c("deleteSession")}
                   </Button>
                 </div>
+              </Section>
+
+              {/* Act as this company — swaps the SPA session to a manager. */}
+              <Section title={c("impersonate")}>
+                <p className="mb-2 text-xs text-ink-subtle">{c("impersonateHint")}</p>
+                <Button variant="secondary" onClick={loginAsCompany} disabled={busy}>
+                  <LogIn className="h-4 w-4 rtl:rotate-180" /> {c("impersonate")}
+                </Button>
               </Section>
 
               {/* Enable/disable lives in the status toggle at the top of the panel,

@@ -180,6 +180,10 @@ const en: Dict = {
     confirm_relink_body: "The Uber session is marked needs-relink; offers stop until the manager reconnects.",
     confirm_deleteSession_title: "Delete session?",
     confirm_deleteSession_body: "The Uber session is deleted; the manager must reconnect from scratch.",
+    impersonate: "Log in as company",
+    impersonateHint: "Take over this company's session as one of its managers. You can stop and return to admin at any time.",
+    impersonateStarted: "You are now acting as the company",
+    impersonateFailed: "Couldn’t log in as company",
   },
 };
 
@@ -359,6 +363,10 @@ const de: Dict = {
     confirm_relink_body: "Die Uber-Sitzung wird auf „neu verbinden“ gesetzt; Angebote stoppen bis zur erneuten Verbindung.",
     confirm_deleteSession_title: "Sitzung löschen?",
     confirm_deleteSession_body: "Die Uber-Sitzung wird gelöscht; der Manager muss neu verbinden.",
+    impersonate: "Als Firma anmelden",
+    impersonateHint: "Übernimm die Sitzung dieser Firma als einer ihrer Manager. Du kannst jederzeit beenden und zur Administration zurückkehren.",
+    impersonateStarted: "Du bist jetzt als Firma angemeldet",
+    impersonateFailed: "Anmeldung als Firma fehlgeschlagen",
   },
 };
 
@@ -538,6 +546,10 @@ const ar: Dict = {
     confirm_relink_body: "بتنعلّم جلسة أوبر «تحتاج إعادة ربط»؛ العروض بتوقف لحد ما المدير يعيد الربط.",
     confirm_deleteSession_title: "حذف الجلسة؟",
     confirm_deleteSession_body: "بتنحذف جلسة أوبر؛ المدير لازم يعيد الربط من الصفر.",
+    impersonate: "تسجيل الدخول كشركة",
+    impersonateHint: "تولَّ جلسة هذه الشركة كأحد مدرائها. تقدر توقف وترجع للإدارة في أي وقت.",
+    impersonateStarted: "أنت الآن مسجّل دخول كشركة",
+    impersonateFailed: "فشل تسجيل الدخول كشركة",
   },
 };
 

@@ -433,6 +433,28 @@ export async function deleteCompanySession(id: number): Promise<void> {
   await apiFetch(`${base}/${id}/session`, { method: "DELETE", withCsrf: true });
 }
 
+// ── Impersonation ("act as company") ─────────────────────────────────────────
+export type ImpersonationResult = {
+  user: { id: number; name: string; email: string };
+  company: { id: number; name: string };
+};
+
+/** Super-admin swaps the current SPA session identity to one of the company's
+ *  managers. After a 200 the browser session IS that manager — the app must be
+ *  hard-reloaded so all cached data refetches under the new identity. */
+export async function startImpersonation(tenantId: number): Promise<ImpersonationResult> {
+  const res = await apiFetch<{ data: ImpersonationResult }>(
+    `${base}/${tenantId}/impersonate`,
+    { method: "POST", withCsrf: true },
+  );
+  return res.data;
+}
+
+/** Reverts the session back to the super-admin. */
+export async function stopImpersonation(): Promise<void> {
+  await apiFetch(`/api/v1/impersonate/stop`, { method: "POST", withCsrf: true });
+}
+
 // ── Billing reports ──────────────────────────────────────────────────────────
 export type BillingSummary = {
   revenue_by_month: { month: string; total: number }[];

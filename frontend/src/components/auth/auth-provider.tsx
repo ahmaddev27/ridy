@@ -12,6 +12,8 @@ import { AuthUser, fetchMe, logout as apiLogout } from "@/lib/api/auth";
 
 type AuthState = {
   user: AuthUser | null;
+  /** True while a super-admin is acting as a company manager (impersonation). */
+  impersonating: boolean;
   loading: boolean;
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -21,14 +23,18 @@ const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [impersonating, setImpersonating] = useState(false);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   const refresh = useCallback(async () => {
     try {
-      setUser(await fetchMe());
+      const me = await fetchMe();
+      setUser(me.user);
+      setImpersonating(me.impersonating);
     } catch {
       setUser(null);
+      setImpersonating(false);
     } finally {
       setLoading(false);
     }
@@ -43,12 +49,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await apiLogout();
     } finally {
       setUser(null);
+      setImpersonating(false);
       router.push("/login");
     }
   }, [router]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, refresh, signOut }}>
+    <AuthContext.Provider value={{ user, impersonating, loading, refresh, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -68,6 +68,7 @@ const en = {
     profile: { title: "Profile", subtitle: "Edit your account." },
   },
   extBanner: { missing: "Reidey not installed — offers won’t be captured.", outdated: "Reidey is outdated — please update it.", unpaired: "Reidey isn’t paired yet.", action: "Fix" },
+  impersonation: { banner: "You are acting as {company}.", bannerNoCompany: "You are acting as a company.", stop: "Stop" },
   common: {
     save: "Save changes",
     newOffer: "New offer",
@@ -215,6 +216,7 @@ const de: typeof en = {
     profile: { title: "Profil", subtitle: "Dein Konto bearbeiten." },
   },
   extBanner: { missing: "Reidey nicht installiert — Angebote werden nicht erfasst.", outdated: "Reidey ist veraltet — bitte aktualisieren.", unpaired: "Reidey ist noch nicht gekoppelt.", action: "Beheben" },
+  impersonation: { banner: "Du bist als {company} angemeldet.", bannerNoCompany: "Du bist als Firma angemeldet.", stop: "Beenden" },
   common: {
     save: "Änderungen speichern",
     newOffer: "Neues Angebot",
@@ -363,6 +365,7 @@ const ar: typeof en = {
     profile: { title: "الملف الشخصي", subtitle: "تعديل حسابك." },
   },
   extBanner: { missing: "رايدي غير مثبّتة — لن تُلتقط العروض.", outdated: "رايدي قديمة — رجاءً حدّثها.", unpaired: "رايدي غير مقترنة بعد.", action: "إصلاح" },
+  impersonation: { banner: "أنت مسجّل دخول كشركة {company}.", bannerNoCompany: "أنت مسجّل دخول كشركة.", stop: "إيقاف" },
   common: {
     save: "حفظ التغييرات",
     newOffer: "عرض جديد",
