@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
-import { login } from "@/lib/api/auth";
+import { login, fetchMe } from "@/lib/api/auth";
+import type { AuthUser } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n/context";
 import { apiErrorMessage } from "@/lib/api/error-message";
@@ -16,9 +17,17 @@ import { OtpInput } from "@/components/ui/otp-input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { SuspendedScreen, type SuspendedInfo } from "@/components/auth/suspended-screen";
 
+/** Where a signed-in user belongs, by role. */
+function homeFor(u: AuthUser): string {
+  return u.roles.includes("super_admin") ? "/admin" : u.roles.includes("reseller") ? "/reseller" : "/dashboard";
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { t } = useI18n();
+  // Already-authenticated users must not see the login form — bounce them to
+  // their home. Show a loader until that check resolves so the form never flashes.
+  const [checkingSession, setCheckingSession] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -27,9 +36,24 @@ export default function LoginPage() {
   const [activateMode, setActivateMode] = useState(false);
   const [code, setCode] = useState("");
 
+  useEffect(() => {
+    let active = true;
+    fetchMe()
+      .then((me) => {
+        if (active) router.replace(homeFor(me.user));
+      })
+      .catch(() => {
+        // Not signed in (401) — show the login form.
+        if (active) setCheckingSession(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
   async function goAfterLogin() {
     const u = await login(email, password, remember);
-    router.push(u.roles.includes("super_admin") ? "/admin" : u.roles.includes("reseller") ? "/reseller" : "/dashboard");
+    router.push(homeFor(u));
   }
 
   async function onActivate(e: React.FormEvent) {
@@ -51,7 +75,7 @@ export default function LoginPage() {
     try {
       const u = await login(email, password, remember);
       // Super-admins land on the platform panel; managers on their dashboard.
-      router.push(u.roles.includes("super_admin") ? "/admin" : u.roles.includes("reseller") ? "/reseller" : "/dashboard");
+      router.push(homeFor(u));
     } catch (err) {
       // A suspended company (disabled/banned/expired) → the contact/activate screen.
       if (err instanceof ApiError && err.status === 403 && err.data?.reason) {
@@ -72,6 +96,16 @@ export default function LoginPage() {
       toast.error(t("login.failed"), { description: message });
       setSubmitting(false);
     }
+  }
+
+  // While confirming an existing session, show a loader instead of the form so
+  // an already-authenticated visitor never flashes the login screen.
+  if (checkingSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-2 p-4">
+        <Loader2 className="h-6 w-6 animate-spin text-ink-subtle" />
+      </div>
+    );
   }
 
   return (
