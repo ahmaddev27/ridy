@@ -47,13 +47,23 @@ class FleetSessionService
             $attributes['supplier_cookies'] = $supplierCookies;
         }
 
+        // Was this org already streaming before this capture? Routine cookie
+        // refreshes re-call capture() constantly; only a genuinely new or
+        // reconnected session should notify, otherwise managers get spammed.
+        $wasActive = UberFleetSession::where('tenant_id', $tenant->id)
+            ->where('uber_org_uuid', $uberOrgUuid)
+            ->where('status', UberFleetSession::STATUS_ACTIVE)
+            ->exists();
+
         $session = UberFleetSession::updateOrCreate(
             ['tenant_id' => $tenant->id, 'uber_org_uuid' => $uberOrgUuid],
             $attributes,
         );
 
-        // Alert the fleet's managers that a fresh session is now live.
-        $this->notifier->toTenant($tenant->id, 'session_connected', ['company' => $tenant->name], '/connections');
+        // Alert the fleet's managers only when the session actually (re)connects.
+        if (! $wasActive) {
+            $this->notifier->toTenant($tenant->id, 'session_connected', ['company' => $tenant->name], '/connections');
+        }
 
         return $session;
     }
