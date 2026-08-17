@@ -12,7 +12,10 @@ name: Deploy
 #   DOMAIN                  — reidey.de
 #   APP_KEY                 — base64 app key (php artisan key:generate --show); or leave blank to auto-generate
 #   DB_PASSWORD, DB_ROOT_PASSWORD, DISPATCH_INGEST_SECRET  — strong random strings
-#   FCM_SERVER_KEY          — optional (blank = pushes logged, not sent)
+#   FCM_CREDENTIALS_JSON    — the full Google service-account JSON (Firebase →
+#                             Project settings → Service accounts → Generate key).
+#                             Blank = pushes are only logged, never delivered.
+#   FCM_PROJECT_ID          — optional; defaults to the id inside the JSON
 on:
   push:
     branches: [main]
@@ -36,7 +39,7 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SSH_PORT }}
           # Pass secrets as env so they never appear in the script text/logs.
-          envs: REPO_URL,DOMAIN,APP_KEY,DB_PASSWORD,DB_ROOT_PASSWORD,DISPATCH_INGEST_SECRET,FCM_SERVER_KEY
+          envs: REPO_URL,DOMAIN,APP_KEY,DB_PASSWORD,DB_ROOT_PASSWORD,DISPATCH_INGEST_SECRET,FCM_CREDENTIALS_JSON,FCM_PROJECT_ID
           script_stop: true
           script: |
             set -e
@@ -74,6 +77,17 @@ jobs:
             # (a new key would make previously-encrypted data undecryptable).
             if [ -z "$APP_KEY" ] && [ -f "$APP_DIR/.app_key" ]; then APP_KEY="$(cat "$APP_DIR/.app_key")"; fi
             if [ -z "$APP_KEY" ]; then APP_KEY="base64:$(head -c 32 /dev/urandom | base64 | tr -d '\n')"; printf '%s' "$APP_KEY" > "$APP_DIR/.app_key"; fi
+
+            # FCM HTTP v1: materialise the service-account JSON from the secret so
+            # the backend container can read it (./backend is mounted at /var/www).
+            # Empty secret -> no file -> FcmPushSender falls back to logging only.
+            FCM_CREDENTIALS_PATH=""
+            if [ -n "$FCM_CREDENTIALS_JSON" ]; then
+              mkdir -p "$APP_DIR/backend/storage/app"
+              printf '%s' "$FCM_CREDENTIALS_JSON" > "$APP_DIR/backend/storage/app/fcm-credentials.json"
+              FCM_CREDENTIALS_PATH="/var/www/storage/app/fcm-credentials.json"
+            fi
+
             cat > .env <<EOF
             DOMAIN=$DOMAIN
             SITE_ADDRESS=$DOMAIN
@@ -85,7 +99,8 @@ jobs:
             DB_PASSWORD=$DB_PASSWORD
             DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD
             DISPATCH_INGEST_SECRET=$DISPATCH_INGEST_SECRET
-            FCM_SERVER_KEY=$FCM_SERVER_KEY
+            FCM_CREDENTIALS=$FCM_CREDENTIALS_PATH
+            FCM_PROJECT_ID=$FCM_PROJECT_ID
             EOF
 
             # --- 4. Free the web ports + build + start ------------------------
@@ -132,4 +147,5 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD }}
           DISPATCH_INGEST_SECRET: ${{ secrets.DISPATCH_INGEST_SECRET }}
-          FCM_SERVER_KEY: ${{ secrets.FCM_SERVER_KEY }}
+          FCM_CREDENTIALS_JSON: ${{ secrets.FCM_CREDENTIALS_JSON }}
+          FCM_PROJECT_ID: ${{ secrets.FCM_PROJECT_ID }}
