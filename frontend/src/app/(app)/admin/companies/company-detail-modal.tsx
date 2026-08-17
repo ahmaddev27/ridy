@@ -21,6 +21,7 @@ import {
   resetCompanyUserPassword,
   forceRelink,
   deleteCompanySession,
+  purgeCompanyData,
   startImpersonation,
   generateActivationCode,
   grantFreeSubscription,
@@ -65,7 +66,7 @@ export function CompanyDetail({
   const [tab, setTab] = useState<"details" | "subscription" | "managers" | "drivers" | "offers" | "vehicles">("details");
 
   // Sub-actions.
-  const [confirm, setConfirm] = useState<null | "disable" | "relink" | "deleteSession">(null);
+  const [confirm, setConfirm] = useState<null | "disable" | "relink" | "deleteSession" | "purgeData">(null);
   const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
 
   // Subscription/activation — a code is generated against a plan, paid optional.
@@ -228,9 +229,13 @@ export function CompanyDetail({
 
   async function runConfirm() {
     if (!confirm) return;
+    if (confirm === "purgeData") {
+      await runPurge();
+      return;
+    }
     setBusy(true);
     try {
-      if (confirm === "disable") await setCompanyActive(id, false); // reversible — never deletes
+      if (confirm === "disable") await setCompanyActive(id, false); // reversible, never deletes
       if (confirm === "relink") await forceRelink(id);
       if (confirm === "deleteSession") await deleteCompanySession(id);
       toast.success(c("done"));
@@ -238,6 +243,28 @@ export function CompanyDetail({
       onChanged();
     } catch (e) {
       toast.error(c("actionFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+      setConfirm(null);
+    }
+  }
+
+  async function runPurge() {
+    setBusy(true);
+    try {
+      const counts = await purgeCompanyData(id);
+      const summary = c("purgedCounts")
+        .replace("{drivers}", String(counts.drivers))
+        .replace("{vehicles}", String(counts.vehicles))
+        .replace("{offers}", String(counts.offers))
+        .replace("{devices}", String(counts.device_tokens))
+        .replace("{metrics}", String(counts.driver_metrics))
+        .replace("{sessions}", String(counts.sessions));
+      toast.success(c("purgedToast"), { description: summary });
+      await load();
+      onChanged();
+    } catch (e) {
+      toast.error(c("purgeFailed"), { description: e instanceof Error ? e.message : undefined });
     } finally {
       setBusy(false);
       setConfirm(null);
@@ -519,6 +546,11 @@ export function CompanyDetail({
                   </Button>
                   <Button variant="secondary" onClick={() => setConfirm("deleteSession")} disabled={busy || !company.session_status}>
                     <Trash2 className="h-4 w-4" /> {c("deleteSession")}
+                  </Button>
+                </div>
+                <div className="mt-3 border-t border-line pt-3">
+                  <Button variant="danger" onClick={() => setConfirm("purgeData")} disabled={busy}>
+                    <Trash2 className="h-4 w-4" /> {c("purgeData")}
                   </Button>
                 </div>
               </Section>

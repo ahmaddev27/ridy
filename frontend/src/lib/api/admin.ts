@@ -433,6 +433,27 @@ export async function deleteCompanySession(id: number): Promise<void> {
   await apiFetch(`${base}/${id}/session`, { method: "DELETE", withCsrf: true });
 }
 
+/** Per-entity counts returned when a company's operational data is wiped. */
+export type CompanyDataPurgeCounts = {
+  device_tokens: number;
+  driver_metrics: number;
+  offers: number;
+  vehicles: number;
+  drivers: number;
+  sessions: number;
+};
+
+/** Disconnects the Uber session and PERMANENTLY deletes all operational data
+ *  (drivers, vehicles, offers, devices, metrics) for the company. Keeps the
+ *  company account, its users and billing history. Not reversible. */
+export async function purgeCompanyData(tenantId: number): Promise<CompanyDataPurgeCounts> {
+  const res = await apiFetch<{ data: CompanyDataPurgeCounts }>(`${base}/${tenantId}/data`, {
+    method: "DELETE",
+    withCsrf: true,
+  });
+  return res.data;
+}
+
 // ── Impersonation ("act as company") ─────────────────────────────────────────
 export type ImpersonationResult = {
   user: { id: number; name: string; email: string };

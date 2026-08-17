@@ -69,7 +69,9 @@ export default function CompanySubscriptionPage() {
                     <td className="px-4 py-3">
                       {r.code_status ? <Badge status={CODE_TONE[r.code_status]}>{c(`st_${r.code_status}`)}</Badge> : <span className="text-ink-subtle">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-ink-muted" dir="ltr">{date(r.starts_at)} – {date(r.ends_at)}</td>
+                    <td className="px-4 py-3 text-start text-ink-muted whitespace-nowrap">
+                      <span dir="ltr">{date(r.starts_at)} - {date(r.ends_at)}</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
