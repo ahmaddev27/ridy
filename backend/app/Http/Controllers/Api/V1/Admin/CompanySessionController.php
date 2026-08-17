@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Dispatch\FleetSessionService;
 use App\Domain\Dispatch\Models\UberFleetSession;
+use App\Domain\Tenancy\CompanyDataPurger;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Admin\CompanySessionResource;
@@ -41,6 +42,17 @@ class CompanySessionController extends Controller
         $deleted = UberFleetSession::withoutGlobalScopes()->where('tenant_id', $tenant->id)->delete();
 
         return response()->json(['data' => ['deleted' => $deleted]]);
+    }
+
+    /**
+     * Disconnect AND wipe: delete the session plus all of the company's
+     * operational fleet data (drivers, vehicles, offers, device tokens,
+     * metrics). Keeps the tenant, its users and billing history. Returns the
+     * per-entity delete counts for the confirmation toast.
+     */
+    public function purge(Tenant $tenant, CompanyDataPurger $purger): JsonResponse
+    {
+        return response()->json(['data' => $purger->purge($tenant)]);
     }
 
     private function sessionFor(Tenant $tenant): ?UberFleetSession

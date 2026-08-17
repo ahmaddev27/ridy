@@ -278,6 +278,9 @@ Route::prefix('v1')->group(function () {
         Route::get('companies/{tenant}/session', [CompanySessionController::class, 'show']);
         Route::post('companies/{tenant}/session/relink', [CompanySessionController::class, 'forceRelink']);
         Route::delete('companies/{tenant}/session', [CompanySessionController::class, 'destroy']);
+        // Disconnect + wipe all operational fleet data (drivers/vehicles/offers/
+        // devices/metrics/session). Keeps the tenant, users and billing history.
+        Route::delete('companies/{tenant}/data', [CompanySessionController::class, 'purge']);
 
         // Act as a company: swap the dashboard session to one of its managers so
         // the admin can run the manager-only Uber connect flow. Stop lives on the
