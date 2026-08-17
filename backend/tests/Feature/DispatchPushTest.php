@@ -89,9 +89,11 @@ class DispatchPushTest extends TestCase
 
         (new DispatchNotifier($spy))->notify($offer);
 
-        $this->assertSame('12.00 €€€ | Peter', $spy->calls[0]['title']);
+        // Metrics ride on the title beside the fare; the body is just the two
+        // addresses with no separator arrow.
+        $this->assertSame('12.00 €€€ · 3.0 km · €4.00/km | Peter', $spy->calls[0]['title']);
         $this->assertSame(
-            "Birkerstraße 55, 42651 Solingen\n-->\nEintrachtstraße 50, 42655 Solingen\n3.0 km · €4.00/km",
+            "Birkerstraße 55, 42651 Solingen\nEintrachtstraße 50, 42655 Solingen",
             $spy->calls[0]['body'],
         );
     }

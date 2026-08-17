@@ -73,7 +73,7 @@ class DispatchNotificationTest extends TestCase
         // Data-only title: fare + €-quality (one sign with no distance) + no rider.
         $this->assertSame('7.41 €', $this->sent[0]['title']);
         $this->assertStringContainsString('Alexanderplatz, Berlin', $this->sent[0]['body']);
-        $this->assertStringContainsString('-->', $this->sent[0]['body']);
+        $this->assertStringNotContainsString('-->', $this->sent[0]['body']);
         $this->assertSame('Alexanderplatz, Berlin', $this->sent[0]['data']['pickup']);
     }
 

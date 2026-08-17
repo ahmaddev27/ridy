@@ -59,7 +59,7 @@ class DispatchNotifier
         return $sent;
     }
 
-    /** "5.85 €€ | Peter" — fare, €-quality, rider. */
+    /** "5.85 €€ · 12.3 km · €1.26/km | Peter" — fare, €-quality, trip metrics, rider. */
     private function buildTitle(DispatchOffer $offer): string
     {
         $fare = $offer->fare_amount !== null
@@ -67,30 +67,27 @@ class DispatchNotifier
             : trim((string) $offer->fare_formatted);
 
         $title = trim($fare.' '.$this->euroSigns($offer));
+
+        // Distance + price-per-km ride on the first line, beside the fare.
+        $metrics = $this->buildMetrics($offer);
+        if ($metrics !== '') {
+            $title .= ' · '.$metrics;
+        }
+
         $rider = trim((string) $offer->rider_first_name);
 
         return $rider !== '' ? $title.' | '.$rider : $title;
     }
 
-    /** "pickup\n-->\ndropoff" (+ "12.3 km · €1.26/km" when known), country stripped. */
+    /** "pickup\ndropoff" — the two addresses, country stripped, no separator arrow. */
     private function buildBody(DispatchOffer $offer): string
     {
         $pickup = $this->cleanAddress($offer->pickup_address);
         $dropoff = $this->cleanAddress($offer->dropoff_address);
 
-        $lines = [];
-        if ($pickup !== '' || $dropoff !== '') {
-            $lines[] = $pickup;
-            $lines[] = '-->';
-            $lines[] = $dropoff;
-        }
+        $lines = array_values(array_filter([$pickup, $dropoff], fn ($l) => $l !== ''));
 
-        $metrics = $this->buildMetrics($offer);
-        if ($metrics !== '') {
-            $lines[] = $metrics;
-        }
-
-        return $lines === [] ? 'Uber' : trim(implode("\n", $lines));
+        return $lines === [] ? 'Uber' : implode("\n", $lines);
     }
 
     /** "12.3 km · €1.26/km" so the driver can judge worth — empty when distance is unknown. */
