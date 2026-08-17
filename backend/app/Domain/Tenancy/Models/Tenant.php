@@ -33,6 +33,29 @@ class Tenant extends Model
         return $this->belongsTo(Proxy::class);
     }
 
+    /**
+     * Auto-relink block: after an operator disconnects/wipes the fleet, the
+     * browser extension must NOT silently re-capture the Uber session on the
+     * next Uber page load — only an explicit reconnect may restore it. Stored in
+     * settings so it needs no migration.
+     */
+    public function isAutolinkBlocked(): bool
+    {
+        return (bool) ($this->settings['autolink_blocked'] ?? false);
+    }
+
+    public function blockAutolink(): void
+    {
+        $this->forceFill(['settings' => array_merge($this->settings ?? [], ['autolink_blocked' => true])])->save();
+    }
+
+    public function unblockAutolink(): void
+    {
+        $settings = $this->settings ?? [];
+        unset($settings['autolink_blocked']);
+        $this->forceFill(['settings' => $settings])->save();
+    }
+
     /** Whether the company can log in and operate right now. */
     public function isUsable(): bool
     {

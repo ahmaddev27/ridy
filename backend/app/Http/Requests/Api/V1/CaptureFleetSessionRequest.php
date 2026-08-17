@@ -27,6 +27,9 @@ class CaptureFleetSessionRequest extends FormRequest
             'supplier_cookies.*.name' => ['required_with:supplier_cookies', 'string'],
             'supplier_cookies.*.value' => ['required_with:supplier_cookies', 'string'],
             'expires_at' => ['nullable', 'date'],
+            // true = the manager pressed Connect; false/absent = the extension's
+            // silent auto-capture (refused while the tenant is autolink-blocked).
+            'manual' => ['nullable', 'boolean'],
         ];
     }
 }

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\FleetSessionService;
 use App\Domain\Dispatch\Models\UberFleetSession;
+use App\Domain\Tenancy\CompanyDataPurger;
+use App\Domain\Tenancy\ProxyPool;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\CaptureFleetSessionRequest;
 use App\Support\RidyLog;
@@ -23,25 +25,43 @@ class FleetSessionController extends Controller
     }
 
     /**
-     * Disconnect: delete the tenant's Uber fleet session(s). The daemon stops
-     * their streams on its next reconcile. Used to clear a stale session before
-     * re-linking with fresh cookies.
+     * Disconnect = full wipe: delete the tenant's Uber session AND all of its
+     * fleet data (drivers, vehicles, offers, devices, metrics), free its proxy
+     * slot, and block the extension's silent auto-relink until the manager
+     * explicitly reconnects. The daemon stops the streams on its next reconcile.
      */
-    public function destroy(): JsonResponse
+    public function destroy(CompanyDataPurger $purger): JsonResponse
     {
-        // Auto-scoped to the manager's tenant by the BelongsToTenant global scope.
-        $deleted = UberFleetSession::query()->delete();
+        $tenant = request()->user()->tenant;
 
-        return response()->json(['data' => ['deleted' => $deleted]]);
+        return response()->json(['data' => $purger->purge($tenant)]);
     }
 
     /**
      * The manager pastes their captured Uber session (cookies + getUser org id).
      * We store it encrypted and bind the tenant to its Uber org.
      */
-    public function capture(CaptureFleetSessionRequest $request, FleetSessionService $service): JsonResponse
+    public function capture(CaptureFleetSessionRequest $request, FleetSessionService $service, ProxyPool $proxies): JsonResponse
     {
         $tenant = $request->user()->tenant;
+        $manual = $request->boolean('manual');
+
+        // After an operator disconnects, the extension keeps auto-capturing on
+        // every Uber page load. Refuse those silent (non-manual) captures until
+        // the manager explicitly reconnects, so a wiped company stays wiped.
+        if (! $manual && $tenant->isAutolinkBlocked()) {
+            return response()->json(['data' => ['status' => 'blocked', 'reason' => 'autolink_blocked']], 202);
+        }
+
+        // An explicit reconnect clears the block and re-acquires a proxy slot
+        // (the wipe released it).
+        if ($manual) {
+            $tenant->unblockAutolink();
+            if ($tenant->proxy_id === null) {
+                $proxies->assign($tenant);
+            }
+        }
+
         $cookies = $request->array('cookies');
 
         // Audit trail only — never log cookie values (they are session secrets).

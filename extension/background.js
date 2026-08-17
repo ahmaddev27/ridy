@@ -106,6 +106,14 @@ async function capture(orgUuid, orgName, { manual = false } = {}) {
   if (!pairing.ok) return { ok: false, reason: pairing.reason };
   const { apiUrl, token, lastSync } = pairing;
 
+  // Treat a pending dashboard "Connect" intent as an explicit (manual) capture,
+  // so a reconnect from the dashboard clears the backend's autolink block even
+  // though it flows through the auto-capture content script.
+  if (!manual) {
+    const { connectPending } = await api.storage.local.get(["connectPending"]);
+    if (connectPending && Date.now() - connectPending < 600000) manual = true;
+  }
+
   console.log("[Reidey bg] capture start — orgUuid:", orgUuid || "(discover)");
   // When connecting from account.uber.com there's no org uuid on the page —
   // discover it from the supplier redirect using the just-established session.
@@ -141,6 +149,9 @@ async function capture(orgUuid, orgName, { manual = false } = {}) {
         cookies,
         supplier_cookies: supplierCookies.length ? supplierCookies : undefined,
         uber_org_name: orgName || undefined,
+        // true only when the manager pressed Connect — lets the backend refuse
+        // silent auto-captures after an operator disconnected the fleet.
+        manual,
       }),
     });
     if (!res.ok) {

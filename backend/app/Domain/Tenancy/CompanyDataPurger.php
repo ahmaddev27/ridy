@@ -14,12 +14,15 @@ use Illuminate\Support\Facades\DB;
 /**
  * Wipes a company's operational fleet data — its Uber session(s), drivers,
  * vehicles, dispatch offers, device tokens and driver metrics — so it can start
- * over from a clean re-link. Deliberately KEEPS the tenant, its users and its
- * billing history (subscription / collector payments): a full company deletion
- * is a separate, more destructive action.
+ * over from a clean re-link. Also frees its residential proxy back to the pool
+ * (no drivers left to route) and blocks the extension's silent auto-relink until
+ * the manager explicitly reconnects. Deliberately KEEPS the tenant, its users
+ * and its billing history: a full company deletion is a separate action.
  */
 class CompanyDataPurger
 {
+    public function __construct(private readonly ProxyPool $proxies) {}
+
     /**
      * @return array<string, int> rows deleted per entity
      */
@@ -39,6 +42,11 @@ class CompanyDataPurger
                 'drivers' => Driver::withoutGlobalScopes()->where('tenant_id', $id)->delete(),
                 'sessions' => UberFleetSession::withoutGlobalScopes()->where('tenant_id', $id)->delete(),
             ];
+
+            // Free the proxy slot (no drivers left) and stop the extension from
+            // silently re-capturing an Uber session the operator just cut.
+            $this->proxies->release($tenant);
+            $tenant->blockAutolink();
 
             return $counts;
         });

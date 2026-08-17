@@ -68,6 +68,8 @@ class CompanyPurgeTest extends TestCase
         $this->assertDatabaseCount('device_tokens', 0);
         // The company + its account survive.
         $this->assertDatabaseHas('tenants', ['id' => $tenant->id]);
+        // Auto-relink is blocked so the extension can't silently re-capture.
+        $this->assertTrue($tenant->fresh()->isAutolinkBlocked());
     }
 
     public function test_manager_cannot_purge(): void
