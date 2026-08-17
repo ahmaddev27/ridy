@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Arr;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DispatchOfferController extends Controller
@@ -124,10 +125,20 @@ class DispatchOfferController extends Controller
             'seq' => ['nullable', 'integer'],
         ]);
 
-        $tenantId = (int) $request->user()->tenant_id;
-        $results = ['routed' => 0, 'unlinked_driver' => 0, 'duplicate' => 0, 'skipped_no_uuid' => 0, 'error' => 0];
+        $tenant = $request->user()->tenant;
+        $tenantId = (int) $tenant->id;
+        $results = ['routed' => 0, 'unlinked_driver' => 0, 'duplicate' => 0, 'skipped_no_uuid' => 0, 'org_mismatch' => 0, 'error' => 0];
 
         foreach ($data['offers'] as $offer) {
+            // Only accept offers from THIS company's own Uber org — never a
+            // different account the manager happens to have open in another tab.
+            $partnerUuid = (string) Arr::get($offer, 'partnerUUID', '');
+            if ($tenant->uber_org_uuid !== null && $partnerUuid !== '' && $partnerUuid !== $tenant->uber_org_uuid) {
+                $results['org_mismatch']++;
+
+                continue;
+            }
+
             try {
                 $outcome = $ingestor->ingest($tenantId, $offer, $data['seq'] ?? null);
                 $results[$outcome['status']] = ($results[$outcome['status']] ?? 0) + 1;

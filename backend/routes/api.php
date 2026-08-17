@@ -155,7 +155,7 @@ Route::prefix('v1')->group(function () {
         Route::post('drivers/statuses', [DriverController::class, 'ingestStatuses'])->middleware('fleet.connected');
 
         // Per-driver Uber performance metrics (earnings/hours/trips)
-        Route::post('drivers/metrics', [DriverMetricController::class, 'store']);
+        Route::post('drivers/metrics', [DriverMetricController::class, 'store'])->middleware('fleet.connected');
         Route::get('drivers/{driver}/metrics', [DriverMetricController::class, 'index']);
 
         // Fleet vehicles (synced from Uber via the extension)
