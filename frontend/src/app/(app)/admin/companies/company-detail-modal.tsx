@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
+import { PasswordInput } from "@/components/ui/password-input";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import {
@@ -429,9 +430,8 @@ export function CompanyDetail({
                 <input placeholder={c("fieldManagerEmail")} type="email" value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                   className="rounded-lg border border-line-strong px-2 py-2 text-sm outline-none focus:border-ink" />
-                <input placeholder={c("fieldManagerPassword")} type="password" value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  className="rounded-lg border border-line-strong px-2 py-2 text-sm outline-none focus:border-ink" />
+                <PasswordInput placeholder={c("fieldManagerPassword")} value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
               </div>
               <Button variant="secondary" onClick={addUser} disabled={busy || !newUser.email}>
                 <UserPlus className="h-4 w-4" /> {c("addManager")}
@@ -539,14 +539,12 @@ export function CompanyDetail({
       >
         <div className="text-start">
           <label className="mb-1 block text-sm font-medium text-ink">{c("newPasswordLabel")}</label>
-          <input
-            type="password"
+          <PasswordInput
             value={resetPwd}
             onChange={(e) => setResetPwd(e.target.value)}
             minLength={8}
             autoFocus
             placeholder={c("newPasswordHint")}
-            className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
           />
         </div>
       </Modal>

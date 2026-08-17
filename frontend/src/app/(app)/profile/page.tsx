@@ -6,6 +6,7 @@ import { Loader2, Save, User, KeyRound, Bell } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useI18n } from "@/lib/i18n/context";
 import { useAuth } from "@/components/auth/auth-provider";
 import { updateProfile } from "@/lib/api/auth";
@@ -150,14 +151,23 @@ function Field({
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
-      <input
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        autoComplete="off"
-        className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
-      />
+      {type === "password" ? (
+        <PasswordInput
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          autoComplete="off"
+        />
+      ) : (
+        <input
+          type={type}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          autoComplete="off"
+          className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
+        />
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OtpInput } from "@/components/ui/otp-input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Logo } from "@/components/brand/logo";
 import { useI18n } from "@/lib/i18n/context";
 import { apiErrorMessage } from "@/lib/api/error-message";
@@ -145,13 +146,21 @@ function Field({
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required
-        className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
-      />
+      {type === "password" ? (
+        <PasswordInput
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required
+        />
+      ) : (
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required
+          className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
+        />
+      )}
     </div>
   );
 }
