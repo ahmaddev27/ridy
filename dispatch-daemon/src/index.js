@@ -38,14 +38,24 @@ async function reconcile() {
     sessions.map((s) => [s.id, s.proxy_url || config.proxyUrl || ""]),
   );
 
-  // Stop streams whose session is gone, no longer active, OR whose proxy changed
-  // (a changed proxy is dropped here and immediately re-created below with it —
-  // so setting a company's proxy in the panel takes effect with no manual restart).
+  // Jar fingerprint per session (cookie counts) so a re-link that backfills the
+  // supplier cookies restarts the stream with the fresh jar — otherwise the old
+  // stream keeps polling supplier with the stale/empty jar and every offer
+  // expires to rejected until a manual daemon restart.
+  const effectiveFp = new Map(
+    sessions.map((s) => [s.id, `${s.cookies?.length ?? 0}:${s.supplier_cookies?.length ?? 0}`]),
+  );
+
+  // Stop streams whose session is gone, no longer active, OR whose proxy/cookies
+  // changed (dropped here and immediately re-created below with the new values —
+  // so re-linking or setting a proxy in the panel takes effect with no manual restart).
   for (const [key, stream] of streams) {
     const sessionId = Number(key.split(":")[0]);
     const proxyChanged = effectiveProxy.has(sessionId) && effectiveProxy.get(sessionId) !== stream.proxyUrl;
-    if (!wantedKeys.has(key) || proxyChanged) {
-      console.log(`stopping stream ${key} (${!wantedKeys.has(key) ? "no longer active" : "proxy changed"})`);
+    const cookiesChanged = effectiveFp.has(sessionId) && effectiveFp.get(sessionId) !== stream.cookieFp;
+    if (!wantedKeys.has(key) || proxyChanged || cookiesChanged) {
+      const reason = !wantedKeys.has(key) ? "no longer active" : proxyChanged ? "proxy changed" : "cookies changed";
+      console.log(`stopping stream ${key} (${reason})`);
       stream.stop();
       streams.delete(key);
     }

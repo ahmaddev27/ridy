@@ -47,6 +47,12 @@ export class RamenStream {
     this.supplierJar = new Map(
       (session.supplier_cookies?.length ? session.supplier_cookies : session.cookies).map((c) => [c.name, c.value]),
     );
+    // Jar fingerprint (counts, not values) so the supervisor can restart this
+    // stream when a re-link changes the captured cookies — e.g. supplier cookies
+    // get backfilled after the manager reconnects while logged into
+    // supplier.uber.com. Routine value rotation keeps the counts, so this won't
+    // churn the stream on every refresh.
+    this.cookieFp = `${session.cookies?.length ?? 0}:${session.supplier_cookies?.length ?? 0}`;
     this.seq = 0;
     this.stopped = false;
     this.reconnectDelay = config.reconnectMinDelay;
