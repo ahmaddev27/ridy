@@ -9,6 +9,7 @@ use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 
 /**
  * Read-only health report that explains *why* a company's offers land as
@@ -183,7 +184,7 @@ class DiagnoseDispatch extends Command
         return '<fg=green>live</>';
     }
 
-    private function miniBreakdown(\Illuminate\Support\Collection $b): string
+    private function miniBreakdown(Collection $b): string
     {
         return implode('/', [
             (int) $b->get(OfferStatus::Pending->value, 0),

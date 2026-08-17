@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\V1\Admin\ImpersonationController;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\LoginRequest;
 use App\Http\Resources\UserResource;
@@ -58,7 +59,7 @@ class AuthController extends Controller
         // banner with a stop control (the session key is set by the admin's
         // impersonate/start).
         $impersonating = $request->hasSession()
-            && $request->session()->has(\App\Http\Controllers\Api\V1\Admin\ImpersonationController::KEY);
+            && $request->session()->has(ImpersonationController::KEY);
 
         return (new UserResource($request->user()->load('tenant')))
             ->additional(['impersonating' => $impersonating])

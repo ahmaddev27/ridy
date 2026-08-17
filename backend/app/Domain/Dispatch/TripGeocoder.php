@@ -132,7 +132,7 @@ class TripGeocoder
     {
         try {
             $path = "{$from['lng']},{$from['lat']};{$to['lng']},{$to['lat']}";
-            $res = Http::timeout(6)->get($this->osrmUrl()."/".$path, [
+            $res = Http::timeout(6)->get($this->osrmUrl().'/'.$path, [
                 'overview' => 'full',
                 'geometries' => 'geojson',
             ]);

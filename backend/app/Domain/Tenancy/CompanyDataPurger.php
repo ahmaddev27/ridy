@@ -6,8 +6,8 @@ use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\DriverMetric;
-use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Fleet\Models\Vehicle;
+use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Tenancy\Models\Tenant;
 use Illuminate\Support\Facades\DB;
 
