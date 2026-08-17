@@ -53,7 +53,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::get('health', HealthController::class);
-    Route::post('login', [AuthController::class, 'login']);
+    // Throttle the dashboard credential endpoint (super-admin/manager/reseller)
+    // to blunt brute-force — every other auth endpoint is already throttled.
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
     // Public force-update gate for the mobile driver app (checked on launch).
     Route::get('app/version', [AppVersionController::class, 'check'])->middleware('throttle:60,1');
@@ -123,12 +125,12 @@ Route::prefix('v1')->group(function () {
 
     // Session basics every authenticated user needs — including tenant-less ones
     // (resellers). NOT tenant-scoped, so they never hit the no-tenant guard.
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'user.account'])->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
     });
 
-    Route::middleware(['auth:sanctum', ResolveTenant::class])->group(function () {
+    Route::middleware(['auth:sanctum', 'user.account', ResolveTenant::class])->group(function () {
         // Dashboard
         Route::get('dashboard/summary', [DashboardController::class, 'summary']);
 
@@ -212,7 +214,10 @@ Route::prefix('v1')->group(function () {
     // tenant context stays empty and the global scope no-ops → cross-tenant.
     // Reseller (a collector with a login) issues activation codes on a plan.
     // No ResolveTenant — resellers are platform-level, not tenant users.
-    Route::middleware('auth:sanctum')->prefix('reseller')->group(function () {
+    // Gate the WHOLE reseller group on the reseller permission — previously only
+    // generate()/codes() checked in-controller, leaving plans()/searchCompanies()
+    // open to any authenticated user (cross-tenant company + owner-phone leak).
+    Route::middleware(['auth:sanctum', 'user.account', 'can:codes.generate'])->prefix('reseller')->group(function () {
         Route::get('plans', [ResellerController::class, 'plans']);
         Route::get('companies/search', [ResellerController::class, 'searchCompanies']);
         Route::post('activation', [ResellerController::class, 'generate']);

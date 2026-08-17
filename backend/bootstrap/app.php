@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureDriverTenantActive;
 use App\Http\Middleware\EnsureSuperAdmin;
+use App\Http\Middleware\EnsureUserAccount;
 use App\Http\Middleware\VerifyDispatchSecret;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'dispatch.secret' => VerifyDispatchSecret::class,
             'super.admin' => EnsureSuperAdmin::class,
             'driver.active' => EnsureDriverTenantActive::class,
+            'user.account' => EnsureUserAccount::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
