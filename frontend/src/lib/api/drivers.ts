@@ -79,6 +79,19 @@ export async function testDriverPush(id: number): Promise<{ sent: number; device
   return res.data;
 }
 
+/**
+ * Set or clear the driver's app login email (the email used to sign into the
+ * driver app). Tenant-scoped; the email is kept globally unique server-side.
+ */
+export async function updateDriverEmail(id: number, email: string | null): Promise<Driver> {
+  const res = await apiFetch<{ data: Driver }>(`/api/v1/drivers/${id}`, {
+    method: "PATCH",
+    withCsrf: true,
+    body: { email },
+  });
+  return res.data;
+}
+
 // ── Live map ─────────────────────────────────────────────────────────────────
 export type LiveWaypoint = { lat: number; lng: number; type: string | null };
 

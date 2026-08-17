@@ -3,15 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Users, Star, RefreshCw, Send, Smartphone, Loader2, Bell } from "lucide-react";
+import { Users, Star, RefreshCw, Send, Smartphone, Loader2, Bell, Mail } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { listDrivers, syncDrivers, inviteDriver, testDriverPush, type Driver } from "@/lib/api/drivers";
+import { listDrivers, syncDrivers, inviteDriver, testDriverPush, updateDriverEmail, type Driver } from "@/lib/api/drivers";
+import { apiErrorMessage } from "@/lib/api/error-message";
 import { syncRosterViaExtension, fetchDriverStatusesViaExtension } from "@/lib/extension";
 
 export default function DriversPage() {
@@ -24,7 +26,30 @@ export default function DriversPage() {
   const [syncing, setSyncing] = useState(false);
   const [invitingId, setInvitingId] = useState<number | null>(null);
   const [testingId, setTestingId] = useState<number | null>(null);
+  const [emailDriver, setEmailDriver] = useState<Driver | null>(null);
+  const [emailValue, setEmailValue] = useState("");
+  const [savingEmail, setSavingEmail] = useState(false);
   const didAutoSync = useRef(false);
+
+  function openEmailModal(d: Driver) {
+    setEmailDriver(d);
+    setEmailValue(d.email ?? "");
+  }
+
+  async function saveEmail() {
+    if (!emailDriver) return;
+    setSavingEmail(true);
+    try {
+      await updateDriverEmail(emailDriver.id, emailValue.trim() || null);
+      toast.success(t("screens.drivers.editEmailSaved"));
+      await refetch();
+      setEmailDriver(null);
+    } catch (e) {
+      toast.error(apiErrorMessage(e, t));
+    } finally {
+      setSavingEmail(false);
+    }
+  }
 
   async function testPush(d: Driver) {
     setTestingId(d.id);
@@ -214,6 +239,15 @@ export default function DriversPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => openEmailModal(d)}
+                        title={t("screens.drivers.editEmail")}
+                        aria-label={t("screens.drivers.editEmail")}
+                        className="rounded-lg border border-line p-1.5 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50"
+                      >
+                        <Mail className="h-3.5 w-3.5" />
+                      </button>
                       {d.app_status === "active" ? (
                         <div className="flex items-center gap-2">
                           <Badge status="connected" dot>
@@ -267,6 +301,7 @@ export default function DriversPage() {
                           {t("screens.drivers.appInvite")}
                         </button>
                       )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -275,6 +310,41 @@ export default function DriversPage() {
           </div>
         )}
       </Card>
+
+      <Modal
+        open={emailDriver !== null}
+        onClose={() => setEmailDriver(null)}
+        title={t("screens.drivers.editEmailTitle")}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEmailDriver(null)} disabled={savingEmail}>
+              {t("screens.drivers.cancel")}
+            </Button>
+            <Button onClick={saveEmail} disabled={savingEmail}>
+              {savingEmail && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t("screens.drivers.save")}
+            </Button>
+          </>
+        }
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void saveEmail();
+          }}
+          className="space-y-3"
+        >
+          <input
+            type="email"
+            autoFocus
+            value={emailValue}
+            onChange={(e) => setEmailValue(e.target.value)}
+            placeholder={t("screens.drivers.editEmailPlaceholder")}
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-primary"
+          />
+          <p className="text-xs text-ink-subtle">{t("screens.drivers.editEmailHint")}</p>
+        </form>
+      </Modal>
     </div>
   );
 }
