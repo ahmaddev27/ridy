@@ -43,7 +43,14 @@ WORKDIR /var/www
 # baking the install in keeps the image runnable on its own (CI / prod).
 COPY backend/ /var/www/
 
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist \
+# Retry the install: GitHub's codeload occasionally 429s anonymous dist
+# downloads, which would otherwise fail the whole deploy build. Back off and
+# retry a few times so a transient rate-limit self-heals.
+RUN for i in 1 2 3 4 5 6; do \
+        composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist && break; \
+        echo "composer install failed (attempt $i) — retrying in 20s..."; sleep 20; \
+    done \
+    && composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist \
     && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
 # PHP-FPM listens on 9000; nginx (separate service) proxies FastCGI to it.
