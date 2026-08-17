@@ -17,19 +17,25 @@ return new class extends Migration
 
     private const WARN = '#d97706';
 
-    /** @return array<string, array{subject: string, accent: string}> */
+    /**
+     * Each event only differs by accent colour; the subject stays {{title}} so it
+     * renders in the recipient's language (the Notifier fills the localized
+     * title/body). The admin can still override any subject per event.
+     *
+     * @return array<string, string>
+     */
     private function events(): array
     {
         return [
-            'subscription_expiring' => ['subject' => 'Dein Abo läuft bald ab', 'accent' => self::WARN],
-            'subscription_expired' => ['subject' => 'Dein Abo ist abgelaufen', 'accent' => self::WARN],
-            'subscription_activated' => ['subject' => 'Dein Abo ist aktiv', 'accent' => self::BRAND],
-            'subscription_free' => ['subject' => 'Kostenloses Abo freigeschaltet', 'accent' => self::BRAND],
-            'session_needs_relink' => ['subject' => 'Uber-Verbindung erneuern', 'accent' => self::WARN],
-            'company_banned' => ['subject' => 'Konto gesperrt', 'accent' => self::WARN],
-            'company_registered' => ['subject' => 'Neue Firma registriert', 'accent' => self::BRAND],
-            'proxy_expiring' => ['subject' => 'Proxy läuft bald ab', 'accent' => self::WARN],
-            'code_activated' => ['subject' => 'Aktivierungscode eingelöst', 'accent' => self::BRAND],
+            'subscription_expiring' => self::WARN,
+            'subscription_expired' => self::WARN,
+            'subscription_activated' => self::BRAND,
+            'subscription_free' => self::BRAND,
+            'session_needs_relink' => self::WARN,
+            'company_banned' => self::WARN,
+            'company_registered' => self::BRAND,
+            'proxy_expiring' => self::WARN,
+            'code_activated' => self::BRAND,
         ];
     }
 
@@ -41,13 +47,13 @@ return new class extends Migration
             .'<p>{{body}}</p>'
             .'<p><a href="{{action_url}}" class="btn">{{action_label}}</a></p>';
 
-        foreach ($this->events() as $key => $meta) {
+        foreach ($this->events() as $key => $accent) {
             DB::table('email_templates')->updateOrInsert(
                 ['key' => $key],
                 [
-                    'subject' => $meta['subject'],
+                    'subject' => '{{title}}',
                     'body_html' => $bodyHtml,
-                    'accent_color' => $meta['accent'],
+                    'accent_color' => $accent,
                     'footer_text' => 'Reidey · Fleet Management',
                     'created_at' => $now,
                     'updated_at' => $now,
