@@ -85,7 +85,7 @@ class CompanyRegistrationTest extends TestCase
         $this->assertDatabaseMissing('tenants', ['name' => 'Acme Fleet']);
     }
 
-    public function test_start_rejects_an_email_already_registered_as_a_user(): void
+    public function test_start_is_non_disclosing_for_an_email_already_registered_as_a_user(): void
     {
         $tenant = Tenant::create(['name' => 'Existing', 'country' => 'DE']);
         User::create([
@@ -93,12 +93,16 @@ class CompanyRegistrationTest extends TestCase
             'password' => Hash::make('password'), 'tenant_id' => $tenant->id,
         ]);
 
+        // Neutral 200 — must not reveal that the email already exists.
         $this->postJson('/api/v1/register', [
             'company_name' => 'Acme Fleet',
             'name' => 'Alex',
             'phone' => '+49123456',
             'email' => 'taken@acme.de',
             'password' => 'super-secret',
-        ])->assertStatus(422)->assertJsonValidationErrors('email');
+        ])->assertOk()->assertJsonPath('data.email', 'taken@acme.de');
+
+        // No pending registration was created and no OTP was issued.
+        $this->assertDatabaseMissing('registrations', ['email' => 'taken@acme.de']);
     }
 }

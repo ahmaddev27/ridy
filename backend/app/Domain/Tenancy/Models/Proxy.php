@@ -16,7 +16,7 @@ class Proxy extends Model
 
     protected $hidden = ['url'];
 
-    protected $casts = ['capacity' => 'integer', 'price' => 'decimal:2', 'expires_at' => 'date'];
+    protected $casts = ['url' => 'encrypted', 'capacity' => 'integer', 'price' => 'decimal:2', 'expires_at' => 'date'];
 
     public function tenants(): HasMany
     {

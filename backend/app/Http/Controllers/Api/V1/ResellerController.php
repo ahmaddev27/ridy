@@ -103,6 +103,18 @@ class ResellerController extends Controller
             throw ValidationException::withMessages(['tenant_id' => 'company_banned']);
         }
 
+        // Don't clobber a still-valid, unused code that a DIFFERENT issuer created
+        // — that would hijack the activation's attribution. The same issuer may
+        // freely regenerate; expired or already-used codes are fair to overwrite.
+        $hasPendingForeignCode = $tenant->activation_code !== null
+            && ! ($tenant->activation_code_expires_at?->isPast() ?? true)
+            && $tenant->activation_collector_id !== $collector->id;
+        if ($hasPendingForeignCode) {
+            throw ValidationException::withMessages([
+                'tenant_id' => 'code_pending_other_issuer',
+            ]);
+        }
+
         $code = $this->newOtp();
         $expiresAt = CarbonImmutable::now()->addMinutes(self::CODE_TTL_MINUTES);
 

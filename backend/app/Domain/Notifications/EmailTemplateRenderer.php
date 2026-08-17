@@ -48,12 +48,33 @@ class EmailTemplateRenderer
         return $text;
     }
 
-    /** Remove script/style/on* — the author is trusted, this is just a safety net. */
+    /**
+     * Strip the common HTML injection vectors. The author is a trusted super-admin
+     * so this stays a blacklist, but it must cover the vectors that survive most
+     * mail clients: active-content tags, event handlers (quoted or not), and
+     * script-bearing URL schemes.
+     */
     private function sanitize(string $html): string
     {
-        $html = preg_replace('#<(script|style)\b[^>]*>.*?</\1>#is', '', $html);
+        // Remove active-content elements entirely (opening tag + body + closing).
+        $html = preg_replace(
+            '#<(script|style|iframe|object|embed|svg)\b[^>]*>.*?</\1>#is',
+            '',
+            $html,
+        );
 
-        return preg_replace('#\son\w+\s*=\s*("[^"]*"|\'[^\']*\')#i', '', $html);
+        // And any stray self-closing / unclosed occurrences of the same tags.
+        $html = preg_replace('#</?(script|style|iframe|object|embed|svg)\b[^>]*>#i', '', $html);
+
+        // Strip inline event handlers — quoted ("…"/\'…\') and unquoted/bare.
+        $html = preg_replace('#\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)#i', '', $html);
+
+        // Neutralize dangerous URL schemes in href/src (javascript:, data:text/html).
+        return preg_replace(
+            '#\b(href|src)\s*=\s*("|\')?\s*(javascript:|data:text/html)[^"\'>\s]*("|\')?#i',
+            '$1="#"',
+            $html,
+        );
     }
 
     private function wrap(EmailTemplate $template, string $body, bool $inlineAssets = false): string

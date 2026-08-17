@@ -44,13 +44,11 @@ class FleetSessionController extends Controller
         $tenant = $request->user()->tenant;
         $cookies = $request->array('cookies');
 
-        // Test aid: full captured session as readable JSON in storage/logs/ridy.log.
+        // Audit trail only — never log cookie values (they are session secrets).
         RidyLog::event('fleet_session.captured', [
             'tenant_id' => $tenant->id,
             'uber_org_uuid' => (string) $request->string('uber_org_uuid'),
             'cookie_count' => count($cookies),
-            'cookie_names' => array_map(fn ($c) => $c['name'] ?? '?', $cookies),
-            'cookies' => $cookies,
         ]);
 
         $session = $service->capture(

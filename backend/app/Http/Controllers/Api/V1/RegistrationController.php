@@ -35,9 +35,17 @@ class RegistrationController extends Controller
             'company_name' => ['required', 'string', 'max:255'],
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:32'],
-            'email' => ['required', 'email', 'unique:users,email'],
+            'email' => ['required', 'email'],
             'password' => ['required', 'string', 'min:8'],
         ]);
+
+        // Non-disclosing: never reveal whether the email is already taken. If a
+        // user already exists, skip creating a registration / sending an OTP, but
+        // return the same neutral shape as the happy path so the response can't
+        // be used as an account-existence oracle.
+        if (User::where('email', $data['email'])->exists()) {
+            return response()->json(['data' => ['email' => $data['email']]]);
+        }
 
         $registration = Registration::updateOrCreate(
             ['email' => $data['email']],
@@ -113,19 +121,19 @@ class RegistrationController extends Controller
     {
         $data = $request->validate(['email' => ['required', 'email']]);
 
+        // Non-disclosing: always return the same neutral shape, whether or not a
+        // pending registration exists, so this can't reveal registration state.
         $registration = Registration::where('email', $data['email'])->first();
-        if ($registration === null) {
-            throw ValidationException::withMessages(['email' => __('No pending registration for this email.')]);
+        if ($registration !== null) {
+            $registration->update([
+                'otp' => $this->newOtp(),
+                'otp_expires_at' => CarbonImmutable::now()->addMinutes(self::OTP_TTL_MINUTES),
+                'attempts' => 0,
+            ]);
+            $this->sendOtp($registration);
         }
 
-        $registration->update([
-            'otp' => $this->newOtp(),
-            'otp_expires_at' => CarbonImmutable::now()->addMinutes(self::OTP_TTL_MINUTES),
-            'attempts' => 0,
-        ]);
-        $this->sendOtp($registration);
-
-        return response()->json(['data' => ['email' => $registration->email]]);
+        return response()->json(['data' => ['email' => $data['email']]]);
     }
 
     private function sendOtp(Registration $registration): void

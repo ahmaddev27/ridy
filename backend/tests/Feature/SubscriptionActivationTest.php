@@ -98,7 +98,7 @@ class SubscriptionActivationTest extends TestCase
         $this->assertTrue($tenant->isUsable());
     }
 
-    public function test_three_wrong_codes_ban_the_company(): void
+    public function test_repeated_wrong_codes_trigger_a_temporary_lockout_not_a_permanent_ban(): void
     {
         $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE', 'status' => 'active']);
         $tenant->forceFill([
@@ -108,18 +108,20 @@ class SubscriptionActivationTest extends TestCase
         ])->save();
         $this->owner($tenant);
 
-        for ($i = 0; $i < 2; $i++) {
+        // Three wrong codes are each rejected, but never permanently ban the tenant.
+        for ($i = 0; $i < 3; $i++) {
             $this->postJson('/api/v1/company/activate', [
                 'email' => 'owner@acme.de', 'password' => 'password', 'code' => '000000',
             ])->assertStatus(422);
+            $this->assertNull($tenant->refresh()->banned_at);
         }
 
-        // Third wrong code bans the account.
+        // A further attempt is temporarily locked out (429), self-healing after cooldown.
         $this->postJson('/api/v1/company/activate', [
             'email' => 'owner@acme.de', 'password' => 'password', 'code' => '000000',
-        ])->assertStatus(403)->assertJsonPath('reason', 'banned');
+        ])->assertStatus(429)->assertJsonPath('reason', 'locked');
 
-        $this->assertNotNull($tenant->refresh()->banned_at);
+        $this->assertNull($tenant->refresh()->banned_at);
     }
 
     public function test_admin_generates_a_code_then_reactivates_a_banned_company(): void

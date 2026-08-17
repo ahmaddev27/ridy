@@ -78,6 +78,8 @@ jobs:
             DOMAIN=$DOMAIN
             SITE_ADDRESS=$DOMAIN
             APP_KEY=$APP_KEY
+            SESSION_SECURE_COOKIE=true
+            SESSION_SAME_SITE=lax
             DB_DATABASE=ridy
             DB_USERNAME=ridy
             DB_PASSWORD=$DB_PASSWORD

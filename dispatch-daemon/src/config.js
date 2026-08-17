@@ -8,9 +8,41 @@ function required(name) {
   return value;
 }
 
+// Refuse to start if the API base is a remote plaintext-HTTP URL: it would leak
+// the shared dispatch secret and the decrypted Uber cookies over the wire.
+// Loopback HTTP (localhost / 127.0.0.1 / ::1) is fine for a single-host setup.
+function assertSecureApiBase(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`Invalid RIDY_API_URL: ${url}`);
+  }
+
+  if (parsed.protocol === "https:") {
+    return url;
+  }
+
+  const host = parsed.hostname.replace(/^\[|\]$/g, "");
+  const isLoopback =
+    host === "localhost" || host === "127.0.0.1" || host === "::1";
+
+  if (parsed.protocol === "http:" && isLoopback) {
+    return url;
+  }
+
+  throw new Error(
+    `Refusing to start: RIDY_API_URL must use https:// for a remote host ` +
+      `(got "${url}"). Plaintext HTTP is only allowed for loopback addresses. ` +
+      `A remote http base leaks the dispatch secret and decrypted cookies.`,
+  );
+}
+
 export const config = {
   // Ridy Laravel API base, e.g. http://localhost:8090
-  apiBaseUrl: (process.env.RIDY_API_URL || "http://localhost:8090").replace(/\/$/, ""),
+  apiBaseUrl: assertSecureApiBase(
+    (process.env.RIDY_API_URL || "http://localhost:8090").replace(/\/$/, ""),
+  ),
 
   // Shared secret matching backend DISPATCH_INGEST_SECRET.
   dispatchSecret: required("DISPATCH_INGEST_SECRET"),

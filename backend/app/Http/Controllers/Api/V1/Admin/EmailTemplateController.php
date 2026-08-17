@@ -51,7 +51,8 @@ class EmailTemplateController extends Controller
     public function uploadImage(Request $request): JsonResponse
     {
         $request->validate([
-            'image' => ['required', 'image', 'max:2048'], // 2 MB
+            // Raster formats only — SVG is a script-injection vector, so it's excluded.
+            'image' => ['required', 'image', 'mimes:png,jpg,jpeg,webp', 'max:2048', 'dimensions:max_width=2000,max_height=2000'],
         ]);
 
         $path = $request->file('image')->store('email-images', 'public');
