@@ -42,7 +42,7 @@
       const offers = inner?.offers ?? [];
       if (offers.length) {
         log(`captured ${offers.length} offer(s), posting to content script`);
-        window.postMessage({ source: "ridy-offer", offers, seq: message.seq }, "*");
+        window.postMessage({ source: "ridy-offer", offers, seq: message.seq }, location.origin);
       }
     }
   }

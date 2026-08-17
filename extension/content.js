@@ -105,7 +105,7 @@
 
     let offerToastAt = 0;
     window.addEventListener("message", async (event) => {
-      if (event.source !== window || event.data?.source !== "ridy-offer") return;
+      if (event.source !== window || event.origin !== location.origin || event.data?.source !== "ridy-offer") return;
       const offers = event.data.offers ?? [];
       if (offers.length === 0) return;
 

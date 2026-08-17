@@ -7,6 +7,41 @@
 // (promises in MV3). This shim lets one codebase run on both.
 const api = globalThis.browser || globalThis["chrome"];
 
+// The backend URL is supplied by the paired dashboard and stored in
+// storage.local. Because every fetch below replays the manager's live Uber
+// session (cookies) to `${apiUrl}/...`, a malicious apiUrl would exfiltrate
+// that session. Lock the destination host to a hardcoded allowlist. reidey.de
+// must be https; localhost/127.0.0.1 may be http for local development.
+const ALLOWED_API_HOSTS = ["reidey.de", "localhost", "127.0.0.1"];
+
+function isAllowedApiUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (!ALLOWED_API_HOSTS.includes(parsed.hostname)) return false;
+  const isLocal = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+  if (isLocal) return parsed.protocol === "http:" || parsed.protocol === "https:";
+  return parsed.protocol === "https:";
+}
+
+/**
+ * Read the paired backend URL + token, but only hand back the URL when it
+ * passes the allowlist. Centralizes the E1 guard so no caller can POST the
+ * captured session to an attacker-controlled host.
+ */
+async function getPairing(extraKeys = []) {
+  const stored = await api.storage.local.get(["apiUrl", "token", ...extraKeys]);
+  if (!stored.apiUrl || !stored.token) return { ...stored, ok: false, reason: "not_paired" };
+  if (!isAllowedApiUrl(stored.apiUrl)) {
+    console.warn("[Reidey bg] blocked non-allowlisted apiUrl:", stored.apiUrl);
+    return { ...stored, ok: false, reason: "bad_api_url" };
+  }
+  return { ...stored, ok: true };
+}
+
 async function readCookies() {
   // Capture exactly the cookies the browser sends to the RAMEN endpoint. A
   // per-URL query returns one correct value per name; getAll({domain}) instead
@@ -67,10 +102,9 @@ async function consumeConnectIntent() {
 }
 
 async function capture(orgUuid, orgName, { manual = false } = {}) {
-  const { apiUrl, token, lastSync } = await api.storage.local.get(["apiUrl", "token", "lastSync"]);
-  if (!apiUrl || !token) {
-    return { ok: false, reason: "not_paired" };
-  }
+  const pairing = await getPairing(["lastSync"]);
+  if (!pairing.ok) return { ok: false, reason: pairing.reason };
+  const { apiUrl, token, lastSync } = pairing;
 
   console.log("[Reidey bg] capture start — orgUuid:", orgUuid || "(discover)");
   // When connecting from account.uber.com there's no org uuid on the page —
@@ -124,9 +158,10 @@ async function capture(orgUuid, orgName, { manual = false } = {}) {
 
 /** Forward the driver roster (captured from the manager's browser) to Reidey. */
 async function postRoster(drivers) {
-  const { apiUrl, token } = await api.storage.local.get(["apiUrl", "token"]);
-  console.log("[Reidey bg] postRoster", { drivers: drivers.length, apiUrl, hasToken: !!token });
-  if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
+  const pairing = await getPairing();
+  console.log("[Reidey bg] postRoster", { drivers: drivers.length, apiUrl: pairing.apiUrl, hasToken: !!pairing.token });
+  if (!pairing.ok) return { ok: false, reason: pairing.reason };
+  const { apiUrl, token } = pairing;
 
   try {
     const res = await fetch(`${apiUrl}/api/v1/drivers/roster`, {
@@ -244,9 +279,10 @@ const METRIC_NAMES = Object.keys(METRIC_MAP);
  * return them to the dashboard. `from`/`to` are ms-epoch.
  */
 async function fetchMetrics(driverUuid, from, to) {
-  const { orgUuid, apiUrl, token } = await api.storage.local.get(["orgUuid", "apiUrl", "token"]);
-  if (!orgUuid) return { ok: false, reason: "no_org_uuid" };
-  if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
+  const pairing = await getPairing(["orgUuid"]);
+  if (!pairing.orgUuid) return { ok: false, reason: "no_org_uuid" };
+  if (!pairing.ok) return { ok: false, reason: pairing.reason };
+  const { orgUuid, apiUrl, token } = pairing;
 
   let uberData;
   try {
@@ -307,9 +343,10 @@ const SEARCH_VEHICLES_QUERY = `query SearchVehicles($orgUUID: String, $filters: 
  * the Vehicles page.
  */
 async function fetchVehicles() {
-  const { orgUuid, apiUrl, token } = await api.storage.local.get(["orgUuid", "apiUrl", "token"]);
-  if (!orgUuid) return { ok: false, reason: "no_org_uuid" };
-  if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
+  const pairing = await getPairing(["orgUuid"]);
+  if (!pairing.orgUuid) return { ok: false, reason: "no_org_uuid" };
+  if (!pairing.ok) return { ok: false, reason: pairing.reason };
+  const { orgUuid, apiUrl, token } = pairing;
 
   let vehicles;
   try {
@@ -368,9 +405,10 @@ async function fetchVehicles() {
  * array of Uber driver UUIDs.
  */
 async function fetchDriverStatuses(driverUuids) {
-  const { orgUuid, apiUrl, token } = await api.storage.local.get(["orgUuid", "apiUrl", "token"]);
-  if (!orgUuid) return { ok: false, reason: "no_org_uuid" };
-  if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
+  const pairing = await getPairing(["orgUuid"]);
+  if (!pairing.orgUuid) return { ok: false, reason: "no_org_uuid" };
+  if (!pairing.ok) return { ok: false, reason: pairing.reason };
+  const { orgUuid, apiUrl, token } = pairing;
   // An empty list means "everyone" — used by the background poll.
   const ids = Array.isArray(driverUuids) ? driverUuids : [];
 
@@ -427,9 +465,10 @@ async function fetchDriverStatuses(driverUuids) {
 
 /** Forward RAMEN offers (captured in the manager's browser) to Reidey. */
 async function postOffers(offers, seq) {
-  const { apiUrl, token } = await api.storage.local.get(["apiUrl", "token"]);
-  console.log("[Reidey bg] postOffers", { offers: offers.length, apiUrl, hasToken: !!token });
-  if (!apiUrl || !token) return { ok: false, reason: "not_paired" };
+  const pairing = await getPairing();
+  console.log("[Reidey bg] postOffers", { offers: offers.length, apiUrl: pairing.apiUrl, hasToken: !!pairing.token });
+  if (!pairing.ok) return { ok: false, reason: pairing.reason };
+  const { apiUrl, token } = pairing;
 
   try {
     const res = await fetch(`${apiUrl}/api/v1/dispatch/offers/ingest`, {
@@ -513,8 +552,8 @@ const POLL_ALARM = "ridy-poll";
 let pollTick = 0;
 
 async function backgroundPoll() {
-  const { apiUrl, token, orgUuid } = await api.storage.local.get(["apiUrl", "token", "orgUuid"]);
-  if (!apiUrl || !token || !orgUuid) return; // not connected yet
+  const pairing = await getPairing(["orgUuid"]);
+  if (!pairing.ok || !pairing.orgUuid) return; // not connected / bad api url
 
   // Presence + acceptance every tick (catches ON_TRIP transitions promptly).
   await fetchDriverStatuses([]).catch(() => {});

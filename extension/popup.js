@@ -6,6 +6,23 @@
 const api = globalThis.browser || globalThis["chrome"];
 const $ = (id) => document.getElementById(id);
 
+// Keep in sync with background.js — the backend host must be allowlisted, and
+// reidey.de must be https (localhost/127.0.0.1 may be http for local dev).
+const ALLOWED_API_HOSTS = ["reidey.de", "localhost", "127.0.0.1"];
+
+function isAllowedApiUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (!ALLOWED_API_HOSTS.includes(parsed.hostname)) return false;
+  const isLocal = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+  if (isLocal) return parsed.protocol === "http:" || parsed.protocol === "https:";
+  return parsed.protocol === "https:";
+}
+
 function setStatus(kind, message) {
   const el = $("status");
   el.className = `status ${kind}`;
@@ -22,8 +39,12 @@ async function loadSettings() {
 }
 
 $("save").addEventListener("click", async () => {
+  const apiUrl = $("apiUrl").value.trim().replace(/\/$/, "");
+  if (!isAllowedApiUrl(apiUrl)) {
+    return setStatus("err", "Ungültige Reidey-URL. Nur https://reidey.de ist erlaubt.");
+  }
   await api.storage.local.set({
-    apiUrl: $("apiUrl").value.trim().replace(/\/$/, ""),
+    apiUrl,
     token: $("token").value.trim(),
     // Re-pairing (new URL/token) must force a fresh capture next time.
     lastSync: null,

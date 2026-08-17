@@ -67,7 +67,7 @@ export default function ConnectionsPage() {
     // manager is actually on, so the extension pairs against whichever domain
     // served the dashboard. Use 127.0.0.1 over localhost to dodge IPv6 loopback.
     const apiUrl = (process.env.NEXT_PUBLIC_API_URL || window.location.origin).replace("localhost", "127.0.0.1");
-    window.postMessage({ source: "ridy-pair", apiUrl, token }, "*");
+    window.postMessage({ source: "ridy-pair", apiUrl, token }, window.location.origin);
   }
 
   // Probe for the extension: ping, and if no "present" reply arrives, it's absent.

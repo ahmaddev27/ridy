@@ -59,7 +59,9 @@ function Gate() {
 
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as { offer_id?: string };
-      if (data?.offer_id) router.push(`/offer/${data.offer_id}`);
+      // Only navigate for a numeric offer id — the payload is attacker-influenced,
+      // so never interpolate an arbitrary string into the route.
+      if (data?.offer_id && /^\d+$/.test(data.offer_id)) router.push(`/offer/${data.offer_id}`);
     });
     return () => sub.remove();
   }, [driver, isOwner, router]);

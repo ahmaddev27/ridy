@@ -4,6 +4,27 @@
 
 const api = globalThis.browser || globalThis["chrome"];
 
+// Only the real dashboard may pair the extension. Validating event.origin (not
+// just event.source === window) stops any other page on a matched origin — or an
+// XSS on the dashboard hosted elsewhere — from injecting a rogue apiUrl+token.
+const ALLOWED_PAIR_ORIGINS = ["https://reidey.de", "http://localhost:3000", "http://127.0.0.1:3000"];
+
+// Keep in sync with background.js — the paired backend host must be allowlisted.
+const ALLOWED_API_HOSTS = ["reidey.de", "localhost", "127.0.0.1"];
+
+function isAllowedApiUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (!ALLOWED_API_HOSTS.includes(parsed.hostname)) return false;
+  const isLocal = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+  if (isLocal) return parsed.protocol === "http:" || parsed.protocol === "https:";
+  return parsed.protocol === "https:";
+}
+
 // Announce presence so the dashboard can tell whether the extension is installed
 // (both on load and on demand, since the page may mount after this script runs).
 async function announce() {
@@ -11,7 +32,7 @@ async function announce() {
   // Report whether we already hold a pairing token, so the dashboard can
   // silently re-pair us if it was lost (e.g. the extension was reinstalled).
   const { token } = await api.storage.local.get(["token"]);
-  window.postMessage({ source: "ridy-ext-present", version, paired: !!token }, "*");
+  window.postMessage({ source: "ridy-ext-present", version, paired: !!token }, location.origin);
 }
 announce();
 window.addEventListener("message", (e) => {
@@ -20,17 +41,23 @@ window.addEventListener("message", (e) => {
 
 window.addEventListener("message", async (event) => {
   if (event.source !== window) return;
+  // Reject pairings that don't come from a trusted dashboard origin.
+  if (!ALLOWED_PAIR_ORIGINS.includes(event.origin)) return;
   const d = event.data;
   if (!d || d.source !== "ridy-pair" || !d.apiUrl || !d.token) return;
 
+  const apiUrl = String(d.apiUrl).replace(/\/$/, "");
+  // Never store a backend URL we wouldn't POST the Uber session to (E1).
+  if (!isAllowedApiUrl(apiUrl)) return;
+
   await api.storage.local.set({
-    apiUrl: String(d.apiUrl).replace(/\/$/, ""),
+    apiUrl,
     token: String(d.token),
     lastSync: null, // force a fresh capture after re-pairing
   });
 
   // Let the page know pairing succeeded so it can show a confirmation.
-  window.postMessage({ source: "ridy-pair-ack" }, "*");
+  window.postMessage({ source: "ridy-pair-ack" }, location.origin);
 });
 
 // The dashboard's "connect" button signals an explicit connect intent right

@@ -89,7 +89,9 @@ export default function CollectorsPage() {
                 {collectors.map((col) => (
                   <tr key={col.id} className="hover:bg-surface-2">
                     <td className="px-4 py-3 font-medium text-ink">{col.name}</td>
-                    <td className="px-4 py-3 text-ink-muted" dir="ltr">{col.phone || c("noneShort")}</td>
+                    <td className="px-4 py-3 text-start text-ink-muted whitespace-nowrap">
+                      <span dir="ltr">{col.phone || c("noneShort")}</span>
+                    </td>
                     <td className="px-4 py-3 font-semibold text-ink">{money(col.total_collected)}</td>
                     <td className="px-4 py-3 text-ink-muted">{col.payments_count}</td>
                     <td className="px-4 py-3 text-ink-muted">
