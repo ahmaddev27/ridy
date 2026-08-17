@@ -78,9 +78,11 @@ class RosterSyncService
      * The single canonical driver for a UUID, self-healing legacy duplicates.
      * uber_driver_uuid isn't unique, so older syncs (no tenant context) or two
      * sessions on one org could create several rows for one driver. Collapse the
-     * extras into one — prefer a row that already has an app login, else the
-     * oldest — moving their offers + device tokens over and dropping the extras
-     * (their metrics are re-derivable) so the roster never lists a driver twice.
+     * extras into one — preferring a row that already has an app login, else one
+     * with a pending invite, else the oldest — moving their offers + device
+     * tokens over and dropping the extras (their metrics are re-derivable) so the
+     * roster never lists a driver twice. A pending invite/login on any extra is
+     * carried onto the canonical so a merge never invalidates an active invite.
      */
     private function canonicalDriver(string $uuid): ?Driver
     {
@@ -88,15 +90,24 @@ class RosterSyncService
         if ($rows->isEmpty()) {
             return null;
         }
-
-        $canonical = $rows->first(fn (Driver $d) => $d->activated_at !== null) ?? $rows->first();
-        $extraIds = $rows->where('id', '!=', $canonical->id)->pluck('id');
-        if ($extraIds->isNotEmpty()) {
-            DispatchOffer::whereIn('driver_id', $extraIds)->update(['driver_id' => $canonical->id]);
-            DeviceToken::whereIn('driver_id', $extraIds)->update(['driver_id' => $canonical->id]);
-            DriverMetric::whereIn('driver_id', $extraIds)->delete();
-            Driver::whereIn('id', $extraIds)->delete();
+        if ($rows->count() === 1) {
+            return $rows->first();
         }
+
+        // Preference keeps whichever row matters most: a live app login first,
+        // then a pending invite (so its unique invite_token/email survive as the
+        // canonical row), else the oldest. This alone preserves an active invite
+        // through the merge — no field copying (which would clash on the unique
+        // invite_token/email while the extra still exists).
+        $canonical = $rows->first(fn (Driver $d) => $d->activated_at !== null)
+            ?? $rows->first(fn (Driver $d) => $d->invite_token !== null)
+            ?? $rows->first();
+
+        $extraIds = $rows->where('id', '!=', $canonical->id)->pluck('id');
+        DispatchOffer::whereIn('driver_id', $extraIds)->update(['driver_id' => $canonical->id]);
+        DeviceToken::whereIn('driver_id', $extraIds)->update(['driver_id' => $canonical->id]);
+        DriverMetric::whereIn('driver_id', $extraIds)->delete();
+        Driver::whereIn('id', $extraIds)->delete();
 
         return $canonical;
     }

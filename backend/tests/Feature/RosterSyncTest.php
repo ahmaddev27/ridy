@@ -119,4 +119,20 @@ class RosterSyncTest extends TestCase
         $this->assertDatabaseMissing('drivers', ['id' => $dupe->id]);
         $this->assertDatabaseHas('dispatch_offers', ['offer_uuid' => 'o-dupe', 'driver_id' => $keep->id]);
     }
+
+    public function test_dedupe_preserves_a_pending_invite(): void
+    {
+        // Older row has no invite; the duplicate carries a pending invite token.
+        Driver::create(['tenant_id' => $this->tenant->id, 'name' => 'Old', 'uber_driver_uuid' => self::DRIVER_UUID]);
+        $invited = Driver::create([
+            'tenant_id' => $this->tenant->id, 'name' => 'Invited', 'uber_driver_uuid' => self::DRIVER_UUID,
+            'email' => 'inv@example.com', 'invite_token' => 'tok-keepme', 'invited_at' => now(),
+        ]);
+
+        app(RosterSyncService::class)->sync($this->tenant->id, [$this->driver()]);
+
+        // Collapsed to one row that still carries the invite token (invite survives).
+        $this->assertSame(1, Driver::withoutGlobalScopes()->where('uber_driver_uuid', self::DRIVER_UUID)->count());
+        $this->assertDatabaseHas('drivers', ['id' => $invited->id, 'invite_token' => 'tok-keepme']);
+    }
 }
