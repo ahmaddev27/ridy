@@ -81,7 +81,7 @@ export default function OffersScreen() {
                 onChangeText={setSearch}
                 placeholder={t("offers.search")}
                 placeholderTextColor={c.inkSubtle}
-                style={{ flex: 1, color: c.ink, fontSize: 16, textAlign: align }}
+                style={{ flex: 1, color: c.ink, fontSize: 16, textAlign: align, writingDirection: isRTL() ? "rtl" : "ltr" }}
                 autoCapitalize="none"
               />
             </View>

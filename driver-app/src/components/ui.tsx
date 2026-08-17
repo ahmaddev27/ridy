@@ -83,7 +83,7 @@ export function Field({
         borderColor: focused ? c.ink : c.line,
         paddingHorizontal: 16,
         paddingVertical: 10,
-        flexDirection: "row",
+        flexDirection: isRTL() ? "row-reverse" : "row",
         alignItems: "center",
         gap: 10,
       }}
@@ -98,7 +98,7 @@ export function Field({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           {...props}
-          style={{ color: c.ink, fontSize: 16, paddingVertical: 1, textAlign: align() }}
+          style={{ color: c.ink, fontSize: 16, paddingVertical: 1, textAlign: align(), writingDirection: isRTL() ? "rtl" : "ltr" }}
         />
       </View>
       {secure && (
@@ -115,7 +115,7 @@ export function StatusBadge({ status, label }: { status: string; label: string }
   const c = useColors();
   const tone = statusColors(c, status);
   return (
-    <View style={{ backgroundColor: tone.bg, borderRadius: radius.pill, paddingHorizontal: 11, paddingVertical: 4, alignSelf: "flex-start" }}>
+    <View style={{ backgroundColor: tone.bg, borderRadius: radius.pill, paddingHorizontal: 11, paddingVertical: 4, alignSelf: isRTL() ? "flex-end" : "flex-start" }}>
       <Text style={{ color: tone.fg, fontSize: 12.5, fontWeight: "700" }}>{label}</Text>
     </View>
   );

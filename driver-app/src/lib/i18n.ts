@@ -337,13 +337,17 @@ const DICTS: Record<string, Dict> = { de, en, ar };
 let current = (getLocales()[0]?.languageCode ?? "de").toLowerCase();
 if (!DICTS[current]) current = "de";
 
-/** Keep the native layout direction in sync with the chosen language. RTL flips
- *  flexbox + text alignment app-wide (a full reload applies it everywhere). */
-export function applyDirection(code: string) {
-  const rtl = code === "ar";
-  I18nManager.allowRTL(true);
-  if (I18nManager.isRTL !== rtl) {
-    I18nManager.forceRTL(rtl);
+/**
+ * Direction is handled MANUALLY per-component via `isRTL()` (flexDirection,
+ * textAlign, writingDirection, side spacing, chevrons). Native RTL is kept OFF
+ * so the base layout is always LTR: this avoids double-flipping (native reversing
+ * `row` on top of our manual `row-reverse`) and lets a runtime language switch
+ * apply instantly through the listeners below, with no app reload.
+ */
+export function applyDirection(_code: string) {
+  I18nManager.allowRTL(false);
+  if (I18nManager.isRTL) {
+    I18nManager.forceRTL(false);
   }
 }
 
