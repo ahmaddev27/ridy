@@ -1,116 +1,267 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
+import { Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
 import { Logo } from "@/components/brand/logo";
-import { MobileNav } from "./_components/mobile-nav";
 
-const NAV_LINKS = [
+const instrumentSans = Instrument_Sans({
+  subsets: ["latin"],
+  variable: "--font-instrument",
+});
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-plex-mono",
+});
+
+const mono = "var(--font-plex-mono), monospace";
+
+// The design commits to ONE light look. We pin the semantic tokens to their
+// light values on the wrapper so the shared legal/FAQ pages (which use
+// bg-canvas / text-ink etc.) stay readable even when the app is in dark mode.
+const lightShell: CSSProperties = {
+  ["--canvas" as string]: "#f6f6f4",
+  ["--surface" as string]: "#ffffff",
+  ["--surface-2" as string]: "#f1f1ef",
+  ["--ink" as string]: "#1e222b",
+  ["--ink-muted" as string]: "#5a616e",
+  ["--ink-subtle" as string]: "#8b909b",
+  ["--line" as string]: "#e4e4e1",
+  ["--line-strong" as string]: "#d6d3cd",
+  ["--primary" as string]: "#1e222b",
+  ["--primary-ink" as string]: "#ffffff",
+  colorScheme: "light",
+  background: "#f6f6f4",
+  color: "#1e222b",
+  fontFamily: "var(--font-instrument), system-ui, sans-serif",
+  fontVariantNumeric: "tabular-nums",
+  overflowX: "hidden",
+};
+
+const HEADER_NAV = [
+  { href: "/#problem", label: "Warum Reidey" },
+  { href: "/#ablauf", label: "Ablauf" },
   { href: "/#funktionen", label: "Funktionen" },
-  { href: "/faq", label: "FAQ" },
-  { href: "/datenschutz", label: "Datenschutz" },
+  { href: "/#faq", label: "FAQ" },
 ];
 
-const FOOTER_COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
-  {
-    title: "Produkt",
-    links: [
-      { href: "/#funktionen", label: "Funktionen" },
-          { href: "/#ablauf", label: "Ablauf" },
-      { href: "/faq", label: "FAQ" },
-      { href: "/login", label: "Anmelden" },
-    ],
-  },
-  {
-    title: "Rechtliches",
-    links: [
-      { href: "/datenschutz", label: "Datenschutz" },
-      { href: "/impressum", label: "Impressum" },
-    ],
-  },
-  {
-    title: "Kontakt",
-    links: [
-      { href: "mailto:[E-Mail]", label: "[E-Mail]" },
-      { href: "/faq", label: "Support & Hilfe" },
-    ],
-  },
+const FOOTER_PRODUCT = [
+  { href: "/#funktionen", label: "Funktionen" },
+  { href: "/#app", label: "App laden" },
+  { href: "/login", label: "Anmelden" },
 ];
+const FOOTER_COMPANY = [
+  { href: "/#kontakt", label: "Kontakt" },
+  { href: "/faq", label: "FAQ" },
+  { href: "mailto:support@reidey.de", label: "Support" },
+];
+const FOOTER_LEGAL = [
+  { href: "/impressum", label: "Impressum" },
+  { href: "/datenschutz", label: "Datenschutz" },
+  { href: "/#agb", label: "AGB" },
+  { href: "/#cookies", label: "Cookie-Einstellungen" },
+];
+
+function MonoLabel({
+  children,
+  color = "#8b909b",
+}: {
+  children: ReactNode;
+  color?: string;
+}) {
+  return (
+    <span
+      style={{
+        font: `500 11px ${mono}`,
+        letterSpacing: ".08em",
+        textTransform: "uppercase",
+        color,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
 
 export default function MarketingLayout({ children }: { children: ReactNode }) {
-  const year = new Date().getFullYear();
-
   return (
-    <div className="flex min-h-screen flex-col bg-canvas text-ink">
-      <header className="sticky top-0 z-50 border-b border-line bg-canvas/85 backdrop-blur">
-        <div className="relative mx-auto flex h-[76px] max-w-[1200px] items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2 text-ink" aria-label="Reidey Startseite">
-            <Logo size={56} className="text-ink" />
-            <span className="text-xl font-semibold tracking-tight">Reidey</span>
+    <div
+      className={`${instrumentSans.variable} ${ibmPlexMono.variable}`}
+      style={lightShell}
+    >
+      {/* Dark top header */}
+      <header style={{ background: "#12151a", color: "#e6e8ec" }}>
+        <div
+          style={{
+            maxWidth: 1240,
+            margin: "0 auto",
+            padding: "18px clamp(20px,5vw,40px)",
+            display: "flex",
+            alignItems: "center",
+            gap: "clamp(14px,2.5vw,38px)",
+            flexWrap: "wrap",
+          }}
+        >
+          <Link
+            href="/"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              color: "#e6e8ec",
+            }}
+          >
+            <Logo size={40} className="text-[#e6e8ec]" />
+            <span
+              style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-.01em" }}
+            >
+              Reidey Driver
+            </span>
           </Link>
-
-          <nav className="hidden items-center gap-1 md:flex">
-            {NAV_LINKS.map((link) => (
+          <nav
+            style={{
+              flex: "1 1 260px",
+              display: "flex",
+              gap: "clamp(14px,2vw,24px)",
+              alignItems: "center",
+              minWidth: 0,
+              whiteSpace: "nowrap",
+              overflowX: "auto",
+            }}
+          >
+            {HEADER_NAV.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-full px-3 py-2 text-sm font-medium text-ink-muted transition-colors hover:text-ink"
+                className="hover:text-[#e6e8ec]!"
+                style={{ fontSize: 14, color: "rgba(230,232,236,.7)" }}
               >
                 {link.label}
               </Link>
             ))}
           </nav>
-
-          <div className="flex items-center gap-2">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              flex: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
             <Link
               href="/login"
-              className="hidden rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-ink transition-opacity hover:opacity-90 md:inline-flex"
+              className="hover:text-[#e6e8ec]!"
+              style={{
+                fontSize: 14,
+                fontWeight: 500,
+                color: "rgba(230,232,236,.8)",
+                padding: "10px 4px",
+              }}
             >
               Anmelden
             </Link>
-            <MobileNav links={NAV_LINKS} />
+            <Link
+              href="/#kontakt"
+              className="hover:bg-white!"
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: "#12151a",
+                background: "#e6e8ec",
+                borderRadius: 12,
+                padding: "11px 18px",
+              }}
+            >
+              Vertrieb kontaktieren
+            </Link>
           </div>
         </div>
       </header>
 
-      <main className="flex-1">{children}</main>
+      <main>{children}</main>
 
-      <footer className="border-t border-line bg-surface">
-        <div className="mx-auto max-w-[1200px] px-4 py-14">
-          <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
-            <div className="max-w-xs">
-              <Link href="/" className="flex items-center gap-2.5 text-ink" aria-label="Reidey Startseite">
-                <Logo size={84} className="text-ink" />
-                <span className="text-2xl font-semibold tracking-tight">Reidey</span>
-              </Link>
-              <p className="mt-4 text-sm leading-relaxed text-ink-muted">
-                Die Flottenmanagement-Plattform für moderne Fahrdienst-Flotten. Fahrer, Abläufe und Abrechnung an einem Ort.
-              </p>
+      {/* Footer */}
+      <footer
+        style={{
+          maxWidth: 1240,
+          margin: "0 auto",
+          padding: "clamp(52px,7vw,72px) clamp(20px,5vw,40px) 44px",
+        }}
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(168px,1fr))",
+            gap: "clamp(24px,3vw,40px)",
+            paddingBottom: "clamp(26px,4vw,36px)",
+            borderBottom: "1px solid #e4e4e1",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Logo size={38} className="text-[#1e222b]" />
+              <span style={{ fontSize: 17, fontWeight: 600 }}>Reidey Driver</span>
             </div>
-
-            {FOOTER_COLUMNS.map((col) => (
-              <div key={col.title}>
-                <h3 className="text-sm font-semibold text-ink">{col.title}</h3>
-                <ul className="mt-4 space-y-2.5">
-                  {col.links.map((link) => (
-                    <li key={link.href + link.label}>
-                      <Link
-                        href={link.href}
-                        className="text-sm text-ink-muted transition-colors hover:text-ink"
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+            <p
+              style={{
+                margin: 0,
+                fontSize: 13.5,
+                lineHeight: 1.6,
+                color: "#8b909b",
+                maxWidth: "24em",
+              }}
+            >
+              Dispatch-Assistent für professionelle Fahrdienst-Flotten. Gebaut in
+              Nordrhein-Westfalen.
+            </p>
           </div>
 
-          <div className="mt-12 flex flex-col gap-3 border-t border-line pt-6 text-sm text-ink-subtle sm:flex-row sm:items-center sm:justify-between">
-            <p>&copy; {year} Reidey. Alle Rechte vorbehalten.</p>
-            <p>DSGVO-konform. Daten in der EU verarbeitet.</p>
-          </div>
+          <FooterColumn title="Produkt" links={FOOTER_PRODUCT} />
+          <FooterColumn title="Unternehmen" links={FOOTER_COMPANY} />
+          <FooterColumn title="Rechtliches" links={FOOTER_LEGAL} />
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+            paddingTop: 22,
+          }}
+        >
+          <span style={{ font: `400 12px ${mono}`, color: "#8b909b" }}>
+            © 2026 Reidey GmbH · Solingen
+          </span>
+          <span style={{ fontSize: 12.5, color: "#8b909b" }}>
+            Reidey ist ein eigenständiges Flottenmanagement-Produkt.
+          </span>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function FooterColumn({
+  title,
+  links,
+}: {
+  title: string;
+  links: { href: string; label: string }[];
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <MonoLabel>{title}</MonoLabel>
+      {links.map((link) => (
+        <Link
+          key={link.href + link.label}
+          href={link.href}
+          className="hover:text-[#059669]!"
+          style={{ fontSize: 14, color: "#5a616e" }}
+        >
+          {link.label}
+        </Link>
+      ))}
     </div>
   );
 }
