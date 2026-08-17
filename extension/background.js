@@ -174,6 +174,10 @@ async function postRoster(drivers) {
   if (!pairing.ok) return { ok: false, reason: pairing.reason };
   const { apiUrl, token } = pairing;
 
+  // Tell the backend which Uber org this roster came from, so it can reject a
+  // pull that doesn't match the company's own linked fleet.
+  const { orgUuid } = await api.storage.local.get(["orgUuid"]);
+
   try {
     const res = await fetch(`${apiUrl}/api/v1/drivers/roster`, {
       method: "POST",
@@ -182,7 +186,7 @@ async function postRoster(drivers) {
         Accept: "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ drivers }),
+      body: JSON.stringify({ drivers, uber_org_uuid: orgUuid || undefined }),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));

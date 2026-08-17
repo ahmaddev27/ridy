@@ -147,9 +147,12 @@ Route::prefix('v1')->group(function () {
         Route::get('drivers/{driver}', [DriverController::class, 'show']);
         Route::patch('drivers/{driver}', [DriverController::class, 'update']);
         Route::get('drivers/{driver}/stats', [DriverController::class, 'stats']);
-        Route::post('drivers/sync', [DriverController::class, 'sync']);
-        Route::post('drivers/roster', [DriverController::class, 'ingestRoster']);
-        Route::post('drivers/statuses', [DriverController::class, 'ingestStatuses']);
+        // Browser-fed ingest: only for a company that has connected its own Uber
+        // account (a stored session), never an arbitrary account the manager is
+        // signed into. Guarded by fleet.connected.
+        Route::post('drivers/sync', [DriverController::class, 'sync'])->middleware('fleet.connected');
+        Route::post('drivers/roster', [DriverController::class, 'ingestRoster'])->middleware('fleet.connected');
+        Route::post('drivers/statuses', [DriverController::class, 'ingestStatuses'])->middleware('fleet.connected');
 
         // Per-driver Uber performance metrics (earnings/hours/trips)
         Route::post('drivers/metrics', [DriverMetricController::class, 'store']);
@@ -157,7 +160,7 @@ Route::prefix('v1')->group(function () {
 
         // Fleet vehicles (synced from Uber via the extension)
         Route::get('vehicles', [VehicleController::class, 'index']);
-        Route::post('vehicles', [VehicleController::class, 'ingest']);
+        Route::post('vehicles', [VehicleController::class, 'ingest'])->middleware('fleet.connected');
 
         // Dispatch offers feed
         Route::get('dispatch/offers', [DispatchOfferController::class, 'index']);
@@ -165,7 +168,7 @@ Route::prefix('v1')->group(function () {
         Route::get('dispatch/offers/export', [DispatchOfferController::class, 'export']);
         Route::get('dispatch/offers/{offer}', [DispatchOfferController::class, 'show']);
         // Extension forwards RAMEN offers captured in the manager's browser.
-        Route::post('dispatch/offers/ingest', [DispatchOfferController::class, 'ingest']);
+        Route::post('dispatch/offers/ingest', [DispatchOfferController::class, 'ingest'])->middleware('fleet.connected');
         Route::post('dispatch/offers/bulk-delete', [DispatchOfferController::class, 'bulkDestroy']);
         Route::delete('dispatch/offers/{offer}', [DispatchOfferController::class, 'destroy']);
 

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\OfferLifecycle;
 use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Dispatch\TripGeocoder;
@@ -37,6 +38,9 @@ class OfferReconcileTest extends TestCase
         ]);
         $manager->assignRole('fleet_manager');
         Sanctum::actingAs($manager);
+
+        // These scenarios are a connected company (statuses come from its live session).
+        UberFleetSession::withoutGlobalScopes()->create(['tenant_id' => $this->tenant->id, 'uber_org_uuid' => 'org1', 'cookies' => [['name' => 'a', 'value' => 'b']]]);
     }
 
     private function driver(): Driver

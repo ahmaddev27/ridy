@@ -95,10 +95,22 @@ class DriverController extends Controller
      */
     public function ingestRoster(Request $request, RosterSyncService $roster): JsonResponse
     {
-        $data = $request->validate(['drivers' => ['required', 'array']]);
+        $data = $request->validate([
+            'drivers' => ['required', 'array'],
+            'uber_org_uuid' => ['nullable', 'string'],
+        ]);
 
-        $tenantId = (int) $request->user()->tenant_id;
-        $result = $roster->sync($tenantId, $data['drivers']);
+        $tenant = $request->user()->tenant;
+
+        // Connected-company gate is enforced by the fleet.connected middleware.
+        // Here we additionally reject a roster whose org (when the extension
+        // reports it) isn't this tenant's own bound fleet.
+        $org = (string) ($data['uber_org_uuid'] ?? '');
+        if ($org !== '' && $tenant->uber_org_uuid !== null && $tenant->uber_org_uuid !== $org) {
+            abort(409, 'org_mismatch');
+        }
+
+        $result = $roster->sync((int) $tenant->id, $data['drivers']);
 
         return response()->json(['data' => $result]);
     }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureDriverTenantActive;
+use App\Http\Middleware\EnsureFleetConnected;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureUserAccount;
 use App\Http\Middleware\VerifyDispatchSecret;
@@ -25,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'super.admin' => EnsureSuperAdmin::class,
             'driver.active' => EnsureDriverTenantActive::class,
             'user.account' => EnsureUserAccount::class,
+            'fleet.connected' => EnsureFleetConnected::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

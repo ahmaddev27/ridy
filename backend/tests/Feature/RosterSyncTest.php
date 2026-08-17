@@ -8,7 +8,11 @@ use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
+use App\Models\User;
+use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class RosterSyncTest extends TestCase
@@ -118,6 +122,31 @@ class RosterSyncTest extends TestCase
         $this->assertSame(1, Driver::withoutGlobalScopes()->where('uber_driver_uuid', self::DRIVER_UUID)->count());
         $this->assertDatabaseMissing('drivers', ['id' => $dupe->id]);
         $this->assertDatabaseHas('dispatch_offers', ['offer_uuid' => 'o-dupe', 'driver_id' => $keep->id]);
+    }
+
+    public function test_manager_roster_refresh_requires_a_connected_session(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $manager = User::create([
+            'name' => 'M', 'email' => 'm@ya.de', 'password' => Hash::make('password'), 'tenant_id' => $this->tenant->id,
+        ]);
+        $manager->assignRole('fleet_manager');
+        Sanctum::actingAs($manager);
+
+        // No stored session yet: the browser "Refresh from Uber" is refused so it
+        // can't import whatever Uber account the manager is signed into.
+        $this->postJson('/api/v1/drivers/roster', ['drivers' => [$this->driver()]])
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'not_connected');
+        $this->assertSame(0, Driver::withoutGlobalScopes()->count());
+
+        // Once connected (a session exists), the pull is accepted.
+        UberFleetSession::withoutGlobalScopes()->create([
+            'tenant_id' => $this->tenant->id, 'uber_org_uuid' => 'org1', 'cookies' => [['name' => 'a', 'value' => 'b']],
+        ]);
+        $this->postJson('/api/v1/drivers/roster', ['drivers' => [$this->driver()]])
+            ->assertOk()
+            ->assertJsonPath('data.created', 1);
     }
 
     public function test_dedupe_preserves_a_pending_invite(): void

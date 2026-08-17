@@ -93,6 +93,18 @@ export default function DriversPage() {
       // supplier.uber.com using the manager's real IP (Uber blocks our server).
       const viaExt = await syncRosterViaExtension();
 
+      // The backend refuses a roster pull unless the company has connected its
+      // own Uber account (and only its own fleet) — surface a clear localized
+      // message instead of failing silently or showing a raw error code.
+      if (viaExt && !viaExt.ok && viaExt.reason === "not_connected") {
+        toast.error(t("screens.drivers.connectFirst"));
+        return;
+      }
+      if (viaExt && !viaExt.ok && viaExt.reason === "org_mismatch") {
+        toast.error(t("screens.drivers.orgMismatch"));
+        return;
+      }
+
       // Fall back to the server-side pull only when no extension answered.
       if (viaExt === null) {
         await syncDrivers();
