@@ -99,7 +99,16 @@ class DispatchOfferIngestor
             }
 
             try {
-                $this->notifier->notify($record);
+                // Log how many devices actually received the push so "no
+                // notification arrived" is diagnosable: sent=0 means the linked
+                // driver has no registered device token (app not installed /
+                // permission not granted), not a delivery failure.
+                $sent = $this->notifier->notify($record);
+                RidyLog::event('dispatch_offer.notified', [
+                    'offer_id' => $record->id,
+                    'driver_id' => $driver->id,
+                    'devices' => $sent,
+                ]);
             } catch (Throwable $e) {
                 RidyLog::event('dispatch_offer.notify_failed', ['offer_id' => $record->id, 'error' => $e->getMessage()]);
             }
