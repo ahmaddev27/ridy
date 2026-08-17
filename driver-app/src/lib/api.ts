@@ -15,6 +15,8 @@ export type Offer = {
   status: string | null;
   /** Present in fleet-owner mode so a row can be attributed to its driver. */
   driver_name?: string | null;
+  /** Rider's (first) name when the captured payload carried it. */
+  rider_name?: string | null;
   pickup_address: string | null;
   dropoff_address: string | null;
   fare_formatted: string | null;
@@ -22,6 +24,8 @@ export type Offer = {
   distance_m: number | null;
   accept_window_seconds: number | null;
   received_at: string | null;
+  /** When Uber requested the trip, if distinct from when we received the offer. */
+  requested_at?: string | null;
 };
 
 export type DriverProfile = {

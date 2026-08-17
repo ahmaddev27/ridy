@@ -9,7 +9,7 @@ import { api, type Offer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius } from "@/lib/theme";
-import { fareLabel, perKmLabel, distanceLabel, cleanAddress, euroQuality } from "@/lib/format";
+import { fareLabel, perKmLabel, distanceLabel, cleanAddress, euroQuality, timeLabel } from "@/lib/format";
 import { StatusBadge, QualityMark, RouteBlock, SectionLabel } from "@/components/ui";
 
 const RING = 230;
@@ -68,6 +68,9 @@ export default function OfferScreen() {
   const q = offer ? euroQuality(offer.fare_amount, offer.distance_m) : { mark: "€", good: false };
   const ringColor = pct > 0.5 ? c.completed : pct > 0.25 ? c.pending : c.canceled;
   const hasMetrics = offer?.distance_m != null; // geo-synced offers only; hide the "—" placeholders otherwise
+  // Rough ETA at ~30 km/h city average — same derivation the home ActiveOffer uses.
+  const km = offer?.distance_m ? offer.distance_m / 1000 : null;
+  const etaMin = km ? Math.round((km / 30) * 60) : null;
 
   return (
     <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: c.canvas }}>
@@ -98,7 +101,12 @@ export default function OfferScreen() {
                   />
                 )}
               </Svg>
-              <Text style={{ color: c.ink, fontSize: 44, fontWeight: "800", letterSpacing: -1 }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
+              {/* Big fare with the euro-quality mark right beside it — the same "€€"
+                  the driver sees in the push notification (a price-per-km rating). */}
+              <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "flex-start", gap: 6 }}>
+                <Text style={{ color: c.ink, fontSize: 44, fontWeight: "800", letterSpacing: -1 }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
+                <View style={{ marginTop: 6 }}><QualityMark mark={q.mark} good={q.good} size={20} /></View>
+              </View>
               {hasMetrics && (
                 <Text style={{ color: c.inkMuted, fontSize: 14, marginTop: 2 }}>
                   {perKmLabel(offer.fare_amount, offer.distance_m)} · {distanceLabel(offer.distance_m)}
@@ -110,12 +118,15 @@ export default function OfferScreen() {
                 {expired ? t("offer.expired") : `${secondsLeft.toFixed(1)}s`}
               </Text>
             )}
+            {/* Clarify the mark so "€€" never reads as a second price. */}
+            <Text style={{ color: c.inkSubtle, fontSize: 12, textAlign: "center", marginTop: 8, lineHeight: 17, paddingHorizontal: 24 }}>
+              {t("offer.qualityHint")}
+            </Text>
           </View>
 
           {/* Status row */}
           <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 12 }}>
             <StatusBadge status={status} label={t(`status.${status}`)} />
-            <QualityMark mark={q.mark} good={q.good} size={17} />
             {offer.received_at && (
               <Text style={{ color: c.inkSubtle, fontSize: 15 }}>
                 {new Date(offer.received_at).toLocaleTimeString("en-GB")}
@@ -123,12 +134,15 @@ export default function OfferScreen() {
             )}
           </View>
 
-          {/* Fleet-owner: attribute the offer to its driver. */}
-          {isOwner && offer.driver_name && (
-            <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 7 }}>
-              <Ionicons name="person-circle-outline" size={18} color={c.inkMuted} />
-              <Text style={{ color: c.ink, fontSize: 16, fontWeight: "700" }}>{offer.driver_name}</Text>
-              <Text style={{ color: c.inkSubtle, fontSize: 14 }}>· {t("fleet.driver")}</Text>
+          {/* People — rider (when captured) and, in fleet-owner mode, the driver. */}
+          {(offer.rider_name || (isOwner && offer.driver_name)) && (
+            <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 18, flexWrap: "wrap" }}>
+              {offer.rider_name && (
+                <PersonTag icon="person-outline" name={offer.rider_name} role={t("offer.rider")} row={row} c={c} />
+              )}
+              {isOwner && offer.driver_name && (
+                <PersonTag icon="person-circle-outline" name={offer.driver_name} role={t("fleet.driver")} row={row} c={c} />
+              )}
             </View>
           )}
 
@@ -143,18 +157,30 @@ export default function OfferScreen() {
           </View>
 
           {/* Metrics — only when the offer has been geo-synced (otherwise the values are just "—"). */}
-          {hasMetrics && (
+          {hasMetrics ? (
             <View style={{ flexDirection: row, backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
-              <View style={{ flex: 1, padding: 16, gap: 4, borderRightWidth: isRTL() ? 0 : 1, borderLeftWidth: isRTL() ? 1 : 0, borderColor: c.line }}>
-                <SectionLabel>{t("offer.strecke")}</SectionLabel>
-                <Text style={{ color: c.ink, fontSize: 20, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>{distanceLabel(offer.distance_m)}</Text>
-              </View>
-              <View style={{ flex: 1, padding: 16, gap: 4 }}>
-                <SectionLabel>{t("offer.qualitaet")}</SectionLabel>
-                <Text style={{ color: c.ink, fontSize: 20, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>{perKmLabel(offer.fare_amount, offer.distance_m)}</Text>
-              </View>
+              <MetricCell label={t("offer.strecke")} value={distanceLabel(offer.distance_m)} c={c} border />
+              <MetricCell label={t("offer.qualitaet")} value={perKmLabel(offer.fare_amount, offer.distance_m)} c={c} border />
+              <MetricCell label={t("offer.eta")} value={etaMin != null ? t("home.eta").replace("{n}", String(etaMin)) : "—"} c={c} />
+            </View>
+          ) : (
+            // Distance / per-km / ETA depend on server-side geocoding — keep the dash
+            // fallback but tell the driver why the numbers are not there yet.
+            <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, padding: 16 }}>
+              <Text style={{ color: c.inkSubtle, fontSize: 13, lineHeight: 19, textAlign: isRTL() ? "right" : "left" }}>{t("offer.noGeo")}</Text>
             </View>
           )}
+
+          {/* Timing — when the offer arrived, when Uber requested it, and the accept window. */}
+          <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
+            <InfoRow label={t("offer.received")} value={timeLabel(offer.received_at)} row={row} c={c} border />
+            {offer.requested_at && (
+              <InfoRow label={t("offer.requested")} value={timeLabel(offer.requested_at)} row={row} c={c} border />
+            )}
+            {isPending && win > 0 && (
+              <InfoRow label={t("offer.acceptWindow")} value={`${win} ${t("common.seconds")}`} row={row} c={c} />
+            )}
+          </View>
 
           <View style={{ flex: 1 }} />
 
@@ -178,5 +204,39 @@ export default function OfferScreen() {
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+type Colors = ReturnType<typeof useColors>;
+
+/** Icon + name + role, used for the rider and (owner mode) driver attribution. */
+function PersonTag({ icon, name, role, row, c }: { icon: keyof typeof Ionicons.glyphMap; name: string; role: string; row: "row" | "row-reverse"; c: Colors }) {
+  return (
+    <View style={{ flexDirection: row, alignItems: "center", gap: 7 }}>
+      <Ionicons name={icon} size={18} color={c.inkMuted} />
+      <Text style={{ color: c.ink, fontSize: 16, fontWeight: "700" }}>{name}</Text>
+      <Text style={{ color: c.inkSubtle, fontSize: 14 }}>· {role}</Text>
+    </View>
+  );
+}
+
+/** One equal-width cell in the distance / per-km / ETA metrics strip. */
+function MetricCell({ label, value, c, border }: { label: string; value: string; c: Colors; border?: boolean }) {
+  return (
+    <View style={{ flex: 1, padding: 16, gap: 4, borderRightWidth: border && !isRTL() ? 1 : 0, borderLeftWidth: border && isRTL() ? 1 : 0, borderColor: c.line }}>
+      <SectionLabel>{label}</SectionLabel>
+      {/* Latin/money values stay LTR even in Arabic, matching how Uber shows them. */}
+      <Text style={{ color: c.ink, fontSize: 20, fontWeight: "800", textAlign: isRTL() ? "right" : "left", writingDirection: "ltr" }}>{value}</Text>
+    </View>
+  );
+}
+
+/** A label/value timing row inside the info card. */
+function InfoRow({ label, value, row, c, border }: { label: string; value: string; row: "row" | "row-reverse"; c: Colors; border?: boolean }) {
+  return (
+    <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", gap: 12, paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: border ? 1 : 0, borderColor: c.line }}>
+      <Text style={{ color: c.inkMuted, fontSize: 14 }}>{label}</Text>
+      <Text style={{ color: c.ink, fontSize: 14, fontWeight: "700", writingDirection: "ltr" }}>{value}</Text>
+    </View>
   );
 }
