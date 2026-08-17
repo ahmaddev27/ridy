@@ -93,7 +93,10 @@ jobs:
             systemctl disable httpd 2>/dev/null || true
             systemctl mask httpd 2>/dev/null || true
 
-            $COMPOSE up -d --build
+            # Force-recreate so every container picks up the freshly written .env
+            # (backend, caddy, frontend, scheduler, daemon). Without this, a
+            # running container keeps its old env and the domain/config "reverts".
+            $COMPOSE up -d --build --force-recreate
 
             # The repo is bind-mounted and owned by root, so make Laravel's
             # writable dirs writable by php-fpm (www-data) — otherwise any log or
@@ -115,6 +118,9 @@ jobs:
               touch "$APP_DIR/.seeded"
             fi
 
+            # Clear any stale cached config first, then re-cache the fresh one, so
+            # a config change (domain, stateful hosts) can never be served stale.
+            $COMPOSE exec -T backend php artisan config:clear || true
             $COMPOSE exec -T backend php artisan config:cache || true
             echo "Deploy complete: https://$DOMAIN"
         env:
