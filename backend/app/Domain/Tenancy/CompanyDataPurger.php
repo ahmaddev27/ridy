@@ -43,9 +43,12 @@ class CompanyDataPurger
                 'sessions' => UberFleetSession::withoutGlobalScopes()->where('tenant_id', $id)->delete(),
             ];
 
-            // Free the proxy slot (no drivers left) and stop the extension from
-            // silently re-capturing an Uber session the operator just cut.
+            // Free the proxy slot (no drivers left), unbind the Uber org (so a
+            // stray offer for that org can never be re-attributed to this now-
+            // disconnected company), and stop the extension from silently
+            // re-capturing the session the operator just cut.
             $this->proxies->release($tenant);
+            $tenant->forceFill(['uber_org_uuid' => null])->save();
             $tenant->blockAutolink();
 
             return $counts;

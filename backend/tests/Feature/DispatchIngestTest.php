@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
@@ -50,7 +51,14 @@ class DispatchIngestTest extends TestCase
 
     private function tenantWithOrg(): Tenant
     {
-        return Tenant::create(['name' => 'YA Mobility', 'country' => 'DE', 'uber_org_uuid' => self::ORG]);
+        $tenant = Tenant::create(['name' => 'YA Mobility', 'country' => 'DE', 'uber_org_uuid' => self::ORG]);
+        // Offers now route via an ACTIVE session for the org, not the tenant's
+        // stored org column, so the company must be connected.
+        UberFleetSession::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id, 'uber_org_uuid' => self::ORG, 'cookies' => [['name' => 'a', 'value' => 'b']],
+        ]);
+
+        return $tenant;
     }
 
     private function ingestOffers(array $offers, string $secret = self::SECRET)

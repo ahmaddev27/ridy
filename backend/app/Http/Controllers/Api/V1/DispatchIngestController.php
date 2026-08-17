@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\DispatchOfferIngestor;
-use App\Domain\Tenancy\Models\Tenant;
+use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,20 +27,24 @@ class DispatchIngestController extends Controller
         $results = ['routed' => 0, 'unlinked_driver' => 0, 'duplicate' => 0, 'skipped_no_uuid' => 0, 'no_tenant' => 0];
 
         foreach ($data['offers'] as $offer) {
-            // The offer's own partnerUUID identifies the fleet, so the daemon
-            // never has to know internal tenant ids.
+            // Route by the ACTIVE session for this Uber org, not the tenant's
+            // stored uber_org_uuid — a disconnected company keeps that column but
+            // must never receive offers again, and one-account-per-company means
+            // exactly one session owns the org. This prevents an offer streamed by
+            // the connected company from being attributed to a since-disconnected
+            // tenant that once linked the same account.
             $partnerUuid = (string) Arr::get($offer, 'partnerUUID', '');
-            $tenant = $partnerUuid !== ''
-                ? Tenant::where('uber_org_uuid', $partnerUuid)->first()
+            $session = $partnerUuid !== ''
+                ? UberFleetSession::withoutGlobalScopes()->where('uber_org_uuid', $partnerUuid)->first()
                 : null;
 
-            if ($tenant === null) {
+            if ($session === null) {
                 $results['no_tenant']++;
 
                 continue;
             }
 
-            $outcome = $ingestor->ingest($tenant->id, $offer, $seq);
+            $outcome = $ingestor->ingest((int) $session->tenant_id, $offer, $seq);
             $results[$outcome['status']] = ($results[$outcome['status']] ?? 0) + 1;
         }
 
