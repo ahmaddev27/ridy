@@ -153,7 +153,7 @@ class DiagnoseDispatch extends Command
         $sample = $offers->take(8)->map(fn ($o) => [
             substr($o->offer_uuid, 0, 8).'…',
             in_array($o->driver_uuid, $uuids, true) ? '<fg=green>'.substr($o->driver_uuid, 0, 8).'…</>' : '<fg=red>'.substr($o->driver_uuid, 0, 8).'…✗</>',
-            $o->status,
+            $o->status instanceof OfferStatus ? $o->status->value : (string) $o->status,
             (int) $o->accept_window_seconds.'s',
         ])->all();
         $this->table(['offer_uuid', 'offer.driver_uuid', 'status', 'window'], $sample);
