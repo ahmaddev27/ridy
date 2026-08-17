@@ -60,7 +60,11 @@ export default function OfferScreen() {
   const status = offer?.status ?? "pending";
   const win = offer?.accept_window_seconds ?? 0;
   const pct = secondsLeft != null && win > 0 ? Math.max(0, Math.min(1, secondsLeft / win)) : 0;
-  const expired = secondsLeft != null && secondsLeft <= 0;
+  // The accept window (and therefore "expired") only applies while the offer is
+  // still open. Once it has been accepted/started/completed the trip is active,
+  // so the countdown must never override the live status with an "expired" label.
+  const isPending = status === "pending";
+  const expired = isPending && secondsLeft != null && secondsLeft <= 0;
   const q = offer ? euroQuality(offer.fare_amount, offer.distance_m) : { mark: "€", good: false };
   const ringColor = pct > 0.5 ? c.completed : pct > 0.25 ? c.pending : c.canceled;
   const hasMetrics = offer?.distance_m != null; // geo-synced offers only; hide the "—" placeholders otherwise
@@ -86,7 +90,7 @@ export default function OfferScreen() {
             <View style={{ width: RING, height: RING, alignItems: "center", justifyContent: "center" }}>
               <Svg width={RING} height={RING} style={{ position: "absolute", transform: [{ rotate: "-90deg" }] }}>
                 <Circle cx={RING / 2} cy={RING / 2} r={R} stroke={c.line} strokeWidth={STROKE} fill="none" />
-                {secondsLeft != null && (
+                {isPending && secondsLeft != null && (
                   <Circle
                     cx={RING / 2} cy={RING / 2} r={R}
                     stroke={ringColor} strokeWidth={STROKE} fill="none" strokeLinecap="round"
@@ -101,7 +105,7 @@ export default function OfferScreen() {
                 </Text>
               )}
             </View>
-            {secondsLeft != null && (
+            {isPending && secondsLeft != null && (
               <Text style={{ color: ringColor, fontSize: 17, fontWeight: "700", marginTop: 6 }}>
                 {expired ? t("offer.expired") : `${secondsLeft.toFixed(1)}s`}
               </Text>

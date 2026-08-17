@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, FlatList, Pressable, RefreshControl, ActivityIndicator } from "react-native";
+import { View, FlatList, Pressable, RefreshControl, ActivityIndicator, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text, TextInput } from "@/components/typography";
 import { useRouter } from "expo-router";
@@ -86,8 +86,12 @@ export default function OffersScreen() {
               />
             </View>
 
-            {/* Filter chips */}
-            <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", flexWrap: "wrap", gap: 10 }}>
+            {/* Filter chips — one horizontal row (scrolls if the labels overflow). */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ flexDirection: isRTL() ? "row-reverse" : "row", gap: 8, paddingVertical: 2 }}
+            >
               {FILTERS.map((s) => {
                 const on = status === s;
                 const label = s === "all" ? t("home.all") : t(`status.${s}`);
@@ -96,13 +100,13 @@ export default function OffersScreen() {
                   <Pressable
                     key={s}
                     onPress={() => setStatus(s)}
-                    style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: radius.pill, backgroundColor: on ? c.primary : c.surface, borderWidth: 1, borderColor: on ? c.primary : c.line }}
+                    style={{ paddingHorizontal: 18, paddingVertical: 9, borderRadius: radius.pill, backgroundColor: on ? c.primary : c.surface, borderWidth: 1, borderColor: on ? c.primary : c.line }}
                   >
                     <Text style={{ color: on ? c.primaryInk : hue, fontWeight: "700", fontSize: 14 }}>{label}</Text>
                   </Pressable>
                 );
               })}
-            </View>
+            </ScrollView>
 
             {/* Count */}
             {total > 0 && (

@@ -15,13 +15,18 @@ import { Ionicons } from "@expo/vector-icons";
  * re-render once their font is ready.
  */
 export function useAppFonts(): boolean {
-  const [loaded] = useFonts({
+  // Load the two font families in separate batches. `useFonts` resolves each
+  // batch with Promise.all, so keeping the glyph font apart from Tajawal means a
+  // slow/failed load of one family can never block the other from registering
+  // (a single combined batch would drop the tab-bar icons and the Arabic text
+  // together the moment any one file failed).
+  const [textLoaded] = useFonts({
     Tajawal_400Regular,
     Tajawal_500Medium,
     Tajawal_700Bold,
     Tajawal_800ExtraBold,
-    ...Ionicons.font,
   });
+  const [iconsLoaded] = useFonts(Ionicons.font);
 
-  return loaded;
+  return textLoaded && iconsLoaded;
 }
