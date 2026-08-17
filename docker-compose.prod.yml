@@ -146,7 +146,39 @@ services:
       # Residential proxy for all Uber traffic (empty = direct = blocked).
       UBER_PROXY_URL: ${UBER_PROXY_URL:-}
 
+  # --- Self-hosted geocoding + routing (opt-in via the "geo" profile) --------
+  # Removes the free public services' ~1 req/s rate limit so trip distances fill
+  # instantly at scale. NOT started by a normal deploy (profile-gated); import
+  # Germany once, then set NOMINATIM_URL/OSRM_URL and start with --profile geo.
+  # See docs/self-hosted-geo.md for the one-time import steps.
+  nominatim:
+    image: mediagis/nominatim:4.4
+    profiles: ["geo"]
+    restart: unless-stopped
+    environment:
+      PBF_URL: ${GEO_PBF_URL:-https://download.geofabrik.de/europe/germany-latest.osm.pbf}
+      REPLICATION_URL: ${GEO_REPLICATION_URL:-https://download.geofabrik.de/europe/germany-updates/}
+      IMPORT_STYLE: address
+      NOMINATIM_PASSWORD: ${NOMINATIM_PASSWORD:-nominatim}
+    volumes:
+      - nominatim_data:/var/lib/postgresql/14/main
+    shm_size: 1g
+    # Internal only — reached by the backend as http://nominatim:8080.
+
+  osrm:
+    image: osrm/osrm-backend:latest
+    profiles: ["geo"]
+    restart: unless-stopped
+    # Serves the pre-built graph produced by the one-time prep in the docs.
+    # Uses MLD (partition/customize); switch to CH if you prepared with contract.
+    command: osrm-routed --algorithm mld /data/germany-latest.osrm
+    volumes:
+      - osrm_data:/data
+    # Internal only — reached by the backend as http://osrm:5000.
+
 volumes:
   dbdata:
   caddy_data:
   caddy_config:
+  nominatim_data:
+  osrm_data:

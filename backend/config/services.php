@@ -67,4 +67,12 @@ return [
         'project_id' => env('FCM_PROJECT_ID'),
     ],
 
+    // Trip geocoding + routing (TripGeocoder). Defaults to the free public
+    // OSM services; point these at self-hosted Nominatim/OSRM (no rate limits)
+    // once imported — see docs/self-hosted-geo.md.
+    'geo' => [
+        'nominatim_url' => env('NOMINATIM_URL') ?: 'https://nominatim.openstreetmap.org',
+        'osrm_url' => env('OSRM_URL') ?: 'https://router.project-osrm.org',
+    ],
+
 ];

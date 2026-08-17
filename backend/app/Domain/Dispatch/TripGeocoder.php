@@ -9,17 +9,27 @@ use Illuminate\Support\Facades\Http;
 
 /**
  * Turns an offer's pickup/dropoff addresses into map coordinates + a road route,
- * using only free services (Nominatim for geocoding, OSRM for routing). Results
- * are cached on the offer (and addresses in a shared geocode_cache) so the work
- * runs once, lazily, on first detail view.
+ * using Nominatim for geocoding + OSRM for routing. The base URLs are
+ * configurable (services.geo.*) so a self-hosted, rate-limit-free instance can
+ * replace the free public services at scale — see docs/self-hosted-geo.md.
+ * Results are cached on the offer (and addresses in a shared geocode_cache) so
+ * the work runs once, lazily, on first detail view.
  */
 class TripGeocoder
 {
-    private const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
-
-    private const OSRM = 'https://router.project-osrm.org/route/v1/driving';
-
     private const UA = 'Reidey/1.0 (fleet dispatch; contact: ops@reidey.de)';
+
+    /** Nominatim /search endpoint (self-hosted or public), from config. */
+    private function nominatimUrl(): string
+    {
+        return rtrim((string) config('services.geo.nominatim_url'), '/').'/search';
+    }
+
+    /** OSRM driving route endpoint (self-hosted or public), from config. */
+    private function osrmUrl(): string
+    {
+        return rtrim((string) config('services.geo.osrm_url'), '/').'/route/v1/driving';
+    }
 
     /**
      * Give up (mark synced) only after this many failed attempts. The backfill
@@ -83,7 +93,7 @@ class TripGeocoder
         try {
             $res = Http::withHeaders(['User-Agent' => self::UA])
                 ->timeout(6)
-                ->get(self::NOMINATIM, [
+                ->get($this->nominatimUrl(), [
                     'q' => $address,
                     'format' => 'json',
                     'limit' => 1,
@@ -122,7 +132,7 @@ class TripGeocoder
     {
         try {
             $path = "{$from['lng']},{$from['lat']};{$to['lng']},{$to['lat']}";
-            $res = Http::timeout(6)->get(self::OSRM.'/'.$path, [
+            $res = Http::timeout(6)->get($this->osrmUrl()."/".$path, [
                 'overview' => 'full',
                 'geometries' => 'geojson',
             ]);
