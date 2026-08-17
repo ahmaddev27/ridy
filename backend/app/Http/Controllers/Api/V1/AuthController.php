@@ -52,9 +52,17 @@ class AuthController extends Controller
         return (new UserResource($user))->response()->setStatusCode(200);
     }
 
-    public function me(Request $request): UserResource
+    public function me(Request $request): JsonResponse
     {
-        return new UserResource($request->user()->load('tenant'));
+        // Surface impersonation so the dashboard can show an "acting as company"
+        // banner with a stop control (the session key is set by the admin's
+        // impersonate/start).
+        $impersonating = $request->hasSession()
+            && $request->session()->has(\App\Http\Controllers\Api\V1\Admin\ImpersonationController::KEY);
+
+        return (new UserResource($request->user()->load('tenant')))
+            ->additional(['impersonating' => $impersonating])
+            ->response();
     }
 
     public function logout(Request $request): Response

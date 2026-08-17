@@ -128,6 +128,9 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'user.account'])->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
+        // Stop impersonating: mid-impersonation the caller is a manager, so this
+        // lives outside the super-admin group (the session key gates it).
+        Route::post('impersonate/stop', [\App\Http\Controllers\Api\V1\Admin\ImpersonationController::class, 'stop']);
     });
 
     Route::middleware(['auth:sanctum', 'user.account', ResolveTenant::class])->group(function () {
@@ -275,6 +278,11 @@ Route::prefix('v1')->group(function () {
         Route::get('companies/{tenant}/session', [CompanySessionController::class, 'show']);
         Route::post('companies/{tenant}/session/relink', [CompanySessionController::class, 'forceRelink']);
         Route::delete('companies/{tenant}/session', [CompanySessionController::class, 'destroy']);
+
+        // Act as a company: swap the dashboard session to one of its managers so
+        // the admin can run the manager-only Uber connect flow. Stop lives on the
+        // authenticated group above (the caller is a manager mid-impersonation).
+        Route::post('companies/{tenant}/impersonate', [\App\Http\Controllers\Api\V1\Admin\ImpersonationController::class, 'start']);
 
         // Cash collectors + payment ledger.
         Route::get('collectors', [CollectorController::class, 'index']);
