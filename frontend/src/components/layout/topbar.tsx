@@ -88,7 +88,7 @@ export function Topbar() {
           `backdrop-filter` would otherwise become the containing block for this
           `fixed` overlay and collapse it to the header's height. */}
       {navOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-[1200] lg:hidden">
           <div className="absolute inset-0 bg-overlay" onClick={() => setNavOpen(false)} />
           <div className="absolute inset-y-0 start-0 flex w-64 flex-col bg-surface shadow-xl">
             <div className="relative">

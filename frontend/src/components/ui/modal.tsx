@@ -29,7 +29,7 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-overlay" onClick={onClose} />
       <div className={`relative max-h-[88vh] w-full overflow-y-auto rounded-xl bg-surface p-6 shadow-xl ${sizeClass[size]}`}>
         {title && (
