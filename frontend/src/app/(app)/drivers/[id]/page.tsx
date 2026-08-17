@@ -3,27 +3,27 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ChevronLeft, Phone, Mail, Star, Car, UserCheck, Loader2, Wallet, Clock, MapPin, Gauge } from "lucide-react";
+import { ChevronLeft, Phone, Mail, Star, Car, UserCheck, MapPin, ArrowRight, ChevronDown, Inbox } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Badge, type Status } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
+import { latnLocale, toLatinDigits } from "@/lib/utils";
 import { getDriver, getDriverStats, type Driver, type DriverStats } from "@/lib/api/drivers";
-import { fetchDriverMetricsViaExtension, type DriverMetrics } from "@/lib/extension";
+import { listOffersPaged, fareLabel, type DispatchOffer, type OfferStatus } from "@/lib/api/offers";
+import { OfferDetailModal } from "../../offers/offer-detail-modal";
 
 type RangeKey = "today" | "yesterday" | "7" | "30" | "custom";
 
-function num(v: number | string | null | undefined): number | null {
-  if (v == null) return null;
-  const n = typeof v === "number" ? v : parseFloat(v);
-  return Number.isFinite(n) ? n : null;
-}
-function pct(v: number | string | null | undefined): string {
-  const n = num(v);
-  if (n == null) return "—";
-  return `${(n <= 1 ? n * 100 : n).toFixed(0)}%`;
-}
-function eur(n: number | null): string {
-  return n != null ? `€${n.toFixed(2)}` : "—";
-}
+/** Offer lifecycle status → badge tone (mirrors the offers page). */
+const OFFER_TONE: Record<OfferStatus, Status> = {
+  pending: "expiring",
+  accepted: "info",
+  started: "private",
+  completed: "connected",
+  rejected: "neutral",
+  canceled: "personal",
+};
 
 // Uber measures a "day" as its business day: 04:00 → 04:00 in the fleet's
 // timezone (Europe/Berlin), NOT local midnight. Aligning our windows to the same
@@ -61,13 +61,6 @@ function rangeMs(key: RangeKey): { from: number; to: number } {
   return { from: now - Number(key) * DAY_MS, to: now };
 }
 
-/** Uber's earnings_label is already formatted (e.g. "€2,478.75"); prefer it. */
-function earningsDisplay(m: DriverMetrics): string {
-  const label = typeof m.earnings_label === "string" ? m.earnings_label.trim() : "";
-  if (label && /\d/.test(label)) return label;
-  return eur(num(m.earnings));
-}
-
 function statusLabel(driver: Driver, d: (k: string) => string): { text: string; tone: string } {
   const s = (driver.online_status ?? "").toUpperCase();
   if (s.includes("ON_TRIP")) return { text: d("onTrip"), tone: "text-success-fg" };
@@ -77,8 +70,9 @@ function statusLabel(driver: Driver, d: (k: string) => string): { text: string; 
 }
 
 export default function DriverProfilePage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const d = (k: string) => t(`screens.drivers.${k}`);
+  const o = (k: string) => t(`screens.offers.${k}`);
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
 
@@ -88,8 +82,10 @@ export default function DriverProfilePage() {
   const [range, setRange] = useState<RangeKey>("today");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
-  const [metrics, setMetrics] = useState<DriverMetrics | null>(null);
-  const [loadingMetrics, setLoadingMetrics] = useState(false);
+  const [offers, setOffers] = useState<DispatchOffer[]>([]);
+  const [loadingOffers, setLoadingOffers] = useState(false);
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set([new Date().toDateString()]));
 
   useEffect(() => {
     getDriver(id).then(setDriver).catch(() => setDriver(null));
@@ -112,29 +108,46 @@ export default function DriverProfilePage() {
     getDriverStats(id, win.fromDate, win.toDate).then(setStats).catch(() => setStats(null));
   }, [id, win.fromDate, win.toDate]);
 
-  // Uber performance metrics for the window (via the extension).
+  // This driver's own captured offers for the selected window.
   useEffect(() => {
-    if (!driver?.uber_driver_uuid) return;
-    setLoadingMetrics(true);
-    setMetrics(null);
-    fetchDriverMetricsViaExtension(driver.uber_driver_uuid, win.fromMs, win.toMs)
-      .then(setMetrics)
-      .finally(() => setLoadingMetrics(false));
-  }, [driver?.uber_driver_uuid, win.fromMs, win.toMs]);
+    const uuid = driver?.uber_driver_uuid;
+    if (!uuid) {
+      setOffers([]);
+      return;
+    }
+    setLoadingOffers(true);
+    listOffersPaged({ driverUuid: uuid, from: win.fromDate, to: win.toDate, perPage: 100 })
+      .then((res) => setOffers(res.items))
+      .catch(() => setOffers([]))
+      .finally(() => setLoadingOffers(false));
+  }, [driver?.uber_driver_uuid, win.fromDate, win.toDate]);
 
-  const derived = useMemo(() => {
-    if (!metrics) return null;
-    const hoursOnline = num(metrics.hours_online) ?? 0;
-    const hoursOnTrip = num(metrics.hours_on_trip) ?? 0;
-    const earnings = num(metrics.earnings);
-    const trips = num(metrics.trips);
-    return {
-      hoursOnline,
-      utilization: hoursOnline > 0 ? (hoursOnTrip / hoursOnline) * 100 : null,
-      earningsPerHour: earnings != null && hoursOnline > 0 ? earnings / hoursOnline : null,
-      tripsPerHour: trips != null && hoursOnline > 0 ? trips / hoursOnline : null,
-    };
-  }, [metrics]);
+  // Group the loaded offers into day buckets (feed is newest-first).
+  const groupedByDay = useMemo(() => {
+    const groups = new Map<string, DispatchOffer[]>();
+    for (const offer of offers) {
+      const key = offer.received_at ? new Date(offer.received_at).toDateString() : "—";
+      const bucket = groups.get(key) ?? [];
+      bucket.push(offer);
+      groups.set(key, bucket);
+    }
+    return [...groups.entries()];
+  }, [offers]);
+
+  function toggleDay(key: string) {
+    setOpenDays((s) => {
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  }
+
+  function dayLabel(key: string): string {
+    if (key === new Date().toDateString()) return o("today");
+    if (key === "—") return "—";
+    return new Date(key).toLocaleDateString(latnLocale(locale), { weekday: "long", day: "numeric", month: "long" });
+  }
 
   const status = driver ? statusLabel(driver, d) : null;
 
@@ -227,29 +240,81 @@ export default function DriverProfilePage() {
             </div>
           )}
 
+          {/* This driver's own offers for the window */}
           {!driver?.uber_driver_uuid ? (
             <Card className="p-6 text-center text-sm text-ink-subtle">{d("notLinkedNoMetrics")}</Card>
-          ) : loadingMetrics ? (
-            <div className="flex items-center justify-center py-10 text-ink-subtle">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-          ) : metrics && derived ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <PerfCard icon={Wallet} title={d("cardEarnings")}
-                primary={earningsDisplay(metrics)} primaryLabel={d("totalEarnings")}
-                secondary={eur(derived.earningsPerHour)} secondaryLabel={d("earningsPerHour")} />
-              <PerfCard icon={Clock} title={d("cardSupply")}
-                primary={derived.hoursOnline.toFixed(2)} primaryLabel={d("onlineHours")}
-                secondary={derived.utilization != null ? `${derived.utilization.toFixed(0)}%` : "—"} secondaryLabel={d("utilization")} />
-              <PerfCard icon={MapPin} title={d("cardTrips")}
-                primary={num(metrics.trips) != null ? String(num(metrics.trips)) : "—"} primaryLabel={d("mTrips")}
-                secondary={derived.tripsPerHour != null ? derived.tripsPerHour.toFixed(2) : "—"} secondaryLabel={d("tripsPerHour")} />
-              <PerfCard icon={Gauge} title={d("cardQuality")}
-                primary={pct(metrics.acceptance_rate)} primaryLabel={d("acceptanceRate")}
-                secondary={pct(metrics.cancellation_rate)} secondaryLabel={d("cancellationRate")} />
-            </div>
           ) : (
-            <Card className="p-6 text-center text-sm text-ink-subtle">{d("metricsUnavailable")}</Card>
+            <Card className="overflow-hidden">
+              {loadingOffers ? (
+                <div className="space-y-2 p-4">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="h-12 animate-pulse rounded bg-surface-2" />
+                  ))}
+                </div>
+              ) : offers.length === 0 ? (
+                <EmptyState icon={Inbox} title={d("offersTitle")} description={d("noOffers")} />
+              ) : (
+                <div>
+                  {groupedByDay.map(([key, dayOffers]) => {
+                    const open = openDays.has(key);
+                    return (
+                      <div key={key} className="border-b border-line last:border-0">
+                        <button
+                          onClick={() => toggleDay(key)}
+                          className="flex w-full items-center gap-2 px-4 py-3 text-start hover:bg-surface-2"
+                        >
+                          <ChevronDown className={`h-4 w-4 text-ink-subtle transition ${open ? "" : "-rotate-90"}`} />
+                          <span className="font-semibold text-ink">{dayLabel(key)}</span>
+                          <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-ink">
+                            {dayOffers.length} {o("offersCount")}
+                          </span>
+                        </button>
+                        {open && (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <tbody className="divide-y divide-line">
+                                {dayOffers.map((offer) => (
+                                  <tr
+                                    key={offer.id}
+                                    onClick={() => setDetailId(offer.id)}
+                                    className="cursor-pointer hover:bg-surface-2"
+                                  >
+                                    <td className="whitespace-nowrap px-4 py-3 text-ink-muted">
+                                      {offer.received_at ? new Date(offer.received_at).toLocaleTimeString(latnLocale(locale)) : "—"}
+                                    </td>
+                                    <td className="px-4 py-3 text-ink-muted">
+                                      <div className="flex items-start gap-1.5">
+                                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success-fg" />
+                                        <div className="min-w-0">
+                                          <div className="truncate">{offer.pickup_address ?? "—"}</div>
+                                          <div className="flex items-center gap-1 truncate text-ink-subtle">
+                                            <ArrowRight className="h-3 w-3 shrink-0 rtl:rotate-180" />
+                                            <span className="truncate">{offer.dropoff_address ?? "—"}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-ink">
+                                      {toLatinDigits(fareLabel(offer, latnLocale(locale)))}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      {(() => {
+                                        const st = offer.status ?? (offer.accepted ? "accepted" : "pending");
+                                        return <Badge status={OFFER_TONE[st]} dot>{o(`st_${st}`)}</Badge>;
+                                      })()}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
           )}
 
           {/* Our own captured data */}
@@ -289,42 +354,11 @@ export default function DriverProfilePage() {
           </div>
         </Card>
       )}
-    </div>
-  );
-}
 
-function PerfCard({
-  icon: Icon,
-  title,
-  primary,
-  primaryLabel,
-  secondary,
-  secondaryLabel,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  primary: string;
-  primaryLabel: string;
-  secondary: string;
-  secondaryLabel: string;
-}) {
-  return (
-    <Card className="p-5">
-      <div className="mb-4 flex items-center gap-2 text-ink">
-        <Icon className="h-4 w-4" />
-        <span className="text-sm font-semibold">{title}</span>
-      </div>
-      <div className="space-y-3">
-        <div>
-          <div className="text-2xl font-bold tabular-nums text-ink">{primary}</div>
-          <div className="text-xs text-ink-subtle">{primaryLabel}</div>
-        </div>
-        <div className="border-t border-line pt-3">
-          <div className="text-lg font-semibold tabular-nums text-ink">{secondary}</div>
-          <div className="text-xs text-ink-subtle">{secondaryLabel}</div>
-        </div>
-      </div>
-    </Card>
+      {detailId !== null && (
+        <OfferDetailModal id={detailId} onClose={() => setDetailId(null)} />
+      )}
+    </div>
   );
 }
 
