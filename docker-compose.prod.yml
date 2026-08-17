@@ -117,6 +117,24 @@ services:
       - ./backend:/var/www
       - /var/www/vendor
 
+  # --- Queue worker — processes ShouldQueue jobs (admin broadcast fan-out) ---
+  # Without this, database-queued jobs are enqueued and never run. --tries=3 with
+  # a short backoff; --max-time recycles the worker so a leaked handle can't grow.
+  queue:
+    build:
+      context: .
+      dockerfile: ./docker/backend.Dockerfile
+    restart: unless-stopped
+    command: php artisan queue:work --queue=default --tries=3 --backoff=10 --max-time=3600 --sleep=2
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+    volumes:
+      - ./backend:/var/www
+      - /var/www/vendor
+
   # --- Frontend — Next.js dashboard -----------------------------------------
   frontend:
     build:

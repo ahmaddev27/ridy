@@ -27,6 +27,7 @@ class FcmPushSender implements PushSender
         try {
             $response = Http::withToken($this->auth->accessToken())
                 ->acceptJson()
+                ->timeout(5) // a hung FCM endpoint must never stall the ingest hot path
                 ->post($this->endpoint(), [
                     'message' => $this->message($deviceToken, $title, $body, $data),
                 ]);

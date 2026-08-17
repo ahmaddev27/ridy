@@ -89,20 +89,10 @@ class DispatchOfferIngestor
         // accept window makes this notification time-sensitive — but a push failure
         // must never lose the offer.
         if ($driver !== null) {
-            // Geocode now (same TripGeocoder the dashboard uses) so the push carries
-            // the trip distance + €/km. Cached addresses are instant; a failure just
-            // means no metrics line — it must never delay or lose the offer.
+            // PUSH FIRST — never behind a (possibly cold, multi-second) geocode.
+            // The 5s accept window is the priority; the distance/€km line is
+            // best-effort and the app's detail view geocodes lazily anyway.
             try {
-                $this->geocoder->enrich($record);
-            } catch (Throwable $e) {
-                RidyLog::event('dispatch_offer.geocode_failed', ['offer_id' => $record->id, 'error' => $e->getMessage()]);
-            }
-
-            try {
-                // Log how many devices actually received the push so "no
-                // notification arrived" is diagnosable: sent=0 means the linked
-                // driver has no registered device token (app not installed /
-                // permission not granted), not a delivery failure.
                 $sent = $this->notifier->notify($record);
                 RidyLog::event('dispatch_offer.notified', [
                     'offer_id' => $record->id,
@@ -111,6 +101,15 @@ class DispatchOfferIngestor
                 ]);
             } catch (Throwable $e) {
                 RidyLog::event('dispatch_offer.notify_failed', ['offer_id' => $record->id, 'error' => $e->getMessage()]);
+            }
+
+            // Geocode after the push (same TripGeocoder the dashboard uses) so the
+            // trip distance + route are ready for the dashboard/list. A failure
+            // just leaves it for the backfill sweep — it must never lose the offer.
+            try {
+                $this->geocoder->enrich($record);
+            } catch (Throwable $e) {
+                RidyLog::event('dispatch_offer.geocode_failed', ['offer_id' => $record->id, 'error' => $e->getMessage()]);
             }
         }
 

@@ -18,6 +18,9 @@ use Illuminate\Validation\Rule;
 
 class DriverController extends Controller
 {
+    /** A driver whose status hasn't synced within this many minutes is stale. */
+    private const LIVE_STALE_MINUTES = 10;
+
     public function index(): AnonymousResourceCollection
     {
         $drivers = Driver::query()->orderBy('name')->paginate(50);
@@ -33,9 +36,15 @@ class DriverController extends Controller
      */
     public function live(): JsonResponse
     {
+        // Only show genuinely-live positions: a driver whose status hasn't been
+        // synced within this window (dead session / closed extension) must drop
+        // off the map instead of freezing in place and looking live.
+        $freshSince = now()->subMinutes(self::LIVE_STALE_MINUTES);
+
         $drivers = Driver::query()
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
+            ->where('status_synced_at', '>=', $freshSince)
             ->get()
             ->map(fn (Driver $d) => [
                 'id' => $d->id,
