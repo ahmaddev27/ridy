@@ -22,6 +22,14 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
       }}
     >
+      {/* Order: Offers, Home (centered), Profile — Home sits in the middle. */}
+      <Tabs.Screen
+        name="offers"
+        options={{
+          title: t("tabs.offers"),
+          tabBarIcon: ({ color, size }) => <Ionicons name="reorder-three-outline" size={size + 4} color={color} />,
+        }}
+      />
       <Tabs.Screen
         name="index"
         options={{
@@ -29,13 +37,6 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? "home" : "home-outline"} size={size} color={color} />
           ),
-        }}
-      />
-      <Tabs.Screen
-        name="offers"
-        options={{
-          title: t("tabs.offers"),
-          tabBarIcon: ({ color, size }) => <Ionicons name="reorder-three-outline" size={size + 4} color={color} />,
         }}
       />
       <Tabs.Screen
