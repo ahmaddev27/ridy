@@ -38,6 +38,20 @@ class FleetSessionController extends Controller
     }
 
     /**
+     * The manager pressed "Connect" on the dashboard. Clear the autolink block
+     * server-side so the very next capture succeeds — this works regardless of
+     * the installed extension version (an older extension can't send the
+     * `manual` flag, so without this an autolink-blocked tenant could never
+     * reconnect and the connect button would spin forever).
+     */
+    public function reconnect(): JsonResponse
+    {
+        request()->user()->tenant->unblockAutolink();
+
+        return response()->json(['data' => ['status' => 'ready']]);
+    }
+
+    /**
      * The manager pastes their captured Uber session (cookies + getUser org id).
      * We store it encrypted and bind the tenant to its Uber org.
      */

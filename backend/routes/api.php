@@ -179,6 +179,7 @@ Route::prefix('v1')->group(function () {
         // Uber fleet session status + capture (cookie paste OR extension via token)
         Route::get('fleet-session', [FleetSessionController::class, 'show']);
         Route::post('fleet-session', [FleetSessionController::class, 'capture']);
+        Route::post('fleet-session/reconnect', [FleetSessionController::class, 'reconnect']);
         Route::delete('fleet-session', [FleetSessionController::class, 'destroy']);
 
         // Uber driver linking

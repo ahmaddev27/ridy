@@ -101,4 +101,22 @@ class RosterSyncTest extends TestCase
 
         $this->assertSame(1, Driver::withoutGlobalScopes()->count());
     }
+
+    public function test_roster_self_heals_duplicate_drivers_for_one_uuid(): void
+    {
+        // Two legacy rows share the same uuid (uber_driver_uuid isn't unique).
+        $keep = Driver::create(['tenant_id' => $this->tenant->id, 'name' => 'Old', 'uber_driver_uuid' => self::DRIVER_UUID]);
+        $dupe = Driver::create(['tenant_id' => $this->tenant->id, 'name' => 'Dupe', 'uber_driver_uuid' => self::DRIVER_UUID]);
+        DispatchOffer::create([
+            'tenant_id' => $this->tenant->id, 'driver_uuid' => self::DRIVER_UUID, 'driver_id' => $dupe->id,
+            'offer_uuid' => 'o-dupe', 'received_at' => now(), 'raw_payload' => [],
+        ]);
+
+        app(RosterSyncService::class)->sync($this->tenant->id, [$this->driver()]);
+
+        // Collapsed to the single oldest row; the dupe's offer moved to it.
+        $this->assertSame(1, Driver::withoutGlobalScopes()->where('uber_driver_uuid', self::DRIVER_UUID)->count());
+        $this->assertDatabaseMissing('drivers', ['id' => $dupe->id]);
+        $this->assertDatabaseHas('dispatch_offers', ['offer_uuid' => 'o-dupe', 'driver_id' => $keep->id]);
+    }
 }

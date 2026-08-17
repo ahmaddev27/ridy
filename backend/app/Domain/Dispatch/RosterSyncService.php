@@ -4,6 +4,8 @@ namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Fleet\Models\DriverMetric;
+use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
@@ -34,7 +36,7 @@ class RosterSyncService
                 continue;
             }
 
-            $driver = Driver::where('uber_driver_uuid', $uuid)->first();
+            $driver = $this->canonicalDriver($uuid);
             $wasNew = $driver === null;
 
             $attributes = [
@@ -70,6 +72,33 @@ class RosterSyncService
         }
 
         return ['synced' => $synced, 'created' => $created];
+    }
+
+    /**
+     * The single canonical driver for a UUID, self-healing legacy duplicates.
+     * uber_driver_uuid isn't unique, so older syncs (no tenant context) or two
+     * sessions on one org could create several rows for one driver. Collapse the
+     * extras into one — prefer a row that already has an app login, else the
+     * oldest — moving their offers + device tokens over and dropping the extras
+     * (their metrics are re-derivable) so the roster never lists a driver twice.
+     */
+    private function canonicalDriver(string $uuid): ?Driver
+    {
+        $rows = Driver::where('uber_driver_uuid', $uuid)->orderBy('id')->get();
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        $canonical = $rows->first(fn (Driver $d) => $d->activated_at !== null) ?? $rows->first();
+        $extraIds = $rows->where('id', '!=', $canonical->id)->pluck('id');
+        if ($extraIds->isNotEmpty()) {
+            DispatchOffer::whereIn('driver_id', $extraIds)->update(['driver_id' => $canonical->id]);
+            DeviceToken::whereIn('driver_id', $extraIds)->update(['driver_id' => $canonical->id]);
+            DriverMetric::whereIn('driver_id', $extraIds)->delete();
+            Driver::whereIn('id', $extraIds)->delete();
+        }
+
+        return $canonical;
     }
 
     /** Uber wraps ids as nested objects; dig out the first 36-char UUID string. */

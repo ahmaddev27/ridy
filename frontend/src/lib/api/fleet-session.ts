@@ -15,6 +15,11 @@ export async function getFleetSession(): Promise<FleetSession> {
 }
 
 /** Disconnect: delete the tenant's Uber fleet session(s). */
+/** Clear the tenant's autolink block before an explicit dashboard reconnect. */
+export async function prepareReconnect(): Promise<void> {
+  await apiFetch("/api/v1/fleet-session/reconnect", { method: "POST" });
+}
+
 export async function deleteFleetSession(): Promise<{ deleted: number }> {
   const res = await apiFetch<{ data: { deleted: number } }>("/api/v1/fleet-session", {
     method: "DELETE",

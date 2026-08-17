@@ -10,7 +10,7 @@ import { Badge, type Status } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { getFleetSession, captureFleetSession, deleteFleetSession, type Cookie } from "@/lib/api/fleet-session";
+import { getFleetSession, captureFleetSession, deleteFleetSession, prepareReconnect, type Cookie } from "@/lib/api/fleet-session";
 import { issueExtensionToken } from "@/lib/api/extension";
 import { LATEST_EXTENSION_VERSION, isExtensionOutdated } from "@/lib/extension";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
@@ -114,6 +114,9 @@ export default function ConnectionsPage() {
   async function connectViaExtension() {
     setExtBusy(true);
     try {
+      // Clear any autolink block server-side FIRST, so the capture that follows
+      // is accepted even from an older extension that can't send `manual`.
+      await prepareReconnect();
       await pairExtension();
       // Tell the extension THIS is an explicit connect, so it auto-closes the tab
       // it's about to open (but never a supplier tab the manager opens later).
