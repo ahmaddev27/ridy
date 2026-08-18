@@ -143,6 +143,13 @@ jobs:
             # (e.g. fleet.connected) would silently not apply.
             $COMPOSE exec -T backend php artisan optimize:clear || true
             $COMPOSE exec -T backend php artisan config:cache || true
+
+            # Cap the Docker build cache so it can't slowly fill the disk (it grew
+            # to 80GB before). Keeps the most recent 5GB for fast rebuilds; drops
+            # the rest. Also sweep dangling images left by --build.
+            docker builder prune -f --keep-storage 5GB || true
+            docker image prune -f || true
+
             echo "Deploy complete: https://$DOMAIN"
         env:
           REPO_URL: ${{ secrets.REPO_URL }}
