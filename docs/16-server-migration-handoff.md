@@ -32,8 +32,8 @@ scratch on the new box.
 
 | Tier | Spec | Good for | Monthly |
 |---|---|---|---|
-| **Start here** | Hetzner **CCX33** — 8 vCPU / 32 GB / 240 GB NVMe | app + DB + geo + daemon, ~100–300 companies | ~€50–70 |
-| More runway | Hetzner **CCX43** — 16 vCPU / 64 GB / 360 GB NVMe | same, comfortable to ~500 companies | ~€110 |
+| **Chosen ✅** | Hetzner **CCX43** — 16 vCPU / 64 GB / 360 GB NVMe | one company up to 10k drivers + geo; comfortable to ~500 companies | **€276.49** |
+| Smaller option | Hetzner **CCX33** — 8 vCPU / 32 GB / 240 GB NVMe | app + DB + geo + daemon, ~100–300 companies | ~€148 |
 
 - **Region:** Germany (Falkenstein/Nuremberg) — DSGVO + low latency to German OSM/Uber traffic.
 - **OS:** Ubuntu 24.04 LTS (the deploy also supports AlmaLinux/RHEL via dnf).
