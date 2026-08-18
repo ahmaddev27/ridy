@@ -7,16 +7,10 @@ export const metadata = {
 export default function DatenschutzPage() {
   return (
     <div className="mx-auto max-w-[70ch] px-4 py-16 lg:py-24">
-      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-4 text-sm text-ink">
-        <strong className="font-semibold">Vorlage – bitte durch die tatsächlichen
-        Unternehmensangaben ersetzen.</strong> Alle mit eckigen Klammern markierten Felder
-        (z. B. [Firmenname]) sind Platzhalter und vor der Veröffentlichung auszufüllen.
-      </div>
-
-      <h1 className="mt-10 text-3xl font-bold tracking-tight text-ink sm:text-4xl">
+      <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">
         Datenschutzerklärung
       </h1>
-      <p className="mt-3 text-sm text-ink-subtle">Stand: [Datum]</p>
+      <p className="mt-3 text-sm text-ink-subtle">Stand: 18.08.2026</p>
 
       <div className="mt-10 space-y-10 text-[15px] leading-relaxed text-ink-muted">
         <section>
@@ -36,20 +30,20 @@ export default function DatenschutzPage() {
             Verantwortlicher im Sinne des Art. 4 Nr. 7 DSGVO für den Betrieb dieser Plattform ist:
           </p>
           <p className="mt-3">
-            [Firmenname] [Rechtsform]
+            Reidey (Einzelunternehmen)
             <br />
-            [Anschrift]
+            Plus Code P4GG+CHF
             <br />
-            [PLZ, Ort]
+            Bloudan, Syrien
             <br />
-            Vertretungsberechtigt: [Vertretungsberechtigter]
+            Vertretungsberechtigt: Ahmed Jaber
             <br />
-            E-Mail: [E-Mail]
+            E-Mail: info@reidey.de
             <br />
-            Telefon: [Telefon]
+            Telefon: +972 56 619 2186
           </p>
           <p className="mt-3">
-            Einen Datenschutzbeauftragten erreichen Sie, sofern bestellt, unter [E-Mail].
+            Einen Datenschutzbeauftragten erreichen Sie, sofern bestellt, unter info@reidey.de.
           </p>
         </section>
 
@@ -209,7 +203,7 @@ export default function DatenschutzPage() {
             Betrifft Ihr Anliegen Fahrerdaten, die wir im Auftrag eines Flottenbetreibers
             verarbeiten, wenden Sie sich bitte an den jeweiligen Flottenbetreiber als
             Verantwortlichen; wir unterstützen ihn bei der Erfüllung dieser Rechte. Im Übrigen
-            erreichen Sie uns unter [E-Mail].
+            erreichen Sie uns unter info@reidey.de.
           </p>
         </section>
 
@@ -238,8 +232,8 @@ export default function DatenschutzPage() {
           <p className="mt-3">
             Wir passen diese Datenschutzerklärung an, wenn sich die Rechtslage, unsere Dienste oder
             die Datenverarbeitung ändern. Es gilt jeweils die auf dieser Seite veröffentlichte
-            aktuelle Fassung. Stand dieser Erklärung: [Datum]. Bei Fragen zum Datenschutz erreichen
-            Sie uns unter [E-Mail].
+            aktuelle Fassung. Stand dieser Erklärung: 18.08.2026. Bei Fragen zum Datenschutz erreichen
+            Sie uns unter info@reidey.de.
           </p>
         </section>
       </div>
