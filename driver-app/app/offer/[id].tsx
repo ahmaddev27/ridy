@@ -12,6 +12,14 @@ import { useColors, radius } from "@/lib/theme";
 import { fareLabel, perKmLabel, distanceLabel, cleanAddress, euroQuality, timeLabel } from "@/lib/format";
 import { StatusBadge, QualityMark, RouteBlock, SectionLabel } from "@/components/ui";
 
+/** "19 Min" / "45 Sek" / "1 Std 5 Min" — how long the trip took. */
+function durationLabel(sec: number): string {
+  if (sec < 60) return `${sec} ${t("offer.secShort")}`;
+  const m = Math.round(sec / 60);
+  if (m < 60) return `${m} ${t("offer.minShort")}`;
+  return `${Math.floor(m / 60)} ${t("offer.hrShort")} ${m % 60} ${t("offer.minShort")}`;
+}
+
 const RING = 230;
 const STROKE = 12;
 const R = (RING - STROKE) / 2;
@@ -176,6 +184,9 @@ export default function OfferScreen() {
             <InfoRow label={t("offer.received")} value={timeLabel(offer.received_at)} row={row} c={c} border />
             {offer.requested_at && (
               <InfoRow label={t("offer.requested")} value={timeLabel(offer.requested_at)} row={row} c={c} border />
+            )}
+            {offer.trip_duration_seconds != null && (
+              <InfoRow label={t("offer.duration")} value={durationLabel(offer.trip_duration_seconds)} row={row} c={c} border />
             )}
             {isPending && win > 0 && (
               <InfoRow label={t("offer.acceptWindow")} value={`${win} ${t("common.seconds")}`} row={row} c={c} />

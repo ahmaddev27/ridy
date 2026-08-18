@@ -25,6 +25,10 @@ class DispatchOfferResource extends JsonResource
             'accepted_at' => $this->accepted_at?->toIso8601String(),
             'started_at' => $this->started_at?->toIso8601String(),
             'completed_at' => $this->completed_at?->toIso8601String(),
+            // How long the trip actually took (start -> completion), in seconds.
+            'trip_duration_seconds' => $this->started_at !== null && $this->completed_at !== null
+                ? (int) $this->started_at->diffInSeconds($this->completed_at)
+                : null,
             'rejected_at' => $this->rejected_at?->toIso8601String(),
             'canceled_at' => $this->canceled_at?->toIso8601String(),
             'rider_first_name' => $this->rider_first_name,

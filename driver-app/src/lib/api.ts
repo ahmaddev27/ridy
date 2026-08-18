@@ -23,6 +23,7 @@ export type Offer = {
   fare_amount: number | null;
   distance_m: number | null;
   accept_window_seconds: number | null;
+  trip_duration_seconds?: number | null;
   received_at: string | null;
   /** When Uber requested the trip, if distinct from when we received the offer. */
   requested_at?: string | null;
