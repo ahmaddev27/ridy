@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
+import { Logo } from "@/components/brand/logo";
 
 export const metadata = {
   title: "Reidey · Dispatch für Fahrdienst-Flotten",
@@ -10,16 +11,18 @@ export const metadata = {
 const mono = "var(--font-plex-mono), monospace";
 const MAXW = 1240;
 const PADX = "clamp(20px,5vw,40px)";
+// Brand emerald accent — stable across both themes.
+const accent = "#059669";
 
 const monoEyebrow: CSSProperties = {
   font: `500 11px ${mono}`,
   letterSpacing: ".08em",
   textTransform: "uppercase",
-  color: "#8b909b",
+  color: "var(--ink-subtle)",
 };
 
 const cardWhite: CSSProperties = {
-  background: "#ffffff",
+  background: "var(--surface)",
   padding: "clamp(20px,3vw,26px) clamp(18px,3vw,24px)",
   display: "flex",
   flexDirection: "column",
@@ -63,145 +66,189 @@ function SectionHead({
 export default function LandingPage() {
   return (
     <>
-      {/* Hero (dark) */}
-      <div style={{ background: "#12151a", color: "#e6e8ec" }}>
+      {/* Hero */}
+      <section
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          borderBottom: "1px solid var(--line)",
+        }}
+      >
+        {/* Decorative dotted grid — purely visual, never interactive. */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 0,
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            className="hero-dots"
+            style={{
+              position: "absolute",
+              top: -40,
+              right: -30,
+              width: "min(46vw,520px)",
+              height: "min(46vw,520px)",
+              WebkitMaskImage:
+                "radial-gradient(closest-side, #000 28%, transparent 78%)",
+              maskImage:
+                "radial-gradient(closest-side, #000 28%, transparent 78%)",
+            }}
+          />
+          <div
+            className="hero-dots"
+            style={{
+              position: "absolute",
+              bottom: -60,
+              left: -40,
+              width: "min(40vw,440px)",
+              height: "min(40vw,440px)",
+              WebkitMaskImage:
+                "radial-gradient(closest-side, #000 24%, transparent 76%)",
+              maskImage:
+                "radial-gradient(closest-side, #000 24%, transparent 76%)",
+            }}
+          />
+        </div>
+
         <div
           id="top"
           style={{
+            position: "relative",
+            zIndex: 1,
             maxWidth: MAXW,
             margin: "0 auto",
-            padding: "clamp(44px,7vw,64px) " + PADX + " 0",
+            padding:
+              "clamp(40px,6vw,72px) " + PADX + " clamp(48px,7vw,88px)",
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))",
-            gap: "clamp(30px,5vw,56px)",
+            gap: "clamp(32px,5vw,60px)",
             alignItems: "center",
           }}
         >
+          {/* Left column */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: "clamp(20px,3vw,26px)",
-              paddingBottom: "clamp(40px,7vw,96px)",
+              gap: "clamp(18px,2.6vw,24px)",
             }}
           >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Logo size={34} className="text-ink" />
+              <span
+                style={{
+                  fontSize: 20,
+                  fontWeight: 600,
+                  letterSpacing: "-.01em",
+                }}
+              >
+                Reidey
+              </span>
+            </div>
             <h1
               style={{
                 margin: 0,
-                fontSize: "clamp(33px,5.4vw,60px)",
+                fontSize: "clamp(34px,5.2vw,58px)",
                 lineHeight: 1.05,
                 fontWeight: 600,
                 letterSpacing: "-.03em",
               }}
             >
-              Fünf Sekunden entscheiden über die Marge.
+              <span style={{ color: accent }}>Jedes Fahrtangebot</span> klar
+              bewertet, bevor dein Fahrer zusagt.
             </h1>
             <p
               style={{
                 margin: 0,
                 fontSize: "clamp(16px,1.6vw,19px)",
                 lineHeight: 1.55,
-                color: "rgba(230,232,236,.72)",
-                maxWidth: "30em",
+                color: "var(--ink-muted)",
+                maxWidth: "32em",
               }}
             >
-              Reidey meldet jedes Fahrtangebot in dem Moment, in dem es eintrifft,
-              mit Fahrpreis, €/km und Route auf einen Blick. Deine Fahrer
-              entscheiden schneller, deine Flotte fährt profitabler.
+              Reidey zeigt Fahrpreis, €/km und Route auf einen Blick. Deine
+              Fahrer entscheiden schneller, deine Flotte fährt profitabler.
             </p>
+
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: 12 }}
+            >
+              <span style={monoEyebrow}>Verfügbar auf:</span>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <StoreBadge kicker="Laden im" name="App Store" href="/#app">
+                  <path d="M16.4 12.7c0-2.2 1.8-3.3 1.9-3.4-1-1.5-2.6-1.7-3.2-1.7-1.3-.1-2.6.8-3.3.8-.7 0-1.7-.8-2.9-.8-1.5 0-2.9.9-3.6 2.3-1.6 2.7-.4 6.7 1.1 8.9.7 1.1 1.6 2.3 2.8 2.2 1.1 0 1.6-.7 3-.7 1.4 0 1.8.7 3 .7 1.2 0 2-1.1 2.7-2.2.5-.8.8-1.5 1-2.3-1.6-.6-2.5-2.1-2.5-3.8Z" />
+                  <path d="M14.3 5.6c.6-.7 1-1.7.9-2.7-.9.1-1.9.6-2.5 1.3-.6.6-1 1.6-.9 2.6 1 .1 2-.5 2.5-1.2Z" />
+                </StoreBadge>
+                <StoreBadge
+                  kicker="Jetzt bei"
+                  name="Google Play"
+                  href="/#app"
+                >
+                  <path d="M4.3 2.8 15.6 12 4.3 21.2c-.3-.2-.5-.6-.5-1.1V3.9c0-.5.2-.9.5-1.1Z" />
+                  <path d="M15.6 12 4.3 21.2l7.6-6.2 3.7-3Z" />
+                  <path d="m15.6 12 3.9-2.4c.9-.6.9-1.6 0-2.2L15.6 5" />
+                  <path d="m15.6 12 3.9 2.4c.9.6.9 1.6 0 2.2L15.6 19" />
+                </StoreBadge>
+              </div>
+            </div>
+
+            {/* Rating */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 14,
+                gap: 12,
                 flexWrap: "wrap",
+                paddingTop: 2,
               }}
             >
-              <Link
-                href="/#kontakt"
-                className="hover:bg-white!"
-                style={{
-                  fontSize: 15.5,
-                  fontWeight: 600,
-                  color: "#12151a",
-                  background: "#e6e8ec",
-                  borderRadius: 13,
-                  padding: "16px 26px",
-                }}
-              >
-                Vertrieb kontaktieren
-              </Link>
-              <Link
-                href="/login"
-                className="hover:border-[rgba(230,232,236,.5)]!"
-                style={{
-                  fontSize: 15.5,
-                  fontWeight: 500,
-                  color: "#e6e8ec",
-                  border: "1px solid rgba(230,232,236,.22)",
-                  borderRadius: 13,
-                  padding: "16px 24px",
-                }}
-              >
-                Als Fahrer anmelden
-              </Link>
-            </div>
-            <div style={{ display: "flex", gap: 12, paddingTop: 6 }}>
-              <StoreBadge kicker="Laden im" name="App Store" href="/#app">
-                <path d="M16.4 12.7c0-2.2 1.8-3.3 1.9-3.4-1-1.5-2.6-1.7-3.2-1.7-1.3-.1-2.6.8-3.3.8-.7 0-1.7-.8-2.9-.8-1.5 0-2.9.9-3.6 2.3-1.6 2.7-.4 6.7 1.1 8.9.7 1.1 1.6 2.3 2.8 2.2 1.1 0 1.6-.7 3-.7 1.4 0 1.8.7 3 .7 1.2 0 2-1.1 2.7-2.2.5-.8.8-1.5 1-2.3-1.6-.6-2.5-2.1-2.5-3.8Z" />
-                <path d="M14.3 5.6c.6-.7 1-1.7.9-2.7-.9.1-1.9.6-2.5 1.3-.6.6-1 1.6-.9 2.6 1 .1 2-.5 2.5-1.2Z" />
-              </StoreBadge>
-              <StoreBadge kicker="Jetzt bei" name="Google Play" href="/#app">
-                <path d="M4.3 2.8 15.6 12 4.3 21.2c-.3-.2-.5-.6-.5-1.1V3.9c0-.5.2-.9.5-1.1Z" />
-                <path d="M15.6 12 4.3 21.2l7.6-6.2 3.7-3Z" />
-                <path d="m15.6 12 3.9-2.4c.9-.6.9-1.6 0-2.2L15.6 5" />
-                <path d="m15.6 12 3.9 2.4c.9.6.9 1.6 0 2.2L15.6 19" />
-              </StoreBadge>
+              <Stars />
+              <span style={{ fontSize: 14.5, color: "var(--ink-muted)" }}>
+                <strong style={{ color: "var(--ink)", fontWeight: 600 }}>
+                  4.9
+                </strong>{" "}
+                · Von Flotten in ganz Deutschland genutzt
+              </span>
             </div>
           </div>
+
+          {/* Right column: two overlapping, angled phones */}
           <div
             style={{
               position: "relative",
               display: "flex",
               justifyContent: "center",
-              alignItems: "flex-end",
-              paddingTop: 20,
+              alignItems: "center",
+              minHeight: "clamp(360px,44vw,540px)",
             }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/app-screens/1a-home.png"
-              alt="Reidey Driver Startbildschirm"
-              width={780}
-              height={1688}
+            <PhoneMock
+              src="/app-screens/1a-offer-detail.png"
+              alt="Reidey Angebotsdetail"
               style={{
-                ...phoneImg,
-                width: "min(330px,66vw)",
-                height: "auto",
-                borderRadius: "clamp(26px,5vw,40px)",
-                boxShadow: "0 24px 60px rgba(0,0,0,.35)",
+                position: "absolute",
+                width: "min(216px,44vw)",
+                transform: "translate(-30%,-3%) rotate(-8deg)",
+                zIndex: 1,
               }}
             />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/app-screens/1a-offer-detail.png"
-              alt="Reidey Driver Angebotsdetail"
-              width={780}
-              height={1688}
+            <PhoneMock
+              src="/app-screens/1a-home.png"
+              alt="Reidey Startbildschirm"
               style={{
-                ...phoneImg,
-                width: "min(250px,50vw)",
-                height: "auto",
-                borderRadius: "clamp(20px,4vw,30px)",
-                position: "absolute",
-                left: 0,
-                bottom: "clamp(-40px,-4vw,-16px)",
-                boxShadow: "0 20px 50px rgba(0,0,0,.4)",
+                position: "relative",
+                width: "min(240px,48vw)",
+                transform: "translate(13%,0) rotate(4deg)",
+                zIndex: 2,
               }}
             />
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Das Problem */}
       <div
@@ -239,7 +286,7 @@ export default function LandingPage() {
                 margin: 0,
                 fontSize: 17,
                 lineHeight: 1.6,
-                color: "#5a616e",
+                color: "var(--ink-muted)",
               }}
             >
               In dieser Zeit müssen sie Fahrpreis, Distanz und Anfahrt
@@ -253,8 +300,8 @@ export default function LandingPage() {
               display: "flex",
               flexDirection: "column",
               gap: 1,
-              background: "#e4e4e1",
-              border: "1px solid #e4e4e1",
+              background: "var(--line)",
+              border: "1px solid var(--line)",
               borderRadius: 16,
               overflow: "hidden",
             }}
@@ -342,8 +389,8 @@ export default function LandingPage() {
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit,minmax(258px,1fr))",
             gap: 1,
-            background: "#e4e4e1",
-            border: "1px solid #e4e4e1",
+            background: "var(--line)",
+            border: "1px solid var(--line)",
             borderRadius: 16,
             overflow: "hidden",
           }}
@@ -504,8 +551,8 @@ export default function LandingPage() {
               display: "flex",
               flexDirection: "column",
               gap: 1,
-              background: "#e4e4e1",
-              border: "1px solid #e4e4e1",
+              background: "var(--line)",
+              border: "1px solid var(--line)",
               borderRadius: 16,
               overflow: "hidden",
             }}
@@ -546,9 +593,9 @@ export default function LandingPage() {
       >
         <div
           style={{
-            border: "1px solid #e4e4e1",
+            border: "1px solid var(--line)",
             borderRadius: 20,
-            background: "#ffffff",
+            background: "var(--surface)",
             padding: "clamp(28px,4vw,52px) clamp(22px,4vw,44px)",
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit,minmax(258px,1fr))",
@@ -573,7 +620,7 @@ export default function LandingPage() {
                 margin: 0,
                 fontSize: "clamp(15px,1.5vw,16.5px)",
                 lineHeight: 1.6,
-                color: "#5a616e",
+                color: "var(--ink-muted)",
                 maxWidth: "44em",
               }}
             >
@@ -596,8 +643,8 @@ export default function LandingPage() {
                 textAlign: "center",
                 fontSize: 15.5,
                 fontWeight: 600,
-                background: "#1e222b",
-                color: "#ffffff",
+                background: "var(--primary)",
+                color: "var(--primary-ink)",
                 borderRadius: 13,
                 padding: "16px 26px",
               }}
@@ -611,7 +658,7 @@ export default function LandingPage() {
                 textAlign: "center",
                 fontSize: 14.5,
                 fontWeight: 500,
-                color: "#5a616e",
+                color: "var(--ink-muted)",
                 padding: "6px 0",
               }}
             >
@@ -633,7 +680,7 @@ function Icon({ children, size = 26 }: { children: ReactNode; size?: number }) {
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke="#1e222b"
+      stroke="var(--ink)"
       strokeWidth={1.4}
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -657,15 +704,16 @@ function StoreBadge({
   return (
     <Link
       href={href}
-      className="hover:border-[rgba(230,232,236,.45)]!"
+      className="hover:border-[var(--line-strong)]!"
       style={{
         display: "flex",
         alignItems: "center",
         gap: 11,
-        border: "1px solid rgba(230,232,236,.2)",
+        border: "1px solid var(--line)",
+        background: "var(--surface)",
         borderRadius: 12,
         padding: "10px 16px",
-        color: "#e6e8ec",
+        color: "var(--ink)",
       }}
     >
       <svg
@@ -686,7 +734,7 @@ function StoreBadge({
         <span
           style={{
             fontSize: 9.5,
-            color: "rgba(230,232,236,.55)",
+            color: "var(--ink-subtle)",
             letterSpacing: ".04em",
             textTransform: "uppercase",
           }}
@@ -699,12 +747,64 @@ function StoreBadge({
   );
 }
 
+/** Five brand-amber rating stars. Decorative — the text carries the meaning. */
+function Stars() {
+  return (
+    <div style={{ display: "flex", gap: 3 }} aria-hidden="true">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <svg key={i} width="18" height="18" viewBox="0 0 24 24" fill="#f59e0b">
+          <path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 21l-5.8 3 1.1-6.5L2.6 9.4l6.5-.9L12 2.6Z" />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+/** Screenshot inside a realistic dark phone bezel with a theme-aware shadow. */
+function PhoneMock({
+  src,
+  alt,
+  style,
+}: {
+  src: string;
+  alt: string;
+  style?: CSSProperties;
+}) {
+  return (
+    <div
+      className="phone-shadow"
+      style={{
+        background: "#0b0d10",
+        borderRadius: 34,
+        padding: 7,
+        border: "1px solid rgba(255,255,255,.07)",
+        ...style,
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        width={780}
+        height={1688}
+        style={{
+          display: "block",
+          width: "100%",
+          height: "auto",
+          aspectRatio: "780 / 1688",
+          borderRadius: 27,
+        }}
+      />
+    </div>
+  );
+}
+
 function Stat({ value, label }: { value: string; label: string }) {
   return (
     <div
       style={{
         flex: "1 1 190px",
-        background: "#ffffff",
+        background: "var(--surface)",
         padding: "clamp(18px,3vw,24px) clamp(16px,3vw,22px)",
         display: "flex",
         flexDirection: "column",
@@ -721,7 +821,7 @@ function Stat({ value, label }: { value: string; label: string }) {
       >
         {value}
       </span>
-      <span style={{ fontSize: 13.5, color: "#5a616e", lineHeight: 1.45 }}>
+      <span style={{ fontSize: 13.5, color: "var(--ink-muted)", lineHeight: 1.45 }}>
         {label}
       </span>
     </div>
@@ -742,9 +842,9 @@ function Step({
   return (
     <div
       style={{
-        border: "1px solid #e4e4e1",
+        border: "1px solid var(--line)",
         borderRadius: 16,
-        background: "#ffffff",
+        background: "var(--surface)",
         padding: "clamp(20px,3vw,26px) clamp(18px,3vw,24px)",
         display: "flex",
         flexDirection: "column",
@@ -760,7 +860,7 @@ function Step({
       <span style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-.01em" }}>
         {title}
       </span>
-      <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.6, color: "#5a616e" }}>
+      <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.6, color: "var(--ink-muted)" }}>
         {body}
       </p>
     </div>
@@ -780,7 +880,7 @@ function Feature({
     <div style={{ ...cardWhite, gap: 11 }}>
       <Icon size={24}>{children}</Icon>
       <span style={{ fontSize: 17, fontWeight: 600 }}>{title}</span>
-      <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#5a616e" }}>
+      <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--ink-muted)" }}>
         {body}
       </p>
     </div>
@@ -811,7 +911,7 @@ function AppShot({ src, caption }: { src: string; caption: string }) {
           borderRadius: "clamp(20px,4vw,26px)",
         }}
       />
-      <span style={{ font: `400 11.5px ${mono}`, color: "#8b909b" }}>
+      <span style={{ font: `400 11.5px ${mono}`, color: "var(--ink-subtle)" }}>
         {caption}
       </span>
     </div>
@@ -889,7 +989,7 @@ function Faq({ q, a }: { q: string; a: string }) {
   return (
     <div
       style={{
-        background: "#ffffff",
+        background: "var(--surface)",
         padding: "clamp(18px,3vw,22px) clamp(18px,3vw,24px)",
         display: "flex",
         flexDirection: "column",
@@ -897,7 +997,7 @@ function Faq({ q, a }: { q: string; a: string }) {
       }}
     >
       <span style={{ fontSize: 16, fontWeight: 600 }}>{q}</span>
-      <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.6, color: "#5a616e" }}>
+      <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.6, color: "var(--ink-muted)" }}>
         {a}
       </p>
     </div>

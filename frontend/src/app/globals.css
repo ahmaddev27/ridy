@@ -114,6 +114,24 @@ html[lang="ar"] body,
   line-height: 1.7;
 }
 
+/* Marketing hero: decorative dotted grid + phone framing shadow.
+   Kept here so the dot tint / shadow depth can react to the theme, which inline
+   styles cannot express (no media/.dark selector inline). */
+.hero-dots {
+  --dot: color-mix(in srgb, #059669 22%, transparent);
+  background-image: radial-gradient(var(--dot) 1.4px, transparent 1.6px);
+  background-size: 22px 22px;
+}
+.dark .hero-dots {
+  --dot: color-mix(in srgb, #10b981 36%, transparent);
+}
+.phone-shadow {
+  box-shadow: 0 24px 60px rgba(15, 18, 23, 0.18);
+}
+.dark .phone-shadow {
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6);
+}
+
 /* Thin, subtle scrollbars to match the dashboard aesthetic */
 ::-webkit-scrollbar {
   width: 8px;

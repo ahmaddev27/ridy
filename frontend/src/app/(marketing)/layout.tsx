@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
 import { Logo } from "@/components/brand/logo";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
@@ -15,23 +16,12 @@ const ibmPlexMono = IBM_Plex_Mono({
 
 const mono = "var(--font-plex-mono), monospace";
 
-// The design commits to ONE light look. We pin the semantic tokens to their
-// light values on the wrapper so the shared legal/FAQ pages (which use
-// bg-canvas / text-ink etc.) stay readable even when the app is in dark mode.
-const lightShell: CSSProperties = {
-  ["--canvas" as string]: "#f6f6f4",
-  ["--surface" as string]: "#ffffff",
-  ["--surface-2" as string]: "#f1f1ef",
-  ["--ink" as string]: "#1e222b",
-  ["--ink-muted" as string]: "#5a616e",
-  ["--ink-subtle" as string]: "#8b909b",
-  ["--line" as string]: "#e4e4e1",
-  ["--line-strong" as string]: "#d6d3cd",
-  ["--primary" as string]: "#1e222b",
-  ["--primary-ink" as string]: "#ffffff",
-  colorScheme: "light",
-  background: "#f6f6f4",
-  color: "#1e222b",
+// The shell follows the active theme via semantic tokens (canvas/surface/ink…),
+// exactly like the dashboard. No light pinning here — the whole marketing area
+// switches with the app's light/dark preference.
+const shell: CSSProperties = {
+  background: "var(--canvas)",
+  color: "var(--ink)",
   fontFamily: "var(--font-instrument), system-ui, sans-serif",
   fontVariantNumeric: "tabular-nums",
   overflowX: "hidden",
@@ -61,20 +51,14 @@ const FOOTER_LEGAL = [
   { href: "/#cookies", label: "Cookie-Einstellungen" },
 ];
 
-function MonoLabel({
-  children,
-  color = "#8b909b",
-}: {
-  children: ReactNode;
-  color?: string;
-}) {
+function MonoLabel({ children }: { children: ReactNode }) {
   return (
     <span
       style={{
         font: `500 11px ${mono}`,
         letterSpacing: ".08em",
         textTransform: "uppercase",
-        color,
+        color: "var(--ink-subtle)",
       }}
     >
       {children}
@@ -86,15 +70,24 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <div
       className={`${instrumentSans.variable} ${ibmPlexMono.variable}`}
-      style={lightShell}
+      style={shell}
     >
-      {/* Dark top header */}
-      <header style={{ background: "#12151a", color: "#e6e8ec" }}>
+      {/* Header — theme-aware, sticky, subtle bottom line */}
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 20,
+          background: "color-mix(in srgb, var(--canvas) 88%, transparent)",
+          backdropFilter: "saturate(140%) blur(10px)",
+          borderBottom: "1px solid var(--line)",
+        }}
+      >
         <div
           style={{
             maxWidth: 1240,
             margin: "0 auto",
-            padding: "18px clamp(20px,5vw,40px)",
+            padding: "14px clamp(20px,5vw,40px)",
             display: "flex",
             alignItems: "center",
             gap: "clamp(14px,2.5vw,38px)",
@@ -107,14 +100,14 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
               display: "flex",
               alignItems: "center",
               gap: 10,
-              color: "#e6e8ec",
+              color: "var(--ink)",
             }}
           >
-            <Logo size={40} className="text-[#e6e8ec]" />
+            <Logo size={38} className="text-ink" />
             <span
               style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-.01em" }}
             >
-              Reidey Driver
+              Reidey
             </span>
           </Link>
           <nav
@@ -132,8 +125,8 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
               <Link
                 key={link.href}
                 href={link.href}
-                className="hover:text-[#e6e8ec]!"
-                style={{ fontSize: 14, color: "rgba(230,232,236,.7)" }}
+                className="hover:text-ink!"
+                style={{ fontSize: 14, color: "var(--ink-muted)" }}
               >
                 {link.label}
               </Link>
@@ -143,18 +136,19 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 14,
+              gap: 12,
               flex: "none",
               whiteSpace: "nowrap",
             }}
           >
+            <ThemeToggle />
             <Link
               href="/login"
-              className="hover:text-[#e6e8ec]!"
+              className="hover:text-ink!"
               style={{
                 fontSize: 14,
                 fontWeight: 500,
-                color: "rgba(230,232,236,.8)",
+                color: "var(--ink-muted)",
                 padding: "10px 4px",
               }}
             >
@@ -162,12 +156,12 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
             </Link>
             <Link
               href="/#kontakt"
-              className="hover:bg-white!"
+              className="hover:opacity-90!"
               style={{
                 fontSize: 14,
                 fontWeight: 600,
-                color: "#12151a",
-                background: "#e6e8ec",
+                color: "var(--primary-ink)",
+                background: "var(--primary)",
                 borderRadius: 12,
                 padding: "11px 18px",
               }}
@@ -194,24 +188,24 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
             gridTemplateColumns: "repeat(auto-fit,minmax(168px,1fr))",
             gap: "clamp(24px,3vw,40px)",
             paddingBottom: "clamp(26px,4vw,36px)",
-            borderBottom: "1px solid #e4e4e1",
+            borderBottom: "1px solid var(--line)",
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Logo size={38} className="text-[#1e222b]" />
-              <span style={{ fontSize: 17, fontWeight: 600 }}>Reidey Driver</span>
+              <Logo size={36} className="text-ink" />
+              <span style={{ fontSize: 17, fontWeight: 600 }}>Reidey</span>
             </div>
             <p
               style={{
                 margin: 0,
                 fontSize: 13.5,
                 lineHeight: 1.6,
-                color: "#8b909b",
+                color: "var(--ink-subtle)",
                 maxWidth: "24em",
               }}
             >
-              Dispatch-Assistent für professionelle Fahrdienst-Flotten. Gebaut in
+              Flottenmanagement für professionelle Fahrdienst-Flotten. Gebaut in
               Nordrhein-Westfalen.
             </p>
           </div>
@@ -230,10 +224,10 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
             paddingTop: 22,
           }}
         >
-          <span style={{ font: `400 12px ${mono}`, color: "#8b909b" }}>
+          <span style={{ font: `400 12px ${mono}`, color: "var(--ink-subtle)" }}>
             © 2026 Reidey GmbH · Solingen
           </span>
-          <span style={{ fontSize: 12.5, color: "#8b909b" }}>
+          <span style={{ fontSize: 12.5, color: "var(--ink-subtle)" }}>
             Reidey ist ein eigenständiges Flottenmanagement-Produkt.
           </span>
         </div>
@@ -257,7 +251,7 @@ function FooterColumn({
           key={link.href + link.label}
           href={link.href}
           className="hover:text-[#059669]!"
-          style={{ fontSize: 14, color: "#5a616e" }}
+          style={{ fontSize: 14, color: "var(--ink-muted)" }}
         >
           {link.label}
         </Link>
