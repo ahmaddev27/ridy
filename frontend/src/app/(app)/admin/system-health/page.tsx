@@ -132,10 +132,16 @@ function SubscriptionCell({ row, c }: { row: SystemHealthRow; c: Tr }) {
 
 function SessionCell({ row, c, locale }: { row: SystemHealthRow; c: Tr; locale: string }) {
   const { ok, status, last_seen } = row.session;
-  const label = status === null ? c("noSession") : c(`st_${status}`);
+  // `ok` = the session is ACTIVE *and* recently seen. An active session that has
+  // never streamed (no daemon) must NOT read a green "Active" — reflect the real
+  // health so the colour and the label agree: amber "Idle" for active-but-silent.
+  const active = status === "active";
+  const warn = active && !ok;
+  const label =
+    status === null ? c("noSession") : ok ? c("st_active") : active ? c("st_idle") : c(`st_${status}`);
   return (
     <div className="space-y-1">
-      <Pill ok={ok}>{label}</Pill>
+      <Pill ok={ok} warn={warn}>{label}</Pill>
       {status !== null && (
         <div className="text-[11px] text-ink-subtle">
           {c("lastSeen").replace("{t}", relTime(last_seen, locale, c("never")))}
