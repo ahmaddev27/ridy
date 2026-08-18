@@ -24,6 +24,7 @@ class DispatchOfferIngestor
     public function __construct(
         private TenantContext $context,
         private DispatchNotifier $notifier,
+        private TripGeocoder $geocoder,
     ) {}
 
     /**
@@ -89,9 +90,17 @@ class DispatchOfferIngestor
         // accept window makes this notification time-sensitive — but a push failure
         // must never lose the offer.
         if ($driver !== null) {
-            // PUSH FIRST — never behind a (possibly cold, multi-second) geocode.
-            // The 5s accept window is the priority; the distance/€km line is
-            // best-effort and the app's detail view geocodes lazily anyway.
+            // Geocode BEFORE the push so the notification carries the trip
+            // distance + €/km (the driver decides on it). Cached addresses —
+            // common for a city fleet — are instant; a cold one may add a second
+            // or two. A failure just drops the metrics line; it's retried async
+            // below and by the 5-min backfill sweep, and never loses the offer.
+            try {
+                $this->geocoder->enrich($record);
+            } catch (Throwable $e) {
+                RidyLog::event('dispatch_offer.geocode_failed', ['offer_id' => $record->id, 'error' => $e->getMessage()]);
+            }
+
             try {
                 $sent = $this->notifier->notify($record);
                 RidyLog::event('dispatch_offer.notified', [
@@ -103,11 +112,11 @@ class DispatchOfferIngestor
                 RidyLog::event('dispatch_offer.notify_failed', ['offer_id' => $record->id, 'error' => $e->getMessage()]);
             }
 
-            // Geocode OFF the hot path: queue it so the daemon's ingest request
-            // isn't held open on a slow external geocode. Fills the dashboard's
-            // trip detail async; the backfill sweep is the safety net if the
-            // queue is down. (Falls back to sync when QUEUE_CONNECTION=sync.)
-            GeocodeOffer::dispatch($record->id);
+            // If the inline geocode didn't resolve (transient rate-limit), retry
+            // it off the hot path so the dashboard trip detail still fills in.
+            if ($record->geo_synced_at === null) {
+                GeocodeOffer::dispatch($record->id);
+            }
         }
 
         $status = $driver !== null ? 'routed' : 'unlinked_driver';
