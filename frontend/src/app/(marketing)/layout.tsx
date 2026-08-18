@@ -80,7 +80,6 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
           zIndex: 20,
           background: "color-mix(in srgb, var(--canvas) 88%, transparent)",
           backdropFilter: "saturate(140%) blur(10px)",
-          borderBottom: "1px solid var(--line)",
         }}
       >
         <div

@@ -71,7 +71,6 @@ export default function LandingPage() {
         style={{
           position: "relative",
           overflow: "hidden",
-          borderBottom: "1px solid var(--line)",
         }}
       >
         {/* Decorative dotted grid — purely visual, never interactive. */}
@@ -137,18 +136,6 @@ export default function LandingPage() {
               gap: "clamp(18px,2.6vw,24px)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Logo size={52} className="text-ink" />
-              <span
-                style={{
-                  fontSize: 26,
-                  fontWeight: 700,
-                  letterSpacing: "-.02em",
-                }}
-              >
-                Reidey
-              </span>
-            </div>
             <h1
               style={{
                 margin: 0,
@@ -161,19 +148,6 @@ export default function LandingPage() {
               <span style={{ color: accent }}>Jedes Fahrtangebot</span> klar
               bewertet, bevor dein Fahrer zusagt.
             </h1>
-            <p
-              style={{
-                margin: 0,
-                fontSize: "clamp(16px,1.6vw,19px)",
-                lineHeight: 1.55,
-                color: "var(--ink-muted)",
-                maxWidth: "32em",
-              }}
-            >
-              Reidey zeigt Fahrpreis, €/km und Route auf einen Blick. Deine
-              Fahrer entscheiden schneller, deine Flotte fährt profitabler.
-            </p>
-
             <div
               style={{ display: "flex", flexDirection: "column", gap: 12 }}
             >
