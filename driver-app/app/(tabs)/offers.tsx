@@ -150,7 +150,9 @@ function OfferCard({ offer, onPress, showDriver }: { offer: Offer; onPress: () =
       </View>
       <View style={{ alignItems: isRTL() ? "flex-start" : "flex-end", gap: 6 }}>
         <StatusBadge status={status} label={t(`status.${status}`)} />
-        <Text style={{ color: c.inkSubtle, fontSize: 13 }}>{distanceLabel(offer.distance_m)}</Text>
+        {offer.distance_m != null && (
+          <Text style={{ color: c.inkSubtle, fontSize: 13 }}>{distanceLabel(offer.distance_m)}</Text>
+        )}
       </View>
     </Pressable>
   );
