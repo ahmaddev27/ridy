@@ -146,6 +146,6 @@ html[lang="ar"] body,
 }
 
 /* Marketing hero: swap phone screenshots between light and dark themes. */
-.theme-dark-only { display: none; }
-.dark .theme-light-only { display: none; }
-.dark .theme-dark-only { display: block; }
+.theme-dark-only { display: none !important; }
+.dark .theme-light-only { display: none !important; }
+.dark .theme-dark-only { display: block !important; }
