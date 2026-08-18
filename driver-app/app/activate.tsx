@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
 import { Field, PrimaryButton, Logo } from "@/components/ui";
+import { CheckCircle } from "lucide-react-native";
 
 /** Reached via the emailed deep link: reidey://activate?token=… */
 export default function ActivateScreen() {
@@ -80,7 +81,7 @@ export default function ActivateScreen() {
                 onPress={submit}
                 loading={loading}
                 disabled={!preview || password.length < 8}
-                icon="checkmark-circle-outline"
+                icon={CheckCircle}
               />
             </View>
           </View>

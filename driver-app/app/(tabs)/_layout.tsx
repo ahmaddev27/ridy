@@ -1,23 +1,22 @@
 import { Tabs } from "expo-router";
 import { View, Pressable, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Home, List, User, type LucideIcon } from "lucide-react-native";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Text } from "@/components/typography";
 import { t, useLocale, isRTL } from "@/lib/i18n";
 import { useColors, radius, isDarkPalette, type Palette } from "@/lib/theme";
 
-type IconName = React.ComponentProps<typeof Ionicons>["name"];
-
-/** Ionicon for each route — filled variant when the tab is active. */
-function iconFor(routeName: string, focused: boolean): IconName {
+/** Lucide icon for each route. Active state is conveyed by color/stroke, not a
+ *  filled variant (Lucide ships a single outline cut per icon). */
+function iconFor(routeName: string): LucideIcon {
   switch (routeName) {
     case "offers":
-      return "reorder-three";
+      return List;
     case "profile":
-      return focused ? "person" : "person-outline";
+      return User;
     default: // index / home
-      return focused ? "home" : "home-outline";
+      return Home;
   }
 }
 
@@ -89,11 +88,16 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 backgroundColor: focused ? c.accent : "transparent",
               }}
             >
-              <Ionicons
-                name={iconFor(route.name, focused)}
-                size={21}
-                color={focused ? "#ffffff" : c.inkSubtle}
-              />
+              {(() => {
+                const Icon = iconFor(route.name);
+                return (
+                  <Icon
+                    size={21}
+                    strokeWidth={focused ? 2.4 : 2}
+                    color={focused ? "#ffffff" : c.inkSubtle}
+                  />
+                );
+              })()}
               {focused && (
                 <Text style={{ color: "#ffffff", fontSize: 13.5, fontWeight: "700" }}>{label}</Text>
               )}

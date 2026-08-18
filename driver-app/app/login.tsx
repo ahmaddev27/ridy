@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { t } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
 import { Field, PrimaryButton, Logo } from "@/components/ui";
+import { LogIn } from "lucide-react-native";
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -45,7 +46,7 @@ export default function LoginScreen() {
           <Field label={t("login.password")} value={password} onChangeText={setPassword} secure />
           {error && <Text style={{ color: c.danger, fontSize: 14, textAlign: "center" }}>{error}</Text>}
           <View style={{ marginTop: 4 }}>
-            <PrimaryButton label={t("login.submit")} onPress={submit} loading={loading} icon="log-in-outline" />
+            <PrimaryButton label={t("login.submit")} onPress={submit} loading={loading} icon={LogIn} />
           </View>
           <Pressable
             onPress={() => Alert.alert(t("signin.forgot"), t("signin.forgotHint"))}

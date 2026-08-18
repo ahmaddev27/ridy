@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { CheckCircle, AlertCircle, Info, type LucideIcon } from "lucide-react-native";
 import { Text } from "@/components/typography";
 import { useColors, radius } from "@/lib/theme";
 import { isRTL } from "@/lib/i18n";
@@ -14,10 +14,10 @@ type ToastApi = {
 
 const ToastContext = createContext<ToastApi | null>(null);
 
-const ICONS: Record<ToastKind, keyof typeof Ionicons.glyphMap> = {
-  success: "checkmark-circle",
-  error: "alert-circle",
-  info: "information-circle",
+const ICONS: Record<ToastKind, LucideIcon> = {
+  success: CheckCircle,
+  error: AlertCircle,
+  info: Info,
 };
 
 /** Lightweight themed toast rendered above the app; auto-dismisses after 2.6s. */
@@ -78,7 +78,7 @@ function ToastView({ toast, opacity }: { toast: NonNullable<ToastState>; opacity
         elevation: 6,
       }}
     >
-      <Ionicons name={ICONS[toast.kind]} size={20} color={tone} />
+      {(() => { const Icon = ICONS[toast.kind]; return <Icon size={20} color={tone} />; })()}
       <Text style={{ flex: 1, color: c.ink, fontWeight: "600", textAlign: isRTL() ? "right" : "left" }}>
         {toast.message}
       </Text>

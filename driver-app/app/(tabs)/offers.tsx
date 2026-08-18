@@ -3,7 +3,7 @@ import { View, FlatList, Pressable, RefreshControl, ActivityIndicator, ScrollVie
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text, TextInput } from "@/components/typography";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Search } from "lucide-react-native";
 import { api, type Offer, type OffersQuery } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, getLocale } from "@/lib/i18n";
@@ -75,7 +75,7 @@ export default function OffersScreen() {
 
             {/* Search */}
             <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 10, backgroundColor: c.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: c.line, paddingHorizontal: 14, paddingVertical: 13 }}>
-              <Ionicons name="search" size={18} color={c.inkSubtle} />
+              <Search size={18} color={c.inkSubtle} />
               <TextInput
                 value={search}
                 onChangeText={setSearch}

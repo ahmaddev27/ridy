@@ -13,7 +13,7 @@ import {
  * plain `fontWeight` never picks the heavier cut. These thin wrappers replace
  * react-native's <Text>/<TextInput> in our screens and inject the matching
  * Tajawal family for the flattened style's weight — while preserving any explicit
- * `fontFamily` (so glyph fonts like Ionicons are never overridden).
+ * `fontFamily` (so a glyph font passed through is never overridden).
  */
 function familyForWeight(weight?: TextStyle["fontWeight"]): string {
   switch (String(weight)) {

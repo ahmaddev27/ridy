@@ -3,7 +3,7 @@ import { View, Pressable, ActivityIndicator, Linking, ScrollView } from "react-n
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { ChevronLeft, ChevronRight, User, UserCircle, Car, Map, type LucideIcon } from "lucide-react-native";
 import Svg, { Circle } from "react-native-svg";
 import { api, type Offer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -98,7 +98,7 @@ export default function OfferScreen() {
       {/* Header */}
       <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", paddingHorizontal: 16, paddingVertical: 10 }}>
         <Pressable onPress={() => router.back()} hitSlop={10} style={{ position: "absolute", [isRTL() ? "right" : "left"]: 16 }}>
-          <Ionicons name={isRTL() ? "chevron-forward" : "chevron-back"} size={26} color={c.ink} />
+          {isRTL() ? <ChevronRight size={26} color={c.ink} /> : <ChevronLeft size={26} color={c.ink} />}
         </Pressable>
         <Text style={{ color: c.ink, fontSize: 17, fontWeight: "700" }}>{t("offer.header")}</Text>
       </View>
@@ -159,10 +159,10 @@ export default function OfferScreen() {
           {(offer.rider_name || (isOwner && offer.driver_name)) && (
             <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 18, flexWrap: "wrap" }}>
               {offer.rider_name && (
-                <PersonTag icon="person-outline" name={offer.rider_name} role={t("offer.rider")} row={row} c={c} />
+                <PersonTag icon={User} name={offer.rider_name} role={t("offer.rider")} row={row} c={c} />
               )}
               {isOwner && offer.driver_name && (
-                <PersonTag icon="person-circle-outline" name={offer.driver_name} role={t("fleet.driver")} row={row} c={c} />
+                <PersonTag icon={UserCircle} name={offer.driver_name} role={t("fleet.driver")} row={row} c={c} />
               )}
             </View>
           )}
@@ -210,12 +210,12 @@ export default function OfferScreen() {
 
           {/* CTA — Open in Uber (primary) + Open in Maps (route) */}
           <View style={{ flexDirection: row, gap: 10, marginTop: 8 }}>
-            <SecondaryButton label={t("offer.openMaps")} icon="map-outline" onPress={openMaps} />
+            <SecondaryButton label={t("offer.openMaps")} icon={Map} onPress={openMaps} />
             <Pressable
               onPress={() => Linking.openURL("uberdriver://").catch(() => Linking.openURL("https://drivers.uber.com"))}
               style={{ flex: 1, flexDirection: isRTL() ? "row-reverse" : "row", gap: 8, backgroundColor: c.primary, borderRadius: radius.lg, paddingVertical: 12, alignItems: "center", justifyContent: "center" }}
             >
-              <Ionicons name="car-outline" size={17} color={c.primaryInk} />
+              <Car size={17} color={c.primaryInk} />
               <Text style={{ color: c.primaryInk, fontSize: 15, fontWeight: "700" }}>{t("offer.openUber")}</Text>
             </Pressable>
           </View>
@@ -229,10 +229,10 @@ export default function OfferScreen() {
 type Colors = ReturnType<typeof useColors>;
 
 /** Icon + name + role, used for the rider and (owner mode) driver attribution. */
-function PersonTag({ icon, name, role, row, c }: { icon: keyof typeof Ionicons.glyphMap; name: string; role: string; row: "row" | "row-reverse"; c: Colors }) {
+function PersonTag({ icon: Icon, name, role, row, c }: { icon: LucideIcon; name: string; role: string; row: "row" | "row-reverse"; c: Colors }) {
   return (
     <View style={{ flexDirection: row, alignItems: "center", gap: 7 }}>
-      <Ionicons name={icon} size={18} color={c.inkMuted} />
+      <Icon size={18} color={c.inkMuted} />
       <Text style={{ color: c.ink, fontSize: 16, fontWeight: "700" }}>{name}</Text>
       <Text style={{ color: c.inkSubtle, fontSize: 14 }}>· {role}</Text>
     </View>

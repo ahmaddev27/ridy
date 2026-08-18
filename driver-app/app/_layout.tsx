@@ -13,9 +13,9 @@ import { useAppFonts } from "@/lib/fonts";
 import { UpdateGate } from "@/components/update-gate";
 
 // Hold the native splash screen up until the fonts are registered, so the very
-// first painted frame already has Tajawal + the Ionicons glyph font. Without
-// this the tab-bar icons render as blank glyphs and Arabic falls back to the
-// system font on first paint (and don't reliably recover in a release build).
+// first painted frame already has Tajawal. Without this Arabic falls back to the
+// system font on first paint (and doesn't reliably recover in a release build).
+// Icons are SVG (lucide-react-native), so they need no font to be ready.
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 /** Fonts must be ready before the first paint, but a failed/slow load must never

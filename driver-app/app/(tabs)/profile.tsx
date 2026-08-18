@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { View, ScrollView, Pressable, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
-import { Ionicons } from "@expo/vector-icons";
+import { LogOut, ChevronLeft, ChevronRight, Save } from "lucide-react-native";
 import { api, type DriverStats } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, setLocale, getLocale } from "@/lib/i18n";
@@ -206,7 +206,7 @@ function Settings() {
 
       {/* Logout */}
       <Pressable onPress={logout} style={{ flexDirection: isRTL() ? "row-reverse" : "row", gap: 8, ...cardStyle(c), paddingVertical: 16, alignItems: "center", justifyContent: "center", marginTop: 6 }}>
-        <Ionicons name="log-out-outline" size={18} color={c.danger} />
+        <LogOut size={18} color={c.danger} />
         <Text style={{ color: c.danger, fontSize: 15, fontWeight: "700" }}>{t("settings.logout")}</Text>
       </Pressable>
       <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: "center" }}>Reidey Driver 1.0.0</Text>
@@ -221,7 +221,7 @@ function Settings() {
             ) : (
               <Field label={t("settings.newPassword")} value={password} onChangeText={setPassword} secure />
             )}
-            <PrimaryButton label={t("settings.save")} onPress={save} loading={saving} icon="save-outline" />
+            <PrimaryButton label={t("settings.save")} onPress={save} loading={saving} icon={Save} />
           </Pressable>
         </Pressable>
       </Modal>
@@ -235,7 +235,7 @@ function Row({ label, value, onPress, last }: { label: string; value?: string; o
     <Pressable onPress={onPress} style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 10, paddingHorizontal: 18, paddingVertical: 17 }}>
       <Text style={{ flex: 1, color: c.ink, fontSize: 17, textAlign: isRTL() ? "right" : "left" }}>{label}</Text>
       {value ? <Text style={{ color: c.inkMuted, fontSize: 16 }} numberOfLines={1}>{value}</Text> : null}
-      <Ionicons name={isRTL() ? "chevron-back" : "chevron-forward"} size={18} color={c.inkSubtle} />
+      {isRTL() ? <ChevronLeft size={18} color={c.inkSubtle} /> : <ChevronRight size={18} color={c.inkSubtle} />}
     </Pressable>
   );
 }

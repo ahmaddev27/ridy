@@ -3,7 +3,7 @@ import { View, ScrollView, RefreshControl, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { ChevronLeft, ChevronRight, UserCircle } from "lucide-react-native";
 import { api, type HomeData, type FleetHomeData, type Offer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
@@ -256,7 +256,7 @@ function ActiveOffer({ offer, onPress }: { offer: Offer; onPress: () => void }) 
         </Text>
         <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 2 }}>
           <Text style={{ color: c.ink, fontSize: 15, fontWeight: "700" }}>{t("home.details")}</Text>
-          <Ionicons name={isRTL() ? "chevron-back" : "chevron-forward"} size={16} color={c.ink} />
+          {isRTL() ? <ChevronLeft size={16} color={c.ink} /> : <ChevronRight size={16} color={c.ink} />}
         </View>
       </View>
     </Pressable>
@@ -290,7 +290,7 @@ export function DriverTag({ name }: { name: string }) {
   const c = useColors();
   return (
     <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 5, marginBottom: 3, alignSelf: isRTL() ? "flex-end" : "flex-start" }}>
-      <Ionicons name="person-circle-outline" size={14} color={c.inkSubtle} />
+      <UserCircle size={14} color={c.inkSubtle} />
       <Text numberOfLines={1} style={{ color: c.inkSubtle, fontSize: 12, fontWeight: "700", textAlign: isRTL() ? "right" : "left" }}>{name}</Text>
     </View>
   );

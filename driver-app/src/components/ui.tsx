@@ -6,7 +6,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useState } from "react";
-import { Ionicons } from "@expo/vector-icons";
+import { Eye, EyeOff, type LucideIcon } from "lucide-react-native";
 import Svg, { Path } from "react-native-svg";
 import { Text, TextInput } from "@/components/typography";
 import { useColors, radius, statusColors, cardStyle, type Palette } from "@/lib/theme";
@@ -42,10 +42,11 @@ export function PrimaryButton({
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: LucideIcon;
 }) {
   const c = useColors();
   const off = disabled || loading;
+  const Icon = icon;
   return (
     <Pressable
       onPress={onPress}
@@ -65,7 +66,7 @@ export function PrimaryButton({
         <ActivityIndicator color={c.primaryInk} />
       ) : (
         <>
-          {icon && <Ionicons name={icon} size={17} color={c.primaryInk} />}
+          {Icon && <Icon size={17} color={c.primaryInk} />}
           <Text style={{ color: c.primaryInk, fontWeight: "700", fontSize: 15 }}>{label}</Text>
         </>
       )}
@@ -111,7 +112,7 @@ export function Field({
       </View>
       {secure && (
         <Pressable onPress={() => setHidden((h) => !h)} hitSlop={8}>
-          <Ionicons name={hidden ? "eye-outline" : "eye-off-outline"} size={20} color={c.inkSubtle} />
+          {hidden ? <Eye size={20} color={c.inkSubtle} /> : <EyeOff size={20} color={c.inkSubtle} />}
         </Pressable>
       )}
     </View>
@@ -161,11 +162,12 @@ export function SecondaryButton({
   style,
 }: {
   label: string;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: LucideIcon;
   onPress: () => void;
   style?: ViewStyle;
 }) {
   const c = useColors();
+  const Icon = icon;
   return (
     <Pressable
       onPress={onPress}
@@ -185,7 +187,7 @@ export function SecondaryButton({
         style,
       ]}
     >
-      {icon && <Ionicons name={icon} size={16} color={c.ink} />}
+      {Icon && <Icon size={16} color={c.ink} />}
       <Text style={{ color: c.ink, fontSize: 14, fontWeight: "700" }}>{label}</Text>
     </Pressable>
   );
