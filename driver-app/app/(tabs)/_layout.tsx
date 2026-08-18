@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Text } from "@/components/typography";
 import { t, useLocale, isRTL } from "@/lib/i18n";
-import { useColors, radius, type Palette } from "@/lib/theme";
+import { useColors, radius, isDarkPalette, type Palette } from "@/lib/theme";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -45,13 +45,12 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         style={{
           flexDirection: isRTL() ? "row-reverse" : "row",
           alignItems: "center",
-          gap: 6,
+          gap: 4,
           backgroundColor: c.surface,
-          borderRadius: 28,
-          borderWidth: 1,
-          borderColor: c.line,
-          paddingHorizontal: 8,
-          paddingVertical: 8,
+          borderRadius: radius.pill,
+          paddingHorizontal: 6,
+          paddingVertical: 6,
+          ...(isDarkPalette(c) ? { borderWidth: 1, borderColor: c.line } : null),
           ...shadow(c),
         }}
       >
@@ -83,20 +82,20 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               style={{
                 flexDirection: isRTL() ? "row-reverse" : "row",
                 alignItems: "center",
-                gap: 8,
+                gap: 7,
                 borderRadius: radius.pill,
-                paddingHorizontal: focused ? 16 : 14,
-                paddingVertical: 10,
+                paddingHorizontal: focused ? 15 : 13,
+                paddingVertical: 9,
                 backgroundColor: focused ? c.accent : "transparent",
               }}
             >
               <Ionicons
                 name={iconFor(route.name, focused)}
-                size={24}
+                size={21}
                 color={focused ? "#ffffff" : c.inkSubtle}
               />
               {focused && (
-                <Text style={{ color: "#ffffff", fontSize: 14, fontWeight: "700" }}>{label}</Text>
+                <Text style={{ color: "#ffffff", fontSize: 13.5, fontWeight: "700" }}>{label}</Text>
               )}
             </Pressable>
           );
@@ -109,12 +108,12 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 /** Soft, theme-aware elevation for the floating bar. */
 function shadow(c: Palette) {
   return Platform.select({
-    android: { elevation: 12 },
+    android: { elevation: 10 },
     default: {
       shadowColor: "#000000",
-      shadowOpacity: c.canvas === "#090b0f" ? 0.5 : 0.15,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: isDarkPalette(c) ? 0.45 : 0.12,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 6 },
     },
   });
 }

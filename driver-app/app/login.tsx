@@ -45,7 +45,7 @@ export default function LoginScreen() {
           <Field label={t("login.password")} value={password} onChangeText={setPassword} secure />
           {error && <Text style={{ color: c.danger, fontSize: 14, textAlign: "center" }}>{error}</Text>}
           <View style={{ marginTop: 4 }}>
-            <PrimaryButton label={t("login.submit")} onPress={submit} loading={loading} />
+            <PrimaryButton label={t("login.submit")} onPress={submit} loading={loading} icon="log-in-outline" />
           </View>
           <Pressable
             onPress={() => Alert.alert(t("signin.forgot"), t("signin.forgotHint"))}

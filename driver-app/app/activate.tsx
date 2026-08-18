@@ -80,6 +80,7 @@ export default function ActivateScreen() {
                 onPress={submit}
                 loading={loading}
                 disabled={!preview || password.length < 8}
+                icon="checkmark-circle-outline"
               />
             </View>
           </View>

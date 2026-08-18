@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { api, type DriverStats } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, setLocale, getLocale } from "@/lib/i18n";
-import { useColors, radius } from "@/lib/theme";
+import { useColors, radius, cardStyle } from "@/lib/theme";
 import { fareLabel } from "@/lib/format";
 import { Field, PrimaryButton, SectionLabel } from "@/components/ui";
 import { useToast } from "@/components/toast";
@@ -31,7 +31,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: c.canvas }}>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 18 }}>
-        <Text style={{ color: c.ink, fontSize: 30, fontWeight: "800", textAlign: align }}>{t("tabs.profile")}</Text>
+        <Text style={{ color: c.ink, fontSize: 26, fontWeight: "800", textAlign: align }}>{t("tabs.profile")}</Text>
 
         {/* Segment */}
         <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", backgroundColor: c.surface2, borderRadius: radius.lg, padding: 5 }}>
@@ -86,13 +86,13 @@ function Stats() {
       </View>
 
       {/* Earnings */}
-      <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, padding: 20, gap: 6 }}>
+      <View style={{ ...cardStyle(c), padding: 20, gap: 6 }}>
         <SectionLabel>{t("profile.verdienstToday")}</SectionLabel>
-        <Text style={{ color: c.ink, fontSize: 44, fontWeight: "800", letterSpacing: -1, textAlign: align }}>{fareLabel(null, data?.earnings ?? 0)}</Text>
+        <Text style={{ color: c.ink, fontSize: 38, fontWeight: "800", letterSpacing: -1, textAlign: align }}>{fareLabel(null, data?.earnings ?? 0)}</Text>
       </View>
 
       {/* Grid */}
-      <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
+      <View style={cardStyle(c)}>
         <View style={{ flexDirection: isRTL() ? "row-reverse" : "row" }}>
           <GridCell label={t("home.st.offers")} value={String(data?.total ?? 0)} border />
           <GridCell label={t("stat.accepted")} value={String(accepted)} />
@@ -105,10 +105,10 @@ function Stats() {
       </View>
 
       {/* Acceptance */}
-      <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, padding: 18, gap: 12 }}>
+      <View style={{ ...cardStyle(c), padding: 18, gap: 12 }}>
         <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Text style={{ color: c.ink, fontSize: 17, fontWeight: "700" }}>{t("stat.acceptanceRate")}</Text>
-          <Text style={{ color: c.ink, fontSize: 24, fontWeight: "800" }}>{rate}%</Text>
+          <Text style={{ color: c.ink, fontSize: 16, fontWeight: "700" }}>{t("stat.acceptanceRate")}</Text>
+          <Text style={{ color: c.ink, fontSize: 22, fontWeight: "800" }}>{rate}%</Text>
         </View>
         <View style={{ height: 8, borderRadius: 999, backgroundColor: c.surface2, overflow: "hidden" }}>
           <View style={{ height: "100%", width: `${rate}%`, backgroundColor: c.completed }} />
@@ -125,10 +125,10 @@ function Stats() {
 function GridCell({ label, value, unit, border }: { label: string; value: string; unit?: string; border?: boolean }) {
   const c = useColors();
   return (
-    <View style={{ flex: 1, padding: 18, gap: 6, borderRightWidth: border && !isRTL() ? 1 : 0, borderLeftWidth: border && isRTL() ? 1 : 0, borderColor: c.line }}>
+    <View style={{ flex: 1, padding: 16, gap: 5, borderRightWidth: border && !isRTL() ? 1 : 0, borderLeftWidth: border && isRTL() ? 1 : 0, borderColor: c.line }}>
       <SectionLabel>{label}</SectionLabel>
-      <Text style={{ color: c.ink, fontSize: 26, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>
-        {value}{unit ? <Text style={{ fontSize: 15, color: c.inkMuted }}> {unit}</Text> : null}
+      <Text style={{ color: c.ink, fontSize: 22, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>
+        {value}{unit ? <Text style={{ fontSize: 14, color: c.inkMuted }}> {unit}</Text> : null}
       </Text>
     </View>
   );
@@ -174,7 +174,7 @@ function Settings() {
   return (
     <View style={{ gap: 18 }}>
       {/* Identity */}
-      <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 16, backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, padding: 18 }}>
+      <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 16, ...cardStyle(c), padding: 18 }}>
         <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: c.surface2, alignItems: "center", justifyContent: "center" }}>
           <Text style={{ color: c.inkMuted, fontSize: 20, fontWeight: "700" }}>{initials}</Text>
         </View>
@@ -187,7 +187,7 @@ function Settings() {
 
       {/* KONTO */}
       <SectionLabel>{t("profile.konto")}</SectionLabel>
-      <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
+      <View style={cardStyle(c)}>
         {/* Owners monitor read-only; name/password are managed in the dashboard. */}
         {!isOwner && (
           <>
@@ -205,8 +205,9 @@ function Settings() {
       </View>
 
       {/* Logout */}
-      <Pressable onPress={logout} style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, paddingVertical: 18, alignItems: "center", marginTop: 6 }}>
-        <Text style={{ color: c.danger, fontSize: 16, fontWeight: "700" }}>{t("settings.logout")}</Text>
+      <Pressable onPress={logout} style={{ flexDirection: isRTL() ? "row-reverse" : "row", gap: 8, ...cardStyle(c), paddingVertical: 16, alignItems: "center", justifyContent: "center", marginTop: 6 }}>
+        <Ionicons name="log-out-outline" size={18} color={c.danger} />
+        <Text style={{ color: c.danger, fontSize: 15, fontWeight: "700" }}>{t("settings.logout")}</Text>
       </Pressable>
       <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: "center" }}>Reidey Driver 1.0.0</Text>
 
@@ -220,7 +221,7 @@ function Settings() {
             ) : (
               <Field label={t("settings.newPassword")} value={password} onChangeText={setPassword} secure />
             )}
-            <PrimaryButton label={t("settings.save")} onPress={save} loading={saving} />
+            <PrimaryButton label={t("settings.save")} onPress={save} loading={saving} icon="save-outline" />
           </Pressable>
         </Pressable>
       </Modal>

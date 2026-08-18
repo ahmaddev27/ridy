@@ -7,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { api, type HomeData, type FleetHomeData, type Offer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
-import { useColors, radius } from "@/lib/theme";
+import { useColors, radius, cardStyle } from "@/lib/theme";
 import { fareLabel, perKmLabel, distanceLabel, cleanAddress, euroQuality } from "@/lib/format";
 import { Logo, StatusBadge, QualityMark, RouteBlock, SectionLabel } from "@/components/ui";
 
@@ -53,7 +53,7 @@ export default function HomeScreen() {
         <View style={{ flexDirection: row, alignItems: "center", gap: 12 }}>
           <Logo size={30} />
           <View style={{ flex: 1 }}>
-            <Text style={{ color: c.ink, fontSize: 21, fontWeight: "800", textAlign: align }}>
+            <Text style={{ color: c.ink, fontSize: 20, fontWeight: "800", textAlign: align }}>
               {greeting}, {headline}
             </Text>
             {!isOwner && driver?.company_name && (
@@ -69,7 +69,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Today stats — 2×2 grid */}
-        <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
+        <View style={cardStyle(c)}>
           <View style={{ flexDirection: row }}>
             <GridCell label={t("home.st.offers")} value={String(today?.total ?? 0)} c={c} border />
             <GridCell label={t("home.st.accept")} value={`${today?.acceptance_rate ?? 0}%`} c={c} />
@@ -89,8 +89,8 @@ export default function HomeScreen() {
 
         {isOwner && activeOffers.length > 0 && (
           <>
-            <Text style={{ color: c.ink, fontSize: 17, fontWeight: "800", textAlign: align, marginTop: 4 }}>{t("fleet.activeNow")}</Text>
-            <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
+            <Text style={{ color: c.ink, fontSize: 16, fontWeight: "800", textAlign: align, marginTop: 4 }}>{t("fleet.activeNow")}</Text>
+            <View style={cardStyle(c)}>
               {activeOffers.map((o, i) => (
                 <RecentRow key={o.id} offer={o} showDriver onPress={() => router.push(`/offer/${o.id}`)} last={i === activeOffers.length - 1} />
               ))}
@@ -100,13 +100,13 @@ export default function HomeScreen() {
 
         {/* Recent */}
         <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
-          <Text style={{ color: c.ink, fontSize: 17, fontWeight: "800" }}>{t("home.recent")}</Text>
+          <Text style={{ color: c.ink, fontSize: 16, fontWeight: "800" }}>{t("home.recent")}</Text>
           <Pressable onPress={() => router.push("/offers")}>
             <Text style={{ color: c.inkMuted, fontSize: 15 }}>{t("home.all")}</Text>
           </Pressable>
         </View>
 
-        <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
+        <View style={cardStyle(c)}>
           {recent.length === 0 ? (
             <Text style={{ color: c.inkSubtle, textAlign: "center", padding: 24 }}>{t("home.empty")}</Text>
           ) : (
@@ -159,7 +159,7 @@ function WeeklyChart({ offers }: { offers: Offer[] }) {
   const todayIdx = mondayIndex(new Date());
 
   return (
-    <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, padding: 18, gap: 14 }}>
+    <View style={{ ...cardStyle(c), padding: 18, gap: 14 }}>
       <SectionLabel>{t("home.week")}</SectionLabel>
       <View style={{ flexDirection: "row", alignItems: "flex-end", height: 132, gap: 10 }}>
         {WEEKDAYS.map((label, i) => {
@@ -211,11 +211,11 @@ function DriversPill({ count }: { count: number }) {
 function GridCell({ label, value, unit, c, border }: { label: string; value: string; unit?: string; c: ReturnType<typeof useColors>; border?: boolean }) {
   const align = isRTL() ? "right" : "left";
   return (
-    <View style={{ flex: 1, padding: 18, gap: 6, borderRightWidth: border && !isRTL() ? 1 : 0, borderLeftWidth: border && isRTL() ? 1 : 0, borderColor: c.line }}>
+    <View style={{ flex: 1, padding: 16, gap: 5, borderRightWidth: border && !isRTL() ? 1 : 0, borderLeftWidth: border && isRTL() ? 1 : 0, borderColor: c.line }}>
       <SectionLabel>{label}</SectionLabel>
-      <Text style={{ color: c.ink, fontSize: 28, fontWeight: "800", textAlign: align }}>
+      <Text style={{ color: c.ink, fontSize: 24, fontWeight: "800", textAlign: align }}>
         {value}
-        {unit ? <Text style={{ fontSize: 16, fontWeight: "700", color: c.inkMuted }}> {unit}</Text> : null}
+        {unit ? <Text style={{ fontSize: 15, fontWeight: "700", color: c.inkMuted }}> {unit}</Text> : null}
       </Text>
     </View>
   );
@@ -230,7 +230,7 @@ function ActiveOffer({ offer, onPress }: { offer: Offer; onPress: () => void }) 
   const eta = km ? Math.round((km / 30) * 60) : null;
 
   return (
-    <Pressable onPress={onPress} style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, padding: 18, gap: 14 }}>
+    <Pressable onPress={onPress} style={{ ...cardStyle(c), padding: 18, gap: 14 }}>
       <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
         <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 8 }}>
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.started }} />
@@ -240,7 +240,7 @@ function ActiveOffer({ offer, onPress }: { offer: Offer; onPress: () => void }) 
       </View>
 
       <View style={{ flexDirection: row, alignItems: "flex-end", justifyContent: "space-between" }}>
-        <Text style={{ color: c.ink, fontSize: 48, fontWeight: "800", letterSpacing: -1 }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
+        <Text style={{ color: c.ink, fontSize: 42, fontWeight: "800", letterSpacing: -1 }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
         <View style={{ alignItems: isRTL() ? "flex-start" : "flex-end", gap: 2 }}>
           <QualityMark mark={q.mark} good={q.good} size={18} />
           <Text style={{ color: c.inkMuted, fontSize: 14 }}>{perKmLabel(offer.fare_amount, offer.distance_m)}</Text>

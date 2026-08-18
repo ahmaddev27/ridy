@@ -1,4 +1,4 @@
-import { useColorScheme } from "react-native";
+import { Platform, useColorScheme, type ViewStyle } from "react-native";
 
 /** Semantic palette — calibrated to the Reidey Driver design (light-first). */
 export type Palette = {
@@ -83,7 +83,45 @@ export function useColors(): Palette {
   return useColorScheme() === "dark" ? dark : light;
 }
 
-export const radius = { sm: 10, md: 14, lg: 18, xl: 24, pill: 999 };
+export const radius = { sm: 10, md: 14, lg: 18, xl: 22, pill: 999 };
+
+/** True when the given palette is the dark scheme (shadows barely read there). */
+export function isDarkPalette(c: Palette): boolean {
+  return c.canvas === dark.canvas;
+}
+
+/**
+ * Soft, theme-aware card elevation. On light we lean on a low-opacity, wide
+ * shadow; on dark a shadow is nearly invisible, so we skip it and let the
+ * lighter `surface` separate the card from the canvas (with a hairline for
+ * extra definition, applied by `cardStyle`).
+ */
+export function softShadow(c: Palette): ViewStyle {
+  if (isDarkPalette(c)) return {};
+  return Platform.select({
+    android: { elevation: 2 },
+    default: {
+      shadowColor: "#000000",
+      shadowOpacity: 0.07,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 4 },
+    },
+  }) as ViewStyle;
+}
+
+/**
+ * The one card look used everywhere: borderless soft-shadowed surface on light,
+ * a lighter surface with an ultra-subtle hairline on dark. Keeps every screen's
+ * cards visually identical (DRY).
+ */
+export function cardStyle(c: Palette): ViewStyle {
+  const d = isDarkPalette(c);
+  return {
+    backgroundColor: c.surface,
+    borderRadius: radius.xl,
+    ...(d ? { borderWidth: 1, borderColor: c.line } : softShadow(c)),
+  };
+}
 
 /** Offer status → its hue + soft badge background. */
 export function statusColors(c: Palette, status: string): { fg: string; bg: string } {

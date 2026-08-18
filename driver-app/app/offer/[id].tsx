@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Pressable, ActivityIndicator, Linking, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
@@ -8,9 +8,9 @@ import Svg, { Circle } from "react-native-svg";
 import { api, type Offer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
-import { useColors, radius } from "@/lib/theme";
+import { useColors, radius, cardStyle } from "@/lib/theme";
 import { fareLabel, perKmLabel, distanceLabel, cleanAddress, euroQuality, timeLabel } from "@/lib/format";
-import { StatusBadge, QualityMark, RouteBlock, SectionLabel } from "@/components/ui";
+import { StatusBadge, QualityMark, RouteBlock, SectionLabel, SecondaryButton } from "@/components/ui";
 
 /** "19 Min" / "45 Sek" / "1 Std 5 Min" — how long the trip took. */
 function durationLabel(sec: number): string {
@@ -20,18 +20,31 @@ function durationLabel(sec: number): string {
   return `${Math.floor(m / 60)} ${t("offer.hrShort")} ${m % 60} ${t("offer.minShort")}`;
 }
 
-const RING = 230;
-const STROKE = 12;
+const RING = 216;
+const STROKE = 10;
 const R = (RING - STROKE) / 2;
 const CIRC = 2 * Math.PI * R;
 
+/**
+ * Seconds remaining in the accept window, refreshed every animation frame so the
+ * SVG ring depletes smoothly. The frame loop only runs while the offer is still
+ * pending and the deadline is in the future; it stops itself the moment the
+ * window elapses (or the status leaves "pending"), so no work is done once the
+ * trip is active. Returns null when there is no accept window to count down.
+ */
 function useCountdown(offer: Offer | null): number | null {
   const [now, setNow] = useState(() => Date.now());
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
-    timer.current = setInterval(() => setNow(Date.now()), 200);
-    return () => { if (timer.current) clearInterval(timer.current); };
-  }, []);
+    if (!offer?.received_at || !offer.accept_window_seconds || offer.status !== "pending") return;
+    const deadline = new Date(offer.received_at).getTime() + offer.accept_window_seconds * 1000;
+    let raf = 0;
+    const tick = () => {
+      setNow(Date.now());
+      if (Date.now() < deadline) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [offer]);
   return useMemo(() => {
     if (!offer?.received_at || !offer.accept_window_seconds) return null;
     const deadline = new Date(offer.received_at).getTime() + offer.accept_window_seconds * 1000;
@@ -112,8 +125,8 @@ export default function OfferScreen() {
               {/* Big fare with the euro-quality mark right beside it — the same "€€"
                   the driver sees in the push notification (a price-per-km rating). */}
               <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "flex-start", gap: 6 }}>
-                <Text style={{ color: c.ink, fontSize: 44, fontWeight: "800", letterSpacing: -1 }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
-                <View style={{ marginTop: 6 }}><QualityMark mark={q.mark} good={q.good} size={20} /></View>
+                <Text style={{ color: c.ink, fontSize: 40, fontWeight: "800", letterSpacing: -1 }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
+                <View style={{ marginTop: 5 }}><QualityMark mark={q.mark} good={q.good} size={18} /></View>
               </View>
               {hasMetrics && (
                 <Text style={{ color: c.inkMuted, fontSize: 14, marginTop: 2 }}>
@@ -155,7 +168,7 @@ export default function OfferScreen() {
           )}
 
           {/* Route card */}
-          <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, padding: 18 }}>
+          <View style={{ ...cardStyle(c), padding: 18 }}>
             <RouteBlock
               pickup={cleanAddress(offer.pickup_address)}
               dropoff={cleanAddress(offer.dropoff_address)}
@@ -166,7 +179,7 @@ export default function OfferScreen() {
 
           {/* Metrics — only when the offer has been geo-synced (otherwise the values are just "—"). */}
           {hasMetrics ? (
-            <View style={{ flexDirection: row, backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
+            <View style={{ flexDirection: row, ...cardStyle(c) }}>
               <MetricCell label={t("offer.strecke")} value={distanceLabel(offer.distance_m)} c={c} border />
               <MetricCell label={t("offer.qualitaet")} value={perKmLabel(offer.fare_amount, offer.distance_m)} c={c} border />
               <MetricCell label={t("offer.eta")} value={etaMin != null ? t("home.eta").replace("{n}", String(etaMin)) : "—"} c={c} />
@@ -174,13 +187,13 @@ export default function OfferScreen() {
           ) : (
             // Distance / per-km / ETA depend on server-side geocoding — keep the dash
             // fallback but tell the driver why the numbers are not there yet.
-            <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, padding: 16 }}>
+            <View style={{ ...cardStyle(c), padding: 16 }}>
               <Text style={{ color: c.inkSubtle, fontSize: 13, lineHeight: 19, textAlign: isRTL() ? "right" : "left" }}>{t("offer.noGeo")}</Text>
             </View>
           )}
 
           {/* Timing — when the offer arrived, when Uber requested it, and the accept window. */}
-          <View style={{ backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line }}>
+          <View style={cardStyle(c)}>
             <InfoRow label={t("offer.received")} value={timeLabel(offer.received_at)} row={row} c={c} border />
             {offer.requested_at && (
               <InfoRow label={t("offer.requested")} value={timeLabel(offer.requested_at)} row={row} c={c} border />
@@ -197,17 +210,12 @@ export default function OfferScreen() {
 
           {/* CTA — Open in Uber (primary) + Open in Maps (route) */}
           <View style={{ flexDirection: row, gap: 10, marginTop: 8 }}>
-            <Pressable
-              onPress={openMaps}
-              style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: radius.lg, paddingVertical: 13, paddingHorizontal: 16 }}
-            >
-              <Ionicons name="map-outline" size={16} color={c.ink} />
-              <Text style={{ color: c.ink, fontSize: 14, fontWeight: "700" }}>{t("offer.openMaps")}</Text>
-            </Pressable>
+            <SecondaryButton label={t("offer.openMaps")} icon="map-outline" onPress={openMaps} />
             <Pressable
               onPress={() => Linking.openURL("uberdriver://").catch(() => Linking.openURL("https://drivers.uber.com"))}
-              style={{ flex: 1, backgroundColor: c.primary, borderRadius: radius.lg, paddingVertical: 13, alignItems: "center" }}
+              style={{ flex: 1, flexDirection: isRTL() ? "row-reverse" : "row", gap: 8, backgroundColor: c.primary, borderRadius: radius.lg, paddingVertical: 12, alignItems: "center", justifyContent: "center" }}
             >
+              <Ionicons name="car-outline" size={17} color={c.primaryInk} />
               <Text style={{ color: c.primaryInk, fontSize: 15, fontWeight: "700" }}>{t("offer.openUber")}</Text>
             </Pressable>
           </View>

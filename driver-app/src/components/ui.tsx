@@ -9,7 +9,7 @@ import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
 import { Text, TextInput } from "@/components/typography";
-import { useColors, radius, statusColors, type Palette } from "@/lib/theme";
+import { useColors, radius, statusColors, cardStyle, type Palette } from "@/lib/theme";
 import { isRTL } from "@/lib/i18n";
 
 const align = () => (isRTL() ? "right" : "left") as "right" | "left";
@@ -36,11 +36,13 @@ export function PrimaryButton({
   onPress,
   loading,
   disabled,
+  icon,
 }: {
   label: string;
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
+  icon?: keyof typeof Ionicons.glyphMap;
 }) {
   const c = useColors();
   const off = disabled || loading;
@@ -49,17 +51,23 @@ export function PrimaryButton({
       onPress={onPress}
       disabled={off}
       style={{
+        flexDirection: isRTL() ? "row-reverse" : "row",
+        gap: 8,
         backgroundColor: c.primary,
         borderRadius: radius.pill,
-        paddingVertical: 15,
+        paddingVertical: 13,
         alignItems: "center",
+        justifyContent: "center",
         opacity: off ? 0.45 : 1,
       }}
     >
       {loading ? (
         <ActivityIndicator color={c.primaryInk} />
       ) : (
-        <Text style={{ color: c.primaryInk, fontWeight: "700", fontSize: 16 }}>{label}</Text>
+        <>
+          {icon && <Ionicons name={icon} size={17} color={c.primaryInk} />}
+          <Text style={{ color: c.primaryInk, fontWeight: "700", fontSize: 15 }}>{label}</Text>
+        </>
       )}
     </Pressable>
   );
@@ -98,7 +106,7 @@ export function Field({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           {...props}
-          style={{ color: c.ink, fontSize: 16, paddingVertical: 1, textAlign: align(), writingDirection: isRTL() ? "rtl" : "ltr" }}
+          style={{ color: c.ink, fontSize: 15, paddingVertical: 1, textAlign: align(), writingDirection: isRTL() ? "rtl" : "ltr" }}
         />
       </View>
       {secure && (
@@ -139,18 +147,47 @@ export function SectionLabel({ children, style }: { children: React.ReactNode; s
   );
 }
 
-/** Card container. */
+/** Borderless soft-shadowed card — the single card look shared across the app. */
 export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
   const c = useColors();
+  return <View style={[cardStyle(c), style]}>{children}</View>;
+}
+
+/** Compact secondary action — outlined pill/rounded button with an optional leading icon. */
+export function SecondaryButton({
+  label,
+  icon,
+  onPress,
+  style,
+}: {
+  label: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+  style?: ViewStyle;
+}) {
+  const c = useColors();
   return (
-    <View
+    <Pressable
+      onPress={onPress}
       style={[
-        { backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line },
+        {
+          flexDirection: isRTL() ? "row-reverse" : "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 7,
+          backgroundColor: c.surface,
+          borderWidth: 1,
+          borderColor: c.line,
+          borderRadius: radius.lg,
+          paddingVertical: 12,
+          paddingHorizontal: 16,
+        },
         style,
       ]}
     >
-      {children}
-    </View>
+      {icon && <Ionicons name={icon} size={16} color={c.ink} />}
+      <Text style={{ color: c.ink, fontSize: 14, fontWeight: "700" }}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -160,9 +197,9 @@ export function Metric({ label, value, unit }: { label: string; value: string; u
   return (
     <View style={{ gap: 4 }}>
       <SectionLabel>{label}</SectionLabel>
-      <Text style={{ color: c.ink, fontSize: 26, fontWeight: "800", textAlign: align() }}>
+      <Text style={{ color: c.ink, fontSize: 23, fontWeight: "800", textAlign: align() }}>
         {value}
-        {unit ? <Text style={{ fontSize: 15, fontWeight: "700", color: c.inkMuted }}> {unit}</Text> : null}
+        {unit ? <Text style={{ fontSize: 14, fontWeight: "700", color: c.inkMuted }}> {unit}</Text> : null}
       </Text>
     </View>
   );
@@ -192,11 +229,11 @@ export function RouteBlock({
       <View style={{ flex: 1, gap: pickupLabel ? 14 : 12 }}>
         <View>
           {pickupLabel && <SectionLabel>{pickupLabel}</SectionLabel>}
-          <Text style={{ color: c.ink, fontSize: 17, textAlign: align() }}>{pickup}</Text>
+          <Text style={{ color: c.ink, fontSize: 16, textAlign: align() }}>{pickup}</Text>
         </View>
         <View>
           {dropoffLabel && <SectionLabel>{dropoffLabel}</SectionLabel>}
-          <Text style={{ color: c.ink, fontSize: 17, textAlign: align() }}>{dropoff}</Text>
+          <Text style={{ color: c.ink, fontSize: 16, textAlign: align() }}>{dropoff}</Text>
         </View>
       </View>
     </View>

@@ -7,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { api, type Offer, type OffersQuery } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, getLocale } from "@/lib/i18n";
-import { useColors, radius } from "@/lib/theme";
+import { useColors, radius, cardStyle } from "@/lib/theme";
 import { fareLabel, cleanAddress, distanceLabel, euroQuality } from "@/lib/format";
 import { StatusBadge, QualityMark } from "@/components/ui";
 import { DriverTag } from "./index";
@@ -71,7 +71,7 @@ export default function OffersScreen() {
         onEndReached={loadMore}
         ListHeaderComponent={
           <View style={{ gap: 14, marginBottom: 2 }}>
-            <Text style={{ color: c.ink, fontSize: 30, fontWeight: "800", textAlign: align }}>{t("offers.title")}</Text>
+            <Text style={{ color: c.ink, fontSize: 26, fontWeight: "800", textAlign: align }}>{t("offers.title")}</Text>
 
             {/* Search */}
             <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 10, backgroundColor: c.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: c.line, paddingHorizontal: 14, paddingVertical: 13 }}>
@@ -137,10 +137,10 @@ function OfferCard({ offer, onPress, showDriver }: { offer: Offer; onPress: () =
   return (
     <Pressable
       onPress={onPress}
-      style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 14, backgroundColor: c.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: c.line, padding: 16, opacity: dim ? 0.55 : 1 }}
+      style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 14, ...cardStyle(c), padding: 16, opacity: dim ? 0.55 : 1 }}
     >
-      <View style={{ minWidth: 96 }}>
-        <Text style={{ color: c.ink, fontSize: 21, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
+      <View style={{ minWidth: 92 }}>
+        <Text style={{ color: c.ink, fontSize: 19, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
         <QualityMark mark={q.mark} good={q.good} />
       </View>
       <View style={{ flex: 1 }}>
