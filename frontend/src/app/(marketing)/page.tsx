@@ -115,6 +115,7 @@ export default function LandingPage() {
 
         <div
           id="top"
+          className="mkt-hero"
           style={{
             position: "relative",
             zIndex: 1,
@@ -122,84 +123,65 @@ export default function LandingPage() {
             margin: "0 auto",
             padding:
               "clamp(40px,6vw,72px) " + PADX + " clamp(48px,7vw,88px)",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))",
-            gap: "clamp(32px,5vw,60px)",
-            alignItems: "center",
           }}
         >
-          {/* Left column */}
-          <div
+          {/* Headline (mobile: 1st) */}
+          <h1
+            className="mkt-hero__headline"
             style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "clamp(18px,2.6vw,24px)",
+              margin: 0,
+              fontSize: "clamp(30px,7vw,58px)",
+              lineHeight: 1.06,
+              fontWeight: 600,
+              letterSpacing: "-.03em",
             }}
           >
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "clamp(34px,5.2vw,58px)",
-                lineHeight: 1.05,
-                fontWeight: 600,
-                letterSpacing: "-.03em",
-              }}
-            >
-              <span style={{ color: accent }}>Jedes Fahrtangebot</span> klar
-              bewertet, bevor dein Fahrer zusagt.
-            </h1>
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: 12 }}
-            >
-              <span style={monoEyebrow}>Verfügbar auf:</span>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <StoreBadge kicker="Laden im" name="App Store" href="/#app">
-                  <path d="M16.4 12.7c0-2.2 1.8-3.3 1.9-3.4-1-1.5-2.6-1.7-3.2-1.7-1.3-.1-2.6.8-3.3.8-.7 0-1.7-.8-2.9-.8-1.5 0-2.9.9-3.6 2.3-1.6 2.7-.4 6.7 1.1 8.9.7 1.1 1.6 2.3 2.8 2.2 1.1 0 1.6-.7 3-.7 1.4 0 1.8.7 3 .7 1.2 0 2-1.1 2.7-2.2.5-.8.8-1.5 1-2.3-1.6-.6-2.5-2.1-2.5-3.8Z" />
-                  <path d="M14.3 5.6c.6-.7 1-1.7.9-2.7-.9.1-1.9.6-2.5 1.3-.6.6-1 1.6-.9 2.6 1 .1 2-.5 2.5-1.2Z" />
-                </StoreBadge>
-                <StoreBadge
-                  kicker="Jetzt bei"
-                  name="Google Play"
-                  href="/#app"
-                >
-                  <path d="M4.3 2.8 15.6 12 4.3 21.2c-.3-.2-.5-.6-.5-1.1V3.9c0-.5.2-.9.5-1.1Z" />
-                  <path d="M15.6 12 4.3 21.2l7.6-6.2 3.7-3Z" />
-                  <path d="m15.6 12 3.9-2.4c.9-.6.9-1.6 0-2.2L15.6 5" />
-                  <path d="m15.6 12 3.9 2.4c.9.6.9 1.6 0 2.2L15.6 19" />
-                </StoreBadge>
-              </div>
-            </div>
+            <span style={{ color: accent }}>Jedes Fahrtangebot</span> klar
+            bewertet, bevor dein Fahrer zusagt.
+          </h1>
 
-            {/* Rating */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                flexWrap: "wrap",
-                paddingTop: 2,
-              }}
-            >
-              <Stars />
-              <span style={{ fontSize: 14.5, color: "var(--ink-muted)" }}>
-                <strong style={{ color: "var(--ink)", fontWeight: 600 }}>
-                  4.9
-                </strong>{" "}
-                · Von Flotten in ganz Deutschland genutzt
-              </span>
+          {/* Store badges (mobile: 3rd, after phones) */}
+          <div
+            className="mkt-hero__badges"
+            style={{ display: "flex", flexDirection: "column", gap: 12 }}
+          >
+            <span style={monoEyebrow}>Verfügbar auf:</span>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <StoreBadge kicker="Laden im" name="App Store" href="/#app">
+                <path d="M16.4 12.7c0-2.2 1.8-3.3 1.9-3.4-1-1.5-2.6-1.7-3.2-1.7-1.3-.1-2.6.8-3.3.8-.7 0-1.7-.8-2.9-.8-1.5 0-2.9.9-3.6 2.3-1.6 2.7-.4 6.7 1.1 8.9.7 1.1 1.6 2.3 2.8 2.2 1.1 0 1.6-.7 3-.7 1.4 0 1.8.7 3 .7 1.2 0 2-1.1 2.7-2.2.5-.8.8-1.5 1-2.3-1.6-.6-2.5-2.1-2.5-3.8Z" />
+                <path d="M14.3 5.6c.6-.7 1-1.7.9-2.7-.9.1-1.9.6-2.5 1.3-.6.6-1 1.6-.9 2.6 1 .1 2-.5 2.5-1.2Z" />
+              </StoreBadge>
+              <StoreBadge kicker="Jetzt bei" name="Google Play" href="/#app">
+                <path d="M4.3 2.8 15.6 12 4.3 21.2c-.3-.2-.5-.6-.5-1.1V3.9c0-.5.2-.9.5-1.1Z" />
+                <path d="M15.6 12 4.3 21.2l7.6-6.2 3.7-3Z" />
+                <path d="m15.6 12 3.9-2.4c.9-.6.9-1.6 0-2.2L15.6 5" />
+                <path d="m15.6 12 3.9 2.4c.9.6.9 1.6 0 2.2L15.6 19" />
+              </StoreBadge>
             </div>
           </div>
 
-          {/* Right column: two overlapping, angled phones */}
+          {/* Rating (mobile: 4th) */}
           <div
+            className="mkt-hero__rating"
             style={{
-              position: "relative",
               display: "flex",
-              justifyContent: "center",
               alignItems: "center",
-              minHeight: "clamp(360px,44vw,540px)",
+              gap: 12,
+              flexWrap: "wrap",
+              paddingTop: 2,
             }}
           >
+            <Stars />
+            <span style={{ fontSize: 14.5, color: "var(--ink-muted)" }}>
+              <strong style={{ color: "var(--ink)", fontWeight: 600 }}>
+                4.9
+              </strong>{" "}
+              · Von Flotten in ganz Deutschland genutzt
+            </span>
+          </div>
+
+          {/* Two overlapping, angled phones (mobile: 2nd, right column on desktop) */}
+          <div className="mkt-hero__phones">
             <PhoneMock
               src="/app-screens/1a-offer-detail.png"
               darkSrc="/app-screens/1b-offer-detail-dark.png"
@@ -430,16 +412,7 @@ export default function LandingPage() {
         }}
       >
         <SectionHead title="Die App" eyebrow="Hell & dunkel · DE / AR" />
-        <div
-          style={{
-            display: "flex",
-            gap: "clamp(12px,2vw,20px)",
-            overflowX: "auto",
-            scrollSnapType: "x mandatory",
-            paddingBottom: 8,
-            WebkitOverflowScrolling: "touch",
-          }}
-        >
+        <div className="mkt-slider">
           <AppShot src="/app-screens/1a-home.png" caption="Start" />
           <AppShot src="/app-screens/1a-offer-detail.png" caption="Angebot" />
           <AppShot
@@ -455,6 +428,16 @@ export default function LandingPage() {
             caption="Start · العربية"
           />
         </div>
+        <span
+          style={{
+            display: "block",
+            marginTop: 6,
+            font: `400 11.5px ${mono}`,
+            color: "var(--ink-subtle)",
+          }}
+        >
+          Wischen für mehr →
+        </span>
       </div>
 
       {/* Testimonials */}
@@ -504,20 +487,14 @@ export default function LandingPage() {
           padding: "clamp(58px,8vw,88px) " + PADX + " 0",
         }}
       >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
-            gap: "clamp(24px,4vw,56px)",
-            alignItems: "start",
-          }}
-        >
+        <div>
           <h2
             style={{
-              margin: 0,
+              margin: "0 0 clamp(28px,4vw,44px)",
               fontSize: "clamp(25px,3.4vw,32px)",
               fontWeight: 600,
               letterSpacing: "-.02em",
+              textAlign: "center",
             }}
           >
             Häufige Fragen
@@ -527,6 +504,8 @@ export default function LandingPage() {
               display: "flex",
               flexDirection: "column",
               gap: 1,
+              maxWidth: 760,
+              margin: "0 auto",
               background: "var(--line)",
               border: "1px solid var(--line)",
               borderRadius: 16,

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
 import { Logo } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { MobileNav } from "./_components/mobile-nav";
 
 const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
@@ -110,14 +111,13 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
             </span>
           </Link>
           <nav
+            className="mkt-desktop-only"
             style={{
-              flex: "1 1 260px",
-              display: "flex",
+              flex: "1 1 auto",
               gap: "clamp(14px,2vw,24px)",
               alignItems: "center",
               minWidth: 0,
               whiteSpace: "nowrap",
-              overflowX: "auto",
             }}
           >
             {HEADER_NAV.map((link) => (
@@ -131,9 +131,14 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
               </Link>
             ))}
           </nav>
+
+          {/* Push actions to the right on mobile, where the nav is hidden. */}
+          <div style={{ flex: "1 1 auto" }} className="mkt-mobile-only" />
+
+          {/* Desktop actions */}
           <div
+            className="mkt-desktop-only"
             style={{
-              display: "flex",
               alignItems: "center",
               gap: 12,
               flex: "none",
@@ -167,6 +172,15 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
             >
               Vertrieb kontaktieren
             </Link>
+          </div>
+
+          {/* Mobile actions: theme toggle + hamburger menu (logo stays). */}
+          <div
+            className="mkt-mobile-only"
+            style={{ alignItems: "center", gap: 6, flex: "none" }}
+          >
+            <ThemeToggle />
+            <MobileNav links={HEADER_NAV} />
           </div>
         </div>
       </header>
@@ -224,7 +238,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
           }}
         >
           <span style={{ font: `400 12px ${mono}`, color: "var(--ink-subtle)" }}>
-            © 2026 Reidey GmbH · Solingen
+            © 2026 Reidey · Elprofessor
           </span>
           <span style={{ fontSize: 12.5, color: "var(--ink-subtle)" }}>
             Reidey ist ein eigenständiges Flottenmanagement-Produkt.

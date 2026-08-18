@@ -149,3 +149,82 @@ html[lang="ar"] body,
 .theme-dark-only { display: none !important; }
 .dark .theme-light-only { display: none !important; }
 .dark .theme-dark-only { display: block !important; }
+
+/* ------------------------------------------------------------------ *
+ * Marketing landing — responsive helpers.
+ * The page is built with inline styles which cannot express media
+ * queries, so breakpoint-dependent layout lives here (breakpoint: 768px,
+ * matching the MobileNav's Tailwind `md:` boundary).
+ * ------------------------------------------------------------------ */
+
+/* Header: desktop-only inline nav + secondary actions. Hidden on mobile,
+   where the MobileNav hamburger takes over. */
+.mkt-desktop-only { display: flex; }
+.mkt-mobile-only { display: none; }
+@media (max-width: 767px) {
+  .mkt-desktop-only { display: none !important; }
+  .mkt-mobile-only { display: flex !important; }
+}
+
+/* Hero: single column on mobile with an explicit visual order
+   (headline -> phones -> store badges -> rating); two columns on desktop
+   with the phones spanning the full height of the right side. */
+.mkt-hero {
+  display: grid;
+  gap: clamp(22px, 4vw, 32px);
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "headline"
+    "phones"
+    "badges"
+    "rating";
+  align-items: start;
+}
+@media (min-width: 768px) {
+  .mkt-hero {
+    grid-template-columns: 1.05fr 0.95fr;
+    grid-template-areas:
+      "headline phones"
+      "badges   phones"
+      "rating   phones";
+    column-gap: clamp(32px, 5vw, 60px);
+    row-gap: clamp(18px, 2.6vw, 24px);
+    align-items: center;
+  }
+}
+.mkt-hero__headline { grid-area: headline; }
+.mkt-hero__phones { grid-area: phones; }
+.mkt-hero__badges { grid-area: badges; }
+.mkt-hero__rating { grid-area: rating; }
+
+/* On mobile the overlapping phones need less vertical room and a tighter
+   spread so they never clip against the edges of a ~360px screen. */
+.mkt-hero__phones {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: clamp(320px, 78vw, 420px);
+}
+@media (min-width: 768px) {
+  .mkt-hero__phones { min-height: clamp(360px, 44vw, 540px); }
+}
+
+/* "Die App" slider: horizontal scroll-snap track, peeking next card,
+   hidden scrollbar, smooth touch scrolling. */
+.mkt-slider {
+  display: flex;
+  gap: clamp(12px, 2vw, 20px);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-left: var(--mkt-padx, 20px);
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 10px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.mkt-slider::-webkit-scrollbar { display: none; }
+.mkt-slider > * {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
