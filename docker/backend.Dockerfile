@@ -37,20 +37,25 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www
 
+# --- Dependencies (cached layer) --------------------------------------------
+# Install PHP deps from ONLY composer.json + composer.lock first, so this heavy
+# layer is cached and re-runs ONLY when dependencies actually change — a
+# code-only deploy skips it entirely. That both speeds deploys and avoids
+# GitHub codeload's anonymous 429 rate-limit firing on every build.
+# Retry with backoff so a transient 429 (on a genuine dep change) self-heals.
+COPY backend/composer.json backend/composer.lock /var/www/
+RUN for i in 1 2 3 4 5 6 7 8; do \
+        composer install --no-dev --no-scripts --no-autoloader --no-interaction --prefer-dist && break; \
+        echo "composer install failed (attempt $i) — retrying in 30s..."; sleep 30; \
+    done \
+    && composer install --no-dev --no-scripts --no-autoloader --no-interaction --prefer-dist
+
 # --- Application -------------------------------------------------------------
-# Copy the Laravel app, then install production dependencies. The Compose
-# `backend` service bind-mounts ./backend over this at runtime for local dev;
+# Now the app code + the optimized autoloader. The Compose `backend` service
+# bind-mounts ./backend over this at runtime (with a named vendor volume), so
 # baking the install in keeps the image runnable on its own (CI / prod).
 COPY backend/ /var/www/
-
-# Retry the install: GitHub's codeload occasionally 429s anonymous dist
-# downloads, which would otherwise fail the whole deploy build. Back off and
-# retry a few times so a transient rate-limit self-heals.
-RUN for i in 1 2 3 4 5 6; do \
-        composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist && break; \
-        echo "composer install failed (attempt $i) — retrying in 20s..."; sleep 20; \
-    done \
-    && composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist \
+RUN composer dump-autoload --no-dev --optimize \
     && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
 # PHP-FPM listens on 9000; nginx (separate service) proxies FastCGI to it.
