@@ -144,3 +144,8 @@ html[lang="ar"] body,
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Marketing hero: swap phone screenshots between light and dark themes. */
+.theme-dark-only { display: none; }
+.dark .theme-light-only { display: none; }
+.dark .theme-dark-only { display: block; }

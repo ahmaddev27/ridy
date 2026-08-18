@@ -137,13 +137,13 @@ export default function LandingPage() {
               gap: "clamp(18px,2.6vw,24px)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Logo size={34} className="text-ink" />
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Logo size={52} className="text-ink" />
               <span
                 style={{
-                  fontSize: 20,
-                  fontWeight: 600,
-                  letterSpacing: "-.01em",
+                  fontSize: 26,
+                  fontWeight: 700,
+                  letterSpacing: "-.02em",
                 }}
               >
                 Reidey
@@ -228,6 +228,7 @@ export default function LandingPage() {
           >
             <PhoneMock
               src="/app-screens/1a-offer-detail.png"
+              darkSrc="/app-screens/1b-offer-detail-dark.png"
               alt="Reidey Angebotsdetail"
               style={{
                 position: "absolute",
@@ -238,6 +239,7 @@ export default function LandingPage() {
             />
             <PhoneMock
               src="/app-screens/1a-home.png"
+              darkSrc="/app-screens/1b-home-dark.png"
               alt="Reidey Startbildschirm"
               style={{
                 position: "relative",
@@ -763,13 +765,22 @@ function Stars() {
 /** Screenshot inside a realistic dark phone bezel with a theme-aware shadow. */
 function PhoneMock({
   src,
+  darkSrc,
   alt,
   style,
 }: {
   src: string;
+  darkSrc?: string;
   alt: string;
   style?: CSSProperties;
 }) {
+  const imgStyle: CSSProperties = {
+    display: "block",
+    width: "100%",
+    height: "auto",
+    aspectRatio: "780 / 1688",
+    borderRadius: 27,
+  };
   return (
     <div
       className="phone-shadow"
@@ -782,19 +793,11 @@ function PhoneMock({
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={alt}
-        width={780}
-        height={1688}
-        style={{
-          display: "block",
-          width: "100%",
-          height: "auto",
-          aspectRatio: "780 / 1688",
-          borderRadius: 27,
-        }}
-      />
+      <img src={src} alt={alt} width={780} height={1688} style={imgStyle} className={darkSrc ? "theme-light-only" : undefined} />
+      {darkSrc && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={darkSrc} alt={alt} width={780} height={1688} style={imgStyle} className="theme-dark-only" />
+      )}
     </div>
   );
 }
