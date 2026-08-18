@@ -89,7 +89,7 @@ export class RamenStream {
       const rows = [];
       let pageToken = "";
       for (let page = 1; page <= 100; page++) {
-        const res = await fetch(`${config.uberSupplierBase}/api/getDrivers?localeCode=en-GB`, {
+        const res = await fetch(`${config.uberSupplierBase}/api/getDrivers?localeCode=de-DE`, {
           method: "POST",
           headers: { ...this.supplierHeaders(), "content-type": "application/json", "x-csrf-token": "x" },
           dispatcher: this.dispatcher,
@@ -136,7 +136,7 @@ export class RamenStream {
    */
   async syncStatuses() {
     try {
-      const res = await fetch(`${config.uberSupplierBase}/api/GetDriverLiveLocation?localeCode=en-GB`, {
+      const res = await fetch(`${config.uberSupplierBase}/api/GetDriverLiveLocation?localeCode=de-DE`, {
         method: "POST",
         headers: { ...this.supplierHeaders(), "content-type": "application/json", "x-csrf-token": "x" },
         dispatcher: this.dispatcher,
@@ -180,7 +180,11 @@ export class RamenStream {
   headers() {
     return {
       accept: "*/*",
-      "accept-language": "en-US,en;q=0.9",
+      // Force German so offer addresses come back consistently in German
+      // (Uber otherwise localises them to the driver/rider language — Russian,
+      // Arabic, English mixed).
+      "accept-language": "de-DE,de;q=0.9",
+      "x-uber-locale": "de-DE",
       "cache-control": "no-cache",
       "x-uber-client-name": "vs_dispatch",
       "x-uber-client-session": randomUUID(),
