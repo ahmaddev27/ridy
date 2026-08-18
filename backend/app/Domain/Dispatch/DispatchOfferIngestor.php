@@ -2,6 +2,7 @@
 
 namespace App\Domain\Dispatch;
 
+use App\Domain\Dispatch\Jobs\GeocodeOffer;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\DriverStatsService;
 use App\Domain\Fleet\Models\Driver;
@@ -23,7 +24,6 @@ class DispatchOfferIngestor
     public function __construct(
         private TenantContext $context,
         private DispatchNotifier $notifier,
-        private TripGeocoder $geocoder,
     ) {}
 
     /**
@@ -103,14 +103,11 @@ class DispatchOfferIngestor
                 RidyLog::event('dispatch_offer.notify_failed', ['offer_id' => $record->id, 'error' => $e->getMessage()]);
             }
 
-            // Geocode after the push (same TripGeocoder the dashboard uses) so the
-            // trip distance + route are ready for the dashboard/list. A failure
-            // just leaves it for the backfill sweep — it must never lose the offer.
-            try {
-                $this->geocoder->enrich($record);
-            } catch (Throwable $e) {
-                RidyLog::event('dispatch_offer.geocode_failed', ['offer_id' => $record->id, 'error' => $e->getMessage()]);
-            }
+            // Geocode OFF the hot path: queue it so the daemon's ingest request
+            // isn't held open on a slow external geocode. Fills the dashboard's
+            // trip detail async; the backfill sweep is the safety net if the
+            // queue is down. (Falls back to sync when QUEUE_CONNECTION=sync.)
+            GeocodeOffer::dispatch($record->id);
         }
 
         $status = $driver !== null ? 'routed' : 'unlinked_driver';

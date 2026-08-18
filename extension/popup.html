@@ -26,14 +26,8 @@
       }
       header h1 { font-size: 15px; margin: 0; }
       main { padding: 16px; }
-      label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin: 10px 0 4px; }
-      input {
-        width: 100%; box-sizing: border-box; padding: 8px 10px;
-        border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none;
-      }
-      input:focus { border-color: #000; box-shadow: 0 0 0 2px #e2e8f0; }
       button {
-        width: 100%; margin-top: 14px; padding: 10px; border: 0; border-radius: 8px;
+        width: 100%; padding: 10px; border: 0; border-radius: 8px;
         background: #000; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
       }
       button:disabled { opacity: .5; cursor: default; }
@@ -41,9 +35,11 @@
       .status { margin-top: 12px; font-size: 13px; padding: 8px 10px; border-radius: 8px; display: none; }
       .status.ok { display: block; background: #ecfdf5; color: #047857; }
       .status.err { display: block; background: #fef2f2; color: #b91c1c; }
-      .hint { font-size: 11px; color: #94a3b8; margin-top: 6px; }
-      details { margin-top: 14px; }
-      summary { font-size: 12px; color: #64748b; cursor: pointer; }
+      .hint { font-size: 12px; color: #64748b; margin-top: 10px; line-height: 1.5; }
+      .paired-badge { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #047857; margin-bottom: 12px; }
+      .paired-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; }
+      .unpaired { font-size: 13px; color: #b91c1c; background: #fef2f2; padding: 10px; border-radius: 8px; margin-bottom: 12px; line-height: 1.5; }
+      .hidden { display: none; }
     </style>
   </head>
   <body>
@@ -52,20 +48,25 @@
       <h1>Reidey Uber Connector</h1>
     </header>
     <main>
-      <button id="connect">Uber-Sitzung verbinden</button>
-      <div id="status" class="status"></div>
-      <p class="hint">
-        Melde dich zuerst bei <b>supplier.uber.com</b> an und klicke dann hier.
-      </p>
+      <!-- Paired: the dashboard has handed us a token — show the connect action. -->
+      <div id="paired-view" class="hidden">
+        <div class="paired-badge"><span class="dot"></span> Mit Reidey verbunden</div>
+        <button id="connect">Uber-Sitzung verbinden</button>
+        <p class="hint">
+          Melde dich zuerst bei <b>supplier.uber.com</b> an und klicke dann hier.
+        </p>
+      </div>
 
-      <details id="settings">
-        <summary>Einstellungen</summary>
-        <label for="apiUrl">Reidey-URL</label>
-        <input id="apiUrl" placeholder="https://reidey.de" />
-        <label for="token">Kopplungs-Token</label>
-        <input id="token" type="password" placeholder="aus dem Reidey-Dashboard" />
-        <button id="save" class="secondary">Speichern</button>
-      </details>
+      <!-- Not paired: no manual token entry. Pairing happens on the dashboard. -->
+      <div id="unpaired-view" class="hidden">
+        <div class="unpaired">
+          Die Erweiterung ist noch nicht gekoppelt. Öffne dein Reidey-Dashboard und
+          gehe zu <b>Uber-Verbindung</b> — die Kopplung passiert automatisch.
+        </div>
+        <button id="open-dashboard" class="secondary">Reidey-Dashboard öffnen</button>
+      </div>
+
+      <div id="status" class="status"></div>
     </main>
     <script src="popup.js"></script>
   </body>
