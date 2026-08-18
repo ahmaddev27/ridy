@@ -1,0 +1,46 @@
+# Standalone geocoding + routing stack for a DEDICATED box.
+#
+# Run this on its own VPS (not the app server) so heavy imports + high-throughput
+# geocoding never compete with the live app. Nominatim answers address lookups
+# (100+ req/s locally, no rate limit); OSRM answers routing (thousands/s).
+#
+# After it's up, point the app at it via the GitHub secrets:
+#   NOMINATIM_URL = http://<GEO_BOX_IP>:8080
+#   OSRM_URL      = http://<GEO_BOX_IP>:5000
+# (Lock these ports to the app server's IP with a firewall — see the guide.)
+#
+# Recommended box: 8-16 GB RAM, 100 GB SSD, 4 vCPU. Germany import runs a few
+# hours; the DB persists in the nominatim_data volume.
+
+services:
+  # --- Nominatim: address -> coordinates (Germany extract) -------------------
+  nominatim:
+    image: mediagis/nominatim:4.4
+    restart: unless-stopped
+    ports:
+      - "8080:8080" # firewall this to the app server's IP only
+    environment:
+      # Import Germany on first boot. Swap for a wider extract (e.g. dach or
+      # europe) if you need cross-border trips (NL/BE/…): see download.geofabrik.de.
+      PBF_URL: ${GEO_PBF_URL:-https://download.geofabrik.de/europe/germany-latest.osm.pbf}
+      REPLICATION_URL: ${GEO_REPLICATION_URL:-https://download.geofabrik.de/europe/germany-updates/}
+      IMPORT_STYLE: address # lighter, address-focused import
+      NOMINATIM_PASSWORD: ${NOMINATIM_PASSWORD:-nominatim}
+    volumes:
+      - nominatim_data:/var/lib/postgresql/14/main
+    shm_size: 1g
+
+  # --- OSRM: coordinates -> road distance + route ----------------------------
+  # Serves the pre-built graph produced by the one-time prep in the guide.
+  osrm:
+    image: osrm/osrm-backend:latest
+    restart: unless-stopped
+    ports:
+      - "5000:5000" # firewall this to the app server's IP only
+    command: osrm-routed --algorithm mld /data/germany-latest.osrm
+    volumes:
+      - osrm_data:/data
+
+volumes:
+  nominatim_data:
+  osrm_data:
