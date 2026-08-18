@@ -285,6 +285,7 @@ export class RamenStream {
 
     console.log(`[${this.tag()}] stream open (seq ${this.seq})`);
     this.reconnectDelay = config.reconnectMinDelay; // reset backoff on success
+    this.lastHeartbeatAt = 0; // force an immediate heartbeat on the first frame
 
     // Pull the driver roster once the session is proven good, then periodically.
     // Only the primary channel does this — secondary channels just ingest offers.
@@ -307,6 +308,11 @@ export class RamenStream {
       const { done, value } = await reader.read();
       if (done) break;
 
+      // Any frame (offer OR keep-alive) means the stream is alive — heartbeat so
+      // an open-but-quiet stream doesn't drift to "stale/idle" in System Health.
+      // Throttled so frequent keep-alives don't spam the backend.
+      await this.maybeHeartbeat();
+
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
@@ -319,6 +325,15 @@ export class RamenStream {
     }
   }
 
+  /** Heartbeat on stream activity, at most once per interval, so a live-but-quiet
+   *  stream keeps its "last seen" fresh without spamming the backend. */
+  async maybeHeartbeat() {
+    const now = Date.now();
+    if (this.lastHeartbeatAt && now - this.lastHeartbeatAt < 45000) return;
+    this.lastHeartbeatAt = now;
+    await api.heartbeat(this.session.id).catch(() => {});
+  }
+
   async handleData(data) {
     let payload;
     try {
@@ -327,7 +342,7 @@ export class RamenStream {
       return; // non-JSON keep-alive frame
     }
 
-    await api.heartbeat(this.session.id).catch(() => {});
+    await this.maybeHeartbeat();
 
     for (const message of payload.msg ?? []) {
       if (typeof message.seq === "number") this.seq = Math.max(this.seq, message.seq);
