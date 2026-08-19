@@ -151,6 +151,7 @@ services:
         # /api paths), so the dashboard works on EVERY domain Caddy serves without
         # a rebuild. Override only to force an absolute API base.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
     restart: unless-stopped
 
   # --- Dispatch daemon — holds the Uber RAMEN stream ------------------------

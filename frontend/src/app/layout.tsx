@@ -5,6 +5,7 @@ import { I18nProvider } from "@/lib/i18n/context";
 import { ThemeProvider } from "@/lib/theme/context";
 import { ThemedToaster } from "@/components/ui/themed-toaster";
 import { InitialLoader } from "@/components/brand/initial-loader";
+import { SentryInit } from "@/components/sentry-init";
 
 // Runs before paint to set the `.dark` class from the saved/system preference,
 // avoiding a light→dark flash on load. Kept tiny and dependency-free.
@@ -38,6 +39,7 @@ export default function RootLayout({
           <ThemedToaster />
         </ThemeProvider>
         <InitialLoader />
+        <SentryInit />
       </body>
     </html>
   );

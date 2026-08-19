@@ -19,6 +19,8 @@ RUN npm ci
 # provided as a build arg (defaults to same-origin in production).
 # Empty default = same-origin: the client calls relative /api paths, so the
 # dashboard works on any domain Caddy serves. Pass an absolute URL to override.
+ARG NEXT_PUBLIC_SENTRY_DSN=
+ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
 ARG NEXT_PUBLIC_API_URL=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
