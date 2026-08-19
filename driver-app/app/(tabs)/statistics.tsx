@@ -1,13 +1,16 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, ScrollView, RefreshControl, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useFocusEffect } from "expo-router";
-import { api, type DriverStats } from "@/lib/api";
+import { api, type DriverStats, type Offer } from "@/lib/api";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius, cardStyle } from "@/lib/theme";
 import { fareLabel } from "@/lib/format";
 import { SectionLabel } from "@/components/ui";
+
+const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] as const;
+const mondayIndex = (d: Date) => (d.getDay() + 6) % 7;
 
 type Range = "today" | "7d" | "30d";
 const RANGES: Range[] = ["today", "7d", "30d"];
@@ -33,13 +36,21 @@ export default function StatisticsScreen() {
   const align = isRTL() ? "right" : "left";
   const [range, setRange] = useState<Range>("7d");
   const [stats, setStats] = useState<DriverStats | null>(null);
+  const [week, setWeek] = useState<Offer[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (r: Range) => {
     setRefreshing(true);
     try {
       const { from, to } = rangeDates(r);
-      setStats((await api.stats(from, to)).data);
+      // Stats for the selected range + the last 7 days of offers for the chart.
+      const w = rangeDates("7d");
+      const [s, o] = await Promise.all([
+        api.stats(from, to),
+        api.offers({ from: w.from, to: w.to, per_page: 100 }),
+      ]);
+      setStats(s.data);
+      setWeek(o.data);
     } catch {
       /* keep last */
     } finally {
@@ -92,6 +103,9 @@ export default function StatisticsScreen() {
           </Text>
         </View>
 
+        {/* Last 7 days — income bars */}
+        <WeeklyChart offers={week} c={c} />
+
         {/* 2×2 grid */}
         <View style={cardStyle(c)}>
           <View style={{ flexDirection: isRTL() ? "row-reverse" : "row" }}>
@@ -116,6 +130,50 @@ export default function StatisticsScreen() {
 }
 
 type Colors = ReturnType<typeof useColors>;
+
+/** Income bars for the current week (Mon–Sun); today's bar is emphasised. */
+function WeeklyChart({ offers, c }: { offers: Offer[]; c: Colors }) {
+  const totals = useMemo(() => {
+    const buckets = [0, 0, 0, 0, 0, 0, 0];
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(now.getDate() - mondayIndex(now));
+    const nextMonday = new Date(monday);
+    nextMonday.setDate(monday.getDate() + 7);
+    for (const o of offers) {
+      if (!o.received_at || o.fare_amount == null) continue;
+      if (o.status === "rejected" || o.status === "canceled") continue;
+      const at = new Date(o.received_at);
+      if (at < monday || at >= nextMonday) continue;
+      buckets[mondayIndex(at)] += o.fare_amount;
+    }
+    return buckets;
+  }, [offers]);
+
+  const max = Math.max(...totals, 1);
+  const todayIdx = mondayIndex(new Date());
+
+  return (
+    <View style={{ ...cardStyle(c), padding: 18, gap: 14 }}>
+      <SectionLabel>{t("home.week")}</SectionLabel>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", height: 130, gap: 9 }}>
+        {WEEKDAYS.map((label, i) => {
+          const isToday = i === todayIdx;
+          const h = 8 + (totals[i] / max) * 92;
+          return (
+            <View key={label} style={{ flex: 1, alignItems: "center", gap: 8 }}>
+              <View style={{ flex: 1, width: "100%", justifyContent: "flex-end", alignItems: "center" }}>
+                <View style={{ height: h, width: "100%", borderRadius: 4, backgroundColor: isToday ? c.ink : c.borderStrong }} />
+              </View>
+              <Text style={{ color: isToday ? c.ink : c.inkSubtle, fontSize: 11, fontWeight: isToday ? "700" : "500" }}>{label}</Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
 function Cell({ label, value, unit, c, border }: { label: string; value: string; unit?: string; c: Colors; border?: boolean }) {
   const align = isRTL() ? "right" : "left";
