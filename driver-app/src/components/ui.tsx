@@ -9,7 +9,7 @@ import { useState } from "react";
 import { Eye, EyeOff, type LucideIcon } from "lucide-react-native";
 import Svg, { Path } from "react-native-svg";
 import { Text, TextInput } from "@/components/typography";
-import { useColors, radius, statusColors, cardStyle, type Palette } from "@/lib/theme";
+import { useColors, radius, statusColors, cardStyle, isDarkPalette, type Palette } from "@/lib/theme";
 import { isRTL } from "@/lib/i18n";
 
 const align = () => (isRTL() ? "right" : "left") as "right" | "left";
@@ -30,19 +30,25 @@ export function Logo({ size = 40, color }: { size?: number; color?: string }) {
   );
 }
 
-/** Full-width primary action — dark pill button (near-black on light, near-white on dark). */
+/**
+ * Full-width primary action — the design's solid button (near-white on dark,
+ * near-black on light), 12px radius. Pass `style` to flex it inside an action
+ * row next to a SecondaryButton.
+ */
 export function PrimaryButton({
   label,
   onPress,
   loading,
   disabled,
   icon,
+  style,
 }: {
   label: string;
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
   icon?: LucideIcon;
+  style?: ViewStyle;
 }) {
   const c = useColors();
   const off = disabled || loading;
@@ -51,16 +57,19 @@ export function PrimaryButton({
     <Pressable
       onPress={onPress}
       disabled={off}
-      style={{
-        flexDirection: isRTL() ? "row-reverse" : "row",
-        gap: 8,
-        backgroundColor: c.primary,
-        borderRadius: radius.pill,
-        paddingVertical: 13,
-        alignItems: "center",
-        justifyContent: "center",
-        opacity: off ? 0.45 : 1,
-      }}
+      style={[
+        {
+          flexDirection: isRTL() ? "row-reverse" : "row",
+          gap: 8,
+          backgroundColor: c.primary,
+          borderRadius: radius.control,
+          paddingVertical: 14,
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: off ? 0.45 : 1,
+        },
+        style,
+      ]}
     >
       {loading ? (
         <ActivityIndicator color={c.primaryInk} />
@@ -71,6 +80,35 @@ export function PrimaryButton({
         </>
       )}
     </Pressable>
+  );
+}
+
+/** Small monochrome badge shown on offer cards (TOP OFFER / VERIFIED / NEW / EXPIRING). */
+export function Badge({ variant, label }: { variant: "top" | "verified" | "new" | "expiring"; label: string }) {
+  const c = useColors();
+  // Expiring is the one tinted badge; the rest are pure monochrome.
+  const styles =
+    variant === "expiring"
+      ? { bg: c.canceledBg, border: isDarkPalette(c) ? "#3d2a2a" : "#f0d4d3", text: isDarkPalette(c) ? "#d98c88" : c.danger }
+      : variant === "new"
+        ? { bg: c.surfaceRaised, border: c.borderStrong, text: c.ink }
+        : { bg: c.surfaceRaised, border: c.line, text: c.inkMuted };
+  return (
+    <View
+      style={{
+        alignSelf: isRTL() ? "flex-end" : "flex-start",
+        backgroundColor: styles.bg,
+        borderWidth: 1,
+        borderColor: styles.border,
+        borderRadius: radius.xs,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+      }}
+    >
+      <Text style={{ color: styles.text, fontSize: 9.5, fontWeight: "700", letterSpacing: 0.8 }}>
+        {label.toUpperCase()}
+      </Text>
+    </View>
   );
 }
 
@@ -168,6 +206,9 @@ export function SecondaryButton({
 }) {
   const c = useColors();
   const Icon = icon;
+  // On dark the secondary sits on the raised surface with a muted label; on light
+  // it's an outlined white control. Monochrome in both.
+  const d = isDarkPalette(c);
   return (
     <Pressable
       onPress={onPress}
@@ -177,18 +218,18 @@ export function SecondaryButton({
           alignItems: "center",
           justifyContent: "center",
           gap: 7,
-          backgroundColor: c.surface,
+          backgroundColor: d ? c.surfaceRaised : c.surface,
           borderWidth: 1,
           borderColor: c.line,
-          borderRadius: radius.lg,
-          paddingVertical: 12,
+          borderRadius: radius.control,
+          paddingVertical: 13,
           paddingHorizontal: 16,
         },
         style,
       ]}
     >
-      {Icon && <Icon size={16} color={c.ink} />}
-      <Text style={{ color: c.ink, fontSize: 14, fontWeight: "700" }}>{label}</Text>
+      {Icon && <Icon size={16} color={c.inkMuted} />}
+      <Text style={{ color: c.inkMuted, fontSize: 14, fontWeight: "700" }}>{label}</Text>
     </Pressable>
   );
 }

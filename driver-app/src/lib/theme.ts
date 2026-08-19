@@ -1,24 +1,33 @@
 import { Platform, useColorScheme, type ViewStyle } from "react-native";
 
-/** Semantic palette — calibrated to the Reidey Driver design (light-first). */
+/**
+ * Semantic palette — calibrated to the REIDEY Driver hi-fi design: a dark,
+ * monochrome system (black / white / grey) with emerald kept only as a small,
+ * subordinate accent for active/accept states. A matching monochrome light
+ * scheme mirrors it (inverted primary button, warm neutral surfaces).
+ */
 export type Palette = {
-  canvas: string;
-  surface: string;
-  surface2: string;
-  ink: string;
-  inkMuted: string;
-  inkSubtle: string;
-  line: string;
-  primary: string;
-  primaryInk: string;
-  accent: string;
-  // status hues (offer lifecycle)
-  pending: string; // Offen — orange
-  accepted: string; // Angenommen — blue
-  started: string; // Auf Fahrt — violet
-  completed: string; // Fertig — green
-  rejected: string; // Abgelehnt — grey
-  canceled: string; // Storniert — red
+  canvas: string; // screen background (bg/base)
+  surface: string; // standard card (surface/card)
+  surface2: string; // inset lists, inputs, tertiary (bg/tertiary)
+  surfaceRaised: string; // live card, secondary buttons, badges, pills (surface/raised)
+  overlay: string; // toast / push mock / hairline inside cards (surface/overlay)
+  ink: string; // primary text/values
+  inkMuted: string; // secondary text (text/secondary)
+  inkSubtle: string; // labels, captions, inactive tabs (text/muted)
+  inkFaint: string; // footnotes, chevrons, section meta (text/faint)
+  line: string; // 1px card + control borders (border/default)
+  borderStrong: string; // emphasized borders — live card, active chip
+  primary: string; // primary button background
+  primaryInk: string; // primary button label
+  accent: string; // subtle emerald — online dot, accept/active touches
+  // status hues (offer lifecycle) — kept monochrome-leaning per the design
+  pending: string; // Offen — warning amber
+  accepted: string; // Angenommen — subtle emerald
+  started: string; // Auf Fahrt — neutral
+  completed: string; // Fertig — subtle emerald
+  rejected: string; // Abgelehnt — muted grey
+  canceled: string; // Storniert — error red
   // soft badge backgrounds
   completedBg: string;
   startedBg: string;
@@ -26,56 +35,67 @@ export type Palette = {
   canceledBg: string;
   rejectedBg: string;
   danger: string;
+  warning: string;
 };
 
 const light: Palette = {
-  canvas: "#f3f3f1",
+  canvas: "#f4f4f3",
   surface: "#ffffff",
-  surface2: "#eeedeb",
-  ink: "#14161b",
-  inkMuted: "#7c828c",
-  inkSubtle: "#a7abb2",
-  line: "#ececea",
-  primary: "#14161b",
+  surface2: "#efefed",
+  surfaceRaised: "#fafaf9",
+  overlay: "#ffffff",
+  ink: "#0a0b0b",
+  inkMuted: "#45484a",
+  inkSubtle: "#74777a",
+  inkFaint: "#a2a5a8",
+  line: "#e6e6e3",
+  borderStrong: "#d2d3d1",
+  primary: "#0a0b0b",
   primaryInk: "#ffffff",
-  accent: "#12a06a",
-  pending: "#d9871c",
-  accepted: "#3b82f6",
-  started: "#7c5cff",
-  completed: "#12a06a",
-  rejected: "#9aa0a8",
-  canceled: "#e5484d",
-  completedBg: "#dff3e9",
-  startedBg: "#ece7ff",
-  pendingBg: "#fbebd2",
-  canceledBg: "#fbe3e4",
+  accent: "#0e9d63",
+  pending: "#b8860b",
+  accepted: "#0e9d63",
+  started: "#45484a",
+  completed: "#0e9d63",
+  rejected: "#74777a",
+  canceled: "#c4413d",
+  completedBg: "#e2f2ea",
+  startedBg: "#eceded",
+  pendingBg: "#f7edd6",
+  canceledBg: "#f7e2e1",
   rejectedBg: "#eceded",
-  danger: "#e5484d",
+  danger: "#c4413d",
+  warning: "#b8860b",
 };
 
 const dark: Palette = {
-  canvas: "#090b0f",
-  surface: "#14171d",
-  surface2: "#1d222b",
-  ink: "#f0f2f4",
-  inkMuted: "#969ca6",
-  inkSubtle: "#616772",
-  line: "#242a33",
-  primary: "#f0f2f4",
-  primaryInk: "#14161b",
-  accent: "#34d399",
-  pending: "#e0982f",
-  accepted: "#5a9bff",
-  started: "#9d84ff",
-  completed: "#34d399",
-  rejected: "#7b828d",
-  canceled: "#ff6b70",
-  completedBg: "#12352a",
-  startedBg: "#241f3d",
-  pendingBg: "#3a2c14",
-  canceledBg: "#3a1e20",
-  rejectedBg: "#20242c",
-  danger: "#ff6b70",
+  canvas: "#080909",
+  surface: "#17191a",
+  surface2: "#151718",
+  surfaceRaised: "#1d1f20",
+  overlay: "#232526",
+  ink: "#ffffff",
+  inkMuted: "#b5b7b8",
+  inkSubtle: "#777a7c",
+  inkFaint: "#4e5152",
+  line: "#2a2c2d",
+  borderStrong: "#3a3d3e",
+  primary: "#ffffff",
+  primaryInk: "#080909",
+  accent: "#35c88f",
+  pending: "#e4a11b",
+  accepted: "#35c88f",
+  started: "#b5b7b8",
+  completed: "#35c88f",
+  rejected: "#777a7c",
+  canceled: "#d9534f",
+  completedBg: "#122b22",
+  startedBg: "#1d1f20",
+  pendingBg: "#3a3123",
+  canceledBg: "#221a1a",
+  rejectedBg: "#1d1f20",
+  danger: "#d9534f",
+  warning: "#e4a11b",
 };
 
 /** Colors for the device's current light/dark setting. */
@@ -83,7 +103,11 @@ export function useColors(): Palette {
   return useColorScheme() === "dark" ? dark : light;
 }
 
-export const radius = { sm: 10, md: 14, lg: 18, xl: 22, pill: 999 };
+/**
+ * Radii from the design: 6 badges · 12 controls/buttons · 14 cards · 16 large
+ * cards · 22 bottom sheet · 999 pills.
+ */
+export const radius = { xs: 6, sm: 10, control: 12, md: 14, lg: 16, xl: 22, pill: 999 };
 
 /** True when the given palette is the dark scheme (shadows barely read there). */
 export function isDarkPalette(c: Palette): boolean {
@@ -93,8 +117,7 @@ export function isDarkPalette(c: Palette): boolean {
 /**
  * Soft, theme-aware card elevation. On light we lean on a low-opacity, wide
  * shadow; on dark a shadow is nearly invisible, so we skip it and let the
- * lighter `surface` separate the card from the canvas (with a hairline for
- * extra definition, applied by `cardStyle`).
+ * lighter `surface` + a hairline border separate the card from the canvas.
  */
 export function softShadow(c: Palette): ViewStyle {
   if (isDarkPalette(c)) return {};
@@ -102,7 +125,7 @@ export function softShadow(c: Palette): ViewStyle {
     android: { elevation: 2 },
     default: {
       shadowColor: "#000000",
-      shadowOpacity: 0.07,
+      shadowOpacity: 0.06,
       shadowRadius: 14,
       shadowOffset: { width: 0, height: 4 },
     },
@@ -110,16 +133,21 @@ export function softShadow(c: Palette): ViewStyle {
 }
 
 /**
- * The one card look used everywhere: borderless soft-shadowed surface on light,
- * a lighter surface with an ultra-subtle hairline on dark. Keeps every screen's
- * cards visually identical (DRY).
+ * The one card look used everywhere: on dark a `surface/card` with a 1px
+ * `border/default` hairline (monochrome, no shadow); on light a borderless
+ * soft-shadowed white surface. `raised` opts into the emphasized look used by
+ * the live/new-offer card (raised surface + strong border).
  */
-export function cardStyle(c: Palette): ViewStyle {
+export function cardStyle(c: Palette, raised = false): ViewStyle {
   const d = isDarkPalette(c);
   return {
-    backgroundColor: c.surface,
-    borderRadius: radius.xl,
-    ...(d ? { borderWidth: 1, borderColor: c.line } : softShadow(c)),
+    backgroundColor: raised ? c.surfaceRaised : c.surface,
+    borderRadius: radius.md,
+    ...(d
+      ? { borderWidth: 1, borderColor: raised ? c.borderStrong : c.line }
+      : raised
+        ? { borderWidth: 1, borderColor: c.line }
+        : softShadow(c)),
   };
 }
 
@@ -131,7 +159,7 @@ export function statusColors(c: Palette, status: string): { fg: string; bg: stri
     case "started":
       return { fg: c.started, bg: c.startedBg };
     case "accepted":
-      return { fg: c.accepted, bg: c.startedBg };
+      return { fg: c.accepted, bg: c.completedBg };
     case "pending":
       return { fg: c.pending, bg: c.pendingBg };
     case "canceled":
