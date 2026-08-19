@@ -8,8 +8,7 @@
 # Required env on the shard box (a .env next to this file):
 #   RIDY_API_URL            https://reidey.de            (the main box, via Caddy/Cloudflare)
 #   DISPATCH_INGEST_SECRET  <same secret as the backend>
-#   SHARD_INDEX             this box's index (0..SHARD_COUNT-1)
-#   SHARD_COUNT             total number of shards (same on every box)
+#   SHARD_ID                this box's shard name (unique per box, e.g. "shard-2")
 #   UBER_PROXY_URL          optional global fallback proxy (usually empty — proxies are per-company)
 #
 # Deploy:
@@ -29,5 +28,4 @@ services:
       UBER_DISPATCH_BASE_URL: https://vsdispatch.uber.com
       UBER_RAMEN_PATHS: /ramendca/events,/ramenphx/events
       UBER_PROXY_URL: ${UBER_PROXY_URL:-}
-      SHARD_INDEX: ${SHARD_INDEX}
-      SHARD_COUNT: ${SHARD_COUNT}
+      SHARD_ID: ${SHARD_ID}

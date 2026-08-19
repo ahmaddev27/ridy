@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\Admin\OverviewController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\ProxyController;
 use App\Http\Controllers\Api\V1\Admin\SettingsController;
+use App\Http\Controllers\Api\V1\Admin\ShardController;
 use App\Http\Controllers\Api\V1\Admin\SubscriptionController;
 use App\Http\Controllers\Api\V1\Admin\SystemHealthController;
 use App\Http\Controllers\Api\V1\Admin\UserDirectoryController;
@@ -258,6 +259,11 @@ Route::prefix('v1')->group(function () {
 
         // Broadcast a bell + push notification to a set of users (queued).
         Route::post('notifications/broadcast', [AdminNotificationController::class, 'broadcast']);
+
+        // Daemon shards — scale-out visibility + control.
+        Route::get('shards', [ShardController::class, 'index']);
+        Route::patch('shards/{shard}', [ShardController::class, 'update']);
+        Route::post('shards/rebalance', [ShardController::class, 'rebalance']);
 
         Route::get('companies', [CompanyController::class, 'index']);
         Route::post('companies', [CompanyController::class, 'store']);

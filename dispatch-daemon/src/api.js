@@ -6,6 +6,8 @@ const headers = {
   "Content-Type": "application/json",
   Accept: "application/json",
   "X-Dispatch-Secret": config.dispatchSecret,
+  // Identifies this daemon box so the backend returns only its assigned companies.
+  "X-Shard-Id": config.shardId,
 };
 
 async function call(method, path, body) {

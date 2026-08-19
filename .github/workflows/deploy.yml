@@ -112,10 +112,15 @@ jobs:
             systemctl disable httpd 2>/dev/null || true
             systemctl mask httpd 2>/dev/null || true
 
-            # Force-recreate so every container picks up the freshly written .env
-            # (backend, caddy, frontend, scheduler, daemon). Without this, a
-            # running container keeps its old env and the domain/config "reverts".
-            $COMPOSE up -d --build --force-recreate
+            # Force-recreate the app services so they pick up the freshly written
+            # .env (domain/config). The dispatch-daemon is deliberately EXCLUDED
+            # and brought up separately without --force-recreate, so an app-only
+            # deploy does NOT restart it — its live Uber streams keep running and
+            # only blip when the daemon's own code/config actually changed. mysql
+            # is likewise left running (no needless DB restart).
+            $COMPOSE up -d --build --force-recreate backend caddy frontend scheduler queue
+            # Daemon: recreate only if its image/config changed (streams stay up otherwise).
+            $COMPOSE up -d --build dispatch-daemon
 
             # The repo is bind-mounted and owned by root, so make Laravel's
             # writable dirs writable by php-fpm (www-data) — otherwise any log or

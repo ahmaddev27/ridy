@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Dispatch\FleetSessionService;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
+use App\Domain\Dispatch\ShardService;
 use App\Domain\Fleet\DriverStatusIngestor;
 use App\Http\Controllers\Controller;
 use Carbon\CarbonImmutable;
@@ -23,11 +24,19 @@ class DispatchDaemonController extends Controller
      * RAMEN stream per fleet. Cookies are decrypted here — this endpoint is
      * secret-guarded and internal-only.
      */
-    public function sessions(): JsonResponse
+    public function sessions(Request $request, ShardService $shards): JsonResponse
     {
+        // Each daemon box identifies itself by shard name (default "main" for a
+        // single-box deploy). Heartbeat it, then (re)assign unowned or stranded
+        // companies to a live shard — so adding a box auto-picks-up new companies
+        // and a dead box's companies fail over to survivors.
+        $shard = $shards->heartbeat((string) ($request->header('X-Shard-Id') ?: 'main'));
+        $shards->reconcileAssignments();
+
         $sessions = UberFleetSession::withoutGlobalScopes()
             ->with('tenant:id,proxy_url')
             ->where('status', UberFleetSession::STATUS_ACTIVE)
+            ->where('shard_id', $shard->id) // only the companies this box owns
             ->get()
             ->filter->isUsable()
             ->map(fn (UberFleetSession $s) => [

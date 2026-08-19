@@ -83,17 +83,9 @@ export const config = {
   reconnectMinDelay: Number(process.env.RECONNECT_MIN_MS || 2000),
   reconnectMaxDelay: Number(process.env.RECONNECT_MAX_MS || 60000),
 
-  // Horizontal sharding. Each daemon instance owns the companies whose session
-  // id maps to its shard: `sessionId % shardCount === shardIndex`. Defaults to a
-  // single shard that owns everything, so an unsharded deploy is unchanged. To
-  // scale, run N instances with SHARD_COUNT=N and SHARD_INDEX=0..N-1.
-  shardIndex: Number(process.env.SHARD_INDEX || 0),
-  shardCount: Number(process.env.SHARD_COUNT || 1),
+  // Horizontal sharding is DB-driven and admin-controlled: this box identifies
+  // itself by a stable shard NAME and the backend returns only the companies
+  // assigned to it (auto-balanced across boxes, with failover). One box → leave
+  // this "main". More boxes → give each a distinct SHARD_ID.
+  shardId: (process.env.SHARD_ID || "main").trim(),
 };
-
-if (!Number.isInteger(config.shardCount) || config.shardCount < 1) {
-  throw new Error(`SHARD_COUNT must be an integer >= 1 (got "${process.env.SHARD_COUNT}")`);
-}
-if (!Number.isInteger(config.shardIndex) || config.shardIndex < 0 || config.shardIndex >= config.shardCount) {
-  throw new Error(`SHARD_INDEX must be an integer in [0, ${config.shardCount - 1}] (got "${process.env.SHARD_INDEX}")`);
-}
