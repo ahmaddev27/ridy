@@ -70,7 +70,7 @@ export default function AdminDashboardPage() {
           <div>
             <div className="mb-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">{c("revenueChart")}</div>
             {revenueChart.length > 0 ? (
-              <AreaChart data={revenueChart} />
+              <AreaChart data={revenueChart} color="#10b981" valueFormat={money} />
             ) : (
               <div className="flex h-[180px] items-center justify-center rounded-lg bg-surface-2 text-sm text-ink-subtle">{c("revenueEmpty")}</div>
             )}
