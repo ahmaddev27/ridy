@@ -1,11 +1,10 @@
-import { View, ScrollView, Pressable } from "react-native";
+import { View, ScrollView, Pressable, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import {
   Settings as SettingsIcon,
   ShieldCheck,
-  User,
   SlidersHorizontal,
   LifeBuoy,
   LogOut,
@@ -19,6 +18,7 @@ import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
 
 const APP_VERSION = Constants.expoConfig?.version ?? "1.1.0";
+const SUPPORT_EMAIL = "support@reidey.de";
 
 export default function ProfileScreen() {
   const c = useColors();
@@ -37,12 +37,15 @@ export default function ProfileScreen() {
       .join("")
       .toUpperCase() || "?";
 
-  // Only the fields that actually exist on DriverProfile.
-  const idLine = driver?.email ?? driver?.company_name ?? (driver ? `#${driver.id}` : "");
+  // Only real identity data — email, else the driver id. Never invented.
+  const subLine = driver?.email ?? (driver ? `ID: ${driver.id}` : "");
 
+  // Facts card lists only the fields that actually exist.
   const facts: { label: string; value: string }[] = [];
   if (driver?.company_name) facts.push({ label: t("profile.company"), value: driver.company_name });
   if (driver?.email) facts.push({ label: t("profile.email"), value: driver.email });
+
+  const openSupport = () => Linking.openURL(`mailto:${SUPPORT_EMAIL}`);
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: c.canvas }}>
@@ -83,12 +86,15 @@ export default function ProfileScreen() {
             <Text style={{ color: c.inkMuted, fontSize: 20, fontWeight: "800" }}>{initials}</Text>
           </View>
           <View style={{ flex: 1, gap: 3 }}>
-            <Text style={{ color: c.ink, fontSize: 16, fontWeight: "700", textAlign: align }} numberOfLines={1}>
+            <Text
+              style={{ color: c.ink, fontSize: 16, fontWeight: "700", textAlign: align }}
+              numberOfLines={1}
+            >
               {name}
             </Text>
-            {idLine ? (
+            {subLine ? (
               <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: align }} numberOfLines={1}>
-                {idLine}
+                {subLine}
               </Text>
             ) : null}
           </View>
@@ -112,7 +118,7 @@ export default function ProfileScreen() {
           ) : null}
         </View>
 
-        {/* Facts */}
+        {/* Facts — real fields only */}
         {facts.length > 0 && (
           <View style={cardStyle(c)}>
             {facts.map((f, i) => (
@@ -129,7 +135,13 @@ export default function ProfileScreen() {
                 >
                   <Text style={{ color: c.inkSubtle, fontSize: 13.5, textAlign: align }}>{f.label}</Text>
                   <Text
-                    style={{ color: c.ink, fontSize: 13.5, fontWeight: "500", flexShrink: 1, textAlign: isRTL() ? "left" : "right" }}
+                    style={{
+                      color: c.ink,
+                      fontSize: 13.5,
+                      fontWeight: "500",
+                      flexShrink: 1,
+                      textAlign: isRTL() ? "left" : "right",
+                    }}
                     numberOfLines={1}
                   >
                     {f.value}
@@ -141,19 +153,39 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* Menu group 1 */}
+        {/* Menu — functional rows only */}
         <View style={cardStyle(c)}>
-          <MenuRow c={c} icon={User} label={t("profile.personalInfo")} onPress={() => {}} />
+          <MenuRow
+            c={c}
+            icon={SlidersHorizontal}
+            label={t("profile.settings")}
+            onPress={() => router.push("/settings")}
+          />
           <Separator c={c} />
-          <MenuRow c={c} icon={SlidersHorizontal} label={t("profile.settings")} onPress={() => router.push("/settings")} last />
+          <MenuRow
+            c={c}
+            icon={LifeBuoy}
+            label={t("settings.contactSupport")}
+            onPress={openSupport}
+            last
+          />
         </View>
 
-        {/* Menu group 2 */}
-        <View style={cardStyle(c)}>
-          <MenuRow c={c} icon={LifeBuoy} label={t("profile.support")} onPress={() => {}} />
-          <Separator c={c} />
-          <MenuRow c={c} icon={LogOut} label={t("profile.logout")} onPress={logout} danger last />
-        </View>
+        {/* Log out */}
+        <Pressable
+          onPress={logout}
+          style={{
+            ...cardStyle(c),
+            flexDirection: row,
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            paddingVertical: 15,
+          }}
+        >
+          <LogOut size={18} color={c.danger} strokeWidth={1.8} />
+          <Text style={{ color: c.danger, fontSize: 14.5, fontWeight: "700" }}>{t("profile.logout")}</Text>
+        </Pressable>
 
         {/* Footer */}
         <Text style={{ color: c.inkFaint, fontSize: 12, textAlign: "center", marginTop: 4 }}>
@@ -169,28 +201,25 @@ function MenuRow({
   icon: Icon,
   label,
   onPress,
-  danger,
   last,
 }: {
   c: Palette;
   icon: LucideIcon;
   label: string;
   onPress: () => void;
-  danger?: boolean;
   last?: boolean;
 }) {
   const row = isRTL() ? "row-reverse" : "row";
   const align = isRTL() ? "right" : "left";
-  const color = danger ? c.danger : c.ink;
   const Chevron = isRTL() ? ChevronLeft : ChevronRight;
   return (
     <Pressable
       onPress={onPress}
       style={{ flexDirection: row, alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 15 }}
     >
-      <Icon size={18} color={danger ? c.danger : c.inkMuted} strokeWidth={1.6} />
-      <Text style={{ flex: 1, color, fontSize: 13.5, fontWeight: "500", textAlign: align }}>{label}</Text>
-      {!danger && <Chevron size={18} color={c.inkFaint} strokeWidth={1.6} />}
+      <Icon size={18} color={c.inkMuted} strokeWidth={1.6} />
+      <Text style={{ flex: 1, color: c.ink, fontSize: 13.5, fontWeight: "500", textAlign: align }}>{label}</Text>
+      <Chevron size={18} color={c.inkFaint} strokeWidth={1.6} />
     </Pressable>
   );
 }
