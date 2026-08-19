@@ -25,8 +25,10 @@ x-app-env: &app-env
   CACHE_STORE: database
   QUEUE_CONNECTION: database
   DB_CONNECTION: mysql
-  DB_HOST: mysql
-  DB_PORT: 3306
+  # Defaults to the local mysql service; override DB_HOST/DB_PORT in .env to point
+  # the app at a dedicated DB box during scale-out (see docs/19-scale-out-runbook.md).
+  DB_HOST: ${DB_HOST:-mysql}
+  DB_PORT: ${DB_PORT:-3306}
   DB_DATABASE: ${DB_DATABASE}
   DB_USERNAME: ${DB_USERNAME}
   DB_PASSWORD: ${DB_PASSWORD}

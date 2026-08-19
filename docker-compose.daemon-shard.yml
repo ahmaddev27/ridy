@@ -1,0 +1,33 @@
+# Daemon-only stack for a SHARD BOX.
+#
+# Run this on each dedicated daemon box during scale-out. It builds and runs a
+# single dispatch-daemon that holds streams for ITS shard only, talking back to
+# the main box's API over HTTPS. The main box keeps running app + DB + geo (and,
+# if you like, shard 0); these boxes add capacity.
+#
+# Required env on the shard box (a .env next to this file):
+#   RIDY_API_URL            https://reidey.de            (the main box, via Caddy/Cloudflare)
+#   DISPATCH_INGEST_SECRET  <same secret as the backend>
+#   SHARD_INDEX             this box's index (0..SHARD_COUNT-1)
+#   SHARD_COUNT             total number of shards (same on every box)
+#   UBER_PROXY_URL          optional global fallback proxy (usually empty — proxies are per-company)
+#
+# Deploy:
+#   docker compose -f docker-compose.daemon-shard.yml up -d --build
+#
+# There is no database, Caddy or app here — this box only holds streams.
+
+services:
+  dispatch-daemon:
+    build:
+      context: .
+      dockerfile: ./docker/dispatch-daemon.Dockerfile
+    restart: unless-stopped
+    environment:
+      RIDY_API_URL: ${RIDY_API_URL}
+      DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
+      UBER_DISPATCH_BASE_URL: https://vsdispatch.uber.com
+      UBER_RAMEN_PATHS: /ramendca/events,/ramenphx/events
+      UBER_PROXY_URL: ${UBER_PROXY_URL:-}
+      SHARD_INDEX: ${SHARD_INDEX}
+      SHARD_COUNT: ${SHARD_COUNT}
