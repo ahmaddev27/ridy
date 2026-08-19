@@ -121,7 +121,70 @@ export default function ShardsPage() {
       </Card>
 
       <p className="text-xs text-ink-subtle">{c("hint")}</p>
+
+      <AddShardCard c={c} />
     </div>
+  );
+}
+
+/** Instructions + copy-paste script to bring a new daemon box online. */
+function AddShardCard({ c }: { c: (k: string) => string }) {
+  const [name, setName] = useState("shard-2");
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://reidey.de";
+  const safeName = name.trim() || "shard-2";
+
+  const script = `# 1) From your computer, SSH into the NEW box:
+ssh root@<NEW_BOX_IP>
+
+# 2) Install Docker + clone the repo (first time only):
+curl -fsSL https://get.docker.com | sh
+git clone <REPO_URL> ~/reidey && cd ~/reidey
+
+# 3) Write the daemon .env:
+cat > .env <<'ENV'
+RIDY_API_URL=${origin}
+DISPATCH_INGEST_SECRET=<same DISPATCH_INGEST_SECRET as the main box>
+SHARD_ID=${safeName}
+ENV
+
+# 4) Start the daemon — it registers and appears above automatically:
+docker compose -f docker-compose.daemon-shard.yml up -d --build`;
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(script);
+      toast.success(c("copied"));
+    } catch {
+      /* clipboard blocked — the user can still select the text */
+    }
+  }
+
+  return (
+    <Card className="p-5">
+      <h3 className="text-base font-semibold text-ink">{c("addTitle")}</h3>
+      <p className="mt-1 text-sm text-ink-muted">{c("addIntro")}</p>
+
+      <label className="mt-4 block text-xs font-medium uppercase tracking-wider text-ink-subtle">
+        {c("addNameLabel")}
+      </label>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="mt-1 w-56 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+        placeholder="shard-2"
+      />
+
+      <div className="mt-4 flex items-center justify-between">
+        <span className="text-xs text-ink-subtle">{c("addFillNote")}</span>
+        <Button variant="secondary" size="sm" onClick={copy}>{c("copyCmd")}</Button>
+      </div>
+      <pre className="mt-2 overflow-x-auto rounded-lg bg-surface-2 p-4 text-xs leading-relaxed text-ink" dir="ltr">
+        {script}
+      </pre>
+
+      <p className="mt-3 text-xs text-ink-subtle">🔒 {c("addSecretNote")}</p>
+      <p className="mt-1 text-xs text-ink-subtle">✓ {c("addAppears")}</p>
+    </Card>
   );
 }
 

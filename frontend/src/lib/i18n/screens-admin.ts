@@ -12,6 +12,7 @@ const en: Dict = {
     stLive: "Live", stIdle: "Idle", stDrained: "Drained",
     drain: "Drain", enable: "Enable",
     hint: "Drain stops new assignments to a box and moves its companies to a live one. Rebalance spreads everything evenly across live shards.",
+    addTitle: "Add a shard box", addIntro: "Run these on the NEW box over SSH. It connects to this dashboard's server and shows up in the table above automatically — nothing to enter here.", addNameLabel: "Shard name", addSecretNote: "Use the SAME DISPATCH_INGEST_SECRET as the main box (never share it here).", addFillNote: "Replace <NEW_BOX_IP> and <REPO_URL> with your new server's IP and your repo URL.", addAppears: "It appears in the table above within a minute.", copyCmd: "Copy commands", copied: "Copied",
   },
   systemHealth: {
     colCompany: "Company", colSubscription: "Subscription", colSession: "Uber session", colDaemon: "Daemon", colProxy: "Proxy",
@@ -213,6 +214,7 @@ const de: Dict = {
     stLive: "Live", stIdle: "Inaktiv", stDrained: "Geleert",
     drain: "Leeren", enable: "Aktivieren",
     hint: "Leeren stoppt neue Zuweisungen und verschiebt die Firmen auf eine aktive Box. Neu verteilen streut alles gleichmäßig auf die aktiven Shards.",
+    addTitle: "Shard-Box hinzufügen", addIntro: "Führe diese Befehle auf der NEUEN Box per SSH aus. Sie verbindet sich mit dem Server dieses Dashboards und erscheint oben automatisch — hier ist keine Eingabe nötig.", addNameLabel: "Shard-Name", addSecretNote: "Verwende dasselbe DISPATCH_INGEST_SECRET wie die Haupt-Box (hier nie teilen).", addFillNote: "Ersetze <NEW_BOX_IP> und <REPO_URL> durch die IP der neuen Box und deine Repo-URL.", addAppears: "Erscheint innerhalb einer Minute in der Tabelle oben.", copyCmd: "Befehle kopieren", copied: "Kopiert",
   },
   systemHealth: {
     colCompany: "Firma", colSubscription: "Abonnement", colSession: "Uber-Sitzung", colDaemon: "Daemon", colProxy: "Proxy",
@@ -412,6 +414,7 @@ const ar: Dict = {
     stLive: "حيّ", stIdle: "خامل", stDrained: "مُفرَّغ",
     drain: "تفريغ", enable: "تفعيل",
     hint: "التفريغ يوقف تعيين شركات جديدة لهذا البوكس وينقل شركاته لبوكس حيّ. إعادة التوزيع تعيد التوزيع بالتساوي على النشطة.",
+    addTitle: "إضافة بوكس (شارد)", addIntro: "شغّل هذه الأوامر على البوكس الجديد عبر SSH. البوكس بيتّصل بسيرفر هذه اللوحة ويظهر بالجدول فوق تلقائياً — ما بتحتاج تدخل شي هنا.", addNameLabel: "اسم الشارد", addSecretNote: "استخدم نفس DISPATCH_INGEST_SECRET تبع البوكس الرئيسي (لا تشاركه هنا).", addFillNote: "بدّل <NEW_BOX_IP> و<REPO_URL> بـIP سيرفرك الجديد ورابط الريبو.", addAppears: "بيظهر بالجدول فوق خلال دقيقة.", copyCmd: "نسخ الأوامر", copied: "تم النسخ",
   },
   systemHealth: {
     colCompany: "الشركة", colSubscription: "الاشتراك", colSession: "جلسة أوبر", colDaemon: "الخدمة", colProxy: "البروكسي",
