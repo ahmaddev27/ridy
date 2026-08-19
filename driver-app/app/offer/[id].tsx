@@ -9,8 +9,8 @@ import { api, type Offer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius, cardStyle } from "@/lib/theme";
-import { fareLabel, perKmLabel, distanceLabel, cleanAddress, euroQuality, timeLabel } from "@/lib/format";
-import { StatusBadge, QualityMark, RouteBlock, SectionLabel, SecondaryButton } from "@/components/ui";
+import { fareLabel, perKmValue, perKmLabel, distanceLabel, cleanAddress, timeLabel } from "@/lib/format";
+import { StatusBadge, RouteBlock, SectionLabel, SecondaryButton } from "@/components/ui";
 
 /** "19 Min" / "45 Sek" / "1 Std 5 Min" — how long the trip took. */
 function durationLabel(sec: number): string {
@@ -86,7 +86,6 @@ export default function OfferScreen() {
   // so the countdown must never override the live status with an "expired" label.
   const isPending = status === "pending";
   const expired = isPending && secondsLeft != null && secondsLeft <= 0;
-  const q = offer ? euroQuality(offer.fare_amount, offer.distance_m) : { mark: "€", good: false };
   const ringColor = pct > 0.5 ? c.completed : pct > 0.25 ? c.pending : c.canceled;
   const hasMetrics = offer?.distance_m != null; // geo-synced offers only; hide the "—" placeholders otherwise
   // Rough ETA at ~30 km/h city average — same derivation the home ActiveOffer uses.
@@ -122,17 +121,26 @@ export default function OfferScreen() {
                   />
                 )}
               </Svg>
-              {/* Big fare with the euro-quality mark right beside it — the same "€€"
-                  the driver sees in the push notification (a price-per-km rating). */}
-              <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "flex-start", gap: 6 }}>
-                <Text style={{ color: c.ink, fontSize: 40, fontWeight: "800", letterSpacing: -1 }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
-                <View style={{ marginTop: 5 }}><QualityMark mark={q.mark} good={q.good} size={18} /></View>
-              </View>
-              {hasMetrics && (
-                <Text style={{ color: c.inkMuted, fontSize: 14, marginTop: 2 }}>
-                  {perKmLabel(offer.fare_amount, offer.distance_m)} · {distanceLabel(offer.distance_m)}
-                </Text>
-              )}
+              {/* Hero is the €/km rate — the number the driver judges in ~5s. The
+                  total fare sits beneath it as the secondary figure. Falls back to
+                  the total when the trip is not geo-synced yet (no per-km). */}
+              {(() => {
+                const perKm = offer.distance_m != null ? perKmValue(offer.fare_amount, offer.distance_m) : null;
+                return (
+                  <>
+                    <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "flex-end", gap: 5 }}>
+                      <Text style={{ color: c.ink, fontSize: 40, fontWeight: "800", letterSpacing: -1.5 }}>
+                        {perKm?.value ?? fareLabel(offer.fare_formatted, offer.fare_amount)}
+                      </Text>
+                      {perKm && <Text style={{ color: c.inkSubtle, fontSize: 16, fontWeight: "500", marginBottom: 7 }}>/km</Text>}
+                    </View>
+                    <Text style={{ color: c.inkMuted, fontSize: 14, marginTop: 3 }}>
+                      {fareLabel(offer.fare_formatted, offer.fare_amount)}
+                      <Text style={{ color: c.inkSubtle }}> · {t("offer.total")}</Text>
+                    </Text>
+                  </>
+                );
+              })()}
             </View>
             {isPending && secondsLeft != null && (
               <Text style={{ color: ringColor, fontSize: 17, fontWeight: "700", marginTop: 6 }}>
@@ -213,7 +221,7 @@ export default function OfferScreen() {
             <SecondaryButton label={t("offer.openMaps")} icon={Map} onPress={openMaps} />
             <Pressable
               onPress={() => Linking.openURL("uberdriver://").catch(() => Linking.openURL("https://drivers.uber.com"))}
-              style={{ flex: 1, flexDirection: isRTL() ? "row-reverse" : "row", gap: 8, backgroundColor: c.primary, borderRadius: radius.lg, paddingVertical: 12, alignItems: "center", justifyContent: "center" }}
+              style={{ flex: 1, flexDirection: isRTL() ? "row-reverse" : "row", gap: 8, backgroundColor: c.primary, borderRadius: radius.control, paddingVertical: 13, alignItems: "center", justifyContent: "center" }}
             >
               <Car size={17} color={c.primaryInk} />
               <Text style={{ color: c.primaryInk, fontSize: 15, fontWeight: "700" }}>{t("offer.openUber")}</Text>

@@ -24,6 +24,24 @@ export function perKmLabel(fare_amount: number | null, meters: number | null): s
   return `${new Intl.NumberFormat(LATIN, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(perKm)} €/km`;
 }
 
+/**
+ * The hero €/km figure split for the offer card: a currency `value` ("€1,40")
+ * plus whether the rate is strong. Returns null when it can't be computed, so
+ * the card can fall back to a dash.
+ */
+export function perKmValue(
+  fare_amount: number | null,
+  meters: number | null,
+): { value: string; rate: number; good: boolean } | null {
+  if (fare_amount == null || !meters) return null;
+  const rate = fare_amount / (meters / 1000);
+  return {
+    value: new Intl.NumberFormat(LATIN, { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(rate),
+    rate,
+    good: rate > 1,
+  };
+}
+
 /** €-quality mark by price-per-km: € (≤1), €€ (>1), €€€ (≥3). `good` when ≥ €€. */
 export function euroQuality(fare_amount: number | null, meters: number | null): { mark: string; good: boolean } {
   if (fare_amount == null || !meters) return { mark: "€", good: false };

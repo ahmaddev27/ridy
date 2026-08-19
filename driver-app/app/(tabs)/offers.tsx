@@ -7,10 +7,8 @@ import { Search } from "lucide-react-native";
 import { api, type Offer, type OffersQuery } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, getLocale } from "@/lib/i18n";
-import { useColors, radius, cardStyle } from "@/lib/theme";
-import { fareLabel, cleanAddress, distanceLabel, euroQuality } from "@/lib/format";
-import { StatusBadge, QualityMark } from "@/components/ui";
-import { DriverTag } from "./index";
+import { useColors, radius } from "@/lib/theme";
+import { OfferCard } from "@/components/offer-card";
 
 const FILTERS = ["all", "pending", "accepted", "completed"] as const;
 const PER_PAGE = 20;
@@ -125,35 +123,5 @@ export default function OffersScreen() {
         renderItem={({ item }) => <OfferCard offer={item} showDriver={isOwner} onPress={() => router.push(`/offer/${item.id}`)} />}
       />
     </SafeAreaView>
-  );
-}
-
-function OfferCard({ offer, onPress, showDriver }: { offer: Offer; onPress: () => void; showDriver?: boolean }) {
-  const c = useColors();
-  const status = offer.status ?? "pending";
-  const dim = status === "rejected" || status === "canceled";
-  const q = euroQuality(offer.fare_amount, offer.distance_m);
-  const arrow = (d: string) => (isRTL() ? { textAlign: "right" as const } : { textAlign: "left" as const });
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 14, ...cardStyle(c), padding: 16, opacity: dim ? 0.55 : 1 }}
-    >
-      <View style={{ minWidth: 92 }}>
-        <Text style={{ color: c.ink, fontSize: 19, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
-        <QualityMark mark={q.mark} good={q.good} />
-      </View>
-      <View style={{ flex: 1 }}>
-        {showDriver && offer.driver_name && <DriverTag name={offer.driver_name} />}
-        <Text numberOfLines={1} style={{ color: c.ink, fontSize: 15, ...arrow("p") }}>↑ {cleanAddress(offer.pickup_address)}</Text>
-        <Text numberOfLines={1} style={{ color: c.ink, fontSize: 15, ...arrow("d") }}>↓ {cleanAddress(offer.dropoff_address)}</Text>
-      </View>
-      <View style={{ alignItems: isRTL() ? "flex-start" : "flex-end", gap: 6 }}>
-        <StatusBadge status={status} label={t(`status.${status}`)} />
-        {offer.distance_m != null && (
-          <Text style={{ color: c.inkSubtle, fontSize: 13 }}>{distanceLabel(offer.distance_m)}</Text>
-        )}
-      </View>
-    </Pressable>
   );
 }
