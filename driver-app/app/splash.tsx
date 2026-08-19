@@ -85,7 +85,7 @@ export default function SplashScreen() {
     <Pressable style={{ flex: 1 }} onPress={advance}>
       <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: c.canvas }}>
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 20 }}>
-          <Logo size={72} />
+          <Logo size={92} />
 
           <View style={{ alignItems: "center", gap: 10 }}>
             <Text

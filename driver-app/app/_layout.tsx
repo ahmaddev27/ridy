@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as Notifications from "expo-notifications";
 import * as SplashScreen from "expo-splash-screen";
+import * as SecureStore from "expo-secure-store";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/lib/auth";
@@ -9,6 +10,7 @@ import { ToastProvider } from "@/components/toast";
 import { registerForPush } from "@/lib/push";
 import { useColors } from "@/lib/theme";
 import { useAppFonts } from "@/lib/fonts";
+import { setLocale } from "@/lib/i18n";
 import { UpdateGate } from "@/components/update-gate";
 
 // Hold the native splash screen up until the fonts are registered, so the very
@@ -25,13 +27,20 @@ const FONT_TIMEOUT_MS = 4000;
 export default function RootLayout() {
   const fontsReady = useAppFonts();
   const [timedOut, setTimedOut] = useState(false);
+  // Apply the saved language BEFORE the first paint, so the splash caption (and
+  // every screen) starts in the chosen language, not the device default.
+  const [localeReady, setLocaleReady] = useState(false);
 
   useEffect(() => {
     const id = setTimeout(() => setTimedOut(true), FONT_TIMEOUT_MS);
+    SecureStore.getItemAsync("locale")
+      .then((l) => { if (l) setLocale(l); })
+      .catch(() => {})
+      .finally(() => setLocaleReady(true));
     return () => clearTimeout(id);
   }, []);
 
-  const ready = fontsReady || timedOut;
+  const ready = (fontsReady || timedOut) && localeReady;
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});
