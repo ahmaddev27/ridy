@@ -54,33 +54,36 @@ export default function HomeScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 18 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} tintColor={c.ink} />}
       >
-        {/* Header: brand + greeting */}
-        <View style={{ flexDirection: row, alignItems: "center", gap: 11 }}>
-          <Logo size={30} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: c.ink, fontSize: 22, fontWeight: "800", letterSpacing: -0.4, textAlign: align }}>
-              {greeting}, {headline}
-            </Text>
-            {!!sub && <Text style={{ color: c.inkSubtle, fontSize: 13.5, textAlign: align }}>{sub}</Text>}
-          </View>
-        </View>
-
-        {/* Status card — display-only (status is derived from Uber, not settable here) */}
-        <View style={{ ...cardStyle(c), padding: 16, flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
+        {/* Brand + greeting + status — one combined card */}
+        <View style={{ ...cardStyle(c), padding: 16, gap: 13 }}>
           <View style={{ flexDirection: row, alignItems: "center", gap: 12 }}>
-            <View style={{ width: 11, height: 11, borderRadius: 6, backgroundColor: online ? c.accent : c.inkFaint }} />
-            <View>
-              <Text style={{ color: c.ink, fontSize: 15.5, fontWeight: "700", textAlign: align }}>
-                {isOwner
-                  ? `${fleet?.online_drivers ?? 0} ${t("fleet.onlineDrivers")}`
-                  : online
-                    ? t(`home.engagement.${engagement}`)
-                    : t("home.offline")}
+            <Logo size={36} />
+            <View style={{ flex: 1 }}>
+              <Text numberOfLines={1} style={{ color: c.ink, fontSize: 17, fontWeight: "800", letterSpacing: -0.3, textAlign: align }}>
+                {greeting}, {headline}
               </Text>
-              <Text style={{ color: c.inkSubtle, fontSize: 11.5, textAlign: align }}>{t("home.driverStatus")}</Text>
+              {!!sub && <Text numberOfLines={1} style={{ color: c.inkSubtle, fontSize: 12.5, textAlign: align }}>{sub}</Text>}
             </View>
           </View>
-          <StatusBadge status={online ? "completed" : "rejected"} label={online ? t("home.online") : t("home.offline")} />
+
+          <View style={{ height: 1, backgroundColor: c.line }} />
+
+          <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
+            <View style={{ flexDirection: row, alignItems: "center", gap: 10 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: online ? c.accent : c.inkFaint }} />
+              <View>
+                <Text style={{ color: c.ink, fontSize: 14.5, fontWeight: "700", textAlign: align }}>
+                  {isOwner
+                    ? `${fleet?.online_drivers ?? 0} ${t("fleet.onlineDrivers")}`
+                    : online
+                      ? t(`home.engagement.${engagement}`)
+                      : t("home.offline")}
+                </Text>
+                <Text style={{ color: c.inkSubtle, fontSize: 11, textAlign: align }}>{t("home.driverStatus")}</Text>
+              </View>
+            </View>
+            <StatusBadge status={online ? "completed" : "rejected"} label={online ? t("home.online") : t("home.offline")} />
+          </View>
         </View>
 
         {/* Live / active offer — the driver's current offer as the full €/km card */}
