@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Activity, Building2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge, type Status } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ShardsPanel } from "@/components/admin/shards-panel";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getSystemHealth, type SystemHealthRow } from "@/lib/api/admin";
@@ -14,10 +16,28 @@ export default function SystemHealthPage() {
   const c = (k: string) => t(`screens.systemHealth.${k}`);
   const { data, loading, error } = useAsync(getSystemHealth, { refetchInterval: 30000 });
   const rows = data ?? [];
+  const [tab, setTab] = useState<"health" | "shards">("health");
 
   return (
     <div className="space-y-6">
-      <PageHeader tkey="systemHealth" />
+      {/* Sub-tabs: System Health + Shards live together under one "System" area. */}
+      <div className="flex gap-1 rounded-lg border border-line bg-surface p-1">
+        {(["health", "shards"] as const).map((tk) => (
+          <button
+            key={tk}
+            onClick={() => setTab(tk)}
+            className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${tab === tk ? "bg-surface-2 text-ink" : "text-ink-muted hover:text-ink"}`}
+          >
+            {tk === "health" ? t("nav.systemHealth") : t("nav.shards")}
+          </button>
+        ))}
+      </div>
+
+      {tab === "shards" ? (
+        <ShardsPanel />
+      ) : (
+        <>
+          <PageHeader tkey="systemHealth" />
 
       <Card className="overflow-hidden">
         {loading && rows.length === 0 ? (
@@ -88,7 +108,9 @@ export default function SystemHealthPage() {
             </div>
           </>
         )}
-      </Card>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

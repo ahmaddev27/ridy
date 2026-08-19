@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { AreaChart } from "@/components/charts/area-chart";
 import { BarChart } from "@/components/charts/bar-chart";
+import { DonutChart } from "@/components/charts/donut-chart";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getOverview, getBillingSummary } from "@/lib/api/admin";
@@ -96,7 +97,7 @@ export default function AdminDashboardPage() {
         <Card className="p-5">
           <h3 className="mb-4 font-semibold text-ink">{c("healthTitle")}</h3>
           <div className="flex items-center gap-6">
-            <Donut segments={sessionSegments} total={sessionsTotal} />
+            <DonutChart segments={sessionSegments} total={sessionsTotal} />
             <div className="flex-1 space-y-2.5">
               <LegendRow color={SESSION_COLORS.active} label={c("stActive")} value={breakdown?.active ?? 0} />
               <LegendRow color={SESSION_COLORS.needs_relink} label={c("stNeedsRelink")} value={breakdown?.needs_relink ?? 0} />
@@ -119,8 +120,8 @@ export default function AdminDashboardPage() {
                     <span className="font-medium text-ink">{tc.company}</span>
                     <span className="tabular-nums text-ink-subtle">{tc.offers.toLocaleString(latnLocale(locale))}</span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-surface-2">
-                    <div className="h-full rounded-full bg-primary" style={{ width: `${(tc.offers / topMax) * 100}%` }} />
+                  <div className="h-2.5 overflow-hidden rounded-full bg-surface-2">
+                    <div className="h-full rounded-full bg-[#6366f1]" style={{ width: `${(tc.offers / topMax) * 100}%` }} />
                   </div>
                 </div>
               ))}
@@ -233,40 +234,6 @@ function MiniStat({
   );
 }
 
-function Donut({ segments, total }: { segments: readonly { key: string; value: number; color: string }[]; total: number }) {
-  const R = 42;
-  const C = 2 * Math.PI * R;
-  let offset = 0;
-  return (
-    <div className="relative h-32 w-32 shrink-0">
-      <svg viewBox="0 0 100 100" className="h-32 w-32 -rotate-90">
-        <circle cx={50} cy={50} r={R} fill="none" stroke="var(--surface-2)" strokeWidth={12} />
-        {total > 0 &&
-          segments.map((seg) => {
-            const len = (seg.value / total) * C;
-            const el = (
-              <circle
-                key={seg.key}
-                cx={50}
-                cy={50}
-                r={R}
-                fill="none"
-                stroke={seg.color}
-                strokeWidth={12}
-                strokeDasharray={`${len} ${C - len}`}
-                strokeDashoffset={-offset}
-              />
-            );
-            offset += len;
-            return el;
-          })}
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold tabular-nums text-ink">{total}</span>
-      </div>
-    </div>
-  );
-}
 
 function LegendRow({ color, label, value }: { color: string; label: string; value: number }) {
   return (
