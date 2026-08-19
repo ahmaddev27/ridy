@@ -84,6 +84,7 @@ const de: Dict = {
   "tabs.home": "Startseite",
   "tabs.offers": "Angebote",
   "tabs.profile": "Profil",
+  "tabs.statistics": "Statistiken", "stats.title": "Statistiken", "stats.totalIncome": "Gesamteinnahmen", "stats.avgPerKm": "Ø €/km",
   // Home
   "home.greeting": "Hallo",
   "home.online": "Online",
@@ -202,6 +203,7 @@ const en: Dict = {
   "tabs.home": "Home",
   "tabs.offers": "Offers",
   "tabs.profile": "Profile",
+  "tabs.statistics": "Statistics", "stats.title": "Statistics", "stats.totalIncome": "Total income", "stats.avgPerKm": "Avg. €/km",
   // Home
   "home.greeting": "Hi",
   "home.online": "Online",
@@ -320,6 +322,7 @@ const ar: Dict = {
   "tabs.home": "الرئيسية",
   "tabs.offers": "العروض",
   "tabs.profile": "البروفايل",
+  "tabs.statistics": "الإحصائيات", "stats.title": "الإحصائيات", "stats.totalIncome": "إجمالي الدخل", "stats.avgPerKm": "متوسط €/كم",
   // Home
   "home.greeting": "مرحباً",
   "home.online": "متصل",
