@@ -1,17 +1,47 @@
-import { useCallback, useEffect, useState } from "react";
-import { View, FlatList, Pressable, RefreshControl, ActivityIndicator, ScrollView } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { View, FlatList, Pressable, RefreshControl, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text, TextInput } from "@/components/typography";
 import { useRouter } from "expo-router";
-import { Search } from "lucide-react-native";
+import { Search, SlidersHorizontal } from "lucide-react-native";
 import { api, type Offer, type OffersQuery } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, getLocale } from "@/lib/i18n";
-import { useColors, radius } from "@/lib/theme";
+import { useColors, radius, isDarkPalette } from "@/lib/theme";
 import { OfferCard } from "@/components/offer-card";
+import { FilterSheet, DEFAULT_FILTERS, type OfferFilters, type SortKey } from "@/components/filter-sheet";
 
-const FILTERS = ["all", "pending", "accepted", "completed"] as const;
 const PER_PAGE = 20;
+
+/** Local yyyy-mm-dd for the date window. */
+function ymd(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+/** from/to for the chosen date window (empty for "all"). */
+function dateWindow(day: OfferFilters["day"]): { from?: string; to?: string } {
+  if (day === "all") return {};
+  const now = new Date();
+  const start = new Date(now);
+  if (day === "week") start.setDate(now.getDate() - 6);
+  return { from: ymd(start), to: ymd(now) };
+}
+
+/** €/km for a sort comparison (missing metrics sink to the bottom). */
+function rate(o: Offer): number {
+  if (o.fare_amount == null || !o.distance_m) return -1;
+  return o.fare_amount / (o.distance_m / 1000);
+}
+
+function sortOffers(list: Offer[], sort: SortKey): Offer[] {
+  if (sort === "new") return list; // backend already returns newest-first
+  const copy = [...list];
+  if (sort === "rate") copy.sort((a, b) => rate(b) - rate(a));
+  else if (sort === "total") copy.sort((a, b) => (b.fare_amount ?? -1) - (a.fare_amount ?? -1));
+  return copy;
+}
 
 export default function OffersScreen() {
   const c = useColors();
@@ -20,7 +50,8 @@ export default function OffersScreen() {
   const align = isRTL() ? "right" : "left";
 
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<(typeof FILTERS)[number]>("all");
+  const [filters, setFilters] = useState<OfferFilters>(DEFAULT_FILTERS);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
@@ -30,8 +61,9 @@ export default function OffersScreen() {
 
   const fetchPage = useCallback(
     async (target: number) => {
-      const params: OffersQuery = { per_page: PER_PAGE, page: target };
-      if (status !== "all") params.status = status;
+      const win = dateWindow(filters.day);
+      const params: OffersQuery = { per_page: PER_PAGE, page: target, ...win };
+      if (filters.status !== "all") params.status = filters.status;
       if (search.trim()) params.search = search.trim();
       const res = isOwner ? await api.fleetOffers(params) : await api.offers(params);
       setLastPage(res.meta?.last_page ?? 1);
@@ -39,7 +71,7 @@ export default function OffersScreen() {
       setPage(res.meta?.current_page ?? target);
       setOffers((prev) => (target === 1 ? res.data : [...prev, ...res.data]));
     },
-    [status, search, isOwner],
+    [filters.status, filters.day, search, isOwner],
   );
 
   const reload = useCallback(async () => {
@@ -58,10 +90,20 @@ export default function OffersScreen() {
     try { await fetchPage(page + 1); } catch { /* */ } finally { setLoadingMore(false); }
   }
 
+  // Sort is applied client-side over the loaded pages.
+  const shown = useMemo(() => sortOffers(offers, filters.sort), [offers, filters.sort]);
+
+  // The three quick pills mirror common filter combos.
+  const quick: { key: string; label: string; active: boolean; apply: () => void }[] = [
+    { key: "all", label: t("filter.all"), active: filters.sort === "new" && filters.day === "all" && filters.status === "all", apply: () => setFilters(DEFAULT_FILTERS) },
+    { key: "rate", label: t("filter.bestKm"), active: filters.sort === "rate", apply: () => setFilters((f) => ({ ...f, sort: "rate" })) },
+    { key: "today", label: t("filter.today"), active: filters.day === "today", apply: () => setFilters((f) => ({ ...f, day: "today" })) },
+  ];
+
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: c.canvas }}>
       <FlatList
-        data={offers}
+        data={shown}
         keyExtractor={(o) => String(o.id)}
         contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 12 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={c.ink} />}
@@ -69,44 +111,42 @@ export default function OffersScreen() {
         onEndReached={loadMore}
         ListHeaderComponent={
           <View style={{ gap: 14, marginBottom: 2 }}>
-            <Text style={{ color: c.ink, fontSize: 26, fontWeight: "800", textAlign: align }}>{t("offers.title")}</Text>
+            <Text style={{ color: c.ink, fontSize: 26, fontWeight: "800", letterSpacing: -0.5, textAlign: align }}>{t("offers.title")}</Text>
 
             {/* Search */}
-            <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 10, backgroundColor: c.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: c.line, paddingHorizontal: 14, paddingVertical: 13 }}>
+            <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 10, backgroundColor: isDarkPalette(c) ? c.surface2 : c.surface, borderRadius: radius.md, borderWidth: 1, borderColor: c.line, paddingHorizontal: 14, paddingVertical: 12 }}>
               <Search size={18} color={c.inkSubtle} />
               <TextInput
                 value={search}
                 onChangeText={setSearch}
                 placeholder={t("offers.search")}
                 placeholderTextColor={c.inkSubtle}
-                style={{ flex: 1, color: c.ink, fontSize: 16, textAlign: align, writingDirection: isRTL() ? "rtl" : "ltr" }}
+                style={{ flex: 1, color: c.ink, fontSize: 15, textAlign: align, writingDirection: isRTL() ? "rtl" : "ltr" }}
                 autoCapitalize="none"
               />
             </View>
 
-            {/* Filter chips — one horizontal row (scrolls if the labels overflow). */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ flexDirection: isRTL() ? "row-reverse" : "row", gap: 8, paddingVertical: 2 }}
-            >
-              {FILTERS.map((s) => {
-                const on = status === s;
-                const label = s === "all" ? t("home.all") : t(`status.${s}`);
-                const hue = s === "pending" ? c.pending : s === "accepted" ? c.accepted : s === "completed" ? c.completed : c.ink;
-                return (
-                  <Pressable
-                    key={s}
-                    onPress={() => setStatus(s)}
-                    style={{ paddingHorizontal: 18, paddingVertical: 9, borderRadius: radius.pill, backgroundColor: on ? c.primary : c.surface, borderWidth: 1, borderColor: on ? c.primary : c.line }}
-                  >
-                    <Text style={{ color: on ? c.primaryInk : hue, fontWeight: "700", fontSize: 14 }}>{label}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            {/* Quick pills + full-filter button */}
+            <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 8 }}>
+              {quick.map((q) => (
+                <Pressable
+                  key={q.key}
+                  onPress={q.apply}
+                  style={{ paddingHorizontal: 15, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: q.active ? c.primary : isDarkPalette(c) ? c.surface2 : c.surface, borderWidth: 1, borderColor: q.active ? c.primary : c.line }}
+                >
+                  <Text style={{ color: q.active ? c.primaryInk : c.inkMuted, fontWeight: "700", fontSize: 13.5 }}>{q.label}</Text>
+                </Pressable>
+              ))}
+              <View style={{ flex: 1 }} />
+              <Pressable
+                onPress={() => setSheetOpen(true)}
+                hitSlop={6}
+                style={{ width: 36, height: 36, borderRadius: radius.control, alignItems: "center", justifyContent: "center", backgroundColor: isDarkPalette(c) ? c.surface2 : c.surface, borderWidth: 1, borderColor: c.line }}
+              >
+                <SlidersHorizontal size={17} color={c.ink} />
+              </Pressable>
+            </View>
 
-            {/* Count */}
             {total > 0 && (
               <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: align }}>
                 {total.toLocaleString(getLocale() === "ar" ? "en" : getLocale())} {t("offers.title")}
@@ -122,6 +162,8 @@ export default function OffersScreen() {
         ListFooterComponent={loadingMore ? <ActivityIndicator color={c.ink} style={{ paddingVertical: 16 }} /> : null}
         renderItem={({ item }) => <OfferCard offer={item} showDriver={isOwner} onPress={() => router.push(`/offer/${item.id}`)} />}
       />
+
+      <FilterSheet open={sheetOpen} value={filters} onApply={setFilters} onClose={() => setSheetOpen(false)} />
     </SafeAreaView>
   );
 }

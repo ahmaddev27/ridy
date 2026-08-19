@@ -112,6 +112,7 @@ const de: Dict = {
   "offers.to": "Bis",
   "offers.loadMore": "Mehr laden",
   "filter.all": "Alle",
+  "filter.title": "Filter", "filter.sortBy": "Sortieren", "filter.bestKm": "Bestes €/km", "filter.newest": "Neueste", "filter.highestTotal": "Höchster Gesamt", "filter.date": "Datum", "filter.today": "Heute", "filter.week": "Diese Woche", "filter.status": "Status", "filter.apply": "Anwenden", "filter.reset": "Zurücksetzen",
   // Profile
   "profile.stats": "Statistik",
   "profile.settings": "Einstellungen",
@@ -233,6 +234,7 @@ const en: Dict = {
   "offers.to": "To",
   "offers.loadMore": "Load more",
   "filter.all": "All",
+  "filter.title": "Filter", "filter.sortBy": "Sort by", "filter.bestKm": "Best €/km", "filter.newest": "Newest", "filter.highestTotal": "Highest total", "filter.date": "Date", "filter.today": "Today", "filter.week": "This week", "filter.status": "Status", "filter.apply": "Apply", "filter.reset": "Reset",
   // Profile
   "profile.stats": "Stats",
   "profile.settings": "Settings",
@@ -354,6 +356,7 @@ const ar: Dict = {
   "offers.to": "إلى",
   "offers.loadMore": "تحميل المزيد",
   "filter.all": "الكل",
+  "filter.title": "فلترة", "filter.sortBy": "الترتيب", "filter.bestKm": "أفضل €/كم", "filter.newest": "الأحدث", "filter.highestTotal": "الأعلى إجمالاً", "filter.date": "التاريخ", "filter.today": "اليوم", "filter.week": "هذا الأسبوع", "filter.status": "الحالة", "filter.apply": "تطبيق", "filter.reset": "إعادة تعيين",
   // Profile
   "profile.stats": "الإحصائيات",
   "profile.settings": "الإعدادات",
