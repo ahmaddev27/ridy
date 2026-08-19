@@ -5,8 +5,8 @@ import { NavList } from "./nav-list";
 
 /** Brand lockup shared by the desktop sidebar and the mobile drawer. */
 export function SidebarBrand() {
+  // Height h-16 matches the topbar so their bottom borders line up.
   return (
-    {/* Same height as the topbar (h-16) so their bottom borders line up. */}
     <div className="flex h-16 items-center gap-2 border-b border-line px-4">
       <Logo size={40} className="text-ink" />
       <div className="leading-tight">

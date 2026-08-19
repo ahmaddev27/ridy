@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { latnLocale } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn } from "lucide-react";
+import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn, Globe, AlertTriangle, Activity } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { StatCard } from "@/components/ui/card";
+import { Card, StatCard } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -481,49 +481,48 @@ export function CompanyDetail({
             </Section>
           ) : (
             <>
-              {/* Status — a toggle switch at the top */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-ink">{c("colStatus")}</span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={status === "active"}
-                  onClick={() => setStatus(status === "active" ? "disabled" : "active")}
-                  className={
-                    "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors " +
-                    (status === "active" ? "bg-emerald-500" : "bg-ink-subtle")
-                  }
-                >
-                  <span
+              {/* Status — active toggle + the three stat cards */}
+              <SectionCard icon={Activity} title={c("colStatus")}>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={status === "active"}
+                    onClick={() => setStatus(status === "active" ? "disabled" : "active")}
                     className={
-                      "inline-block h-5 w-5 transform rounded-full bg-surface shadow transition-transform " +
-                      (status === "active" ? "translate-x-[22px] rtl:-translate-x-[22px]" : "translate-x-0.5 rtl:-translate-x-0.5")
+                      "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors " +
+                      (status === "active" ? "bg-emerald-500" : "bg-ink-subtle")
                     }
-                  />
-                </button>
-                <span className={"text-sm font-medium " + (status === "active" ? "text-success-fg" : "text-ink-muted")}>
-                  {status === "active" ? c("statusActive") : c("statusDisabled")}
-                </span>
-              </div>
+                  >
+                    <span
+                      className={
+                        "inline-block h-5 w-5 transform rounded-full bg-surface shadow transition-transform " +
+                        (status === "active" ? "translate-x-[22px] rtl:-translate-x-[22px]" : "translate-x-0.5 rtl:-translate-x-0.5")
+                      }
+                    />
+                  </button>
+                  <span className={"text-sm font-medium " + (status === "active" ? "text-success-fg" : "text-ink-muted")}>
+                    {status === "active" ? c("statusActive") : c("statusDisabled")}
+                  </span>
+                </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <StatCard icon={Users} label={c("colDrivers")} value={company.driver_count} />
-                <StatCard icon={Radio} label={c("colOffers")} value={company.offer_count} />
-                <StatCard icon={Plug} label={c("colSession")} value={company.session_status ? c(`session_${company.session_status}`) : c("noSession")} />
-              </div>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <StatCard icon={Plug} label={c("colSession")} value={company.session_status ? c(`session_${company.session_status}`) : c("noSession")} />
+                  <StatCard icon={Radio} label={c("colOffers")} value={company.offer_count} />
+                  <StatCard icon={Users} label={c("colDrivers")} value={company.driver_count} />
+                </div>
+              </SectionCard>
 
-              {/* Edit info */}
-              <Section title={c("info")}>
-                <div className="grid gap-3 md:grid-cols-2">
+              {/* Details — name + country */}
+              <SectionCard icon={Info} title={c("info")}>
+                <div className="grid gap-4 md:grid-cols-2">
                   <Field label={c("fieldName")} value={name} onChange={setName} />
                   <Field label={c("fieldCountry")} value={country} onChange={setCountry} />
                 </div>
-              </Section>
+              </SectionCard>
 
-              {/* Proxy — assigned from the shared pool */}
-              <Section title={c("proxy")}>
-                <p className="mb-2 text-xs text-ink-subtle">{c("proxyPoolHint")}</p>
+              {/* Residential proxy — assigned from the shared pool */}
+              <SectionCard icon={Globe} title={c("proxy")}>
                 <Select
                   value={proxyId}
                   onChange={setProxyId}
@@ -536,11 +535,13 @@ export function CompanyDetail({
                     })),
                   ]}
                 />
-              </Section>
+                <p className="mt-2 text-xs text-ink-subtle">{c("proxyPoolHint")}</p>
+              </SectionCard>
 
-              {/* Session controls */}
-              <Section title={c("session")}>
-                <div className="flex gap-2">
+              {/* Uber session controls */}
+              <SectionCard icon={Plug} title={c("session")}>
+                <p className="mb-3 text-xs text-ink-subtle">{c("sessionHint")}</p>
+                <div className="flex flex-wrap gap-2">
                   <Button variant="secondary" onClick={() => setConfirm("relink")} disabled={busy || !company.session_status}>
                     <RefreshCw className="h-4 w-4" /> {c("forceRelink")}
                   </Button>
@@ -548,24 +549,26 @@ export function CompanyDetail({
                     <Trash2 className="h-4 w-4" /> {c("deleteSession")}
                   </Button>
                 </div>
-                <div className="mt-3 border-t border-line pt-3">
-                  <Button variant="danger" onClick={() => setConfirm("purgeData")} disabled={busy}>
-                    <Trash2 className="h-4 w-4" /> {c("purgeData")}
-                  </Button>
-                </div>
-              </Section>
+              </SectionCard>
 
-              {/* Act as this company — swaps the SPA session to a manager. */}
-              <Section title={c("impersonate")}>
-                <p className="mb-2 text-xs text-ink-subtle">{c("impersonateHint")}</p>
+              {/* Impersonate — swaps the SPA session to a manager. */}
+              <SectionCard icon={LogIn} title={c("impersonate")}>
+                <p className="mb-3 text-xs text-ink-subtle">{c("impersonateHint")}</p>
                 <Button variant="secondary" onClick={loginAsCompany} disabled={busy}>
                   <LogIn className="h-4 w-4 rtl:rotate-180" /> {c("impersonate")}
                 </Button>
-              </Section>
+              </SectionCard>
 
-              {/* Enable/disable lives in the status toggle at the top of the panel,
-                  so no separate disable button here. */}
-              <div className="flex justify-end">
+              {/* Danger zone — irreversible purge */}
+              <SectionCard icon={AlertTriangle} title={c("dangerZone")} tone="danger">
+                <p className="mb-3 text-xs text-danger-fg/80">{c("dangerZoneHint")}</p>
+                <Button variant="danger" onClick={() => setConfirm("purgeData")} disabled={busy}>
+                  <Trash2 className="h-4 w-4" /> {c("purgeData")}
+                </Button>
+              </SectionCard>
+
+              {/* Save — enable/disable lives in the status toggle above. */}
+              <div className="sticky bottom-0 -mx-5 -mb-5 flex justify-end border-t border-line bg-surface/95 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
                 <Button onClick={saveInfo} disabled={busy}>
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {c("save")}
@@ -625,6 +628,37 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h3 className="text-sm font-semibold text-ink">{title}</h3>
       {children}
     </div>
+  );
+}
+
+/** Titled card with an icon header; `danger` tone gives a subtle red frame. */
+function SectionCard({
+  icon: Icon,
+  title,
+  children,
+  tone = "default",
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  children: React.ReactNode;
+  tone?: "default" | "danger";
+}) {
+  const danger = tone === "danger";
+  return (
+    <Card className={danger ? "border-danger-ring/30 bg-danger-bg/40 p-5" : "p-5"}>
+      <div className="mb-4 flex items-center gap-2.5">
+        <span
+          className={
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg " +
+            (danger ? "bg-danger-bg text-danger-fg" : "bg-surface-2 text-ink-muted")
+          }
+        >
+          <Icon className="h-4 w-4" />
+        </span>
+        <h3 className={"text-sm font-semibold " + (danger ? "text-danger-fg" : "text-ink")}>{title}</h3>
+      </div>
+      {children}
+    </Card>
   );
 }
 
