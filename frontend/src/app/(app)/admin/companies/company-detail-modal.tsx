@@ -4,10 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { latnLocale } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn, Globe, AlertTriangle, Activity } from "lucide-react";
+import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn, Globe } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Card, StatCard } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -481,91 +480,92 @@ export function CompanyDetail({
             </Section>
           ) : (
             <>
-              {/* Status — active toggle + the three stat cards */}
-              <SectionCard icon={Activity} title={c("colStatus")}>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={status === "active"}
-                    onClick={() => setStatus(status === "active" ? "disabled" : "active")}
-                    className={
-                      "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors " +
-                      (status === "active" ? "bg-emerald-500" : "bg-ink-subtle")
-                    }
-                  >
-                    <span
+              {/* One calm form: flat groups, two per row on desktop, no nested cards. */}
+              <div className="grid gap-x-8 gap-y-7 md:grid-cols-2">
+                {/* Status — active toggle + three flat stat tiles (full width) */}
+                <Group title={c("colStatus")} className="md:col-span-2">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={status === "active"}
+                      onClick={() => setStatus(status === "active" ? "disabled" : "active")}
                       className={
-                        "inline-block h-5 w-5 transform rounded-full bg-surface shadow transition-transform " +
-                        (status === "active" ? "translate-x-[22px] rtl:-translate-x-[22px]" : "translate-x-0.5 rtl:-translate-x-0.5")
+                        "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors " +
+                        (status === "active" ? "bg-emerald-500" : "bg-ink-subtle")
                       }
-                    />
-                  </button>
-                  <span className={"text-sm font-medium " + (status === "active" ? "text-success-fg" : "text-ink-muted")}>
-                    {status === "active" ? c("statusActive") : c("statusDisabled")}
-                  </span>
-                </div>
+                    >
+                      <span
+                        className={
+                          "inline-block h-5 w-5 transform rounded-full bg-surface shadow transition-transform " +
+                          (status === "active" ? "translate-x-[22px] rtl:-translate-x-[22px]" : "translate-x-0.5 rtl:-translate-x-0.5")
+                        }
+                      />
+                    </button>
+                    <span className={"text-sm font-medium " + (status === "active" ? "text-success-fg" : "text-ink-muted")}>
+                      {status === "active" ? c("statusActive") : c("statusDisabled")}
+                    </span>
+                  </div>
 
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <StatCard icon={Plug} label={c("colSession")} value={company.session_status ? c(`session_${company.session_status}`) : c("noSession")} />
-                  <StatCard icon={Radio} label={c("colOffers")} value={company.offer_count} />
-                  <StatCard icon={Users} label={c("colDrivers")} value={company.driver_count} />
-                </div>
-              </SectionCard>
+                  <div className="grid grid-cols-3 gap-3">
+                    <StatTile icon={Plug} label={c("colSession")} value={company.session_status ? c(`session_${company.session_status}`) : c("noSession")} />
+                    <StatTile icon={Radio} label={c("colOffers")} value={company.offer_count} />
+                    <StatTile icon={Users} label={c("colDrivers")} value={company.driver_count} />
+                  </div>
+                </Group>
 
-              {/* Details — name + country */}
-              <SectionCard icon={Info} title={c("info")}>
-                <div className="grid gap-4 md:grid-cols-2">
+                {/* Details — name + country */}
+                <Group title={c("info")}>
                   <Field label={c("fieldName")} value={name} onChange={setName} />
                   <Field label={c("fieldCountry")} value={country} onChange={setCountry} />
-                </div>
-              </SectionCard>
+                </Group>
 
-              {/* Residential proxy — assigned from the shared pool */}
-              <SectionCard icon={Globe} title={c("proxy")}>
-                <Select
-                  value={proxyId}
-                  onChange={setProxyId}
-                  options={[
-                    { value: "", label: c("proxyNone") },
-                    ...proxies.map((p) => ({
-                      value: String(p.id),
-                      label: `${p.label} (${p.used}/${p.capacity})`,
-                      disabled: p.free <= 0 && String(p.id) !== proxyId,
-                    })),
-                  ]}
-                />
-                <p className="mt-2 text-xs text-ink-subtle">{c("proxyPoolHint")}</p>
-              </SectionCard>
+                {/* Residential proxy — assigned from the shared pool */}
+                <Group title={c("proxy")}>
+                  <Select
+                    value={proxyId}
+                    onChange={setProxyId}
+                    options={[
+                      { value: "", label: c("proxyNone") },
+                      ...proxies.map((p) => ({
+                        value: String(p.id),
+                        label: `${p.label} (${p.used}/${p.capacity})`,
+                        disabled: p.free <= 0 && String(p.id) !== proxyId,
+                      })),
+                    ]}
+                  />
+                  <p className="text-xs text-ink-subtle">{c("proxyPoolHint")}</p>
+                </Group>
 
-              {/* Uber session controls */}
-              <SectionCard icon={Plug} title={c("session")}>
-                <p className="mb-3 text-xs text-ink-subtle">{c("sessionHint")}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" onClick={() => setConfirm("relink")} disabled={busy || !company.session_status}>
-                    <RefreshCw className="h-4 w-4" /> {c("forceRelink")}
+                {/* Uber session controls */}
+                <Group title={c("session")}>
+                  <p className="text-xs text-ink-subtle">{c("sessionHint")}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="secondary" onClick={() => setConfirm("relink")} disabled={busy || !company.session_status}>
+                      <RefreshCw className="h-4 w-4" /> {c("forceRelink")}
+                    </Button>
+                    <Button variant="secondary" onClick={() => setConfirm("deleteSession")} disabled={busy || !company.session_status}>
+                      <Trash2 className="h-4 w-4" /> {c("deleteSession")}
+                    </Button>
+                  </div>
+                </Group>
+
+                {/* Impersonate — swaps the SPA session to a manager. */}
+                <Group title={c("impersonate")}>
+                  <p className="text-xs text-ink-subtle">{c("impersonateHint")}</p>
+                  <Button variant="secondary" onClick={loginAsCompany} disabled={busy}>
+                    <LogIn className="h-4 w-4 rtl:rotate-180" /> {c("impersonate")}
                   </Button>
-                  <Button variant="secondary" onClick={() => setConfirm("deleteSession")} disabled={busy || !company.session_status}>
-                    <Trash2 className="h-4 w-4" /> {c("deleteSession")}
+                </Group>
+
+                {/* Danger zone — irreversible purge; flat but visually distinct. */}
+                <Group title={c("dangerZone")} tone="danger">
+                  <p className="text-xs text-danger-fg/80">{c("dangerZoneHint")}</p>
+                  <Button variant="danger" onClick={() => setConfirm("purgeData")} disabled={busy}>
+                    <Trash2 className="h-4 w-4" /> {c("purgeData")}
                   </Button>
-                </div>
-              </SectionCard>
-
-              {/* Impersonate — swaps the SPA session to a manager. */}
-              <SectionCard icon={LogIn} title={c("impersonate")}>
-                <p className="mb-3 text-xs text-ink-subtle">{c("impersonateHint")}</p>
-                <Button variant="secondary" onClick={loginAsCompany} disabled={busy}>
-                  <LogIn className="h-4 w-4 rtl:rotate-180" /> {c("impersonate")}
-                </Button>
-              </SectionCard>
-
-              {/* Danger zone — irreversible purge */}
-              <SectionCard icon={AlertTriangle} title={c("dangerZone")} tone="danger">
-                <p className="mb-3 text-xs text-danger-fg/80">{c("dangerZoneHint")}</p>
-                <Button variant="danger" onClick={() => setConfirm("purgeData")} disabled={busy}>
-                  <Trash2 className="h-4 w-4" /> {c("purgeData")}
-                </Button>
-              </SectionCard>
+                </Group>
+              </div>
 
               {/* Save — enable/disable lives in the status toggle above. */}
               <div className="sticky bottom-0 -mx-5 -mb-5 flex justify-end border-t border-line bg-surface/95 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
@@ -631,34 +631,56 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-/** Titled card with an icon header; `danger` tone gives a subtle red frame. */
-function SectionCard({
-  icon: Icon,
+/** Flat, borderless section: a small uppercase title over its stacked controls.
+ *  `danger` tone tints the title and adds a subtle inline-start rule — distinct
+ *  without becoming a nested card. */
+function Group({
   title,
   children,
   tone = "default",
+  className = "",
 }: {
-  icon: React.ComponentType<{ className?: string }>;
   title: string;
   children: React.ReactNode;
   tone?: "default" | "danger";
+  className?: string;
 }) {
   const danger = tone === "danger";
   return (
-    <Card className={danger ? "border-danger-ring/30 bg-danger-bg/40 p-5" : "p-5"}>
-      <div className="mb-4 flex items-center gap-2.5">
-        <span
-          className={
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg " +
-            (danger ? "bg-danger-bg text-danger-fg" : "bg-surface-2 text-ink-muted")
-          }
-        >
-          <Icon className="h-4 w-4" />
-        </span>
-        <h3 className={"text-sm font-semibold " + (danger ? "text-danger-fg" : "text-ink")}>{title}</h3>
+    <section className={className}>
+      <h3
+        className={
+          "mb-3 text-xs font-semibold uppercase tracking-wider " +
+          (danger ? "text-danger-fg" : "text-ink-subtle")
+        }
+      >
+        {title}
+      </h3>
+      <div className={"space-y-3 " + (danger ? "border-s-2 border-danger-ring/40 ps-3" : "")}>
+        {children}
       </div>
-      {children}
-    </Card>
+    </section>
+  );
+}
+
+/** Flat stat tile — a soft surface panel, no card border. */
+function StatTile({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg bg-surface-2 px-3 py-2.5">
+      <div className="flex items-center gap-1.5 text-ink-subtle">
+        <Icon className="h-3.5 w-3.5" />
+        <span className="text-xs font-medium">{label}</span>
+      </div>
+      <div className="mt-1 truncate text-sm font-semibold text-ink">{value}</div>
+    </div>
   );
 }
 

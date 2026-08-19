@@ -2,22 +2,46 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { Bell } from "lucide-react";
 import { cn, latnLocale } from "@/lib/utils";
 import { notifContent } from "@/lib/notif-content";
 import { useI18n } from "@/lib/i18n/context";
-import type { AppNotification } from "@/lib/api/notifications";
+import { markAllNotificationsRead, type AppNotification } from "@/lib/api/notifications";
 
 /**
  * Bell with a hover/click dropdown of the latest 5 notifications, so a quick
  * peek doesn't require opening the full page. Full list stays one click away.
  */
-export function NotificationsBell({ items, unread }: { items: AppNotification[]; unread: number }) {
+export function NotificationsBell({
+  items,
+  unread,
+  onChanged,
+}: {
+  items: AppNotification[];
+  unread: number;
+  /** Refresh the list/badge after a change (e.g. marking all read). */
+  onChanged?: () => void;
+}) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
+  const [marking, setMarking] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const latest = items.slice(0, 5);
+
+  async function handleMarkAllRead() {
+    setMarking(true);
+    try {
+      await markAllNotificationsRead();
+      toast.success(t("screens.notifications.allMarkedRead"));
+      onChanged?.();
+    } catch {
+      toast.error(t("screens.notifications.updateError"));
+    } finally {
+      setMarking(false);
+    }
+  }
 
   // Small grace delay so moving the cursor into the panel doesn't dismiss it.
   function scheduleClose() {
@@ -58,7 +82,16 @@ export function NotificationsBell({ items, unread }: { items: AppNotification[];
           <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
             <span className="text-sm font-semibold text-ink">{t("screens.notifications.title")}</span>
             {unread > 0 && (
-              <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-ink">{unread}</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleMarkAllRead}
+                  disabled={marking}
+                  className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                >
+                  {t("screens.notifications.markAllRead")}
+                </button>
+                <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-ink">{unread}</span>
+              </div>
             )}
           </div>
 

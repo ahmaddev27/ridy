@@ -92,7 +92,25 @@ export default function AdminDashboardPage() {
         {offersChart.length > 0 ? <BarChart data={offersChart} /> : <div className="h-[180px] animate-pulse rounded-lg bg-surface-2" />}
       </Card>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Companies health — active vs inactive donut */}
+        <Card className="p-5">
+          <h3 className="mb-4 font-semibold text-ink">{c("companiesHealth")}</h3>
+          <div className="flex items-center gap-6">
+            <DonutChart
+              segments={[
+                { value: s?.active_companies ?? 0, color: "#10b981" },
+                { value: Math.max(0, (s?.companies ?? 0) - (s?.active_companies ?? 0)), color: "#94a3b8" },
+              ]}
+              total={s?.companies ?? 0}
+            />
+            <div className="flex-1 space-y-2.5">
+              <LegendRow color="#10b981" label={c("cActive")} value={s?.active_companies ?? 0} />
+              <LegendRow color="#94a3b8" label={c("cInactive")} value={Math.max(0, (s?.companies ?? 0) - (s?.active_companies ?? 0))} />
+            </div>
+          </div>
+        </Card>
+
         {/* Session health — donut */}
         <Card className="p-5">
           <h3 className="mb-4 font-semibold text-ink">{c("healthTitle")}</h3>

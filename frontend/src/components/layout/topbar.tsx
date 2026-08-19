@@ -35,7 +35,9 @@ export function Topbar() {
   const [navOpen, setNavOpen] = useState(false);
 
   // Live unread badge — polled so new notifications surface without a refresh.
-  const { data: notifications } = useAsync(listNotifications, { refetchInterval: 15000 });
+  const { data: notifications, refetch: refetchNotifications } = useAsync(listNotifications, {
+    refetchInterval: 15000,
+  });
   const unread = notifications?.unread ?? 0;
 
   // Offer-alert sound mute (persisted); the OfferAlerts watcher reads the same key.
@@ -180,7 +182,7 @@ export function Topbar() {
         )}
 
         {/* Notifications — bell with a hover dropdown of the latest 5 */}
-        <NotificationsBell items={notifications?.items ?? []} unread={unread} />
+        <NotificationsBell items={notifications?.items ?? []} unread={unread} onChanged={refetchNotifications} />
 
         {/* User menu */}
         <div className="relative">

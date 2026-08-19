@@ -9,12 +9,32 @@ import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getDashboardSummary } from "@/lib/api/dashboard";
 import { LiveMap } from "@/components/dashboard/live-map";
+import { BarChart } from "@/components/charts/bar-chart";
+import { DonutChart } from "@/components/charts/donut-chart";
+
+// Legend/segment colors for the driver-linking donut (identity never by color alone).
+const LINK_COLORS = { linked: "#059669", unlinked: "#94a3b8" } as const;
 
 export default function DashboardPage() {
   const { t, locale } = useI18n();
   const { data, loading, error } = useAsync(getDashboardSummary, { refetchInterval: 10000 });
 
   const k = (key: string) => t(`screens.dashboard.${key}`);
+
+  // Offers captured per day — a short, honest daily-count series (already fetched).
+  const offersChart = (data?.offers_daily ?? []).map((d) => ({
+    label: new Date(d.date).toLocaleDateString(latnLocale(locale), { month: "numeric", day: "numeric" }),
+    value: d.count,
+  }));
+
+  // Driver linking split — how many drivers are matched to an Uber account.
+  const linkedDrivers = data?.linked_drivers ?? 0;
+  const totalDrivers = data?.drivers ?? 0;
+  const unlinkedDrivers = Math.max(0, totalDrivers - linkedDrivers);
+  const linkSegments = [
+    { value: linkedDrivers, color: LINK_COLORS.linked },
+    { value: unlinkedDrivers, color: LINK_COLORS.unlinked },
+  ];
 
   return (
     <div className="space-y-6">
@@ -92,6 +112,42 @@ export default function DashboardPage() {
           <LiveMap heightClass="h-[460px]" />
         </div>
       </div>
+
+      {/* Trend charts — two per row on desktop, built from data already fetched */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Offers captured per day */}
+        <Card className="p-5">
+          <h3 className="mb-4 font-semibold text-ink">{k("offersTrend")}</h3>
+          {offersChart.length > 0 ? (
+            <BarChart data={offersChart} />
+          ) : (
+            <div className="h-[200px] animate-pulse rounded-lg bg-surface-2" />
+          )}
+        </Card>
+
+        {/* Driver linking split — linked vs. not linked */}
+        <Card className="p-5">
+          <h3 className="mb-4 font-semibold text-ink">{k("linkTitle")}</h3>
+          <div className="flex items-center gap-6">
+            <DonutChart segments={linkSegments} total={totalDrivers} />
+            <div className="flex-1 space-y-2.5">
+              <LegendRow color={LINK_COLORS.linked} label={k("statLinked")} value={linkedDrivers} />
+              <LegendRow color={LINK_COLORS.unlinked} label={k("unlinkedDrivers")} value={unlinkedDrivers} />
+            </div>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/** One legend line beside the donut: color dot, label, and value. */
+function LegendRow({ color, label, value }: { color: string; label: string; value: number }) {
+  return (
+    <div className="flex items-center gap-2.5 text-sm">
+      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+      <span className="flex-1 text-ink-muted">{label}</span>
+      <span className="font-semibold tabular-nums text-ink">{value}</span>
     </div>
   );
 }
