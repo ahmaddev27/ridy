@@ -3,7 +3,6 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import * as Notifications from "expo-notifications";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { View, ActivityIndicator } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/toast";
@@ -63,22 +62,21 @@ function Gate() {
   const router = useRouter();
   const c = useColors();
 
+  // Cold start: jump straight to the brand splash (once), independent of auth
+  // readiness — the splash IS the loading screen, so no separate spinner shows.
   const booted = useRef(false);
+  useEffect(() => {
+    if (booted.current) return;
+    booted.current = true;
+    const seg = segments[0];
+    if (seg !== "splash" && seg !== "language") router.replace("/splash");
+  }, [segments, router]);
+
+  // Auth gate — only once the session is known. Onboarding screens self-navigate.
   useEffect(() => {
     if (!ready) return;
     const seg = segments[0];
-    // Cold start: show the brand splash first (once). It advances to the language
-    // picker on first launch, or straight into the app afterwards.
-    if (!booted.current) {
-      booted.current = true;
-      if (seg !== "splash" && seg !== "language") {
-        router.replace("/splash");
-        return;
-      }
-    }
-    // Onboarding screens drive their own navigation.
     if (seg === "splash" || seg === "language") return;
-    // Auth gate.
     const inAuth = seg === "login" || seg === "activate";
     if (!driver && !inAuth) router.replace("/login");
     else if (driver && inAuth) router.replace("/");
@@ -100,14 +98,6 @@ function Gate() {
     });
     return () => sub.remove();
   }, [driver, isOwner, router]);
-
-  if (!ready) {
-    return (
-      <View style={{ flex: 1, backgroundColor: c.canvas, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator color={c.ink} />
-      </View>
-    );
-  }
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.canvas } }}>

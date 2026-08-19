@@ -6,7 +6,7 @@ import * as SecureStore from "expo-secure-store";
 import { Text } from "@/components/typography";
 import { Logo } from "@/components/ui";
 import { useColors, radius } from "@/lib/theme";
-import { t, setLocale } from "@/lib/i18n";
+import { t, setLocale, useLocale } from "@/lib/i18n";
 
 const TRACK_WIDTH = 96;
 const INDICATOR_WIDTH = TRACK_WIDTH * 0.4;
@@ -20,7 +20,14 @@ const AUTO_ADVANCE_MS = 1900;
 export default function SplashScreen() {
   const c = useColors();
   const router = useRouter();
+  useLocale(); // re-render the caption once the saved language is applied
   const pulse = useRef(new Animated.Value(0)).current;
+
+  // Apply the saved language immediately on mount so the caption (and the rest of
+  // the session) is in the chosen language, not the device default.
+  useEffect(() => {
+    SecureStore.getItemAsync("locale").then((l) => { if (l) setLocale(l); }).catch(() => {});
+  }, []);
 
   // First launch (no stored language) → language picker; afterwards apply the
   // saved language and hand off to the app (the auth Gate takes it from there).
