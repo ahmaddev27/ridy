@@ -3,6 +3,16 @@
 type Dict = Record<string, unknown>;
 
 const en: Dict = {
+  shards: {
+    title: "Shards", subtitle: "Daemon boxes and how companies are spread across them. Adding a box auto-takes new companies.",
+    rebalance: "Rebalance", rebalanced: "Rebalanced", actionFailed: "Action failed",
+    statShards: "Shards", statLive: "Live", statCompanies: "Companies",
+    loadError: "Could not load", emptyTitle: "No shards yet", emptyDesc: "As soon as a daemon starts, it registers here.",
+    colShard: "Shard", colStatus: "Status", colCompanies: "Companies", colLastSeen: "Last seen", colAction: "Action",
+    stLive: "Live", stIdle: "Idle", stDrained: "Drained",
+    drain: "Drain", enable: "Enable",
+    hint: "Drain stops new assignments to a box and moves its companies to a live one. Rebalance spreads everything evenly across live shards.",
+  },
   systemHealth: {
     colCompany: "Company", colSubscription: "Subscription", colSession: "Uber session", colDaemon: "Daemon", colProxy: "Proxy",
     ok: "OK", down: "Down", noSession: "No session", noProxy: "No proxy",
@@ -194,6 +204,16 @@ const en: Dict = {
 };
 
 const de: Dict = {
+  shards: {
+    title: "Shards", subtitle: "Daemon-Boxen und Firmenverteilung. Eine neue Box übernimmt neue Firmen automatisch.",
+    rebalance: "Neu verteilen", rebalanced: "Neu verteilt", actionFailed: "Aktion fehlgeschlagen",
+    statShards: "Shards", statLive: "Aktiv", statCompanies: "Firmen",
+    loadError: "Laden fehlgeschlagen", emptyTitle: "Noch keine Shards", emptyDesc: "Sobald ein Daemon startet, registriert er sich hier.",
+    colShard: "Shard", colStatus: "Status", colCompanies: "Firmen", colLastSeen: "Zuletzt gesehen", colAction: "Aktion",
+    stLive: "Live", stIdle: "Inaktiv", stDrained: "Geleert",
+    drain: "Leeren", enable: "Aktivieren",
+    hint: "Leeren stoppt neue Zuweisungen und verschiebt die Firmen auf eine aktive Box. Neu verteilen streut alles gleichmäßig auf die aktiven Shards.",
+  },
   systemHealth: {
     colCompany: "Firma", colSubscription: "Abonnement", colSession: "Uber-Sitzung", colDaemon: "Daemon", colProxy: "Proxy",
     ok: "OK", down: "Aus", noSession: "Keine Sitzung", noProxy: "Kein Proxy",
@@ -383,6 +403,16 @@ const de: Dict = {
 };
 
 const ar: Dict = {
+  shards: {
+    title: "الشاردات", subtitle: "بوكسات الديمون وتوزيع الشركات. إضافة بوكس توزّع الشركات الجديدة تلقائياً.",
+    rebalance: "إعادة توزيع", rebalanced: "تمّت إعادة التوزيع", actionFailed: "فشل الإجراء",
+    statShards: "الشاردات", statLive: "نشطة", statCompanies: "الشركات",
+    loadError: "تعذّر التحميل", emptyTitle: "لا شاردات بعد", emptyDesc: "أول ما يشتغل ديمون، بيسجّل نفسه هنا.",
+    colShard: "الشارد", colStatus: "الحالة", colCompanies: "الشركات", colLastSeen: "آخر ظهور", colAction: "إجراء",
+    stLive: "حيّ", stIdle: "خامل", stDrained: "مُفرَّغ",
+    drain: "تفريغ", enable: "تفعيل",
+    hint: "التفريغ يوقف تعيين شركات جديدة لهذا البوكس وينقل شركاته لبوكس حيّ. إعادة التوزيع تعيد التوزيع بالتساوي على النشطة.",
+  },
   systemHealth: {
     colCompany: "الشركة", colSubscription: "الاشتراك", colSession: "جلسة أوبر", colDaemon: "الخدمة", colProxy: "البروكسي",
     ok: "سليم", down: "متوقف", noSession: "لا جلسة", noProxy: "لا بروكسي",

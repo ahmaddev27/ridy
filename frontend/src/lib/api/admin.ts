@@ -610,3 +610,27 @@ export async function broadcastNotification(input: BroadcastInput): Promise<{ qu
     withCsrf: true,
   });
 }
+
+// ── Daemon shards (scale-out control) ──────────────────────────────────────
+export type DaemonShardRow = {
+  id: number;
+  name: string;
+  label: string | null;
+  active: boolean;
+  live: boolean;
+  companies: number;
+  last_seen_at: string | null;
+};
+
+export async function listShards(): Promise<DaemonShardRow[]> {
+  const res = await apiFetch<{ data: DaemonShardRow[] }>("/api/v1/admin/shards");
+  return res.data;
+}
+
+export async function updateShard(id: number, input: { active?: boolean; label?: string | null }): Promise<void> {
+  await apiFetch(`/api/v1/admin/shards/${id}`, { method: "PATCH", body: input, withCsrf: true });
+}
+
+export async function rebalanceShards(): Promise<void> {
+  await apiFetch("/api/v1/admin/shards/rebalance", { method: "POST", withCsrf: true });
+}
