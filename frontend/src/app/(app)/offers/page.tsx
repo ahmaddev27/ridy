@@ -258,6 +258,23 @@ export default function OffersPage() {
           )}
         </div>
 
+        {/* Quick ranges: today / last 7 days / last 30 days */}
+        <div className="flex items-center gap-1 rounded-lg border border-line bg-surface p-1">
+          {(["today", "week", "month"] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => applyPreset(p)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                datePreset === p
+                  ? "bg-primary text-primary-ink"
+                  : "text-ink-muted hover:bg-surface-2 hover:text-ink"
+              }`}
+            >
+              {c(p === "today" ? "presetToday" : p === "week" ? "presetWeek" : "presetMonth")}
+            </button>
+          ))}
+        </div>
+
         {/* Date range */}
         <input
           type="date"
@@ -280,23 +297,6 @@ export default function OffersPage() {
           title={c("dateTo")}
           className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line"
         />
-
-        {/* Quick ranges: today / last 7 days / last 30 days */}
-        <div className="flex items-center gap-1 rounded-lg border border-line bg-surface p-1">
-          {(["today", "week", "month"] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => applyPreset(p)}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                datePreset === p
-                  ? "bg-primary text-primary-ink"
-                  : "text-ink-muted hover:bg-surface-2 hover:text-ink"
-              }`}
-            >
-              {c(p === "today" ? "presetToday" : p === "week" ? "presetWeek" : "presetMonth")}
-            </button>
-          ))}
-        </div>
 
         {(from || to) && (
           <button
