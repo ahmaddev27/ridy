@@ -13,6 +13,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { listOffersPaged, getOfferStats, exportOffers, fareLabel, type DispatchOffer, type OfferStatus, type PageMeta, type OfferStats } from "@/lib/api/offers";
 
+/** Format a Date as a local `yyyy-mm-dd` string for a native date input. */
+function ymd(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
 /** Offer lifecycle status → badge tone. */
 const OFFER_TONE: Record<OfferStatus, Status> = {
   pending: "expiring",
@@ -51,6 +58,10 @@ export default function OffersPage() {
   const [openDays, setOpenDays] = useState<Set<string>>(() => new Set([new Date().toDateString()]));
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  // Which quick-range chip is active (today / week / month), or null for a
+  // manual range. Tracked separately so the chip can highlight and manual edits
+  // clear it.
+  const [datePreset, setDatePreset] = useState<"today" | "week" | "month" | null>(null);
   const [meta, setMeta] = useState<PageMeta | null>(null);
   const [stats, setStats] = useState<OfferStats | null>(null);
 
@@ -155,6 +166,18 @@ export default function OffersPage() {
     setDriverUuids((prev) => (prev.includes(uuid) ? prev.filter((x) => x !== uuid) : [...prev, uuid]));
   }
 
+  /** Apply a rolling quick-range: today, last 7 days, or last 30 days. */
+  function applyPreset(preset: "today" | "week" | "month") {
+    const now = new Date();
+    const start = new Date(now);
+    if (preset === "week") start.setDate(now.getDate() - 6);
+    else if (preset === "month") start.setDate(now.getDate() - 29);
+    setFrom(ymd(start));
+    setTo(ymd(now));
+    setDatePreset(preset);
+    setPage(1);
+  }
+
   // Group the loaded offers into day buckets (feed is newest-first, so days stay ordered).
   const groupedByDay = useMemo(() => {
     const groups = new Map<string, DispatchOffer[]>();
@@ -239,7 +262,10 @@ export default function OffersPage() {
         <input
           type="date"
           value={from}
-          onChange={(e) => setFrom(e.target.value)}
+          onChange={(e) => {
+            setFrom(e.target.value);
+            setDatePreset(null);
+          }}
           title={c("dateFrom")}
           className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line"
         />
@@ -247,15 +273,37 @@ export default function OffersPage() {
         <input
           type="date"
           value={to}
-          onChange={(e) => setTo(e.target.value)}
+          onChange={(e) => {
+            setTo(e.target.value);
+            setDatePreset(null);
+          }}
           title={c("dateTo")}
           className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line"
         />
+
+        {/* Quick ranges: today / last 7 days / last 30 days */}
+        <div className="flex items-center gap-1 rounded-lg border border-line bg-surface p-1">
+          {(["today", "week", "month"] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => applyPreset(p)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                datePreset === p
+                  ? "bg-primary text-primary-ink"
+                  : "text-ink-muted hover:bg-surface-2 hover:text-ink"
+              }`}
+            >
+              {c(p === "today" ? "presetToday" : p === "week" ? "presetWeek" : "presetMonth")}
+            </button>
+          ))}
+        </div>
+
         {(from || to) && (
           <button
             onClick={() => {
               setFrom("");
               setTo("");
+              setDatePreset(null);
             }}
             className="text-xs font-medium text-ink hover:underline"
           >

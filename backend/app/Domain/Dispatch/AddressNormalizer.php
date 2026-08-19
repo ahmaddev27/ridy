@@ -14,12 +14,14 @@ namespace App\Domain\Dispatch;
  */
 class AddressNormalizer
 {
-    /** Matches a letter from a script we never want in a German address. */
-    private const NON_LATIN = '/[\x{0600}-\x{06FF}\x{0750}-\x{077F}'  // Arabic
-        .'\x{0400}-\x{04FF}'                                          // Cyrillic
-        .'\x{0590}-\x{05FF}'                                          // Hebrew
-        .'\x{4E00}-\x{9FFF}\x{3040}-\x{30FF}'                         // CJK / Kana
-        .'\x{0370}-\x{03FF}]/u';                                      // Greek
+    /**
+     * Matches a single character that is a letter but NOT in the Latin script —
+     * i.e. a localized country name in Arabic, Cyrillic, Korean, Thai, CJK, etc.
+     * Latin letters (including German umlauts ä/ö/ü/ß) are kept. Using the
+     * Unicode property is future-proof: any non-Latin script is covered without
+     * enumerating code-point ranges.
+     */
+    private const NON_LATIN = '/(?=\p{L})\P{Latin}/u';
 
     /**
      * Return the address with any non-Latin (localised country) segment removed

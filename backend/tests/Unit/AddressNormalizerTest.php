@@ -23,6 +23,14 @@ class AddressNormalizerTest extends TestCase
         );
     }
 
+    public function test_strips_korean_country_segment(): void
+    {
+        $this->assertSame(
+            'Deutscher Ring 42, 42327 Wuppertal-Elberfeld-West',
+            AddressNormalizer::clean('Deutscher Ring 42, 42327 Wuppertal-Elberfeld-West, 독일'),
+        );
+    }
+
     public function test_keeps_german_umlaut_address_untouched(): void
     {
         $address = 'Königsallee 12, 40212 Düsseldorf';
