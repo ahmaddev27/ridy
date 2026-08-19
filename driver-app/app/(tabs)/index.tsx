@@ -1,15 +1,16 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { View, ScrollView, RefreshControl, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useFocusEffect, useRouter } from "expo-router";
-import { ChevronLeft, ChevronRight, UserCircle } from "lucide-react-native";
+import { UserCircle } from "lucide-react-native";
 import { api, type HomeData, type FleetHomeData, type Offer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
-import { useColors, radius, cardStyle } from "@/lib/theme";
-import { fareLabel, perKmLabel, distanceLabel, cleanAddress, euroQuality } from "@/lib/format";
-import { Logo, StatusBadge, QualityMark, RouteBlock, SectionLabel } from "@/components/ui";
+import { useColors, cardStyle } from "@/lib/theme";
+import { fareLabel, perKmValue, distanceLabel, cleanAddress } from "@/lib/format";
+import { Logo, SectionLabel, StatusBadge } from "@/components/ui";
+import { OfferCard } from "@/components/offer-card";
 
 export default function HomeScreen() {
   const c = useColors();
@@ -38,247 +39,149 @@ export default function HomeScreen() {
   const greeting = new Date().getHours() >= 17 ? t("home.greetingEvening") : t("home.greetingDay");
   const today = isOwner ? fleet?.today : data?.today;
   const active = data?.active_offer ?? null;
-  // Owners see the company name as the headline; drivers see their own name.
   const headline = isOwner ? (fleet?.owner.company_name ?? driver?.company_name ?? "…") : (data?.driver.name ?? "…");
+  const sub = isOwner ? t("home.fleetTitle") : (driver?.company_name ?? "");
   const recent = isOwner ? fleet?.recent ?? [] : data?.recent ?? [];
   const activeOffers = fleet?.active_offers ?? [];
+
+  const online = isOwner ? (fleet?.online_drivers ?? 0) > 0 : !!data?.driver.online;
+  const engagement = data?.driver.engagement ?? 0;
+  const avgKm = today && today.km > 0 ? today.earnings / today.km : 0;
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: c.canvas }}>
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 18 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} tintColor={c.ink} />}
       >
-        {/* Header */}
-        <View style={{ flexDirection: row, alignItems: "center", gap: 12 }}>
+        {/* Header: brand + greeting */}
+        <View style={{ flexDirection: row, alignItems: "center", gap: 11 }}>
           <Logo size={30} />
           <View style={{ flex: 1 }}>
-            <Text style={{ color: c.ink, fontSize: 20, fontWeight: "800", textAlign: align }}>
+            <Text style={{ color: c.ink, fontSize: 22, fontWeight: "800", letterSpacing: -0.4, textAlign: align }}>
               {greeting}, {headline}
             </Text>
-            {!isOwner && driver?.company_name && (
-              <Text style={{ color: c.inkMuted, fontSize: 14, textAlign: align }}>{driver.company_name}</Text>
-            )}
-            {isOwner && (
-              <Text style={{ color: c.inkMuted, fontSize: 14, textAlign: align }}>{t("home.fleetTitle")}</Text>
-            )}
-          </View>
-          {isOwner
-            ? <DriversPill count={fleet?.online_drivers ?? 0} />
-            : <OnlinePill online={!!data?.driver.online} />}
-        </View>
-
-        {/* Today stats — 2×2 grid */}
-        <View style={cardStyle(c)}>
-          <View style={{ flexDirection: row }}>
-            <GridCell label={t("home.st.offers")} value={String(today?.total ?? 0)} c={c} border />
-            <GridCell label={t("home.st.accept")} value={`${today?.acceptance_rate ?? 0}%`} c={c} />
-          </View>
-          <View style={{ height: 1, backgroundColor: c.line }} />
-          <View style={{ flexDirection: row }}>
-            <GridCell label={t("home.st.earnings")} value={fareLabel(null, today?.earnings ?? 0)} c={c} border />
-            <GridCell label={t("home.st.distance")} value={String(today?.km ?? 0)} unit="km" c={c} />
+            {!!sub && <Text style={{ color: c.inkSubtle, fontSize: 13.5, textAlign: align }}>{sub}</Text>}
           </View>
         </View>
 
-        {/* Weekly earnings — bars bucketed client-side by weekday of the current week. */}
-        <WeeklyChart offers={recent} />
-
-        {/* Driver: personal active offer. Owner: active trips across the fleet. */}
-        {!isOwner && active && <ActiveOffer offer={active} onPress={() => router.push(`/offer/${active.id}`)} />}
-
-        {isOwner && activeOffers.length > 0 && (
-          <>
-            <Text style={{ color: c.ink, fontSize: 16, fontWeight: "800", textAlign: align, marginTop: 4 }}>{t("fleet.activeNow")}</Text>
-            <View style={cardStyle(c)}>
-              {activeOffers.map((o, i) => (
-                <RecentRow key={o.id} offer={o} showDriver onPress={() => router.push(`/offer/${o.id}`)} last={i === activeOffers.length - 1} />
-              ))}
+        {/* Status card — display-only (status is derived from Uber, not settable here) */}
+        <View style={{ ...cardStyle(c), padding: 16, flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
+          <View style={{ flexDirection: row, alignItems: "center", gap: 12 }}>
+            <View style={{ width: 11, height: 11, borderRadius: 6, backgroundColor: online ? c.accent : c.inkFaint }} />
+            <View>
+              <Text style={{ color: c.ink, fontSize: 15.5, fontWeight: "700", textAlign: align }}>
+                {isOwner
+                  ? `${fleet?.online_drivers ?? 0} ${t("fleet.onlineDrivers")}`
+                  : online
+                    ? t(`home.engagement.${engagement}`)
+                    : t("home.offline")}
+              </Text>
+              <Text style={{ color: c.inkSubtle, fontSize: 11.5, textAlign: align }}>{t("home.driverStatus")}</Text>
             </View>
-          </>
+          </View>
+          <StatusBadge status={online ? "completed" : "rejected"} label={online ? t("home.online") : t("home.offline")} />
+        </View>
+
+        {/* Live / active offer — the driver's current offer as the full €/km card */}
+        {!isOwner && active && (
+          <View style={{ gap: 10 }}>
+            <SectionLabel>{t("home.activeOffer")}</SectionLabel>
+            <OfferCard offer={active} onPress={() => router.push(`/offer/${active.id}`)} />
+          </View>
         )}
 
-        {/* Recent */}
-        <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
-          <Text style={{ color: c.ink, fontSize: 16, fontWeight: "800" }}>{t("home.recent")}</Text>
-          <Pressable onPress={() => router.push("/offers")}>
-            <Text style={{ color: c.inkMuted, fontSize: 15 }}>{t("home.all")}</Text>
-          </Pressable>
+        {isOwner && activeOffers.length > 0 && (
+          <View style={{ gap: 10 }}>
+            <SectionLabel>{t("fleet.activeNow")}</SectionLabel>
+            <View style={cardStyle(c)}>
+              {activeOffers.map((o, i) => (
+                <RecentRow key={o.id} offer={o} showDriver onPress={() => router.push(`/offer/${o.id}`)} last={i === activeOffers.length - 1} c={c} />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* TODAY — 2×2 grid (design: income / avg €/km / offers / accepted) */}
+        <View style={{ gap: 10 }}>
+          <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
+            <SectionLabel>{t("home.today")}</SectionLabel>
+            <Pressable onPress={() => router.push("/statistics")}>
+              <Text style={{ color: c.inkMuted, fontSize: 13.5, fontWeight: "600" }}>{t("profile.stats")}</Text>
+            </Pressable>
+          </View>
+          <View style={cardStyle(c)}>
+            <View style={{ flexDirection: row }}>
+              <GridCell label={t("home.incomeToday")} value={fareLabel(null, today?.earnings ?? 0)} c={c} border />
+              <GridCell label={t("home.avgKm")} value={fareLabel(null, avgKm)} c={c} />
+            </View>
+            <View style={{ height: 1, backgroundColor: c.line }} />
+            <View style={{ flexDirection: row }}>
+              <GridCell label={t("home.st.offers")} value={String(today?.total ?? 0)} c={c} border />
+              <GridCell label={t("home.st.accept")} value={`${today?.accepted ?? 0}/${today?.total ?? 0}`} c={c} />
+            </View>
+          </View>
         </View>
 
-        <View style={cardStyle(c)}>
-          {recent.length === 0 ? (
-            <Text style={{ color: c.inkSubtle, textAlign: "center", padding: 24 }}>{t("home.empty")}</Text>
-          ) : (
-            recent.map((o, i) => (
-              <RecentRow key={o.id} offer={o} showDriver={isOwner} onPress={() => router.push(`/offer/${o.id}`)} last={i === recent.length - 1} />
-            ))
-          )}
-        </View>
+        {/* Recent — compact rows, full list on the Offers tab */}
+        {recent.length > 0 && (
+          <View style={{ gap: 10 }}>
+            <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
+              <SectionLabel>{t("home.recent")}</SectionLabel>
+              <Pressable onPress={() => router.push("/offers")}>
+                <Text style={{ color: c.inkMuted, fontSize: 13.5, fontWeight: "600" }}>{t("home.all")}</Text>
+              </Pressable>
+            </View>
+            <View style={cardStyle(c)}>
+              {recent.slice(0, 4).map((o, i, arr) => (
+                <RecentRow key={o.id} offer={o} showDriver={isOwner} onPress={() => router.push(`/offer/${o.id}`)} last={i === arr.length - 1} c={c} />
+              ))}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-/** German weekday abbreviations, Monday-first, matching the design. */
-const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] as const;
+type Colors = ReturnType<typeof useColors>;
 
-/** Monday-first weekday index (0 = Mon … 6 = Sun) for a given date. */
-function mondayIndex(d: Date): number {
-  return (d.getDay() + 6) % 7;
-}
-
-/**
- * Weekly bar chart: buckets completed/taken offers' fares by weekday of the
- * current week (Mon–Sun). Today's bar is highlighted in ink; the rest use the
- * muted surface fill. Days with no data render a minimal baseline bar.
- */
-function WeeklyChart({ offers }: { offers: Offer[] }) {
-  const c = useColors();
-
-  const totals = useMemo(() => {
-    const buckets = [0, 0, 0, 0, 0, 0, 0];
-    const now = new Date();
-    const monday = new Date(now);
-    monday.setHours(0, 0, 0, 0);
-    monday.setDate(now.getDate() - mondayIndex(now));
-    const nextMonday = new Date(monday);
-    nextMonday.setDate(monday.getDate() + 7);
-
-    for (const o of offers) {
-      if (!o.received_at || o.fare_amount == null) continue;
-      if (o.status === "rejected" || o.status === "canceled") continue;
-      const at = new Date(o.received_at);
-      if (at < monday || at >= nextMonday) continue;
-      buckets[mondayIndex(at)] += o.fare_amount;
-    }
-    return buckets;
-  }, [offers]);
-
-  const max = Math.max(...totals, 1);
-  const todayIdx = mondayIndex(new Date());
-
-  return (
-    <View style={{ ...cardStyle(c), padding: 18, gap: 14 }}>
-      <SectionLabel>{t("home.week")}</SectionLabel>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", height: 132, gap: 10 }}>
-        {WEEKDAYS.map((label, i) => {
-          const isToday = i === todayIdx;
-          const barHeight = 10 + (totals[i] / max) * 92;
-          return (
-            <View key={label} style={{ flex: 1, alignItems: "center", gap: 8 }}>
-              <View style={{ flex: 1, width: "100%", justifyContent: "flex-end", alignItems: "center" }}>
-                <View
-                  style={{
-                    height: barHeight,
-                    width: "100%",
-                    borderRadius: radius.sm,
-                    backgroundColor: isToday ? c.ink : c.surface2,
-                  }}
-                />
-              </View>
-              <Text style={{ color: isToday ? c.ink : c.inkMuted, fontSize: 12, fontWeight: isToday ? "700" : "500" }}>
-                {label}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-function OnlinePill({ online }: { online: boolean }) {
-  const c = useColors();
-  return (
-    <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 7, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7 }}>
-      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: online ? c.completed : c.inkSubtle }} />
-      <Text style={{ color: c.ink, fontSize: 14, fontWeight: "600" }}>{online ? t("home.online") : t("home.offline")}</Text>
-    </View>
-  );
-}
-
-function DriversPill({ count }: { count: number }) {
-  const c = useColors();
-  return (
-    <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 7, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7 }}>
-      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: count > 0 ? c.completed : c.inkSubtle }} />
-      <Text style={{ color: c.ink, fontSize: 14, fontWeight: "600" }}>{count} {t("fleet.onlineDrivers")}</Text>
-    </View>
-  );
-}
-
-function GridCell({ label, value, unit, c, border }: { label: string; value: string; unit?: string; c: ReturnType<typeof useColors>; border?: boolean }) {
+function GridCell({ label, value, c, border }: { label: string; value: string; c: Colors; border?: boolean }) {
   const align = isRTL() ? "right" : "left";
   return (
     <View style={{ flex: 1, padding: 16, gap: 5, borderRightWidth: border && !isRTL() ? 1 : 0, borderLeftWidth: border && isRTL() ? 1 : 0, borderColor: c.line }}>
       <SectionLabel>{label}</SectionLabel>
-      <Text style={{ color: c.ink, fontSize: 24, fontWeight: "800", textAlign: align }}>
-        {value}
-        {unit ? <Text style={{ fontSize: 15, fontWeight: "700", color: c.inkMuted }}> {unit}</Text> : null}
-      </Text>
+      <Text style={{ color: c.ink, fontSize: 22, fontWeight: "800", letterSpacing: -0.4, textAlign: align, writingDirection: "ltr" }}>{value}</Text>
     </View>
   );
 }
 
-function ActiveOffer({ offer, onPress }: { offer: Offer; onPress: () => void }) {
-  const c = useColors();
+/** A compact recent-offer row: €/km + route + status. */
+function RecentRow({ offer, onPress, last, showDriver, c }: { offer: Offer; onPress: () => void; last: boolean; showDriver?: boolean; c: Colors }) {
   const row = isRTL() ? "row-reverse" : "row";
-  const q = euroQuality(offer.fare_amount, offer.distance_m);
-  const mins = offer.received_at ? Math.max(0, Math.round((Date.now() - new Date(offer.received_at).getTime()) / 60000)) : null;
-  const km = offer.distance_m ? offer.distance_m / 1000 : null;
-  const eta = km ? Math.round((km / 30) * 60) : null;
-
-  return (
-    <Pressable onPress={onPress} style={{ ...cardStyle(c), padding: 18, gap: 14 }}>
-      <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
-        <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 8 }}>
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.started }} />
-          <Text style={{ color: c.started, fontSize: 15, fontWeight: "700" }}>{t("status.started")}</Text>
-        </View>
-        {mins != null && <Text style={{ color: c.inkSubtle, fontSize: 14 }}>{t("home.ago").replace("{n}", String(mins))}</Text>}
-      </View>
-
-      <View style={{ flexDirection: row, alignItems: "flex-end", justifyContent: "space-between" }}>
-        <Text style={{ color: c.ink, fontSize: 42, fontWeight: "800", letterSpacing: -1 }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
-        <View style={{ alignItems: isRTL() ? "flex-start" : "flex-end", gap: 2 }}>
-          <QualityMark mark={q.mark} good={q.good} size={18} />
-          <Text style={{ color: c.inkMuted, fontSize: 14 }}>{perKmLabel(offer.fare_amount, offer.distance_m)}</Text>
-        </View>
-      </View>
-
-      <RouteBlock pickup={cleanAddress(offer.pickup_address)} dropoff={cleanAddress(offer.dropoff_address)} />
-
-      <View style={{ height: 1, backgroundColor: c.line, marginTop: 2 }} />
-      <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
-        <Text style={{ color: c.inkMuted, fontSize: 15 }}>
-          {distanceLabel(offer.distance_m)}{eta ? ` · ${t("home.eta").replace("{n}", String(eta))}` : ""}
-        </Text>
-        <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 2 }}>
-          <Text style={{ color: c.ink, fontSize: 15, fontWeight: "700" }}>{t("home.details")}</Text>
-          {isRTL() ? <ChevronLeft size={16} color={c.ink} /> : <ChevronRight size={16} color={c.ink} />}
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-function RecentRow({ offer, onPress, last, showDriver }: { offer: Offer; onPress: () => void; last: boolean; showDriver?: boolean }) {
-  const c = useColors();
-  const row = isRTL() ? "row-reverse" : "row";
+  const align = isRTL() ? "right" : "left";
   const status = offer.status ?? "pending";
   const dim = status === "rejected" || status === "canceled";
-  const q = euroQuality(offer.fare_amount, offer.distance_m);
+  const perKm = perKmValue(offer.fare_amount, offer.distance_m);
   return (
-    <Pressable onPress={onPress} style={{ flexDirection: row, alignItems: "center", gap: 12, padding: 16, borderBottomWidth: last ? 0 : 1, borderColor: c.line, opacity: dim ? 0.55 : 1 }}>
-      <View style={{ minWidth: 84 }}>
-        <Text style={{ color: c.ink, fontSize: 18, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>{fareLabel(offer.fare_formatted, offer.fare_amount)}</Text>
-        <QualityMark mark={q.mark} good={q.good} />
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({ flexDirection: row, alignItems: "center", gap: 12, padding: 15, borderBottomWidth: last ? 0 : 1, borderColor: c.line, opacity: dim ? 0.5 : pressed ? 0.7 : 1 })}
+    >
+      <View style={{ minWidth: 76 }}>
+        <Text style={{ color: c.ink, fontSize: 17, fontWeight: "800", letterSpacing: -0.5, textAlign: align }}>
+          {perKm?.value ?? fareLabel(offer.fare_formatted, offer.fare_amount)}
+        </Text>
+        <Text style={{ color: c.inkSubtle, fontSize: 10.5, textAlign: align }}>
+          {perKm ? "€/km" : distanceLabel(offer.distance_m)}
+        </Text>
       </View>
       <View style={{ flex: 1 }}>
-        {showDriver && offer.driver_name && <DriverTag name={offer.driver_name} />}
-        <Text numberOfLines={1} style={{ color: c.inkMuted, fontSize: 14, textAlign: isRTL() ? "right" : "left" }}>{cleanAddress(offer.pickup_address)}</Text>
-        <Text numberOfLines={1} style={{ color: c.ink, fontSize: 14, textAlign: isRTL() ? "right" : "left" }}>{cleanAddress(offer.dropoff_address)}</Text>
+        {showDriver && offer.driver_name && (
+          <Text numberOfLines={1} style={{ color: c.inkSubtle, fontSize: 11, fontWeight: "700", textAlign: align }}>{offer.driver_name}</Text>
+        )}
+        <Text numberOfLines={1} style={{ color: c.inkMuted, fontSize: 12.5, textAlign: align }}>{cleanAddress(offer.pickup_address)}</Text>
+        <Text numberOfLines={1} style={{ color: c.ink, fontSize: 13, fontWeight: "500", textAlign: align }}>{cleanAddress(offer.dropoff_address)}</Text>
       </View>
       <StatusBadge status={status} label={t(`status.${status}`)} />
     </Pressable>

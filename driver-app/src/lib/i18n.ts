@@ -95,6 +95,7 @@ const de: Dict = {
   "home.today": "Heute",
   "home.activeOffer": "Aktives Angebot",
   "home.recent": "Letzte Angebote",
+  "home.avgKm": "Ø €/km", "home.driverStatus": "Fahrerstatus", "home.incomeToday": "Verdienst heute",
   "home.week": "Diese Woche",
   "home.empty": "Noch keine Angebote heute",
   // Stat cards
@@ -215,6 +216,7 @@ const en: Dict = {
   "home.today": "Today",
   "home.activeOffer": "Active offer",
   "home.recent": "Recent offers",
+  "home.avgKm": "Avg. €/km", "home.driverStatus": "Driver status", "home.incomeToday": "Income today",
   "home.week": "This week",
   "home.empty": "No offers yet today",
   // Stat cards
@@ -335,6 +337,7 @@ const ar: Dict = {
   "home.today": "اليوم",
   "home.activeOffer": "العرض الحالي",
   "home.recent": "أحدث العروض",
+  "home.avgKm": "متوسط €/كم", "home.driverStatus": "حالة السائق", "home.incomeToday": "دخل اليوم",
   "home.week": "هذا الأسبوع",
   "home.empty": "لا عروض اليوم بعد",
   // Stat cards
