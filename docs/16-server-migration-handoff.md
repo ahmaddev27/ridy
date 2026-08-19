@@ -28,20 +28,34 @@ scratch on the new box.
 
 ---
 
-## 1. Target box
+## 1. Target box — Netcup RS 4000 G12 (Nuremberg)
 
-| Tier | Spec | Good for | Monthly |
-|---|---|---|---|
-| **Chosen ✅** | Hetzner **CCX43** — 16 vCPU / 64 GB / 360 GB NVMe | one company up to 10k drivers + geo; comfortable to ~500 companies | **€276.49** |
-| Smaller option | Hetzner **CCX33** — 8 vCPU / 32 GB / 240 GB NVMe | app + DB + geo + daemon, ~100–300 companies | ~€148 |
+| Tier | Spec | Good for |
+|---|---|---|
+| **Chosen ✅** | Netcup **RS 4000 G12** — ~12 dedicated vCPU / ~48–64 GB RAM / ~1 TB NVMe (Nürnberg) | app + DB + geo + daemon; comfortable to ~300–500 companies + thousands of drivers |
 
-- **Region:** Germany (Falkenstein/Nuremberg) — DSGVO + low latency to German OSM/Uber traffic.
-- **OS:** Ubuntu 24.04 LTS (the deploy also supports AlmaLinux/RHEL via dnf).
-- **Disk headroom is the point:** the Germany OSM import needs ~30–40 GB working
-  space + the final Nominatim DB. 240 GB NVMe leaves plenty; never run geo on <120 GB free.
+- **Root Server (RS) line = dedicated cores**, not shared vServer — steady performance under load. Confirm the exact RAM/NVMe on the order page.
+- **Term:** the `…-12m` variant is a **12-month minimum contract** (cheapest). Watch for a one-time setup fee.
+- **Region:** **Nürnberg, Germany** — DSGVO + low latency to German OSM/Uber traffic.
+- **OS:** install **Ubuntu 24.04 LTS** from the Netcup **SCP** (Server Control Panel) → *Media → Images* → assign & install; then reboot. The deploy also supports AlmaLinux/RHEL via dnf.
+- **Access:** RS gives full **root over SSH**. After install, SCP shows the server's **IPv4** and the initial root password (or set an SSH key).
+- **Disk headroom is the point:** the Germany OSM import needs ~30–40 GB working space + the final Nominatim DB. ~1 TB NVMe is plenty; never run geo on <120 GB free.
+
+> **First-order caveats (from Gaza):** Netcup may run an **identity check** on a new
+> account (have ID/passport ready) and provisioning can take from minutes to hours.
+> Payment: PayPal / card / SEPA.
 
 > For **1000 companies** one box is not enough — see §7 (split architecture). Start
 > single, split as load demands. The stack is built to split without rewrites.
+
+### 1b. Put Cloudflare in front (recommended, free)
+
+Cloudflare is **not** a host — it sits in front of the Netcup box as DNS + CDN + DDoS.
+1. Add the domain to Cloudflare (free plan); change the registrar's nameservers to Cloudflare's.
+2. Point the `reidey.de` (and `www`) **A record → the Netcup IPv4**, proxy **ON** (orange cloud).
+3. SSL/TLS mode → **Full (strict)** — Caddy issues a real cert on the box, so strict validates end to end.
+4. Keep the daemon's Uber traffic as-is: it egresses through the **residential proxy**, never through Cloudflare — no conflict.
+5. If Caddy can't get a cert while proxied, use Cloudflare's **Origin Certificate** on the box or set the DNS record to "DNS only" during first issuance, then re-enable the proxy.
 
 ---
 
@@ -50,7 +64,9 @@ scratch on the new box.
 1. **Provision the new box**, note its public IP.
 2. **SSH key:** make sure the same key in the `SSH_KEY` GitHub secret can log into
    the new box as the deploy user (root or a sudo user). Test: `ssh USER@NEW_IP echo ok`.
-3. **Firewall:** open 22, 80, 443. (Hetzner Cloud Firewall or `ufw`.)
+3. **Firewall:** open 22, 80, 443. On Ubuntu use `ufw`:
+   `ufw allow 22 && ufw allow 80 && ufw allow 443 && ufw enable`.
+   (Netcup has no cloud firewall layer — do it on the box.)
 4. **Confirm GitHub secrets exist** (Settings → Secrets and variables → Actions).
    These already drive production; nothing to change except `SSH_HOST` at cutover:
    - `SSH_HOST` `SSH_USER` `SSH_KEY` (or `SSH_PASSWORD`) `SSH_PORT`
