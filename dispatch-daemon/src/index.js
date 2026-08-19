@@ -13,6 +13,12 @@ function streamKey(sessionId, path) {
   return `${sessionId}:${path}`;
 }
 
+/** True when this shard owns the company (stable partition by session id). */
+function ownedByShard(sessionId) {
+  if (config.shardCount <= 1) return true;
+  return ((sessionId % config.shardCount) + config.shardCount) % config.shardCount === config.shardIndex;
+}
+
 async function reconcile() {
   let sessions, globalProxyUrl;
   try {
@@ -20,6 +26,13 @@ async function reconcile() {
   } catch (e) {
     console.error(`session poll failed: ${e.message}`);
     return;
+  }
+
+  // Keep only the companies this shard is responsible for. Every shard polls the
+  // full list but holds streams for its own slice, so the fleet is split with no
+  // coordinator and no overlap.
+  if (config.shardCount > 1) {
+    sessions = sessions.filter((s) => ownedByShard(s.id));
   }
 
   // Proxy priority: the company's own proxy_url, else the super-admin global
@@ -75,7 +88,8 @@ async function reconcile() {
 }
 
 async function main() {
-  console.log(`Ridy dispatch daemon starting -> ${config.apiBaseUrl}`);
+  const shardLabel = config.shardCount > 1 ? ` [shard ${config.shardIndex + 1}/${config.shardCount}]` : "";
+  console.log(`Ridy dispatch daemon starting${shardLabel} -> ${config.apiBaseUrl}`);
   // Uber traffic is proxied per-stream (per-company proxy_url, else the global
   // UBER_PROXY_URL); calls back to our own API stay direct.
   console.log(

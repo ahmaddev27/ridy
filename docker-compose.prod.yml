@@ -163,6 +163,11 @@ services:
       UBER_RAMEN_PATHS: /ramendca/events,/ramenphx/events
       # Residential proxy for all Uber traffic (empty = direct = blocked).
       UBER_PROXY_URL: ${UBER_PROXY_URL:-}
+      # Horizontal sharding. Defaults to a single shard owning every company.
+      # To scale, run more daemon instances (this one plus overrides) each with a
+      # distinct SHARD_INDEX and the same SHARD_COUNT. See docs/18-daemon-sharding.md.
+      SHARD_INDEX: ${SHARD_INDEX:-0}
+      SHARD_COUNT: ${SHARD_COUNT:-1}
 
   # --- Self-hosted geocoding + routing (opt-in via the "geo" profile) --------
   # Removes the free public services' ~1 req/s rate limit so trip distances fill
