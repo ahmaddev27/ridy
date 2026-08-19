@@ -80,7 +80,10 @@ class TripGeocoder
     /** Address → {lat,lng}, cached in geocode_cache (dedupes across offers). */
     private function geocode(?string $address): ?array
     {
-        $address = trim((string) $address);
+        // Strip any localised (non-Latin) country tail so Nominatim sees a clean
+        // German address — this is what mixed-script offers were failing on.
+        $address = (string) AddressNormalizer::clean($address);
+        $address = trim($address);
         if ($address === '') {
             return null;
         }

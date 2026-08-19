@@ -197,8 +197,9 @@ function pricePerKm(offer: DispatchOfferDetail): number | null {
   const trip = offer.trip;
   if (!trip || !trip.distance_km) return null;
   if (trip.price_per_km != null) return trip.price_per_km;
-  // Fall back to the numeric fare (from the offer) or the parsed formatted fare.
-  const fare = trip.fare_amount ?? parseFareNum(offer.fare_formatted);
+  // Fall back to any known numeric fare (trip or the offer's authoritative
+  // column) before parsing the formatted string.
+  const fare = trip.fare_amount ?? offer.fare_amount ?? parseFareNum(offer.fare_formatted);
   return fare != null ? fare / trip.distance_km : null;
 }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Domain\Dispatch\AddressNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -32,8 +33,8 @@ class DispatchOfferResource extends JsonResource
             'rejected_at' => $this->rejected_at?->toIso8601String(),
             'canceled_at' => $this->canceled_at?->toIso8601String(),
             'rider_first_name' => $this->rider_first_name,
-            'pickup_address' => $this->pickup_address,
-            'dropoff_address' => $this->dropoff_address,
+            'pickup_address' => AddressNormalizer::clean($this->pickup_address),
+            'dropoff_address' => AddressNormalizer::clean($this->dropoff_address),
             'fare_formatted' => $this->fare_formatted,
             'fare_amount' => $this->fare_amount !== null ? (float) $this->fare_amount : null,
             'accept_window_seconds' => $this->accept_window_seconds,

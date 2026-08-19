@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Dispatch\AddressNormalizer;
 use App\Domain\Dispatch\DispatchOfferIngestor;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\TripGeocoder;
@@ -176,7 +177,13 @@ class DispatchOfferController extends Controller
     private function trip(DispatchOffer $offer): array
     {
         $distanceKm = $offer->distance_m !== null ? round($offer->distance_m / 1000, 2) : null;
-        $fare = $this->fareAmount($offer->fare_formatted);
+        // Prefer the authoritative numeric fare column (the same one earnings sum
+        // over); only fall back to parsing the formatted string when it is unset.
+        // Otherwise a completed offer whose fare_formatted is blank shows "—" for
+        // price/km even though its fare is known.
+        $fare = $offer->fare_amount !== null
+            ? (float) $offer->fare_amount
+            : $this->fareAmount($offer->fare_formatted);
         $pricePerKm = ($fare !== null && $distanceKm) ? round($fare / $distanceKm, 2) : null;
 
         return [
@@ -184,8 +191,8 @@ class DispatchOfferController extends Controller
                 ? ['lat' => $offer->pickup_lat, 'lng' => $offer->pickup_lng] : null,
             'dropoff' => $offer->dropoff_lat !== null
                 ? ['lat' => $offer->dropoff_lat, 'lng' => $offer->dropoff_lng] : null,
-            'pickup_address' => $offer->pickup_address,
-            'dropoff_address' => $offer->dropoff_address,
+            'pickup_address' => AddressNormalizer::clean($offer->pickup_address),
+            'dropoff_address' => AddressNormalizer::clean($offer->dropoff_address),
             'route_geometry' => $offer->route_geometry, // GeoJSON LineString or null
             'distance_km' => $distanceKm,
             'fare_amount' => $fare,
