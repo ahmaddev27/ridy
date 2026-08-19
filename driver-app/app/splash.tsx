@@ -2,10 +2,11 @@ import { useEffect, useRef } from "react";
 import { View, Pressable, Animated, Easing } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { Text } from "@/components/typography";
 import { Logo } from "@/components/ui";
 import { useColors, radius } from "@/lib/theme";
-import { t } from "@/lib/i18n";
+import { t, setLocale } from "@/lib/i18n";
 
 const TRACK_WIDTH = 96;
 const INDICATOR_WIDTH = TRACK_WIDTH * 0.4;
@@ -21,7 +22,21 @@ export default function SplashScreen() {
   const router = useRouter();
   const pulse = useRef(new Animated.Value(0)).current;
 
-  const advance = useRef(() => router.replace("/")).current;
+  // First launch (no stored language) → language picker; afterwards apply the
+  // saved language and hand off to the app (the auth Gate takes it from there).
+  // Guarded so a tap + the timer can't both navigate.
+  const navigated = useRef(false);
+  const advance = useRef(async () => {
+    if (navigated.current) return;
+    navigated.current = true;
+    const stored = await SecureStore.getItemAsync("locale").catch(() => null);
+    if (stored) {
+      setLocale(stored);
+      router.replace("/");
+    } else {
+      router.replace("/language");
+    }
+  }).current;
 
   useEffect(() => {
     const loop = Animated.loop(

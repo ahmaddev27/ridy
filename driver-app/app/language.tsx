@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { Text } from "@/components/typography";
 import { Logo, PrimaryButton } from "@/components/ui";
 import { useColors, radius } from "@/lib/theme";
@@ -29,6 +30,9 @@ export default function LanguageScreen() {
 
   const onContinue = () => {
     setLocale(selected);
+    // Persist the choice: its presence also marks onboarding as done, so the
+    // splash skips this screen on later launches and re-applies the language.
+    SecureStore.setItemAsync("locale", selected).catch(() => {});
     router.replace("/login");
   };
 

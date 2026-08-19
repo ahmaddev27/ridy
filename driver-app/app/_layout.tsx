@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as Notifications from "expo-notifications";
 import * as SplashScreen from "expo-splash-screen";
@@ -63,14 +63,25 @@ function Gate() {
   const router = useRouter();
   const c = useColors();
 
+  const booted = useRef(false);
   useEffect(() => {
     if (!ready) return;
-    const inAuth = segments[0] === "login" || segments[0] === "activate";
-    if (!driver && !inAuth) {
-      router.replace("/login");
-    } else if (driver && inAuth) {
-      router.replace("/");
+    const seg = segments[0];
+    // Cold start: show the brand splash first (once). It advances to the language
+    // picker on first launch, or straight into the app afterwards.
+    if (!booted.current) {
+      booted.current = true;
+      if (seg !== "splash" && seg !== "language") {
+        router.replace("/splash");
+        return;
+      }
     }
+    // Onboarding screens drive their own navigation.
+    if (seg === "splash" || seg === "language") return;
+    // Auth gate.
+    const inAuth = seg === "login" || seg === "activate";
+    if (!driver && !inAuth) router.replace("/login");
+    else if (driver && inAuth) router.replace("/");
   }, [ready, driver, segments, router]);
 
   // Once signed in: register for push and open the offer when a notification is tapped.
