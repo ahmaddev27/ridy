@@ -19,3 +19,9 @@ Schedule::command('offers:backfill-geo')->everyFiveMinutes()->withoutOverlapping
 
 // Daily heads-up notifications: subscriptions/proxies expiring or expired.
 Schedule::command('notifications:scan')->dailyAt('08:00')->withoutOverlapping();
+
+// Ops alerting: broken Uber sessions / down daemon shards (emailed once each).
+Schedule::command('alerts:check')->everyFiveMinutes()->withoutOverlapping();
+
+// Nightly gzipped database backup (kept 7 days in storage/app/backups).
+Schedule::command('db:backup')->dailyAt('03:00')->withoutOverlapping();

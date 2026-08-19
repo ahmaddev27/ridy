@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libzip-dev \
         libicu-dev \
         libonig-dev \
+        default-mysql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # --- PHP extensions ----------------------------------------------------------

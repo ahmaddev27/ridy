@@ -38,6 +38,8 @@ x-app-env: &app-env
   # app falls back to LogPushSender (pushes are only logged, not sent).
   FCM_CREDENTIALS: ${FCM_CREDENTIALS:-}
   FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+  # Ops alerting: where broken-session / down-shard alerts are emailed (empty = log only).
+  ALERT_EMAIL: ${ALERT_EMAIL:-}
   FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
   # Fixed OTP for testing — leave OTP_TEST_CODE unset in prod for random codes.
   OTP_TEST_CODE: ${OTP_TEST_CODE:-}

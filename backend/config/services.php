@@ -75,4 +75,10 @@ return [
         'osrm_url' => env('OSRM_URL') ?: 'https://router.project-osrm.org',
     ],
 
+    // Ops alerting: where operational alerts (broken session / down shard) are
+    // emailed. Empty = alerts are only logged (RidyLog), never mailed.
+    'alerts' => [
+        'email' => env('ALERT_EMAIL'),
+    ],
+
 ];

@@ -6,6 +6,7 @@ import { AlertTriangle, Building2, Radio, Plug, ArrowRight, Users, Wallet, Trend
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { AreaChart } from "@/components/charts/area-chart";
+import { BarChart } from "@/components/charts/bar-chart";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getOverview, getBillingSummary } from "@/lib/api/admin";
@@ -87,7 +88,7 @@ export default function AdminDashboardPage() {
       {/* Offers over time */}
       <Card className="p-5">
         <h3 className="mb-4 font-semibold text-ink">{c("offersChart")}</h3>
-        {offersChart.length > 0 ? <AreaChart data={offersChart} /> : <div className="h-[180px] animate-pulse rounded-lg bg-surface-2" />}
+        {offersChart.length > 0 ? <BarChart data={offersChart} /> : <div className="h-[180px] animate-pulse rounded-lg bg-surface-2" />}
       </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
