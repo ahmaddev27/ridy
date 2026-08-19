@@ -102,8 +102,11 @@ function Gate() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.canvas } }}>
       <Stack.Screen name="login" />
       <Stack.Screen name="activate" />
+      <Stack.Screen name="language" />
+      <Stack.Screen name="splash" options={{ gestureEnabled: false }} />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="offer/[id]" options={{ presentation: "modal" }} />
+      <Stack.Screen name="settings" options={{ presentation: "modal" }} />
     </Stack>
   );
 }

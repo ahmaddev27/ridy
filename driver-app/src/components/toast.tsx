@@ -23,7 +23,7 @@ const ICONS: Record<ToastKind, LucideIcon> = {
 /** Lightweight themed toast rendered above the app; auto-dismisses after 2.6s. */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<ToastState>(null);
-  const opacity = useRef(new Animated.Value(0)).current;
+  const anim = useRef(new Animated.Value(0)).current;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const show = useCallback((message: string, kind: ToastKind = "info") => {
@@ -33,26 +33,28 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!toast) return;
-    Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+    Animated.timing(anim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
     timer.current = setTimeout(() => {
-      Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => setToast(null));
+      Animated.timing(anim, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => setToast(null));
     }, 2600);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [toast, opacity]);
+  }, [toast, anim]);
 
   return (
     <ToastContext.Provider value={{ show }}>
       {children}
-      {toast && <ToastView toast={toast} opacity={opacity} />}
+      {toast && <ToastView toast={toast} anim={anim} />}
     </ToastContext.Provider>
   );
 }
 
-function ToastView({ toast, opacity }: { toast: NonNullable<ToastState>; opacity: Animated.Value }) {
+function ToastView({ toast, anim }: { toast: NonNullable<ToastState>; anim: Animated.Value }) {
   const c = useColors();
-  const tone = toast.kind === "success" ? c.completed : toast.kind === "error" ? c.danger : c.accent;
+  const tone = toast.kind === "success" ? c.accent : toast.kind === "error" ? c.danger : c.inkMuted;
+  // Subtle rise: slide up a few px as it fades in.
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
   return (
     <Animated.View
       pointerEvents="none"
@@ -61,25 +63,29 @@ function ToastView({ toast, opacity }: { toast: NonNullable<ToastState>; opacity
         bottom: 90,
         left: 16,
         right: 16,
-        opacity,
+        opacity: anim,
+        transform: [{ translateY }],
         flexDirection: isRTL() ? "row-reverse" : "row",
         alignItems: "center",
         gap: 10,
-        backgroundColor: c.surface,
+        backgroundColor: c.overlay,
         borderWidth: 1,
-        borderColor: c.line,
-        borderRadius: radius.lg,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        shadowColor: "#000",
-        shadowOpacity: 0.2,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 6,
+        borderColor: c.borderStrong,
+        borderRadius: radius.control,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
       }}
     >
-      {(() => { const Icon = ICONS[toast.kind]; return <Icon size={20} color={tone} />; })()}
-      <Text style={{ flex: 1, color: c.ink, fontWeight: "600", textAlign: isRTL() ? "right" : "left" }}>
+      {(() => { const Icon = ICONS[toast.kind]; return <Icon size={17} color={tone} strokeWidth={1.6} />; })()}
+      <Text
+        style={{
+          flex: 1,
+          color: c.ink,
+          fontSize: 12.5,
+          fontWeight: "500",
+          textAlign: isRTL() ? "right" : "left",
+        }}
+      >
         {toast.message}
       </Text>
     </Animated.View>

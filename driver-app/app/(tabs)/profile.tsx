@@ -1,246 +1,200 @@
-import { useCallback, useEffect, useState } from "react";
-import { View, ScrollView, Pressable, Modal } from "react-native";
+import { View, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import Constants from "expo-constants";
+import {
+  Settings as SettingsIcon,
+  ShieldCheck,
+  User,
+  SlidersHorizontal,
+  LifeBuoy,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  type LucideIcon,
+} from "lucide-react-native";
 import { Text } from "@/components/typography";
-import { LogOut, ChevronLeft, ChevronRight, Save } from "lucide-react-native";
-import { api, type DriverStats } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { t, isRTL, setLocale, getLocale } from "@/lib/i18n";
-import { useColors, radius, cardStyle } from "@/lib/theme";
-import { fareLabel } from "@/lib/format";
-import { Field, PrimaryButton, SectionLabel } from "@/components/ui";
-import { useToast } from "@/components/toast";
+import { t, isRTL } from "@/lib/i18n";
+import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
 
-const RANGES = [
-  { key: "today", days: 0 },
-  { key: "7d", days: 7 },
-  { key: "30d", days: 30 },
-] as const;
-
-const LANGS = [
-  { code: "de", label: "Deutsch" },
-  { code: "en", label: "English" },
-  { code: "ar", label: "العربية" },
-];
+const APP_VERSION = Constants.expoConfig?.version ?? "1.1.0";
 
 export default function ProfileScreen() {
   const c = useColors();
-  const [tab, setTab] = useState<"stats" | "settings">("stats");
+  const router = useRouter();
+  const { driver, logout } = useAuth();
   const align = isRTL() ? "right" : "left";
+  const row = isRTL() ? "row-reverse" : "row";
+
+  const name = driver?.name ?? "";
+  const initials =
+    name
+      .split(" ")
+      .map((w) => w[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "?";
+
+  // Only the fields that actually exist on DriverProfile.
+  const idLine = driver?.email ?? driver?.company_name ?? (driver ? `#${driver.id}` : "");
+
+  const facts: { label: string; value: string }[] = [];
+  if (driver?.company_name) facts.push({ label: t("profile.company"), value: driver.company_name });
+  if (driver?.email) facts.push({ label: t("profile.email"), value: driver.email });
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: c.canvas }}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 18 }}>
-        <Text style={{ color: c.ink, fontSize: 26, fontWeight: "800", textAlign: align }}>{t("tabs.profile")}</Text>
-
-        {/* Segment */}
-        <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", backgroundColor: c.surface2, borderRadius: radius.lg, padding: 5 }}>
-          {(["stats", "settings"] as const).map((s) => {
-            const on = tab === s;
-            return (
-              <Pressable key={s} onPress={() => setTab(s)} style={{ flex: 1, paddingVertical: 11, borderRadius: radius.md, backgroundColor: on ? c.surface : "transparent", alignItems: "center", ...(on ? { shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 1 }, elevation: 1 } : {}) }}>
-                <Text style={{ color: on ? c.ink : c.inkMuted, fontWeight: "700", fontSize: 16 }}>{t(s === "stats" ? "profile.stats" : "profile.settings")}</Text>
-              </Pressable>
-            );
-          })}
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 18 }}>
+        {/* Header */}
+        <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
+          <Text style={{ color: c.ink, fontSize: 26, fontWeight: "800", textAlign: align }}>
+            {t("tabs.profile")}
+          </Text>
+          <Pressable
+            onPress={() => router.push("/settings")}
+            hitSlop={8}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: radius.control,
+              backgroundColor: c.surface2,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <SettingsIcon size={19} color={c.inkMuted} strokeWidth={1.6} />
+          </Pressable>
         </View>
 
-        {tab === "stats" ? <Stats /> : <Settings />}
+        {/* Identity */}
+        <View style={{ ...cardStyle(c), padding: 18, flexDirection: row, alignItems: "center", gap: 14 }}>
+          <View
+            style={{
+              width: 58,
+              height: 58,
+              borderRadius: 29,
+              backgroundColor: c.surface2,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ color: c.inkMuted, fontSize: 20, fontWeight: "800" }}>{initials}</Text>
+          </View>
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text style={{ color: c.ink, fontSize: 16, fontWeight: "700", textAlign: align }} numberOfLines={1}>
+              {name}
+            </Text>
+            {idLine ? (
+              <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: align }} numberOfLines={1}>
+                {idLine}
+              </Text>
+            ) : null}
+          </View>
+          {driver?.uber_linked ? (
+            <View
+              style={{
+                flexDirection: row,
+                alignItems: "center",
+                gap: 5,
+                backgroundColor: c.completedBg,
+                borderRadius: radius.pill,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+              }}
+            >
+              <ShieldCheck size={13} color={c.accepted} strokeWidth={1.8} />
+              <Text style={{ color: c.accepted, fontSize: 11.5, fontWeight: "700" }}>
+                {t("profile.verified")}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Facts */}
+        {facts.length > 0 && (
+          <View style={cardStyle(c)}>
+            {facts.map((f, i) => (
+              <View key={f.label}>
+                <View
+                  style={{
+                    flexDirection: row,
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    paddingHorizontal: 16,
+                    paddingVertical: 15,
+                    gap: 12,
+                  }}
+                >
+                  <Text style={{ color: c.inkSubtle, fontSize: 13.5, textAlign: align }}>{f.label}</Text>
+                  <Text
+                    style={{ color: c.ink, fontSize: 13.5, fontWeight: "500", flexShrink: 1, textAlign: isRTL() ? "left" : "right" }}
+                    numberOfLines={1}
+                  >
+                    {f.value}
+                  </Text>
+                </View>
+                {i < facts.length - 1 && <Separator c={c} />}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Menu group 1 */}
+        <View style={cardStyle(c)}>
+          <MenuRow c={c} icon={User} label={t("profile.personalInfo")} onPress={() => {}} />
+          <Separator c={c} />
+          <MenuRow c={c} icon={SlidersHorizontal} label={t("profile.settings")} onPress={() => router.push("/settings")} last />
+        </View>
+
+        {/* Menu group 2 */}
+        <View style={cardStyle(c)}>
+          <MenuRow c={c} icon={LifeBuoy} label={t("profile.support")} onPress={() => {}} />
+          <Separator c={c} />
+          <MenuRow c={c} icon={LogOut} label={t("profile.logout")} onPress={logout} danger last />
+        </View>
+
+        {/* Footer */}
+        <Text style={{ color: c.inkFaint, fontSize: 12, textAlign: "center", marginTop: 4 }}>
+          {t("profile.appName")} {APP_VERSION}
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Stats() {
-  const c = useColors();
-  const { isOwner } = useAuth();
-  const [range, setRange] = useState<(typeof RANGES)[number]["key"]>("today");
-  const [data, setData] = useState<DriverStats | null>(null);
+function MenuRow({
+  c,
+  icon: Icon,
+  label,
+  onPress,
+  danger,
+  last,
+}: {
+  c: Palette;
+  icon: LucideIcon;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+  last?: boolean;
+}) {
+  const row = isRTL() ? "row-reverse" : "row";
   const align = isRTL() ? "right" : "left";
-
-  const load = useCallback(async (r: (typeof RANGES)[number]) => {
-    try {
-      const from = r.days === 0 ? new Date().toISOString().slice(0, 10) : new Date(Date.now() - r.days * 864e5).toISOString().slice(0, 10);
-      setData((await (isOwner ? api.fleetStats(from) : api.stats(from))).data);
-    } catch { /* */ }
-  }, [isOwner]);
-
-  useEffect(() => { const r = RANGES.find((x) => x.key === range)!; load(r); }, [range, load]);
-
-  const accepted = data?.accepted ?? 0;
-  const declined = data?.declined ?? 0;
-  const rate = data?.acceptance_rate ?? 0;
-
+  const color = danger ? c.danger : c.ink;
+  const Chevron = isRTL() ? ChevronLeft : ChevronRight;
   return (
-    <View style={{ gap: 16 }}>
-      {/* Range chips */}
-      <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", gap: 10 }}>
-        {RANGES.map((r) => {
-          const on = range === r.key;
-          return (
-            <Pressable key={r.key} onPress={() => setRange(r.key)} style={{ paddingHorizontal: 18, paddingVertical: 10, borderRadius: radius.pill, backgroundColor: on ? c.primary : c.surface, borderWidth: 1, borderColor: on ? c.primary : c.line }}>
-              <Text style={{ color: on ? c.primaryInk : c.inkMuted, fontWeight: "700", fontSize: 14 }}>{t(`range.${r.key}`)}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* Earnings */}
-      <View style={{ ...cardStyle(c), padding: 20, gap: 6 }}>
-        <SectionLabel>{t("profile.verdienstToday")}</SectionLabel>
-        <Text style={{ color: c.ink, fontSize: 38, fontWeight: "800", letterSpacing: -1, textAlign: align }}>{fareLabel(null, data?.earnings ?? 0)}</Text>
-      </View>
-
-      {/* Grid */}
-      <View style={cardStyle(c)}>
-        <View style={{ flexDirection: isRTL() ? "row-reverse" : "row" }}>
-          <GridCell label={t("home.st.offers")} value={String(data?.total ?? 0)} border />
-          <GridCell label={t("stat.accepted")} value={String(accepted)} />
-        </View>
-        <View style={{ height: 1, backgroundColor: c.line }} />
-        <View style={{ flexDirection: isRTL() ? "row-reverse" : "row" }}>
-          <GridCell label={t("stat.completed")} value={String(data?.completed ?? 0)} border />
-          <GridCell label={t("home.st.distance")} value={String(data?.km ?? 0)} unit="km" />
-        </View>
-      </View>
-
-      {/* Acceptance */}
-      <View style={{ ...cardStyle(c), padding: 18, gap: 12 }}>
-        <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Text style={{ color: c.ink, fontSize: 16, fontWeight: "700" }}>{t("stat.acceptanceRate")}</Text>
-          <Text style={{ color: c.ink, fontSize: 22, fontWeight: "800" }}>{rate}%</Text>
-        </View>
-        <View style={{ height: 8, borderRadius: 999, backgroundColor: c.surface2, overflow: "hidden" }}>
-          <View style={{ height: "100%", width: `${rate}%`, backgroundColor: c.completed }} />
-        </View>
-        <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", justifyContent: "space-between" }}>
-          <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("profile.accepted").replace("{n}", String(accepted))}</Text>
-          <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("profile.declined").replace("{n}", String(declined))}</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function GridCell({ label, value, unit, border }: { label: string; value: string; unit?: string; border?: boolean }) {
-  const c = useColors();
-  return (
-    <View style={{ flex: 1, padding: 16, gap: 5, borderRightWidth: border && !isRTL() ? 1 : 0, borderLeftWidth: border && isRTL() ? 1 : 0, borderColor: c.line }}>
-      <SectionLabel>{label}</SectionLabel>
-      <Text style={{ color: c.ink, fontSize: 22, fontWeight: "800", textAlign: isRTL() ? "right" : "left" }}>
-        {value}{unit ? <Text style={{ fontSize: 14, color: c.inkMuted }}> {unit}</Text> : null}
-      </Text>
-    </View>
-  );
-}
-
-function Settings() {
-  const c = useColors();
-  const { driver, isOwner, updateProfile, logout } = useAuth();
-  const toast = useToast();
-  const [locale, setLocaleState] = useState(getLocale());
-  const [edit, setEdit] = useState<null | "name" | "password">(null);
-  const [name, setName] = useState(driver?.name ?? "");
-  const [password, setPassword] = useState("");
-  const [saving, setSaving] = useState(false);
-  const align = isRTL() ? "right" : "left";
-  const initials = (driver?.name ?? "?").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
-
-  function cycleLang() {
-    const i = LANGS.findIndex((l) => l.code === locale);
-    const next = LANGS[(i + 1) % LANGS.length];
-    setLocale(next.code);
-    setLocaleState(next.code);
-    // Owners have no editable driver profile; keep the language change local.
-    if (!isOwner) updateProfile({ locale: next.code }).catch(() => {});
-  }
-
-  async function save() {
-    setSaving(true);
-    try {
-      const patch: { name?: string; password?: string } = {};
-      if (edit === "name") patch.name = name;
-      if (edit === "password" && password.length >= 8) patch.password = password;
-      await updateProfile(patch);
-      toast.show(t("settings.saved"));
-      setEdit(null); setPassword("");
-    } catch {
-      toast.show(t("settings.saveError"), "error");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <View style={{ gap: 18 }}>
-      {/* Identity */}
-      <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 16, ...cardStyle(c), padding: 18 }}>
-        <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: c.surface2, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ color: c.inkMuted, fontSize: 20, fontWeight: "700" }}>{initials}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: c.ink, fontSize: 20, fontWeight: "800", textAlign: align }}>{driver?.name}</Text>
-          {driver?.company_name && <Text style={{ color: c.inkMuted, fontSize: 15, textAlign: align }}>{driver.company_name}</Text>}
-          {driver?.email && <Text style={{ color: c.inkSubtle, fontSize: 14, textAlign: align }}>{driver.email}</Text>}
-        </View>
-      </View>
-
-      {/* KONTO */}
-      <SectionLabel>{t("profile.konto")}</SectionLabel>
-      <View style={cardStyle(c)}>
-        {/* Owners monitor read-only; name/password are managed in the dashboard. */}
-        {!isOwner && (
-          <>
-            <Row label={t("settings.name")} value={driver?.name ?? ""} onPress={() => { setName(driver?.name ?? ""); setEdit("name"); }} />
-            <Divider />
-          </>
-        )}
-        <Row label={t("settings.language")} value={LANGS.find((l) => l.code === locale)?.label ?? ""} onPress={cycleLang} last={isOwner} />
-        {!isOwner && (
-          <>
-            <Divider />
-            <Row label={t("settings.newPassword").replace(" (optional)", "").replace(" (اختياري)", "").replace(" (optional)", "")} onPress={() => { setPassword(""); setEdit("password"); }} last />
-          </>
-        )}
-      </View>
-
-      {/* Logout */}
-      <Pressable onPress={logout} style={{ flexDirection: isRTL() ? "row-reverse" : "row", gap: 8, ...cardStyle(c), paddingVertical: 16, alignItems: "center", justifyContent: "center", marginTop: 6 }}>
-        <LogOut size={18} color={c.danger} />
-        <Text style={{ color: c.danger, fontSize: 15, fontWeight: "700" }}>{t("settings.logout")}</Text>
-      </Pressable>
-      <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: "center" }}>Reidey Driver 1.0.0</Text>
-
-      {/* Edit modal */}
-      <Modal visible={edit !== null} transparent animationType="fade" onRequestClose={() => setEdit(null)}>
-        <Pressable onPress={() => setEdit(null)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}>
-          <Pressable onPress={() => {}} style={{ backgroundColor: c.canvas, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 34, gap: 16 }}>
-            <Text style={{ color: c.ink, fontSize: 18, fontWeight: "800", textAlign: align }}>{edit === "name" ? t("settings.name") : t("settings.newPassword")}</Text>
-            {edit === "name" ? (
-              <Field label={t("settings.name")} value={name} onChangeText={setName} />
-            ) : (
-              <Field label={t("settings.newPassword")} value={password} onChangeText={setPassword} secure />
-            )}
-            <PrimaryButton label={t("settings.save")} onPress={save} loading={saving} icon={Save} />
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </View>
-  );
-}
-
-function Row({ label, value, onPress, last }: { label: string; value?: string; onPress: () => void; last?: boolean }) {
-  const c = useColors();
-  return (
-    <Pressable onPress={onPress} style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 10, paddingHorizontal: 18, paddingVertical: 17 }}>
-      <Text style={{ flex: 1, color: c.ink, fontSize: 17, textAlign: isRTL() ? "right" : "left" }}>{label}</Text>
-      {value ? <Text style={{ color: c.inkMuted, fontSize: 16 }} numberOfLines={1}>{value}</Text> : null}
-      {isRTL() ? <ChevronLeft size={18} color={c.inkSubtle} /> : <ChevronRight size={18} color={c.inkSubtle} />}
+    <Pressable
+      onPress={onPress}
+      style={{ flexDirection: row, alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 15 }}
+    >
+      <Icon size={18} color={danger ? c.danger : c.inkMuted} strokeWidth={1.6} />
+      <Text style={{ flex: 1, color, fontSize: 13.5, fontWeight: "500", textAlign: align }}>{label}</Text>
+      {!danger && <Chevron size={18} color={c.inkFaint} strokeWidth={1.6} />}
     </Pressable>
   );
 }
 
-function Divider() {
-  const c = useColors();
-  return <View style={{ height: 1, backgroundColor: c.line, marginHorizontal: 18 }} />;
+function Separator({ c }: { c: Palette }) {
+  return <View style={{ height: 1, backgroundColor: c.line, marginHorizontal: 16 }} />;
 }

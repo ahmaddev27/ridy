@@ -49,21 +49,39 @@ export default function ActivateScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.canvas }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.canvas }} edges={["top"]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1, justifyContent: "center", padding: 24 }}
+        style={{ flex: 1, justifyContent: "center", padding: 16 }}
       >
         {/* Brand */}
-        <View style={{ alignItems: "center", marginBottom: 32 }}>
-          <Logo size={72} />
-          <Text style={{ color: c.ink, fontSize: 28, fontWeight: "800", marginTop: 16, textAlign: "center" }}>
+        <View
+          style={{
+            flexDirection: isRTL() ? "row-reverse" : "row",
+            alignItems: "center",
+            gap: 9,
+            marginBottom: 40,
+          }}
+        >
+          <Logo size={30} />
+          <Text style={{ color: c.ink, fontSize: 21, fontWeight: "800", fontStyle: "italic", letterSpacing: 1.2 }}>
+            REIDEY
+          </Text>
+        </View>
+
+        {/* Heading */}
+        <View style={{ marginBottom: 28 }}>
+          <Text style={{ color: c.ink, fontSize: 30, fontWeight: "800", letterSpacing: -0.8, textAlign: align }}>
             {t("activate.title")}
           </Text>
-          {preview && (
-            <Text style={{ color: c.inkMuted, fontSize: 15, marginTop: 6, textAlign: "center" }}>
+          {preview ? (
+            <Text style={{ color: c.inkMuted, fontSize: 15, marginTop: 8, lineHeight: 21, textAlign: align }}>
               {preview.driver_name}
               {preview.company_name ? ` · ${preview.company_name}` : ""}
+            </Text>
+          ) : (
+            <Text style={{ color: c.inkMuted, fontSize: 15, marginTop: 8, lineHeight: 21, textAlign: align }}>
+              {t("activate.intro")}
             </Text>
           )}
         </View>
@@ -72,10 +90,10 @@ export default function ActivateScreen() {
           <ActivityIndicator color={c.ink} />
         ) : (
           <View style={{ gap: 12 }}>
-            <Text style={{ color: c.inkMuted, fontSize: 14, textAlign: align }}>{t("activate.intro")}</Text>
+            <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20, textAlign: align }}>{t("activate.intro")}</Text>
             <Field label={t("login.password")} value={password} onChangeText={setPassword} secure />
-            {error && <Text style={{ color: c.danger, fontSize: 14, textAlign: "center" }}>{error}</Text>}
-            <View style={{ marginTop: 4 }}>
+            {error && <Text style={{ color: c.danger, fontSize: 14, textAlign: align }}>{error}</Text>}
+            <View style={{ marginTop: 8 }}>
               <PrimaryButton
                 label={t("activate.submit")}
                 onPress={submit}
