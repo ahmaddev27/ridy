@@ -24,8 +24,18 @@ export function AreaChart({ data, height = 180, color = "#4f46e5" }: { data: Poi
   const x = (i: number) => padX + (data.length <= 1 ? innerW / 2 : (i / (data.length - 1)) * innerW);
   const y = (v: number) => padTop + innerH - (v / max) * innerH;
 
-  const line = data.map((d, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(d.value).toFixed(1)}`).join(" ");
-  const area = `${line} L${x(data.length - 1).toFixed(1)},${padTop + innerH} L${x(0).toFixed(1)},${padTop + innerH} Z`;
+  // A single data point can't form a line (an "M" with no "L" draws nothing), so
+  // the chart would look empty with only one month of data. Draw a flat line at
+  // that value across the full width instead, with the area filled beneath it.
+  const single = data.length === 1;
+  const yFirst = y(data[0]?.value ?? 0).toFixed(1);
+  const baseline = (padTop + innerH).toFixed(1);
+  const line = single
+    ? `M${padX.toFixed(1)},${yFirst} L${(W - padX).toFixed(1)},${yFirst}`
+    : data.map((d, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(d.value).toFixed(1)}`).join(" ");
+  const area = single
+    ? `${line} L${(W - padX).toFixed(1)},${baseline} L${padX.toFixed(1)},${baseline} Z`
+    : `${line} L${x(data.length - 1).toFixed(1)},${baseline} L${x(0).toFixed(1)},${baseline} Z`;
 
   function onMove(e: React.PointerEvent<SVGSVGElement>) {
     const rect = ref.current!.getBoundingClientRect();
