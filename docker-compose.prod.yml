@@ -40,6 +40,8 @@ x-app-env: &app-env
   FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
   # Ops alerting: where broken-session / down-shard alerts are emailed (empty = log only).
   ALERT_EMAIL: ${ALERT_EMAIL:-}
+  # Error tracking (Sentry/GlitchTip). Empty = disabled.
+  SENTRY_LARAVEL_DSN: ${SENTRY_LARAVEL_DSN:-}
   FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
   # Fixed OTP for testing — leave OTP_TEST_CODE unset in prod for random codes.
   OTP_TEST_CODE: ${OTP_TEST_CODE:-}

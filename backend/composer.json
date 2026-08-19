@@ -11,6 +11,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
         "resend/resend-php": "^1.7",
+        "sentry/sentry-laravel": "^4.27",
         "spatie/laravel-permission": "^8.0"
     },
     "require-dev": {

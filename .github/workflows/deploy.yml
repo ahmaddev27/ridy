@@ -39,7 +39,7 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SSH_PORT }}
           # Pass secrets as env so they never appear in the script text/logs.
-          envs: REPO_URL,DOMAIN,APP_KEY,DB_PASSWORD,DB_ROOT_PASSWORD,DISPATCH_INGEST_SECRET,FCM_CREDENTIALS_JSON,FCM_PROJECT_ID,NOMINATIM_URL,OSRM_URL,ALERT_EMAIL
+          envs: REPO_URL,DOMAIN,APP_KEY,DB_PASSWORD,DB_ROOT_PASSWORD,DISPATCH_INGEST_SECRET,FCM_CREDENTIALS_JSON,FCM_PROJECT_ID,NOMINATIM_URL,OSRM_URL,ALERT_EMAIL,SENTRY_LARAVEL_DSN
           script_stop: true
           script: |
             set -e
@@ -102,6 +102,7 @@ jobs:
             FCM_CREDENTIALS=$FCM_CREDENTIALS_PATH
             FCM_PROJECT_ID=$FCM_PROJECT_ID
             ALERT_EMAIL=$ALERT_EMAIL
+            SENTRY_LARAVEL_DSN=$SENTRY_LARAVEL_DSN
             NOMINATIM_URL=$NOMINATIM_URL
             OSRM_URL=$OSRM_URL
             EOF
