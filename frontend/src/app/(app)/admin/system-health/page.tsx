@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, Building2 } from "lucide-react";
+import { Activity, Building2, Server } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge, type Status } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
@@ -20,17 +20,27 @@ export default function SystemHealthPage() {
 
   return (
     <div className="space-y-6">
-      {/* Sub-tabs: System Health + Shards live together under one "System" area. */}
-      <div className="flex gap-1 rounded-lg border border-line bg-surface p-1">
-        {(["health", "shards"] as const).map((tk) => (
-          <button
-            key={tk}
-            onClick={() => setTab(tk)}
-            className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${tab === tk ? "bg-surface-2 text-ink" : "text-ink-muted hover:text-ink"}`}
-          >
-            {tk === "health" ? t("nav.systemHealth") : t("nav.shards")}
-          </button>
-        ))}
+      {/* Sub-tabs (same style as the app's other tab strips). */}
+      <div className="flex flex-wrap gap-1.5">
+        {([
+          { k: "health", icon: Activity, label: t("nav.systemHealth") },
+          { k: "shards", icon: Server, label: t("nav.shards") },
+        ] as const).map(({ k: tk, icon: Icon, label }) => {
+          const active = tab === tk;
+          return (
+            <button
+              key={tk}
+              onClick={() => setTab(tk)}
+              className={
+                "group flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-start text-sm font-medium transition-all " +
+                (active ? "bg-primary text-primary-ink shadow-sm" : "text-ink-muted hover:bg-surface-2 hover:text-ink")
+              }
+            >
+              <Icon className={"h-4 w-4 shrink-0 " + (active ? "text-primary-ink" : "text-ink-subtle group-hover:text-ink-muted")} />
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {tab === "shards" ? (

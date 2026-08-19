@@ -6,7 +6,6 @@ import { Server, Scale, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge, type Status } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
@@ -48,17 +47,15 @@ export function ShardsPanel() {
   const liveCount = rows.filter((r) => r.live).length;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={c("title")}
-        subtitle={c("subtitle")}
-        action={
-          <Button onClick={rebalance} disabled={busy === "rebalance" || liveCount < 2}>
-            {busy === "rebalance" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scale className="h-4 w-4" />}
-            {c("rebalance")}
-          </Button>
-        }
-      />
+    <div className="space-y-4">
+      {/* The parent tab already titles this; just the subtitle + action here. */}
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-sm text-ink-muted">{c("subtitle")}</p>
+        <Button onClick={rebalance} disabled={busy === "rebalance" || liveCount < 2}>
+          {busy === "rebalance" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scale className="h-4 w-4" />}
+          {c("rebalance")}
+        </Button>
+      </div>
 
       {rows.length > 0 && (
         <div className="grid grid-cols-3 gap-3">

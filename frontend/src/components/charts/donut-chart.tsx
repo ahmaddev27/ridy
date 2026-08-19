@@ -27,7 +27,8 @@ export function DonutChart({ segments, total, size = 132 }: { segments: readonly
             endAngle={-270}
             paddingAngle={has ? 2 : 0}
             stroke="none"
-            isAnimationActive={false}
+            isAnimationActive
+            animationDuration={700}
           >
             {data.map((d, i) => (
               <Cell key={i} fill={d.color} />
