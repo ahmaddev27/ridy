@@ -161,9 +161,6 @@ export default function ConnectionsPage() {
             </span>
             <h3 className="mt-4 text-lg font-semibold text-ink">{c("connectedTitle")}</h3>
             <p className="mt-1 text-sm text-ink-muted">{c("connectedBody")}</p>
-            {data?.uber_org_uuid && (
-              <p className="mt-3 font-mono text-xs text-ink-subtle">{data.uber_org_uuid}</p>
-            )}
             <Button
               variant="ghost"
               size="sm"

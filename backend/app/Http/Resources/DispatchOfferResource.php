@@ -37,6 +37,9 @@ class DispatchOfferResource extends JsonResource
             'dropoff_address' => AddressNormalizer::clean($this->dropoff_address),
             'fare_formatted' => $this->fare_formatted,
             'fare_amount' => $this->fare_amount !== null ? (float) $this->fare_amount : null,
+            // Road distance once the trip is geocoded — lets the driver app show
+            // the distance and derive €/km (same data the dashboard trip view uses).
+            'distance_m' => $this->distance_m,
             'accept_window_seconds' => $this->accept_window_seconds,
             'received_at' => $this->received_at?->toIso8601String(),
         ];
