@@ -12,7 +12,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getFleetSession, captureFleetSession, deleteFleetSession, prepareReconnect, type Cookie } from "@/lib/api/fleet-session";
 import { issueExtensionToken } from "@/lib/api/extension";
-import { LATEST_EXTENSION_VERSION, isExtensionOutdated } from "@/lib/extension";
+import { LATEST_EXTENSION_VERSION, EXTENSION_STORE_URL, isExtensionOutdated } from "@/lib/extension";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 
 const statusTone: Record<string, Status> = {
@@ -221,7 +221,7 @@ export default function ConnectionsPage() {
               <li>{c("installStep2")}</li>
               <li>{c("installStep3")}</li>
             </ol>
-            <a href="/downloads/reidey-extension.zip" download>
+            <a href={EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer">
               <Button>
                 <Download className="h-4 w-4" /> {c("installDownload")}
               </Button>
@@ -242,7 +242,7 @@ export default function ConnectionsPage() {
                 .replace("{installed}", extVersion ?? "?")
                 .replace("{latest}", LATEST_EXTENSION_VERSION)}
             </p>
-            <a href="/downloads/reidey-extension.zip" download className="mt-3 inline-block">
+            <a href={EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block">
               <Button>
                 <Download className="h-4 w-4" /> {c("extUpdateDownload")}
               </Button>

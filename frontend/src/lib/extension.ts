@@ -6,9 +6,15 @@
 // any extension API and degrades gracefully when the extension isn't installed.
 
 // The extension version this dashboard build expects. Bump it in lockstep with
-// extension/manifest.json so managers running an older, manually-installed
-// build get prompted to update (unpacked extensions don't auto-update).
-export const LATEST_EXTENSION_VERSION = "1.14.0";
+// extension/manifest.json. Store installs auto-update, so this only nudges
+// managers on an older, manually-loaded build.
+export const LATEST_EXTENSION_VERSION = "1.15.3";
+
+// The published (unlisted) Chrome Web Store listing. Unlisted = installable by
+// anyone with the link but hidden from search, so managers install with one
+// "Add to Chrome" click and get automatic updates.
+export const EXTENSION_ID = "jkejjdjgoknicbejmgcmojgdeljnaean";
+export const EXTENSION_STORE_URL = `https://chromewebstore.google.com/detail/${EXTENSION_ID}`;
 
 /** True when `installed` is a valid version older than LATEST_EXTENSION_VERSION. */
 export function isExtensionOutdated(installed: string | null | undefined): boolean {
