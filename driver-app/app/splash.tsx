@@ -41,7 +41,7 @@ export default function SplashScreen() {
       setLocale(stored);
       router.replace("/");
     } else {
-      router.replace("/language");
+      router.replace("/onboarding"); // first run: intro → language → login
     }
   }).current;
 

@@ -100,14 +100,14 @@ function Gate() {
     if (booted.current) return;
     booted.current = true;
     const seg = segments[0];
-    if (seg !== "splash" && seg !== "language") router.replace("/splash");
+    if (seg !== "splash" && seg !== "language" && seg !== "onboarding") router.replace("/splash");
   }, [segments, router]);
 
   // Auth gate — only once the session is known. Onboarding screens self-navigate.
   useEffect(() => {
     if (!ready) return;
     const seg = segments[0];
-    if (seg === "splash" || seg === "language") return;
+    if (seg === "splash" || seg === "language" || seg === "onboarding") return;
     const inAuth = seg === "login" || seg === "activate";
     if (!driver && !inAuth) router.replace("/login");
     else if (driver && inAuth) router.replace("/");
@@ -148,6 +148,7 @@ function Gate() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.canvas } }}>
       <Stack.Screen name="login" />
       <Stack.Screen name="activate" />
+      <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
       <Stack.Screen name="language" />
       <Stack.Screen name="splash" options={{ gestureEnabled: false }} />
       <Stack.Screen name="(tabs)" />
