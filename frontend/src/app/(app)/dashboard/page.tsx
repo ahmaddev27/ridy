@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { latnLocale } from "@/lib/utils";
-import { Users, Wifi, Link2, Car, Radio, AlertTriangle } from "lucide-react";
+import { Users, Wifi, Link2, Car, Radio, AlertTriangle, KeyRound } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { RedeemCodeModal } from "@/components/subscription/redeem-code-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getDashboardSummary } from "@/lib/api/dashboard";
@@ -14,7 +15,8 @@ import { AdSlot } from "@/components/ads/ad-slot";
 
 export default function DashboardPage() {
   const { t, locale } = useI18n();
-  const { data, loading, error } = useAsync(getDashboardSummary, { refetchInterval: 10000 });
+  const { data, loading, error, refetch } = useAsync(getDashboardSummary, { refetchInterval: 10000 });
+  const [redeemOpen, setRedeemOpen] = useState(false);
 
   const k = (key: string) => t(`screens.dashboard.${key}`);
 
@@ -85,6 +87,13 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
+              <button
+                onClick={() => setRedeemOpen(true)}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+                {k("redeemCode")}
+              </button>
             </div>
           </Card>
         )}
@@ -99,6 +108,8 @@ export default function DashboardPage() {
           <LiveMap heightClass="h-[460px]" />
         </div>
       </div>
+
+      <RedeemCodeModal open={redeemOpen} onClose={() => setRedeemOpen(false)} onSuccess={refetch} />
     </div>
   );
 }

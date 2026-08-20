@@ -1,18 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
 import { ReceiptText, KeyRound } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge, type Status } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { RedeemCodeModal } from "@/components/subscription/redeem-code-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { getCompanySubscriptions, redeemSubscriptionCode, type CompanySubscriptionRow } from "@/lib/api/company-subscription";
+import { getCompanySubscriptions, type CompanySubscriptionRow } from "@/lib/api/company-subscription";
 
 const CODE_TONE: Record<NonNullable<CompanySubscriptionRow["code_status"]>, Status> = {
   activated: "matched",
@@ -27,24 +26,6 @@ export default function CompanySubscriptionPage() {
   const rows = data ?? [];
 
   const [open, setOpen] = useState(false);
-  const [code, setCode] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  async function redeem() {
-    if (code.trim().length !== 6 || submitting) return;
-    setSubmitting(true);
-    try {
-      await redeemSubscriptionCode(code.trim());
-      toast.success(c("redeemSuccess"));
-      setOpen(false);
-      setCode("");
-      await refetch();
-    } catch (e) {
-      toast.error(c("redeemFailed"), { description: e instanceof Error ? e.message : undefined });
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   const money = (n: number | null) =>
     n === null ? "—" : new Intl.NumberFormat(latnLocale(locale), { style: "currency", currency: "EUR" }).format(n);
@@ -62,26 +43,7 @@ export default function CompanySubscriptionPage() {
         }
       />
 
-      <Modal open={open} onClose={() => setOpen(false)} title={c("redeemTitle")}>
-        <div className="space-y-4">
-          <p className="text-sm text-ink-muted">{c("redeemHint")}</p>
-          <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-ink-subtle">{c("codeLabel")}</label>
-            <input
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              onKeyDown={(e) => e.key === "Enter" && redeem()}
-              inputMode="numeric"
-              placeholder="123456"
-              autoFocus
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-center text-lg font-semibold tracking-[0.3em] tabular-nums text-ink outline-none focus:border-ink"
-            />
-          </div>
-          <Button onClick={redeem} disabled={code.length !== 6 || submitting} className="w-full justify-center">
-            {c("activate")}
-          </Button>
-        </div>
-      </Modal>
+      <RedeemCodeModal open={open} onClose={() => setOpen(false)} onSuccess={refetch} />
 
       <Card className="overflow-hidden">
         {loading ? (

@@ -1,4 +1,3 @@
-import { getLocales } from "expo-localization";
 import { I18nManager } from "react-native";
 import { useSyncExternalStore } from "react";
 
@@ -376,8 +375,11 @@ const ar: Dict = {
 
 const DICTS: Record<string, Dict> = { de, en, ar };
 
-let current = (getLocales()[0]?.languageCode ?? "de").toLowerCase();
-if (!DICTS[current]) current = "de";
+// German is the product's default until the driver explicitly picks a language
+// (first run routes through the language picker). We deliberately do NOT follow
+// the device language here — otherwise an Arabic phone shows Arabic on the very
+// first paint before any choice is made.
+let current = "de";
 
 /**
  * Direction is handled MANUALLY per-component via `isRTL()` (flexDirection,

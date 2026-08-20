@@ -145,7 +145,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
     },
     dashboard: {
       onlineTitle: "Online drivers", online: "Online", onTrip: "On trip", onlineNone: "No drivers online right now.", refresh: "Refresh",
-      subTitle: "Subscription", subActive: "Active", subInactive: "Needs activation", subDaysLeft: "{n} days left", subDaysShort: "days left", subActivated: "Activated", subEnds: "Renews / ends",
+      subTitle: "Subscription", subActive: "Active", subInactive: "Needs activation", subDaysLeft: "{n} days left", subDaysShort: "days left", subActivated: "Activated", subEnds: "Renews / ends", redeemCode: "Enter code",
       statDrivers: "Drivers", statOnline: "Online now", statVehicles: "Vehicles", offersTrend: "Offers · last 7 days",
       statLinked: "Linked to Uber",
       linkTitle: "Driver linking", unlinkedDrivers: "Not linked",
@@ -301,7 +301,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
     },
     dashboard: {
       onlineTitle: "Fahrer online", online: "Online", onTrip: "Auf Fahrt", onlineNone: "Gerade sind keine Fahrer online.", refresh: "Aktualisieren",
-      subTitle: "Abonnement", subActive: "Aktiv", subInactive: "Aktivierung nötig", subDaysLeft: "{n} Tage übrig", subDaysShort: "Tage übrig", subActivated: "Aktiviert", subEnds: "Verlängert / endet",
+      subTitle: "Abonnement", subActive: "Aktiv", subInactive: "Aktivierung nötig", subDaysLeft: "{n} Tage übrig", subDaysShort: "Tage übrig", subActivated: "Aktiviert", subEnds: "Verlängert / endet", redeemCode: "Code eingeben",
       statDrivers: "Fahrer", statOnline: "Jetzt online", statVehicles: "Fahrzeuge", offersTrend: "Angebote · letzte 7 Tage",
       statLinked: "Mit Uber verknüpft",
       linkTitle: "Fahrer-Verknüpfung", unlinkedDrivers: "Nicht verknüpft",
@@ -455,7 +455,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
     },
     dashboard: {
       onlineTitle: "السائقين أونلاين", online: "أونلاين", onTrip: "على رحلة", onlineNone: "ما في سائقين أونلاين حالياً.", refresh: "تحديث",
-      subTitle: "الاشتراك", subActive: "نشط", subInactive: "يحتاج تفعيل", subDaysLeft: "باقي {n} يوم", subDaysShort: "يوم باقي", subActivated: "تاريخ التفعيل", subEnds: "التجديد / الانتهاء",
+      subTitle: "الاشتراك", subActive: "نشط", subInactive: "يحتاج تفعيل", subDaysLeft: "باقي {n} يوم", subDaysShort: "يوم باقي", subActivated: "تاريخ التفعيل", subEnds: "التجديد / الانتهاء", redeemCode: "إدخال كود",
       statDrivers: "السائقون", statOnline: "أونلاين الآن", statVehicles: "المركبات", offersTrend: "العروض · آخر 7 أيام",
       statLinked: "مربوطون بأوبر",
       linkTitle: "ربط السائقين", unlinkedDrivers: "غير مربوطين",
