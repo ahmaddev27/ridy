@@ -29,16 +29,20 @@ class CompanySubscriptionController extends Controller
             throw ValidationException::withMessages(['code' => 'activation_no_company']);
         }
 
+        // A real admin/reseller-issued code takes priority over the test code, so
+        // a generated code that happens to equal OTP_TEST_CODE still links its
+        // ledger entry and grants the plan's days (not the test default).
+        $hasCode = $tenant->activation_code !== null;
+        $expired = $tenant->activation_code_expires_at?->isPast() ?? false;
+        $realMatch = $hasCode && ! $expired && hash_equals((string) $tenant->activation_code, $data['code']);
+
         // TEMPORARY test backdoor: OTP_TEST_CODE activates a monthly period even in
         // production (unlike isTestCode, which is prod-guarded). Remove after testing.
         $fixed = config('services.otp_test_code');
-        $testCode = filled($fixed) && hash_equals((string) $fixed, $data['code']);
-        if (! $testCode) {
-            if ($tenant->activation_code === null
-                || $tenant->activation_code_expires_at?->isPast()
-                || ! hash_equals((string) $tenant->activation_code, $data['code'])) {
-                throw ValidationException::withMessages(['code' => 'otp_incorrect']);
-            }
+        $testCode = ! $realMatch && filled($fixed) && hash_equals((string) $fixed, $data['code']);
+
+        if (! $realMatch && ! $testCode) {
+            throw ValidationException::withMessages(['code' => 'otp_incorrect']);
         }
 
         $days = (int) $tenant->activation_days;
@@ -52,7 +56,7 @@ class CompanySubscriptionController extends Controller
             $tenant->activation_amount,
             (bool) $tenant->activation_paid,
             $tenant->activation_collector_id,
-            $testCode ? null : $tenant->activation_code,
+            $realMatch ? $tenant->activation_code : null,
         );
 
         return response()->json(['data' => [
