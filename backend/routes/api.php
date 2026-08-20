@@ -141,6 +141,8 @@ Route::prefix('v1')->group(function () {
 
         // The company's own subscription history (codes/plans/collector/status).
         Route::get('subscription/history', [CompanySubscriptionController::class, 'index']);
+        // Redeem a subscription code from inside the dashboard (stacks after current).
+        Route::post('subscription/redeem', [CompanySubscriptionController::class, 'redeem'])->middleware('throttle:10,1');
 
         // Fleet drivers
         Route::get('drivers', [DriverController::class, 'index']);

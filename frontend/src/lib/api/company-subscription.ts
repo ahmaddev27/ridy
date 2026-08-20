@@ -18,3 +18,13 @@ export async function getCompanySubscriptions(): Promise<CompanySubscriptionRow[
   const res = await apiFetch<{ data: CompanySubscriptionRow[] }>("/api/v1/subscription/history");
   return res.data;
 }
+
+/** Redeem a subscription code from inside the dashboard (stacks after current). */
+export async function redeemSubscriptionCode(code: string): Promise<{ activated: boolean; days: number; ends_at: string }> {
+  const res = await apiFetch<{ data: { activated: boolean; days: number; ends_at: string } }>("/api/v1/subscription/redeem", {
+    method: "POST",
+    body: { code },
+    withCsrf: true,
+  });
+  return res.data;
+}

@@ -65,6 +65,7 @@ const en: Dict = {
     myCodesTitle: "My codes", myCodesDesc: "Every code you generated and its status.",
   },
   codes: {
+    redeem: "Enter code", redeemTitle: "Activate a subscription code", redeemHint: "Enter the 6-digit code. A new period is added after your current one ends.", codeLabel: "Subscription code", activate: "Activate", redeemSuccess: "Subscription activated", redeemFailed: "Activation failed",
     title: "Activation codes", subtitle: "Every issued code and its lifecycle.",
     filterStatus: "Status", allStatuses: "All statuses", st_pending: "Pending", st_activated: "Activated", st_expired: "Expired",
     from: "From", to: "To", clearFilters: "Clear", exportExcel: "Export Excel", exportFailed: "Export failed",
@@ -271,6 +272,7 @@ const de: Dict = {
     myCodesTitle: "Meine Codes", myCodesDesc: "Jeder von dir erzeugte Code und sein Status.",
   },
   codes: {
+    redeem: "Code eingeben", redeemTitle: "Abonnement-Code aktivieren", redeemHint: "Gib den 6-stelligen Code ein. Eine neue Periode wird nach deiner aktuellen hinzugefügt.", codeLabel: "Abonnement-Code", activate: "Aktivieren", redeemSuccess: "Abonnement aktiviert", redeemFailed: "Aktivierung fehlgeschlagen",
     title: "Aktivierungscodes", subtitle: "Jeder ausgegebene Code und sein Lebenszyklus.",
     filterStatus: "Status", allStatuses: "Alle Status", st_pending: "Ausstehend", st_activated: "Aktiviert", st_expired: "Abgelaufen",
     from: "Von", to: "Bis", clearFilters: "Zurücksetzen", exportExcel: "Excel exportieren", exportFailed: "Export fehlgeschlagen",
@@ -475,6 +477,7 @@ const ar: Dict = {
     myCodesTitle: "أكوادي", myCodesDesc: "كل كود ولّدته وحالته.",
   },
   codes: {
+    redeem: "إدخال كود", redeemTitle: "تفعيل كود اشتراك", redeemHint: "أدخل الكود المكوّن من 6 أرقام. تُضاف فترة جديدة بعد انتهاء فترتك الحالية.", codeLabel: "كود الاشتراك", activate: "تفعيل", redeemSuccess: "تم تفعيل الاشتراك", redeemFailed: "فشل التفعيل",
     title: "أكواد التفعيل", subtitle: "كل كود تم توليده ودورة حياته.",
     filterStatus: "الحالة", allStatuses: "كل الحالات", st_pending: "قيد الانتظار", st_activated: "مُفعّل", st_expired: "منتهي",
     from: "من", to: "إلى", clearFilters: "مسح", exportExcel: "تصدير Excel", exportFailed: "فشل التصدير",

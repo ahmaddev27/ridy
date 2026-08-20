@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Billing\Models\SubscriptionPeriod;
+use App\Domain\Billing\SubscriptionActivator;
+use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 /**
  * A company's own subscription history — the periods it activated, each with the
@@ -14,6 +17,51 @@ use Illuminate\Http\Request;
  */
 class CompanySubscriptionController extends Controller
 {
+    use GeneratesOtp;
+
+    /**
+     * Redeem a subscription code from inside the dashboard (already signed in) —
+     * a new period stacks after any remaining time. A test code (OTP_TEST_CODE)
+     * grants a default monthly period with no admin-issued plan needed.
+     */
+    public function redeem(Request $request, SubscriptionActivator $activator): JsonResponse
+    {
+        $data = $request->validate(['code' => ['required', 'digits:6']]);
+        $tenant = $request->user()->tenant;
+        if ($tenant === null) {
+            throw ValidationException::withMessages(['code' => 'activation_no_company']);
+        }
+
+        $testCode = $this->isTestCode($data['code']);
+        if (! $testCode) {
+            if ($tenant->activation_code === null
+                || $tenant->activation_code_expires_at?->isPast()
+                || ! hash_equals((string) $tenant->activation_code, $data['code'])) {
+                throw ValidationException::withMessages(['code' => 'otp_incorrect']);
+            }
+        }
+
+        $days = (int) $tenant->activation_days;
+        if ($testCode && $days <= 0) {
+            $days = CompanyActivationController::TEST_CODE_DAYS;
+        }
+
+        $period = $activator->apply(
+            $tenant,
+            $days,
+            $tenant->activation_amount,
+            (bool) $tenant->activation_paid,
+            $tenant->activation_collector_id,
+            $testCode ? null : $tenant->activation_code,
+        );
+
+        return response()->json(['data' => [
+            'activated' => true,
+            'days' => $days,
+            'ends_at' => $period->ends_at->toIso8601String(),
+        ]]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $tenantId = (int) $request->user()->tenant_id;

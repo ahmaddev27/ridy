@@ -2,14 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Domain\Billing\Models\SubscriptionCode;
-use App\Domain\Billing\Models\SubscriptionPeriod;
-use App\Domain\Notifications\Notifier;
-use App\Domain\Tenancy\ProxyPool;
+use App\Domain\Billing\SubscriptionActivator;
 use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -32,7 +28,10 @@ class CompanyActivationController extends Controller
     /** How long the lockout lasts once tripped (seconds). */
     private const LOCKOUT_SECONDS = 900; // 15 minutes
 
-    public function activate(Request $request, Notifier $notifier): JsonResponse
+    /** Days granted by a test code when no admin plan is attached (monthly). */
+    public const TEST_CODE_DAYS = 30;
+
+    public function activate(Request $request, SubscriptionActivator $activator): JsonResponse
     {
         $data = $request->validate([
             'email' => ['required', 'email'],
@@ -78,60 +77,20 @@ class CompanyActivationController extends Controller
         // Correct code — clear any accumulated wrong-attempt counter.
         RateLimiter::clear($throttleKey);
 
+        // A test code with no admin-generated plan grants a default monthly period.
         $days = (int) $tenant->activation_days;
-        $amount = $tenant->activation_amount; // set by the admin/reseller at code generation
-        $paid = (bool) $tenant->activation_paid;
-        $soldBy = $tenant->activation_collector_id; // the reseller who issued the code
-        $usedCode = $tenant->activation_code; // captured before we clear it, to close the ledger entry
-        $startsAt = CarbonImmutable::now();
-        $endsAt = $startsAt->addDays($days);
+        if ($testCode && $days <= 0) {
+            $days = self::TEST_CODE_DAYS;
+        }
 
-        $tenant->forceFill([
-            'status' => 'active',
-            'banned_at' => null,
-            'activated_at' => $startsAt,
-            'subscription_ends_at' => $endsAt,
-            'activation_code' => null,
-            'activation_code_expires_at' => null,
-            'activation_days' => null,
-            'activation_amount' => null,
-            'activation_paid' => false,
-            'activation_collector_id' => null,
-            'activation_attempts' => 0,
-        ])->save();
-
-        // Record the period as an invoice. Marked paid immediately if the admin
-        // said so at code generation; otherwise it stays open until a collector
-        // payment settles it. sold_by tags the reseller who issued the code.
-        $period = SubscriptionPeriod::create([
-            'tenant_id' => $tenant->id,
-            'days' => $days,
-            'amount' => $amount,
-            'paid_at' => $paid ? $startsAt : null,
-            'sold_by_collector_id' => $soldBy,
-            'starts_at' => $startsAt,
-            'ends_at' => $endsAt,
-        ]);
-
-        // Close the ledger entry: mark the issued code activated and link it to
-        // the period it created.
-        $ledgerEntry = SubscriptionCode::where('tenant_id', $tenant->id)
-            ->where('code', $usedCode)
-            ->whereNull('activated_at')
-            ->latest('id')
-            ->first();
-        $ledgerEntry?->forceFill([
-            'activated_at' => $startsAt,
-            'subscription_period_id' => $period->id,
-        ])->save();
-
-        // Now that it's active, place it on a proxy from the pool.
-        app(ProxyPool::class)->assign($tenant);
-
-        // Notify the company managers, and the reseller whose code was activated.
-        $notifier->toTenant($tenant->id, 'subscription_activated', ['days' => $days], '/subscription');
-        $reseller = $ledgerEntry?->collector()->with('user')->first()?->user;
-        $notifier->toUser($reseller, 'code_activated', ['company' => $tenant->name, 'code' => $usedCode], '/reseller');
+        $activator->apply(
+            $tenant,
+            $days,
+            $tenant->activation_amount,
+            (bool) $tenant->activation_paid,
+            $tenant->activation_collector_id,
+            $testCode ? null : $tenant->activation_code,
+        );
 
         return response()->json(['data' => ['activated' => true]]);
     }
