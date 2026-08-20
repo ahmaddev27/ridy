@@ -148,6 +148,11 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
                 <Row icon={Clock} label={c("colTime")}>
                   {offer.received_at ? new Date(offer.received_at).toLocaleString(latnLocale(locale)) : "—"}
                 </Row>
+                {offer.trip_duration_seconds != null && (
+                  <Row icon={Clock} label={c("colDuration")}>
+                    {toLatinDigits(`${Math.round(offer.trip_duration_seconds / 60)} min`)}
+                  </Row>
+                )}
               </dl>
             </>
           )}

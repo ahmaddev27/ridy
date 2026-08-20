@@ -21,7 +21,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       empty: "No offers yet",
       emptyDesc:
         "Once the Uber fleet session is connected, incoming ride offers appear here.",
-      colTime: "Time",
+      colTime: "Time", colDuration: "Duration",
       colDriver: "Driver",
       colRoute: "Route",
       colFare: "Fare",
@@ -178,7 +178,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       empty: "Noch keine Angebote",
       emptyDesc:
         "Sobald die Uber-Flottensitzung verbunden ist, erscheinen hier die eingehenden Fahrtangebote.",
-      colTime: "Zeit",
+      colTime: "Zeit", colDuration: "Dauer",
       colDriver: "Fahrer",
       colRoute: "Route",
       colFare: "Preis",
@@ -333,7 +333,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       loadError: "تعذّر تحميل العروض",
       empty: "لا عروض بعد",
       emptyDesc: "بمجرد ربط جلسة أسطول أوبر، ستظهر هنا العروض الواردة.",
-      colTime: "الوقت",
+      colTime: "الوقت", colDuration: "المدة",
       colDriver: "السائق",
       colRoute: "المسار",
       colFare: "السعر",

@@ -26,7 +26,7 @@
   --line-strong: #d6d3cd; /* stronger borders (slate-300) */
   --primary: #1e222b; /* primary button fill */
   --primary-ink: #ffffff; /* text on primary */
-  --overlay: rgb(15 18 23 / 0.4); /* modal/drawer scrim */
+  --overlay: rgb(15 18 23 / 0.55); /* modal/drawer scrim */
 
   /* Status tones: soft background + strong foreground + ring. */
   --success-bg: #ecfdf5; --success-fg: #047857; --success-ring: #059669;

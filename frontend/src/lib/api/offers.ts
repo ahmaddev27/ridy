@@ -23,6 +23,7 @@ export type DispatchOffer = {
   fare_amount: number | null;
   accept_window_seconds: number | null;
   received_at: string | null;
+  trip_duration_seconds: number | null;
 };
 
 /**

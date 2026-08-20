@@ -192,12 +192,19 @@ export default function OfferScreen() {
             />
           </View>
 
-          {/* Metrics — only when the offer has been geo-synced (otherwise the values are just "—"). */}
+          {/* Metrics — only when the offer has been geo-synced (otherwise the values are just "—").
+              The third cell prefers the ACTUAL trip duration once the trip finished,
+              and only falls back to the estimated ETA while it is still in flight —
+              so there is one, unambiguous duration (no estimate-vs-actual clash). */}
           {hasMetrics ? (
             <View style={{ flexDirection: row, ...cardStyle(c) }}>
               <MetricCell label={t("offer.strecke")} value={distanceLabel(offer.distance_m)} c={c} border />
               <MetricCell label={t("offer.qualitaet")} value={perKmLabel(offer.fare_amount, offer.distance_m)} c={c} border />
-              <MetricCell label={t("offer.eta")} value={etaMin != null ? t("home.eta").replace("{n}", String(etaMin)) : "—"} c={c} />
+              {offer.trip_duration_seconds != null ? (
+                <MetricCell label={t("offer.duration")} value={durationLabel(offer.trip_duration_seconds)} c={c} />
+              ) : (
+                <MetricCell label={t("offer.eta")} value={etaMin != null ? t("home.eta").replace("{n}", String(etaMin)) : "—"} c={c} />
+              )}
             </View>
           ) : (
             // Distance / per-km / ETA depend on server-side geocoding — keep the dash
@@ -207,19 +214,23 @@ export default function OfferScreen() {
             </View>
           )}
 
-          {/* Timing — when the offer arrived, when Uber requested it, and the accept window. */}
-          <View style={cardStyle(c)}>
-            <InfoRow label={t("offer.received")} value={timeLabel(offer.received_at)} row={row} c={c} border />
-            {offer.requested_at && (
-              <InfoRow label={t("offer.requested")} value={timeLabel(offer.requested_at)} row={row} c={c} border />
-            )}
-            {offer.trip_duration_seconds != null && (
-              <InfoRow label={t("offer.duration")} value={durationLabel(offer.trip_duration_seconds)} row={row} c={c} border />
-            )}
-            {isPending && win > 0 && (
-              <InfoRow label={t("offer.acceptWindow")} value={`${win} ${t("common.seconds")}`} row={row} c={c} />
-            )}
-          </View>
+          {/* Timing — arrival, Uber request time, and (while live) the accept window.
+              Trip duration is shown in the metrics above, so it is not repeated here.
+              The last row never draws a bottom border (no trailing hairline). */}
+          {(() => {
+            const rows = [
+              { label: t("offer.received"), value: timeLabel(offer.received_at) },
+              ...(offer.requested_at ? [{ label: t("offer.requested"), value: timeLabel(offer.requested_at) }] : []),
+              ...(isPending && win > 0 ? [{ label: t("offer.acceptWindow"), value: `${win} ${t("common.seconds")}` }] : []),
+            ];
+            return (
+              <View style={cardStyle(c)}>
+                {rows.map((r, i) => (
+                  <InfoRow key={r.label} label={r.label} value={r.value} row={row} c={c} border={i < rows.length - 1} />
+                ))}
+              </View>
+            );
+          })()}
 
           <Text style={{ color: c.inkSubtle, fontSize: 12, textAlign: "center", lineHeight: 18, marginTop: 4 }}>{t("offer.observe")}</Text>
         </ScrollView>
