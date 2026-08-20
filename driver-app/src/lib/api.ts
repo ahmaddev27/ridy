@@ -75,7 +75,12 @@ export type OffersQuery = {
   search?: string;
   per_page?: number;
   page?: number;
+  /** Fleet-owner mode only: restrict the feed to a single driver. */
+  driver_id?: number;
 };
+
+/** A tenant driver, for the fleet-owner offers picker. */
+export type FleetDriver = { id: number; name: string };
 
 export type PaginationMeta = {
   current_page: number;
@@ -164,6 +169,18 @@ export class ApiClient {
 
   fleetHome() {
     return this.request<{ data: FleetHomeData }>("/api/v1/driver/fleet/home");
+  }
+
+  fleetDrivers() {
+    return this.request<{ data: FleetDriver[] }>("/api/v1/driver/fleet/drivers");
+  }
+
+  /** Owner-mode push registration (User token) — mirrors registerDevice for drivers. */
+  fleetRegisterDevice(token: string, platform: "android" | "ios") {
+    return this.request<{ data: { id: number } }>("/api/v1/driver/fleet/devices", {
+      method: "POST",
+      body: JSON.stringify({ token, platform }),
+    });
   }
 
   fleetStats(from?: string, to?: string) {

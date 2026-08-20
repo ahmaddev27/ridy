@@ -43,9 +43,11 @@ Notifications.setNotificationHandler({
 /**
  * Ask for permission, ensure a high-importance Android channel exists (so offers
  * pop with sound while the app is closed), fetch the device push token and
- * register it with the backend against the signed-in driver.
+ * register it with the backend. A fleet owner registers on their User token via
+ * the fleet endpoint (the driver endpoint would 401 their token); a driver
+ * registers against themselves. Owners then receive a copy of every driver's offer.
  */
-export async function registerForPush(): Promise<string | null> {
+export async function registerForPush(owner = false): Promise<string | null> {
   if (!Device.isDevice) return null;
 
   const existing = await Notifications.getPermissionsAsync();
@@ -66,8 +68,10 @@ export async function registerForPush(): Promise<string | null> {
   }
 
   const { data: token } = await Notifications.getDevicePushTokenAsync();
+  const platform = Platform.OS === "ios" ? "ios" : "android";
   try {
-    await api.registerDevice(token, Platform.OS === "ios" ? "ios" : "android");
+    if (owner) await api.fleetRegisterDevice(token, platform);
+    else await api.registerDevice(token, platform);
   } catch {
     // Non-fatal: the driver is signed in; a later launch retries registration.
     return token;

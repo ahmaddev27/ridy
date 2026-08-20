@@ -125,6 +125,8 @@ const de: Dict = {
   "fleet.driver": "Fahrer",
   "fleet.onlineDrivers": "Fahrer online",
   "fleet.activeNow": "Aktive Fahrten",
+  "fleet.allDrivers": "Alle Fahrer",
+  "fleet.filterByDriver": "Nach Fahrer filtern",
 };
 
 const en: Dict = {
@@ -248,6 +250,8 @@ const en: Dict = {
   "fleet.driver": "Driver",
   "fleet.onlineDrivers": "drivers online",
   "fleet.activeNow": "Active trips",
+  "fleet.allDrivers": "All drivers",
+  "fleet.filterByDriver": "Filter by driver",
 };
 
 const ar: Dict = {
@@ -371,6 +375,8 @@ const ar: Dict = {
   "fleet.driver": "السائق",
   "fleet.onlineDrivers": "سائق متصل",
   "fleet.activeNow": "الرحلات النشطة",
+  "fleet.allDrivers": "كل السائقين",
+  "fleet.filterByDriver": "تصفية حسب السائق",
 };
 
 const DICTS: Record<string, Dict> = { de, en, ar };
