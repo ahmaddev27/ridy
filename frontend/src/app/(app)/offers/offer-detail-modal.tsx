@@ -19,7 +19,7 @@ const OFFER_TONE: Record<OfferStatus, Status> = {
   canceled: "personal",
 };
 
-// Leaflet touches `window`, so load the map client-side only.
+// MapLibre GL touches `window`, so load the map client-side only.
 const TripMap = dynamic(() => import("./trip-map").then((m) => m.TripMap), {
   ssr: false,
   loading: () => <div className="h-[220px] w-full animate-pulse rounded-xl bg-surface-2" />,

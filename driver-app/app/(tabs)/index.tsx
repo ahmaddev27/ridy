@@ -3,11 +3,12 @@ import { View, ScrollView, RefreshControl, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useFocusEffect, useRouter } from "expo-router";
-import { UserCircle } from "lucide-react-native";
+import { UserCircle, Map as MapIcon } from "lucide-react-native";
 import { api, type HomeData, type FleetHomeData, type Offer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
-import { useColors, cardStyle } from "@/lib/theme";
+import { openRouteInMaps } from "@/lib/maps";
+import { useColors, cardStyle, radius } from "@/lib/theme";
 import { fareLabel, perKmValue, distanceLabel, cleanAddress } from "@/lib/format";
 import { Logo, SectionLabel, StatusBadge } from "@/components/ui";
 import { OfferCard } from "@/components/offer-card";
@@ -86,11 +87,30 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Live / active offer — the driver's current offer as the full €/km card */}
+        {/* Live / active offer — the driver's current offer as the full €/km card,
+            with a quick "open in map" shortcut for its pickup → drop-off route. */}
         {!isOwner && active && (
           <View style={{ gap: 10 }}>
             <SectionLabel>{t("home.activeOffer")}</SectionLabel>
             <OfferCard offer={active} onPress={() => router.push(`/offer/${active.id}`)} />
+            <Pressable
+              onPress={() => openRouteInMaps(active.pickup_address, active.dropoff_address)}
+              style={({ pressed }) => ({
+                flexDirection: row,
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                paddingVertical: 13,
+                borderRadius: radius.control,
+                backgroundColor: c.surfaceRaised,
+                borderWidth: 1,
+                borderColor: c.line,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <MapIcon size={17} color={c.ink} />
+              <Text style={{ color: c.ink, fontSize: 15, fontWeight: "600" }}>{t("offer.openMaps")}</Text>
+            </Pressable>
           </View>
         )}
 
