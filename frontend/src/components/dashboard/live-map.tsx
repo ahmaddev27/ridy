@@ -1,9 +1,9 @@
 "use client";
 
-import "leaflet/dist/leaflet.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { latnLocale } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
-import type { Map as LeafletMap, LayerGroup } from "leaflet";
+import type { Map as MapLibreMap, Marker, StyleSpecification } from "maplibre-gl";
 import { RefreshCw } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { getLiveDrivers, type LiveDriver } from "@/lib/api/drivers";
@@ -16,53 +16,109 @@ function escapeHtml(s: string): string {
 const STATUS_COLOR = (status: string | null): string => PRESENCE_COLOR[presence(status)];
 const statusLabel = (status: string | null, c: (k: string) => string): string => c(PRESENCE_LABEL_KEY[presence(status)]);
 
+/**
+ * A free, token-less MapLibre style built inline from OpenStreetMap raster
+ * tiles. Kept in code (not a hosted style URL) so the map never depends on any
+ * API key or third-party style host.
+ */
+const OSM_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    osm: {
+      type: "raster",
+      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: "© OpenStreetMap contributors",
+    },
+  },
+  layers: [{ id: "osm", type: "raster", source: "osm" }],
+};
+
+const LINE_SOURCE = "wp-lines";
+const POINT_SOURCE = "wp-points";
+
 type DriverMarker = {
-  marker: import("leaflet").Marker;
-  halo: import("leaflet").CircleMarker;
-  wp: import("leaflet").LayerGroup;
+  marker: Marker;
+  /** The car <img> inside the marker element — restyled (rotation) each poll. */
+  car: HTMLImageElement;
+  /** The translucent halo ring behind the car — recolored each poll. */
+  halo: HTMLSpanElement;
   raf: number | null;
 };
 
 /**
- * Glide a driver's marker + halo from its current point to the new one over a
- * short duration (client-side only — no polling change, no server load), so cars
+ * Build the DOM element for a driver marker: a fixed-size halo ring with the
+ * rotatable car icon centered on top. Mirrors the old Leaflet divIcon + halo.
+ */
+function createMarkerElement(): { el: HTMLDivElement; car: HTMLImageElement; halo: HTMLSpanElement } {
+  const el = document.createElement("div");
+  el.style.cssText = "position:relative;width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer";
+
+  const halo = document.createElement("span");
+  halo.style.cssText = "position:absolute;inset:0;border-radius:9999px;border-width:2px;border-style:solid;box-sizing:border-box";
+
+  const car = document.createElement("img");
+  car.src = "/markers/car.png";
+  car.alt = "";
+  car.style.cssText = "position:relative;width:42px;height:42px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))";
+
+  el.appendChild(halo);
+  el.appendChild(car);
+  return { el, car, halo };
+}
+
+function styleHalo(halo: HTMLSpanElement, color: string): void {
+  halo.style.borderColor = hexToRgba(color, 0.5);
+  halo.style.backgroundColor = hexToRgba(color, 0.12);
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/**
+ * Glide a driver's marker from its current point to the new one over a short
+ * duration (client-side only — no polling change, no server load), so cars
  * slide smoothly between position updates instead of teleporting.
  */
-function animateTo(entry: DriverMarker, from: import("leaflet").LatLng, to: [number, number]) {
+function animateTo(entry: DriverMarker, from: { lng: number; lat: number }, to: [number, number]) {
   if (entry.raf) cancelAnimationFrame(entry.raf);
-  const dLat = to[0] - from.lat;
-  const dLng = to[1] - from.lng;
+  const [lat, lng] = to;
+  const dLat = lat - from.lat;
+  const dLng = lng - from.lng;
   if (Math.abs(dLat) < 1e-6 && Math.abs(dLng) < 1e-6) {
-    entry.marker.setLatLng(to);
-    entry.halo.setLatLng(to);
+    entry.marker.setLngLat([lng, lat]);
     return;
   }
   const DURATION = 1400;
   const start = performance.now();
   const step = (now: number) => {
     const t = Math.min(1, (now - start) / DURATION);
-    const at: [number, number] = [from.lat + dLat * t, from.lng + dLng * t];
-    entry.marker.setLatLng(at);
-    entry.halo.setLatLng(at);
+    entry.marker.setLngLat([from.lng + dLng * t, from.lat + dLat * t]);
     entry.raf = t < 1 ? requestAnimationFrame(step) : null;
   };
   entry.raf = requestAnimationFrame(step);
 }
 
-
 /**
- * The live fleet map. Self-contained (own Leaflet instance + polling) so it can
+ * The live fleet map. Self-contained (own MapLibre instance + polling) so it can
  * be embedded on the dashboard and used full-page alike. `heightClass` sets the
- * map height; everything else adapts.
+ * map height; everything else adapts. MapLibre GL runs on the free, token-less
+ * OpenStreetMap raster style above.
  */
 export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.map.${k}`);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<LeafletMap | null>(null);
-  const layerRef = useRef<LayerGroup | null>(null);
-  const LRef = useRef<typeof import("leaflet") | null>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const MRef = useRef<typeof import("maplibre-gl") | null>(null);
+  const readyRef = useRef(false);
   const firstFitRef = useRef(true);
   // One persistent marker per driver, so positions animate (tween) between polls
   // instead of the whole layer being cleared and redrawn (which made cars "jump").
@@ -74,17 +130,15 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
   /** Pan + zoom the map onto one driver (from the side list). */
   function focusDriver(dr: LiveDriver) {
-    mapRef.current?.setView([dr.lat, dr.lng], 16, { animate: true });
+    mapRef.current?.flyTo({ center: [dr.lng, dr.lat], zoom: 16 });
   }
 
   useEffect(() => {
     let cancelled = false;
 
     async function refresh() {
-      const L = LRef.current;
-      const layer = layerRef.current;
       const map = mapRef.current;
-      if (!L || !layer || !map) return;
+      if (!map || !readyRef.current) return;
 
       let drivers: LiveDriver[] = [];
       try {
@@ -94,9 +148,14 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
       }
       if (cancelled) return;
 
+      const maplibregl = MRef.current;
+      if (!maplibregl) return;
+
       const registry = markersRef.current;
       const points: [number, number][] = [];
       const seen = new Set<number>();
+      const lineFeatures: GeoJSON.Feature[] = [];
+      const pointFeatures: GeoJSON.Feature[] = [];
 
       for (const d of drivers) {
         const color = STATUS_COLOR(d.status);
@@ -105,37 +164,43 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
         seen.add(d.id);
 
         const rot = typeof d.heading === "number" ? d.heading : 0;
-        const carHtml = `<img src="/markers/car.png" alt="" style="width:42px;height:42px;transform:rotate(${rot}deg);filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))"/>`;
-        const popup = `<b>${escapeHtml(d.name)}</b><br>${escapeHtml(statusLabel(d.status, c))}`;
+        const popupHtml = `<b>${escapeHtml(d.name)}</b><br>${escapeHtml(statusLabel(d.status, c))}`;
 
         let entry = registry.get(d.id);
         if (!entry) {
           // First sighting — create the halo + car marker at the position.
-          const halo = L.circleMarker(to, { radius: 24, color, weight: 2, opacity: 0.5, fillColor: color, fillOpacity: 0.12 }).addTo(layer);
-          const marker = L.marker(to, {
-            icon: L.divIcon({ className: "", iconSize: [42, 42], iconAnchor: [21, 21], html: carHtml }),
-          }).bindPopup(popup).addTo(layer);
-          entry = { marker, halo, wp: L.layerGroup().addTo(layer), raf: null };
+          const { el, car, halo } = createMarkerElement();
+          styleHalo(halo, color);
+          car.style.transform = `rotate(${rot}deg)`;
+          const marker = new maplibregl.Marker({ element: el })
+            .setLngLat([d.lng, d.lat])
+            .setPopup(new maplibregl.Popup({ offset: 24, closeButton: false }).setHTML(popupHtml))
+            .addTo(map);
+          entry = { marker, car, halo, raf: null };
           registry.set(d.id, entry);
         } else {
           // Existing — glide from the current spot to the new one; refresh style.
-          entry.halo.setStyle({ color, fillColor: color });
-          entry.marker.setIcon(L.divIcon({ className: "", iconSize: [42, 42], iconAnchor: [21, 21], html: carHtml }));
-          entry.marker.getPopup()?.setContent(popup);
-          animateTo(entry, entry.marker.getLatLng(), to);
+          styleHalo(entry.halo, color);
+          entry.car.style.transform = `rotate(${rot}deg)`;
+          entry.marker.getPopup()?.setHTML(popupHtml);
+          animateTo(entry, entry.marker.getLngLat(), to);
         }
 
-        // Waypoints (pickup/dropoff route) are cheap to redraw each poll.
-        entry.wp.clearLayers();
+        // Waypoints (pickup/dropoff route) are cheap to rebuild each poll.
         const wp = d.waypoints ?? [];
         if (wp.length >= 2) {
-          const line = wp.map((w) => [w.lat, w.lng]) as [number, number][];
-          L.polyline(line, { color, weight: 3, opacity: 0.5, dashArray: "6 6" }).addTo(entry.wp);
+          lineFeatures.push({
+            type: "Feature",
+            properties: { color },
+            geometry: { type: "LineString", coordinates: wp.map((w) => [w.lng, w.lat]) },
+          });
           for (const w of wp) {
             const isPickup = (w.type ?? "").toUpperCase().includes("PICKUP");
-            L.circleMarker([w.lat, w.lng], { radius: 5, color: "#fff", weight: 2, fillColor: isPickup ? "#2563eb" : "#dc2626", fillOpacity: 1 })
-              .bindPopup(isPickup ? c("pickup") : c("dropoff"))
-              .addTo(entry.wp);
+            pointFeatures.push({
+              type: "Feature",
+              properties: { color: isPickup ? "#2563eb" : "#dc2626", label: isPickup ? c("pickup") : c("dropoff") },
+              geometry: { type: "Point", coordinates: [w.lng, w.lat] },
+            });
             points.push([w.lat, w.lng]);
           }
         }
@@ -145,12 +210,14 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
       for (const [id, entry] of registry) {
         if (!seen.has(id)) {
           if (entry.raf) cancelAnimationFrame(entry.raf);
-          layer.removeLayer(entry.marker);
-          layer.removeLayer(entry.halo);
-          layer.removeLayer(entry.wp);
+          entry.marker.remove();
           registry.delete(id);
         }
       }
+
+      // Push the fresh waypoint geometry into the two GeoJSON sources.
+      (map.getSource(LINE_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: lineFeatures });
+      (map.getSource(POINT_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: pointFeatures });
 
       setCount(drivers.length);
       setDrivers(drivers);
@@ -158,21 +225,67 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
       if (firstFitRef.current && points.length > 0) {
         firstFitRef.current = false;
-        // Zoom in close on the drivers (tighter than a country-wide view).
-        map.fitBounds(points, { padding: [60, 60], maxZoom: 15 });
-        if (points.length === 1) map.setView(points[0], 15);
+        if (points.length === 1) {
+          map.setCenter([points[0][1], points[0][0]]);
+          map.setZoom(15);
+        } else {
+          const bounds = new maplibregl.LngLatBounds();
+          for (const [lat, lng] of points) bounds.extend([lng, lat]);
+          map.fitBounds(bounds, { padding: 60, maxZoom: 15 });
+        }
       }
     }
 
     (async () => {
-      const L = (await import("leaflet")).default;
+      const maplibregl = await import("maplibre-gl");
       if (cancelled || !containerRef.current) return;
-      LRef.current = L;
-      const map = L.map(containerRef.current, { attributionControl: true }).setView([51.1657, 10.4515], 6);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap", maxZoom: 19 }).addTo(map);
-      layerRef.current = L.layerGroup().addTo(map);
+      MRef.current = maplibregl;
+      const map = new maplibregl.Map({
+        container: containerRef.current,
+        style: OSM_STYLE,
+        center: [10.4515, 51.1657],
+        zoom: 5,
+        attributionControl: { compact: true },
+      });
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
       mapRef.current = map;
-      await refresh();
+
+      map.on("load", async () => {
+        if (cancelled) return;
+        // Route line + pickup/dropoff dot layers, fed by GeoJSON sources refreshed each poll.
+        map.addSource(LINE_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        map.addSource(POINT_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+        map.addLayer({
+          id: LINE_SOURCE,
+          type: "line",
+          source: LINE_SOURCE,
+          paint: { "line-color": ["get", "color"], "line-width": 3, "line-opacity": 0.5, "line-dasharray": [2, 2] },
+        });
+        map.addLayer({
+          id: POINT_SOURCE,
+          type: "circle",
+          source: POINT_SOURCE,
+          paint: {
+            "circle-radius": 5,
+            "circle-color": ["get", "color"],
+            "circle-stroke-color": "#fff",
+            "circle-stroke-width": 2,
+          },
+        });
+        // Waypoint dots open a pickup/dropoff popup on click (like the old bindPopup).
+        map.on("click", POINT_SOURCE, (e) => {
+          const f = e.features?.[0];
+          if (!f) return;
+          const label = String(f.properties?.label ?? "");
+          const [lng, lat] = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+          new maplibregl.Popup({ offset: 8, closeButton: false }).setLngLat([lng, lat]).setText(label).addTo(map);
+        });
+        map.on("mouseenter", POINT_SOURCE, () => { map.getCanvas().style.cursor = "pointer"; });
+        map.on("mouseleave", POINT_SOURCE, () => { map.getCanvas().style.cursor = ""; });
+
+        readyRef.current = true;
+        await refresh();
+      });
     })();
 
     const timer = setInterval(refresh, 12000);
@@ -184,6 +297,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
         if (entry.raf) cancelAnimationFrame(entry.raf);
       }
       markersRef.current.clear();
+      readyRef.current = false;
       mapRef.current?.remove();
       mapRef.current = null;
     };
