@@ -9,6 +9,7 @@ use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\Vehicle;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
+use App\Support\FleetDay;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,7 @@ class DashboardController extends Controller
 {
     public function summary(Request $request): JsonResponse
     {
-        $today = now()->startOfDay();
+        $today = FleetDay::todayStart();
         $tenant = $request->user()?->tenant;
 
         return response()->json(['data' => [
@@ -74,10 +75,11 @@ class DashboardController extends Controller
     /** Offer volume for the last 7 days (zero-filled) for the dashboard trend. */
     private function offersDaily(): array
     {
-        $since = now()->subDays(6)->startOfDay();
+        $since = FleetDay::startDaysAgo(6);
+        $dayExpr = FleetDay::dateExpr('received_at');
         $counts = DispatchOffer::where('received_at', '>=', $since)
-            ->groupBy('day')->orderBy('day')
-            ->pluck(DB::raw('count(*) as c'), DB::raw('date(received_at) as day'));
+            ->groupBy(DB::raw($dayExpr))->orderBy(DB::raw($dayExpr))
+            ->pluck(DB::raw('count(*) as c'), DB::raw("{$dayExpr} as day"));
 
         $out = [];
         for ($i = 0; $i < 7; $i++) {

@@ -8,6 +8,7 @@ use App\Domain\Fleet\Models\Driver;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchOfferResource;
 use App\Models\User;
+use App\Support\FleetDay;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -26,7 +27,6 @@ class FleetController extends Controller
     public function home(Request $request): JsonResponse
     {
         $tenantId = $this->tenantId($request);
-        $todayStart = CarbonImmutable::now()->startOfDay();
 
         $online = Driver::withoutGlobalScopes()->where('tenant_id', $tenantId)->online()->count();
 
@@ -49,7 +49,7 @@ class FleetController extends Controller
                 'company_name' => $request->user()->loadMissing('tenant')->tenant?->name,
             ],
             'online_drivers' => $online,
-            'today' => $this->summary($tenantId, $todayStart, CarbonImmutable::now()),
+            'today' => $this->summary($tenantId, FleetDay::todayStart(), FleetDay::todayStart()->addDay()),
             'active_offers' => DispatchOfferResource::collection($active),
             'recent' => DispatchOfferResource::collection($recent),
         ]]);
@@ -71,12 +71,13 @@ class FleetController extends Controller
     public function stats(Request $request): JsonResponse
     {
         $tenantId = $this->tenantId($request);
+        // Fleet-day windows (04:00 boundary), $to exclusive.
         $from = $request->filled('from')
-            ? CarbonImmutable::parse($request->string('from'))->startOfDay()
-            : CarbonImmutable::now()->subDays(30)->startOfDay();
+            ? FleetDay::startOfDate($request->string('from'))
+            : FleetDay::startDaysAgo(30);
         $to = $request->filled('to')
-            ? CarbonImmutable::parse($request->string('to'))->endOfDay()
-            : CarbonImmutable::now()->endOfDay();
+            ? FleetDay::endOfDate($request->string('to'))
+            : FleetDay::todayStart()->addDay();
 
         return response()->json(['data' => $this->summary($tenantId, $from, $to)]);
     }
@@ -132,8 +133,8 @@ class FleetController extends Controller
         return $this->scoped($this->tenantId($request))
             ->when($request->filled('driver_id'), fn ($q) => $q->where('driver_id', $request->integer('driver_id')))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
-            ->when($request->filled('from'), fn ($q) => $q->whereDate('received_at', '>=', $request->date('from')))
-            ->when($request->filled('to'), fn ($q) => $q->whereDate('received_at', '<=', $request->date('to')))
+            ->when($request->filled('from'), fn ($q) => $q->where('received_at', '>=', FleetDay::startOfDate($request->string('from'))))
+            ->when($request->filled('to'), fn ($q) => $q->where('received_at', '<', FleetDay::endOfDate($request->string('to'))))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%'.$request->string('search').'%';
                 $q->where(fn ($sub) => $sub
@@ -146,7 +147,7 @@ class FleetController extends Controller
     /** @return array<string, mixed> */
     private function summary(int $tenantId, CarbonImmutable $from, CarbonImmutable $to): array
     {
-        $base = fn () => $this->scoped($tenantId)->whereBetween('received_at', [$from, $to]);
+        $base = fn () => $this->scoped($tenantId)->where('received_at', '>=', $from)->where('received_at', '<', $to);
 
         $total = $base()->count();
         $accepted = $base()->whereNotNull('accepted_at')->count();

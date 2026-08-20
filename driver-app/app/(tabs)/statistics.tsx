@@ -7,6 +7,7 @@ import { api, type DriverStats, type Offer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius, cardStyle } from "@/lib/theme";
+import { fleetNow } from "@/lib/fleet-day";
 import { fareLabel } from "@/lib/format";
 import { SectionLabel } from "@/components/ui";
 
@@ -23,9 +24,9 @@ function ymd(d: Date): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
-/** from/to for a rolling range (today / last 7 / last 30 days). */
+/** from/to for a rolling range (today / last 7 / last 30 days), in fleet-days. */
 function rangeDates(r: Range): { from: string; to: string } {
-  const now = new Date();
+  const now = fleetNow();
   const start = new Date(now);
   if (r === "7d") start.setDate(now.getDate() - 6);
   else if (r === "30d") start.setDate(now.getDate() - 29);
@@ -163,7 +164,9 @@ const sameDay = (a: Date, b: Date) => ymd(a) === ymd(b);
 function WeeklyChart({ offers, c, selected, onSelect }: { offers: Offer[]; c: Colors; selected: Date | null; onSelect: (d: Date | null) => void }) {
   const { totals, monday } = useMemo(() => {
     const buckets = [0, 0, 0, 0, 0, 0, 0];
-    const now = new Date();
+    // Anchor everything to the fleet-day (Uber day starts 04:00) so a 02:00 trip
+    // lands in the previous day's bar, matching the backend and the filters.
+    const now = fleetNow();
     const mon = new Date(now);
     mon.setHours(0, 0, 0, 0);
     mon.setDate(now.getDate() - mondayIndex(now));
@@ -172,7 +175,7 @@ function WeeklyChart({ offers, c, selected, onSelect }: { offers: Offer[]; c: Co
     for (const o of offers) {
       if (!o.received_at || o.fare_amount == null) continue;
       if (o.status === "rejected" || o.status === "canceled") continue;
-      const at = new Date(o.received_at);
+      const at = fleetNow(new Date(o.received_at));
       if (at < mon || at >= nextMonday) continue;
       buckets[mondayIndex(at)] += o.fare_amount;
     }
@@ -180,7 +183,7 @@ function WeeklyChart({ offers, c, selected, onSelect }: { offers: Offer[]; c: Co
   }, [offers]);
 
   const max = Math.max(...totals, 1);
-  const now = new Date();
+  const now = fleetNow();
   const todayIdx = mondayIndex(now);
 
   return (

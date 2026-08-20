@@ -8,6 +8,7 @@ use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\TripGeocoder;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchOfferResource;
+use App\Support\FleetDay;
 use App\Support\RidyLog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -108,8 +109,8 @@ class DispatchOfferController extends Controller
                         ->orWhere('dropoff_address', 'like', $term);
                 });
             })
-            ->when($request->filled('from'), fn ($q) => $q->whereDate('received_at', '>=', $request->date('from')))
-            ->when($request->filled('to'), fn ($q) => $q->whereDate('received_at', '<=', $request->date('to')));
+            ->when($request->filled('from'), fn ($q) => $q->where('received_at', '>=', FleetDay::startOfDate($request->string('from'))))
+            ->when($request->filled('to'), fn ($q) => $q->where('received_at', '<', FleetDay::endOfDate($request->string('to'))));
     }
 
     /**

@@ -10,7 +10,7 @@ use App\Domain\Fleet\DriverStatusIngestor;
 use App\Domain\Fleet\Models\Driver;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DriverResource;
-use Carbon\CarbonImmutable;
+use App\Support\FleetDay;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -87,12 +87,13 @@ class DriverController extends Controller
     /** Work stats for one driver, computed from our own offers/acceptance data. */
     public function stats(Request $request, Driver $driver, DriverStatsService $stats): JsonResponse
     {
+        // Fleet-day windows (04:00 boundary), $to exclusive.
         $from = $request->filled('from')
-            ? CarbonImmutable::parse($request->string('from'))->startOfDay()
-            : CarbonImmutable::now()->subDays(30)->startOfDay();
+            ? FleetDay::startOfDate($request->string('from'))
+            : FleetDay::startDaysAgo(30);
         $to = $request->filled('to')
-            ? CarbonImmutable::parse($request->string('to'))->endOfDay()
-            : CarbonImmutable::now()->endOfDay();
+            ? FleetDay::endOfDate($request->string('to'))
+            : FleetDay::todayStart()->addDay();
 
         return response()->json(['data' => $stats->forDriver($driver, $from, $to)]);
     }

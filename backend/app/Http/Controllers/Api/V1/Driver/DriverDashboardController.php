@@ -6,6 +6,7 @@ use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\OfferStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchOfferResource;
+use App\Support\FleetDay;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -20,7 +21,6 @@ class DriverDashboardController extends Controller
     public function home(Request $request): JsonResponse
     {
         $driver = $request->user();
-        $todayStart = CarbonImmutable::now()->startOfDay();
 
         $active = $this->scoped($driver->id)
             ->with('driver:id,name')
@@ -36,7 +36,7 @@ class DriverDashboardController extends Controller
                 'online' => $driver->isOnline(),
                 'engagement' => $driver->engagementStatus(), // 0 idle / 1 en-route / 2 on-trip
             ],
-            'today' => $this->summary($driver->id, $todayStart, CarbonImmutable::now()),
+            'today' => $this->summary($driver->id, FleetDay::todayStart(), FleetDay::todayStart()->addDay()),
             'active_offer' => $active ? new DispatchOfferResource($active) : null,
             'recent' => DispatchOfferResource::collection($recent),
         ]]);
@@ -45,12 +45,14 @@ class DriverDashboardController extends Controller
     public function stats(Request $request): JsonResponse
     {
         $driver = $request->user();
+        // Fleet-day windows (04:00 boundary): a picked date labels [date 04:00,
+        // next 04:00). $to is the exclusive upper bound.
         $from = $request->filled('from')
-            ? CarbonImmutable::parse($request->string('from'))->startOfDay()
-            : CarbonImmutable::now()->subDays(30)->startOfDay();
+            ? FleetDay::startOfDate($request->string('from'))
+            : FleetDay::startDaysAgo(30);
         $to = $request->filled('to')
-            ? CarbonImmutable::parse($request->string('to'))->endOfDay()
-            : CarbonImmutable::now()->endOfDay();
+            ? FleetDay::endOfDate($request->string('to'))
+            : FleetDay::todayStart()->addDay();
 
         return response()->json(['data' => $this->summary($driver->id, $from, $to)]);
     }
@@ -58,7 +60,7 @@ class DriverDashboardController extends Controller
     /** @return array<string, mixed> */
     private function summary(int $driverId, CarbonImmutable $from, CarbonImmutable $to): array
     {
-        $base = fn () => $this->scoped($driverId)->whereBetween('received_at', [$from, $to]);
+        $base = fn () => $this->scoped($driverId)->where('received_at', '>=', $from)->where('received_at', '<', $to);
 
         $total = $base()->count();
         $accepted = $base()->whereNotNull('accepted_at')->count();

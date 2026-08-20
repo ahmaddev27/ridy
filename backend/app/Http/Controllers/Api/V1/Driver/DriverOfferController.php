@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Driver;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchOfferResource;
+use App\Support\FleetDay;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -33,8 +34,8 @@ class DriverOfferController extends Controller
         return DispatchOffer::withoutGlobalScopes()
             ->where('driver_id', $request->user()->id)
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
-            ->when($request->filled('from'), fn ($q) => $q->whereDate('received_at', '>=', $request->date('from')))
-            ->when($request->filled('to'), fn ($q) => $q->whereDate('received_at', '<=', $request->date('to')))
+            ->when($request->filled('from'), fn ($q) => $q->where('received_at', '>=', FleetDay::startOfDate($request->string('from'))))
+            ->when($request->filled('to'), fn ($q) => $q->where('received_at', '<', FleetDay::endOfDate($request->string('to'))))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%'.$request->string('search').'%';
                 $q->where(fn ($sub) => $sub

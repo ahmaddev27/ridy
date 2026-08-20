@@ -17,8 +17,10 @@ class DriverStatsService
     /** @return array<string, mixed> */
     public function forDriver(Driver $driver, CarbonImmutable $from, CarbonImmutable $to): array
     {
+        // $to is an exclusive upper bound (fleet-day next-04:00 boundary).
         $offers = DispatchOffer::where('driver_uuid', $driver->uber_driver_uuid)
-            ->whereBetween('received_at', [$from, $to])
+            ->where('received_at', '>=', $from)
+            ->where('received_at', '<', $to)
             ->get(['fare_amount', 'distance_m', 'accepted_at', 'status']);
 
         $total = $offers->count();

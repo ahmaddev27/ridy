@@ -8,6 +8,7 @@ import { api, type Offer, type OffersQuery, type FleetDriver } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, getLocale } from "@/lib/i18n";
 import { useColors, radius, isDarkPalette } from "@/lib/theme";
+import { fleetNow } from "@/lib/fleet-day";
 import { OfferCard } from "@/components/offer-card";
 import { FilterSheet, DEFAULT_FILTERS, type OfferFilters, type SortKey } from "@/components/filter-sheet";
 
@@ -20,10 +21,11 @@ function ymd(d: Date): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
-/** from/to for the chosen date window (empty for "all"). */
+/** from/to for the chosen date window (empty for "all"). Dates are fleet-days
+ *  (the Uber day starts at 04:00), so "today" before 04:00 is still yesterday. */
 function dateWindow(day: OfferFilters["day"]): { from?: string; to?: string } {
   if (day === "all") return {};
-  const now = new Date();
+  const now = fleetNow();
   const start = new Date(now);
   if (day === "week") start.setDate(now.getDate() - 6);
   return { from: ymd(start), to: ymd(now) };
