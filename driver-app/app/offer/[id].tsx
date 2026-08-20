@@ -99,7 +99,7 @@ export default function OfferScreen() {
         <Pressable onPress={() => router.back()} hitSlop={10} style={{ position: "absolute", [isRTL() ? "right" : "left"]: 16 }}>
           {isRTL() ? <ChevronRight size={26} color={c.ink} /> : <ChevronLeft size={26} color={c.ink} />}
         </Pressable>
-        <Text style={{ color: c.ink, fontSize: 17, fontWeight: "700" }}>{t("offer.header")}</Text>
+        <Text style={{ color: c.ink, fontSize: 17, fontWeight: "600" }}>{t("offer.header")}</Text>
       </View>
 
       {!offer ? (
@@ -124,33 +124,28 @@ export default function OfferScreen() {
               {/* Hero is the €/km rate — the number the driver judges in ~5s. The
                   total fare sits beneath it as the secondary figure. Falls back to
                   the total when the trip is not geo-synced yet (no per-km). */}
+              {/* Hero is the trip total (the one bold figure); €/km sits beneath it. */}
               {(() => {
                 const perKm = offer.distance_m != null ? perKmValue(offer.fare_amount, offer.distance_m) : null;
                 return (
                   <>
-                    <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "flex-end", gap: 5 }}>
-                      <Text style={{ color: c.ink, fontSize: 40, fontWeight: "800", letterSpacing: -1.5 }}>
-                        {perKm?.value ?? fareLabel(offer.fare_formatted, offer.fare_amount)}
-                      </Text>
-                      {perKm && <Text style={{ color: c.inkSubtle, fontSize: 16, fontWeight: "500", marginBottom: 7 }}>/km</Text>}
-                    </View>
-                    <Text style={{ color: c.inkMuted, fontSize: 14, marginTop: 3 }}>
+                    <Text style={{ color: c.ink, fontSize: 40, fontWeight: "800", letterSpacing: -1.5 }}>
                       {fareLabel(offer.fare_formatted, offer.fare_amount)}
-                      <Text style={{ color: c.inkSubtle }}> · {t("offer.total")}</Text>
                     </Text>
+                    {perKm && (
+                      <Text style={{ color: c.inkMuted, fontSize: 15, marginTop: 3, writingDirection: "ltr" }}>
+                        {perKm.value} <Text style={{ color: c.inkSubtle }}>/km</Text>
+                      </Text>
+                    )}
                   </>
                 );
               })()}
             </View>
             {isPending && secondsLeft != null && (
-              <Text style={{ color: ringColor, fontSize: 17, fontWeight: "700", marginTop: 6 }}>
+              <Text style={{ color: ringColor, fontSize: 16, fontWeight: "600", marginTop: 6 }}>
                 {expired ? t("offer.expired") : `${secondsLeft.toFixed(1)}s`}
               </Text>
             )}
-            {/* Clarify the mark so "€€" never reads as a second price. */}
-            <Text style={{ color: c.inkSubtle, fontSize: 12, textAlign: "center", marginTop: 8, lineHeight: 17, paddingHorizontal: 24 }}>
-              {t("offer.qualityHint")}
-            </Text>
           </View>
 
           {/* Status row */}
@@ -161,6 +156,18 @@ export default function OfferScreen() {
                 {new Date(offer.received_at).toLocaleTimeString("en-GB")}
               </Text>
             )}
+          </View>
+
+          {/* Quick actions up top so the driver reaches map / Uber fast. */}
+          <View style={{ flexDirection: row, gap: 10 }}>
+            <SecondaryButton label={t("offer.openMaps")} icon={Map} onPress={openMaps} style={{ flex: 1 }} />
+            <Pressable
+              onPress={() => Linking.openURL("uberdriver://").catch(() => Linking.openURL("https://drivers.uber.com"))}
+              style={{ flex: 1, flexDirection: isRTL() ? "row-reverse" : "row", gap: 8, backgroundColor: c.primary, borderRadius: radius.control, paddingVertical: 13, alignItems: "center", justifyContent: "center" }}
+            >
+              <Car size={17} color={c.primaryInk} />
+              <Text style={{ color: c.primaryInk, fontSize: 15, fontWeight: "700" }}>{t("offer.openUber")}</Text>
+            </Pressable>
           </View>
 
           {/* People — rider (when captured) and, in fleet-owner mode, the driver. */}
@@ -214,20 +221,7 @@ export default function OfferScreen() {
             )}
           </View>
 
-          <View style={{ flex: 1 }} />
-
-          {/* CTA — Open in Uber (primary) + Open in Maps (route) */}
-          <View style={{ flexDirection: row, gap: 10, marginTop: 8 }}>
-            <SecondaryButton label={t("offer.openMaps")} icon={Map} onPress={openMaps} />
-            <Pressable
-              onPress={() => Linking.openURL("uberdriver://").catch(() => Linking.openURL("https://drivers.uber.com"))}
-              style={{ flex: 1, flexDirection: isRTL() ? "row-reverse" : "row", gap: 8, backgroundColor: c.primary, borderRadius: radius.control, paddingVertical: 13, alignItems: "center", justifyContent: "center" }}
-            >
-              <Car size={17} color={c.primaryInk} />
-              <Text style={{ color: c.primaryInk, fontSize: 15, fontWeight: "700" }}>{t("offer.openUber")}</Text>
-            </Pressable>
-          </View>
-          <Text style={{ color: c.inkSubtle, fontSize: 12, textAlign: "center", lineHeight: 18 }}>{t("offer.observe")}</Text>
+          <Text style={{ color: c.inkSubtle, fontSize: 12, textAlign: "center", lineHeight: 18, marginTop: 4 }}>{t("offer.observe")}</Text>
         </ScrollView>
       )}
     </SafeAreaView>
@@ -241,7 +235,7 @@ function PersonTag({ icon: Icon, name, role, row, c }: { icon: LucideIcon; name:
   return (
     <View style={{ flexDirection: row, alignItems: "center", gap: 7 }}>
       <Icon size={18} color={c.inkMuted} />
-      <Text style={{ color: c.ink, fontSize: 16, fontWeight: "600" }}>{name}</Text>
+      <Text style={{ color: c.ink, fontSize: 15, fontWeight: "500" }}>{name}</Text>
       <Text style={{ color: c.inkSubtle, fontSize: 14 }}>· {role}</Text>
     </View>
   );
@@ -253,7 +247,7 @@ function MetricCell({ label, value, c, border }: { label: string; value: string;
     <View style={{ flex: 1, padding: 16, gap: 4, borderRightWidth: border && !isRTL() ? 1 : 0, borderLeftWidth: border && isRTL() ? 1 : 0, borderColor: c.line }}>
       <SectionLabel>{label}</SectionLabel>
       {/* Latin/money values stay LTR even in Arabic, matching how Uber shows them. */}
-      <Text style={{ color: c.ink, fontSize: 20, fontWeight: "800", textAlign: isRTL() ? "right" : "left", writingDirection: "ltr" }}>{value}</Text>
+      <Text style={{ color: c.ink, fontSize: 16, fontWeight: "500", textAlign: isRTL() ? "right" : "left", writingDirection: "ltr" }}>{value}</Text>
     </View>
   );
 }
@@ -263,7 +257,7 @@ function InfoRow({ label, value, row, c, border }: { label: string; value: strin
   return (
     <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", gap: 12, paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: border ? 1 : 0, borderColor: c.line }}>
       <Text style={{ color: c.inkMuted, fontSize: 14 }}>{label}</Text>
-      <Text style={{ color: c.ink, fontSize: 14, fontWeight: "600", writingDirection: "ltr" }}>{value}</Text>
+      <Text style={{ color: c.ink, fontSize: 14, fontWeight: "500", writingDirection: "ltr" }}>{value}</Text>
     </View>
   );
 }
