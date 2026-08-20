@@ -45,23 +45,22 @@ class CompanySubscriptionController extends Controller
             throw ValidationException::withMessages(['code' => 'otp_incorrect']);
         }
 
-        $days = (int) $tenant->activation_days;
-        if ($testCode && $days <= 0) {
-            $days = CompanyActivationController::TEST_CODE_DAYS;
-        }
-
-        $period = $activator->apply(
-            $tenant,
-            $days,
-            $tenant->activation_amount,
-            (bool) $tenant->activation_paid,
-            $tenant->activation_collector_id,
-            $realMatch ? $tenant->activation_code : null,
-        );
+        // The test code grants a real monthly subscription (plan + activated
+        // ledger row shown on the history page); a real code applies its own plan.
+        $period = $testCode
+            ? $activator->applyTestMonthly($tenant, $data['code'], $request->user()->id)
+            : $activator->apply(
+                $tenant,
+                (int) $tenant->activation_days,
+                $tenant->activation_amount,
+                (bool) $tenant->activation_paid,
+                $tenant->activation_collector_id,
+                $tenant->activation_code,
+            );
 
         return response()->json(['data' => [
             'activated' => true,
-            'days' => $days,
+            'days' => $period->days,
             'ends_at' => $period->ends_at->toIso8601String(),
         ]]);
     }

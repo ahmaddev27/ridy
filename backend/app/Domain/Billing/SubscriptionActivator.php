@@ -2,6 +2,7 @@
 
 namespace App\Domain\Billing;
 
+use App\Domain\Billing\Models\Plan;
 use App\Domain\Billing\Models\SubscriptionCode;
 use App\Domain\Billing\Models\SubscriptionPeriod;
 use App\Domain\Notifications\Notifier;
@@ -82,5 +83,43 @@ class SubscriptionActivator
         }
 
         return $period;
+    }
+
+    /**
+     * Redeem the test code as a real monthly subscription: resolve the monthly
+     * plan, write a matching ledger entry (so the history row shows the plan and
+     * an "activated" status like a genuine purchase), then apply it — stacking
+     * after any remaining time. Returns the created period.
+     */
+    public function applyTestMonthly(Tenant $tenant, string $code, ?int $createdBy): SubscriptionPeriod
+    {
+        $plan = $this->monthlyPlan();
+        $days = $plan?->duration_days ?? 30;
+        $amount = $plan?->price;
+
+        // A ledger row the apply() call then marks activated and links to the
+        // period, so the Subscription page shows the plan, amount and status.
+        SubscriptionCode::create([
+            'code' => $code,
+            'plan_id' => $plan?->id,
+            'tenant_id' => $tenant->id,
+            'collector_id' => null,
+            'amount' => $amount,
+            'paid' => true,
+            'expires_at' => CarbonImmutable::now()->addMinutes(10),
+            'created_by' => $createdBy,
+        ]);
+
+        return $this->apply($tenant, $days, $amount, true, null, $code);
+    }
+
+    /** The monthly plan: an active ~30-day plan, else the shortest active plan. */
+    private function monthlyPlan(): ?Plan
+    {
+        return Plan::query()->where('active', true)
+            ->whereBetween('duration_days', [28, 31])
+            ->orderBy('duration_days')
+            ->first()
+            ?? Plan::query()->where('active', true)->orderBy('duration_days')->first();
     }
 }

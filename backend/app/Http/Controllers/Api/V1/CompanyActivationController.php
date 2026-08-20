@@ -83,20 +83,20 @@ class CompanyActivationController extends Controller
         // Correct code — clear any accumulated wrong-attempt counter.
         RateLimiter::clear($throttleKey);
 
-        // A test code with no admin-generated plan grants a default monthly period.
-        $days = (int) $tenant->activation_days;
-        if ($testCode && $days <= 0) {
-            $days = self::TEST_CODE_DAYS;
+        // The test code grants a real monthly subscription (plan + activated
+        // ledger row); a real code applies its own admin-issued plan.
+        if ($testCode) {
+            $activator->applyTestMonthly($tenant, $data['code'], $user->id);
+        } else {
+            $activator->apply(
+                $tenant,
+                (int) $tenant->activation_days,
+                $tenant->activation_amount,
+                (bool) $tenant->activation_paid,
+                $tenant->activation_collector_id,
+                $tenant->activation_code,
+            );
         }
-
-        $activator->apply(
-            $tenant,
-            $days,
-            $tenant->activation_amount,
-            (bool) $tenant->activation_paid,
-            $tenant->activation_collector_id,
-            $realMatch ? $tenant->activation_code : null,
-        );
 
         return response()->json(['data' => ['activated' => true]]);
     }
