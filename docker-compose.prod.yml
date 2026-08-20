@@ -176,6 +176,8 @@ services:
       # returns only this box's slice. One box → "main". More boxes → give each a
       # distinct SHARD_ID and run the daemon-only stack there. See docs/18.
       SHARD_ID: ${SHARD_ID:-main}
+      # Sentry error tracking for the daemon (empty = disabled).
+      SENTRY_DSN: ${DAEMON_SENTRY_DSN:-}
 
   # --- Self-hosted geocoding + routing (opt-in via the "geo" profile) --------
   # Removes the free public services' ~1 req/s rate limit so trip distances fill

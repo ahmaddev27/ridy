@@ -4,6 +4,7 @@
 import { config } from "./config.js";
 import { api } from "./api.js";
 import { RamenStream } from "./stream.js";
+import { initSentry, captureException, flush } from "./sentry.js";
 
 // Keyed by `${sessionId}:${ramenPath}` — one entry per (session × RAMEN channel),
 // since Uber pushes offers across several regional channels in parallel.
@@ -21,6 +22,7 @@ async function reconcile() {
     ({ sessions, globalProxyUrl } = await api.sessions());
   } catch (e) {
     console.error(`session poll failed: ${e.message}`);
+    captureException(e, { where: "session_poll" });
     return;
   }
 
@@ -71,12 +73,16 @@ async function reconcile() {
       console.log(`starting stream ${key} (${session.uber_org_uuid})`);
       const stream = new RamenStream(session, path, { primary: index === 0 });
       streams.set(key, stream);
-      stream.run().catch((e) => console.error(`stream ${key} crashed: ${e.message}`));
+      stream.run().catch((e) => {
+        console.error(`stream ${key} crashed: ${e.message}`);
+        captureException(e, { where: "stream", key });
+      });
     });
   }
 }
 
 async function main() {
+  initSentry();
   console.log(`Ridy dispatch daemon starting [shard "${config.shardId}"] -> ${config.apiBaseUrl}`);
   // Uber traffic is proxied per-stream (per-company proxy_url, else the global
   // UBER_PROXY_URL); calls back to our own API stay direct.
@@ -97,7 +103,21 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
   });
 }
 
-main().catch((e) => {
+// Report crashes the loop never caught, then let the process restart.
+process.on("uncaughtException", async (e) => {
+  console.error(`uncaughtException: ${e.message}`);
+  captureException(e, { where: "uncaughtException" });
+  await flush();
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error(`unhandledRejection: ${reason}`);
+  captureException(reason instanceof Error ? reason : new Error(String(reason)), { where: "unhandledRejection" });
+});
+
+main().catch(async (e) => {
   console.error(`fatal: ${e.message}`);
+  captureException(e, { where: "fatal" });
+  await flush();
   process.exit(1);
 });

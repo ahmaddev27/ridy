@@ -88,4 +88,7 @@ export const config = {
   // assigned to it (auto-balanced across boxes, with failover). One box → leave
   // this "main". More boxes → give each a distinct SHARD_ID.
   shardId: (process.env.SHARD_ID || "main").trim(),
+
+  // Sentry DSN for daemon error tracking. Empty = disabled (no-op).
+  sentryDsn: (process.env.SENTRY_DSN || "").trim(),
 };
