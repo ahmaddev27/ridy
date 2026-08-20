@@ -50,22 +50,35 @@ class FcmPushSender implements PushSender
      */
     private function message(string $token, string $title, string $body, array $data): array
     {
-        $aps = ['sound' => 'default', 'content-available' => 1];
+        // DATA-ONLY on purpose: with a top-level `notification` block, Android's
+        // system tray renders the push itself when the app is backgrounded/killed,
+        // which strips expo's category (the "Open in map" action button) and stops
+        // the JS tap handler from routing to the offer. Sending data-only lets
+        // expo-notifications present it instead — so the action button shows and a
+        // tap opens the offer. expo builds the Android notification from these data
+        // keys (title/body/channelId/categoryId/sound).
+        $payload = array_merge([
+            'title' => $title,
+            'body' => $body,
+            'channelId' => 'offers',
+            'sound' => 'default',
+        ], array_map('strval', $data));
 
-        // iOS surfaces action buttons by matching aps.category to a category the
-        // app registered. Android/expo reads the same id from the data payload.
+        // iOS still needs an explicit alert to display; aps.category surfaces the
+        // action button by matching a category the app registered.
+        $aps = [
+            'alert' => ['title' => $title, 'body' => $body],
+            'sound' => 'default',
+            'content-available' => 1,
+        ];
         if (! empty($data['categoryId'])) {
             $aps['category'] = (string) $data['categoryId'];
         }
 
         return [
             'token' => $token,
-            'notification' => ['title' => $title, 'body' => $body],
-            'data' => array_map('strval', $data),
-            'android' => [
-                'priority' => 'high',
-                'notification' => ['channel_id' => 'offers', 'sound' => 'default'],
-            ],
+            'data' => $payload,
+            'android' => ['priority' => 'high'],
             'apns' => [
                 'headers' => ['apns-priority' => '10'],
                 'payload' => ['aps' => $aps],

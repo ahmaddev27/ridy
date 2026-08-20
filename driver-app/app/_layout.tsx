@@ -124,7 +124,16 @@ function Gate() {
       registerOfferCategory();
     }
 
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+    // De-dupe: a cold-start tap is delivered by BOTH getLastNotificationResponse
+    // and (sometimes) the listener, so handle each notification only once.
+    const handled = new Set<string>();
+    const handle = (response: Notifications.NotificationResponse | null) => {
+      if (!response) return;
+      const id = response.notification.request.identifier;
+      if (id) {
+        if (handled.has(id)) return;
+        handled.add(id);
+      }
       const data = response.notification.request.content.data as {
         offer_id?: string;
         pickup?: string;
@@ -139,8 +148,16 @@ function Gate() {
 
       // Default tap: only navigate for a numeric offer id — the payload is
       // attacker-influenced, so never interpolate an arbitrary string into the route.
-      if (data?.offer_id && /^\d+$/.test(data.offer_id)) router.push(`/offer/${data.offer_id}`);
-    });
+      if (data?.offer_id && /^\d+$/.test(String(data.offer_id))) router.push(`/offer/${data.offer_id}`);
+    };
+
+    // Cold start: the notification tap that LAUNCHED the app is not delivered to
+    // the listener below, so pick it up explicitly — this is what makes a tap open
+    // the offer instead of the home screen when the app was closed.
+    Notifications.getLastNotificationResponseAsync().then(handle).catch(() => {});
+
+    // Warm taps (app already running / backgrounded).
+    const sub = Notifications.addNotificationResponseReceivedListener(handle);
     return () => sub.remove();
   }, [driver, isOwner, router]);
 
