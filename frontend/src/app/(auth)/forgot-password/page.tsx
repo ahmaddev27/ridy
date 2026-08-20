@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OtpInput } from "@/components/ui/otp-input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { WhatsAppButton } from "@/components/support/whatsapp-button";
 import { Logo } from "@/components/brand/logo";
 import { useI18n } from "@/lib/i18n/context";
 import { apiErrorMessage } from "@/lib/api/error-message";
@@ -27,6 +28,21 @@ export default function ForgotPasswordPage() {
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Resend cooldown: disabled with a live countdown after each send.
+  const [cooldown, setCooldown] = useState(0);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startCooldown = () => {
+    setCooldown(60);
+    if (timer.current) clearInterval(timer.current);
+    timer.current = setInterval(() => {
+      setCooldown((s) => {
+        if (s <= 1 && timer.current) clearInterval(timer.current);
+        return Math.max(0, s - 1);
+      });
+    }, 1000);
+  };
+  useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
+
   async function submitEmail(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -34,6 +50,7 @@ export default function ForgotPasswordPage() {
       await forgotPassword(email);
       toast.success(r("codeSent"), { description: email });
       setStep("code");
+      startCooldown();
     } catch (err) {
       toast.error(r("failed"), { description: apiErrorMessage(err, t) });
     } finally {
@@ -77,6 +94,7 @@ export default function ForgotPasswordPage() {
     try {
       await forgotPassword(email);
       toast.success(r("codeResent"));
+      startCooldown();
     } catch (err) {
       toast.error(r("failed"), { description: apiErrorMessage(err, t) });
     }
@@ -126,8 +144,13 @@ export default function ForgotPasswordPage() {
                 {busy && <Loader2 className="h-4 w-4 animate-spin" />}
                 {r("verifyCta")}
               </Button>
-              <button type="button" onClick={resend} className="w-full text-center text-xs font-medium text-ink-muted hover:text-ink">
-                {r("resend")}
+              <button
+                type="button"
+                onClick={resend}
+                disabled={cooldown > 0}
+                className="w-full text-center text-xs font-medium text-ink-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {cooldown > 0 ? r("resendIn").replace("{s}", String(cooldown)) : r("resend")}
               </button>
             </form>
           )}
@@ -168,6 +191,10 @@ export default function ForgotPasswordPage() {
             {r("backToLogin")}
           </Link>
         </p>
+
+        <div className="mt-4 flex justify-center">
+          <WhatsAppButton />
+        </div>
       </div>
     </div>
   );
