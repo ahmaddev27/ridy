@@ -21,6 +21,9 @@ export type DashboardSummary = {
     activated_at: string | null;
     ends_at: string | null;
     days_left: number | null;
+    current_ends_at: string | null;
+    current_days_left: number | null;
+    queued: { count: number; days: number; starts_at: string | null } | null;
   } | null;
 };
 

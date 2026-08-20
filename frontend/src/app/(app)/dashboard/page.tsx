@@ -83,10 +83,23 @@ export default function DashboardPage() {
                 <div>
                   <div className="text-xs text-ink-subtle">{k("subEnds")}</div>
                   <div className="font-medium text-ink">
-                    {data.subscription.ends_at ? new Date(data.subscription.ends_at).toLocaleDateString(latnLocale(locale)) : "—"}
+                    {(data.subscription.current_ends_at ?? data.subscription.ends_at)
+                      ? new Date((data.subscription.current_ends_at ?? data.subscription.ends_at) as string).toLocaleDateString(latnLocale(locale))
+                      : "—"}
                   </div>
                 </div>
               </div>
+              {data.subscription.queued && (
+                <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-surface-2 px-2.5 py-1.5 text-xs text-ink-muted">
+                  <span className="font-semibold text-ink">+{data.subscription.queued.days} {k("subDaysShort")}</span>
+                  <span className="text-ink-subtle">
+                    {k("subQueued")}
+                    {data.subscription.queued.starts_at
+                      ? ` ${new Date(data.subscription.queued.starts_at).toLocaleDateString(latnLocale(locale))}`
+                      : ""}
+                  </span>
+                </div>
+              )}
               <button
                 onClick={() => setRedeemOpen(true)}
                 className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
@@ -119,6 +132,9 @@ type SubInfo = {
   days_left: number | null;
   activated_at: string | null;
   ends_at: string | null;
+  current_ends_at: string | null;
+  current_days_left: number | null;
+  queued: { count: number; days: number; starts_at: string | null } | null;
 };
 
 /** Compact radial gauge of the subscription — animates its fill on mount. */
@@ -131,10 +147,12 @@ function SubscriptionRing({
   inactiveLabel: string;
   daysLabel: string;
 }) {
-  const left = Math.max(0, subscription.days_left ?? 0);
+  // The ring reflects the CURRENT period only; queued periods show separately.
+  const endsAt = subscription.current_ends_at ?? subscription.ends_at;
+  const left = Math.max(0, subscription.current_days_left ?? subscription.days_left ?? 0);
   const total =
-    subscription.activated_at && subscription.ends_at
-      ? Math.max(1, Math.round((new Date(subscription.ends_at).getTime() - new Date(subscription.activated_at).getTime()) / 86_400_000))
+    subscription.activated_at && endsAt
+      ? Math.max(1, Math.round((new Date(endsAt).getTime() - new Date(subscription.activated_at).getTime()) / 86_400_000))
       : 30;
   const frac = Math.min(1, left / total);
 
