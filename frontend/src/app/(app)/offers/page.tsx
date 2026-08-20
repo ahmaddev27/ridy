@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { listOffersPaged, getOfferStats, exportOffers, fareLabel, type DispatchOffer, type OfferStatus, type PageMeta, type OfferStats } from "@/lib/api/offers";
+import { fleetNow } from "@/lib/fleet-day";
 
 /** Format a Date as a local `yyyy-mm-dd` string for a native date input. */
 function ymd(d: Date): string {
@@ -56,7 +57,7 @@ export default function OffersPage() {
   const [page, setPage] = useState(1);
   const [perPage] = useState(50); // fixed; offers are grouped by day, not paged by size
   // Collapsible day groups — today starts open, the rest collapsed.
-  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set([new Date().toDateString()]));
+  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set([fleetNow().toDateString()]));
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   // Which quick-range chip is active (today / week / month), or null for a
@@ -167,9 +168,11 @@ export default function OffersPage() {
     setDriverUuids((prev) => (prev.includes(uuid) ? prev.filter((x) => x !== uuid) : [...prev, uuid]));
   }
 
-  /** Apply a rolling quick-range: today, last 7 days, or last 30 days. */
+  /** Apply a rolling quick-range: today, last 7 days, or last 30 days.
+   *  Anchored to the fleet-day (Uber day starts 04:00), so "today" before 04:00
+   *  is still yesterday — matching the backend's date windows. */
   function applyPreset(preset: "today" | "week" | "month") {
-    const now = new Date();
+    const now = fleetNow();
     const start = new Date(now);
     if (preset === "week") start.setDate(now.getDate() - 6);
     else if (preset === "month") start.setDate(now.getDate() - 29);
@@ -183,7 +186,7 @@ export default function OffersPage() {
   const groupedByDay = useMemo(() => {
     const groups = new Map<string, DispatchOffer[]>();
     for (const o of offers) {
-      const key = o.received_at ? new Date(o.received_at).toDateString() : "—";
+      const key = o.received_at ? fleetNow(new Date(o.received_at)).toDateString() : "—";
       const bucket = groups.get(key) ?? [];
       bucket.push(o);
       groups.set(key, bucket);
@@ -201,7 +204,7 @@ export default function OffersPage() {
   }
 
   function dayLabel(key: string): string {
-    if (key === new Date().toDateString()) return c("today");
+    if (key === fleetNow().toDateString()) return c("today");
     if (key === "—") return "—";
     return new Date(key).toLocaleDateString(latnLocale(locale), { weekday: "long", day: "numeric", month: "long" });
   }
