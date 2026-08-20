@@ -35,18 +35,20 @@ export default function StatisticsScreen() {
   const c = useColors();
   const align = isRTL() ? "right" : "left";
   const [range, setRange] = useState<Range>("7d");
+  const [day, setDay] = useState<Date | null>(null); // tapping a chart bar filters to one day
   const [stats, setStats] = useState<DriverStats | null>(null);
   const [week, setWeek] = useState<Offer[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async (r: Range) => {
+  const load = useCallback(async (r: Range, d: Date | null) => {
     setRefreshing(true);
     try {
-      const { from, to } = rangeDates(r);
-      // Stats for the selected range + the last 7 days of offers for the chart.
+      // Stats for the picked day (if any) or the selected range; the chart always
+      // shows the last 7 days so you can tap another bar.
+      const window = d ? { from: ymd(d), to: ymd(d) } : rangeDates(r);
       const w = rangeDates("7d");
       const [s, o] = await Promise.all([
-        api.stats(from, to),
+        api.stats(window.from, window.to),
         api.offers({ from: w.from, to: w.to, per_page: 100 }),
       ]);
       setStats(s.data);
@@ -58,7 +60,7 @@ export default function StatisticsScreen() {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(range); }, [load, range]));
+  useFocusEffect(useCallback(() => { load(range, day); }, [load, range, day]));
 
   const avgPerKm = stats && stats.km > 0 ? stats.earnings / stats.km : 0;
 
@@ -66,7 +68,7 @@ export default function StatisticsScreen() {
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: c.canvas }}>
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 16 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(range)} tintColor={c.ink} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(range, day)} tintColor={c.ink} />}
       >
         <Text style={{ color: c.ink, fontSize: 26, fontWeight: "800", textAlign: align }}>{t("stats.title")}</Text>
 
@@ -77,7 +79,7 @@ export default function StatisticsScreen() {
             return (
               <Pressable
                 key={r}
-                onPress={() => setRange(r)}
+                onPress={() => { setRange(r); setDay(null); }}
                 style={{
                   paddingHorizontal: 16,
                   paddingVertical: 8,
@@ -103,8 +105,21 @@ export default function StatisticsScreen() {
           </Text>
         </View>
 
-        {/* Last 7 days — income bars */}
-        <WeeklyChart offers={week} c={c} />
+        {/* Selected-day filter chip */}
+        {day && (
+          <Pressable
+            onPress={() => setDay(null)}
+            style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignSelf: isRTL() ? "flex-end" : "flex-start", alignItems: "center", gap: 8, backgroundColor: c.surfaceRaised, borderWidth: 1, borderColor: c.borderStrong, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 }}
+          >
+            <Text style={{ color: c.ink, fontSize: 12.5, fontWeight: "700", writingDirection: "ltr" }}>
+              {day.toLocaleDateString("en-DE", { weekday: "short", day: "2-digit", month: "2-digit" })}
+            </Text>
+            <Text style={{ color: c.inkSubtle, fontSize: 14, fontWeight: "700" }}>×</Text>
+          </Pressable>
+        )}
+
+        {/* Last 7 days — income bars (tap a bar to filter to that day) */}
+        <WeeklyChart offers={week} c={c} selected={day} onSelect={setDay} />
 
         {/* 2×2 grid */}
         <View style={cardStyle(c)}>
@@ -131,43 +146,58 @@ export default function StatisticsScreen() {
 
 type Colors = ReturnType<typeof useColors>;
 
-/** Income bars for the current week (Mon–Sun); today's bar is emphasised. */
-function WeeklyChart({ offers, c }: { offers: Offer[]; c: Colors }) {
-  const totals = useMemo(() => {
+const sameDay = (a: Date, b: Date) => ymd(a) === ymd(b);
+
+/**
+ * Income bars for the current week (Mon–Sun). Tapping a bar filters the whole
+ * screen to that day; the selected (or today's) bar is emphasised. Future days
+ * aren't tappable.
+ */
+function WeeklyChart({ offers, c, selected, onSelect }: { offers: Offer[]; c: Colors; selected: Date | null; onSelect: (d: Date | null) => void }) {
+  const { totals, monday } = useMemo(() => {
     const buckets = [0, 0, 0, 0, 0, 0, 0];
     const now = new Date();
-    const monday = new Date(now);
-    monday.setHours(0, 0, 0, 0);
-    monday.setDate(now.getDate() - mondayIndex(now));
-    const nextMonday = new Date(monday);
-    nextMonday.setDate(monday.getDate() + 7);
+    const mon = new Date(now);
+    mon.setHours(0, 0, 0, 0);
+    mon.setDate(now.getDate() - mondayIndex(now));
+    const nextMonday = new Date(mon);
+    nextMonday.setDate(mon.getDate() + 7);
     for (const o of offers) {
       if (!o.received_at || o.fare_amount == null) continue;
       if (o.status === "rejected" || o.status === "canceled") continue;
       const at = new Date(o.received_at);
-      if (at < monday || at >= nextMonday) continue;
+      if (at < mon || at >= nextMonday) continue;
       buckets[mondayIndex(at)] += o.fare_amount;
     }
-    return buckets;
+    return { totals: buckets, monday: mon };
   }, [offers]);
 
   const max = Math.max(...totals, 1);
-  const todayIdx = mondayIndex(new Date());
+  const now = new Date();
+  const todayIdx = mondayIndex(now);
 
   return (
     <View style={{ ...cardStyle(c), padding: 18, gap: 14 }}>
       <SectionLabel>{t("home.week")}</SectionLabel>
       <View style={{ flexDirection: "row", alignItems: "flex-end", height: 130, gap: 9 }}>
         {WEEKDAYS.map((label, i) => {
-          const isToday = i === todayIdx;
+          const date = new Date(monday);
+          date.setDate(monday.getDate() + i);
+          const future = date > now && !sameDay(date, now);
+          const isSelected = selected ? sameDay(date, selected) : i === todayIdx;
           const h = 8 + (totals[i] / max) * 92;
           return (
-            <View key={label} style={{ flex: 1, alignItems: "center", gap: 8 }}>
+            <Pressable
+              key={label}
+              disabled={future}
+              onPress={() => onSelect(selected && sameDay(date, selected) ? null : date)}
+              style={{ flex: 1, alignItems: "center", gap: 8, opacity: future ? 0.4 : 1 }}
+            >
               <View style={{ flex: 1, width: "100%", justifyContent: "flex-end", alignItems: "center" }}>
-                <View style={{ height: h, width: "100%", borderRadius: 4, backgroundColor: isToday ? c.ink : c.borderStrong }} />
+                <View style={{ height: h, width: "100%", borderRadius: 4, backgroundColor: isSelected ? (selected ? c.accent : c.ink) : c.borderStrong }} />
               </View>
-              <Text style={{ color: isToday ? c.ink : c.inkSubtle, fontSize: 11, fontWeight: isToday ? "700" : "500" }}>{label}</Text>
-            </View>
+              <Text style={{ color: isSelected ? c.ink : c.inkSubtle, fontSize: 11, fontWeight: isSelected ? "700" : "500" }}>{label}</Text>
+            </Pressable>
           );
         })}
       </View>

@@ -90,10 +90,10 @@ export default function TabsLayout() {
   useLocale(); // re-render tab labels when the language changes
   return (
     <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <BottomBar {...props} />}>
-      {/* Order: Offers · Home · Statistics · Profile. */}
-      <Tabs.Screen name="offers" options={{ title: t("tabs.offers") }} />
+      {/* Order: Home · Statistics · Offers · Profile. */}
       <Tabs.Screen name="index" options={{ title: t("tabs.home") }} />
       <Tabs.Screen name="statistics" options={{ title: t("tabs.statistics") }} />
+      <Tabs.Screen name="offers" options={{ title: t("tabs.offers") }} />
       <Tabs.Screen name="profile" options={{ title: t("tabs.profile") }} />
     </Tabs>
   );
