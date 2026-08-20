@@ -62,7 +62,7 @@ export function OfferCard({
           </View>
         </View>
         <View style={{ alignItems: isRTL() ? "flex-start" : "flex-end", gap: 2 }}>
-          <Text style={{ color: c.ink, fontSize: 17, fontWeight: "700" }}>
+          <Text style={{ color: c.ink, fontSize: 17, fontWeight: "600" }}>
             {fareLabel(offer.fare_formatted, offer.fare_amount)}
           </Text>
           <Text style={{ color: c.inkSubtle, fontSize: 11 }}>{t("offer.total")}</Text>
@@ -113,7 +113,7 @@ export function OfferCard({
           {live && offer.accept_window_seconds != null && (
             <View style={{ flexDirection: rowDir(), alignItems: "center", gap: 6 }}>
               <Clock size={14} color={c.inkSubtle} />
-              <Text style={{ color: c.inkMuted, fontSize: 12.5, fontWeight: "700" }}>
+              <Text style={{ color: c.inkMuted, fontSize: 12.5, fontWeight: "600" }}>
                 {offer.accept_window_seconds}
                 {t("offer.secShort")}
               </Text>
@@ -130,7 +130,7 @@ function MetaCol({ value, label }: { value: string; label: string }) {
   const c = useColors();
   return (
     <View style={{ flex: 1, alignItems: "center", gap: 2 }}>
-      <Text numberOfLines={1} style={{ color: c.ink, fontSize: 12.5, fontWeight: "700" }}>
+      <Text numberOfLines={1} style={{ color: c.ink, fontSize: 12.5, fontWeight: "600" }}>
         {value}
       </Text>
       <Text style={{ color: c.inkSubtle, fontSize: 10.5 }}>{label}</Text>

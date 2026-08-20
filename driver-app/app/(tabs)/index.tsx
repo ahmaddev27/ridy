@@ -72,7 +72,7 @@ export default function HomeScreen() {
             <View style={{ flexDirection: row, alignItems: "center", gap: 10 }}>
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: online ? c.accent : c.inkFaint }} />
               <View>
-                <Text style={{ color: c.ink, fontSize: 14.5, fontWeight: "700", textAlign: align }}>
+                <Text style={{ color: c.ink, fontSize: 14.5, fontWeight: "600", textAlign: align }}>
                   {isOwner
                     ? `${fleet?.online_drivers ?? 0} ${t("fleet.onlineDrivers")}`
                     : online
@@ -181,7 +181,7 @@ function RecentRow({ offer, onPress, last, showDriver, c }: { offer: Offer; onPr
       </View>
       <View style={{ flex: 1 }}>
         {showDriver && offer.driver_name && (
-          <Text numberOfLines={1} style={{ color: c.inkSubtle, fontSize: 11, fontWeight: "700", textAlign: align }}>{offer.driver_name}</Text>
+          <Text numberOfLines={1} style={{ color: c.inkSubtle, fontSize: 11, fontWeight: "500", textAlign: align }}>{offer.driver_name}</Text>
         )}
         <Text numberOfLines={1} style={{ color: c.inkMuted, fontSize: 12.5, textAlign: align }}>{cleanAddress(offer.pickup_address)}</Text>
         <Text numberOfLines={1} style={{ color: c.ink, fontSize: 13, fontWeight: "500", textAlign: align }}>{cleanAddress(offer.dropoff_address)}</Text>
@@ -197,7 +197,7 @@ export function DriverTag({ name }: { name: string }) {
   return (
     <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 5, marginBottom: 3, alignSelf: isRTL() ? "flex-end" : "flex-start" }}>
       <UserCircle size={14} color={c.inkSubtle} />
-      <Text numberOfLines={1} style={{ color: c.inkSubtle, fontSize: 12, fontWeight: "700", textAlign: isRTL() ? "right" : "left" }}>{name}</Text>
+      <Text numberOfLines={1} style={{ color: c.inkSubtle, fontSize: 12, fontWeight: "500", textAlign: isRTL() ? "right" : "left" }}>{name}</Text>
     </View>
   );
 }

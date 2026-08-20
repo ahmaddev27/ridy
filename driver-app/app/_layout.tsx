@@ -9,7 +9,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/toast";
 import { Linking } from "react-native";
 import { registerForPush, registerOfferCategory, OPEN_MAP_ACTION } from "@/lib/push";
-import { useColors } from "@/lib/theme";
+import { useColors, setThemeMode, type ThemeMode } from "@/lib/theme";
 import { useAppFonts } from "@/lib/fonts";
 import { setLocale } from "@/lib/i18n";
 import { UpdateGate } from "@/components/update-gate";
@@ -34,6 +34,11 @@ export default function RootLayout() {
 
   useEffect(() => {
     const id = setTimeout(() => setTimedOut(true), FONT_TIMEOUT_MS);
+    // Apply the saved appearance (light/dark/system) too — a frame-early flash is
+    // fine; it doesn't gate the first paint.
+    SecureStore.getItemAsync("theme")
+      .then((m) => { if (m === "light" || m === "dark" || m === "system") setThemeMode(m as ThemeMode); })
+      .catch(() => {});
     SecureStore.getItemAsync("locale")
       .then((l) => { if (l) setLocale(l); })
       .catch(() => {})

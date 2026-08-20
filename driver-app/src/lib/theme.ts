@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import { Platform, useColorScheme, type ViewStyle } from "react-native";
 
 /**
@@ -98,9 +99,43 @@ const dark: Palette = {
   warning: "#e4a11b",
 };
 
-/** Colors for the device's current light/dark setting. */
+/**
+ * Theme preference: follow the device ("system") or force light/dark. Held in a
+ * tiny external store (mirrors the i18n store) so `useColors` stays a plain hook
+ * and any screen can flip it live. Persistence lives in the caller (Settings +
+ * the root layout loader), like the locale.
+ */
+export type ThemeMode = "system" | "light" | "dark";
+let currentMode: ThemeMode = "system";
+const themeListeners = new Set<() => void>();
+
+export function setThemeMode(mode: ThemeMode): void {
+  if (mode !== currentMode) {
+    currentMode = mode;
+    themeListeners.forEach((fn) => fn());
+  }
+}
+
+export function getThemeMode(): ThemeMode {
+  return currentMode;
+}
+
+export function useThemeMode(): ThemeMode {
+  return useSyncExternalStore(
+    (fn) => {
+      themeListeners.add(fn);
+      return () => themeListeners.delete(fn);
+    },
+    () => currentMode,
+  );
+}
+
+/** Colors for the effective scheme: the chosen mode, or the device setting. */
 export function useColors(): Palette {
-  return useColorScheme() === "dark" ? dark : light;
+  const mode = useThemeMode();
+  const system = useColorScheme();
+  const scheme = mode === "system" ? (system ?? "light") : mode;
+  return scheme === "dark" ? dark : light;
 }
 
 /**

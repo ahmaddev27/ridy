@@ -241,7 +241,7 @@ function PersonTag({ icon: Icon, name, role, row, c }: { icon: LucideIcon; name:
   return (
     <View style={{ flexDirection: row, alignItems: "center", gap: 7 }}>
       <Icon size={18} color={c.inkMuted} />
-      <Text style={{ color: c.ink, fontSize: 16, fontWeight: "700" }}>{name}</Text>
+      <Text style={{ color: c.ink, fontSize: 16, fontWeight: "600" }}>{name}</Text>
       <Text style={{ color: c.inkSubtle, fontSize: 14 }}>· {role}</Text>
     </View>
   );
@@ -263,7 +263,7 @@ function InfoRow({ label, value, row, c, border }: { label: string; value: strin
   return (
     <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", gap: 12, paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: border ? 1 : 0, borderColor: c.line }}>
       <Text style={{ color: c.inkMuted, fontSize: 14 }}>{label}</Text>
-      <Text style={{ color: c.ink, fontSize: 14, fontWeight: "700", writingDirection: "ltr" }}>{value}</Text>
+      <Text style={{ color: c.ink, fontSize: 14, fontWeight: "600", writingDirection: "ltr" }}>{value}</Text>
     </View>
   );
 }

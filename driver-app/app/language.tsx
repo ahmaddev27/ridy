@@ -75,7 +75,7 @@ export default function LanguageScreen() {
                 }}
               >
                 <View style={{ gap: 3 }}>
-                  <Text style={{ color: c.ink, fontSize: 17, fontWeight: "700", textAlign: align }}>
+                  <Text style={{ color: c.ink, fontSize: 17, fontWeight: "600", textAlign: align }}>
                     {opt.native}
                   </Text>
                   <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: align }}>

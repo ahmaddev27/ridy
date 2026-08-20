@@ -9,7 +9,7 @@ import { SectionLabel, Field, PrimaryButton } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, useLocale } from "@/lib/i18n";
-import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
+import { useColors, radius, cardStyle, setThemeMode, useThemeMode, type Palette } from "@/lib/theme";
 
 const LANG_NAMES: Record<string, string> = { de: "Deutsch", en: "English", ar: "العربية" };
 
@@ -22,6 +22,7 @@ const SUPPORT_EMAIL = "support@reidey.de";
 
 export default function SettingsScreen() {
   const c = useColors();
+  const themeMode = useThemeMode();
   const router = useRouter();
   const locale = useLocale();
   const { driver, updateProfile, logout } = useAuth();
@@ -101,6 +102,30 @@ export default function SettingsScreen() {
             <ToggleRow icon={Bell} label={t("settings.offerNotifications")} value={prefs.notifications} onChange={setPref("notifications", PREF_KEYS.notifications)} c={c} border />
             <ToggleRow icon={Volume2} label={t("settings.sound")} value={prefs.sound} onChange={setPref("sound", PREF_KEYS.sound)} c={c} border />
             <ToggleRow icon={Vibrate} label={t("settings.haptic")} value={prefs.haptic} onChange={setPref("haptic", PREF_KEYS.haptic)} c={c} />
+          </View>
+        </View>
+
+        {/* APPEARANCE — light / dark / follow system */}
+        <View style={{ gap: 10 }}>
+          <SectionLabel>{t("settings.appearance")}</SectionLabel>
+          <View style={{ ...cardStyle(c), flexDirection: isRTL() ? "row-reverse" : "row", padding: 4, gap: 4 }}>
+            {(["system", "light", "dark"] as const).map((m) => {
+              const on = themeMode === m;
+              return (
+                <Pressable
+                  key={m}
+                  onPress={() => {
+                    setThemeMode(m);
+                    SecureStore.setItemAsync("theme", m).catch(() => {});
+                  }}
+                  style={{ flex: 1, alignItems: "center", paddingVertical: 11, borderRadius: radius.control, backgroundColor: on ? c.primary : "transparent" }}
+                >
+                  <Text style={{ color: on ? c.primaryInk : c.inkMuted, fontSize: 13.5, fontWeight: "600" }}>
+                    {t(`settings.theme${m === "system" ? "System" : m === "light" ? "Light" : "Dark"}`)}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
 

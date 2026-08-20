@@ -212,7 +212,7 @@ function Cell({ label, value, unit, c, border }: { label: string; value: string;
       <SectionLabel>{label}</SectionLabel>
       <Text style={{ color: c.ink, fontSize: 24, fontWeight: "800", textAlign: align, writingDirection: "ltr" }}>
         {value}
-        {unit ? <Text style={{ fontSize: 15, fontWeight: "700", color: c.inkMuted }}> {unit}</Text> : null}
+        {unit ? <Text style={{ fontSize: 15, fontWeight: "500", color: c.inkMuted }}> {unit}</Text> : null}
       </Text>
     </View>
   );
@@ -223,7 +223,7 @@ function Row({ label, value, c, border }: { label: string; value: string; c: Col
   return (
     <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 15, borderBottomWidth: border ? 1 : 0, borderColor: c.line }}>
       <Text style={{ color: c.inkMuted, fontSize: 14 }}>{label}</Text>
-      <Text style={{ color: c.ink, fontSize: 15, fontWeight: "700", writingDirection: "ltr" }}>{value}</Text>
+      <Text style={{ color: c.ink, fontSize: 15, fontWeight: "600", writingDirection: "ltr" }}>{value}</Text>
     </View>
   );
 }
