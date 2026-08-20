@@ -2,6 +2,32 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { api } from "./api";
+import { t } from "./i18n";
+
+/** Category id shared with the backend (data.categoryId) so the notification
+ *  renders the "Open in map" action. Keep in sync with DispatchNotifier. */
+export const OFFER_CATEGORY = "offer";
+export const OPEN_MAP_ACTION = "open_map";
+
+let categoryRegistered = false;
+
+/** Registers the "offer" notification category with a single "Open in map"
+ *  action button. Idempotent — safe to call on every app start. */
+export async function registerOfferCategory(): Promise<void> {
+  if (categoryRegistered) return;
+  categoryRegistered = true;
+  try {
+    await Notifications.setNotificationCategoryAsync(OFFER_CATEGORY, [
+      {
+        identifier: OPEN_MAP_ACTION,
+        buttonTitle: t("notif.openMap"),
+        options: { opensAppToForeground: false },
+      },
+    ]);
+  } catch {
+    categoryRegistered = false; // allow a later retry if registration failed
+  }
+}
 
 // Offers are time-critical — always show them, with sound, even in foreground.
 Notifications.setNotificationHandler({

@@ -50,6 +50,14 @@ class FcmPushSender implements PushSender
      */
     private function message(string $token, string $title, string $body, array $data): array
     {
+        $aps = ['sound' => 'default', 'content-available' => 1];
+
+        // iOS surfaces action buttons by matching aps.category to a category the
+        // app registered. Android/expo reads the same id from the data payload.
+        if (! empty($data['categoryId'])) {
+            $aps['category'] = (string) $data['categoryId'];
+        }
+
         return [
             'token' => $token,
             'notification' => ['title' => $title, 'body' => $body],
@@ -60,7 +68,7 @@ class FcmPushSender implements PushSender
             ],
             'apns' => [
                 'headers' => ['apns-priority' => '10'],
-                'payload' => ['aps' => ['sound' => 'default', 'content-available' => 1]],
+                'payload' => ['aps' => $aps],
             ],
         ];
     }

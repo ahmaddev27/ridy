@@ -36,6 +36,9 @@ class DispatchNotifier
         $title = $this->buildTitle($offer);
         $body = $this->buildBody($offer);
         $data = [
+            // Ties the push to the app's "offer" notification category so the
+            // "Open in map" action button is rendered (see FcmPushSender::message).
+            'categoryId' => 'offer',
             'offer_id' => (string) $offer->id,
             'offer_uuid' => (string) $offer->offer_uuid,
             'pickup' => $this->cleanAddress($offer->pickup_address),

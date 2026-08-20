@@ -7,7 +7,8 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/toast";
-import { registerForPush } from "@/lib/push";
+import { Linking } from "react-native";
+import { registerForPush, registerOfferCategory, OPEN_MAP_ACTION } from "@/lib/push";
 import { useColors } from "@/lib/theme";
 import { useAppFonts } from "@/lib/fonts";
 import { setLocale } from "@/lib/i18n";
@@ -63,6 +64,22 @@ export default function RootLayout() {
   );
 }
 
+/** Opens the maps app at the pickup → drop-off route. Falls back to a plain
+ *  search when only one address is present, and no-ops when neither is. */
+function openRouteInMaps(pickup?: string, dropoff?: string): void {
+  const origin = (pickup ?? "").trim();
+  const dest = (dropoff ?? "").trim();
+
+  let url: string | null = null;
+  if (origin && dest) {
+    url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}&travelmode=driving`;
+  } else if (origin || dest) {
+    url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(origin || dest)}`;
+  }
+
+  if (url) Linking.openURL(url).catch(() => {});
+}
+
 /** Routes the user between auth screens and the app based on session state, and
  *  wires push registration + notification-tap navigation once signed in. */
 function Gate() {
@@ -97,12 +114,26 @@ function Gate() {
     // Owners are read-only fleet monitors on a User token; the /driver/devices
     // endpoint (auth:driver guard) rejects it with 401, which would nuke the
     // session and bounce them back to login. They don't receive driver push.
-    if (!isOwner) registerForPush();
+    if (!isOwner) {
+      registerForPush();
+      registerOfferCategory();
+    }
 
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as { offer_id?: string };
-      // Only navigate for a numeric offer id — the payload is attacker-influenced,
-      // so never interpolate an arbitrary string into the route.
+      const data = response.notification.request.content.data as {
+        offer_id?: string;
+        pickup?: string;
+        dropoff?: string;
+      };
+
+      // "Open in map" action button: open the route without opening the app.
+      if (response.actionIdentifier === OPEN_MAP_ACTION) {
+        openRouteInMaps(data?.pickup, data?.dropoff);
+        return;
+      }
+
+      // Default tap: only navigate for a numeric offer id — the payload is
+      // attacker-influenced, so never interpolate an arbitrary string into the route.
       if (data?.offer_id && /^\d+$/.test(data.offer_id)) router.push(`/offer/${data.offer_id}`);
     });
     return () => sub.remove();
