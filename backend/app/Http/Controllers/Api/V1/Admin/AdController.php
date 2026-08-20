@@ -54,16 +54,32 @@ class AdController extends Controller
     /** @return array<string, mixed> */
     private function validated(Request $request): array
     {
+        // A scheme-less link like "www.example.com" is what admins actually type;
+        // normalize it to a valid URL before validation instead of rejecting it.
+        if ($request->filled('link_url')) {
+            $request->merge(['link_url' => $this->normalizeUrl($request->input('link_url'))]);
+        }
+
         return $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'body' => ['nullable', 'string', 'max:2000'],
-            'image_url' => ['nullable', 'url', 'max:2048'],
+            // image_url is set from our own upload endpoint (a relative same-origin
+            // path), so it is a trusted string, not an external absolute URL.
+            'image_url' => ['nullable', 'string', 'max:2048'],
             'link_url' => ['nullable', 'url', 'max:2048'],
             'cta_label' => ['nullable', 'string', 'max:80'],
             'active' => ['boolean'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
         ]);
+    }
+
+    /** Prepend https:// when the admin omitted the scheme. */
+    private function normalizeUrl(string $url): string
+    {
+        $url = trim($url);
+
+        return preg_match('#^https?://#i', $url) ? $url : 'https://'.$url;
     }
 
     /** @return array<string, mixed> */
