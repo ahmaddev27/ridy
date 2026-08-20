@@ -33,6 +33,8 @@ class DispatchOfferResource extends JsonResource
             'rejected_at' => $this->rejected_at?->toIso8601String(),
             'canceled_at' => $this->canceled_at?->toIso8601String(),
             'rider_first_name' => $this->rider_first_name,
+            // Alias the driver app reads as the customer/rider name.
+            'rider_name' => $this->rider_first_name,
             'pickup_address' => AddressNormalizer::clean($this->pickup_address),
             'dropoff_address' => AddressNormalizer::clean($this->dropoff_address),
             'fare_formatted' => $this->fare_formatted,
