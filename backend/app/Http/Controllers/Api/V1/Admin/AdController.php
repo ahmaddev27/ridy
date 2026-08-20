@@ -1,0 +1,73 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\Admin;
+
+use App\Domain\Ads\Models\Ad;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+/** Super-admin management of platform-wide promotional ads. */
+class AdController extends Controller
+{
+    public function index(): JsonResponse
+    {
+        $ads = Ad::orderByDesc('active')->orderByDesc('created_at')->get()->map(fn (Ad $ad) => $this->present($ad));
+
+        return response()->json(['data' => $ads]);
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $data = $this->validated($request);
+        $data['active'] = $data['active'] ?? true;
+        $ad = Ad::create($data);
+
+        return response()->json(['data' => $this->present($ad)], 201);
+    }
+
+    public function update(Request $request, Ad $ad): JsonResponse
+    {
+        $ad->update($this->validated($request));
+
+        return response()->json(['data' => $this->present($ad->fresh())]);
+    }
+
+    public function destroy(Ad $ad): JsonResponse
+    {
+        $ad->delete();
+
+        return response()->json(['data' => ['deleted' => true]]);
+    }
+
+    /** @return array<string, mixed> */
+    private function validated(Request $request): array
+    {
+        return $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'body' => ['nullable', 'string', 'max:2000'],
+            'image_url' => ['nullable', 'url', 'max:2048'],
+            'link_url' => ['nullable', 'url', 'max:2048'],
+            'cta_label' => ['nullable', 'string', 'max:80'],
+            'active' => ['boolean'],
+            'starts_at' => ['nullable', 'date'],
+            'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function present(Ad $ad): array
+    {
+        return [
+            'id' => $ad->id,
+            'title' => $ad->title,
+            'body' => $ad->body,
+            'image_url' => $ad->image_url,
+            'link_url' => $ad->link_url,
+            'cta_label' => $ad->cta_label,
+            'active' => $ad->active,
+            'starts_at' => $ad->starts_at?->toIso8601String(),
+            'ends_at' => $ad->ends_at?->toIso8601String(),
+        ];
+    }
+}

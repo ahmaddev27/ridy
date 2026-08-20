@@ -30,3 +30,9 @@ export async function resendOtp(email: string): Promise<void> {
     withCsrf: true,
   });
 }
+
+/** Public support contact, readable by the unauthenticated auth pages. */
+export async function getSupportContact(): Promise<{ whatsapp: string | null }> {
+  const res = await apiFetch<{ data: { whatsapp: string | null } }>("/api/v1/support-contact");
+  return res.data;
+}

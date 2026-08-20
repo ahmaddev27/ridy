@@ -16,6 +16,7 @@ import { activateCompany } from "@/lib/api/activation";
 import { OtpInput } from "@/components/ui/otp-input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { SuspendedScreen, type SuspendedInfo } from "@/components/auth/suspended-screen";
+import { WhatsAppButton } from "@/components/support/whatsapp-button";
 
 /** Where a signed-in user belongs, by role. */
 function homeFor(u: AuthUser): string {
@@ -208,6 +209,10 @@ export default function LoginPage() {
             {t("login.registerCta")}
           </Link>
         </p>
+
+        <div className="mt-4 flex justify-center">
+          <WhatsAppButton />
+        </div>
       </div>
     </div>
   );

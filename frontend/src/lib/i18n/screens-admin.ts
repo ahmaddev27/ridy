@@ -3,6 +3,7 @@
 type Dict = Record<string, unknown>;
 
 const en: Dict = {
+  ads: { title: "Ads", subtitle: "Platform-wide ads every company sees on its Offers page.", create: "Create ad", empty: "No ads yet", emptyDesc: "Create your first ad to show it to companies.", colTitle: "Title", colStatus: "Status", colWindow: "Window", active: "Active", inactive: "Inactive", always: "Always", from: "From", until: "Until", edit: "Edit", delete: "Delete", deleted: "Ad deleted", deleteTitle: "Delete ad", deleteConfirm: "This ad will be permanently deleted.", createTitle: "Create ad", editTitle: "Edit ad", fieldTitle: "Title", fieldBody: "Body", fieldImageUrl: "Image URL", fieldLinkUrl: "Link URL", fieldCtaLabel: "Button label", fieldStartsAt: "Starts at", fieldEndsAt: "Ends at", fieldActive: "Active", save: "Save", saved: "Ad saved", cancel: "Cancel", error: "Something went wrong", slotSponsored: "Sponsored", slotDefaultCta: "Learn more" },
   shards: {
     title: "Shards", subtitle: "Daemon boxes and how companies are spread across them. Adding a box auto-takes new companies.",
     rebalance: "Rebalance", rebalanced: "Rebalanced", actionFailed: "Action failed",
@@ -210,6 +211,7 @@ const en: Dict = {
 };
 
 const de: Dict = {
+  ads: { title: "Werbung", subtitle: "Plattformweite Anzeigen, die jede Firma auf ihrer Angebote-Seite sieht.", create: "Anzeige erstellen", empty: "Noch keine Anzeigen", emptyDesc: "Erstelle deine erste Anzeige, um sie den Firmen zu zeigen.", colTitle: "Titel", colStatus: "Status", colWindow: "Zeitraum", active: "Aktiv", inactive: "Inaktiv", always: "Immer", from: "Ab", until: "Bis", edit: "Bearbeiten", delete: "Löschen", deleted: "Anzeige gelöscht", deleteTitle: "Anzeige löschen", deleteConfirm: "Diese Anzeige wird dauerhaft gelöscht.", createTitle: "Anzeige erstellen", editTitle: "Anzeige bearbeiten", fieldTitle: "Titel", fieldBody: "Text", fieldImageUrl: "Bild-URL", fieldLinkUrl: "Link-URL", fieldCtaLabel: "Button-Text", fieldStartsAt: "Startet am", fieldEndsAt: "Endet am", fieldActive: "Aktiv", save: "Speichern", saved: "Anzeige gespeichert", cancel: "Abbrechen", error: "Etwas ist schiefgelaufen", slotSponsored: "Anzeige", slotDefaultCta: "Mehr erfahren" },
   shards: {
     title: "Shards", subtitle: "Daemon-Boxen und Firmenverteilung. Eine neue Box übernimmt neue Firmen automatisch.",
     rebalance: "Neu verteilen", rebalanced: "Neu verteilt", actionFailed: "Aktion fehlgeschlagen",
@@ -415,6 +417,7 @@ const de: Dict = {
 };
 
 const ar: Dict = {
+  ads: { title: "الإعلانات", subtitle: "إعلانات على مستوى المنصة تراها كل شركة في صفحة العروض.", create: "إنشاء إعلان", empty: "لا توجد إعلانات بعد", emptyDesc: "أنشئ أول إعلان لعرضه على الشركات.", colTitle: "العنوان", colStatus: "الحالة", colWindow: "الفترة", active: "نشط", inactive: "غير نشط", always: "دائمًا", from: "من", until: "حتى", edit: "تعديل", delete: "حذف", deleted: "تم حذف الإعلان", deleteTitle: "حذف الإعلان", deleteConfirm: "سيتم حذف هذا الإعلان نهائيًا.", createTitle: "إنشاء إعلان", editTitle: "تعديل الإعلان", fieldTitle: "العنوان", fieldBody: "النص", fieldImageUrl: "رابط الصورة", fieldLinkUrl: "رابط الوجهة", fieldCtaLabel: "نص الزر", fieldStartsAt: "يبدأ في", fieldEndsAt: "ينتهي في", fieldActive: "نشط", save: "حفظ", saved: "تم حفظ الإعلان", cancel: "إلغاء", error: "حدث خطأ ما", slotSponsored: "إعلان", slotDefaultCta: "اعرف المزيد" },
   shards: {
     title: "الشاردات", subtitle: "بوكسات الديمون وتوزيع الشركات. إضافة بوكس توزّع الشركات الجديدة تلقائياً.",
     rebalance: "إعادة توزيع", rebalanced: "تمّت إعادة التوزيع", actionFailed: "فشل الإجراء",

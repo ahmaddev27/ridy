@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AdController;
+use App\Http\Controllers\Api\V1\Admin\AdController as AdminAdController;
 use App\Http\Controllers\Api\V1\Admin\AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\BillingReportController;
 use App\Http\Controllers\Api\V1\Admin\CollectorController;
@@ -46,6 +48,7 @@ use App\Http\Controllers\Api\V1\NotificationPrefsController;
 use App\Http\Controllers\Api\V1\PasswordResetController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\PublicPlanController;
+use App\Http\Controllers\Api\V1\PublicSupportController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\ResellerController;
 use App\Http\Controllers\Api\V1\UberLoginController;
@@ -64,6 +67,9 @@ Route::prefix('v1')->group(function () {
 
     // Public plan catalogue for the marketing site's pricing section.
     Route::get('plans', [PublicPlanController::class, 'index'])->middleware('throttle:60,1');
+
+    // Public support-contact (WhatsApp) for the auth pages' "contact support" button.
+    Route::get('support-contact', [PublicSupportController::class, 'show'])->middleware('throttle:60,1');
 
     // Public company self-registration (email OTP).
     Route::post('register', [RegistrationController::class, 'start'])->middleware('throttle:6,1');
@@ -138,6 +144,9 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'user.account', ResolveTenant::class])->group(function () {
         // Dashboard
         Route::get('dashboard/summary', [DashboardController::class, 'summary']);
+
+        // The current live platform ad for this company's Offers slot.
+        Route::get('ads/current', [AdController::class, 'current']);
 
         // The company's own subscription history (codes/plans/collector/status).
         Route::get('subscription/history', [CompanySubscriptionController::class, 'index']);
@@ -316,6 +325,12 @@ Route::prefix('v1')->group(function () {
         Route::post('plans', [PlanController::class, 'store']);
         Route::put('plans/{plan}', [PlanController::class, 'update']);
         Route::delete('plans/{plan}', [PlanController::class, 'destroy']);
+
+        // Platform-wide promotional ads shown on every company's Offers view.
+        Route::get('ads', [AdminAdController::class, 'index']);
+        Route::post('ads', [AdminAdController::class, 'store']);
+        Route::put('ads/{ad}', [AdminAdController::class, 'update']);
+        Route::delete('ads/{ad}', [AdminAdController::class, 'destroy']);
 
         // Billing: subscription revenue reports + auto-generated invoices.
         Route::get('reports/billing-summary', [BillingReportController::class, 'summary']);
