@@ -35,27 +35,20 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1, justifyContent: "center", padding: 16 }}
       >
-        {/* Brand */}
-        <View
-          style={{
-            flexDirection: isRTL() ? "row-reverse" : "row",
-            alignItems: "center",
-            gap: 9,
-            marginBottom: 40,
-          }}
-        >
-          <Logo size={30} />
-          <Text style={{ color: c.ink, fontSize: 21, fontWeight: "700", fontStyle: "italic", letterSpacing: 1.2 }}>
+        {/* Brand — centered, prominent monogram over the wordmark */}
+        <View style={{ alignItems: "center", gap: 14, marginBottom: 36 }}>
+          <Logo size={72} />
+          <Text style={{ color: c.ink, fontSize: 27, fontWeight: "800", fontStyle: "italic", letterSpacing: 1.5 }}>
             REIDEY
           </Text>
         </View>
 
-        {/* Heading */}
-        <View style={{ marginBottom: 28 }}>
-          <Text style={{ color: c.ink, fontSize: 30, fontWeight: "700", letterSpacing: -0.8, textAlign: align }}>
+        {/* Heading — centered under the brand */}
+        <View style={{ marginBottom: 28, alignItems: "center", paddingHorizontal: 8 }}>
+          <Text style={{ color: c.ink, fontSize: 28, fontWeight: "700", letterSpacing: -0.6, textAlign: "center" }}>
             {t("login.submit")}
           </Text>
-          <Text style={{ color: c.inkMuted, fontSize: 15, marginTop: 8, lineHeight: 21, textAlign: align }}>
+          <Text style={{ color: c.inkMuted, fontSize: 15, marginTop: 8, lineHeight: 21, textAlign: "center" }}>
             {t("signin.subtitle")}
           </Text>
         </View>
