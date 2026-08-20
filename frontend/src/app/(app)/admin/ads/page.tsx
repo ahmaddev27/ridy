@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { listAds, createAd, updateAd, deleteAd, uploadAdImage, type Ad, type AdInput } from "@/lib/api/ads";
+import { ImageCropper } from "@/components/ads/image-cropper";
 import { ApiError } from "@/lib/api/client";
 
 /** Turn an ISO datetime into a value a `datetime-local` input accepts. */
@@ -164,6 +165,7 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
   const [endsAt, setEndsAt] = useState(toLocalInput(ad?.ends_at ?? null));
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
 
   // Uploaded images are stored as same-origin relative URLs; in dev they resolve
@@ -174,14 +176,18 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
       : `${process.env.NEXT_PUBLIC_API_URL ?? ""}${imageUrl}`
     : "";
 
-  async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
+  function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-picking the same file
-    if (!file) return;
+    if (file) setCropFile(file); // open the cropper before uploading
+  }
+
+  async function onCropped(blob: Blob) {
+    setCropFile(null);
     setUploading(true);
     setErrors({});
     try {
-      setImageUrl(await uploadAdImage(file));
+      setImageUrl(await uploadAdImage(blob));
     } catch (err) {
       if (err instanceof ApiError && err.errors) setErrors(err.errors);
       toast.error(err instanceof ApiError ? err.message : c("error"));
@@ -300,6 +306,10 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
           {c("fieldActive")}
         </label>
       </div>
+
+      {cropFile && (
+        <ImageCropper file={cropFile} aspect={3 / 4} onCancel={() => setCropFile(null)} onCropped={onCropped} />
+      )}
     </Modal>
   );
 }

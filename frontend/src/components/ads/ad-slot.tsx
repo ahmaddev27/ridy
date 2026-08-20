@@ -12,7 +12,7 @@ import { getCurrentAd, type CurrentAd } from "@/lib/api/ads";
  * card. Renders nothing when there is no live ad or the fetch fails, so it
  * never disrupts the host page.
  */
-export function AdSlot() {
+export function AdSlot({ layout = "row" }: { layout?: "row" | "stacked" }) {
   const { t } = useI18n();
   const [ad, setAd] = useState<CurrentAd | null>(null);
 
@@ -32,15 +32,21 @@ export function AdSlot() {
       ? `${process.env.NEXT_PUBLIC_API_URL ?? ""}${ad.image_url}`
       : ad.image_url;
 
+  const stacked = layout === "stacked";
+
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-col gap-4 sm:flex-row">
+      <div className={stacked ? "flex flex-col" : "flex flex-col gap-4 sm:flex-row"}>
         {imageSrc && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={imageSrc}
             alt=""
-            className="h-40 w-full shrink-0 object-cover sm:h-auto sm:w-48"
+            className={
+              stacked
+                ? "aspect-[3/4] w-full object-cover"
+                : "h-40 w-full shrink-0 object-cover sm:h-auto sm:w-48"
+            }
           />
         )}
         <div className="flex flex-1 flex-col gap-2 p-4">

@@ -48,10 +48,11 @@ export async function deleteAd(id: number): Promise<void> {
   await apiFetch(`${adminBase}/${id}`, { method: "DELETE", withCsrf: true });
 }
 
-/** Upload an ad image; returns the same-origin URL to store as image_url. */
-export async function uploadAdImage(file: File): Promise<string> {
+/** Upload an ad image (raw file or cropped blob); returns the URL for image_url. */
+export async function uploadAdImage(image: Blob): Promise<string> {
   const form = new FormData();
-  form.append("image", file);
+  const name = image instanceof File ? image.name : "ad.webp";
+  form.append("image", image, name);
   const res = await apiUpload<{ data: { url: string } }>(`${adminBase}/upload`, form);
   return res.data.url;
 }
