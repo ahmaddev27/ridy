@@ -6,6 +6,8 @@ use App\Domain\Dispatch\OfferLifecycle;
 use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Applies a batch of live driver statuses to a tenant's roster and drives each
@@ -20,6 +22,9 @@ use Carbon\CarbonImmutable;
  */
 class DriverStatusIngestor
 {
+    /** How often (seconds) the opportunistic stale-offer sweep may run per tenant. */
+    private const SWEEP_THROTTLE_SECONDS = 15;
+
     public function __construct(private readonly OfferLifecycle $lifecycle) {}
 
     /**
@@ -72,12 +77,33 @@ class DriverStatusIngestor
             $this->applyTransition($tenantId, $uuid, $was, $now, $counts);
         }
 
-        // Keep pending→rejected fresh, and force-finalize anything that slipped
-        // past an unobserved edge — both cheap and indexed, so safe every poll.
-        $this->lifecycle->expirePending($tenantId);
-        $this->lifecycle->finalizeStale($tenantId);
+        $this->sweepStaleOffers($tenantId);
 
         return $counts;
+    }
+
+    /**
+     * Opportunistically expire pending offers and finalize anything that slipped
+     * past an unobserved edge. These are bulk UPDATEs over the tenant's offers, so
+     * running them on EVERY poll made concurrent polls deadlock on the same rows.
+     * Throttle to once per tenant per window (the scheduled command is the real
+     * guarantee), and swallow a transient deadlock so the ingest never 500s.
+     */
+    private function sweepStaleOffers(int $tenantId): void
+    {
+        // Cache::add is atomic: only the first poll within the window runs the sweep.
+        if (! Cache::add("offer-sweep:{$tenantId}", 1, self::SWEEP_THROTTLE_SECONDS)) {
+            return;
+        }
+
+        try {
+            $this->lifecycle->expirePending($tenantId);
+            $this->lifecycle->finalizeStale($tenantId);
+        } catch (QueryException $e) {
+            // A best-effort safety net: a lost race here is picked up by the next
+            // window or the scheduled offers:finalize-stale run. Report, don't fail.
+            report($e);
+        }
     }
 
     /**
