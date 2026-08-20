@@ -13,6 +13,10 @@ import { useColors, setThemeMode, type ThemeMode } from "@/lib/theme";
 import { useAppFonts } from "@/lib/fonts";
 import { setLocale } from "@/lib/i18n";
 import { UpdateGate } from "@/components/update-gate";
+import { initSentry, Sentry } from "@/lib/sentry";
+
+// Start crash/error reporting as early as possible (inert without a DSN).
+initSentry();
 
 // Hold the native splash screen up until the fonts are registered, so the very
 // first painted frame already has Tajawal. Without this Arabic falls back to the
@@ -25,7 +29,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
  *  font (text stays readable, icons re-register once loaded). */
 const FONT_TIMEOUT_MS = 4000;
 
-export default function RootLayout() {
+function RootLayout() {
   const fontsReady = useAppFonts();
   const [timedOut, setTimedOut] = useState(false);
   // Apply the saved language BEFORE the first paint, so the splash caption (and
@@ -68,6 +72,10 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+// Wrap the root so Sentry can capture render errors + attach touch/nav context
+// (a no-op passthrough when Sentry was not initialized).
+export default Sentry.wrap(RootLayout);
 
 /** Opens the maps app at the pickup → drop-off route. Falls back to a plain
  *  search when only one address is present, and no-ops when neither is. */
