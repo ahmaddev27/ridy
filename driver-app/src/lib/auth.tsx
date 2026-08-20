@@ -87,7 +87,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function updateProfile(patch: { name?: string; locale?: string; password?: string }) {
-    const res = await api.updateProfile(patch);
+    // Owners update on their User token via the fleet endpoint; the driver /me
+    // PATCH (auth:driver) would 401 an owner and bounce them to login.
+    const res = await (isOwner ? api.fleetUpdateProfile(patch) : api.updateProfile(patch));
     applyProfile(res.data, isOwner);
   }
 

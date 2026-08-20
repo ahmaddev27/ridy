@@ -93,6 +93,23 @@ class FleetController extends Controller
     }
 
     /** Owner profile, mirroring the driver `me` shape so the app can restore a session. */
+    /** Update the fleet owner's own profile (User token) — the owner counterpart
+     *  of the driver's PATCH /driver/me, so saving a profile never 401s them. */
+    public function update(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['sometimes', 'string', 'max:120'],
+            'locale' => ['sometimes', 'in:de,en,ar'],
+            'password' => ['sometimes', 'string', 'min:8'],
+        ]);
+
+        $owner = $request->user();
+        $owner->fill(array_intersect_key($data, array_flip(['name', 'locale', 'password'])));
+        $owner->save();
+
+        return $this->me($request);
+    }
+
     public function me(Request $request): JsonResponse
     {
         $owner = $request->user();

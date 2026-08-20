@@ -115,6 +115,7 @@ Route::prefix('v1')->group(function () {
         // tenant, and FleetController rejects non-tenant callers.
         Route::middleware(['auth:sanctum', 'driver.active'])->prefix('fleet')->group(function () {
             Route::get('me', [FleetController::class, 'me']);
+            Route::patch('me', [FleetController::class, 'update']);
             Route::get('home', [FleetController::class, 'home']);
             Route::get('drivers', [FleetController::class, 'drivers']);
             Route::get('offers', [FleetController::class, 'offers']);
