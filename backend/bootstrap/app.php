@@ -35,5 +35,8 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/*'),
         );
         // Report exceptions to Sentry (no-op unless SENTRY_LARAVEL_DSN is set).
-        Integration::handles($exceptions);
+        // Guarded so a missing package (e.g. a stale image) never fatals boot.
+        if (class_exists(Integration::class)) {
+            Integration::handles($exceptions);
+        }
     })->create();
