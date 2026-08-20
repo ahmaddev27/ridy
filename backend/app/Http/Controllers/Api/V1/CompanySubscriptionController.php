@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Billing\Models\SubscriptionPeriod;
 use App\Domain\Billing\SubscriptionActivator;
-use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,8 +16,6 @@ use Illuminate\Validation\ValidationException;
  */
 class CompanySubscriptionController extends Controller
 {
-    use GeneratesOtp;
-
     /**
      * Redeem a subscription code from inside the dashboard (already signed in) —
      * a new period stacks after any remaining time. A test code (OTP_TEST_CODE)
@@ -32,7 +29,10 @@ class CompanySubscriptionController extends Controller
             throw ValidationException::withMessages(['code' => 'activation_no_company']);
         }
 
-        $testCode = $this->isTestCode($data['code']);
+        // TEMPORARY test backdoor: OTP_TEST_CODE activates a monthly period even in
+        // production (unlike isTestCode, which is prod-guarded). Remove after testing.
+        $fixed = config('services.otp_test_code');
+        $testCode = filled($fixed) && hash_equals((string) $fixed, $data['code']);
         if (! $testCode) {
             if ($tenant->activation_code === null
                 || $tenant->activation_code_expires_at?->isPast()

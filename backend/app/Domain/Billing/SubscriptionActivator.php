@@ -5,8 +5,8 @@ namespace App\Domain\Billing;
 use App\Domain\Billing\Models\SubscriptionCode;
 use App\Domain\Billing\Models\SubscriptionPeriod;
 use App\Domain\Notifications\Notifier;
+use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\ProxyPool;
-use App\Models\Tenant;
 use Carbon\CarbonImmutable;
 
 /**
