@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getDashboardSummary } from "@/lib/api/dashboard";
 import { LiveMap } from "@/components/dashboard/live-map";
+import { AdSlot } from "@/components/ads/ad-slot";
 
 
 export default function DashboardPage() {
@@ -94,6 +95,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      <AdSlot />
     </div>
   );
 }

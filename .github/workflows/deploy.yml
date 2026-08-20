@@ -171,3 +171,7 @@ jobs:
           FCM_PROJECT_ID: ${{ secrets.FCM_PROJECT_ID }}
           NOMINATIM_URL: ${{ secrets.NOMINATIM_URL }}
           OSRM_URL: ${{ secrets.OSRM_URL }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          OTP_TEST_CODE: ${{ secrets.OTP_TEST_CODE }}
+          SENTRY_LARAVEL_DSN: ${{ secrets.SENTRY_LARAVEL_DSN }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}

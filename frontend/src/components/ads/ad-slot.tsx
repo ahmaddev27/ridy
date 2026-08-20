@@ -25,14 +25,20 @@ export function AdSlot() {
   if (!ad) return null;
 
   const cta = ad.cta_label?.trim() || t("screens.ads.slotDefaultCta");
+  // Uploaded images are stored as same-origin relative URLs; resolve against the
+  // API host so they load in development too (same-origin behind the edge in prod).
+  const imageSrc =
+    ad.image_url && !ad.image_url.startsWith("http")
+      ? `${process.env.NEXT_PUBLIC_API_URL ?? ""}${ad.image_url}`
+      : ad.image_url;
 
   return (
     <Card className="overflow-hidden">
       <div className="flex flex-col gap-4 sm:flex-row">
-        {ad.image_url && (
+        {imageSrc && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={ad.image_url}
+            src={imageSrc}
             alt=""
             className="h-40 w-full shrink-0 object-cover sm:h-auto sm:w-48"
           />

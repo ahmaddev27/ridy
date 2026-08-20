@@ -12,7 +12,7 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { listAds, createAd, updateAd, deleteAd, type Ad, type AdInput } from "@/lib/api/ads";
+import { listAds, createAd, updateAd, deleteAd, uploadAdImage, type Ad, type AdInput } from "@/lib/api/ads";
 import { ApiError } from "@/lib/api/client";
 
 /** Turn an ISO datetime into a value a `datetime-local` input accepts. */
@@ -163,7 +163,32 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
   const [startsAt, setStartsAt] = useState(toLocalInput(ad?.starts_at ?? null));
   const [endsAt, setEndsAt] = useState(toLocalInput(ad?.ends_at ?? null));
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
+
+  // Uploaded images are stored as same-origin relative URLs; in dev they resolve
+  // against the API host, in production they are same-origin behind the edge.
+  const previewSrc = imageUrl
+    ? imageUrl.startsWith("http")
+      ? imageUrl
+      : `${process.env.NEXT_PUBLIC_API_URL ?? ""}${imageUrl}`
+    : "";
+
+  async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    setUploading(true);
+    setErrors({});
+    try {
+      setImageUrl(await uploadAdImage(file));
+    } catch (err) {
+      if (err instanceof ApiError && err.errors) setErrors(err.errors);
+      toast.error(err instanceof ApiError ? err.message : c("error"));
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function submit() {
     setBusy(true);
@@ -205,7 +230,7 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             {c("cancel")}
           </Button>
-          <Button onClick={submit} disabled={busy || !title.trim()}>
+          <Button onClick={submit} disabled={busy || uploading || !title.trim()}>
             {c("save")}
           </Button>
         </>
@@ -222,9 +247,33 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
           <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} className={field} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-ink">{c("fieldImageUrl")}</label>
-          <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className={field} placeholder="https://" />
-          {err("image_url") && <p className="mt-1 text-xs text-danger-fg">{err("image_url")}</p>}
+          <label className="mb-1 block text-xs font-medium text-ink">{c("fieldImage")}</label>
+          {previewSrc && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={previewSrc}
+              alt=""
+              className="mb-2 h-32 w-full rounded-lg border border-line object-cover"
+            />
+          )}
+          <div className="flex items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink hover:bg-surface-2">
+              <input type="file" accept="image/*" onChange={onPickImage} className="hidden" disabled={uploading} />
+              {uploading ? c("uploading") : previewSrc ? c("changeImage") : c("uploadImage")}
+            </label>
+            {previewSrc && !uploading && (
+              <button
+                type="button"
+                onClick={() => setImageUrl("")}
+                className="text-sm text-danger-fg hover:underline"
+              >
+                {c("removeImage")}
+              </button>
+            )}
+          </div>
+          {(err("image") || err("image_url")) && (
+            <p className="mt-1 text-xs text-danger-fg">{err("image") ?? err("image_url")}</p>
+          )}
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-ink">{c("fieldLinkUrl")}</label>

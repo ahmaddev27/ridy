@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { apiFetch, apiUpload } from "./client";
 
 /** A platform-wide promotional ad managed by the super-admin. */
 export type Ad = {
@@ -46,6 +46,14 @@ export async function updateAd(id: number, input: AdInput): Promise<Ad> {
 
 export async function deleteAd(id: number): Promise<void> {
   await apiFetch(`${adminBase}/${id}`, { method: "DELETE", withCsrf: true });
+}
+
+/** Upload an ad image; returns the same-origin URL to store as image_url. */
+export async function uploadAdImage(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("image", file);
+  const res = await apiUpload<{ data: { url: string } }>(`${adminBase}/upload`, form);
+  return res.data.url;
 }
 
 /** The current live ad for the signed-in company's Offers slot. */

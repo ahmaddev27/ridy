@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Ads\Models\Ad;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /** Serves the current live ad to a signed-in company for its Offers slot. */
 class AdController extends Controller
@@ -14,6 +15,15 @@ class AdController extends Controller
         $ad = Ad::live()->inRandomOrder()->first();
 
         return response()->json(['data' => $ad ? $this->present($ad) : null]);
+    }
+
+    /** Serves an uploaded ad image by filename. Public so <img> loads without auth. */
+    public function media(string $filename): BinaryFileResponse
+    {
+        $path = storage_path('app/public/ads/'.basename($filename));
+        abort_unless(is_file($path), 404);
+
+        return response()->file($path);
     }
 
     /** @return array<string, mixed> */

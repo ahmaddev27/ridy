@@ -40,6 +40,17 @@ class AdController extends Controller
         return response()->json(['data' => ['deleted' => true]]);
     }
 
+    /** Upload an ad image; returns a same-origin URL to store in image_url. */
+    public function upload(Request $request): JsonResponse
+    {
+        $request->validate([
+            'image' => ['required', 'image', 'mimes:jpeg,jpg,png,webp,gif', 'max:4096'],
+        ]);
+        $path = $request->file('image')->store('ads', 'public');
+
+        return response()->json(['data' => ['url' => '/api/v1/ads/media/'.basename($path)]]);
+    }
+
     /** @return array<string, mixed> */
     private function validated(Request $request): array
     {

@@ -67,6 +67,33 @@ export async function apiFetch<T>(
   return (await response.json()) as T;
 }
 
+/** POST multipart form data (e.g. a file upload) with the CSRF token attached. */
+export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  await ensureCsrfCookie();
+  const headers: Record<string, string> = { Accept: "application/json" };
+  const token = readCookie("XSRF-TOKEN");
+  if (token) headers["X-XSRF-TOKEN"] = token;
+
+  // No Content-Type header: the browser sets the multipart boundary itself.
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body: form,
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new ApiError(
+      response.status,
+      (payload as { message?: string }).message ?? response.statusText,
+      (payload as { errors?: Record<string, string[]> }).errors,
+      payload as Record<string, unknown>,
+    );
+  }
+  return (await response.json()) as T;
+}
+
 /** Fetch a file (e.g. a CSV export) as a Blob, carrying the session cookie. */
 export async function apiDownload(path: string): Promise<Blob> {
   const response = await fetch(`${API_URL}${path}`, { credentials: "include" });

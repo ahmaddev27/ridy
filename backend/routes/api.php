@@ -147,6 +147,7 @@ Route::prefix('v1')->group(function () {
 
         // The current live platform ad for this company's Offers slot.
         Route::get('ads/current', [AdController::class, 'current']);
+        Route::get('ads/media/{filename}', [AdController::class, 'media']);
 
         // The company's own subscription history (codes/plans/collector/status).
         Route::get('subscription/history', [CompanySubscriptionController::class, 'index']);
@@ -329,6 +330,7 @@ Route::prefix('v1')->group(function () {
         // Platform-wide promotional ads shown on every company's Offers view.
         Route::get('ads', [AdminAdController::class, 'index']);
         Route::post('ads', [AdminAdController::class, 'store']);
+        Route::post('ads/upload', [AdminAdController::class, 'upload']);
         Route::put('ads/{ad}', [AdminAdController::class, 'update']);
         Route::delete('ads/{ad}', [AdminAdController::class, 'destroy']);
 

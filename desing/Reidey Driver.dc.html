@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..600&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet"><style>
+body{margin:0;background:#e9e8e4;font-family:'Instrument Sans',system-ui,sans-serif}
+a{color:#1e222b}a:hover{color:#059669}
+.dv-turn{padding:44px 48px 36px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 26px}
+.dv-tid{font:500 10px 'IBM Plex Mono',monospace;padding:3px 7px;background:#1e222b;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 'Instrument Sans',sans-serif;color:#1e222b}
+.dv-opts{display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:12px;scroll-margin-top:16px}
+.dv-oid{font:500 10.5px 'IBM Plex Mono',monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1e222b;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:9px;font:400 11.5px/1.3 'Instrument Sans',sans-serif;color:rgba(30,34,43,.6)}
+.dv-opt:target .dv-oid{background:#059669;color:#fff}
+.dv-next{margin:26px 0 0;font:12px/1.6 'Instrument Sans',sans-serif;color:rgba(30,34,43,.55)}
+.dv-cap{font:400 10px/1.3 'IBM Plex Mono',monospace;color:rgba(30,34,43,.45);letter-spacing:.02em;text-align:center;margin-top:2px}
+@keyframes rd-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes rd-shimmer{0%{opacity:.55}50%{opacity:.9}100%{opacity:.55}}
+@keyframes rd-ring{from{stroke-dashoffset:0}to{stroke-dashoffset:339.3}}
+</style></helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Reidey Driver — first pass</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Core screens — light</div>
+<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;--frame:#dcdbd6;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600;letter-spacing:.01em"><span>14:32</span><span style="display:flex;gap:5px;align-items:center;color:var(--muted)"><span style="width:16px;height:9px;border:1px solid currentColor;border-radius:2px;display:block"></span></span></div>
+<div style="flex:1;overflow:hidden;display:flex;flex-direction:column;gap:18px;padding:14px 20px 0">
+
+<div style="display:flex;align-items:center;justify-content:space-between">
+<div style="display:flex;align-items:center;gap:10px"><img src="reidey-mark.jpg" alt="Reidey" style="width:26px;height:26px;object-fit:contain;mix-blend-mode:multiply"><div style="display:flex;flex-direction:column;line-height:1.1"><span style="font-size:15px;font-weight:600">Guten Tag, Peter</span><span style="font-size:11.5px;color:var(--subtle)">Rheinfahrt GmbH</span></div></div>
+<div style="display:flex;align-items:center;gap:7px;padding:6px 11px 6px 9px;border-radius:999px;background:var(--surface);border:1px solid var(--line)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:rd-pulse 2.4s ease-in-out infinite"></span><span style="font-size:11.5px;font-weight:600;letter-spacing:.01em">Online</span></div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden">
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Angebote</div><div style="font-size:23px;font-weight:600;margin-top:3px">19</div></div><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Annahme</div><div style="font-size:23px;font-weight:600;margin-top:3px">84%</div></div></div>
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Verdienst</div><div style="font-size:23px;font-weight:600;margin-top:3px">€137.41</div></div><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Strecke</div><div style="font-size:23px;font-weight:600;margin-top:3px">96.4 <span style="font-size:13px;font-weight:500;color:var(--muted)">km</span></div></div></div>
+</div>
+
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:16px 16px 14px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:50%;background:#7c3aed"></span><span style="font-size:11.5px;font-weight:600;color:#7c3aed;letter-spacing:.02em">Auf Fahrt</span></div><span style="font-size:11px;color:var(--subtle);font-family:'IBM Plex Mono',monospace">vor 3 Min</span></div>
+<div style="display:flex;align-items:flex-end;justify-content:space-between"><div style="font-size:46px;font-weight:600;letter-spacing:-.025em;line-height:.95">€14.37</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><span style="font-size:15px;font-weight:600;color:var(--accent);letter-spacing:.06em">€€</span><span style="font-size:12px;color:var(--muted)">€1.26/km</span></div></div>
+<div style="display:flex;gap:11px">
+<div style="display:flex;flex-direction:column;align-items:center;padding-top:5px"><span style="width:8px;height:8px;border-radius:50%;border:1.6px solid var(--ink);display:block"></span><span style="flex:1;width:0;border-left:1.5px dotted var(--subtle);margin:3px 0"></span><span style="width:8px;height:8px;border-radius:2px;background:var(--accent);display:block"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:11px;min-width:0"><div style="font-size:14px;line-height:1.25">Birkerstraße 55, 42651 Solingen</div><div style="font-size:14px;line-height:1.25">Friedrich-Ebert-Straße 89, 42103 Wuppertal</div></div>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:12px"><span style="font-size:13px;color:var(--muted)">11.4 km · ca. 19 Min</span><span style="font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:5px">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 5 16 12 9 19"></polyline></svg></span></div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:8px;flex:1;min-height:0">
+<div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-size:12.5px;font-weight:600;letter-spacing:.02em">Letzte Angebote</span><span style="font-size:11.5px;color:var(--subtle)">Alle</span></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden">
+<div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border-bottom:1px solid var(--line)"><div style="width:52px"><div style="font-size:15px;font-weight:600">€22.90</div><div style="font-size:10.5px;color:var(--accent);letter-spacing:.06em;font-weight:600">€€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Kölner Straße 132, Solingen</div><div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Hauptstraße 4, Solingen</div></div><span style="font-size:10.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.1);padding:3px 7px;border-radius:6px">Fertig</span></div>
+<div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border-bottom:1px solid var(--line)"><div style="width:52px"><div style="font-size:15px;font-weight:600">€8.20</div><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.06em;font-weight:600">€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Focher Straße 76, Solingen</div><div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bahnhofstraße 21, Solingen</div></div><span style="font-size:10.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.1);padding:3px 7px;border-radius:6px">Fertig</span></div>
+<div style="display:flex;align-items:center;gap:12px;padding:11px 13px"><div style="width:52px"><div style="font-size:15px;font-weight:600">€5.85</div><div style="font-size:10.5px;color:var(--muted);letter-spacing:.06em;font-weight:600">€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Werwolf 12, Solingen</div><div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Konrad-Adenauer-Straße 12, Solingen</div></div><span style="font-size:10.5px;font-weight:600;color:#8b909b;background:rgba(139,144,155,.13);padding:3px 7px;border-radius:6px">Abgelehnt</span></div>
+</div>
+</div>
+</div>
+
+<div style="display:flex;border-top:1px solid var(--line);background:var(--surface);padding:9px 26px 22px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span style="font-size:10px;font-weight:600">Start</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span style="font-size:10px;font-weight:500">Angebote</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"></path></svg><span style="font-size:10px;font-weight:500">Profil</span></div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Home</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;--frame:#dcdbd6;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px 4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 5 8 12 15 19"></polyline></svg><span style="font-size:12.5px;font-weight:600;letter-spacing:.02em">Angebot</span><span style="width:20px"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;padding:16px 20px 0;align-items:center">
+
+<div style="position:relative;width:190px;height:190px;display:flex;align-items:center;justify-content:center">
+<svg width="190" height="190" viewBox="0 0 190 190" style="position:absolute;inset:0;transform:rotate(-90deg)"><circle cx="95" cy="95" r="86" fill="none" stroke="#e4e4e1" stroke-width="5"></circle><circle cx="95" cy="95" r="86" fill="none" stroke="#d97706" stroke-width="5" stroke-linecap="round" stroke-dasharray="540.4" stroke-dashoffset="248"></circle></svg>
+<div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:42px;font-weight:600;letter-spacing:-.035em;line-height:1">€14.37</div><div style="font-size:13px;color:var(--muted)">€1.26/km · 11.4 km</div></div>
+<div style="position:absolute;bottom:-6px;background:var(--canvas);padding:0 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;color:#d97706">2.4s</div>
+</div>
+
+<div style="display:flex;align-items:center;gap:10px"><span style="font-size:11.5px;font-weight:600;color:#d97706;background:rgba(217,119,6,.1);padding:4px 10px;border-radius:7px">Offen</span><span style="font-size:16px;font-weight:600;color:var(--accent);letter-spacing:.06em">€€</span><span style="font-size:12.5px;color:var(--subtle);font-family:'IBM Plex Mono',monospace">14:32:07</span></div>
+
+<div style="width:100%;border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:16px;display:flex;gap:12px">
+<div style="display:flex;flex-direction:column;align-items:center;padding-top:6px"><span style="width:9px;height:9px;border-radius:50%;border:1.8px solid var(--ink);display:block"></span><span style="flex:1;width:0;border-left:1.5px dotted var(--subtle);margin:4px 0"></span><span style="width:9px;height:9px;border-radius:2px;background:var(--accent);display:block"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;min-width:0">
+<div><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase;margin-bottom:3px">Abholung</div><div style="font-size:15px;line-height:1.3">Birkerstraße 55, 42651 Solingen</div></div>
+<div><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase;margin-bottom:3px">Ziel</div><div style="font-size:15px;line-height:1.3">Friedrich-Ebert-Straße 89, 42103 Wuppertal</div></div>
+</div>
+</div>
+
+<div style="width:100%;display:flex;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden">
+<div style="flex:1;background:var(--surface);padding:12px 14px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Strecke</div><div style="font-size:19px;font-weight:600;margin-top:2px">11.4 km</div></div>
+<div style="flex:1;background:var(--surface);padding:12px 14px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Qualität</div><div style="font-size:19px;font-weight:600;margin-top:2px">€1.26<span style="font-size:12px;color:var(--muted);font-weight:500">/km</span></div></div>
+</div>
+
+<div style="flex:1"></div>
+<div style="width:100%;display:flex;flex-direction:column;gap:10px;padding-bottom:26px">
+<button style="width:100%;border:0;border-radius:14px;background:var(--pri);color:var(--priink);font-family:inherit;font-size:16px;font-weight:600;padding:17px 0;letter-spacing:.01em">In Uber öffnen</button>
+<div style="text-align:center;font-size:11.5px;color:var(--subtle);line-height:1.4">Annahme erfolgt in der Uber Driver App.<br>Reidey beobachtet nur.</div>
+</div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Offer detail</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;--frame:#dcdbd6;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="padding:12px 20px 0;display:flex;flex-direction:column;gap:12px">
+<div style="font-size:22px;font-weight:600;letter-spacing:-.01em">Angebote</div>
+<div style="display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg><span style="font-size:14px;color:var(--subtle)">Fahrer oder Adresse suchen</span></div>
+<div style="display:flex;gap:7px;overflow:hidden">
+<span style="font-size:12px;font-weight:600;padding:7px 13px;border-radius:999px;background:var(--pri);color:var(--priink);white-space:nowrap">Alle</span>
+<span style="font-size:12px;font-weight:500;padding:7px 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:#d97706;white-space:nowrap">Offen</span>
+<span style="font-size:12px;font-weight:500;padding:7px 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:#2563eb;white-space:nowrap">Angenommen</span>
+<span style="font-size:12px;font-weight:500;padding:7px 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:#059669;white-space:nowrap">Fertig</span>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--subtle);font-family:'IBM Plex Mono',monospace"><span>01.08 — 16.08.2026</span><span>128 Angebote</span></div>
+</div>
+<div style="flex:1;overflow:hidden;padding:12px 20px 0;display:flex;flex-direction:column;gap:9px">
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€14.37</div><div style="font-size:11px;color:var(--accent);letter-spacing:.06em;font-weight:600">€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Birkerstraße 55, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Friedrich-Ebert-Straße 89, Wuppertal</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#7c3aed;background:rgba(124,58,237,.1);padding:3px 7px;border-radius:6px">Auf Fahrt</span><span style="font-size:11px;color:var(--subtle)">11.4 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€22.90</div><div style="font-size:11px;color:var(--accent);letter-spacing:.06em;font-weight:600">€€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Kölner Straße 132, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Hauptstraße 4, Solingen</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.1);padding:3px 7px;border-radius:6px">Fertig</span><span style="font-size:11px;color:var(--subtle)">6.2 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€8.20</div><div style="font-size:11px;color:var(--subtle);letter-spacing:.06em;font-weight:600">€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Focher Straße 76, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Bahnhofstraße 21, Solingen</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.1);padding:3px 7px;border-radius:6px">Fertig</span><span style="font-size:11px;color:var(--subtle)">9.6 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€5.85</div><div style="font-size:11px;color:var(--muted);letter-spacing:.06em;font-weight:600">€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Werwolf 12, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Konrad-Adenauer-Straße 12, Solingen</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#8b909b;background:rgba(139,144,155,.13);padding:3px 7px;border-radius:6px">Abgelehnt</span><span style="font-size:11px;color:var(--subtle)">4.1 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€11.40</div><div style="font-size:11px;color:var(--muted);letter-spacing:.06em;font-weight:600">€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Bahnhofstraße 21, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Birkerstraße 55, Solingen</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.1);padding:3px 7px;border-radius:6px">Fertig</span><span style="font-size:11px;color:var(--subtle)">8.8 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center;opacity:.55"><div style="width:60px"><div style="font-size:17px;font-weight:600">€7.10</div><div style="font-size:11px;color:var(--subtle);letter-spacing:.06em;font-weight:600">€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Hauptstraße 4, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Focher Straße 76, Solingen</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#dc2626;background:rgba(220,38,38,.1);padding:3px 7px;border-radius:6px">Storniert</span><span style="font-size:11px;color:var(--subtle)">7.9 km</span></div></div>
+</div>
+<div style="display:flex;border-top:1px solid var(--line);background:var(--surface);padding:9px 26px 22px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span style="font-size:10px;font-weight:500">Start</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span style="font-size:10px;font-weight:600">Angebote</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"></path></svg><span style="font-size:10px;font-weight:500">Profil</span></div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Offers list</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;--frame:#dcdbd6;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="padding:12px 20px 0;display:flex;flex-direction:column;gap:14px">
+<div style="font-size:22px;font-weight:600;letter-spacing:-.01em">Profil</div>
+<div style="display:flex;gap:2px;background:var(--surface2);border-radius:11px;padding:3px"><span style="flex:1;text-align:center;font-size:13px;font-weight:600;padding:8px 0;border-radius:8px;background:var(--surface);border:1px solid var(--line)">Statistik</span><span style="flex:1;text-align:center;font-size:13px;font-weight:500;padding:8px 0;color:var(--muted)">Einstellungen</span></div>
+<div style="display:flex;gap:7px"><span style="font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;background:var(--pri);color:var(--priink)">Heute</span><span style="font-size:12px;font-weight:500;padding:7px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--line)">7 Tage</span><span style="font-size:12px;font-weight:500;padding:7px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--line)">30 Tage</span></div>
+</div>
+<div style="flex:1;padding:16px 20px 0;display:flex;flex-direction:column;gap:14px">
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:18px 18px 16px;display:flex;flex-direction:column;gap:3px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Verdienst heute</div><div style="font-size:44px;font-weight:600;letter-spacing:-.03em;line-height:1.05">€137.41</div><div style="font-size:12.5px;color:var(--accent);font-weight:500">+€18.20 ggü. gestern</div></div>
+<div style="display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden">
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:13px 14px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Angebote</div><div style="font-size:22px;font-weight:600;margin-top:2px">19</div></div><div style="flex:1;background:var(--surface);padding:13px 14px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Angenommen</div><div style="font-size:22px;font-weight:600;margin-top:2px">16</div></div></div>
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:13px 14px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Abgeschlossen</div><div style="font-size:22px;font-weight:600;margin-top:2px">14</div></div><div style="flex:1;background:var(--surface);padding:13px 14px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Strecke</div><div style="font-size:22px;font-weight:600;margin-top:2px">96.4 <span style="font-size:12px;font-weight:500;color:var(--muted)">km</span></div></div></div>
+</div>
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:16px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-size:12.5px;font-weight:600">Annahmequote</span><span style="font-size:22px;font-weight:600">84%</span></div>
+<div style="height:8px;border-radius:999px;background:var(--surface2);overflow:hidden"><div style="width:84%;height:100%;background:var(--accent);border-radius:999px"></div></div>
+<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--subtle);font-family:'IBM Plex Mono',monospace"><span>16 angenommen</span><span>3 abgelehnt</span></div>
+</div>
+<div style="display:flex;align-items:flex-end;gap:5px;height:74px;padding-top:4px">
+<div style="flex:1;height:38%;background:var(--surface2);border-radius:4px 4px 0 0"></div><div style="flex:1;height:56%;background:var(--surface2);border-radius:4px 4px 0 0"></div><div style="flex:1;height:31%;background:var(--surface2);border-radius:4px 4px 0 0"></div><div style="flex:1;height:72%;background:var(--surface2);border-radius:4px 4px 0 0"></div><div style="flex:1;height:64%;background:var(--surface2);border-radius:4px 4px 0 0"></div><div style="flex:1;height:88%;background:var(--surface2);border-radius:4px 4px 0 0"></div><div style="flex:1;height:100%;background:var(--ink);border-radius:4px 4px 0 0"></div>
+</div>
+<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--subtle);font-family:'IBM Plex Mono',monospace;margin-top:-8px"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
+</div>
+<div style="display:flex;border-top:1px solid var(--line);background:var(--surface);padding:9px 26px 22px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span style="font-size:10px;font-weight:500">Start</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span style="font-size:10px;font-weight:500">Angebote</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"></path></svg><span style="font-size:10px;font-weight:600">Profil</span></div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Profile · Stats</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;--frame:#dcdbd6;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="padding:12px 20px 0;display:flex;flex-direction:column;gap:14px">
+<div style="font-size:22px;font-weight:600;letter-spacing:-.01em">Profil</div>
+<div style="display:flex;gap:2px;background:var(--surface2);border-radius:11px;padding:3px"><span style="flex:1;text-align:center;font-size:13px;font-weight:500;padding:8px 0;color:var(--muted)">Statistik</span><span style="flex:1;text-align:center;font-size:13px;font-weight:600;padding:8px 0;border-radius:8px;background:var(--surface);border:1px solid var(--line)">Einstellungen</span></div>
+</div>
+<div style="flex:1;padding:16px 20px 0;display:flex;flex-direction:column;gap:20px">
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:18px;display:flex;align-items:center;gap:14px">
+<div style="width:52px;height:52px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:600;color:var(--muted)">PK</div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:17px;font-weight:600">Peter Krüger</span><span style="font-size:12.5px;color:var(--muted)">Rheinfahrt GmbH</span><span style="font-size:12px;color:var(--subtle);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">p.krueger@rheinfahrt.de</span></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="font-size:10.5px;color:var(--subtle);letter-spacing:.05em;text-transform:uppercase;padding-left:2px">Konto</div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden">
+<div style="display:flex;align-items:center;gap:12px;padding:15px 15px;border-bottom:1px solid var(--line)"><span style="flex:1;font-size:14.5px">Name ändern</span><span style="font-size:13px;color:var(--subtle)">Peter Krüger</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 5 16 12 9 19"></polyline></svg></div>
+<div style="display:flex;align-items:center;gap:12px;padding:15px 15px;border-bottom:1px solid var(--line)"><span style="flex:1;font-size:14.5px">Sprache</span><span style="font-size:13px;color:var(--subtle)">Deutsch</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 5 16 12 9 19"></polyline></svg></div>
+<div style="display:flex;align-items:center;gap:12px;padding:15px 15px"><span style="flex:1;font-size:14.5px">Passwort ändern</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 5 16 12 9 19"></polyline></svg></div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="font-size:10.5px;color:var(--subtle);letter-spacing:.05em;text-transform:uppercase;padding-left:2px">Benachrichtigungen</div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden">
+<div style="display:flex;align-items:center;gap:12px;padding:15px"><div style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-size:14.5px">Push für neue Angebote</span><span style="font-size:11.5px;color:var(--subtle)">Erlaubt · hohe Priorität</span></div><span style="width:44px;height:26px;border-radius:999px;background:var(--accent);display:flex;align-items:center;justify-content:flex-end;padding:0 3px;box-sizing:border-box"><span style="width:20px;height:20px;border-radius:50%;background:#fff;display:block"></span></span></div>
+</div>
+</div>
+<div style="flex:1"></div>
+<div style="padding-bottom:22px;display:flex;flex-direction:column;gap:12px">
+<button style="width:100%;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:#dc2626;font-family:inherit;font-size:15px;font-weight:600;padding:15px 0">Abmelden</button>
+<div style="text-align:center;font-size:10.5px;color:var(--subtle);font-family:'IBM Plex Mono',monospace">Reidey Driver 2.4.0 · Build 318</div>
+</div>
+</div>
+<div style="display:flex;border-top:1px solid var(--line);background:var(--surface);padding:9px 26px 22px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span style="font-size:10px;font-weight:500">Start</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span style="font-size:10px;font-weight:500">Angebote</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"></path></svg><span style="font-size:10px;font-weight:600">Profil</span></div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Profile · Settings</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;--frame:#dcdbd6;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 26px;gap:30px">
+<div style="display:flex;flex-direction:column;align-items:center;gap:14px"><img src="reidey-mark.jpg" alt="Reidey" style="width:56px;height:56px;object-fit:contain;mix-blend-mode:multiply"><div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div style="font-size:24px;font-weight:600;letter-spacing:-.01em">Reidey Driver</div><div style="font-size:13.5px;color:var(--muted);text-align:center;line-height:1.4">Melde dich mit deinen Flottendaten an</div></div></div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 15px;display:flex;flex-direction:column;gap:3px"><span style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">E-Mail</span><span style="font-size:15.5px">p.krueger@rheinfahrt.de</span></div>
+<div style="border:1.5px solid var(--ink);border-radius:14px;background:var(--surface);padding:13px 15px;display:flex;flex-direction:column;gap:3px"><span style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Passwort</span><div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:15.5px;letter-spacing:.18em">••••••••</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="1.6"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z"></path><circle cx="12" cy="12" r="2.6"></circle></svg></div></div>
+<button style="width:100%;border:0;border-radius:14px;background:var(--pri);color:var(--priink);font-family:inherit;font-size:16px;font-weight:600;padding:17px 0;margin-top:4px">Anmelden</button>
+<div style="text-align:center;font-size:13px;color:var(--muted);margin-top:4px">Passwort vergessen?</div>
+</div>
+</div>
+<div style="padding:0 26px 30px;text-align:center;font-size:11.5px;color:var(--subtle);line-height:1.5">Zugang erhältst du per Einladung<br>deiner Flotte.</div>
+</div>
+</div>
+<div class="dv-cap">Sign in</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="width:390px;height:844px;border-radius:46px;padding:9px;background:#dcdbd6;box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:#22252c;display:flex;flex-direction:column;color:#e6e8ec;font-variant-numeric:tabular-nums;position:relative">
+<div style="position:absolute;inset:0;background:#191c22;opacity:.6"></div>
+<div style="position:relative;display:flex;flex-direction:column;align-items:center;padding:60px 20px 0;gap:2px"><div style="font-size:15px;font-weight:500;color:rgba(230,232,236,.7)">Sonntag, 16. August</div><div style="font-size:74px;font-weight:500;letter-spacing:-.03em;line-height:1.1">14:32</div></div>
+<div style="position:relative;padding:34px 14px 0;display:flex;flex-direction:column;gap:9px">
+<div style="border-radius:18px;background:rgba(255,255,255,.13);backdrop-filter:blur(20px);padding:14px 15px;display:flex;flex-direction:column;gap:9px;border:1px solid rgba(255,255,255,.08)">
+<div style="display:flex;align-items:center;gap:8px"><img src="reidey-mark.jpg" alt="" style="width:17px;height:17px;object-fit:contain;filter:invert(1);mix-blend-mode:screen"><span style="font-size:12px;font-weight:600;letter-spacing:.02em;color:rgba(230,232,236,.85)">REIDEY DRIVER</span><span style="flex:1"></span><span style="font-size:11.5px;color:rgba(230,232,236,.6)">jetzt</span></div>
+<div style="display:flex;align-items:baseline;gap:9px"><span style="font-size:27px;font-weight:600;letter-spacing:-.02em">€14.37</span><span style="font-size:16px;font-weight:600;color:#34d399;letter-spacing:.06em">€€</span><span style="font-size:14px;color:rgba(230,232,236,.75)">· Peter</span></div>
+<div style="display:flex;gap:10px"><div style="display:flex;flex-direction:column;align-items:center;padding-top:5px"><span style="width:7px;height:7px;border-radius:50%;border:1.5px solid rgba(230,232,236,.8);display:block"></span><span style="flex:1;width:0;border-left:1.5px dotted rgba(230,232,236,.4);margin:3px 0"></span><span style="width:7px;height:7px;border-radius:2px;background:#34d399;display:block"></span></div><div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0"><span style="font-size:13.5px;line-height:1.25;color:rgba(230,232,236,.9)">Birkerstraße 55, 42651 Solingen</span><span style="font-size:13.5px;line-height:1.25;color:rgba(230,232,236,.9)">Friedrich-Ebert-Straße 89, 42103 Wuppertal</span></div></div>
+<div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,.12);padding-top:9px"><span style="font-size:13px;color:rgba(230,232,236,.75);font-family:'IBM Plex Mono',monospace">12.3 km · €1.26/km</span><span style="font-size:12.5px;font-weight:600;color:#fbbf24;font-family:'IBM Plex Mono',monospace">4.2s</span></div>
+</div>
+<div style="border-radius:18px;background:rgba(255,255,255,.08);padding:12px 15px;display:flex;align-items:center;gap:9px;opacity:.55"><span style="font-size:11.5px;font-weight:600;letter-spacing:.02em">REIDEY DRIVER</span><span style="flex:1;font-size:13px;color:rgba(230,232,236,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">€8.20 € | Anja</span><span style="font-size:11.5px;color:rgba(230,232,236,.6)">vor 6 Min</span></div>
+</div>
+<div style="flex:1"></div>
+<div style="position:relative;display:flex;align-items:center;justify-content:center;padding-bottom:34px"><span style="width:134px;height:5px;border-radius:999px;background:rgba(230,232,236,.4)"></span></div>
+</div>
+</div>
+<div class="dv-cap">Push on lock screen</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Same screens — dark</div>
+<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#0f1115;--surface:#181b21;--surface2:#20242b;--ink:#e6e8ec;--muted:#a2a8b3;--subtle:#6b7280;--line:#2c313a;--accent:#10b981;--pri:#e6e8ec;--priink:#12151a;--frame:#2a2d34;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>22:08</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="flex:1;overflow:hidden;display:flex;flex-direction:column;gap:18px;padding:14px 20px 0">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<div style="display:flex;align-items:center;gap:10px"><img src="reidey-mark.jpg" alt="Reidey" style="width:26px;height:26px;object-fit:contain;filter:invert(1);mix-blend-mode:screen"><div style="display:flex;flex-direction:column;line-height:1.1"><span style="font-size:15px;font-weight:600">Guten Abend, Peter</span><span style="font-size:11.5px;color:var(--subtle)">Rheinfahrt GmbH</span></div></div>
+<div style="display:flex;align-items:center;gap:7px;padding:6px 11px 6px 9px;border-radius:999px;background:var(--surface);border:1px solid var(--line)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:rd-pulse 2.4s ease-in-out infinite"></span><span style="font-size:11.5px;font-weight:600">Online</span></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden">
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Angebote</div><div style="font-size:23px;font-weight:600;margin-top:3px">19</div></div><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Annahme</div><div style="font-size:23px;font-weight:600;margin-top:3px">84%</div></div></div>
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Verdienst</div><div style="font-size:23px;font-weight:600;margin-top:3px">€137.41</div></div><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Strecke</div><div style="font-size:23px;font-weight:600;margin-top:3px">96.4 <span style="font-size:13px;font-weight:500;color:var(--muted)">km</span></div></div></div>
+</div>
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:16px 16px 14px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:50%;background:#a78bfa"></span><span style="font-size:11.5px;font-weight:600;color:#a78bfa;letter-spacing:.02em">Auf Fahrt</span></div><span style="font-size:11px;color:var(--subtle);font-family:'IBM Plex Mono',monospace">vor 3 Min</span></div>
+<div style="display:flex;align-items:flex-end;justify-content:space-between"><div style="font-size:46px;font-weight:600;letter-spacing:-.025em;line-height:.95">€14.37</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><span style="font-size:15px;font-weight:600;color:var(--accent);letter-spacing:.06em">€€</span><span style="font-size:12px;color:var(--muted)">€1.26/km</span></div></div>
+<div style="display:flex;gap:11px">
+<div style="display:flex;flex-direction:column;align-items:center;padding-top:5px"><span style="width:8px;height:8px;border-radius:50%;border:1.6px solid var(--ink);display:block"></span><span style="flex:1;width:0;border-left:1.5px dotted var(--subtle);margin:3px 0"></span><span style="width:8px;height:8px;border-radius:2px;background:var(--accent);display:block"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:11px;min-width:0"><div style="font-size:14px;line-height:1.25">Birkerstraße 55, 42651 Solingen</div><div style="font-size:14px;line-height:1.25">Friedrich-Ebert-Straße 89, 42103 Wuppertal</div></div>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:12px"><span style="font-size:13px;color:var(--muted)">11.4 km · ca. 19 Min</span><span style="font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:5px">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 5 16 12 9 19"></polyline></svg></span></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;flex:1;min-height:0">
+<div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-size:12.5px;font-weight:600">Letzte Angebote</span><span style="font-size:11.5px;color:var(--subtle)">Alle</span></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden">
+<div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border-bottom:1px solid var(--line)"><div style="width:52px"><div style="font-size:15px;font-weight:600">€22.90</div><div style="font-size:10.5px;color:var(--accent);letter-spacing:.06em;font-weight:600">€€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Kölner Straße 132, Solingen</div><div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Hauptstraße 4, Solingen</div></div><span style="font-size:10.5px;font-weight:600;color:#34d399;background:rgba(52,211,153,.14);padding:3px 7px;border-radius:6px">Fertig</span></div>
+<div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border-bottom:1px solid var(--line)"><div style="width:52px"><div style="font-size:15px;font-weight:600">€8.20</div><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.06em;font-weight:600">€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Focher Straße 76, Solingen</div><div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bahnhofstraße 21, Solingen</div></div><span style="font-size:10.5px;font-weight:600;color:#34d399;background:rgba(52,211,153,.14);padding:3px 7px;border-radius:6px">Fertig</span></div>
+<div style="display:flex;align-items:center;gap:12px;padding:11px 13px"><div style="width:52px"><div style="font-size:15px;font-weight:600">€5.85</div><div style="font-size:10.5px;color:var(--muted);letter-spacing:.06em;font-weight:600">€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Werwolf 12, Solingen</div><div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Konrad-Adenauer-Straße 12, Solingen</div></div><span style="font-size:10.5px;font-weight:600;color:#6b7280;background:rgba(107,114,128,.18);padding:3px 7px;border-radius:6px">Abgelehnt</span></div>
+</div>
+</div>
+</div>
+<div style="display:flex;border-top:1px solid var(--line);background:var(--surface);padding:9px 26px 22px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span style="font-size:10px;font-weight:600">Start</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span style="font-size:10px;font-weight:500">Angebote</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"></path></svg><span style="font-size:10px;font-weight:500">Profil</span></div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Home · dark</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#0f1115;--surface:#181b21;--surface2:#20242b;--ink:#e6e8ec;--muted:#a2a8b3;--subtle:#6b7280;--line:#2c313a;--accent:#10b981;--pri:#e6e8ec;--priink:#12151a;--frame:#2a2d34;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>22:08</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px 4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 5 8 12 15 19"></polyline></svg><span style="font-size:12.5px;font-weight:600">Angebot</span><span style="width:20px"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;padding:16px 20px 0;align-items:center">
+<div style="position:relative;width:190px;height:190px;display:flex;align-items:center;justify-content:center">
+<svg width="190" height="190" viewBox="0 0 190 190" style="position:absolute;inset:0;transform:rotate(-90deg)"><circle cx="95" cy="95" r="86" fill="none" stroke="#2c313a" stroke-width="5"></circle><circle cx="95" cy="95" r="86" fill="none" stroke="#f87171" stroke-width="5" stroke-linecap="round" stroke-dasharray="540.4" stroke-dashoffset="432"></circle></svg>
+<div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:42px;font-weight:600;letter-spacing:-.035em;line-height:1">€14.37</div><div style="font-size:13px;color:var(--muted)">€1.26/km · 11.4 km</div></div>
+<div style="position:absolute;bottom:-6px;background:var(--canvas);padding:0 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;color:#f87171">1.0s</div>
+</div>
+<div style="display:flex;align-items:center;gap:10px"><span style="font-size:11.5px;font-weight:600;color:#fbbf24;background:rgba(251,191,36,.14);padding:4px 10px;border-radius:7px">Offen</span><span style="font-size:16px;font-weight:600;color:var(--accent);letter-spacing:.06em">€€</span><span style="font-size:12.5px;color:var(--subtle);font-family:'IBM Plex Mono',monospace">22:08:41</span></div>
+<div style="width:100%;border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:16px;display:flex;gap:12px">
+<div style="display:flex;flex-direction:column;align-items:center;padding-top:6px"><span style="width:9px;height:9px;border-radius:50%;border:1.8px solid var(--ink);display:block"></span><span style="flex:1;width:0;border-left:1.5px dotted var(--subtle);margin:4px 0"></span><span style="width:9px;height:9px;border-radius:2px;background:var(--accent);display:block"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;min-width:0">
+<div><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase;margin-bottom:3px">Abholung</div><div style="font-size:15px;line-height:1.3">Birkerstraße 55, 42651 Solingen</div></div>
+<div><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase;margin-bottom:3px">Ziel</div><div style="font-size:15px;line-height:1.3">Friedrich-Ebert-Straße 89, 42103 Wuppertal</div></div>
+</div>
+</div>
+<div style="width:100%;display:flex;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden">
+<div style="flex:1;background:var(--surface);padding:12px 14px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Strecke</div><div style="font-size:19px;font-weight:600;margin-top:2px">11.4 km</div></div>
+<div style="flex:1;background:var(--surface);padding:12px 14px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Qualität</div><div style="font-size:19px;font-weight:600;margin-top:2px">€1.26<span style="font-size:12px;color:var(--muted);font-weight:500">/km</span></div></div>
+</div>
+<div style="flex:1"></div>
+<div style="width:100%;display:flex;flex-direction:column;gap:10px;padding-bottom:26px">
+<button style="width:100%;border:0;border-radius:14px;background:var(--pri);color:var(--priink);font-family:inherit;font-size:16px;font-weight:600;padding:17px 0">In Uber öffnen</button>
+<div style="text-align:center;font-size:11.5px;color:var(--subtle);line-height:1.4">Annahme erfolgt in der Uber Driver App.<br>Reidey beobachtet nur.</div>
+</div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Offer detail · dark, last second</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#0f1115;--surface:#181b21;--surface2:#20242b;--ink:#e6e8ec;--muted:#a2a8b3;--subtle:#6b7280;--line:#2c313a;--accent:#10b981;--pri:#e6e8ec;--priink:#12151a;--frame:#2a2d34;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>22:08</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="padding:12px 20px 0;display:flex;flex-direction:column;gap:12px">
+<div style="font-size:22px;font-weight:600;letter-spacing:-.01em">Angebote</div>
+<div style="display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg><span style="font-size:14px;color:var(--subtle)">Fahrer oder Adresse suchen</span></div>
+<div style="display:flex;gap:7px;overflow:hidden">
+<span style="font-size:12px;font-weight:600;padding:7px 13px;border-radius:999px;background:var(--pri);color:var(--priink);white-space:nowrap">Alle</span>
+<span style="font-size:12px;font-weight:500;padding:7px 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:#fbbf24;white-space:nowrap">Offen</span>
+<span style="font-size:12px;font-weight:500;padding:7px 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:#60a5fa;white-space:nowrap">Angenommen</span>
+<span style="font-size:12px;font-weight:500;padding:7px 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:#34d399;white-space:nowrap">Fertig</span>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--subtle);font-family:'IBM Plex Mono',monospace"><span>01.08 — 16.08.2026</span><span>128 Angebote</span></div>
+</div>
+<div style="flex:1;overflow:hidden;padding:12px 20px 0;display:flex;flex-direction:column;gap:9px">
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€14.37</div><div style="font-size:11px;color:var(--accent);letter-spacing:.06em;font-weight:600">€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Birkerstraße 55, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Friedrich-Ebert-Straße 89, Wuppertal</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#a78bfa;background:rgba(167,139,250,.14);padding:3px 7px;border-radius:6px">Auf Fahrt</span><span style="font-size:11px;color:var(--subtle)">11.4 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€22.90</div><div style="font-size:11px;color:var(--accent);letter-spacing:.06em;font-weight:600">€€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Kölner Straße 132, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Hauptstraße 4, Solingen</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#34d399;background:rgba(52,211,153,.14);padding:3px 7px;border-radius:6px">Fertig</span><span style="font-size:11px;color:var(--subtle)">6.2 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€8.20</div><div style="font-size:11px;color:var(--subtle);letter-spacing:.06em;font-weight:600">€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Focher Straße 76, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Bahnhofstraße 21, Solingen</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#34d399;background:rgba(52,211,153,.14);padding:3px 7px;border-radius:6px">Fertig</span><span style="font-size:11px;color:var(--subtle)">9.6 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€5.85</div><div style="font-size:11px;color:var(--muted);letter-spacing:.06em;font-weight:600">€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Werwolf 12, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Konrad-Adenauer-Straße 12, Solingen</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#6b7280;background:rgba(107,114,128,.18);padding:3px 7px;border-radius:6px">Abgelehnt</span><span style="font-size:11px;color:var(--subtle)">4.1 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€11.40</div><div style="font-size:11px;color:var(--muted);letter-spacing:.06em;font-weight:600">€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Bahnhofstraße 21, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Birkerstraße 55, Solingen</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#34d399;background:rgba(52,211,153,.14);padding:3px 7px;border-radius:6px">Fertig</span><span style="font-size:11px;color:var(--subtle)">8.8 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center;opacity:.55"><div style="width:60px"><div style="font-size:17px;font-weight:600">€7.10</div><div style="font-size:11px;color:var(--subtle);letter-spacing:.06em;font-weight:600">€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Hauptstraße 4, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Focher Straße 76, Solingen</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#f87171;background:rgba(248,113,113,.14);padding:3px 7px;border-radius:6px">Storniert</span><span style="font-size:11px;color:var(--subtle)">7.9 km</span></div></div>
+</div>
+<div style="display:flex;border-top:1px solid var(--line);background:var(--surface);padding:9px 26px 22px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span style="font-size:10px;font-weight:500">Start</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span style="font-size:10px;font-weight:600">Angebote</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"></path></svg><span style="font-size:10px;font-weight:500">Profil</span></div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Offers list · dark</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Tappable — tap the active offer, the tabs, and back</div>
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;--frame:#dcdbd6;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);color:var(--ink);font-variant-numeric:tabular-nums;position:relative">
+
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+<div style="position:absolute;inset:0;display:flex;flex-direction:column">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="flex:1;overflow:hidden;display:flex;flex-direction:column;gap:18px;padding:14px 20px 0">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<div style="display:flex;align-items:center;gap:10px"><img src="reidey-mark.jpg" alt="Reidey" style="width:26px;height:26px;object-fit:contain;mix-blend-mode:multiply"><div style="display:flex;flex-direction:column;line-height:1.1"><span style="font-size:15px;font-weight:600">Guten Tag, Peter</span><span style="font-size:11.5px;color:var(--subtle)">Rheinfahrt GmbH</span></div></div>
+<div style="display:flex;align-items:center;gap:7px;padding:6px 11px 6px 9px;border-radius:999px;background:var(--surface);border:1px solid var(--line)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:rd-pulse 2.4s ease-in-out infinite"></span><span style="font-size:11.5px;font-weight:600">Online</span></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden">
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Angebote</div><div style="font-size:23px;font-weight:600;margin-top:3px">19</div></div><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Annahme</div><div style="font-size:23px;font-weight:600;margin-top:3px">84%</div></div></div>
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Verdienst</div><div style="font-size:23px;font-weight:600;margin-top:3px">€137.41</div></div><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Strecke</div><div style="font-size:23px;font-weight:600;margin-top:3px">96.4 <span style="font-size:13px;font-weight:500;color:var(--muted)">km</span></div></div></div>
+</div>
+<div onClick="{{ goDetail }}" style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:16px 16px 14px;display:flex;flex-direction:column;gap:14px;cursor:pointer;transition:border-color .15s ease" style-hover="border-color:#1e222b">
+<div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:50%;background:#d97706"></span><span style="font-size:11.5px;font-weight:600;color:#d97706;letter-spacing:.02em">Neues Angebot</span></div><span style="font-size:11px;font-weight:600;color:#d97706;font-family:'IBM Plex Mono',monospace">{{ secsLabel }}</span></div>
+<div style="display:flex;align-items:flex-end;justify-content:space-between"><div style="font-size:46px;font-weight:600;letter-spacing:-.025em;line-height:.95">€14.37</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><span style="font-size:15px;font-weight:600;color:var(--accent);letter-spacing:.06em">€€</span><span style="font-size:12px;color:var(--muted)">€1.26/km</span></div></div>
+<div style="display:flex;gap:11px">
+<div style="display:flex;flex-direction:column;align-items:center;padding-top:5px"><span style="width:8px;height:8px;border-radius:50%;border:1.6px solid var(--ink);display:block"></span><span style="flex:1;width:0;border-left:1.5px dotted var(--subtle);margin:3px 0"></span><span style="width:8px;height:8px;border-radius:2px;background:var(--accent);display:block"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:11px;min-width:0"><div style="font-size:14px;line-height:1.25">Birkerstraße 55, 42651 Solingen</div><div style="font-size:14px;line-height:1.25">Friedrich-Ebert-Straße 89, 42103 Wuppertal</div></div>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:12px"><span style="font-size:13px;color:var(--muted)">11.4 km · ca. 19 Min</span><span style="font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:5px">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 5 16 12 9 19"></polyline></svg></span></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;flex:1;min-height:0">
+<div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-size:12.5px;font-weight:600">Letzte Angebote</span><span onClick="{{ goOffers }}" style="font-size:11.5px;color:var(--subtle);cursor:pointer">Alle</span></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden">
+<div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border-bottom:1px solid var(--line)"><div style="width:52px"><div style="font-size:15px;font-weight:600">€22.90</div><div style="font-size:10.5px;color:var(--accent);letter-spacing:.06em;font-weight:600">€€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Kölner Straße 132, Solingen</div><div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Hauptstraße 4, Solingen</div></div><span style="font-size:10.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.1);padding:3px 7px;border-radius:6px">Fertig</span></div>
+<div style="display:flex;align-items:center;gap:12px;padding:11px 13px"><div style="width:52px"><div style="font-size:15px;font-weight:600">€8.20</div><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.06em;font-weight:600">€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Focher Straße 76, Solingen</div><div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bahnhofstraße 21, Solingen</div></div><span style="font-size:10.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.1);padding:3px 7px;border-radius:6px">Fertig</span></div>
+</div>
+</div>
+</div>
+<div style="display:flex;border-top:1px solid var(--line);background:var(--surface);padding:9px 26px 22px">
+<div onClick="{{ goHome }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span style="font-size:10px;font-weight:600">Start</span></div>
+<div onClick="{{ goOffers }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span style="font-size:10px;font-weight:500">Angebote</span></div>
+<div onClick="{{ goProfile }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"></path></svg><span style="font-size:10px;font-weight:500">Profil</span></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;display:flex;flex-direction:column;background:var(--canvas)">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px 4px"><span onClick="{{ goHome }}" style="cursor:pointer;display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 5 8 12 15 19"></polyline></svg></span><span style="font-size:12.5px;font-weight:600">Angebot</span><span style="width:20px"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;padding:16px 20px 0;align-items:center">
+<div style="position:relative;width:190px;height:190px;display:flex;align-items:center;justify-content:center">
+<svg width="190" height="190" viewBox="0 0 190 190" style="position:absolute;inset:0;transform:rotate(-90deg)"><circle cx="95" cy="95" r="86" fill="none" stroke="#e4e4e1" stroke-width="5"></circle><circle cx="95" cy="95" r="86" fill="none" stroke="{{ ringColor }}" stroke-width="5" stroke-linecap="round" stroke-dasharray="540.4" stroke-dashoffset="{{ ringOffset }}"></circle></svg>
+<div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:42px;font-weight:600;letter-spacing:-.035em;line-height:1">€14.37</div><div style="font-size:13px;color:var(--muted)">€1.26/km · 11.4 km</div></div>
+<div style="position:absolute;bottom:-6px;background:var(--canvas);padding:0 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;color:{{ ringColor }}">{{ secsLabel }}</div>
+</div>
+<div style="display:flex;align-items:center;gap:10px"><span style="font-size:11.5px;font-weight:600;color:#d97706;background:rgba(217,119,6,.1);padding:4px 10px;border-radius:7px">Offen</span><span style="font-size:16px;font-weight:600;color:var(--accent);letter-spacing:.06em">€€</span><span style="font-size:12.5px;color:var(--subtle);font-family:'IBM Plex Mono',monospace">14:32:07</span></div>
+<div style="width:100%;border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:16px;display:flex;gap:12px">
+<div style="display:flex;flex-direction:column;align-items:center;padding-top:6px"><span style="width:9px;height:9px;border-radius:50%;border:1.8px solid var(--ink);display:block"></span><span style="flex:1;width:0;border-left:1.5px dotted var(--subtle);margin:4px 0"></span><span style="width:9px;height:9px;border-radius:2px;background:var(--accent);display:block"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;min-width:0">
+<div><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase;margin-bottom:3px">Abholung</div><div style="font-size:15px;line-height:1.3">Birkerstraße 55, 42651 Solingen</div></div>
+<div><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase;margin-bottom:3px">Ziel</div><div style="font-size:15px;line-height:1.3">Friedrich-Ebert-Straße 89, 42103 Wuppertal</div></div>
+</div>
+</div>
+<div style="width:100%;display:flex;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden">
+<div style="flex:1;background:var(--surface);padding:12px 14px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Strecke</div><div style="font-size:19px;font-weight:600;margin-top:2px">11.4 km</div></div>
+<div style="flex:1;background:var(--surface);padding:12px 14px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Qualität</div><div style="font-size:19px;font-weight:600;margin-top:2px">€1.26<span style="font-size:12px;color:var(--muted);font-weight:500">/km</span></div></div>
+</div>
+<div style="flex:1"></div>
+<div style="width:100%;display:flex;flex-direction:column;gap:10px;padding-bottom:26px">
+<button style="width:100%;border:0;border-radius:14px;background:var(--pri);color:var(--priink);font-family:inherit;font-size:16px;font-weight:600;padding:17px 0;cursor:pointer">In Uber öffnen</button>
+<div style="text-align:center;font-size:11.5px;color:var(--subtle);line-height:1.4">Annahme erfolgt in der Uber Driver App.<br>Reidey beobachtet nur.</div>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isOffers }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;display:flex;flex-direction:column;background:var(--canvas)">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="padding:12px 20px 0;display:flex;flex-direction:column;gap:12px">
+<div style="font-size:22px;font-weight:600;letter-spacing:-.01em">Angebote</div>
+<div style="display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg><span style="font-size:14px;color:var(--subtle)">Fahrer oder Adresse suchen</span></div>
+<div style="display:flex;gap:7px"><span style="font-size:12px;font-weight:600;padding:7px 13px;border-radius:999px;background:var(--pri);color:var(--priink)">Alle</span><span style="font-size:12px;font-weight:500;padding:7px 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:#d97706">Offen</span><span style="font-size:12px;font-weight:500;padding:7px 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:#059669">Fertig</span></div>
+</div>
+<div style="flex:1;overflow:hidden;padding:12px 20px 0;display:flex;flex-direction:column;gap:9px">
+<div onClick="{{ goDetail }}" style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center;cursor:pointer"><div style="width:60px"><div style="font-size:17px;font-weight:600">€14.37</div><div style="font-size:11px;color:var(--accent);letter-spacing:.06em;font-weight:600">€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Birkerstraße 55, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Friedrich-Ebert-Straße 89, Wuppertal</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#d97706;background:rgba(217,119,6,.1);padding:3px 7px;border-radius:6px">Offen</span><span style="font-size:11px;color:var(--subtle)">11.4 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€22.90</div><div style="font-size:11px;color:var(--accent);letter-spacing:.06em;font-weight:600">€€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Kölner Straße 132, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Hauptstraße 4, Solingen</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.1);padding:3px 7px;border-radius:6px">Fertig</span><span style="font-size:11px;color:var(--subtle)">6.2 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€8.20</div><div style="font-size:11px;color:var(--subtle);letter-spacing:.06em;font-weight:600">€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Focher Straße 76, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Bahnhofstraße 21, Solingen</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.1);padding:3px 7px;border-radius:6px">Fertig</span><span style="font-size:11px;color:var(--subtle)">9.6 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€5.85</div><div style="font-size:11px;color:var(--muted);letter-spacing:.06em;font-weight:600">€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Werwolf 12, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Konrad-Adenauer-Straße 12, Solingen</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#8b909b;background:rgba(139,144,155,.13);padding:3px 7px;border-radius:6px">Abgelehnt</span><span style="font-size:11px;color:var(--subtle)">4.1 km</span></div></div>
+</div>
+<div style="display:flex;border-top:1px solid var(--line);background:var(--surface);padding:9px 26px 22px">
+<div onClick="{{ goHome }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span style="font-size:10px;font-weight:500">Start</span></div>
+<div onClick="{{ goOffers }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span style="font-size:10px;font-weight:600">Angebote</span></div>
+<div onClick="{{ goProfile }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"></path></svg><span style="font-size:10px;font-weight:500">Profil</span></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;display:flex;flex-direction:column;background:var(--canvas)">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="padding:12px 20px 0;display:flex;flex-direction:column;gap:14px">
+<div style="font-size:22px;font-weight:600;letter-spacing:-.01em">Profil</div>
+<div style="display:flex;gap:2px;background:var(--surface2);border-radius:11px;padding:3px"><span onClick="{{ showStats }}" style="flex:1;text-align:center;font-size:13px;font-weight:600;padding:8px 0;border-radius:8px;background:var(--surface);border:1px solid var(--line);cursor:pointer">Statistik</span><span onClick="{{ showSettings }}" style="flex:1;text-align:center;font-size:13px;font-weight:500;padding:8px 0;color:var(--muted);cursor:pointer">Einstellungen</span></div>
+</div>
+<div style="flex:1;padding:16px 20px 0;display:flex;flex-direction:column;gap:14px">
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:18px;display:flex;flex-direction:column;gap:3px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Verdienst heute</div><div style="font-size:44px;font-weight:600;letter-spacing:-.03em;line-height:1.05">€137.41</div><div style="font-size:12.5px;color:var(--accent);font-weight:500">+€18.20 ggü. gestern</div></div>
+<div style="display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden">
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:13px 14px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Angebote</div><div style="font-size:22px;font-weight:600;margin-top:2px">19</div></div><div style="flex:1;background:var(--surface);padding:13px 14px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Angenommen</div><div style="font-size:22px;font-weight:600;margin-top:2px">16</div></div></div>
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:13px 14px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Abgeschlossen</div><div style="font-size:22px;font-weight:600;margin-top:2px">14</div></div><div style="flex:1;background:var(--surface);padding:13px 14px"><div style="font-size:10.5px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">Strecke</div><div style="font-size:22px;font-weight:600;margin-top:2px">96.4 <span style="font-size:12px;font-weight:500;color:var(--muted)">km</span></div></div></div>
+</div>
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:16px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-size:12.5px;font-weight:600">Annahmequote</span><span style="font-size:22px;font-weight:600">84%</span></div>
+<div style="height:8px;border-radius:999px;background:var(--surface2);overflow:hidden"><div style="width:84%;height:100%;background:var(--accent);border-radius:999px"></div></div>
+</div>
+</div>
+<div style="display:flex;border-top:1px solid var(--line);background:var(--surface);padding:9px 26px 22px">
+<div onClick="{{ goHome }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span style="font-size:10px;font-weight:500">Start</span></div>
+<div onClick="{{ goOffers }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span style="font-size:10px;font-weight:500">Angebote</span></div>
+<div onClick="{{ goProfile }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink);cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"></path></svg><span style="font-size:10px;font-weight:600">Profil</span></div>
+</div>
+</div>
+</sc-if>
+
+</div>
+</div>
+<div class="dv-cap">Live countdown · tap through</div>
+</div>
+
+<div class="dv-opt" id="1d">
+<div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Component variations — pick per element</div>
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;background:var(--canvas);border:1px solid var(--line);border-radius:18px;padding:26px 28px;display:flex;flex-direction:column;gap:30px;color:var(--ink);font-variant-numeric:tabular-nums;width:1180px;box-sizing:border-box">
+
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="font:500 10.5px 'IBM Plex Mono',monospace;color:var(--subtle);letter-spacing:.06em;text-transform:uppercase">Active offer card</div>
+<div style="display:flex;gap:20px;align-items:flex-start">
+<div style="width:350px;display:flex;flex-direction:column;gap:7px">
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:16px 16px 14px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:50%;background:#7c3aed"></span><span style="font-size:11.5px;font-weight:600;color:#7c3aed">Auf Fahrt</span></div><span style="font-size:11px;color:var(--subtle);font-family:'IBM Plex Mono',monospace">vor 3 Min</span></div>
+<div style="display:flex;align-items:flex-end;justify-content:space-between"><div style="font-size:46px;font-weight:600;letter-spacing:-.025em;line-height:.95">€14.37</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><span style="font-size:15px;font-weight:600;color:var(--accent);letter-spacing:.06em">€€</span><span style="font-size:12px;color:var(--muted)">€1.26/km</span></div></div>
+<div style="display:flex;gap:11px"><div style="display:flex;flex-direction:column;align-items:center;padding-top:5px"><span style="width:8px;height:8px;border-radius:50%;border:1.6px solid var(--ink)"></span><span style="flex:1;width:0;border-left:1.5px dotted var(--subtle);margin:3px 0"></span><span style="width:8px;height:8px;border-radius:2px;background:var(--accent)"></span></div><div style="flex:1;display:flex;flex-direction:column;gap:11px;min-width:0"><div style="font-size:14px">Birkerstraße 55, 42651 Solingen</div><div style="font-size:14px">Friedrich-Ebert-Straße 89, 42103 Wuppertal</div></div></div>
+<div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:12px"><span style="font-size:13px;color:var(--muted)">11.4 km · ca. 19 Min</span><span style="font-size:12.5px;font-weight:600">Details ›</span></div>
+</div>
+<div class="dv-cap">i · baseline</div>
+</div>
+<div style="width:350px;display:flex;flex-direction:column;gap:7px">
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden">
+<div style="display:flex;align-items:stretch">
+<div style="padding:16px 16px 14px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--line)"><span style="font-size:34px;font-weight:600;letter-spacing:-.025em;line-height:1">€14.37</span><span style="font-size:12px;color:var(--muted)">11.4 km</span></div>
+<div style="flex:1;padding:16px 16px 14px;display:flex;flex-direction:column;justify-content:center;gap:3px"><span style="font-size:24px;font-weight:600;letter-spacing:-.02em;color:var(--accent);line-height:1">€1.26<span style="font-size:13px;color:var(--muted);font-weight:500">/km</span></span><span style="font-size:11px;color:var(--subtle);letter-spacing:.04em;text-transform:uppercase">über Schnitt · €€</span></div>
+</div>
+<div style="border-top:1px solid var(--line);padding:13px 16px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:9px"><span style="width:7px;height:7px;border-radius:50%;border:1.6px solid var(--ink);flex:none"></span><span style="font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Birkerstraße 55, 42651 Solingen</span></div>
+<div style="display:flex;align-items:center;gap:9px"><span style="width:7px;height:7px;border-radius:2px;background:var(--accent);flex:none"></span><span style="font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Friedrich-Ebert-Straße 89, Wuppertal</span></div>
+</div>
+</div>
+<div class="dv-cap">ii · fare / quality split</div>
+</div>
+<div style="width:350px;display:flex;flex-direction:column;gap:7px">
+<div style="border-radius:16px;background:var(--ink);color:#fff;padding:18px 18px 16px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6)">Aktive Fahrt</span><span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:rgba(255,255,255,.6)">vor 3 Min</span></div>
+<div style="display:flex;align-items:baseline;gap:12px"><span style="font-size:52px;font-weight:600;letter-spacing:-.03em;line-height:.9">€14.37</span><span style="font-size:20px;font-weight:600;color:#34d399;letter-spacing:.06em">€€</span></div>
+<div style="display:flex;gap:4px;align-items:center"><span style="flex:1;height:4px;border-radius:999px;background:#34d399"></span><span style="flex:1;height:4px;border-radius:999px;background:#34d399"></span><span style="flex:1;height:4px;border-radius:999px;background:rgba(255,255,255,.18)"></span><span style="font-size:12px;color:rgba(255,255,255,.75);margin-left:6px">€1.26/km</span></div>
+<div style="display:flex;flex-direction:column;gap:7px;border-top:1px solid rgba(255,255,255,.14);padding-top:13px"><span style="font-size:13.5px;color:rgba(255,255,255,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Birkerstraße 55, 42651 Solingen</span><span style="font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Friedrich-Ebert-Straße 89, Wuppertal</span></div>
+</div>
+<div class="dv-cap">iii · inverted, quality meter</div>
+</div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="font:500 10.5px 'IBM Plex Mono',monospace;color:var(--subtle);letter-spacing:.06em;text-transform:uppercase">Countdown treatment</div>
+<div style="display:flex;gap:20px;align-items:flex-start">
+<div style="width:350px;display:flex;flex-direction:column;gap:7px">
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:24px;display:flex;justify-content:center">
+<div style="position:relative;width:170px;height:170px;display:flex;align-items:center;justify-content:center">
+<svg width="170" height="170" viewBox="0 0 190 190" style="position:absolute;inset:0;transform:rotate(-90deg)"><circle cx="95" cy="95" r="86" fill="none" stroke="#e4e4e1" stroke-width="5"></circle><circle cx="95" cy="95" r="86" fill="none" stroke="#059669" stroke-width="5" stroke-linecap="round" stroke-dasharray="540.4" stroke-dashoffset="110"></circle></svg>
+<div style="display:flex;flex-direction:column;align-items:center"><span style="font-size:36px;font-weight:600;letter-spacing:-.03em;line-height:1">€14.37</span><span style="font-size:12px;color:var(--muted)">€1.26/km</span></div>
+</div>
+</div>
+<div class="dv-cap">i · ring around the fare</div>
+</div>
+<div style="width:350px;display:flex;flex-direction:column;gap:7px">
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden">
+<div style="height:6px;background:var(--surface2)"><div style="width:62%;height:100%;background:#d97706"></div></div>
+<div style="padding:26px 24px 24px;display:flex;flex-direction:column;align-items:center;gap:6px"><span style="font-size:56px;font-weight:600;letter-spacing:-.035em;line-height:.95">€14.37</span><span style="font-size:13px;color:var(--muted)">€1.26/km · 11.4 km</span><span style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#d97706;font-weight:500;margin-top:4px">noch 2.4s</span></div>
+</div>
+<div class="dv-cap">ii · edge bar, fare uncontested</div>
+</div>
+<div style="width:350px;display:flex;flex-direction:column;gap:7px">
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px">
+<span style="font-size:56px;font-weight:600;letter-spacing:-.035em;line-height:.95">€14.37</span>
+<div style="display:flex;gap:6px;width:100%"><span style="flex:1;height:10px;border-radius:3px;background:#dc2626"></span><span style="flex:1;height:10px;border-radius:3px;background:#dc2626"></span><span style="flex:1;height:10px;border-radius:3px;background:var(--surface2)"></span><span style="flex:1;height:10px;border-radius:3px;background:var(--surface2)"></span><span style="flex:1;height:10px;border-radius:3px;background:var(--surface2)"></span></div>
+<span style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#dc2626;font-weight:500">2 von 5 Sekunden übrig</span>
+</div>
+<div class="dv-cap">iii · segmented seconds</div>
+</div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="font:500 10.5px 'IBM Plex Mono',monospace;color:var(--subtle);letter-spacing:.06em;text-transform:uppercase">Today's KPI row</div>
+<div style="display:flex;gap:20px;align-items:flex-start">
+<div style="width:350px;display:flex;flex-direction:column;gap:7px">
+<div style="display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden">
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);text-transform:uppercase;letter-spacing:.04em">Angebote</div><div style="font-size:23px;font-weight:600">19</div></div><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);text-transform:uppercase;letter-spacing:.04em">Annahme</div><div style="font-size:23px;font-weight:600">84%</div></div></div>
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);text-transform:uppercase;letter-spacing:.04em">Verdienst</div><div style="font-size:23px;font-weight:600">€137.41</div></div><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:10.5px;color:var(--subtle);text-transform:uppercase;letter-spacing:.04em">Strecke</div><div style="font-size:23px;font-weight:600">96.4</div></div></div>
+</div>
+<div class="dv-cap">i · 2×2 grid</div>
+</div>
+<div style="width:350px;display:flex;flex-direction:column;gap:7px">
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);display:flex;padding:14px 0">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid var(--line)"><span style="font-size:19px;font-weight:600">19</span><span style="font-size:10px;color:var(--subtle);text-transform:uppercase;letter-spacing:.04em">Angeb.</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid var(--line)"><span style="font-size:19px;font-weight:600">84%</span><span style="font-size:10px;color:var(--subtle);text-transform:uppercase;letter-spacing:.04em">Annahme</span></div>
+<div style="flex:1.3;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid var(--line)"><span style="font-size:19px;font-weight:600">€137.41</span><span style="font-size:10px;color:var(--subtle);text-transform:uppercase;letter-spacing:.04em">Verdienst</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:19px;font-weight:600">96.4</span><span style="font-size:10px;color:var(--subtle);text-transform:uppercase;letter-spacing:.04em">km</span></div>
+</div>
+<div class="dv-cap">ii · single strip</div>
+</div>
+<div style="width:350px;display:flex;flex-direction:column;gap:7px">
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:16px 16px 14px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:flex-end;justify-content:space-between"><div><div style="font-size:10.5px;color:var(--subtle);text-transform:uppercase;letter-spacing:.04em">Verdienst heute</div><div style="font-size:38px;font-weight:600;letter-spacing:-.03em;line-height:1.05">€137.41</div></div><span style="font-size:12.5px;font-weight:500;color:var(--accent);padding-bottom:6px">+15%</span></div>
+<div style="display:flex;gap:18px;border-top:1px solid var(--line);padding-top:12px"><span style="font-size:12.5px;color:var(--muted)">19 Angebote</span><span style="font-size:12.5px;color:var(--muted)">84% Annahme</span><span style="font-size:12.5px;color:var(--muted)">96.4 km</span></div>
+</div>
+<div class="dv-cap">iii · earnings hero</div>
+</div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="font:500 10.5px 'IBM Plex Mono',monospace;color:var(--subtle);letter-spacing:.06em;text-transform:uppercase">Offers list density</div>
+<div style="display:flex;gap:20px;align-items:flex-start">
+<div style="width:350px;display:flex;flex-direction:column;gap:7px">
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€14.37</div><div style="font-size:11px;color:var(--accent);font-weight:600;letter-spacing:.06em">€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Birkerstraße 55, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Friedrich-Ebert-Straße 89</div></div><span style="font-size:10.5px;font-weight:600;color:#7c3aed;background:rgba(124,58,237,.1);padding:3px 7px;border-radius:6px">Fahrt</span></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px"><div style="font-size:17px;font-weight:600">€22.90</div><div style="font-size:11px;color:var(--accent);font-weight:600;letter-spacing:.06em">€€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↑ Kölner Straße 132, Solingen</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↓ Hauptstraße 4, Solingen</div></div><span style="font-size:10.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.1);padding:3px 7px;border-radius:6px">Fertig</span></div>
+</div>
+<div class="dv-cap">i · card rows (comfortable)</div>
+</div>
+<div style="width:350px;display:flex;flex-direction:column;gap:7px">
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden">
+<div style="display:flex;gap:11px;align-items:center;padding:10px 13px;border-bottom:1px solid var(--line)"><span style="width:3px;height:30px;border-radius:2px;background:#7c3aed"></span><div style="flex:1;min-width:0"><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Birkerstraße 55 → Friedrich-Ebert-Str. 89</div><div style="font-size:11px;color:var(--subtle);font-family:'IBM Plex Mono',monospace">11.4 km · €1.26/km</div></div><span style="font-size:16px;font-weight:600">€14.37</span></div>
+<div style="display:flex;gap:11px;align-items:center;padding:10px 13px;border-bottom:1px solid var(--line)"><span style="width:3px;height:30px;border-radius:2px;background:#059669"></span><div style="flex:1;min-width:0"><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Kölner Str. 132 → Hauptstraße 4</div><div style="font-size:11px;color:var(--subtle);font-family:'IBM Plex Mono',monospace">6.2 km · €3.69/km</div></div><span style="font-size:16px;font-weight:600">€22.90</span></div>
+<div style="display:flex;gap:11px;align-items:center;padding:10px 13px"><span style="width:3px;height:30px;border-radius:2px;background:#8b909b"></span><div style="flex:1;min-width:0"><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Werwolf 12 → Konrad-Adenauer-Str. 12</div><div style="font-size:11px;color:var(--subtle);font-family:'IBM Plex Mono',monospace">4.1 km · €1.43/km</div></div><span style="font-size:16px;font-weight:600">€5.85</span></div>
+</div>
+<div class="dv-cap">ii · status spine, one-line route</div>
+</div>
+<div style="width:350px;display:flex;flex-direction:column;gap:7px">
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden">
+<div style="display:flex;align-items:center;gap:10px;padding:8px 13px;border-bottom:1px solid var(--line);font-size:10px;color:var(--subtle);font-family:'IBM Plex Mono',monospace;letter-spacing:.04em"><span style="width:56px">FAHRT</span><span style="flex:1">ROUTE</span><span style="width:52px;text-align:right">€/KM</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:8px 13px;border-bottom:1px solid var(--line)"><span style="width:56px;font-size:14px;font-weight:600">€14.37</span><span style="flex:1;min-width:0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Birkerstr. → F.-Ebert-Str.</span><span style="width:52px;text-align:right;font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">1.26</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:8px 13px;border-bottom:1px solid var(--line)"><span style="width:56px;font-size:14px;font-weight:600">€22.90</span><span style="flex:1;min-width:0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Kölner Str. → Hauptstr.</span><span style="width:52px;text-align:right;font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">3.69</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:8px 13px;border-bottom:1px solid var(--line)"><span style="width:56px;font-size:14px;font-weight:600">€8.20</span><span style="flex:1;min-width:0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Focher Str. → Bahnhofstr.</span><span style="width:52px;text-align:right;font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--subtle)">0.85</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:8px 13px"><span style="width:56px;font-size:14px;font-weight:600">€5.85</span><span style="flex:1;min-width:0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Werwolf 12 → K.-Adenauer-Str.</span><span style="width:52px;text-align:right;font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--accent)">1.43</span></div>
+</div>
+<div class="dv-cap">iii · ledger (densest)</div>
+</div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="font:500 10.5px 'IBM Plex Mono',monospace;color:var(--subtle);letter-spacing:.06em;text-transform:uppercase">Push notification</div>
+<div style="display:flex;gap:20px;align-items:flex-start">
+<div style="width:350px;display:flex;flex-direction:column;gap:7px">
+<div style="border-radius:18px;background:#2b2f37;color:#e6e8ec;padding:14px 15px;display:flex;flex-direction:column;gap:9px">
+<div style="display:flex;align-items:center;gap:8px"><img src="reidey-mark.jpg" alt="" style="width:16px;height:16px;object-fit:contain;filter:invert(1);mix-blend-mode:screen"><span style="font-size:11.5px;font-weight:600;letter-spacing:.02em;color:rgba(230,232,236,.85)">REIDEY DRIVER</span><span style="flex:1"></span><span style="font-size:11.5px;color:rgba(230,232,236,.55)">jetzt</span></div>
+<div style="display:flex;align-items:baseline;gap:9px"><span style="font-size:26px;font-weight:600;letter-spacing:-.02em">€14.37</span><span style="font-size:15px;font-weight:600;color:#34d399;letter-spacing:.06em">€€</span><span style="font-size:13.5px;color:rgba(230,232,236,.7)">· Peter</span></div>
+<div style="display:flex;flex-direction:column;gap:5px"><span style="font-size:13px;color:rgba(230,232,236,.85)">Birkerstraße 55, 42651 Solingen</span><span style="font-size:13px;color:rgba(230,232,236,.85)">→ Friedrich-Ebert-Straße 89, Wuppertal</span></div>
+<div style="border-top:1px solid rgba(255,255,255,.12);padding-top:8px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;color:rgba(230,232,236,.7)">12.3 km · €1.26/km</div>
+</div>
+<div class="dv-cap">i · full decision in the banner</div>
+</div>
+<div style="width:350px;display:flex;flex-direction:column;gap:7px">
+<div style="border-radius:18px;background:#2b2f37;color:#e6e8ec;padding:13px 15px;display:flex;align-items:center;gap:12px">
+<div style="display:flex;flex-direction:column;gap:1px"><span style="font-size:22px;font-weight:600;letter-spacing:-.02em">€14.37</span><span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:#34d399">€1.26/km</span></div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:12.5px;color:rgba(230,232,236,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Birkerstraße 55 → F.-Ebert-Str. 89</span><span style="font-size:11.5px;color:rgba(230,232,236,.55)">12.3 km · jetzt</span></div>
+</div>
+<div class="dv-cap">ii · one glance, one line</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="1e">
+<div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Arabic — mirrored layout, Latin numerals</div>
+<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;--frame:#dcdbd6;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div dir="rtl" style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-family:'Noto Sans Arabic','Instrument Sans',sans-serif;font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="flex:1;overflow:hidden;display:flex;flex-direction:column;gap:12px;padding:14px 20px 0">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<div style="display:flex;align-items:center;gap:10px"><img src="reidey-mark.jpg" alt="Reidey" style="width:26px;height:26px;object-fit:contain;mix-blend-mode:multiply"><div style="display:flex;flex-direction:column;line-height:1.25"><span style="font-size:15px;font-weight:600">مرحباً، بيتر</span><span style="font-size:11.5px;color:var(--subtle);direction:ltr;text-align:right">Rheinfahrt GmbH</span></div></div>
+<div style="display:flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:var(--surface);border:1px solid var(--line)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:rd-pulse 2.4s ease-in-out infinite"></span><span style="font-size:11.5px;font-weight:600">متصل</span></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden">
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:11px;color:var(--subtle)">العروض</div><div style="font-size:23px;font-weight:600;margin-top:3px;direction:ltr;text-align:right">19</div></div><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:11px;color:var(--subtle)">نسبة القبول</div><div style="font-size:23px;font-weight:600;margin-top:3px;direction:ltr;text-align:right">84%</div></div></div>
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:11px;color:var(--subtle)">الأرباح</div><div style="font-size:23px;font-weight:600;margin-top:3px;direction:ltr;text-align:right">€137.41</div></div><div style="flex:1;background:var(--surface);padding:12px 13px"><div style="font-size:11px;color:var(--subtle)">المسافة</div><div style="font-size:23px;font-weight:600;margin-top:3px;direction:ltr;text-align:right">96.4 km</div></div></div>
+</div>
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:16px 16px 14px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:50%;background:#7c3aed"></span><span style="font-size:11.5px;font-weight:600;color:#7c3aed">في رحلة</span></div><span style="font-size:11px;color:var(--subtle)">قبل 3 دقائق</span></div>
+<div style="display:flex;align-items:flex-end;justify-content:space-between"><div style="font-size:46px;font-weight:600;letter-spacing:-.025em;line-height:.95;direction:ltr">€14.37</div><div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px"><span style="font-size:15px;font-weight:600;color:var(--accent);letter-spacing:.06em;direction:ltr">€€</span><span style="font-size:12px;color:var(--muted);direction:ltr">€1.26/km</span></div></div>
+<div style="display:flex;gap:11px">
+<div style="display:flex;flex-direction:column;align-items:center;padding-top:5px"><span style="width:8px;height:8px;border-radius:50%;border:1.6px solid var(--ink)"></span><span style="flex:1;width:0;border-left:1.5px dotted var(--subtle);margin:3px 0"></span><span style="width:8px;height:8px;border-radius:2px;background:var(--accent)"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:11px;min-width:0;direction:ltr;text-align:right"><div style="font-size:14px;line-height:1.25">Birkerstraße 55, 42651 Solingen</div><div style="font-size:14px;line-height:1.25">Friedrich-Ebert-Straße 89, 42103 Wuppertal</div></div>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:12px"><span style="font-size:13px;color:var(--muted)"><span style="direction:ltr;display:inline-block">11.4 km</span> · 19 دقيقة</span><span style="font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:5px">التفاصيل <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 5 8 12 15 19"></polyline></svg></span></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;flex:1;min-height:0">
+<div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-size:12.5px;font-weight:600">أحدث العروض</span><span style="font-size:11.5px;color:var(--subtle)">الكل</span></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden">
+<div style="display:flex;align-items:center;gap:12px;padding:11px 13px"><div style="width:52px;direction:ltr;text-align:right"><div style="font-size:15px;font-weight:600">€22.90</div><div style="font-size:10.5px;color:var(--accent);font-weight:600;letter-spacing:.06em">€€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;direction:ltr;text-align:right"><div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Kölner Straße 132, Solingen</div><div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Hauptstraße 4, Solingen</div></div><span style="font-size:10.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.1);padding:3px 7px;border-radius:6px">مكتملة</span></div>
+</div>
+</div>
+</div>
+<div style="display:flex;border-top:1px solid var(--line);background:var(--surface);padding:9px 26px 22px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span style="font-size:10px;font-weight:600">الرئيسية</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span style="font-size:10px;font-weight:500">العروض</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"></path></svg><span style="font-size:10px;font-weight:500">الملف</span></div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Home · RTL</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;--frame:#dcdbd6;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div dir="rtl" style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-family:'Noto Sans Arabic','Instrument Sans',sans-serif;font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px 4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 5 16 12 9 19"></polyline></svg><span style="font-size:12.5px;font-weight:600">العرض</span><span style="width:20px"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;padding:16px 20px 0;align-items:center">
+<div style="position:relative;width:190px;height:190px;display:flex;align-items:center;justify-content:center">
+<svg width="190" height="190" viewBox="0 0 190 190" style="position:absolute;inset:0;transform:rotate(-90deg) scaleY(-1)"><circle cx="95" cy="95" r="86" fill="none" stroke="#e4e4e1" stroke-width="5"></circle><circle cx="95" cy="95" r="86" fill="none" stroke="#d97706" stroke-width="5" stroke-linecap="round" stroke-dasharray="540.4" stroke-dashoffset="248"></circle></svg>
+<div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:42px;font-weight:600;letter-spacing:-.035em;line-height:1;direction:ltr">€14.37</div><div style="font-size:13px;color:var(--muted);direction:ltr">€1.26/km · 11.4 km</div></div>
+<div style="position:absolute;bottom:-6px;background:var(--canvas);padding:0 10px;font-size:13px;font-weight:500;color:#d97706;direction:ltr">2.4s</div>
+</div>
+<div style="display:flex;align-items:center;gap:10px"><span style="font-size:11.5px;font-weight:600;color:#d97706;background:rgba(217,119,6,.1);padding:4px 10px;border-radius:7px">معلّق</span><span style="font-size:16px;font-weight:600;color:var(--accent);letter-spacing:.06em;direction:ltr">€€</span><span style="font-size:12.5px;color:var(--subtle);direction:ltr">14:32:07</span></div>
+<div style="width:100%;border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:16px;display:flex;gap:12px">
+<div style="display:flex;flex-direction:column;align-items:center;padding-top:6px"><span style="width:9px;height:9px;border-radius:50%;border:1.8px solid var(--ink)"></span><span style="flex:1;width:0;border-left:1.5px dotted var(--subtle);margin:4px 0"></span><span style="width:9px;height:9px;border-radius:2px;background:var(--accent)"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;min-width:0">
+<div><div style="font-size:11px;color:var(--subtle);margin-bottom:3px">نقطة الانطلاق</div><div style="font-size:15px;line-height:1.3;direction:ltr;text-align:right">Birkerstraße 55, 42651 Solingen</div></div>
+<div><div style="font-size:11px;color:var(--subtle);margin-bottom:3px">الوجهة</div><div style="font-size:15px;line-height:1.3;direction:ltr;text-align:right">Friedrich-Ebert-Straße 89, 42103 Wuppertal</div></div>
+</div>
+</div>
+<div style="width:100%;display:flex;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden">
+<div style="flex:1;background:var(--surface);padding:12px 14px"><div style="font-size:11px;color:var(--subtle)">المسافة</div><div style="font-size:19px;font-weight:600;margin-top:2px;direction:ltr;text-align:right">11.4 km</div></div>
+<div style="flex:1;background:var(--surface);padding:12px 14px"><div style="font-size:11px;color:var(--subtle)">الجودة</div><div style="font-size:19px;font-weight:600;margin-top:2px;direction:ltr;text-align:right">€1.26/km</div></div>
+</div>
+<div style="flex:1"></div>
+<div style="width:100%;display:flex;flex-direction:column;gap:10px;padding-bottom:26px">
+<button style="width:100%;border:0;border-radius:14px;background:var(--pri);color:var(--priink);font-family:inherit;font-size:16px;font-weight:600;padding:17px 0">افتح في Uber</button>
+<div style="text-align:center;font-size:11.5px;color:var(--subtle);line-height:1.5">القبول يتم داخل تطبيق Uber Driver.<br>ريدي يراقب فقط.</div>
+</div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Offer detail · RTL</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;--frame:#dcdbd6;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div dir="rtl" style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-family:'Noto Sans Arabic','Instrument Sans',sans-serif;font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="padding:12px 20px 0;display:flex;flex-direction:column;gap:12px">
+<div style="font-size:22px;font-weight:600">العروض</div>
+<div style="display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg><span style="font-size:14px;color:var(--subtle)">ابحث عن راكب أو عنوان</span></div>
+<div style="display:flex;gap:7px;overflow:hidden">
+<span style="font-size:12px;font-weight:600;padding:7px 13px;border-radius:999px;background:var(--pri);color:var(--priink);white-space:nowrap">الكل</span>
+<span style="font-size:12px;font-weight:500;padding:7px 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:#d97706;white-space:nowrap">معلّق</span>
+<span style="font-size:12px;font-weight:500;padding:7px 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:#2563eb;white-space:nowrap">مقبولة</span>
+<span style="font-size:12px;font-weight:500;padding:7px 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:#059669;white-space:nowrap">مكتملة</span>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--subtle)"><span style="direction:ltr">01.08 — 16.08.2026</span><span>128 عرضاً</span></div>
+</div>
+<div style="flex:1;overflow:hidden;padding:12px 20px 0;display:flex;flex-direction:column;gap:9px">
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px;direction:ltr;text-align:right"><div style="font-size:17px;font-weight:600">€14.37</div><div style="font-size:11px;color:var(--accent);font-weight:600;letter-spacing:.06em">€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;direction:ltr;text-align:right"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Birkerstraße 55, Solingen ↑</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Friedrich-Ebert-Straße 89 ↓</div></div><div style="display:flex;flex-direction:column;align-items:flex-start;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#7c3aed;background:rgba(124,58,237,.1);padding:3px 7px;border-radius:6px">في رحلة</span><span style="font-size:11px;color:var(--subtle);direction:ltr">11.4 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px;direction:ltr;text-align:right"><div style="font-size:17px;font-weight:600">€22.90</div><div style="font-size:11px;color:var(--accent);font-weight:600;letter-spacing:.06em">€€€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;direction:ltr;text-align:right"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Kölner Straße 132, Solingen ↑</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Hauptstraße 4, Solingen ↓</div></div><div style="display:flex;flex-direction:column;align-items:flex-start;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.1);padding:3px 7px;border-radius:6px">مكتملة</span><span style="font-size:11px;color:var(--subtle);direction:ltr">6.2 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center"><div style="width:60px;direction:ltr;text-align:right"><div style="font-size:17px;font-weight:600">€8.20</div><div style="font-size:11px;color:var(--subtle);font-weight:600;letter-spacing:.06em">€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;direction:ltr;text-align:right"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Focher Straße 76, Solingen ↑</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bahnhofstraße 21, Solingen ↓</div></div><div style="display:flex;flex-direction:column;align-items:flex-start;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.1);padding:3px 7px;border-radius:6px">مكتملة</span><span style="font-size:11px;color:var(--subtle);direction:ltr">9.6 km</span></div></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 14px;display:flex;gap:12px;align-items:center;opacity:.55"><div style="width:60px;direction:ltr;text-align:right"><div style="font-size:17px;font-weight:600">€7.10</div><div style="font-size:11px;color:var(--subtle);font-weight:600;letter-spacing:.06em">€</div></div><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;direction:ltr;text-align:right"><div style="font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Hauptstraße 4, Solingen ↑</div><div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Focher Straße 76, Solingen ↓</div></div><div style="display:flex;flex-direction:column;align-items:flex-start;gap:5px"><span style="font-size:10.5px;font-weight:600;color:#dc2626;background:rgba(220,38,38,.1);padding:3px 7px;border-radius:6px">ملغاة</span><span style="font-size:11px;color:var(--subtle);direction:ltr">7.9 km</span></div></div>
+</div>
+<div style="display:flex;border-top:1px solid var(--line);background:var(--surface);padding:9px 26px 22px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span style="font-size:10px;font-weight:500">الرئيسية</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span style="font-size:10px;font-weight:600">العروض</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"></path></svg><span style="font-size:10px;font-weight:500">الملف</span></div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Offers list · RTL</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;--frame:#dcdbd6;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div dir="rtl" style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-family:'Noto Sans Arabic','Instrument Sans',sans-serif;font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="padding:12px 20px 0;display:flex;flex-direction:column;gap:14px">
+<div style="font-size:22px;font-weight:600">الملف الشخصي</div>
+<div style="display:flex;gap:2px;background:var(--surface2);border-radius:11px;padding:3px"><span style="flex:1;text-align:center;font-size:13px;font-weight:500;padding:8px 0;color:var(--muted)">الإحصاءات</span><span style="flex:1;text-align:center;font-size:13px;font-weight:600;padding:8px 0;border-radius:8px;background:var(--surface);border:1px solid var(--line)">الإعدادات</span></div>
+</div>
+<div style="flex:1;padding:16px 20px 0;display:flex;flex-direction:column;gap:18px;min-height:0;overflow:hidden">
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:18px;display:flex;align-items:center;gap:14px">
+<div style="width:50px;height:50px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:600;color:var(--muted)">PK</div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:17px;font-weight:600">بيتر كروغر</span><span style="font-size:12.5px;color:var(--muted);direction:ltr;text-align:right">Rheinfahrt GmbH</span><span style="font-size:12px;color:var(--subtle);direction:ltr;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">p.krueger@rheinfahrt.de</span></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="font-size:11px;color:var(--subtle);padding:0 2px">الحساب</div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden">
+<div style="display:flex;align-items:center;gap:12px;padding:13px 15px;border-bottom:1px solid var(--line)"><span style="flex:1;font-size:14.5px">تغيير الاسم</span><span style="font-size:13px;color:var(--subtle)">بيتر كروغر</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 5 8 12 15 19"></polyline></svg></div>
+<div style="display:flex;align-items:center;gap:12px;padding:13px 15px;border-bottom:1px solid var(--line)"><span style="flex:1;font-size:14.5px">اللغة</span><span style="font-size:13px;color:var(--subtle)">العربية</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 5 8 12 15 19"></polyline></svg></div>
+<div style="display:flex;align-items:center;gap:12px;padding:13px 15px"><span style="flex:1;font-size:14.5px">تغيير كلمة المرور</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 5 8 12 15 19"></polyline></svg></div>
+</div>
+</div>
+<div style="flex:1"></div>
+<div style="padding-bottom:22px;display:flex;flex-direction:column;gap:12px;flex:none">
+<button style="width:100%;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:#dc2626;font-family:inherit;font-size:15px;font-weight:600;padding:15px 0">تسجيل الخروج</button>
+<div style="text-align:center;font-size:10.5px;color:var(--subtle);direction:ltr">Reidey Driver 2.4.0 · Build 318</div>
+</div>
+</div>
+<div style="display:flex;border-top:1px solid var(--line);background:var(--surface);padding:9px 26px 22px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span style="font-size:10px;font-weight:500">الرئيسية</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span style="font-size:10px;font-weight:500">العروض</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"></path></svg><span style="font-size:10px;font-weight:600">الملف</span></div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Profile · Settings · RTL</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#0f1115;--surface:#181b21;--surface2:#20242b;--ink:#e6e8ec;--muted:#a2a8b3;--subtle:#6b7280;--line:#2c313a;--accent:#10b981;--pri:#e6e8ec;--priink:#12151a;--frame:#2a2d34;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div dir="rtl" style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-family:'Noto Sans Arabic','Instrument Sans',sans-serif;font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>22:08</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 26px;gap:30px">
+<div style="display:flex;flex-direction:column;align-items:center;gap:14px"><img src="reidey-mark.jpg" alt="Reidey" style="width:56px;height:56px;object-fit:contain;filter:invert(1);mix-blend-mode:screen"><div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div style="font-size:24px;font-weight:600;direction:ltr">Reidey Driver</div><div style="font-size:13.5px;color:var(--muted);text-align:center;line-height:1.5">سجّل الدخول ببيانات أسطولك</div></div></div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px 15px;display:flex;flex-direction:column;gap:3px"><span style="font-size:11px;color:var(--subtle)">البريد الإلكتروني</span><span style="font-size:15.5px;direction:ltr;text-align:right">p.krueger@rheinfahrt.de</span></div>
+<div style="border:1.5px solid var(--ink);border-radius:14px;background:var(--surface);padding:13px 15px;display:flex;flex-direction:column;gap:3px"><span style="font-size:11px;color:var(--subtle)">كلمة المرور</span><div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:15.5px;letter-spacing:.18em">••••••••</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.6"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z"></path><circle cx="12" cy="12" r="2.6"></circle></svg></div></div>
+<button style="width:100%;border:0;border-radius:14px;background:var(--pri);color:var(--priink);font-family:inherit;font-size:16px;font-weight:600;padding:17px 0;margin-top:4px">تسجيل الدخول</button>
+<div style="text-align:center;font-size:13px;color:var(--muted);margin-top:4px">نسيت كلمة المرور؟</div>
+</div>
+</div>
+<div style="padding:0 26px 30px;text-align:center;font-size:11.5px;color:var(--subtle);line-height:1.6">تحصل على الدخول عبر دعوة من أسطولك.</div>
+</div>
+</div>
+<div class="dv-cap">Sign in · RTL, dark</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="1f">
+<div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>System states</div>
+<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;--frame:#dcdbd6;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink)">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="flex:1;padding:14px 20px 0;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px;animation:rd-shimmer 1.6s ease-in-out infinite"><span style="width:26px;height:26px;border-radius:8px;background:var(--surface2)"></span><span style="display:flex;flex-direction:column;gap:5px"><span style="width:120px;height:11px;border-radius:4px;background:var(--surface2);display:block"></span><span style="width:78px;height:9px;border-radius:4px;background:var(--surface2);display:block"></span></span></div><span style="width:74px;height:28px;border-radius:999px;background:var(--surface2);animation:rd-shimmer 1.6s ease-in-out infinite"></span></div>
+<div style="display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;animation:rd-shimmer 1.6s ease-in-out .1s infinite">
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:14px 13px;display:flex;flex-direction:column;gap:8px"><span style="width:52px;height:8px;border-radius:4px;background:var(--surface2)"></span><span style="width:38px;height:18px;border-radius:5px;background:var(--surface2)"></span></div><div style="flex:1;background:var(--surface);padding:14px 13px;display:flex;flex-direction:column;gap:8px"><span style="width:52px;height:8px;border-radius:4px;background:var(--surface2)"></span><span style="width:52px;height:18px;border-radius:5px;background:var(--surface2)"></span></div></div>
+<div style="display:flex;gap:1px"><div style="flex:1;background:var(--surface);padding:14px 13px;display:flex;flex-direction:column;gap:8px"><span style="width:52px;height:8px;border-radius:4px;background:var(--surface2)"></span><span style="width:76px;height:18px;border-radius:5px;background:var(--surface2)"></span></div><div style="flex:1;background:var(--surface);padding:14px 13px;display:flex;flex-direction:column;gap:8px"><span style="width:52px;height:8px;border-radius:4px;background:var(--surface2)"></span><span style="width:60px;height:18px;border-radius:5px;background:var(--surface2)"></span></div></div>
+</div>
+<div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:16px;display:flex;flex-direction:column;gap:16px;animation:rd-shimmer 1.6s ease-in-out .2s infinite"><span style="width:88px;height:10px;border-radius:4px;background:var(--surface2)"></span><span style="width:172px;height:34px;border-radius:8px;background:var(--surface2)"></span><span style="width:100%;height:12px;border-radius:4px;background:var(--surface2)"></span><span style="width:78%;height:12px;border-radius:4px;background:var(--surface2)"></span></div>
+<div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:16px;display:flex;flex-direction:column;gap:14px;animation:rd-shimmer 1.6s ease-in-out .3s infinite"><span style="width:100%;height:12px;border-radius:4px;background:var(--surface2)"></span><span style="width:86%;height:12px;border-radius:4px;background:var(--surface2)"></span><span style="width:64%;height:12px;border-radius:4px;background:var(--surface2)"></span></div>
+</div>
+<div style="display:flex;border-top:1px solid var(--line);background:var(--surface);padding:9px 26px 22px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span style="font-size:10px;font-weight:600">Start</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span style="font-size:10px;font-weight:500">Angebote</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"></path></svg><span style="font-size:10px;font-weight:500">Profil</span></div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Loading skeleton</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;--frame:#dcdbd6;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);font-variant-numeric:tabular-nums">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="display:flex;align-items:center;gap:9px;background:#fdf3e6;border-bottom:1px solid #f2e0c4;padding:9px 20px;color:#92400e"><span style="width:7px;height:7px;border-radius:50%;background:#d97706"></span><span style="font-size:12.5px;font-weight:500;flex:1">Keine Verbindung — letzte Aktualisierung 14:26</span><span style="font-size:12px;font-weight:600;text-decoration:underline">Neu laden</span></div>
+<div style="padding:12px 20px 0;display:flex;flex-direction:column;gap:12px">
+<div style="font-size:22px;font-weight:600;letter-spacing:-.01em">Angebote</div>
+<div style="display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8b909b" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4 4"></path></svg><span style="font-size:14px;color:var(--ink)">Wuppertal</span></div>
+<div style="display:flex;gap:7px"><span style="font-size:12px;font-weight:500;padding:7px 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line)">Alle</span><span style="font-size:12px;font-weight:600;padding:7px 13px;border-radius:999px;background:var(--pri);color:var(--priink)">Abgelehnt</span></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:0 40px 60px;text-align:center">
+<span style="width:56px;height:56px;border-radius:50%;border:1.5px dashed var(--line);display:flex;align-items:center;justify-content:center"><span style="width:10px;height:10px;border-radius:2px;background:var(--line)"></span></span>
+<div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:16px;font-weight:600">Keine Angebote gefunden</span><span style="font-size:13.5px;color:var(--muted);line-height:1.5">Für „Wuppertal" mit Status <span style="color:var(--ink);font-weight:500">Abgelehnt</span> gibt es in diesem Zeitraum nichts.</span></div>
+<span style="font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--surface);border-radius:11px;padding:10px 16px">Filter zurücksetzen</span>
+</div>
+<div style="display:flex;border-top:1px solid var(--line);background:var(--surface);padding:9px 26px 22px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20h-5v-6H9v6H4z"></path></svg><span style="font-size:10px;font-weight:500">Start</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg><span style="font-size:10px;font-weight:600">Angebote</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--subtle)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8.5" r="3.6"></circle><path d="M5 20c1.2-3.6 3.8-5.4 7-5.4s5.8 1.8 7 5.4"></path></svg><span style="font-size:10px;font-weight:500">Profil</span></div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Empty result + offline banner</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#f6f6f4;--surface:#ffffff;--surface2:#f1f1ef;--ink:#1e222b;--muted:#5a616e;--subtle:#8b909b;--line:#e4e4e1;--accent:#059669;--pri:#1e222b;--priink:#ffffff;--frame:#dcdbd6;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);position:relative">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>14:32</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 26px;gap:26px;filter:blur(1.5px);opacity:.5">
+<div style="display:flex;flex-direction:column;align-items:center;gap:14px"><img src="reidey-mark.jpg" alt="Reidey" style="width:56px;height:56px;object-fit:contain;mix-blend-mode:multiply"><div style="font-size:24px;font-weight:600">Reidey Driver</div></div>
+<div style="display:flex;flex-direction:column;gap:10px"><div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);height:56px"></div><div style="border:1px solid var(--line);border-radius:14px;background:var(--surface);height:56px"></div><div style="border-radius:14px;background:var(--pri);height:54px"></div></div>
+</div>
+<div style="position:absolute;left:20px;right:20px;bottom:26px;border:1px solid var(--line);border-radius:18px;background:var(--surface);padding:22px 20px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:center;gap:10px"><span style="width:10px;height:10px;border-radius:2px;background:#dc2626"></span><span style="font-size:15.5px;font-weight:600">Abo deiner Flotte beendet</span></div>
+<div style="font-size:13.5px;color:var(--muted);line-height:1.55">Rheinfahrt GmbH hat kein aktives Reidey-Abo mehr. Du wurdest abgemeldet und erhältst keine Angebote, bis die Flotte verlängert.</div>
+<div style="display:flex;flex-direction:column;gap:8px"><button style="width:100%;border:0;border-radius:13px;background:var(--pri);color:var(--priink);font-family:inherit;font-size:15px;font-weight:600;padding:15px 0">Support kontaktieren</button><button style="width:100%;border:1px solid var(--line);border-radius:13px;background:var(--surface);color:var(--ink);font-family:inherit;font-size:15px;font-weight:500;padding:15px 0">Erneut versuchen</button></div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Subscription lapsed → signed out</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="--canvas:#0f1115;--surface:#181b21;--surface2:#20242b;--ink:#e6e8ec;--muted:#a2a8b3;--subtle:#6b7280;--line:#2c313a;--accent:#10b981;--pri:#e6e8ec;--priink:#12151a;--frame:#2a2d34;width:390px;height:844px;border-radius:46px;padding:9px;background:var(--frame);box-sizing:border-box">
+<div style="height:100%;border-radius:38px;overflow:hidden;background:var(--canvas);display:flex;flex-direction:column;color:var(--ink);position:relative">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 26px 6px;font-size:13px;font-weight:600"><span>22:08</span><span style="width:16px;height:9px;border:1px solid var(--muted);border-radius:2px;display:block"></span></div>
+<div style="flex:1;padding:20px;display:flex;flex-direction:column;gap:14px;opacity:.35">
+<div style="height:46px;border-radius:12px;background:var(--surface)"></div><div style="height:120px;border-radius:14px;background:var(--surface)"></div><div style="height:200px;border-radius:16px;background:var(--surface)"></div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);border-radius:22px 22px 0 0;padding:26px 22px 30px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;justify-content:center"><span style="width:38px;height:4px;border-radius:999px;background:var(--line)"></span></div>
+<div style="display:flex;flex-direction:column;gap:9px"><span style="font-size:19px;font-weight:600;line-height:1.3">Ohne Push verpasst du Angebote</span><span style="font-size:14px;color:var(--muted);line-height:1.55">Uber gibt dir rund 5 Sekunden. Reidey kann dich nur benachrichtigen, wenn Mitteilungen erlaubt sind — auch bei geschlossener App.</span></div>
+<div style="border:1px solid var(--line);border-radius:13px;background:var(--canvas);padding:13px 14px;display:flex;align-items:center;gap:11px"><span style="width:8px;height:8px;border-radius:50%;background:var(--accent)"></span><span style="font-size:13px;color:var(--muted);flex:1">Hohe Priorität · Ton auch im Stumm-Modus</span></div>
+<div style="display:flex;flex-direction:column;gap:9px"><button style="width:100%;border:0;border-radius:13px;background:var(--pri);color:var(--priink);font-family:inherit;font-size:15.5px;font-weight:600;padding:16px 0">Mitteilungen erlauben</button><button style="width:100%;border:0;background:none;color:var(--muted);font-family:inherit;font-size:14px;font-weight:500;padding:6px 0">Später</button></div>
+</div>
+</div>
+</div>
+<div class="dv-cap">Notification permission</div>
+</div>
+
+<div style="width:350px;display:flex;flex-direction:column;gap:16px;padding-top:6px">
+<div style="font:500 10.5px 'IBM Plex Mono',monospace;color:rgba(30,34,43,.45);letter-spacing:.06em;text-transform:uppercase">Toasts</div>
+<div style="display:flex;align-items:center;gap:11px;background:#ffffff;border:1px solid #e4e4e1;border-radius:14px;padding:13px 15px"><span style="width:8px;height:8px;border-radius:50%;background:#059669"></span><span style="flex:1;font-size:13.5px;color:#1e222b">Name aktualisiert</span></div>
+<div style="display:flex;align-items:center;gap:11px;background:#ffffff;border:1px solid #e4e4e1;border-radius:14px;padding:13px 15px"><span style="width:8px;height:8px;border-radius:50%;background:#1e222b"></span><span style="flex:1;font-size:13.5px;color:#1e222b">Sprache: Deutsch</span></div>
+<div style="display:flex;align-items:center;gap:11px;background:#ffffff;border:1px solid #f0c9c9;border-radius:14px;padding:13px 15px"><span style="width:8px;height:8px;border-radius:50%;background:#dc2626"></span><span style="flex:1;font-size:13.5px;color:#1e222b">Passwort falsch — bitte erneut versuchen</span></div>
+<div style="display:flex;align-items:center;gap:11px;background:#181b21;border:1px solid #2c313a;border-radius:14px;padding:13px 15px"><span style="width:8px;height:8px;border-radius:50%;background:#34d399"></span><span style="flex:1;font-size:13.5px;color:#e6e8ec">Name aktualisiert</span></div>
+<div style="display:flex;align-items:center;gap:11px;background:#181b21;border:1px solid #2c313a;border-radius:14px;padding:13px 15px;direction:rtl;font-family:'Noto Sans Arabic',sans-serif"><span style="width:8px;height:8px;border-radius:50%;background:#f87171"></span><span style="flex:1;font-size:13.5px;color:#e6e8ec">كلمة المرور غير صحيحة</span></div>
+<div class="dv-cap" style="text-align:start">Auto-dismiss 3s · slides from the top, RTL-aware</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<p class="dv-next">Try next: "use the ledger rows from <a class="dv-oid" href="#1d">1d</a> in <a class="dv-oid" href="#1a">1a</a>" · "make the offer detail inverted like the dark card" · "add the map to the offer screen"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1600,&quot;height&quot;:1000},&quot;acceptWindow&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:5,&quot;min&quot;:3,&quot;max&quot;:15,&quot;step&quot;:1,&quot;unit&quot;:&quot;s&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;calmThreshold&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:0.6,&quot;min&quot;:0.2,&quot;max&quot;:0.9,&quot;step&quot;:0.05,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+class Component extends DCLogic {
+  state = { screen: 'home', theme: 'light', secs: 4.2, tab: 'home', ptab: 'stats' };
+  get window() { return this.props.acceptWindow ?? 5; }
+  componentDidMount() {
+    this.t = setInterval(() => this.setState(s => ({ secs: s.secs <= 0.1 ? this.window : +(s.secs - 0.1).toFixed(1) })), 100);
+  }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const s = this.state;
+    const w = this.window;
+    const secs = Math.min(s.secs, w);
+    const calm = this.props.calmThreshold ?? 0.6;
+    const ringColor = secs > w * calm ? '#059669' : secs > w * 0.3 ? '#d97706' : '#dc2626';
+    const C = 540.4;
+    return {
+      screen: s.screen, tab: s.tab, ptab: s.ptab,
+      secsLabel: secs.toFixed(1) + 's',
+      ringColor,
+      ringOffset: C * (1 - secs / w),
+      go: (v) => this.setState({ screen: v }),
+      goHome: () => this.setState({ screen: 'home', tab: 'home' }),
+      goDetail: () => this.setState({ screen: 'detail' }),
+      goOffers: () => this.setState({ screen: 'offers' }),
+      goProfile: () => this.setState({ screen: 'profile' }),
+      showStats: () => this.setState({ ptab: 'stats' }),
+      showSettings: () => this.setState({ ptab: 'settings' }),
+      isHome: s.screen === 'home', isDetail: s.screen === 'detail',
+      isOffers: s.screen === 'offers', isProfile: s.screen === 'profile'
+    };
+  }
+}
+</script>
+</body>
+</html>

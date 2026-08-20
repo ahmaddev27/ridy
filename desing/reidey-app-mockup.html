@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REIDEY — App Mockups</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+
+:root{
+  --bg:#080909; --card:#17191A; --raised:#1D1F20; --overlay:#232526; --input:#151718;
+  --border:#2A2C2D; --borderStrong:#3A3D3E;
+  --ink:#FFFFFF; --inkMuted:#B5B7B8; --inkSubtle:#777A7C; --inkFaint:#4E5152;
+  --accent:#35C88F; --warning:#E4A11B; --danger:#D9534F;
+  --rCard:14px; --rCtl:12px; --rPill:999px; --rBadge:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#050506;color:var(--ink);font-family:'Tajawal',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+
+/* studio backdrop */
+.studio{
+  min-height:100vh;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, #141617 0%, transparent 60%),
+    radial-gradient(1000px 700px at 100% 20%, #101213 0%, transparent 55%),
+    #050506;
+  padding:56px 40px 80px;
+}
+.studio-head{max-width:1400px;margin:0 auto 44px;display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.studio-title{font-weight:800;font-size:34px;letter-spacing:-.02em;font-style:italic}
+.studio-sub{color:var(--inkSubtle);font-size:14px;margin-top:8px;max-width:560px;line-height:1.5}
+.swatches{display:flex;gap:10px;flex-wrap:wrap}
+.sw{width:26px;height:26px;border-radius:7px;border:1px solid var(--border)}
+
+.gallery{max-width:1400px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(390px,1fr));gap:56px 44px;justify-items:center}
+.frameWrap{display:flex;flex-direction:column;align-items:center;gap:16px}
+.frameLabel{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--inkMuted)}
+.frameLabel small{display:block;color:var(--inkFaint);font-weight:500;letter-spacing:.04em;text-transform:none;margin-top:4px;font-size:11px}
+
+/* phone frame */
+.phone{
+  width:390px;height:844px;border-radius:52px;background:#0c0d0e;
+  padding:12px;position:relative;
+  box-shadow:0 0 0 2px #1c1e1f, 0 30px 70px -20px rgba(0,0,0,.8), inset 0 0 0 1px #000;
+}
+.screen{
+  width:100%;height:100%;border-radius:42px;overflow:hidden;background:var(--bg);
+  position:relative;display:flex;flex-direction:column;
+}
+.notch{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:120px;height:30px;background:#0c0d0e;border-radius:0 0 18px 18px;z-index:40}
+.statusbar{height:52px;flex:0 0 52px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 26px 8px;font-size:14px;font-weight:700;color:var(--ink);z-index:30}
+.statusbar .icons{display:flex;gap:7px;align-items:center;font-size:12px;color:var(--inkMuted)}
+.body{flex:1;overflow:hidden;position:relative;display:flex;flex-direction:column}
+.scroll{flex:1;overflow:hidden;padding:0 20px}
+
+/* generic */
+.h1{font-size:28px;font-weight:800;letter-spacing:-.02em}
+.sub{color:var(--inkSubtle);font-size:14px;line-height:1.5}
+.cap{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--inkSubtle);font-weight:700}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--rCard);padding:16px}
+.btn{height:52px;border-radius:var(--rCtl);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;border:none;cursor:default}
+.btn-white{background:#fff;color:#0a0a0a}
+.btn-ghost{background:var(--raised);color:var(--ink);border:1px solid var(--border)}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid rgba(217,83,79,.4)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px rgba(53,200,143,.15)}
+.pill{height:34px;padding:0 16px;border-radius:var(--rPill);display:inline-flex;align-items:center;font-size:13px;font-weight:700;background:var(--raised);color:var(--inkMuted);border:1px solid var(--border);white-space:nowrap}
+.pill.on{background:#fff;color:#0a0a0a;border-color:#fff}
+.badge{font-size:10px;font-weight:800;letter-spacing:.1em;padding:4px 8px;border-radius:var(--rBadge);text-transform:uppercase}
+.badge-top{background:rgba(53,200,143,.14);color:var(--accent);border:1px solid rgba(53,200,143,.3)}
+.statusPill{font-size:11px;font-weight:800;letter-spacing:.06em;padding:5px 11px;border-radius:var(--rPill);text-transform:uppercase}
+.sp-active{background:rgba(53,200,143,.14);color:var(--accent)}
+.sp-open{background:var(--overlay);color:var(--inkMuted)}
+.sp-done{background:var(--overlay);color:var(--inkSubtle)}
+.hero-km{font-weight:800;letter-spacing:-.03em}
+.mut{color:var(--inkSubtle)}
+
+/* nav header */
+.hdr{display:flex;align-items:center;gap:12px;padding:10px 0 18px}
+.backbtn{width:40px;height:40px;border-radius:12px;background:var(--raised);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--ink)}
+.hdr-title{font-size:18px;font-weight:800;letter-spacing:-.01em}
+
+/* logo mark */
+.rmark{width:64px;height:64px;border-radius:18px;background:linear-gradient(160deg,#1f2121,#141516);border:1px solid var(--borderStrong);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:34px;font-style:italic;color:#fff}
+.rmark.sm{width:38px;height:38px;border-radius:11px;font-size:20px}
+.wordmark{font-weight:800;font-style:italic;letter-spacing:.02em}
+
+/* offer card */
+.offer{background:var(--card);border:1px solid var(--border);border-radius:var(--rCard);padding:16px}
+.offer-top{display:flex;justify-content:space-between;align-items:flex-start}
+.offer-left .badge{margin-bottom:10px}
+.offer-km{display:flex;align-items:baseline;gap:2px}
+.offer-km .val{font-size:33px;font-weight:800;letter-spacing:-.03em;color:#fff}
+.offer-km .suf{font-size:15px;color:var(--inkSubtle);font-weight:700}
+.offer-right{text-align:right}
+.offer-right .tot{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.offer-right .lab{font-size:11px;color:var(--inkSubtle);font-weight:600;margin-top:2px}
+.meta{display:grid;grid-template-columns:1fr 1fr 1fr;border:1px solid var(--border);border-radius:12px;margin:14px 0;overflow:hidden}
+.meta > div{padding:10px 12px;text-align:center}
+.meta > div + div{border-left:1px solid var(--border)}
+.meta .mv{font-size:14px;font-weight:700}
+.meta .ml{font-size:10px;color:var(--inkSubtle);letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
+.route{display:flex;gap:12px;margin-top:6px}
+.rail{display:flex;flex-direction:column;align-items:center;padding-top:4px}
+.rail .o{width:12px;height:12px;border-radius:50%;border:2px solid var(--inkMuted)}
+.rail .line{width:2px;flex:1;min-height:26px;background:var(--border);margin:3px 0}
+.rail .sq{width:12px;height:12px;border-radius:3px;background:#fff}
+.addrs{flex:1;display:flex;flex-direction:column;justify-content:space-between;gap:14px}
+.addr .t{font-size:14px;font-weight:700}
+.addr .s{font-size:12px;color:var(--inkSubtle)}
+.offer-foot{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);color:var(--inkMuted);font-size:13px;font-weight:600}
+.offer-foot .cd{color:var(--warning);font-weight:800}
+
+.icn{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.icn.sm{width:14px;height:14px}
+.icn.lg{width:20px;height:20px}
+
+/* status card */
+.statuscard{display:flex;align-items:center;justify-content:space-between}
+.statuscard .l{display:flex;align-items:center;gap:12px}
+.statuscard .name{font-size:17px;font-weight:800}
+
+/* today grid */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-radius:12px;overflow:hidden;border:1px solid var(--border)}
+.grid2 .cell{background:var(--card);padding:15px}
+.grid2 .cv{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.grid2 .cl{font-size:11px;color:var(--inkSubtle);margin-top:4px;letter-spacing:.04em}
+
+/* recent rows */
+.rrow{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--border)}
+.rrow:last-child{border-bottom:none}
+.rrow .rkm{font-size:16px;font-weight:800;letter-spacing:-.02em;width:66px}
+.rrow .rmid{flex:1;padding:0 12px}
+.rrow .rt{font-size:13px;font-weight:600}
+.rrow .rs{font-size:11px;color:var(--inkSubtle);margin-top:2px}
+
+/* search + input */
+.search{height:48px;border-radius:12px;background:var(--input);border:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:0 14px;color:var(--inkSubtle);font-size:14px}
+.field{height:52px;border-radius:12px;background:var(--input);border:1px solid var(--border);display:flex;align-items:center;padding:0 14px;color:var(--ink);font-size:15px;font-weight:600}
+.field .ph{color:var(--inkFaint);font-weight:500}
+.fieldlab{font-size:12px;color:var(--inkSubtle);font-weight:700;margin:0 0 8px 2px}
+
+/* toggles */
+.torow{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border)}
+.torow:last-child{border-bottom:none}
+.torow .tl{font-size:15px;font-weight:600}
+.tog{width:46px;height:27px;border-radius:999px;background:var(--overlay);position:relative;flex:0 0 auto;border:1px solid var(--border)}
+.tog .knob{position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:var(--inkSubtle);transition:.2s}
+.tog.on{background:var(--accent);border-color:var(--accent)}
+.tog.on .knob{left:21px;background:#fff}
+
+/* language option */
+.langrow{display:flex;align-items:center;justify-content:space-between;padding:16px;border-radius:12px;border:1px solid var(--border);background:var(--card);margin-bottom:12px}
+.langrow.sel{background:var(--raised);border-color:var(--borderStrong)}
+.langrow .native{font-size:16px;font-weight:700}
+.langrow .latin{font-size:12px;color:var(--inkSubtle);margin-top:2px}
+.radio{width:22px;height:22px;border-radius:50%;border:2px solid var(--borderStrong);display:flex;align-items:center;justify-content:center}
+.radio.on{border-color:var(--accent)}
+.radio.on::after{content:"";width:11px;height:11px;border-radius:50%;background:var(--accent)}
+
+/* sticky footer */
+.sticky{padding:14px 20px calc(14px + env(safe-area-inset-bottom));border-top:1px solid var(--border);background:linear-gradient(180deg,rgba(8,9,9,0),var(--bg) 30%);display:flex;gap:12px}
+.sticky .btn{flex:1}
+
+/* countdown ring hero */
+.ringwrap{display:flex;flex-direction:column;align-items:center;padding:8px 0 4px}
+.ringwrap .inside{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ringwrap .rkm{font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.ringwrap .rkm .s{font-size:16px;color:var(--inkSubtle);font-weight:700}
+.ringwrap .rtot{font-size:14px;color:var(--inkMuted);margin-top:6px;font-weight:600}
+
+/* stats bar chart */
+.chart{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;height:150px;padding-top:8px}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+.bar .b{width:100%;max-width:26px;border-radius:6px 6px 3px 3px;background:var(--borderStrong)}
+.bar.today .b{background:#fff}
+.bar .d{font-size:11px;color:var(--inkSubtle);font-weight:600}
+
+.infolist .irow{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--border)}
+.infolist .irow:last-child{border-bottom:none}
+.infolist .il{font-size:14px;color:var(--inkMuted);display:flex;align-items:center;gap:10px}
+.infolist .iv{font-size:14px;font-weight:700}
+
+.spacer{height:14px}
+.spacer.s{height:10px}
+.spacer.l{height:22px}
+.sectlabel{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--inkSubtle);font-weight:800;margin:2px 0 12px 2px}
+
+/* splash */
+.splash{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+.splash .word{font-size:40px;font-weight:800;font-style:italic;letter-spacing:.04em}
+.splash .tag{font-size:11px;letter-spacing:.42em;color:var(--inkSubtle);font-weight:700}
+.progress{width:96px;height:2px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:20px}
+.progress i{display:block;width:60%;height:100%;background:#fff}
+
+[dir="rtl"] .meta > div + div{border-left:none;border-right:1px solid var(--border)}
+[dir="rtl"] .rrow .rmid{text-align:right}
+</style>
+</head>
+<body>
+<div class="studio">
+  <div class="studio-head">
+    <div>
+      <div class="studio-title">REIDEY — Driver App</div>
+      <div class="studio-sub">Static visual mockup of the driver app screens. Dark monochrome system, Tajawal, emerald reserved for active states only. Representative German sample data.</div>
+    </div>
+    <div class="swatches">
+      <div class="sw" style="background:#080909"></div>
+      <div class="sw" style="background:#17191A"></div>
+      <div class="sw" style="background:#232526"></div>
+      <div class="sw" style="background:#2A2C2D"></div>
+      <div class="sw" style="background:#35C88F"></div>
+      <div class="sw" style="background:#E4A11B"></div>
+      <div class="sw" style="background:#D9534F"></div>
+      <div class="sw" style="background:#fff"></div>
+    </div>
+  </div>
+
+  <div class="gallery">
+
+    <!-- 1. SPLASH -->
+    <div class="frameWrap">
+      <div class="frameLabel">1 · Splash<small>Brand boot screen</small></div>
+      <div class="phone"><div class="notch"></div><div class="screen">
+        <div class="statusbar"><span>9:41</span><div class="icons"><span>5G</span><span>100%</span></div></div>
+        <div class="body">
+          <div class="splash">
+            <div class="rmark">R</div>
+            <div class="word">REIDEY</div>
+            <div class="tag">CONNECTING DRIVERS</div>
+            <div class="progress"><i></i></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2. LANGUAGE -->
+    <div class="frameWrap">
+      <div class="frameLabel">2 · Language<small>First-run selection</small></div>
+      <div class="phone"><div class="notch"></div><div class="screen">
+        <div class="statusbar"><span>9:41</span><div class="icons"><span>5G</span><span>100%</span></div></div>
+        <div class="body">
+          <div class="scroll">
+            <div style="display:flex;align-items:center;gap:12px;padding:8px 0 26px">
+              <div class="rmark sm">R</div><div class="wordmark" style="font-size:20px">REIDEY</div>
+            </div>
+            <div class="h1">Choose your language</div>
+            <div class="sub" style="margin-top:8px">Wähle deine bevorzugte Sprache für die App.</div>
+            <div class="spacer l"></div>
+            <div class="langrow sel">
+              <div><div class="native">Deutsch</div><div class="latin">German</div></div>
+              <div class="radio on"></div>
+            </div>
+            <div class="langrow">
+              <div><div class="native">English</div><div class="latin">English</div></div>
+              <div class="radio"></div>
+            </div>
+            <div class="langrow">
+              <div><div class="native" style="font-family:'Tajawal'">العربية</div><div class="latin">Arabic</div></div>
+              <div class="radio"></div>
+            </div>
+          </div>
+          <div class="sticky"><div class="btn btn-white" style="flex:1">Continue</div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 3. HOME -->
+    <div class="frameWrap">
+      <div class="frameLabel">3 · Home<small>Dashboard</small></div>
+      <div class="phone"><div class="notch"></div><div class="screen">
+        <div class="statusbar"><span>9:41</span><div class="icons"><span>5G</span><span>100%</span></div></div>
+        <div class="body"><div class="scroll">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0 18px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div class="rmark sm">R</div>
+              <div><div style="font-size:12px;color:var(--inkSubtle);font-weight:600">Guten Tag,</div><div style="font-size:18px;font-weight:800;letter-spacing:-.01em">Max</div></div>
+            </div>
+            <div class="backbtn"><svg class="icn" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
+          </div>
+
+          <div class="card statuscard" style="margin-bottom:14px">
+            <div class="l"><span class="dot"></span><div><div class="name">Auf Fahrt</div><div style="font-size:11px;color:var(--inkSubtle);letter-spacing:.04em">Fahrerstatus</div></div></div>
+            <span class="statusPill sp-active">Aktiv</span>
+          </div>
+
+          <div class="sectlabel">Aktives Angebot</div>
+          <div class="offer" style="margin-bottom:16px">
+            <div class="offer-top">
+              <div class="offer-left"><span class="badge badge-top">Top Offer</span>
+                <div class="offer-km"><span class="val num">€4,35</span><span class="suf">/km</span></div></div>
+              <div class="offer-right"><div class="tot num">€1.740</div><div class="lab">Gesamtpreis</div></div>
+            </div>
+            <div class="meta">
+              <div><div class="mv num">2.860 km</div><div class="ml">Distanz</div></div>
+              <div><div class="mv">09:12</div><div class="ml">Erhalten</div></div>
+              <div><div class="mv">Wuppertal</div><div class="ml">Pickup</div></div>
+            </div>
+            <div class="route">
+              <div class="rail"><div class="o"></div><div class="line"></div><div class="sq"></div></div>
+              <div class="addrs">
+                <div class="addr"><div class="t">Wuppertal Hbf</div><div class="s">Döppersberg 37</div></div>
+                <div class="addr"><div class="t">Düsseldorf Flughafen</div><div class="s">Terminal A</div></div>
+              </div>
+            </div>
+            <div class="offer-foot"><svg class="icn sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="cd num">02:47</span><span>verbleibend</span></div>
+          </div>
+
+          <div class="sectlabel">Heute</div>
+          <div class="grid2" style="margin-bottom:16px">
+            <div class="cell"><div class="cv num">€480,00</div><div class="cl">Verdienst heute</div></div>
+            <div class="cell"><div class="cv num">€4,28</div><div class="cl">Ø €/km</div></div>
+            <div class="cell"><div class="cv num">5</div><div class="cl">Angebote</div></div>
+            <div class="cell"><div class="cv num">2/5</div><div class="cl">Annahme</div></div>
+          </div>
+
+          <div class="sectlabel">Zuletzt</div>
+          <div class="card" style="margin-bottom:20px">
+            <div class="rrow"><div class="rkm num">€4,10</div><div class="rmid"><div class="rt">Wuppertal → Köln</div><div class="rs">08:24 · 42 km</div></div><span class="statusPill sp-done">Fertig</span></div>
+            <div class="rrow"><div class="rkm num">€3,92</div><div class="rmid"><div class="rt">Solingen → Düsseldorf</div><div class="rs">07:51 · 28 km</div></div><span class="statusPill sp-done">Fertig</span></div>
+            <div class="rrow"><div class="rkm num">€4,60</div><div class="rmid"><div class="rt">Remscheid → Essen</div><div class="rs">07:12 · 35 km</div></div><span class="statusPill sp-open">Offen</span></div>
+          </div>
+        </div></div>
+      </div></div>
+    </div>
+
+    <!-- 4. OFFERS -->
+    <div class="frameWrap">
+      <div class="frameLabel">4 · Offers<small>Angebote list</small></div>
+      <div class="phone"><div class="notch"></div><div class="screen">
+        <div class="statusbar"><span>9:41</span><div class="icons"><span>5G</span><span>100%</span></div></div>
+        <div class="body"><div class="scroll">
+          <div style="padding:14px 0 14px"><div class="h1">Angebote</div></div>
+          <div class="search"><svg class="icn" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span>Suche nach Ziel oder Ort…</span></div>
+          <div style="display:flex;gap:8px;align-items:center;margin:14px 0 16px">
+            <span class="pill on">Alle</span><span class="pill">Bestes €/km</span><span class="pill">Heute</span>
+            <span class="pill" style="width:34px;padding:0;justify-content:center;margin-left:auto"><svg class="icn" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg></span>
+          </div>
+
+          <div class="offer" style="margin-bottom:14px">
+            <div class="offer-top">
+              <div class="offer-left"><span class="badge badge-top">Top Offer</span>
+                <div class="offer-km"><span class="val num">€4,35</span><span class="suf">/km</span></div></div>
+              <div class="offer-right"><div class="tot num">€1.740</div><div class="lab">Gesamtpreis</div></div>
+            </div>
+            <div class="route" style="margin-top:14px">
+              <div class="rail"><div class="o"></div><div class="line"></div><div class="sq"></div></div>
+              <div class="addrs"><div class="addr"><div class="t">Wuppertal Hbf</div></div><div class="addr"><div class="t">Düsseldorf Flughafen</div></div></div>
+            </div>
+            <div class="offer-foot"><svg class="icn sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="cd num">02:47</span><span>verbleibend</span></div>
+          </div>
+
+          <div class="offer" style="margin-bottom:14px">
+            <div class="offer-top">
+              <div class="offer-left"><span class="badge badge-top" style="background:var(--overlay);color:var(--inkMuted);border-color:var(--border)">Angebot</span>
+                <div class="offer-km"><span class="val num">€3,88</span><span class="suf">/km</span></div></div>
+              <div class="offer-right"><div class="tot num">€620</div><div class="lab">Gesamtpreis</div></div>
+            </div>
+            <div class="route" style="margin-top:14px">
+              <div class="rail"><div class="o"></div><div class="line"></div><div class="sq"></div></div>
+              <div class="addrs"><div class="addr"><div class="t">Solingen Mitte</div></div><div class="addr"><div class="t">Köln Deutz</div></div></div>
+            </div>
+            <div class="offer-foot"><svg class="icn sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="cd num">04:10</span><span>verbleibend</span></div>
+          </div>
+
+          <div class="offer" style="margin-bottom:20px">
+            <div class="offer-top">
+              <div class="offer-left"><span class="badge badge-top" style="background:var(--overlay);color:var(--inkMuted);border-color:var(--border)">Angebot</span>
+                <div class="offer-km"><span class="val num">€3,42</span><span class="suf">/km</span></div></div>
+              <div class="offer-right"><div class="tot num">€410</div><div class="lab">Gesamtpreis</div></div>
+            </div>
+            <div class="route" style="margin-top:14px">
+              <div class="rail"><div class="o"></div><div class="line"></div><div class="sq"></div></div>
+              <div class="addrs"><div class="addr"><div class="t">Remscheid</div></div><div class="addr"><div class="t">Essen Hbf</div></div></div>
+            </div>
+            <div class="offer-foot"><svg class="icn sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="cd num">06:33</span><span>verbleibend</span></div>
+          </div>
+        </div></div>
+      </div></div>
+    </div>
+
+    <!-- 5. OFFER DETAILS -->
+    <div class="frameWrap">
+      <div class="frameLabel">5 · Offer Details<small>Countdown + accept</small></div>
+      <div class="phone"><div class="notch"></div><div class="screen">
+        <div class="statusbar"><span>9:41</span><div class="icons"><span>5G</span><span>100%</span></div></div>
+        <div class="body">
+          <div class="scroll">
+            <div class="hdr"><div class="backbtn"><svg class="icn" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div><div class="hdr-title">Angebot</div></div>
+
+            <div class="ringwrap">
+              <div style="position:relative;width:200px;height:200px">
+                <svg width="200" height="200" viewBox="0 0 200 200">
+                  <circle cx="100" cy="100" r="88" fill="none" stroke="#2A2C2D" stroke-width="10"/>
+                  <circle cx="100" cy="100" r="88" fill="none" stroke="#35C88F" stroke-width="10" stroke-linecap="round"
+                    stroke-dasharray="552.9" stroke-dashoffset="165.9" transform="rotate(-90 100 100)"/>
+                </svg>
+                <div class="inside">
+                  <div class="rkm num">€4,35<span class="s"> /km</span></div>
+                  <div class="rtot num">Gesamt €1.740</div>
+                </div>
+              </div>
+            </div>
+            <div style="text-align:center;color:var(--warning);font-weight:800;font-size:13px;margin:6px 0 4px" class="num">02:47 verbleibend</div>
+
+            <div class="card statuscard" style="margin:14px 0">
+              <div class="l"><span class="badge badge-top">Top Offer</span></div>
+              <span class="statusPill sp-open">Verfügbar</span>
+            </div>
+
+            <div class="card" style="margin-bottom:14px">
+              <div class="route">
+                <div class="rail"><div class="o"></div><div class="line"></div><div class="sq"></div></div>
+                <div class="addrs">
+                  <div class="addr"><div class="t">Wuppertal Hbf</div><div class="s">Döppersberg 37, 42103</div></div>
+                  <div class="addr"><div class="t">Düsseldorf Flughafen</div><div class="s">Terminal A, 40474</div></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid2" style="margin-bottom:14px;grid-template-columns:1fr 1fr 1fr">
+              <div class="cell"><div class="cv num">2.860</div><div class="cl">km Distanz</div></div>
+              <div class="cell"><div class="cv num">€4,35</div><div class="cl">€/km</div></div>
+              <div class="cell"><div class="cv num">32:10</div><div class="cl">Std. Dauer</div></div>
+            </div>
+
+            <div class="card infolist" style="margin-bottom:16px">
+              <div class="irow"><span class="il"><svg class="icn sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Erhalten</span><span class="iv num">09:12</span></div>
+              <div class="irow"><span class="il"><svg class="icn sm" viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>Abholung</span><span class="iv">Heute, 10:30</span></div>
+              <div class="irow"><span class="il"><svg class="icn sm" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Ablauf</span><span class="iv num">09:15</span></div>
+            </div>
+          </div>
+          <div class="sticky">
+            <div class="btn btn-ghost">Karte öffnen</div>
+            <div class="btn btn-white">In Uber öffnen</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 6. STATISTICS -->
+    <div class="frameWrap">
+      <div class="frameLabel">6 · Statistics<small>Statistiken</small></div>
+      <div class="phone"><div class="notch"></div><div class="screen">
+        <div class="statusbar"><span>9:41</span><div class="icons"><span>5G</span><span>100%</span></div></div>
+        <div class="body"><div class="scroll">
+          <div style="padding:14px 0 14px"><div class="h1">Statistiken</div></div>
+          <div style="display:flex;gap:8px;margin-bottom:16px"><span class="pill">Heute</span><span class="pill on">7 Tage</span><span class="pill">30 Tage</span></div>
+
+          <div class="card" style="margin-bottom:16px">
+            <div class="cap">Gesamteinnahmen</div>
+            <div style="font-size:34px;font-weight:800;letter-spacing:-.03em;margin-top:8px" class="num">€2.340,50</div>
+            <div style="color:var(--accent);font-size:13px;font-weight:700;margin-top:6px">▲ 12,4% vs. letzte Woche</div>
+          </div>
+
+          <div class="card" style="margin-bottom:16px">
+            <div class="cap" style="margin-bottom:6px">Wocheneinnahmen</div>
+            <div class="chart">
+              <div class="bar"><div class="b" style="height:44%"></div><div class="d">Mo</div></div>
+              <div class="bar"><div class="b" style="height:66%"></div><div class="d">Di</div></div>
+              <div class="bar"><div class="b" style="height:52%"></div><div class="d">Mi</div></div>
+              <div class="bar"><div class="b" style="height:78%"></div><div class="d">Do</div></div>
+              <div class="bar"><div class="b" style="height:60%"></div><div class="d">Fr</div></div>
+              <div class="bar today"><div class="b" style="height:95%"></div><div class="d">Sa</div></div>
+              <div class="bar"><div class="b" style="height:30%"></div><div class="d">So</div></div>
+            </div>
+          </div>
+
+          <div class="grid2" style="margin-bottom:16px">
+            <div class="cell"><div class="cv num">37</div><div class="cl">Angebote</div></div>
+            <div class="cell"><div class="cv num">14</div><div class="cl">Angenommen</div></div>
+            <div class="cell"><div class="cv num">€4,21</div><div class="cl">Ø €/km</div></div>
+            <div class="cell"><div class="cv num">612 km</div><div class="cl">Strecke</div></div>
+          </div>
+
+          <div class="card infolist" style="margin-bottom:20px">
+            <div class="irow"><span class="il">Abgeschlossen</span><span class="iv num">14 Fahrten</span></div>
+            <div class="irow"><span class="il">Annahmequote</span><span class="iv num">38%</span></div>
+          </div>
+        </div></div>
+      </div></div>
+    </div>
+
+    <!-- 7. SETTINGS -->
+    <div class="frameWrap">
+      <div class="frameLabel">7 · Settings<small>Einstellungen</small></div>
+      <div class="phone"><div class="notch"></div><div class="screen">
+        <div class="statusbar"><span>9:41</span><div class="icons"><span>5G</span><span>100%</span></div></div>
+        <div class="body"><div class="scroll">
+          <div class="hdr"><div class="backbtn"><svg class="icn" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div><div class="hdr-title">Einstellungen</div></div>
+
+          <div class="sectlabel">Präferenzen</div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="torow"><span class="tl">Sprache</span><span style="color:var(--inkMuted);font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px">Deutsch <svg class="icn sm" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span></div>
+            <div class="torow"><span class="tl">Angebotsbenachrichtigungen</span><span class="tog on"><span class="knob"></span></span></div>
+            <div class="torow"><span class="tl">Ton</span><span class="tog on"><span class="knob"></span></span></div>
+            <div class="torow"><span class="tl">Haptik</span><span class="tog"><span class="knob"></span></span></div>
+          </div>
+
+          <div class="sectlabel">Konto</div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="fieldlab">Name</div>
+            <div class="field" style="margin-bottom:14px">Max Schneider</div>
+            <div class="fieldlab">Neues Passwort</div>
+            <div class="field" style="margin-bottom:16px"><span class="ph">••••••••</span></div>
+            <div class="btn btn-white">Speichern</div>
+          </div>
+
+          <div class="sectlabel">Support</div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="torow" style="border:none;padding:6px 0"><span class="tl" style="display:flex;align-items:center;gap:10px"><svg class="icn" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Support kontaktieren</span><svg class="icn sm" viewBox="0 0 24 24" style="color:var(--inkSubtle)"><path d="m9 18 6-6-6-6"/></svg></div>
+          </div>
+
+          <div class="btn btn-danger" style="margin-bottom:20px">Abmelden</div>
+        </div></div>
+      </div></div>
+    </div>
+
+    <!-- 8. RTL VARIANT -->
+    <div class="frameWrap">
+      <div class="frameLabel">8 · Offer Details — RTL<small>عرض · Arabic mirror</small></div>
+      <div class="phone"><div class="notch"></div><div class="screen">
+        <div class="statusbar"><span>9:41</span><div class="icons"><span>5G</span><span>100%</span></div></div>
+        <div class="body" dir="rtl">
+          <div class="scroll">
+            <div class="hdr"><div class="backbtn"><svg class="icn" viewBox="0 0 24 24" style="transform:scaleX(-1)"><path d="m15 18-6-6 6-6"/></svg></div><div class="hdr-title">العرض</div></div>
+
+            <div class="ringwrap">
+              <div style="position:relative;width:200px;height:200px">
+                <svg width="200" height="200" viewBox="0 0 200 200">
+                  <circle cx="100" cy="100" r="88" fill="none" stroke="#2A2C2D" stroke-width="10"/>
+                  <circle cx="100" cy="100" r="88" fill="none" stroke="#35C88F" stroke-width="10" stroke-linecap="round"
+                    stroke-dasharray="552.9" stroke-dashoffset="165.9" transform="rotate(-90 100 100)"/>
+                </svg>
+                <div class="inside">
+                  <div class="rkm num" dir="ltr">€4,35<span class="s"> /km</span></div>
+                  <div class="rtot num">الإجمالي €1.740</div>
+                </div>
+              </div>
+            </div>
+            <div style="text-align:center;color:var(--warning);font-weight:800;font-size:13px;margin:6px 0 4px"><span class="num" dir="ltr">02:47</span> متبقٍ</div>
+
+            <div class="card statuscard" style="margin:14px 0">
+              <div class="l"><span class="badge badge-top">أفضل عرض</span></div>
+              <span class="statusPill sp-open">متاح</span>
+            </div>
+
+            <div class="card" style="margin-bottom:14px">
+              <div class="route">
+                <div class="rail"><div class="o"></div><div class="line"></div><div class="sq"></div></div>
+                <div class="addrs">
+                  <div class="addr"><div class="t">محطة فوبرتال</div><div class="s">دوبيرسبيرغ ٣٧</div></div>
+                  <div class="addr"><div class="t">مطار دوسلدورف</div><div class="s">المبنى A</div></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid2" style="margin-bottom:14px;grid-template-columns:1fr 1fr 1fr">
+              <div class="cell"><div class="cv num">2.860</div><div class="cl">كم المسافة</div></div>
+              <div class="cell"><div class="cv num">€4,35</div><div class="cl">€/كم</div></div>
+              <div class="cell"><div class="cv num">32:10</div><div class="cl">ساعة المدة</div></div>
+            </div>
+
+            <div class="card infolist" style="margin-bottom:16px">
+              <div class="irow"><span class="il">وقت الاستلام</span><span class="iv">اليوم، ١٠:٣٠</span></div>
+              <div class="irow"><span class="il">ينتهي في</span><span class="iv num" dir="ltr">09:15</span></div>
+            </div>
+          </div>
+          <div class="sticky">
+            <div class="btn btn-ghost">فتح الخريطة</div>
+            <div class="btn btn-white">فتح في أوبر</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
