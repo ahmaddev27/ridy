@@ -8,6 +8,9 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SENTRY_DSN": "https://5551568a1b4cf2c762ced68cbd2c51dc@o4511942452183040.ingest.de.sentry.io/4511943633403984"
       }
     },
     "development": {
@@ -21,6 +24,9 @@
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_SENTRY_DSN": "https://5551568a1b4cf2c762ced68cbd2c51dc@o4511942452183040.ingest.de.sentry.io/4511943633403984"
       }
     }
   },
