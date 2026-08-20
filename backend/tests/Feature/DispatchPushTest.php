@@ -12,6 +12,7 @@ use App\Domain\Notifications\Push\FcmPushSender;
 use App\Domain\Notifications\Push\GoogleServiceAccountToken;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -59,6 +60,57 @@ class DispatchPushTest extends TestCase
         $this->assertSame('14.37 €', $spy->calls[0]['title']);
         $this->assertSame((string) $offer->id, $spy->calls[0]['data']['offer_id']);
         $this->assertSame('14.37', $spy->calls[0]['data']['fare_amount']);
+    }
+
+    public function test_notifier_also_pushes_to_the_tenants_fleet_owner_with_driver_attribution(): void
+    {
+        $driver = Driver::create(['name' => 'Omar']);
+        DeviceToken::create(['driver_id' => $driver->id, 'token' => 'drv', 'tenant_id' => $driver->tenant_id]);
+
+        // A fleet owner of the SAME tenant registered a device in owner mode.
+        $owner = User::create([
+            'name' => 'Boss', 'email' => 'boss@ya.de',
+            'password' => 'x', 'tenant_id' => $driver->tenant_id,
+        ]);
+        DeviceToken::create(['user_id' => $owner->id, 'token' => 'own', 'tenant_id' => $driver->tenant_id]);
+
+        // Another tenant's owner device must never receive this offer.
+        $otherTenant = Tenant::create(['name' => 'Other', 'country' => 'DE']);
+        $stranger = User::create([
+            'name' => 'Stranger', 'email' => 's@o.de',
+            'password' => 'x', 'tenant_id' => $otherTenant->id,
+        ]);
+        DeviceToken::create(['user_id' => $stranger->id, 'token' => 'stranger', 'tenant_id' => $otherTenant->id]);
+
+        $offer = DispatchOffer::create([
+            'driver_id' => $driver->id, 'driver_uuid' => 'u1', 'offer_uuid' => 'o9',
+            'fare_amount' => 14.37, 'fare_formatted' => '€14.37',
+            'received_at' => now(), 'raw_payload' => [], 'status' => OfferStatus::Pending,
+        ]);
+
+        $spy = new class implements PushSender
+        {
+            public array $calls = [];
+
+            public function send(string $deviceToken, string $title, string $body, array $data = []): bool
+            {
+                $this->calls[] = compact('deviceToken', 'title');
+
+                return true;
+            }
+        };
+
+        $sent = (new DispatchNotifier($spy))->notify($offer);
+
+        // Driver + owner = 2 devices; the stranger tenant's device is untouched.
+        $this->assertSame(2, $sent);
+        $byToken = collect($spy->calls)->keyBy('deviceToken');
+        $this->assertTrue($byToken->has('drv'));
+        $this->assertTrue($byToken->has('own'));
+        $this->assertFalse($byToken->has('stranger'));
+        // The driver's own push is unchanged; the owner's carries the driver name.
+        $this->assertSame('14.37 €', $byToken['drv']['title']);
+        $this->assertSame('Omar · 14.37 €', $byToken['own']['title']);
     }
 
     public function test_notification_title_encodes_per_km_quality_rider_and_strips_country(): void

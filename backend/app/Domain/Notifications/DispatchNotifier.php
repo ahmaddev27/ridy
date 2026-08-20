@@ -59,7 +59,52 @@ class DispatchNotifier
             }
         }
 
+        $sent += $this->notifyOwners($offer, $title, $body, $data);
+
         return $sent;
+    }
+
+    /**
+     * Fan the same offer out to the tenant's fleet owners/managers who registered
+     * a device in owner mode. The driver still gets their own push unchanged; the
+     * owner's copy carries the driver name so they know whose offer it is.
+     *
+     * @param  array<string, string>  $data
+     * @return int number of owner devices notified
+     */
+    private function notifyOwners(DispatchOffer $offer, string $title, string $body, array $data): int
+    {
+        // Scope explicitly by the offer's tenant (bypass the global scope): owner
+        // tokens are the tenant's, keyed by user_id, never a driver.
+        $tokens = DeviceToken::withoutGlobalScopes()
+            ->where('tenant_id', $offer->tenant_id)
+            ->whereNotNull('user_id')
+            ->get();
+
+        if ($tokens->isEmpty()) {
+            return 0;
+        }
+
+        $driverName = $this->driverName($offer);
+        $ownerTitle = $driverName !== '' ? $driverName.' · '.$title : $title;
+
+        $sent = 0;
+        foreach ($tokens as $token) {
+            if ($this->sender->send($token->token, $ownerTitle, $body, $data)) {
+                $sent++;
+            }
+        }
+
+        return $sent;
+    }
+
+    /** The offer's driver name, from the linked driver or the captured payload. */
+    private function driverName(DispatchOffer $offer): string
+    {
+        $name = $offer->driver?->name
+            ?? trim(($offer->driver_first_name ?? '').' '.($offer->driver_last_name ?? ''));
+
+        return trim((string) $name);
     }
 
     /** "5.85 €€ · 12.3 km · €1.26/km | Peter" — fare, €-quality, trip metrics, rider. */

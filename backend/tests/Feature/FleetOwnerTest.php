@@ -77,6 +77,26 @@ class FleetOwnerTest extends TestCase
             ->assertJsonStructure(['data' => ['token', 'owner' => ['name', 'company_name']]]);
     }
 
+    public function test_owner_login_token_authenticates_on_every_fleet_endpoint(): void
+    {
+        $this->owner();
+
+        // Mint a real token through the login endpoint (no Sanctum::actingAs).
+        $token = $this->postJson('/api/v1/driver/login', ['email' => 'owner@ya.de', 'password' => 'secret123'])
+            ->assertOk()->json('data.token');
+
+        $auth = ['Authorization' => 'Bearer '.$token];
+
+        // The session-restore path (fleetMe) and every screen's endpoint must accept
+        // the token — a 401 here is what silently logs the owner out on app re-open.
+        $this->getJson('/api/v1/driver/fleet/me', $auth)->assertOk()->assertJsonPath('data.is_owner', true);
+        $this->getJson('/api/v1/driver/fleet/home', $auth)->assertOk();
+        $this->getJson('/api/v1/driver/fleet/offers', $auth)->assertOk();
+        $this->getJson('/api/v1/driver/fleet/stats', $auth)->assertOk();
+        $this->getJson('/api/v1/driver/fleet/drivers', $auth)->assertOk();
+        $this->postJson('/api/v1/driver/fleet/devices', ['token' => 'tok-1'], $auth)->assertCreated();
+    }
+
     public function test_fleet_offers_returns_every_drivers_offers_for_the_tenant(): void
     {
         $owner = $this->owner();
@@ -132,6 +152,55 @@ class FleetOwnerTest extends TestCase
         $res = $this->getJson('/api/v1/driver/offers')->assertOk();
 
         $this->assertCount(1, $res->json('data'));
+    }
+
+    public function test_owner_registers_a_push_device_against_their_user_and_tenant(): void
+    {
+        $owner = $this->owner();
+
+        Sanctum::actingAs($owner);
+        $this->postJson('/api/v1/driver/fleet/devices', ['token' => 'owner-tok', 'platform' => 'android'])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('device_tokens', [
+            'token' => 'owner-tok',
+            'user_id' => $owner->id,
+            'driver_id' => null,
+            'tenant_id' => $this->tenant->id,
+        ]);
+    }
+
+    public function test_fleet_offers_can_be_filtered_by_driver(): void
+    {
+        $owner = $this->owner();
+        $a = $this->driver(['name' => 'Omar', 'email' => 'omar@ya.de']);
+        $b = $this->driver(['name' => 'Sara', 'email' => 'sara@ya.de']);
+        $this->offer($a, 'a1');
+        $this->offer($b, 'b1');
+
+        Sanctum::actingAs($owner);
+        $res = $this->getJson('/api/v1/driver/fleet/offers?driver_id='.$a->id)->assertOk();
+
+        $this->assertCount(1, $res->json('data'));
+        $this->assertSame('Omar', $res->json('data.0.driver_name'));
+    }
+
+    public function test_fleet_drivers_lists_only_the_tenants_drivers(): void
+    {
+        $owner = $this->owner();
+        $this->driver(['name' => 'Omar', 'email' => 'omar@ya.de']);
+        $this->driver(['name' => 'Sara', 'email' => 'sara@ya.de']);
+
+        $other = Tenant::create(['name' => 'Other', 'country' => 'DE', 'status' => 'active', 'activated_at' => now(), 'subscription_ends_at' => now()->addMonth()]);
+        app(TenantContext::class)->set($other->id);
+        Driver::create(['tenant_id' => $other->id, 'name' => 'Stranger', 'email' => 's@o.de']);
+        app(TenantContext::class)->set($this->tenant->id);
+
+        Sanctum::actingAs($owner);
+        $res = $this->getJson('/api/v1/driver/fleet/drivers')->assertOk();
+
+        $names = collect($res->json('data'))->pluck('name')->all();
+        $this->assertSame(['Omar', 'Sara'], $names);
     }
 
     public function test_suspended_tenant_blocks_manager_login(): void
