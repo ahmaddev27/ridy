@@ -227,6 +227,11 @@ export async function reactivateCompany(id: number): Promise<void> {
   await apiFetch(`${base}/${id}/reactivate`, { method: "POST", withCsrf: true });
 }
 
+/** End the company's subscription now: cancels queued periods and expires it. */
+export async function endCompanySubscription(id: number): Promise<void> {
+  await apiFetch(`${base}/${id}/subscription`, { method: "DELETE", withCsrf: true });
+}
+
 // ── Per-company drill-down (admin detail tabs) ───────────────────────────────
 export type CompanyDriverRow = {
   id: number; name: string; online: boolean; online_status: string | null;

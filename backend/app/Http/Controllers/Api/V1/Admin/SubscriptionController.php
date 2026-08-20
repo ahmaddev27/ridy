@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Billing\Models\Plan;
 use App\Domain\Billing\Models\SubscriptionCode;
+use App\Domain\Billing\Models\SubscriptionPeriod;
 use App\Domain\Notifications\Notifier;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\ProxyPool;
@@ -153,5 +154,34 @@ class SubscriptionController extends Controller
         app(ProxyPool::class)->assign($tenant);
 
         return response()->json(['data' => ['reactivated' => true]]);
+    }
+
+    /**
+     * End a company's subscription now: cancel any queued (future) periods, close
+     * the running one at today, and expire the tenant so it is gated until a new
+     * code is entered. Past periods are kept for history/audit.
+     */
+    public function endSubscription(Tenant $tenant, Notifier $notifier): JsonResponse
+    {
+        $now = CarbonImmutable::now();
+
+        SubscriptionPeriod::where('tenant_id', $tenant->id)
+            ->where('starts_at', '>', $now)
+            ->delete();
+
+        SubscriptionPeriod::where('tenant_id', $tenant->id)
+            ->where('starts_at', '<=', $now)
+            ->where('ends_at', '>', $now)
+            ->update(['ends_at' => $now]);
+
+        $tenant->forceFill([
+            'subscription_ends_at' => $now,
+            'activation_code' => null,
+            'activation_code_expires_at' => null,
+        ])->save();
+
+        $notifier->toTenant($tenant->id, 'subscription_expired', [], '/subscription');
+
+        return response()->json(['data' => ['ended' => true]]);
     }
 }

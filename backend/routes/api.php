@@ -298,6 +298,7 @@ Route::prefix('v1')->group(function () {
         Route::post('companies/{tenant}/activation', [SubscriptionController::class, 'generate']);
         Route::post('companies/{tenant}/free-subscription', [SubscriptionController::class, 'grantFree']);
         Route::post('companies/{tenant}/reactivate', [SubscriptionController::class, 'reactivate']);
+        Route::delete('companies/{tenant}/subscription', [SubscriptionController::class, 'endSubscription']);
 
         Route::get('companies/{tenant}/session', [CompanySessionController::class, 'show']);
         Route::post('companies/{tenant}/session/relink', [CompanySessionController::class, 'forceRelink']);

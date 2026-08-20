@@ -69,19 +69,27 @@ class CompanySubscriptionController extends Controller
     {
         $tenantId = (int) $request->user()->tenant_id;
 
+        $now = now();
         $periods = SubscriptionPeriod::where('tenant_id', $tenantId)
             ->with(['code.plan:id,name', 'code.collector:id,name'])
             ->orderByDesc('starts_at')
             ->orderByDesc('id')
             ->get()
-            ->map(function (SubscriptionPeriod $p) {
+            ->map(function (SubscriptionPeriod $p) use ($now) {
                 $code = $p->code;
+
+                // Temporal state of THIS period: the one running now is "active",
+                // future ones "scheduled", past ones "ended" — this is what the
+                // company cares about, distinct from the code's redemption status.
+                $periodStatus = $p->ends_at->isBefore($now) ? 'ended'
+                    : ($p->starts_at->isAfter($now) ? 'scheduled' : 'active');
 
                 return [
                     'id' => $p->id,
                     'plan' => $code?->plan?->name,
                     'code' => $code?->code,
                     'code_status' => $code?->status(),
+                    'period_status' => $periodStatus,
                     'collector' => $code?->collector?->name,
                     'amount' => $p->amount !== null ? (float) $p->amount : null,
                     'paid' => $p->isPaid(),

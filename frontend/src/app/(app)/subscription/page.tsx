@@ -13,10 +13,10 @@ import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getCompanySubscriptions, type CompanySubscriptionRow } from "@/lib/api/company-subscription";
 
-const CODE_TONE: Record<NonNullable<CompanySubscriptionRow["code_status"]>, Status> = {
-  activated: "matched",
-  pending: "expiring",
-  expired: "error",
+const PERIOD_TONE: Record<CompanySubscriptionRow["period_status"], Status> = {
+  active: "connected",
+  scheduled: "expiring",
+  ended: "neutral",
 };
 
 export default function CompanySubscriptionPage() {
@@ -82,7 +82,7 @@ export default function CompanySubscriptionPage() {
                       <span className={`ms-1.5 text-xs ${r.paid ? "text-success-fg" : "text-ink-subtle"}`}>· {r.paid ? c("paid") : c("unpaid")}</span>
                     </td>
                     <td className="px-4 py-3">
-                      {r.code_status ? <Badge status={CODE_TONE[r.code_status]}>{c(`st_${r.code_status}`)}</Badge> : <span className="text-ink-subtle">—</span>}
+                      <Badge status={PERIOD_TONE[r.period_status]}>{c(`st_${r.period_status}`)}</Badge>
                     </td>
                     <td className="px-4 py-3 text-start text-ink-muted whitespace-nowrap">
                       <span dir="ltr">{date(r.starts_at)} - {date(r.ends_at)}</span>

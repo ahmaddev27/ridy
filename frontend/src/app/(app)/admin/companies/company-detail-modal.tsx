@@ -25,6 +25,7 @@ import {
   generateActivationCode,
   grantFreeSubscription,
   reactivateCompany,
+  endCompanySubscription,
   listProxies,
   getCompanyDrivers,
   getCompanyOffers,
@@ -187,7 +188,9 @@ export function CompanyDetail({
   async function endSubscription() {
     setBusy(true);
     try {
-      await updateCompany(id, { subscription_ends_at: new Date().toISOString() });
+      // Proper end: cancels queued periods + closes the running one, not just a
+      // date bump (which would leave stacked future periods dangling).
+      await endCompanySubscription(id);
       toast.success(c("subEnded"));
       await load();
       onChanged();
