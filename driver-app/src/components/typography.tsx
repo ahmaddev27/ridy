@@ -31,11 +31,18 @@ function familyForWeight(weight?: TextStyle["fontWeight"]): string {
   }
 }
 
+// The weight is encoded in the family name, so we must NOT also pass fontWeight:
+// on Android a weighted custom family + a fontWeight (e.g. "700") makes the font
+// resolver look for that weight inside the already-weighted family, fail, and
+// fall back to the system font (why bold titles/buttons/badges lost Tajawal).
+// Forcing "normal" here lets the picked Tajawal face render as-is on both platforms.
+const NORMAL_WEIGHT = { fontWeight: "normal" } as const;
+
 export const Text = forwardRef<React.ElementRef<typeof RNText>, TextProps>(
   function Text({ style, ...props }, ref) {
     const flat = (StyleSheet.flatten(style) ?? {}) as TextStyle;
     const fontFamily = flat.fontFamily ?? familyForWeight(flat.fontWeight);
-    return <RNText ref={ref} {...props} style={[{ fontFamily }, style]} />;
+    return <RNText ref={ref} {...props} style={[{ fontFamily }, style, NORMAL_WEIGHT]} />;
   },
 );
 
@@ -43,6 +50,6 @@ export const TextInput = forwardRef<React.ElementRef<typeof RNTextInput>, TextIn
   function TextInput({ style, ...props }, ref) {
     const flat = (StyleSheet.flatten(style) ?? {}) as TextStyle;
     const fontFamily = flat.fontFamily ?? familyForWeight(flat.fontWeight);
-    return <RNTextInput ref={ref} {...props} style={[{ fontFamily }, style]} />;
+    return <RNTextInput ref={ref} {...props} style={[{ fontFamily }, style, NORMAL_WEIGHT]} />;
   },
 );
