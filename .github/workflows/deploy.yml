@@ -150,6 +150,12 @@ jobs:
             # re-cache config. Clearing routes is essential: a cached route file
             # would keep serving the old middleware stack, so new route guards
             # (e.g. fleet.connected) would silently not apply.
+            # Sync PHP deps into the bind-mounted code: the image installs vendor/,
+            # but the ./backend:/var/www mount shadows it with the host's copy, so a
+            # newly added package (e.g. Sentry) would be missing at runtime. Install
+            # against the live volume so vendor always matches composer.lock.
+            $COMPOSE exec -T backend composer install --no-dev --optimize-autoloader --no-interaction || true
+
             $COMPOSE exec -T backend php artisan optimize:clear || true
             # Rebuild the package-discovery manifest: the image installs deps with
             # --no-scripts (so post-autoload-dump never runs discover), and
