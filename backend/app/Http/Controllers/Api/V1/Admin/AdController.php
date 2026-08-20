@@ -6,6 +6,7 @@ use App\Domain\Ads\Models\Ad;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 /** Super-admin management of platform-wide promotional ads. */
 class AdController extends Controller
@@ -28,16 +29,32 @@ class AdController extends Controller
 
     public function update(Request $request, Ad $ad): JsonResponse
     {
-        $ad->update($this->validated($request));
+        $data = $this->validated($request);
+        // If the image changed (or was removed), delete the previous upload so
+        // replaced images do not accumulate as orphans on disk.
+        if (array_key_exists('image_url', $data) && $data['image_url'] !== $ad->image_url) {
+            $this->deleteImage($ad->image_url);
+        }
+        $ad->update($data);
 
         return response()->json(['data' => $this->present($ad->fresh())]);
     }
 
     public function destroy(Ad $ad): JsonResponse
     {
+        $this->deleteImage($ad->image_url);
         $ad->delete();
 
         return response()->json(['data' => ['deleted' => true]]);
+    }
+
+    /** Remove an uploaded ad image from disk (ignores external/empty URLs). */
+    private function deleteImage(?string $imageUrl): void
+    {
+        if ($imageUrl === null || ! str_contains($imageUrl, '/ads/media/')) {
+            return;
+        }
+        Storage::disk('public')->delete('ads/'.basename($imageUrl));
     }
 
     /** Upload an ad image; returns a same-origin URL to store in image_url. */

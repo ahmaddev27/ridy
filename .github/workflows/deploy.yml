@@ -151,6 +151,11 @@ jobs:
             # would keep serving the old middleware stack, so new route guards
             # (e.g. fleet.connected) would silently not apply.
             $COMPOSE exec -T backend php artisan optimize:clear || true
+            # Rebuild the package-discovery manifest: the image installs deps with
+            # --no-scripts (so post-autoload-dump never runs discover), and
+            # bootstrap/cache is bind-mounted, so a stale packages.php would keep a
+            # newly added provider (e.g. Sentry) from ever registering.
+            $COMPOSE exec -T backend php artisan package:discover || true
             $COMPOSE exec -T backend php artisan config:cache || true
 
             # Cap the Docker build cache so it can't slowly fill the disk (it grew

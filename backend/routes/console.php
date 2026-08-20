@@ -25,3 +25,6 @@ Schedule::command('alerts:check')->everyFiveMinutes()->withoutOverlapping();
 
 // Nightly gzipped database backup (kept 7 days in storage/app/backups).
 Schedule::command('db:backup')->dailyAt('03:00')->withoutOverlapping();
+
+// Flip expired ads to inactive (scopeLive already hides them; this syncs the flag).
+Schedule::command('ads:expire')->hourly()->withoutOverlapping();
