@@ -117,9 +117,13 @@ class TripGeocoder
             ? ['lat' => (float) $hit['lat'], 'lng' => (float) $hit['lon']]
             : null;
 
-        DB::table('geocode_cache')->updateOrInsert(
-            ['query' => $address],
-            ['lat' => $coords['lat'] ?? null, 'lng' => $coords['lng'] ?? null, 'updated_at' => now(), 'created_at' => now()],
+        // Atomic upsert (INSERT ... ON DUPLICATE KEY UPDATE): two requests geocoding
+        // the same address concurrently would race a check-then-insert and trip the
+        // unique key (1062). upsert lets the loser update instead of erroring.
+        DB::table('geocode_cache')->upsert(
+            [['query' => $address, 'lat' => $coords['lat'] ?? null, 'lng' => $coords['lng'] ?? null, 'updated_at' => now(), 'created_at' => now()]],
+            ['query'],
+            ['lat', 'lng', 'updated_at'],
         );
 
         return $coords;
