@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\V1\Driver\DriverDashboardController;
 use App\Http\Controllers\Api\V1\Driver\DriverDeviceController;
 use App\Http\Controllers\Api\V1\Driver\DriverOfferController;
 use App\Http\Controllers\Api\V1\Driver\FleetController;
+use App\Http\Controllers\Api\V1\Driver\FleetDeviceController;
 use App\Http\Controllers\Api\V1\DriverController;
 use App\Http\Controllers\Api\V1\DriverInviteController;
 use App\Http\Controllers\Api\V1\DriverMetricController;
@@ -115,8 +116,12 @@ Route::prefix('v1')->group(function () {
         Route::middleware(['auth:sanctum', 'driver.active'])->prefix('fleet')->group(function () {
             Route::get('me', [FleetController::class, 'me']);
             Route::get('home', [FleetController::class, 'home']);
+            Route::get('drivers', [FleetController::class, 'drivers']);
             Route::get('offers', [FleetController::class, 'offers']);
             Route::get('stats', [FleetController::class, 'stats']);
+            // The owner's own push device (User token) — receives every driver's offers.
+            Route::post('devices', [FleetDeviceController::class, 'store']);
+            Route::delete('devices', [FleetDeviceController::class, 'destroy']);
         });
     });
 

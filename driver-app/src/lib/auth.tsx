@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import * as SecureStore from "expo-secure-store";
-import { api, type DriverProfile } from "./api";
+import { api, ApiError, type DriverProfile } from "./api";
 import { setLocale } from "./i18n";
 
 const TOKEN_KEY = "reidey_driver_token";
@@ -44,10 +44,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Owners resolve on the User token via the fleet endpoint.
           const me = owner ? await api.fleetMe() : await api.me();
           applyProfile(me.data, owner);
-        } catch {
-          await SecureStore.deleteItemAsync(TOKEN_KEY);
-          await SecureStore.deleteItemAsync(OWNER_KEY);
-          api.setToken(null);
+        } catch (e) {
+          // Only a genuine auth failure (401) ends the session. A transient
+          // network / 5xx error must KEEP the stored token so a later launch can
+          // restore the session — otherwise a flaky connection at boot silently
+          // logs the user (notably a fleet owner) out. A 401 is already handled by
+          // onSessionInvalid; clear here too so this boot doesn't restore a dead one.
+          if (e instanceof ApiError && e.status === 401) {
+            await SecureStore.deleteItemAsync(TOKEN_KEY);
+            await SecureStore.deleteItemAsync(OWNER_KEY);
+            api.setToken(null);
+          }
         }
       }
       setReady(true);

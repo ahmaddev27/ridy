@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { View, FlatList, Pressable, RefreshControl, ActivityIndicator } from "react-native";
+import { View, FlatList, Pressable, RefreshControl, ActivityIndicator, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text, TextInput } from "@/components/typography";
 import { useRouter } from "expo-router";
 import { Search, SlidersHorizontal } from "lucide-react-native";
-import { api, type Offer, type OffersQuery } from "@/lib/api";
+import { api, type Offer, type OffersQuery, type FleetDriver } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, getLocale } from "@/lib/i18n";
 import { useColors, radius, isDarkPalette } from "@/lib/theme";
@@ -51,6 +51,9 @@ export default function OffersScreen() {
 
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<OfferFilters>(DEFAULT_FILTERS);
+  // Fleet-owner mode: pick a single driver (or all) to scope the feed.
+  const [drivers, setDrivers] = useState<FleetDriver[]>([]);
+  const [driverId, setDriverId] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [page, setPage] = useState(1);
@@ -65,14 +68,21 @@ export default function OffersScreen() {
       const params: OffersQuery = { per_page: PER_PAGE, page: target, ...win };
       if (filters.status !== "all") params.status = filters.status;
       if (search.trim()) params.search = search.trim();
+      if (isOwner && driverId != null) params.driver_id = driverId;
       const res = isOwner ? await api.fleetOffers(params) : await api.offers(params);
       setLastPage(res.meta?.last_page ?? 1);
       setTotal(res.meta?.total ?? res.data.length);
       setPage(res.meta?.current_page ?? target);
       setOffers((prev) => (target === 1 ? res.data : [...prev, ...res.data]));
     },
-    [filters.status, filters.day, search, isOwner],
+    [filters.status, filters.day, search, isOwner, driverId],
   );
+
+  // Load the tenant's drivers once, for the owner-only driver filter.
+  useEffect(() => {
+    if (!isOwner) return;
+    api.fleetDrivers().then((r) => setDrivers(r.data)).catch(() => { /* keep empty */ });
+  }, [isOwner]);
 
   const reload = useCallback(async () => {
     setRefreshing(true);
@@ -147,6 +157,20 @@ export default function OffersScreen() {
               </Pressable>
             </View>
 
+            {/* Owner-only: filter the feed by driver (horizontal pills + "all"). */}
+            {isOwner && drivers.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ flexDirection: isRTL() ? "row-reverse" : "row", gap: 8 }}
+              >
+                <DriverPill c={c} label={t("fleet.allDrivers")} active={driverId == null} onPress={() => setDriverId(null)} />
+                {drivers.map((d) => (
+                  <DriverPill key={d.id} c={c} label={d.name} active={driverId === d.id} onPress={() => setDriverId(d.id)} />
+                ))}
+              </ScrollView>
+            )}
+
             {total > 0 && (
               <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: align }}>
                 {total.toLocaleString(getLocale() === "ar" ? "en" : getLocale())} {t("offers.title")}
@@ -165,5 +189,17 @@ export default function OffersScreen() {
 
       <FilterSheet open={sheetOpen} value={filters} onApply={setFilters} onClose={() => setSheetOpen(false)} />
     </SafeAreaView>
+  );
+}
+
+/** A single driver-filter pill (owner mode), styled like the quick pills. */
+function DriverPill({ c, label, active, onPress }: { c: ReturnType<typeof useColors>; label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{ paddingHorizontal: 15, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: active ? c.primary : isDarkPalette(c) ? c.surface2 : c.surface, borderWidth: 1, borderColor: active ? c.primary : c.line }}
+    >
+      <Text numberOfLines={1} style={{ color: active ? c.primaryInk : c.inkMuted, fontWeight: "700", fontSize: 13.5 }}>{label}</Text>
+    </Pressable>
   );
 }

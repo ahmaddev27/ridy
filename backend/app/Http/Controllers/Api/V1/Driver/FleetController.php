@@ -81,6 +81,17 @@ class FleetController extends Controller
         return response()->json(['data' => $this->summary($tenantId, $from, $to)]);
     }
 
+    /** The tenant's drivers, for the offers-view driver picker (id + name only). */
+    public function drivers(Request $request): JsonResponse
+    {
+        $drivers = Driver::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenantId($request))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return response()->json(['data' => $drivers]);
+    }
+
     /** Owner profile, mirroring the driver `me` shape so the app can restore a session. */
     public function me(Request $request): JsonResponse
     {
@@ -102,6 +113,7 @@ class FleetController extends Controller
     private function filtered(Request $request): Builder
     {
         return $this->scoped($this->tenantId($request))
+            ->when($request->filled('driver_id'), fn ($q) => $q->where('driver_id', $request->integer('driver_id')))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->when($request->filled('from'), fn ($q) => $q->whereDate('received_at', '>=', $request->date('from')))
             ->when($request->filled('to'), fn ($q) => $q->whereDate('received_at', '<=', $request->date('to')))

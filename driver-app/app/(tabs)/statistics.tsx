@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useFocusEffect } from "expo-router";
 import { api, type DriverStats, type Offer } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius, cardStyle } from "@/lib/theme";
 import { fareLabel } from "@/lib/format";
@@ -33,6 +34,7 @@ function rangeDates(r: Range): { from: string; to: string } {
 
 export default function StatisticsScreen() {
   const c = useColors();
+  const { isOwner } = useAuth();
   const align = isRTL() ? "right" : "left";
   const [range, setRange] = useState<Range>("7d");
   const [day, setDay] = useState<Date | null>(null); // tapping a chart bar filters to one day
@@ -47,9 +49,14 @@ export default function StatisticsScreen() {
       // shows the last 7 days so you can tap another bar.
       const window = d ? { from: ymd(d), to: ymd(d) } : rangeDates(r);
       const w = rangeDates("7d");
+      // A fleet owner authenticates on a User token; the driver endpoints
+      // (auth:driver) would 401 and log them out. Use the tenant-wide fleet
+      // endpoints for owners, the personal ones for a driver.
       const [s, o] = await Promise.all([
-        api.stats(window.from, window.to),
-        api.offers({ from: w.from, to: w.to, per_page: 100 }),
+        isOwner ? api.fleetStats(window.from, window.to) : api.stats(window.from, window.to),
+        isOwner
+          ? api.fleetOffers({ from: w.from, to: w.to, per_page: 100 })
+          : api.offers({ from: w.from, to: w.to, per_page: 100 }),
       ]);
       setStats(s.data);
       setWeek(o.data);
@@ -58,7 +65,7 @@ export default function StatisticsScreen() {
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [isOwner]);
 
   useFocusEffect(useCallback(() => { load(range, day); }, [load, range, day]));
 

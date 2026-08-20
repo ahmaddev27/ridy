@@ -124,13 +124,12 @@ function Gate() {
   // Once signed in: register for push and open the offer when a notification is tapped.
   useEffect(() => {
     if (!driver) return;
-    // Owners are read-only fleet monitors on a User token; the /driver/devices
-    // endpoint (auth:driver guard) rejects it with 401, which would nuke the
-    // session and bounce them back to login. They don't receive driver push.
-    if (!isOwner) {
-      registerForPush();
-      registerOfferCategory();
-    }
+    // Both roles register for push. An owner registers on their User token via the
+    // fleet endpoint (the driver /devices endpoint would 401 their token) and then
+    // receives a copy of every one of their drivers' offers; a driver registers
+    // against themselves. Both open the tapped offer (owner mode renders it read-only).
+    registerForPush(isOwner);
+    registerOfferCategory();
 
     // De-dupe: a cold-start tap is delivered by BOTH getLastNotificationResponse
     // and (sometimes) the listener, so handle each notification only once.
