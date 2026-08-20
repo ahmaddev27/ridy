@@ -10,6 +10,11 @@ import { initSentry, captureException, flush } from "./sentry.js";
 // since Uber pushes offers across several regional channels in parallel.
 const streams = new Map();
 
+// Consecutive session-poll failures; used to suppress transient (deploy-time)
+// ECONNREFUSED noise and only alert Sentry on a sustained backend outage.
+let sessionPollFailures = 0;
+const SESSION_POLL_ALERT_AFTER = 5; // ~5 min at the 60s poll interval
+
 function streamKey(sessionId, path) {
   return `${sessionId}:${path}`;
 }
@@ -20,9 +25,17 @@ async function reconcile() {
     // The backend returns only the companies assigned to THIS shard (it also
     // heartbeats us and rebalances), so no client-side filtering is needed.
     ({ sessions, globalProxyUrl } = await api.sessions());
+    sessionPollFailures = 0;
   } catch (e) {
-    console.error(`session poll failed: ${e.message}`);
-    captureException(e, { where: "session_poll" });
+    // A single failure is almost always transient — the backend/Caddy briefly
+    // restarting during a deploy (ECONNREFUSED) — and the next poll recovers on
+    // its own. Only report to Sentry once failures PERSIST, so a deploy blip
+    // doesn't create noise while a real outage still surfaces.
+    sessionPollFailures++;
+    console.error(`session poll failed (${sessionPollFailures}): ${e.message}`);
+    if (sessionPollFailures === SESSION_POLL_ALERT_AFTER) {
+      captureException(e, { where: "session_poll", consecutiveFailures: sessionPollFailures });
+    }
     return;
   }
 
