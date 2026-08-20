@@ -59,7 +59,7 @@ export default function HomeScreen() {
           <View style={{ flexDirection: row, alignItems: "center", gap: 12 }}>
             <Logo size={36} />
             <View style={{ flex: 1 }}>
-              <Text numberOfLines={1} style={{ color: c.ink, fontSize: 17, fontWeight: "800", letterSpacing: -0.3, textAlign: align }}>
+              <Text numberOfLines={1} style={{ color: c.ink, fontSize: 17, fontWeight: "700", letterSpacing: -0.3, textAlign: align }}>
                 {greeting}, {headline}
               </Text>
               {!!sub && <Text numberOfLines={1} style={{ color: c.inkSubtle, fontSize: 12.5, textAlign: align }}>{sub}</Text>}
@@ -154,7 +154,7 @@ function GridCell({ label, value, c, border }: { label: string; value: string; c
   return (
     <View style={{ flex: 1, padding: 16, gap: 5, borderRightWidth: border && !isRTL() ? 1 : 0, borderLeftWidth: border && isRTL() ? 1 : 0, borderColor: c.line }}>
       <SectionLabel>{label}</SectionLabel>
-      <Text style={{ color: c.ink, fontSize: 22, fontWeight: "800", letterSpacing: -0.4, textAlign: align, writingDirection: "ltr" }}>{value}</Text>
+      <Text style={{ color: c.ink, fontSize: 22, fontWeight: "700", letterSpacing: -0.4, textAlign: align, writingDirection: "ltr" }}>{value}</Text>
     </View>
   );
 }
@@ -172,7 +172,7 @@ function RecentRow({ offer, onPress, last, showDriver, c }: { offer: Offer; onPr
       style={({ pressed }) => ({ flexDirection: row, alignItems: "center", gap: 12, padding: 15, borderBottomWidth: last ? 0 : 1, borderColor: c.line, opacity: dim ? 0.5 : pressed ? 0.7 : 1 })}
     >
       <View style={{ minWidth: 76 }}>
-        <Text style={{ color: c.ink, fontSize: 17, fontWeight: "800", letterSpacing: -0.5, textAlign: align }}>
+        <Text style={{ color: c.ink, fontSize: 17, fontWeight: "700", letterSpacing: -0.5, textAlign: align }}>
           {perKm?.value ?? fareLabel(offer.fare_formatted, offer.fare_amount)}
         </Text>
         <Text style={{ color: c.inkSubtle, fontSize: 10.5, textAlign: align }}>

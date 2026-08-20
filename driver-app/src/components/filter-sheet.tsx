@@ -60,7 +60,7 @@ function SheetBody({ c, value, onApply, onClose }: { c: ReturnType<typeof useCol
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
-      <Text style={{ color: c.ink, fontSize: 18, fontWeight: "800", textAlign: isRTL() ? "right" : "left", marginBottom: 14 }}>
+      <Text style={{ color: c.ink, fontSize: 18, fontWeight: "700", textAlign: isRTL() ? "right" : "left", marginBottom: 14 }}>
         {t("filter.title")}
       </Text>
 

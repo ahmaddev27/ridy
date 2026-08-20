@@ -41,13 +41,13 @@ export default function LanguageScreen() {
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24, gap: 24 }}>
         <View style={{ flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 12, marginTop: 8 }}>
           <Logo size={32} />
-          <Text style={{ color: c.ink, fontSize: 20, fontWeight: "800", fontStyle: "italic", letterSpacing: -0.5 }}>
+          <Text style={{ color: c.ink, fontSize: 20, fontWeight: "700", fontStyle: "italic", letterSpacing: -0.5 }}>
             REIDEY
           </Text>
         </View>
 
         <View style={{ gap: 6 }}>
-          <Text style={{ color: c.ink, fontSize: 26, fontWeight: "800", textAlign: align }}>
+          <Text style={{ color: c.ink, fontSize: 26, fontWeight: "700", textAlign: align }}>
             {t("language.choose")}
           </Text>
           <Text style={{ color: c.inkSubtle, fontSize: 14, textAlign: align }}>

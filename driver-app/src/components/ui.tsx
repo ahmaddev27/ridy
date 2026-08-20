@@ -240,7 +240,7 @@ export function Metric({ label, value, unit }: { label: string; value: string; u
   return (
     <View style={{ gap: 4 }}>
       <SectionLabel>{label}</SectionLabel>
-      <Text style={{ color: c.ink, fontSize: 23, fontWeight: "800", textAlign: align() }}>
+      <Text style={{ color: c.ink, fontSize: 23, fontWeight: "700", textAlign: align() }}>
         {value}
         {unit ? <Text style={{ fontSize: 14, fontWeight: "700", color: c.inkMuted }}> {unit}</Text> : null}
       </Text>

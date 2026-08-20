@@ -68,7 +68,7 @@ export default function OnboardingScreen() {
               <View style={{ width: 96, height: 96, borderRadius: radius.xl, alignItems: "center", justifyContent: "center", backgroundColor: c.surface2 }}>
                 <Icon size={40} color={c.ink} strokeWidth={1.6} />
               </View>
-              <Text style={{ color: c.ink, fontSize: 24, fontWeight: "800", letterSpacing: -0.4, textAlign: "center" }}>{s.title}</Text>
+              <Text style={{ color: c.ink, fontSize: 24, fontWeight: "700", letterSpacing: -0.4, textAlign: "center" }}>{s.title}</Text>
               <Text style={{ color: c.inkMuted, fontSize: 15, lineHeight: 23, textAlign: "center" }}>{s.body}</Text>
             </View>
           );

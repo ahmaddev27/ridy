@@ -52,7 +52,7 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 18 }}>
         {/* Header */}
         <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
-          <Text style={{ color: c.ink, fontSize: 26, fontWeight: "800", textAlign: align }}>
+          <Text style={{ color: c.ink, fontSize: 26, fontWeight: "700", textAlign: align }}>
             {t("tabs.profile")}
           </Text>
           <Pressable
@@ -83,7 +83,7 @@ export default function ProfileScreen() {
               justifyContent: "center",
             }}
           >
-            <Text style={{ color: c.inkMuted, fontSize: 20, fontWeight: "800" }}>{initials}</Text>
+            <Text style={{ color: c.inkMuted, fontSize: 20, fontWeight: "700" }}>{initials}</Text>
           </View>
           <View style={{ flex: 1, gap: 3 }}>
             <Text

@@ -111,7 +111,7 @@ export default function OffersScreen() {
         onEndReached={loadMore}
         ListHeaderComponent={
           <View style={{ gap: 14, marginBottom: 2 }}>
-            <Text style={{ color: c.ink, fontSize: 26, fontWeight: "800", letterSpacing: -0.5, textAlign: align }}>{t("offers.title")}</Text>
+            <Text style={{ color: c.ink, fontSize: 26, fontWeight: "700", letterSpacing: -0.5, textAlign: align }}>{t("offers.title")}</Text>
 
             {/* Search */}
             <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 10, backgroundColor: isDarkPalette(c) ? c.surface2 : c.surface, borderRadius: radius.md, borderWidth: 1, borderColor: c.line, paddingHorizontal: 14, paddingVertical: 12 }}>

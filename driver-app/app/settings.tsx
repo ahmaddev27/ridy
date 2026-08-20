@@ -90,7 +90,7 @@ export default function SettingsScreen() {
         <Pressable onPress={() => router.back()} hitSlop={10} style={{ padding: 6 }}>
           {isRTL() ? <ChevronRight size={24} color={c.ink} /> : <ChevronLeft size={24} color={c.ink} />}
         </Pressable>
-        <Text style={{ color: c.ink, fontSize: 20, fontWeight: "800", textAlign: align }}>{t("settings.title")}</Text>
+        <Text style={{ color: c.ink, fontSize: 20, fontWeight: "700", textAlign: align }}>{t("settings.title")}</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 22 }} keyboardShouldPersistTaps="handled">

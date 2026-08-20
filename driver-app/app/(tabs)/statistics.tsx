@@ -70,7 +70,7 @@ export default function StatisticsScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 16 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(range, day)} tintColor={c.ink} />}
       >
-        <Text style={{ color: c.ink, fontSize: 26, fontWeight: "800", textAlign: align }}>{t("stats.title")}</Text>
+        <Text style={{ color: c.ink, fontSize: 26, fontWeight: "700", textAlign: align }}>{t("stats.title")}</Text>
 
         {/* Range selector */}
         <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", gap: 8 }}>
@@ -100,7 +100,7 @@ export default function StatisticsScreen() {
         {/* Total income hero */}
         <View style={{ ...cardStyle(c), padding: 18, gap: 6 }}>
           <SectionLabel>{t("stats.totalIncome")}</SectionLabel>
-          <Text style={{ color: c.ink, fontSize: 36, fontWeight: "800", letterSpacing: -1, textAlign: align, writingDirection: "ltr" }}>
+          <Text style={{ color: c.ink, fontSize: 36, fontWeight: "700", letterSpacing: -1, textAlign: align, writingDirection: "ltr" }}>
             {fareLabel(null, stats?.earnings ?? 0)}
           </Text>
         </View>
@@ -210,7 +210,7 @@ function Cell({ label, value, unit, c, border }: { label: string; value: string;
   return (
     <View style={{ flex: 1, padding: 16, gap: 5, borderRightWidth: border && !isRTL() ? 1 : 0, borderLeftWidth: border && isRTL() ? 1 : 0, borderColor: c.line }}>
       <SectionLabel>{label}</SectionLabel>
-      <Text style={{ color: c.ink, fontSize: 24, fontWeight: "800", textAlign: align, writingDirection: "ltr" }}>
+      <Text style={{ color: c.ink, fontSize: 24, fontWeight: "700", textAlign: align, writingDirection: "ltr" }}>
         {value}
         {unit ? <Text style={{ fontSize: 15, fontWeight: "500", color: c.inkMuted }}> {unit}</Text> : null}
       </Text>

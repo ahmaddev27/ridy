@@ -51,7 +51,7 @@ export function UpdateGate({ children }: { children: React.ReactNode }) {
     return (
       <View style={{ flex: 1, backgroundColor: c.canvas, alignItems: "center", justifyContent: "center", padding: 32, gap: 16 }}>
         <Logo size={72} />
-        <Text style={{ color: c.ink, fontSize: 22, fontWeight: "800", textAlign: "center", marginTop: 8 }}>{t("update.title")}</Text>
+        <Text style={{ color: c.ink, fontSize: 22, fontWeight: "700", textAlign: "center", marginTop: 8 }}>{t("update.title")}</Text>
         <Text style={{ color: c.inkMuted, fontSize: 15, textAlign: "center", lineHeight: 22 }}>{t("update.body")}</Text>
         <View style={{ alignSelf: "stretch", marginTop: 8 }}>
           <PrimaryButton

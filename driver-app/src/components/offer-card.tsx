@@ -53,7 +53,7 @@ export function OfferCard({
             <StatusBadge status={status} label={t(`status.${status}`)} />
           )}
           <View style={{ flexDirection: rowDir(), alignItems: "flex-end", gap: 3 }}>
-            <Text style={{ color: c.ink, fontSize: 33, fontWeight: "800", letterSpacing: -1, textAlign: start() }}>
+            <Text style={{ color: c.ink, fontSize: 33, fontWeight: "700", letterSpacing: -1, textAlign: start() }}>
               {hero}
             </Text>
             {perKm && (
@@ -84,8 +84,8 @@ export function OfferCard({
         <MetaCol value={timeLabel(offer.received_at).split(",")[0]?.trim() || "—"} label={t("offer.received")} />
         <MetaDivider />
         <MetaCol
-          value={offer.rider_name || (timeLabel(offer.received_at).split(",")[1]?.trim() ?? "—")}
-          label={offer.rider_name ? t("offer.rider") : t("offer.requested")}
+          value={timeLabel(offer.received_at).split(",")[1]?.trim() ?? "—"}
+          label={t("offer.requested")}
         />
       </View>
 
@@ -102,14 +102,19 @@ export function OfferCard({
         </View>
       </View>
 
-      {/* 4 · Footer: driver (owner mode) + countdown/received */}
-      {(live || showDriver) && (
+      {/* 4 · Footer: rider (customer) + driver (owner mode) + countdown/received */}
+      {(live || showDriver || offer.rider_name) && (
         <View style={{ flexDirection: rowDir(), alignItems: "center", justifyContent: "space-between" }}>
-          {showDriver && offer.driver_name ? (
-            <Text style={{ color: c.inkMuted, fontSize: 12.5, fontWeight: "500" }}>{offer.driver_name}</Text>
-          ) : (
-            <View />
-          )}
+          <View style={{ flexDirection: rowDir(), alignItems: "center", gap: 8, flexShrink: 1 }}>
+            {offer.rider_name ? (
+              <Text numberOfLines={1} style={{ color: c.inkMuted, fontSize: 12.5, fontWeight: "500" }}>
+                {offer.rider_name} <Text style={{ color: c.inkSubtle }}>· {t("offer.rider")}</Text>
+              </Text>
+            ) : null}
+            {showDriver && offer.driver_name ? (
+              <Text numberOfLines={1} style={{ color: c.inkSubtle, fontSize: 12 }}>{offer.driver_name}</Text>
+            ) : null}
+          </View>
           {live && offer.accept_window_seconds != null && (
             <View style={{ flexDirection: rowDir(), alignItems: "center", gap: 6 }}>
               <Clock size={14} color={c.inkSubtle} />

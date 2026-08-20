@@ -45,14 +45,14 @@ export default function LoginScreen() {
           }}
         >
           <Logo size={30} />
-          <Text style={{ color: c.ink, fontSize: 21, fontWeight: "800", fontStyle: "italic", letterSpacing: 1.2 }}>
+          <Text style={{ color: c.ink, fontSize: 21, fontWeight: "700", fontStyle: "italic", letterSpacing: 1.2 }}>
             REIDEY
           </Text>
         </View>
 
         {/* Heading */}
         <View style={{ marginBottom: 28 }}>
-          <Text style={{ color: c.ink, fontSize: 30, fontWeight: "800", letterSpacing: -0.8, textAlign: align }}>
+          <Text style={{ color: c.ink, fontSize: 30, fontWeight: "700", letterSpacing: -0.8, textAlign: align }}>
             {t("login.submit")}
           </Text>
           <Text style={{ color: c.inkMuted, fontSize: 15, marginTop: 8, lineHeight: 21, textAlign: align }}>
