@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>REIDEY — We'll be right back</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      background: #080909;
+      color: #e8e9ea;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+      -webkit-font-smoothing: antialiased;
+    }
+    .card { max-width: 560px; }
+    .wordmark {
+      font-weight: 800;
+      font-style: italic;
+      font-size: clamp(2.75rem, 9vw, 4.5rem);
+      letter-spacing: 0.02em;
+      color: #ffffff;
+    }
+    .rule {
+      width: 44px;
+      height: 3px;
+      background: #2a2c2e;
+      border-radius: 2px;
+      margin: 28px auto;
+    }
+    .lead {
+      font-size: clamp(1.15rem, 3.5vw, 1.5rem);
+      font-weight: 600;
+      color: #f2f3f4;
+      line-height: 1.5;
+    }
+    .lead .ar { direction: rtl; unicode-bidi: isolate; }
+    .de {
+      margin-top: 10px;
+      font-size: clamp(1rem, 3vw, 1.2rem);
+      color: #a9adb1;
+      font-weight: 500;
+    }
+    .note {
+      margin-top: 26px;
+      font-size: 0.9rem;
+      color: #6b6f73;
+      line-height: 1.6;
+    }
+    .dots { display: inline-flex; gap: 6px; margin-top: 22px; }
+    .dots span {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #3a3d40;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    .dots span:nth-child(2) { animation-delay: 0.2s; }
+    .dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; transform: translateY(0); }
+      50% { opacity: 1; transform: translateY(-3px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .dots span { animation: none; opacity: 0.6; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="wordmark">REIDEY</div>
+    <div class="rule"></div>
+    <p class="lead">
+      <span class="ar">نعود قريباً</span> — We'll be right back
+    </p>
+    <p class="de">Wir sind gleich zurück</p>
+    <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    <p class="note">The site is updating. This only takes a moment — please refresh shortly.</p>
+  </main>
+</body>
+</html>

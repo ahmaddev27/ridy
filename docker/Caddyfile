@@ -34,4 +34,19 @@ reidey.de {
 	handle {
 		reverse_proxy frontend:3000
 	}
+
+	# When an upstream (Laravel or Next.js) is unreachable — a deploy restart or a
+	# crash — Caddy surfaces 502/503/504. Serve the branded maintenance page with
+	# 503 (uncached, tells crawlers it's temporary) + a Retry-After hint.
+	handle_errors {
+		@maint expression `{err.status_code} in [502, 503, 504]`
+		handle @maint {
+			root * /srv/maintenance
+			rewrite * /index.html
+			header Retry-After 30
+			file_server {
+				status 503
+			}
+		}
+	}
 }
