@@ -59,11 +59,6 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     Route::get('health', HealthController::class);
 
-    // TEMPORARY: verifies Sentry captures a real backend 500. Visit
-    // /api/v1/debug/boom in the browser. Remove after confirming Sentry works.
-    Route::get('debug/boom', function () {
-        throw new RuntimeException('Sentry backend test error — triggered from /debug/boom.');
-    });
     // Throttle the dashboard credential endpoint (super-admin/manager/reseller)
     // to blunt brute-force — every other auth endpoint is already throttled.
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
