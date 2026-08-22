@@ -12,9 +12,13 @@ class AdController extends Controller
 {
     public function current(): JsonResponse
     {
-        $ad = Ad::live()->inRandomOrder()->first();
+        $ads = Ad::live()
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (Ad $ad) => $this->present($ad))
+            ->all();
 
-        return response()->json(['data' => $ad ? $this->present($ad) : null]);
+        return response()->json(['data' => $ads]);
     }
 
     /** Serves an uploaded ad image by filename. Public so <img> loads without auth. */

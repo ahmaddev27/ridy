@@ -10,7 +10,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getDashboardSummary } from "@/lib/api/dashboard";
 import { LiveMap } from "@/components/dashboard/live-map";
-import { AdSlot } from "@/components/ads/ad-slot";
+import { AdBanner } from "@/components/ads/ad-banner";
 
 
 export default function DashboardPage() {
@@ -23,6 +23,9 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader tkey="dashboard" />
+
+      {/* Sponsored banner — full width, above the stat cards */}
+      <AdBanner />
 
       {error && (
         <div className="rounded-lg border border-rose-200 bg-danger-bg p-3 text-sm text-danger-fg">
@@ -111,8 +114,6 @@ export default function DashboardPage() {
           </Card>
         )}
 
-          {/* Sponsored slot lives under the subscription card, beside the map */}
-          <AdSlot layout="stacked" />
         </div>
 
         {/* Live fleet map — drivers list + statuses live inside it */}

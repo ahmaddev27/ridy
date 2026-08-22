@@ -15,6 +15,7 @@ import { useAsync } from "@/hooks/use-async";
 import { listDrivers, syncDrivers, inviteDriver, testDriverPush, updateDriverEmail, type Driver } from "@/lib/api/drivers";
 import { apiErrorMessage } from "@/lib/api/error-message";
 import { syncRosterViaExtension, fetchDriverStatusesViaExtension } from "@/lib/extension";
+import { AdBanner } from "@/components/ads/ad-banner";
 
 export default function DriversPage() {
   const { t } = useI18n();
@@ -154,6 +155,9 @@ export default function DriversPage() {
           </Button>
         }
       />
+
+      {/* Sponsored banner — full width, renders nothing when none live. */}
+      <AdBanner />
 
       <Card className="overflow-hidden">
         {loading ? (

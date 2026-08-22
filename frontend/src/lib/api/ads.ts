@@ -57,8 +57,8 @@ export async function uploadAdImage(image: Blob): Promise<string> {
   return res.data.url;
 }
 
-/** The current live ad for the signed-in company's Offers slot. */
-export async function getCurrentAd(): Promise<CurrentAd | null> {
-  const res = await apiFetch<{ data: CurrentAd | null }>("/api/v1/ads/current");
-  return res.data;
+/** All currently-live ads for the signed-in company's banner slot (empty when none). */
+export async function getLiveAds(): Promise<CurrentAd[]> {
+  const res = await apiFetch<{ data: CurrentAd[] }>("/api/v1/ads/current");
+  return res.data ?? [];
 }

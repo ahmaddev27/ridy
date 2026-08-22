@@ -33,7 +33,7 @@ const OFFER_TONE: Record<OfferStatus, Status> = {
 import { StatCard } from "@/components/ui/card";
 import { listDrivers, type Driver } from "@/lib/api/drivers";
 import { OfferDetailModal } from "./offer-detail-modal";
-import { AdSlot } from "@/components/ads/ad-slot";
+import { AdBanner } from "@/components/ads/ad-banner";
 
 export default function OffersPage() {
   const { t, locale } = useI18n();
@@ -214,8 +214,8 @@ export default function OffersPage() {
     <div className="space-y-6">
       <PageHeader title={c("title")} subtitle={c("subtitle")} />
 
-      {/* Platform ad slot (super-admin authored); renders nothing when none live. */}
-      <AdSlot />
+      {/* Platform ad banner (super-admin authored); renders nothing when none live. */}
+      <AdBanner />
 
       {/* Toolbar: search + driver filter + bulk delete */}
       <div className="flex flex-wrap items-center gap-3">

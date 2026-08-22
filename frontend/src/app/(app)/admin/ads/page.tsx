@@ -254,6 +254,7 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-ink">{c("fieldImage")}</label>
+          <p className="mb-2 text-xs text-ink-subtle">{c("imageHint")}</p>
           {previewSrc && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -308,7 +309,7 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
       </div>
 
       {cropFile && (
-        <ImageCropper file={cropFile} aspect={3 / 4} onCancel={() => setCropFile(null)} onCropped={onCropped} />
+        <ImageCropper file={cropFile} aspect={4 / 1} onCancel={() => setCropFile(null)} onCropped={onCropped} />
       )}
     </Modal>
   );
