@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MapLibreMap, Marker, StyleSpecification } from "maplibre-gl";
 import { RefreshCw } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
-import { getLiveDrivers, type LiveDriver } from "@/lib/api/drivers";
+import { getLiveDrivers, type LiveDriver, type LiveWaypoint } from "@/lib/api/drivers";
 import { presence, PRESENCE_COLOR, PRESENCE_TONE, PRESENCE_LABEL_KEY, type Presence } from "@/lib/driver-status";
 
 function escapeHtml(s: string): string {
@@ -123,6 +123,9 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
   // One persistent marker per driver, so positions animate (tween) between polls
   // instead of the whole layer being cleared and redrawn (which made cars "jump").
   const markersRef = useRef<Map<number, DriverMarker>>(new Map());
+  // Last-known pickup/drop-off per driver, kept for the whole engaged trip — Uber
+  // trims the pickup once ON_TRIP, so cache them so the stops never vanish mid-trip.
+  const waypointsRef = useRef<Map<number, LiveWaypoint[]>>(new Map());
 
   const [count, setCount] = useState<number | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
@@ -186,14 +189,34 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
           animateTo(entry, entry.marker.getLngLat(), to);
         }
 
-        // Waypoints (pickup/dropoff route) are cheap to rebuild each poll.
-        const wp = d.waypoints ?? [];
-        if (wp.length >= 2) {
-          lineFeatures.push({
-            type: "Feature",
-            properties: { color },
-            geometry: { type: "LineString", coordinates: wp.map((w) => [w.lng, w.lat]) },
-          });
+        // Draw the ACTIVE leg from the car itself to its current target: heading
+        // to pickup (en route) → car → pickup; rider aboard (on trip) → car →
+        // drop-off. So the line always originates at the driver, not between the
+        // two stops. Colored by presence so the leg reads at a glance.
+        const phase = presence(d.status);
+        const engaged = phase === "on_trip" || phase === "en_route";
+        const wpCache = waypointsRef.current;
+        // Cache fresh waypoints; while engaged, fall back to the cached set when a
+        // poll trims them (so ON_TRIP keeps showing both pickup and drop-off).
+        let wp = d.waypoints ?? [];
+        if (wp.length > 0) wpCache.set(d.id, wp);
+        else if (engaged && wpCache.has(d.id)) wp = wpCache.get(d.id)!;
+        if (!engaged) wpCache.delete(d.id);
+
+        if (wp.length > 0) {
+          const pickup = wp.find((w) => (w.type ?? "").toUpperCase().includes("PICKUP"));
+          const dropoff = wp.find((w) => (w.type ?? "").toUpperCase().includes("DROPOFF")) ?? wp.find((w) => w !== pickup);
+          const target = phase === "on_trip" ? dropoff : phase === "en_route" ? pickup : null;
+
+          if (target) {
+            lineFeatures.push({
+              type: "Feature",
+              properties: { color },
+              geometry: { type: "LineString", coordinates: [[d.lng, d.lat], [target.lng, target.lat]] },
+            });
+            points.push([d.lat, d.lng]); // keep the car in view when fitting
+          }
+
           for (const w of wp) {
             const isPickup = (w.type ?? "").toUpperCase().includes("PICKUP");
             pointFeatures.push({
@@ -212,6 +235,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
           if (entry.raf) cancelAnimationFrame(entry.raf);
           entry.marker.remove();
           registry.delete(id);
+          waypointsRef.current.delete(id);
         }
       }
 
