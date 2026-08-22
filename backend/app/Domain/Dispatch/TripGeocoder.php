@@ -58,6 +58,16 @@ class TripGeocoder
         $offer->dropoff_lat = $dropoff['lat'] ?? null;
         $offer->dropoff_lng = $dropoff['lng'] ?? null;
 
+        // Unify the displayed address to German when the geocoder resolved one.
+        // A fresh hit carries the German display_name; cached hits don't, so the
+        // existing (already Latin-digit) text stands until the address is re-geocoded.
+        if (! empty($pickup['address'])) {
+            $offer->pickup_address = $pickup['address'];
+        }
+        if (! empty($dropoff['address'])) {
+            $offer->dropoff_address = $dropoff['address'];
+        }
+
         if ($pickup && $dropoff) {
             $route = $this->route($pickup, $dropoff);
             $offer->distance_m = $route['distance_m'] ?? null;
@@ -101,6 +111,7 @@ class TripGeocoder
                     'format' => 'json',
                     'limit' => 1,
                     'countrycodes' => 'de', // fleet is German — bias + speed up resolution
+                    'accept-language' => 'de', // return the German address, not the driver's app locale
                 ]);
         } catch (\Throwable $e) {
             return null; // transient (timeout/network) — do NOT cache, so a retry can succeed
@@ -116,6 +127,13 @@ class TripGeocoder
         $coords = ($hit && isset($hit['lat'], $hit['lon']))
             ? ['lat' => (float) $hit['lat'], 'lng' => (float) $hit['lon']]
             : null;
+
+        // Nominatim's German display_name unifies the address to one language
+        // regardless of the captured session's locale. Carried on the fresh
+        // result so enrich() can replace the offer's localized address text.
+        if ($coords !== null && is_string($hit['display_name'] ?? null) && $hit['display_name'] !== '') {
+            $coords['address'] = $hit['display_name'];
+        }
 
         // Atomic upsert (INSERT ... ON DUPLICATE KEY UPDATE): two requests geocoding
         // the same address concurrently would race a check-then-insert and trip the

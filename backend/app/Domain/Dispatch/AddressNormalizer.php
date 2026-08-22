@@ -23,10 +23,24 @@ class AddressNormalizer
      */
     private const NON_LATIN = '/(?=\p{L})\P{Latin}/u';
 
+    /** Arabic-Indic + Persian digits → ASCII, so numbers are always Latin. */
+    private const EASTERN_DIGITS = [
+        '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4', '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4', '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+    ];
+
+    /** Convert eastern (Arabic/Persian) digits to Latin. Uber localises numbers to
+     *  the driver's app language; we always store/parse them as Latin. */
+    public static function latinizeDigits(?string $value): ?string
+    {
+        return $value === null ? null : strtr($value, self::EASTERN_DIGITS);
+    }
+
     /**
-     * Return the address with any non-Latin (localised country) segment removed
-     * and whitespace tidied. Idempotent, so it is safe to apply on both write
-     * and read. Falls back to the trimmed original if stripping empties it.
+     * Return the address with any non-Latin (localised country) segment removed,
+     * digits Latinized, and whitespace tidied. Splits on both the Latin (,) and
+     * Arabic (،) comma. Idempotent, safe on write and read. Falls back to the
+     * digit-Latinized original if stripping empties it.
      */
     public static function clean(?string $address): ?string
     {
@@ -34,13 +48,13 @@ class AddressNormalizer
             return null;
         }
 
-        $original = trim($address);
+        $original = trim((string) self::latinizeDigits($address));
         if ($original === '') {
             return $original;
         }
 
         $kept = array_filter(
-            array_map('trim', explode(',', $original)),
+            array_map('trim', preg_split('/[,،]/u', $original) ?: [$original]),
             static fn (string $segment): bool => $segment !== ''
                 && preg_match(self::NON_LATIN, $segment) !== 1,
         );
