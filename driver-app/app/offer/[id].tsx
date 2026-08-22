@@ -25,6 +25,9 @@ const STROKE = 10;
 const R = (RING - STROKE) / 2;
 const CIRC = 2 * Math.PI * R;
 
+/** How long the on-screen accept countdown runs (seconds). */
+const COUNTDOWN_SECONDS = 10;
+
 /**
  * Seconds remaining in the accept window, refreshed every animation frame so the
  * SVG ring depletes smoothly. The frame loop only runs while the offer is still
@@ -35,8 +38,8 @@ const CIRC = 2 * Math.PI * R;
 function useCountdown(offer: Offer | null): number | null {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!offer?.received_at || !offer.accept_window_seconds || offer.status !== "pending") return;
-    const deadline = new Date(offer.received_at).getTime() + offer.accept_window_seconds * 1000;
+    if (!offer?.received_at || offer.status !== "pending") return;
+    const deadline = new Date(offer.received_at).getTime() + COUNTDOWN_SECONDS * 1000;
     let raf = 0;
     const tick = () => {
       setNow(Date.now());
@@ -46,8 +49,8 @@ function useCountdown(offer: Offer | null): number | null {
     return () => cancelAnimationFrame(raf);
   }, [offer]);
   return useMemo(() => {
-    if (!offer?.received_at || !offer.accept_window_seconds) return null;
-    const deadline = new Date(offer.received_at).getTime() + offer.accept_window_seconds * 1000;
+    if (!offer?.received_at) return null;
+    const deadline = new Date(offer.received_at).getTime() + COUNTDOWN_SECONDS * 1000;
     return Math.max(0, (deadline - now) / 1000);
   }, [offer, now]);
 }
@@ -62,12 +65,28 @@ export default function OfferScreen() {
   const secondsLeft = useCountdown(offer);
   const row = isRTL() ? "row-reverse" : "row";
 
+  // Load once, then poll so the status tracks the backend lifecycle (pending →
+  // rejected / accepted / started / completed / canceled), just like the
+  // dashboard — instead of a local "expired" that never updates.
   useEffect(() => {
-    const fetcher = isOwner ? api.fleetOffers({ per_page: 50 }) : api.offers();
-    fetcher.then((r) => {
-      const found = r.data.find((o) => String(o.id) === String(id));
-      found ? setOffer(found) : setError(true);
-    }).catch(() => setError(true));
+    let alive = true;
+    const load = () => {
+      const fetcher = isOwner ? api.fleetOffers({ per_page: 50 }) : api.offers();
+      fetcher
+        .then((r) => {
+          if (!alive) return;
+          const found = r.data.find((o) => String(o.id) === String(id));
+          if (found) setOffer(found);
+          else setError(true);
+        })
+        .catch(() => alive && setError(true));
+    };
+    load();
+    const iv = setInterval(load, 4000);
+    return () => {
+      alive = false;
+      clearInterval(iv);
+    };
   }, [id, isOwner]);
 
   function openMaps() {
@@ -79,7 +98,7 @@ export default function OfferScreen() {
   }
 
   const status = offer?.status ?? "pending";
-  const win = offer?.accept_window_seconds ?? 0;
+  const win = COUNTDOWN_SECONDS;
   const pct = secondsLeft != null && win > 0 ? Math.max(0, Math.min(1, secondsLeft / win)) : 0;
   // The accept window (and therefore "expired") only applies while the offer is
   // still open. Once it has been accepted/started/completed the trip is active,
@@ -141,11 +160,20 @@ export default function OfferScreen() {
                 );
               })()}
             </View>
-            {isPending && secondsLeft != null && (
-              <Text style={{ color: ringColor, fontSize: 16, fontWeight: "600", marginTop: 6 }}>
-                {expired ? t("offer.expired") : `${secondsLeft.toFixed(1)}s`}
-              </Text>
-            )}
+            {/* While pending + counting: the seconds left. Once the window passes
+                (or the trip moves on): the offer's live status — pending, then
+                rejected / accepted / started / completed / canceled as the backend
+                updates it — instead of a static "Expired". */}
+            <Text
+              style={{
+                color: isPending && !expired && secondsLeft != null ? ringColor : c.inkMuted,
+                fontSize: 16,
+                fontWeight: "600",
+                marginTop: 6,
+              }}
+            >
+              {isPending && !expired && secondsLeft != null ? `${secondsLeft.toFixed(1)}s` : t(`status.${status}`)}
+            </Text>
           </View>
 
           {/* Status row */}
