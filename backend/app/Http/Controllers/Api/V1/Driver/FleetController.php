@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Driver;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
 use App\Http\Controllers\Controller;
@@ -131,7 +132,12 @@ class FleetController extends Controller
             'email' => $owner->email,
             'locale' => $owner->locale,
             'company_name' => $owner->tenant?->name,
-            'uber_linked' => false,
+            // Reflect the company's active fleet session (owners have no personal
+            // Uber link), so the app matches the dashboard's "Connected" status.
+            'uber_linked' => UberFleetSession::withoutGlobalScopes()
+                ->where('tenant_id', $owner->tenant_id)
+                ->where('status', UberFleetSession::STATUS_ACTIVE)
+                ->exists(),
             'is_owner' => true,
         ]]);
     }

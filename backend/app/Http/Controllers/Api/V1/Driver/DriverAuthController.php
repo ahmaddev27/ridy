@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Driver;
 
+use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
@@ -198,8 +199,20 @@ class DriverAuthController extends Controller
             'email' => $owner->email,
             'locale' => $owner->locale,
             'company_name' => $owner->tenant?->name,
-            'uber_linked' => false,
+            // Owners don't link a personal Uber; reflect the company's fleet
+            // session instead, so the profile matches the dashboard's status.
+            'uber_linked' => $this->tenantUberLinked($owner->tenant_id),
             'is_owner' => true,
         ];
+    }
+
+    /** True when the owner's company has an active captured Uber fleet session. */
+    private function tenantUberLinked(?int $tenantId): bool
+    {
+        return $tenantId !== null
+            && UberFleetSession::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('status', UberFleetSession::STATUS_ACTIVE)
+                ->exists();
     }
 }
