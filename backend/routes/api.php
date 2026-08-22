@@ -116,6 +116,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware(['auth:sanctum', 'driver.active'])->prefix('fleet')->group(function () {
             Route::get('me', [FleetController::class, 'me']);
             Route::patch('me', [FleetController::class, 'update']);
+            Route::post('logout', [FleetController::class, 'logout']);
             Route::get('home', [FleetController::class, 'home']);
             Route::get('drivers', [FleetController::class, 'drivers']);
             Route::get('offers', [FleetController::class, 'offers']);

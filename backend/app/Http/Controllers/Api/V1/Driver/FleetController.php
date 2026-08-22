@@ -111,6 +111,15 @@ class FleetController extends Controller
         return $this->me($request);
     }
 
+    /** Revoke the owner's current app token. The driver logout route is auth:driver
+     *  and would 401 an owner, leaving their token valid server-side. */
+    public function logout(Request $request): JsonResponse
+    {
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json(['message' => 'ok']);
+    }
+
     public function me(Request $request): JsonResponse
     {
         $owner = $request->user();

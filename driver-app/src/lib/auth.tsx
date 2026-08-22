@@ -123,7 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // as a driver) would keep getting the owner's tenant-wide offer fan-out.
     await unregisterForPush(isOwner);
     try {
-      await api.logout();
+      // Owners revoke on their User token via the fleet route; the driver
+      // /logout (auth:driver) would 401 an owner and leave the token valid.
+      await (isOwner ? api.fleetLogout() : api.logout());
     } catch {
       /* best-effort */
     }

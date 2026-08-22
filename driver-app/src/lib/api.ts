@@ -234,6 +234,12 @@ export class ApiClient {
     return this.request<{ message: string }>("/api/v1/driver/logout", { method: "POST" });
   }
 
+  /** Owner logout on the User token — the driver /logout route is auth:driver
+   *  and would 401 an owner, leaving their token valid server-side. */
+  fleetLogout() {
+    return this.request<{ message: string }>("/api/v1/driver/fleet/logout", { method: "POST" });
+  }
+
   registerDevice(token: string, platform: "android" | "ios") {
     return this.request<{ data: { id: number } }>("/api/v1/driver/devices", {
       method: "POST",
