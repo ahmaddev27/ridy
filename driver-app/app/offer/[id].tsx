@@ -161,30 +161,28 @@ export default function OfferScreen() {
               })()}
             </View>
             {/* While pending + counting: the seconds left. Once the window passes
-                (or the trip moves on): the offer's live status — pending, then
-                rejected / accepted / started / completed / canceled as the backend
-                updates it — instead of a static "Expired". */}
-            <Text
-              style={{
-                color: isPending && !expired && secondsLeft != null ? ringColor : c.inkMuted,
-                fontSize: 16,
-                fontWeight: "600",
-                marginTop: 6,
-              }}
-            >
-              {isPending && !expired && secondsLeft != null ? `${secondsLeft.toFixed(1)}s` : t(`status.${status}`)}
-            </Text>
+                (or the trip moves on): the offer's live status as a colored badge —
+                pending, then rejected / accepted / started / completed / canceled as
+                the backend updates it. This is the single status indicator. */}
+            {isPending && !expired && secondsLeft != null ? (
+              <Text style={{ color: ringColor, fontSize: 16, fontWeight: "600", marginTop: 6 }}>
+                {`${secondsLeft.toFixed(1)}s`}
+              </Text>
+            ) : (
+              <View style={{ marginTop: 8 }}>
+                <StatusBadge status={status} label={t(`status.${status}`)} />
+              </View>
+            )}
           </View>
 
-          {/* Status row */}
-          <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 12 }}>
-            <StatusBadge status={status} label={t(`status.${status}`)} />
-            {offer.received_at && (
+          {/* Received time (the status now lives in the badge under the ring). */}
+          {offer.received_at && (
+            <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center" }}>
               <Text style={{ color: c.inkSubtle, fontSize: 15 }}>
                 {new Date(offer.received_at).toLocaleTimeString("en-GB")}
               </Text>
-            )}
-          </View>
+            </View>
+          )}
 
           {/* Quick action: open the pickup → drop-off route in the maps app. */}
           <SecondaryButton label={t("offer.openMaps")} icon={Map} onPress={openMaps} />
