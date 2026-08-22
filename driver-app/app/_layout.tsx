@@ -125,12 +125,6 @@ function Gate() {
     else if (driver && inAuth) router.replace("/");
   }, [ready, driver, offline, segments, router]);
 
-  // A stored session we couldn't restore because the server is unreachable:
-  // show "check your connection" instead of logging the user out.
-  if (ready && offline && !driver) {
-    return <OfflineScreen onRetry={retry} />;
-  }
-
   // Once signed in: register for push and open the offer when a notification is tapped.
   useEffect(() => {
     if (!driver) return;
@@ -177,6 +171,14 @@ function Gate() {
     const sub = Notifications.addNotificationResponseReceivedListener(handle);
     return () => sub.remove();
   }, [driver, isOwner, router]);
+
+  // A stored session we couldn't restore because the server is unreachable:
+  // show "check your connection" instead of logging the user out. This early
+  // return sits AFTER every hook — returning before them renders fewer hooks on
+  // the offline render than the online one and crashes reconciliation.
+  if (ready && offline && !driver) {
+    return <OfflineScreen onRetry={retry} />;
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.canvas } }}>

@@ -29,8 +29,12 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${tajawal.variable} h-full`}>
+    <html lang="en" translate="no" className={`${inter.variable} ${tajawal.variable} h-full`}>
       <head>
+        {/* The UI is already multilingual (user picks the language). Browser
+            auto-translation rewrites text nodes out from under React, which
+            triggers a "removeChild" NotFoundError crash during reconciliation. */}
+        <meta name="google" content="notranslate" />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-full bg-canvas text-ink antialiased">
