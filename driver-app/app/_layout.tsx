@@ -13,6 +13,7 @@ import { useColors, setThemeMode, type ThemeMode } from "@/lib/theme";
 import { useAppFonts } from "@/lib/fonts";
 import { setLocale } from "@/lib/i18n";
 import { UpdateGate } from "@/components/update-gate";
+import { OfflineScreen } from "@/components/offline-screen";
 import { initSentry, Sentry } from "@/lib/sentry";
 
 // Start crash/error reporting as early as possible (inert without a DSN).
@@ -96,7 +97,7 @@ function openRouteInMaps(pickup?: string, dropoff?: string): void {
 /** Routes the user between auth screens and the app based on session state, and
  *  wires push registration + notification-tap navigation once signed in. */
 function Gate() {
-  const { ready, driver, isOwner } = useAuth();
+  const { ready, driver, isOwner, offline, retry } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const c = useColors();
@@ -114,12 +115,21 @@ function Gate() {
   // Auth gate — only once the session is known. Onboarding screens self-navigate.
   useEffect(() => {
     if (!ready) return;
+    // Offline with a stored session: don't bounce to login — the offline screen
+    // (rendered below) keeps the session and offers a retry.
+    if (offline && !driver) return;
     const seg = segments[0];
     if (seg === "splash" || seg === "language" || seg === "onboarding") return;
     const inAuth = seg === "login" || seg === "activate";
     if (!driver && !inAuth) router.replace("/login");
     else if (driver && inAuth) router.replace("/");
-  }, [ready, driver, segments, router]);
+  }, [ready, driver, offline, segments, router]);
+
+  // A stored session we couldn't restore because the server is unreachable:
+  // show "check your connection" instead of logging the user out.
+  if (ready && offline && !driver) {
+    return <OfflineScreen onRetry={retry} />;
+  }
 
   // Once signed in: register for push and open the offer when a notification is tapped.
   useEffect(() => {

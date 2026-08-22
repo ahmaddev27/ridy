@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import * as SecureStore from "expo-secure-store";
 import { api, ApiError, type DriverProfile } from "./api";
 import { setLocale } from "./i18n";
@@ -11,6 +11,10 @@ type AuthState = {
   driver: DriverProfile | null;
   /** True when the signed-in account is a company owner/manager (read-only fleet monitor). */
   isOwner: boolean;
+  /** True when a stored session exists but the server is unreachable (offline). */
+  offline: boolean;
+  /** Retry restoring the session (used by the offline screen). */
+  retry: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   activate: (inviteToken: string, password: string) => Promise<void>;
   updateProfile: (patch: { name?: string; locale?: string; password?: string }) => Promise<void>;
@@ -23,6 +27,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [driver, setDriver] = useState<DriverProfile | null>(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [offline, setOffline] = useState(false);
+
+  // Restore a stored session. Distinguishes three outcomes:
+  //  - success            → profile applied, into the app
+  //  - 401 (dead token)    → session cleared, to the login screen
+  //  - network / 5xx error → KEEP the token and flag offline, so we show a
+  //    "check your connection" screen instead of logging the user out.
+  const restore = useCallback(async () => {
+    const token = await SecureStore.getItemAsync(TOKEN_KEY);
+    const owner = (await SecureStore.getItemAsync(OWNER_KEY)) === "1";
+    if (!token) {
+      setReady(true);
+
+      return;
+    }
+    api.setToken(token);
+    try {
+      const me = owner ? await api.fleetMe() : await api.me();
+      applyProfile(me.data, owner);
+      setOffline(false);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        await SecureStore.deleteItemAsync(TOKEN_KEY);
+        await SecureStore.deleteItemAsync(OWNER_KEY);
+        api.setToken(null);
+        setOffline(false);
+      } else {
+        // Server unreachable (no internet / timeout / 5xx): keep the session and
+        // surface the offline screen; a retry re-runs this.
+        setOffline(true);
+      }
+    } finally {
+      setReady(true);
+    }
+  }, []);
 
   // Restore a stored session on launch.
   useEffect(() => {
@@ -33,33 +72,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       api.setToken(null);
       setDriver(null);
       setIsOwner(false);
+      setOffline(false);
     };
 
-    (async () => {
-      const token = await SecureStore.getItemAsync(TOKEN_KEY);
-      const owner = (await SecureStore.getItemAsync(OWNER_KEY)) === "1";
-      if (token) {
-        api.setToken(token);
-        try {
-          // Owners resolve on the User token via the fleet endpoint.
-          const me = owner ? await api.fleetMe() : await api.me();
-          applyProfile(me.data, owner);
-        } catch (e) {
-          // Only a genuine auth failure (401) ends the session. A transient
-          // network / 5xx error must KEEP the stored token so a later launch can
-          // restore the session — otherwise a flaky connection at boot silently
-          // logs the user (notably a fleet owner) out. A 401 is already handled by
-          // onSessionInvalid; clear here too so this boot doesn't restore a dead one.
-          if (e instanceof ApiError && e.status === 401) {
-            await SecureStore.deleteItemAsync(TOKEN_KEY);
-            await SecureStore.deleteItemAsync(OWNER_KEY);
-            api.setToken(null);
-          }
-        }
-      }
-      setReady(true);
-    })();
-  }, []);
+    restore();
+  }, [restore]);
+
+  const retry = useCallback(async () => {
+    await restore();
+  }, [restore]);
 
   function applyProfile(d: DriverProfile, owner: boolean) {
     if (d.locale) setLocale(d.locale);
@@ -107,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ ready, driver, isOwner, login, activate, updateProfile, logout }}>
+    <AuthContext.Provider value={{ ready, driver, isOwner, offline, retry, login, activate, updateProfile, logout }}>
       {children}
     </AuthContext.Provider>
   );
