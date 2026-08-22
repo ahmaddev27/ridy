@@ -36,6 +36,13 @@ class AddressNormalizer
         return $value === null ? null : strtr($value, self::EASTERN_DIGITS);
     }
 
+    /** True when the string still contains a non-Latin letter (an Arabic, Cyrillic,
+     *  etc. street/city name that only a re-geocode can render in German). */
+    public static function hasNonLatinLetters(?string $value): bool
+    {
+        return $value !== null && preg_match(self::NON_LATIN, $value) === 1;
+    }
+
     /**
      * Return the address with any non-Latin (localised country) segment removed,
      * digits Latinized, and whitespace tidied. Splits on both the Latin (,) and

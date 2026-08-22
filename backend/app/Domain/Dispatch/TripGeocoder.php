@@ -100,7 +100,15 @@ class TripGeocoder
 
         $cached = DB::table('geocode_cache')->where('query', $address)->first();
         if ($cached !== null) {
-            return $cached->lat !== null ? ['lat' => (float) $cached->lat, 'lng' => (float) $cached->lng] : null;
+            if ($cached->lat === null) {
+                return null;
+            }
+            $result = ['lat' => (float) $cached->lat, 'lng' => (float) $cached->lng];
+            if (! empty($cached->label)) {
+                $result['address'] = $cached->label; // unify to German even from cache
+            }
+
+            return $result;
         }
 
         try {
@@ -143,9 +151,9 @@ class TripGeocoder
         // the same address concurrently would race a check-then-insert and trip the
         // unique key (1062). upsert lets the loser update instead of erroring.
         DB::table('geocode_cache')->upsert(
-            [['query' => $address, 'lat' => $coords['lat'] ?? null, 'lng' => $coords['lng'] ?? null, 'updated_at' => now(), 'created_at' => now()]],
+            [['query' => $address, 'lat' => $coords['lat'] ?? null, 'lng' => $coords['lng'] ?? null, 'label' => $coords['address'] ?? null, 'updated_at' => now(), 'created_at' => now()]],
             ['query'],
-            ['lat', 'lng', 'updated_at'],
+            ['lat', 'lng', 'label', 'updated_at'],
         );
 
         return $coords;
