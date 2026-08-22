@@ -3,7 +3,7 @@ import { View, Pressable, ActivityIndicator, Linking, ScrollView } from "react-n
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, ChevronRight, User, UserCircle, Car, Map, type LucideIcon } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, User, UserCircle, Map, type LucideIcon } from "lucide-react-native";
 import Svg, { Circle } from "react-native-svg";
 import { api, type Offer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -158,17 +158,8 @@ export default function OfferScreen() {
             )}
           </View>
 
-          {/* Quick actions up top so the driver reaches map / Uber fast. */}
-          <View style={{ flexDirection: row, gap: 10 }}>
-            <SecondaryButton label={t("offer.openMaps")} icon={Map} onPress={openMaps} style={{ flex: 1 }} />
-            <Pressable
-              onPress={() => Linking.openURL("uberdriver://").catch(() => Linking.openURL("https://drivers.uber.com"))}
-              style={{ flex: 1, flexDirection: isRTL() ? "row-reverse" : "row", gap: 8, backgroundColor: c.primary, borderRadius: radius.control, paddingVertical: 13, alignItems: "center", justifyContent: "center" }}
-            >
-              <Car size={17} color={c.primaryInk} />
-              <Text style={{ color: c.primaryInk, fontSize: 15, fontWeight: "700" }}>{t("offer.openUber")}</Text>
-            </Pressable>
-          </View>
+          {/* Quick action: open the pickup → drop-off route in the maps app. */}
+          <SecondaryButton label={t("offer.openMaps")} icon={Map} onPress={openMaps} />
 
           {/* People — rider (when captured) and, in fleet-owner mode, the driver. */}
           {(offer.rider_name || (isOwner && offer.driver_name)) && (
