@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { latnLocale } from "@/lib/utils";
-import { Users, Wifi, Link2, Car, Radio, AlertTriangle, KeyRound } from "lucide-react";
+import { Users, Wifi, Car, Radio, KeyRound } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { RedeemCodeModal } from "@/components/subscription/redeem-code-modal";
@@ -33,31 +33,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <StatCard icon={Users} label={k("statDrivers")} value={loading ? "…" : (data?.drivers ?? 0)} />
-        <StatCard
-          icon={Wifi}
-          label={k("statOnline")}
-          value={loading ? "…" : (data?.online_drivers ?? 0)}
-          tone={data?.online_drivers ? "positive" : "default"}
-        />
-        <StatCard
-          icon={Link2}
-          label={k("statLinked")}
-          value={loading ? "…" : (data?.linked_drivers ?? 0)}
-          tone="positive"
-        />
-        <StatCard icon={Car} label={k("statVehicles")} value={loading ? "…" : (data?.vehicles ?? 0)} />
-        <StatCard icon={Radio} label={k("statOffersToday")} value={loading ? "…" : (data?.offers_today ?? 0)} />
-        <StatCard
-          icon={AlertTriangle}
-          label={k("statUnlinked")}
-          value={loading ? "…" : (data?.unlinked_offers ?? 0)}
-          tone={data?.unlinked_offers ? "warning" : "default"}
-        />
-      </div>
-
-      {/* Subscription + live map — one row, side by side */}
+      {/* Subscription + stat cards (left) beside the live map (right) */}
       <div className="grid items-start gap-6 lg:grid-cols-3">
         <div className="space-y-6">
         {data?.subscription && (
@@ -114,6 +90,18 @@ export default function DashboardPage() {
           </Card>
         )}
 
+          {/* Key stats — 2 per row, under the subscription */}
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard
+              icon={Wifi}
+              label={k("statOnline")}
+              value={loading ? "…" : (data?.online_drivers ?? 0)}
+              tone={data?.online_drivers ? "positive" : "default"}
+            />
+            <StatCard icon={Radio} label={k("statOffersToday")} value={loading ? "…" : (data?.offers_today ?? 0)} />
+            <StatCard icon={Users} label={k("statDrivers")} value={loading ? "…" : (data?.drivers ?? 0)} />
+            <StatCard icon={Car} label={k("statVehicles")} value={loading ? "…" : (data?.vehicles ?? 0)} />
+          </div>
         </div>
 
         {/* Live fleet map — drivers list + statuses live inside it */}
