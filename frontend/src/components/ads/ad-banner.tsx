@@ -110,30 +110,28 @@ function AdSlide({
         active ? "z-10 opacity-100" : "z-0 opacity-0"
       }`}
     >
+      {/* Image-first: the ad is just the image + a CTA button, no promo text. */}
       {imageSrc && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={imageSrc} alt="" className="absolute inset-0 h-full w-full object-cover" />
       )}
-      {/* Dark scrim for legibility of the left-aligned overlay text. */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/35 to-transparent rtl:bg-gradient-to-l" />
 
-      <div className="relative flex h-full flex-col justify-center gap-1.5 p-4 sm:gap-2 sm:p-6 md:max-w-[60%]">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-white/70">
-          {t("screens.ads.slotSponsored")}
-        </span>
-        <h3 className="text-lg font-bold text-white sm:text-2xl">{ad.title}</h3>
-        {ad.body && <p className="truncate text-sm text-white/80">{ad.body}</p>}
-        {ad.link_url && (
-          <div className="mt-1.5">
-            <a href={ad.link_url} target="_blank" rel="noopener noreferrer nofollow" tabIndex={active ? 0 : -1}>
-              <Button variant="secondary" size="sm">
-                {cta}
-                <ExternalLink className="h-3.5 w-3.5" />
-              </Button>
-            </a>
-          </div>
-        )}
-      </div>
+      {/* Small "Sponsored" tag, top-start. */}
+      <span className="absolute top-3 z-10 rounded-md bg-black/45 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/90 ltr:left-3 rtl:right-3">
+        {t("screens.ads.slotSponsored")}
+      </span>
+
+      {/* CTA button, pinned bottom-end (right). */}
+      {ad.link_url && (
+        <div className="absolute bottom-4 z-10 ltr:right-4 rtl:left-4">
+          <a href={ad.link_url} target="_blank" rel="noopener noreferrer nofollow" tabIndex={active ? 0 : -1}>
+            <Button variant="secondary" size="sm">
+              {cta}
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Button>
+          </a>
+        </div>
+      )}
     </div>
   );
 }

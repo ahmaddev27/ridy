@@ -78,7 +78,7 @@ class AdController extends Controller
         }
 
         return $request->validate([
-            'title' => ['required', 'string', 'max:255'],
+            'title' => ['nullable', 'string', 'max:255'],
             'body' => ['nullable', 'string', 'max:2000'],
             // image_url is set from our own upload endpoint (a relative same-origin
             // path), so it is a trusted string, not an external absolute URL.

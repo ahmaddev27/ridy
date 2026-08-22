@@ -1,9 +1,11 @@
 import { apiFetch, apiUpload } from "./client";
 
-/** A platform-wide promotional ad managed by the super-admin. */
+/** A platform-wide promotional ad managed by the super-admin. Image-first: the
+ *  title/body are optional (kept only for legacy ads); the banner shows just the
+ *  image + a CTA button. */
 export type Ad = {
   id: number;
-  title: string;
+  title: string | null;
   body: string | null;
   image_url: string | null;
   link_url: string | null;
@@ -14,7 +16,7 @@ export type Ad = {
 };
 
 export type AdInput = {
-  title: string;
+  title?: string | null;
   body?: string | null;
   image_url?: string | null;
   link_url?: string | null;

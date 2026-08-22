@@ -92,7 +92,21 @@ export default function AdminAdsPage() {
               <tbody className="divide-y divide-line">
                 {ads.map((ad) => (
                   <tr key={ad.id} className="hover:bg-surface-2">
-                    <td className="px-4 py-3 font-medium text-ink">{ad.title}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        {ad.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={ad.image_url.startsWith("http") ? ad.image_url : `${process.env.NEXT_PUBLIC_API_URL ?? ""}${ad.image_url}`}
+                            alt=""
+                            className="h-8 w-20 shrink-0 rounded border border-line object-cover"
+                          />
+                        ) : (
+                          <div className="h-8 w-20 shrink-0 rounded border border-line bg-surface-2" />
+                        )}
+                        <span className="font-medium text-ink">{ad.title || `#${ad.id}`}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <Badge status={ad.active ? "connected" : "neutral"} dot>
                         {ad.active ? c("active") : c("inactive")}
@@ -155,8 +169,6 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
   const { t } = useI18n();
   const c = (k: string) => t(`screens.ads.${k}`);
 
-  const [title, setTitle] = useState(ad?.title ?? "");
-  const [body, setBody] = useState(ad?.body ?? "");
   const [imageUrl, setImageUrl] = useState(ad?.image_url ?? "");
   const [linkUrl, setLinkUrl] = useState(ad?.link_url ?? "");
   const [ctaLabel, setCtaLabel] = useState(ad?.cta_label ?? "");
@@ -200,8 +212,6 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
     setBusy(true);
     setErrors({});
     const input: AdInput = {
-      title: title.trim(),
-      body: body.trim() || null,
       image_url: imageUrl.trim() || null,
       link_url: linkUrl.trim() || null,
       cta_label: ctaLabel.trim() || null,
@@ -236,22 +246,13 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             {c("cancel")}
           </Button>
-          <Button onClick={submit} disabled={busy || uploading || !title.trim()}>
+          <Button onClick={submit} disabled={busy || uploading || !imageUrl}>
             {c("save")}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-ink">{c("fieldTitle")}</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} className={field} />
-          {err("title") && <p className="mt-1 text-xs text-danger-fg">{err("title")}</p>}
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-ink">{c("fieldBody")}</label>
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} className={field} />
-        </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-ink">{c("fieldImage")}</label>
           <p className="mb-2 text-xs text-ink-subtle">{c("imageHint")}</p>
