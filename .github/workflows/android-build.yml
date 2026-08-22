@@ -1,0 +1,78 @@
+name: Android Build (local, free)
+
+# Builds the driver app on GitHub's runner with `eas build --local`, so it does
+# NOT consume the EAS Build quota (the build runs here, not on Expo servers) and
+# costs nothing beyond GitHub Actions minutes. Manual trigger only — no build
+# runs on every push, so minutes are spent only when you ask for one.
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile"
+        type: choice
+        default: preview
+        options:
+          - preview
+          - production
+
+jobs:
+  android:
+    name: Build Android (${{ github.event.inputs.profile }})
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: driver-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: driver-app/package-lock.json
+
+      # eas build --local runs a Gradle build, which needs JDK 17 (not the
+      # runner's newer default) and the Android SDK (preinstalled on ubuntu).
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install eas-cli
+        run: npm install -g eas-cli
+
+      - name: Install dependencies
+        run: npm ci
+
+      # A preview profile emits an installable APK; production emits a Play AAB.
+      - name: Resolve output extension
+        id: ext
+        run: |
+          if [ "${{ github.event.inputs.profile }}" = "production" ]; then
+            echo "ext=aab" >> "$GITHUB_OUTPUT"
+          else
+            echo "ext=apk" >> "$GITHUB_OUTPUT"
+          fi
+
+      # --local builds on this runner (no EAS quota). EXPO_TOKEN authenticates so
+      # the build can pull the signing keystore already stored on Expo.
+      - name: Build Android (${{ github.event.inputs.profile }})
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          eas build \
+            --platform android \
+            --profile "${{ github.event.inputs.profile }}" \
+            --local \
+            --non-interactive \
+            --output "build/reidey-${{ github.event.inputs.profile }}.${{ steps.ext.outputs.ext }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reidey-android-${{ github.event.inputs.profile }}
+          path: driver-app/build/reidey-${{ github.event.inputs.profile }}.${{ steps.ext.outputs.ext }}
+          if-no-files-found: error
+          retention-days: 14
