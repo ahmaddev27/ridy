@@ -85,12 +85,18 @@ class DispatchNotifier
             return 0;
         }
 
+        // Fleet-manager layout (4 lines): numbers on the title, then driver · rider,
+        // then pickup, then drop-off — so the manager reads whose offer it is at a
+        // glance. (The driver's own push keeps the rider on the title line.)
+        $ownerTitle = $this->buildNumbers($offer);
         $driverName = $this->driverName($offer);
-        $ownerTitle = $driverName !== '' ? $driverName.' · '.$title : $title;
+        $rider = trim((string) $offer->rider_first_name);
+        $names = trim($driverName.($rider !== '' ? ' · '.$rider : ''));
+        $ownerBody = $names !== '' ? trim($names."\n".$body) : $body;
 
         $sent = 0;
         foreach ($tokens as $token) {
-            if ($this->sender->send($token->token, $ownerTitle, $body, $data)) {
+            if ($this->sender->send($token->token, $ownerTitle, $ownerBody, $data)) {
                 $sent++;
             }
         }
@@ -107,24 +113,31 @@ class DispatchNotifier
         return trim((string) $name);
     }
 
-    /** "5.85 €€ · 12.3 km · €1.26/km | Peter" — fare, €-quality, trip metrics, rider. */
-    private function buildTitle(DispatchOffer $offer): string
+    /** "5.85 €€ · 12.3 km · €1.26/km" — fare, €-quality and trip metrics, no names. */
+    private function buildNumbers(DispatchOffer $offer): string
     {
         $fare = $offer->fare_amount !== null
             ? number_format((float) $offer->fare_amount, 2, '.', '')
             : trim((string) $offer->fare_formatted);
 
-        $title = trim($fare.' '.$this->euroSigns($offer));
+        $numbers = trim($fare.' '.$this->euroSigns($offer));
 
         // Distance + price-per-km ride on the first line, beside the fare.
         $metrics = $this->buildMetrics($offer);
         if ($metrics !== '') {
-            $title .= ' · '.$metrics;
+            $numbers .= ' · '.$metrics;
         }
 
+        return $numbers;
+    }
+
+    /** "5.85 €€ · 12.3 km · €1.26/km | Peter" — the driver's title (numbers + rider). */
+    private function buildTitle(DispatchOffer $offer): string
+    {
+        $numbers = $this->buildNumbers($offer);
         $rider = trim((string) $offer->rider_first_name);
 
-        return $rider !== '' ? $title.' | '.$rider : $title;
+        return $rider !== '' ? $numbers.' | '.$rider : $numbers;
     }
 
     /** "pickup\ndropoff" — the two addresses, country stripped, no separator arrow. */

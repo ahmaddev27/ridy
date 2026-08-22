@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import * as SecureStore from "expo-secure-store";
 import { api, ApiError, type DriverProfile } from "./api";
+import { unregisterForPush } from "./push";
 
 const TOKEN_KEY = "reidey_driver_token";
 const OWNER_KEY = "reidey_is_owner";
@@ -117,6 +118,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
+    // Deregister this device FIRST (while the token is still valid) so it stops
+    // receiving push — otherwise a signed-out phone (or one that later signs in
+    // as a driver) would keep getting the owner's tenant-wide offer fan-out.
+    await unregisterForPush(isOwner);
     try {
       await api.logout();
     } catch {

@@ -94,7 +94,7 @@ class DispatchPushTest extends TestCase
 
             public function send(string $deviceToken, string $title, string $body, array $data = []): bool
             {
-                $this->calls[] = compact('deviceToken', 'title');
+                $this->calls[] = compact('deviceToken', 'title', 'body');
 
                 return true;
             }
@@ -108,9 +108,11 @@ class DispatchPushTest extends TestCase
         $this->assertTrue($byToken->has('drv'));
         $this->assertTrue($byToken->has('own'));
         $this->assertFalse($byToken->has('stranger'));
-        // The driver's own push is unchanged; the owner's carries the driver name.
+        // Driver push unchanged (numbers on the title). The owner's title is the
+        // numbers only, with the driver name attributed on the body's first line.
         $this->assertSame('14.37 €', $byToken['drv']['title']);
-        $this->assertSame('Omar · 14.37 €', $byToken['own']['title']);
+        $this->assertSame('14.37 €', $byToken['own']['title']);
+        $this->assertStringContainsString('Omar', $byToken['own']['body']);
     }
 
     public function test_notification_title_encodes_per_km_quality_rider_and_strips_country(): void

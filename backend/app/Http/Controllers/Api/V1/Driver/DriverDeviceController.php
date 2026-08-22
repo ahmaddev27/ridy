@@ -27,6 +27,10 @@ class DriverDeviceController extends Controller
             [
                 'tenant_id' => $driver->tenant_id,
                 'driver_id' => $driver->id,
+                // Clear any prior fleet-owner claim on this exact device: the same
+                // phone that was signed in as a manager and is now a driver must
+                // NOT keep receiving the tenant-wide owner fan-out.
+                'user_id' => null,
                 'platform' => $data['platform'] ?? 'android',
                 'last_used_at' => now(),
             ],

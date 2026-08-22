@@ -183,6 +183,21 @@ export class ApiClient {
     });
   }
 
+  /** Deregister this device's push token (driver / owner) so it stops receiving offers. */
+  deleteDevice(token: string) {
+    return this.request<{ message: string }>("/api/v1/driver/devices", {
+      method: "DELETE",
+      body: JSON.stringify({ token }),
+    });
+  }
+
+  fleetDeleteDevice(token: string) {
+    return this.request<{ message: string }>("/api/v1/driver/fleet/devices", {
+      method: "DELETE",
+      body: JSON.stringify({ token }),
+    });
+  }
+
   fleetStats(from?: string, to?: string) {
     const qs = new URLSearchParams();
     if (from) qs.set("from", from);

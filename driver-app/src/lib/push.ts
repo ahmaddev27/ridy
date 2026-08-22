@@ -1,8 +1,11 @@
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
+import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { api } from "./api";
 import { t } from "./i18n";
+
+const PUSH_TOKEN_KEY = "reidey_push_token";
 
 /** Category id shared with the backend (data.categoryId) so the notification
  *  renders the "Open in map" action. Keep in sync with DispatchNotifier. */
@@ -69,6 +72,8 @@ export async function registerForPush(owner = false): Promise<string | null> {
 
   const { data: token } = await Notifications.getDevicePushTokenAsync();
   const platform = Platform.OS === "ios" ? "ios" : "android";
+  // Remember the token so logout can deregister THIS device and stop its pushes.
+  await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token).catch(() => {});
   try {
     if (owner) await api.fleetRegisterDevice(token, platform);
     else await api.registerDevice(token, platform);
@@ -77,4 +82,18 @@ export async function registerForPush(owner = false): Promise<string | null> {
     return token;
   }
   return token;
+}
+
+/** Deregister this device's push token on logout so it stops receiving offers.
+ *  Best-effort and must run while the session token is still valid. */
+export async function unregisterForPush(owner: boolean): Promise<void> {
+  const token = await SecureStore.getItemAsync(PUSH_TOKEN_KEY).catch(() => null);
+  if (!token) return;
+  try {
+    if (owner) await api.fleetDeleteDevice(token);
+    else await api.deleteDevice(token);
+  } catch {
+    /* best-effort */
+  }
+  await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY).catch(() => {});
 }
