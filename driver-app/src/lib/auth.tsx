@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import * as SecureStore from "expo-secure-store";
 import { api, ApiError, type DriverProfile } from "./api";
-import { setLocale } from "./i18n";
 
 const TOKEN_KEY = "reidey_driver_token";
 const OWNER_KEY = "reidey_is_owner";
@@ -83,7 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [restore]);
 
   function applyProfile(d: DriverProfile, owner: boolean) {
-    if (d.locale) setLocale(d.locale);
+    // Do NOT override the language from the server profile: the user's in-app
+    // choice (persisted locally and applied before first paint) is the source of
+    // truth. Otherwise every launch reset the language to the profile's locale,
+    // reverting a manual switch (e.g. back to Arabic).
     setDriver(d);
     setIsOwner(owner);
   }
