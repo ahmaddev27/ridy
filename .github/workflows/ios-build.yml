@@ -1,0 +1,63 @@
+name: iOS Build (local, free minutes)
+
+# Builds the driver app for iOS on GitHub's macOS runner with `eas build --local`,
+# so it runs on GitHub's Mac (no EAS Build quota) and costs only Actions minutes.
+# Requires a paid Apple Developer account and iOS signing credentials already set
+# up in EAS (run `eas credentials -p ios` once). Manual trigger only.
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile"
+        type: choice
+        default: production
+        options:
+          - preview
+          - production
+
+jobs:
+  ios:
+    name: Build iOS (${{ github.event.inputs.profile }})
+    # iOS builds require macOS (Xcode + code signing).
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: driver-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: driver-app/package-lock.json
+
+      - name: Install eas-cli
+        run: npm install -g eas-cli
+
+      - name: Install dependencies
+        run: npm ci
+
+      # --local builds on this runner (no EAS Build quota). EXPO_TOKEN authenticates
+      # so the build can pull the iOS distribution cert + provisioning profile that
+      # `eas credentials -p ios` stored on EAS. --non-interactive fails fast if any
+      # credential is missing rather than prompting.
+      - name: Build iOS (${{ github.event.inputs.profile }})
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          eas build \
+            --platform ios \
+            --profile "${{ github.event.inputs.profile }}" \
+            --local \
+            --non-interactive \
+            --output "build/reidey-${{ github.event.inputs.profile }}.ipa"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reidey-ios-${{ github.event.inputs.profile }}
+          path: driver-app/build/reidey-${{ github.event.inputs.profile }}.ipa
+          if-no-files-found: error
+          retention-days: 14
