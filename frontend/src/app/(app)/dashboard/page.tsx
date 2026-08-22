@@ -104,10 +104,11 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Live fleet map — drivers list + statuses live inside it */}
+        {/* Live fleet map — drivers list + statuses live inside it. Height tuned
+            so its bottom edge lines up with the subscription + stat cards column. */}
         <div className="lg:col-span-2">
           <h3 className="mb-3 font-semibold text-ink">{t("pages.map.title")}</h3>
-          <LiveMap heightClass="h-[460px]" />
+          <LiveMap heightClass="h-[352px]" />
         </div>
       </div>
 
