@@ -112,6 +112,7 @@ class TripGeocoder
                     'limit' => 1,
                     'countrycodes' => 'de', // fleet is German — bias + speed up resolution
                     'accept-language' => 'de', // return the German address, not the driver's app locale
+                    'addressdetails' => 1, // structured fields so we can build a short "street, PLZ city" label
                 ]);
         } catch (\Throwable $e) {
             return null; // transient (timeout/network) — do NOT cache, so a retry can succeed
@@ -128,11 +129,14 @@ class TripGeocoder
             ? ['lat' => (float) $hit['lat'], 'lng' => (float) $hit['lon']]
             : null;
 
-        // Nominatim's German display_name unifies the address to one language
-        // regardless of the captured session's locale. Carried on the fresh
-        // result so enrich() can replace the offer's localized address text.
-        if ($coords !== null && is_string($hit['display_name'] ?? null) && $hit['display_name'] !== '') {
-            $coords['address'] = $hit['display_name'];
+        // A short, German, human-readable label ("street nr, PLZ city") unifies
+        // the address to one language regardless of the captured session's locale.
+        // Carried on the fresh result so enrich() can replace the localized text.
+        if ($coords !== null) {
+            $label = $this->shortGermanLabel($hit);
+            if ($label !== null) {
+                $coords['address'] = $label;
+            }
         }
 
         // Atomic upsert (INSERT ... ON DUPLICATE KEY UPDATE): two requests geocoding
@@ -145,6 +149,41 @@ class TripGeocoder
         );
 
         return $coords;
+    }
+
+    /**
+     * Build a compact German address label from Nominatim's structured fields:
+     * "Street 12, 44787 Bochum". Keeps only what a driver needs to recognise the
+     * spot — street (+ house number) and the city with its postal code — instead
+     * of the long "…, Nordrhein-Westfalen, Deutschland" display_name tail. Falls
+     * back to whatever single part exists, then to display_name, then null.
+     *
+     * @param  array<string, mixed>|null  $hit
+     */
+    private function shortGermanLabel(?array $hit): ?string
+    {
+        $a = is_array($hit['address'] ?? null) ? $hit['address'] : [];
+
+        // Street line: road/pedestrian/footway (+ house number), else a named place.
+        $street = $a['road'] ?? $a['pedestrian'] ?? $a['footway'] ?? $a['neighbourhood'] ?? null;
+        if ($street !== null && ! empty($a['house_number'])) {
+            $street = "{$street} {$a['house_number']}";
+        }
+
+        // City line: the settlement, prefixed with its postal code when present.
+        $city = $a['city'] ?? $a['town'] ?? $a['village'] ?? $a['municipality'] ?? $a['suburb'] ?? null;
+        if ($city !== null && ! empty($a['postcode'])) {
+            $city = "{$a['postcode']} {$city}";
+        }
+
+        $label = trim(implode(', ', array_filter([$street, $city])));
+        if ($label !== '') {
+            return $label;
+        }
+
+        $display = $hit['display_name'] ?? null;
+
+        return is_string($display) && $display !== '' ? $display : null;
     }
 
     /**
