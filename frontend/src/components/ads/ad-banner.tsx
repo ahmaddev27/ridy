@@ -58,7 +58,7 @@ export function AdBanner() {
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
-      <div className="relative aspect-[4/1] max-h-[300px] w-full">
+      <div className="relative aspect-[7/1] max-h-[200px] w-full">
         {ads.map((ad, i) => (
           <AdSlide key={ad.id} ad={ad} active={i === current} t={t} />
         ))}
