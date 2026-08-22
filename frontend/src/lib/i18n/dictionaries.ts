@@ -38,7 +38,7 @@ const en = {
     profile: "Profile",
   },
   pages: {
-    dashboard: { title: "Dashboard", subtitle: "Uber dispatch overview — drivers, live offers and fleet session." },
+    dashboard: { title: "Dashboard", subtitle: "" },
     connections: { title: "Uber Connection", subtitle: "Connect the Uber fleet session for the dispatch stream." },
     companySubscription: { title: "My subscription", subtitle: "Your subscription history - plan, code, collector and status." },
     map: { title: "Live map", subtitle: "Live positions of drivers currently on a trip, with pickup and dropoff." },
@@ -189,7 +189,7 @@ const de: typeof en = {
     profile: "Profil",
   },
   pages: {
-    dashboard: { title: "Übersicht", subtitle: "Uber-Dispatch-Übersicht — Fahrer, Live-Angebote und Flottensitzung." },
+    dashboard: { title: "Übersicht", subtitle: "" },
     connections: { title: "Uber-Verbindung", subtitle: "Verbinde die Uber-Flottensitzung für den Dispatch-Stream." },
     companySubscription: { title: "Mein Abo", subtitle: "Dein Abo-Verlauf - Paket, Code, Kassierer und Status." },
     map: { title: "Live-Karte", subtitle: "Live-Positionen der Fahrer auf Tour, mit Abhol- und Zielpunkt." },
@@ -341,7 +341,7 @@ const ar: typeof en = {
     profile: "الملف الشخصي",
   },
   pages: {
-    dashboard: { title: "لوحة التحكّم", subtitle: "نظرة عامة على إرساليات أوبر — السائقون والعروض الحيّة وجلسة الأسطول." },
+    dashboard: { title: "لوحة التحكّم", subtitle: "" },
     connections: { title: "ربط أوبر", subtitle: "اربط جلسة أسطول أوبر لاستقبال تيار الإرساليات." },
     companySubscription: { title: "اشتراكي", subtitle: "سجل اشتراكاتك - الباقة والكود والمحصّل والحالة." },
     map: { title: "الخريطة الحية", subtitle: "مواقع السائقين على رحلة الآن، مع نقطة الاستلام والتنزيل." },

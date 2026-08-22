@@ -309,7 +309,7 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
       </div>
 
       {cropFile && (
-        <ImageCropper file={cropFile} aspect={7 / 1} onCancel={() => setCropFile(null)} onCropped={onCropped} />
+        <ImageCropper file={cropFile} aspect={4 / 1} onCancel={() => setCropFile(null)} onCropped={onCropped} />
       )}
     </Modal>
   );

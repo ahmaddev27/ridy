@@ -50,33 +50,26 @@ class FcmPushSender implements PushSender
      */
     private function message(string $token, string $title, string $body, array $data): array
     {
-        // DATA-ONLY (no top-level `notification`): with a notification block Android
-        // renders the push in the system tray itself when the app is killed, which
-        // strips expo's category — so the "Open in map" action button never shows.
-        // Sending data-only lets expo-notifications present it (the app registered
-        // the "offer" category), which surfaces the action button and routes a tap.
-        // expo builds the Android notification from these data keys.
-        $payload = array_merge([
-            'title' => $title,
-            'body' => $body,
-            'channelId' => 'offers',
-            'sound' => 'default',
-        ], array_map('strval', $data));
-
-        // iOS still needs an explicit alert to display; aps.category shows the button.
-        $aps = [
-            'alert' => ['title' => $title, 'body' => $body],
-            'sound' => 'default',
-            'content-available' => 1,
-        ];
+        // A notification message (title + rich body) so Android reliably renders
+        // the full offer — names + pickup/drop-off — even when the app is killed.
+        // The offer detail also rides in `data` for tap routing. NOTE: a data-only
+        // message (to get the on-notification "Open in map" action button) does NOT
+        // present reliably on Android and dropped the body on real devices, so we
+        // keep the notification message; the map lives inside the offer detail.
+        // iOS still shows the action button via aps.category.
+        $aps = ['sound' => 'default', 'content-available' => 1];
         if (! empty($data['categoryId'])) {
             $aps['category'] = (string) $data['categoryId'];
         }
 
         return [
             'token' => $token,
-            'data' => $payload,
-            'android' => ['priority' => 'high'],
+            'notification' => ['title' => $title, 'body' => $body],
+            'data' => array_map('strval', $data),
+            'android' => [
+                'priority' => 'high',
+                'notification' => ['channel_id' => 'offers', 'sound' => 'default'],
+            ],
             'apns' => [
                 'headers' => ['apns-priority' => '10'],
                 'payload' => ['aps' => $aps],
