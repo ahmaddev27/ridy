@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { latnLocale } from "@/lib/utils";
 import { Users, Wifi, Car, Radio, KeyRound } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/card";
-import { PageHeader } from "@/components/ui/page-header";
 import { RedeemCodeModal } from "@/components/subscription/redeem-code-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
@@ -22,9 +21,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader tkey="dashboard" />
-
-      {/* Sponsored banner — full width, above the stat cards */}
+      {/* Sponsored banner — full width, at the top */}
       <AdBanner />
 
       {error && (
