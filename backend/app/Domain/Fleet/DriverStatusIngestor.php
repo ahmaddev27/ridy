@@ -74,7 +74,14 @@ class DriverStatusIngestor
             }
             $counts['updated']++;
 
-            $this->applyTransition($tenantId, $uuid, $was, $now, $counts);
+            // The offer mutations here (accept/start/complete) update dispatch_offers
+            // rows that a concurrent status poll — or the bulk stale-sweep — may hold
+            // locks on, so they can deadlock (1213). Retry a couple of times, then
+            // report and move on: a lost transition is re-derived on the next poll and
+            // must never 500 the batch (which would drop every driver + acceptance).
+            $this->retryOnDeadlock(function () use ($tenantId, $uuid, $was, $now, &$counts) {
+                $this->applyTransition($tenantId, $uuid, $was, $now, $counts);
+            });
         }
 
         $this->sweepStaleOffers($tenantId);
@@ -104,6 +111,36 @@ class DriverStatusIngestor
             // window or the scheduled offers:finalize-stale run. Report, don't fail.
             report($e);
         }
+    }
+
+    /**
+     * Run a DB mutation, retrying a few times on a deadlock / lock-wait timeout
+     * (concurrent status polls contend on the same offer rows). On the final
+     * failure it reports and returns instead of throwing, so one lost transition
+     * never 500s the whole batch.
+     */
+    private function retryOnDeadlock(callable $fn, int $attempts = 3): void
+    {
+        for ($i = 1; ; $i++) {
+            try {
+                $fn();
+
+                return;
+            } catch (QueryException $e) {
+                if ($i >= $attempts || ! $this->isLockError($e)) {
+                    report($e);
+
+                    return;
+                }
+                usleep(50_000 * $i); // brief, growing backoff before the retry
+            }
+        }
+    }
+
+    /** MySQL 1213 = deadlock, 1205 = lock wait timeout — both worth retrying. */
+    private function isLockError(QueryException $e): bool
+    {
+        return in_array((int) ($e->errorInfo[1] ?? 0), [1213, 1205], true);
     }
 
     /**
