@@ -58,17 +58,8 @@ class TripGeocoder
         $offer->dropoff_lat = $dropoff['lat'] ?? null;
         $offer->dropoff_lng = $dropoff['lng'] ?? null;
 
-        // Germanize the displayed address ONLY when the original is non-Latin
-        // (an Arabic/foreign-script address that a driver can't read and that
-        // doesn't match Uber). Uber's own Latin addresses are kept verbatim —
-        // replacing them with Nominatim's nearest match could shift the city and
-        // disagree with what the driver sees in Uber.
-        if (! empty($pickup['address']) && AddressNormalizer::hasNonLatinLetters($offer->pickup_address)) {
-            $offer->pickup_address = $pickup['address'];
-        }
-        if (! empty($dropoff['address']) && AddressNormalizer::hasNonLatinLetters($offer->dropoff_address)) {
-            $offer->dropoff_address = $dropoff['address'];
-        }
+        $offer->pickup_address = $this->normalizeDisplay($offer->pickup_address, $pickup['address'] ?? null);
+        $offer->dropoff_address = $this->normalizeDisplay($offer->dropoff_address, $dropoff['address'] ?? null);
 
         if ($pickup && $dropoff) {
             $route = $this->route($pickup, $dropoff);
@@ -194,6 +185,76 @@ class TripGeocoder
         $display = $hit['display_name'] ?? null;
 
         return is_string($display) && $display !== '' ? $display : null;
+    }
+
+    /**
+     * Decide the address a driver sees, given the original (from Uber) and the
+     * geocoder's German label:
+     *  - non-Latin original (Arabic/foreign) → replace wholesale, it's unreadable
+     *    and doesn't match Uber anyway.
+     *  - Latin original (Uber's own German) → keep the street exactly as Uber
+     *    sent it and only guarantee the "PLZ City" tail is complete, so the two
+     *    Uber variants ("…, 42117" vs "…, Wuppertal") both end up as "42117
+     *    Wuppertal" without ever shifting the city.
+     */
+    private function normalizeDisplay(?string $original, ?string $germanLabel): ?string
+    {
+        if ($original === null || empty($germanLabel)) {
+            return $original;
+        }
+        if (AddressNormalizer::hasNonLatinLetters($original)) {
+            return $germanLabel;
+        }
+
+        return $this->ensureCity($original, $this->cityPart($germanLabel));
+    }
+
+    /** The "PLZ City" tail of a "Street Nr, PLZ City" label (last comma segment). */
+    private function cityPart(string $label): ?string
+    {
+        $parts = array_map('trim', explode(',', $label));
+        $tail = end($parts);
+
+        return $tail !== false && $tail !== '' ? $tail : null;
+    }
+
+    /**
+     * Ensure the address carries both the postal code and the city name, filling
+     * in whichever half Uber omitted from the deterministic (PLZ ↔ city is 1:1 in
+     * Germany) geocoded "PLZ City", without duplicating what is already there.
+     */
+    private function ensureCity(string $original, ?string $cityLabel): string
+    {
+        if ($cityLabel === null) {
+            return $original;
+        }
+
+        // Split "42117 Wuppertal" → plz "42117", city "Wuppertal".
+        [$plz, $city] = array_pad(explode(' ', $cityLabel, 2), 2, null);
+        if ($plz !== null && ! ctype_digit($plz)) {
+            [$plz, $city] = [null, $cityLabel]; // no leading postcode
+        }
+        if ($city === null || $city === '') {
+            return $original;
+        }
+
+        $hasCity = stripos($original, $city) !== false;
+        $hasPlz = $plz !== null && str_contains($original, $plz);
+
+        if ($hasCity) {
+            // City present; slot the postcode in front of it if it's missing.
+            return $hasPlz || $plz === null
+                ? $original
+                : (string) preg_replace('/'.preg_quote($city, '/').'/i', "{$plz} {$city}", $original, 1);
+        }
+
+        if ($hasPlz) {
+            // Postcode present but no city name → append the city after it.
+            return (string) preg_replace('/'.preg_quote($plz, '/').'/', "{$plz} {$city}", $original, 1);
+        }
+
+        // Neither present → append the full "PLZ City".
+        return rtrim($original, ', ').', '.$cityLabel;
     }
 
     /**
