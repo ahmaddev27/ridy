@@ -1,11 +1,13 @@
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Pressable,
   View,
   type TextInputProps,
   type ViewStyle,
 } from "react-native";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, type LucideIcon } from "lucide-react-native";
 import Svg, { Path } from "react-native-svg";
 import { Text, TextInput } from "@/components/typography";
@@ -158,11 +160,57 @@ export function Field({
 }
 
 /** Colored soft pill for an offer status. */
+/** A softly pulsing dot — marks a status that is LIVE right now (accepted /
+ *  on-trip), so an active ride reads differently from a settled one. */
+function LiveDot({ color }: { color: string }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 700, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 700, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 2.2] });
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] });
+  return (
+    <View style={{ width: 7, height: 7, alignItems: "center", justifyContent: "center" }}>
+      {/* Expanding halo */}
+      <Animated.View
+        style={{ position: "absolute", width: 7, height: 7, borderRadius: 4, backgroundColor: color, opacity, transform: [{ scale }] }}
+      />
+      {/* Solid core */}
+      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />
+    </View>
+  );
+}
+
+/** True while the ride is actively in progress (heading to pickup or on trip). */
+function isLiveStatus(status: string): boolean {
+  return status === "accepted" || status === "started";
+}
+
 export function StatusBadge({ status, label }: { status: string; label: string }) {
   const c = useColors();
   const tone = statusColors(c, status);
+  const live = isLiveStatus(status);
   return (
-    <View style={{ backgroundColor: tone.bg, borderRadius: radius.pill, paddingHorizontal: 11, paddingVertical: 4, alignSelf: isRTL() ? "flex-end" : "flex-start" }}>
+    <View
+      style={{
+        flexDirection: isRTL() ? "row-reverse" : "row",
+        alignItems: "center",
+        gap: live ? 6 : 0,
+        backgroundColor: tone.bg,
+        borderRadius: radius.pill,
+        paddingHorizontal: 11,
+        paddingVertical: 4,
+        alignSelf: isRTL() ? "flex-end" : "flex-start",
+      }}
+    >
+      {live && <LiveDot color={tone.fg} />}
       <Text style={{ color: tone.fg, fontSize: 12.5, fontWeight: "700" }}>{label}</Text>
     </View>
   );

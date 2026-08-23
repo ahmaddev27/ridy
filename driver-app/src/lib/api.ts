@@ -94,10 +94,19 @@ export class ApiClient {
   /** Called when the company's subscription lapsed (403) or the token is dead (401). */
   onSessionInvalid: ((reason: string | null) => void) | null = null;
 
+  /** Whether the signed-in identity is a fleet owner (User token) vs a driver.
+   *  Used so a 401 from a driver-only endpoint — which an owner hits by design
+   *  if a screen mis-routes for a frame — never ends the owner's valid session. */
+  private owner = false;
+
   constructor(private token: string | null = null) {}
 
   setToken(token: string | null) {
     this.token = token;
+  }
+
+  setOwner(owner: boolean) {
+    this.owner = owner;
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -113,9 +122,15 @@ export class ApiClient {
 
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      // A suspended company (403) or a dead token (401) ends the session — the app
-      // clears it and returns the driver to the sign-in screen with the reason.
-      if ((res.status === 403 && body?.message === "account_suspended") || res.status === 401) {
+      // A driver-only endpoint (/driver/* but not /driver/fleet/*) always 401s for
+      // an owner's User token. That's a mis-routed call, NOT a dead session, so it
+      // must never log the owner out — otherwise tapping a notification (which can
+      // briefly hit a driver screen before the identity settles) signs them out.
+      const driverOnly = path.startsWith("/api/v1/driver/") && !path.startsWith("/api/v1/driver/fleet/");
+      const sessionDead =
+        (res.status === 403 && body?.message === "account_suspended") ||
+        (res.status === 401 && !(this.owner && driverOnly));
+      if (sessionDead) {
         this.onSessionInvalid?.(body?.reason ?? null);
       }
       throw new ApiError(res.status, body?.message ?? "request_failed", body);

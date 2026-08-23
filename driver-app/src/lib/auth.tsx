@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (e instanceof ApiError && e.status === 401) {
         await SecureStore.deleteItemAsync(TOKEN_KEY);
         await SecureStore.deleteItemAsync(OWNER_KEY);
-        api.setToken(null);
+        api.setToken(null); api.setOwner(false);
         setOffline(false);
       } else {
         // Server unreachable (no internet / timeout / 5xx): keep the session and
@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.onSessionInvalid = () => {
       SecureStore.deleteItemAsync(TOKEN_KEY);
       SecureStore.deleteItemAsync(OWNER_KEY);
-      api.setToken(null);
+      api.setToken(null); api.setOwner(false);
       setDriver(null);
       setOffline(false);
     };
@@ -95,6 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // onto the profile, so the derived isOwner is correct even if the server
     // profile ever omitted the field. driver + isOwner now update atomically.
     setDriver({ ...d, is_owner: owner });
+    // Tell the api client the identity so a 401 from a driver-only endpoint
+    // never logs an owner out (their User session is still valid).
+    api.setOwner(owner);
   }
 
   async function persist(token: string, d: DriverProfile, owner: boolean) {
@@ -137,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     await SecureStore.deleteItemAsync(OWNER_KEY);
-    api.setToken(null);
+    api.setToken(null); api.setOwner(false);
     setDriver(null);
   }
 
