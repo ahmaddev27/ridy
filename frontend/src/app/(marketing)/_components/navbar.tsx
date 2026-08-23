@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
-import { Logo } from "@/components/brand/logo";
 
 const LINKS = [
   { href: "#problem", label: "Problem" },
@@ -60,14 +59,13 @@ export function Navbar() {
         >
           <div className="flex h-14 items-center justify-between pl-3 pr-3 sm:pr-4">
             <Link href="/#top" className="flex items-center gap-2.5 text-white">
-              {/* White monogram in a dark rounded tile — matches the reference's
-                  inverted (white-on-dark) 40px logo (w-10 h-10 rounded-xl). */}
-              <span
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                style={{ background: "#0f1116", border: "1px solid rgba(255,255,255,0.08)" }}
-              >
-                <Logo size={28} className="text-white" />
-              </span>
+              {/* The reference's exact logo (self-hosted), inverted white-on-dark. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/reidey-logo.jpeg"
+                alt="Reidey"
+                className="h-10 w-10 rounded-xl object-contain mix-blend-screen invert"
+              />
               <span className="font-heading text-[15px] font-bold tracking-tight">
                 REIDEY
               </span>
