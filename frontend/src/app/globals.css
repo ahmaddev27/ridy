@@ -24,7 +24,7 @@
   --ink-subtle: #8b909b; /* tertiary text (slate-400) */
   --line: #e4e4e1; /* borders (slate-200) */
   --line-strong: #d6d3cd; /* stronger borders (slate-300) */
-  --primary: #1e222b; /* primary button fill */
+  --primary: #059669; /* primary button fill — emerald brand accent (green touch) */
   --primary-ink: #ffffff; /* text on primary */
   --overlay: rgb(15 18 23 / 0.55); /* modal/drawer scrim */
 
@@ -46,8 +46,8 @@
   --ink-subtle: #6b7280;
   --line: #2c313a;
   --line-strong: #3a4049;
-  --primary: #e6e8ec;
-  --primary-ink: #12151a;
+  --primary: #10b981; /* emerald brand accent on dark (green touch) */
+  --primary-ink: #ffffff;
   --overlay: rgb(0 0 0 / 0.6);
 
   --success-bg: #052e26; --success-fg: #6ee7b7; --success-ring: #059669;
