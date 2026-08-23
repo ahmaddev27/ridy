@@ -26,8 +26,13 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [driver, setDriver] = useState<DriverProfile | null>(null);
-  const [isOwner, setIsOwner] = useState(false);
   const [offline, setOffline] = useState(false);
+
+  // Derive owner-ness from the profile itself — a SEPARATE isOwner state could
+  // lag one render behind `driver` right after login, and in that window an
+  // owner would hit a driver-only endpoint (api.home) → 401 → instant logout.
+  // Sourcing it from the same object makes the two always consistent.
+  const isOwner = driver?.is_owner === true;
 
   // Restore a stored session. Distinguishes three outcomes:
   //  - success            → profile applied, into the app
@@ -71,7 +76,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       SecureStore.deleteItemAsync(OWNER_KEY);
       api.setToken(null);
       setDriver(null);
-      setIsOwner(false);
       setOffline(false);
     };
 
@@ -87,8 +91,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // choice (persisted locally and applied before first paint) is the source of
     // truth. Otherwise every launch reset the language to the profile's locale,
     // reverting a manual switch (e.g. back to Arabic).
-    setDriver(d);
-    setIsOwner(owner);
+    // Stamp the authoritative owner flag (from the login response / OWNER_KEY)
+    // onto the profile, so the derived isOwner is correct even if the server
+    // profile ever omitted the field. driver + isOwner now update atomically.
+    setDriver({ ...d, is_owner: owner });
   }
 
   async function persist(token: string, d: DriverProfile, owner: boolean) {
@@ -133,7 +139,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await SecureStore.deleteItemAsync(OWNER_KEY);
     api.setToken(null);
     setDriver(null);
-    setIsOwner(false);
   }
 
   return (
