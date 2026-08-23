@@ -20,9 +20,9 @@ export function SiteFooter() {
             <Link href="/#top" className="flex items-center gap-2.5 text-white">
               <span
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
+                style={{ background: "#0f1116", border: "1px solid rgba(255,255,255,0.08)" }}
               >
-                <Logo size={22} className="text-white" />
+                <Logo size={28} className="text-white" />
               </span>
               <span className="font-heading font-bold tracking-tight">REIDEY</span>
             </Link>

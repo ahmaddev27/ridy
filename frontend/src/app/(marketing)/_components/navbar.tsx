@@ -60,13 +60,13 @@ export function Navbar() {
         >
           <div className="flex h-14 items-center justify-between pl-3 pr-3 sm:pr-4">
             <Link href="/#top" className="flex items-center gap-2.5 text-white">
-              {/* White monogram in a subtle rounded tile — matches the reference's
-                  inverted (white-on-dark) logo look, sized w-10/h-10. */}
+              {/* White monogram in a dark rounded tile — matches the reference's
+                  inverted (white-on-dark) 40px logo (w-10 h-10 rounded-xl). */}
               <span
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
+                style={{ background: "#0f1116", border: "1px solid rgba(255,255,255,0.08)" }}
               >
-                <Logo size={22} className="text-white" />
+                <Logo size={28} className="text-white" />
               </span>
               <span className="font-heading text-[15px] font-bold tracking-tight">
                 REIDEY
@@ -118,7 +118,10 @@ export function Navbar() {
             : "pointer-events-none opacity-0"
         }`}
       >
-        <div className="glass-strong absolute inset-0" />
+        {/* Solid dark backdrop — the animated opacity on the parent breaks
+            backdrop-filter, so an opaque fill guarantees the page never bleeds
+            through the menu (matches the reference's solid overlay). */}
+        <div className="absolute inset-0" style={{ background: "#0a0a0a" }} />
         <div className="relative flex h-full flex-col px-5 pt-5">
           <div className="flex h-11 items-center justify-between">
             <span className="font-heading font-bold text-white">REIDEY</span>
