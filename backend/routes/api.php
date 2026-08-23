@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyDataController;
 use App\Http\Controllers\Api\V1\Admin\CompanySessionController;
 use App\Http\Controllers\Api\V1\Admin\CompanyUserController;
+use App\Http\Controllers\Api\V1\Admin\ContactMessageController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Api\V1\Admin\ImpersonationController;
 use App\Http\Controllers\Api\V1\Admin\OverviewController;
@@ -25,6 +26,7 @@ use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CompanyActivationController;
 use App\Http\Controllers\Api\V1\CompanySubscriptionController;
+use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DeviceTokenController;
 use App\Http\Controllers\Api\V1\DispatchDaemonController;
@@ -69,6 +71,9 @@ Route::prefix('v1')->group(function () {
 
     // Public plan catalogue for the marketing site's pricing section.
     Route::get('plans', [PublicPlanController::class, 'index'])->middleware('throttle:60,1');
+
+    // Public contact form on the landing page (throttled against spam/abuse).
+    Route::post('contact', [ContactController::class, 'store'])->middleware('throttle:5,1');
 
     // Public support-contact (WhatsApp) for the auth pages' "contact support" button.
     Route::get('support-contact', [PublicSupportController::class, 'show'])->middleware('throttle:60,1');
@@ -342,6 +347,11 @@ Route::prefix('v1')->group(function () {
         Route::post('ads/upload', [AdminAdController::class, 'upload']);
         Route::put('ads/{ad}', [AdminAdController::class, 'update']);
         Route::delete('ads/{ad}', [AdminAdController::class, 'destroy']);
+
+        // Inbox: landing-page contact-form submissions.
+        Route::get('contact-messages', [ContactMessageController::class, 'index']);
+        Route::patch('contact-messages/{contactMessage}', [ContactMessageController::class, 'update']);
+        Route::delete('contact-messages/{contactMessage}', [ContactMessageController::class, 'destroy']);
 
         // Billing: subscription revenue reports + auto-generated invoices.
         Route::get('reports/billing-summary', [BillingReportController::class, 'summary']);

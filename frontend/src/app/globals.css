@@ -228,3 +228,106 @@ html[lang="ar"] body,
   flex: 0 0 auto;
   scroll-snap-align: start;
 }
+
+/* ================================================================== *
+ * Reidey marketing landing — dark glassy emerald design system.
+ * Self-contained: the marketing shell forces the dark palette and uses
+ * explicit brand colours, independent of the app's theme toggle.
+ * ================================================================== */
+.mkt-root {
+  --mkt-bg: #0a0a0a;
+  --mkt-card: #171717;
+  --mkt-fg: #ffffff;
+  --mkt-muted: #9ca3af;
+  --mkt-border: #2e2e2e;
+  --mkt-primary: #10b981;
+  --mkt-deep: #059669;
+  --mkt-light: #34d399;
+  --mkt-accent: linear-gradient(100deg, #10b981, #059669);
+  background: var(--mkt-bg);
+  color: var(--mkt-fg);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.mkt-root ::selection {
+  background: rgba(16, 185, 129, 0.28);
+}
+.mkt-root .font-heading {
+  font-family: var(--font-heading), var(--font-inter), sans-serif;
+  letter-spacing: -0.02em;
+}
+.mkt-root .font-mono-mkt {
+  font-family: var(--font-mono-mkt), ui-monospace, monospace;
+}
+
+/* Chrome clearance for the fixed GazaBanner + floating Navbar. */
+.mkt-main {
+  padding-top: 6.5rem;
+}
+
+.glass {
+  background: rgba(18, 18, 18, 0.6);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.glass-strong {
+  background: rgba(10, 10, 10, 0.82);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.card-modern {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.045),
+    rgba(255, 255, 255, 0.012)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+.card-modern:hover {
+  border-color: rgba(16, 185, 129, 0.4);
+  box-shadow: 0 20px 60px -20px rgba(16, 185, 129, 0.35);
+}
+.card-modern:hover .feat-tile {
+  background: linear-gradient(100deg, #10b981, #059669) !important;
+}
+
+/* Green radial glow blob used behind hero / features / showcase / cta. */
+.mkt-glow {
+  position: absolute;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgba(16, 185, 129, 0.22) 0%,
+    rgba(16, 185, 129, 0) 70%
+  );
+  filter: blur(20px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.mkt-eyebrow {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #10b981;
+  font-weight: 500;
+}
+
+/* Accordion smooth height (FAQ). */
+.mkt-acc-body {
+  overflow: hidden;
+  transition: grid-template-rows 0.3s ease;
+  display: grid;
+  grid-template-rows: 0fr;
+}
+.mkt-acc-body.open {
+  grid-template-rows: 1fr;
+}
+.mkt-acc-body > div {
+  min-height: 0;
+}

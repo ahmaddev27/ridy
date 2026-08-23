@@ -17,6 +17,7 @@ import {
   ReceiptText,
   Activity,
   Megaphone,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
 
@@ -94,6 +95,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: "/admin/system-health", label: "nav.systemHealth", icon: Activity },
       { href: "/admin/ads", label: "nav.ads", icon: Megaphone },
+      { href: "/admin/inbox", label: "nav.inbox", icon: Inbox },
       { href: "/admin/proxies", label: "nav.proxies", icon: Plug },
       { href: "/admin/email-templates", label: "nav.emailTemplates", icon: Mail },
       { href: "/admin/settings", label: "nav.settings", icon: Settings },
