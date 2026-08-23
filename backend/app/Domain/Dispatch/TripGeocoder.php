@@ -58,13 +58,15 @@ class TripGeocoder
         $offer->dropoff_lat = $dropoff['lat'] ?? null;
         $offer->dropoff_lng = $dropoff['lng'] ?? null;
 
-        // Unify the displayed address to German when the geocoder resolved one.
-        // A fresh hit carries the German display_name; cached hits don't, so the
-        // existing (already Latin-digit) text stands until the address is re-geocoded.
-        if (! empty($pickup['address'])) {
+        // Germanize the displayed address ONLY when the original is non-Latin
+        // (an Arabic/foreign-script address that a driver can't read and that
+        // doesn't match Uber). Uber's own Latin addresses are kept verbatim —
+        // replacing them with Nominatim's nearest match could shift the city and
+        // disagree with what the driver sees in Uber.
+        if (! empty($pickup['address']) && AddressNormalizer::hasNonLatinLetters($offer->pickup_address)) {
             $offer->pickup_address = $pickup['address'];
         }
-        if (! empty($dropoff['address'])) {
+        if (! empty($dropoff['address']) && AddressNormalizer::hasNonLatinLetters($offer->dropoff_address)) {
             $offer->dropoff_address = $dropoff['address'];
         }
 
