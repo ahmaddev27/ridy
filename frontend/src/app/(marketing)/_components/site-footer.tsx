@@ -15,9 +15,9 @@ export function SiteFooter() {
   return (
     <footer className="relative py-12 lg:py-14">
       <Container>
-        <div className="grid gap-10 md:grid-cols-3">
-          <div>
-            <Link href="/#top" className="flex items-center gap-2.5 text-white">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 lg:gap-10">
+          <div className="text-center sm:text-left">
+            <Link href="/#top" className="flex items-center justify-center gap-2.5 text-white sm:justify-start">
               <span
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
                 style={{ background: "#0f1116", border: "1px solid rgba(255,255,255,0.08)" }}
@@ -26,17 +26,17 @@ export function SiteFooter() {
               </span>
               <span className="font-heading font-bold tracking-tight">REIDEY</span>
             </Link>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
+            <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground sm:mx-0">
               Fahrtbewertung für Flotten. Jedes Angebot klar bewertet, bevor dein
               Fahrer zusagt.
             </p>
           </div>
 
-          <div>
+          <div className="text-center sm:text-left">
             <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
               Navigation
             </p>
-            <ul className="mt-4 grid grid-cols-2 gap-x-8 gap-y-3">
+            <ul className="mx-auto mt-4 grid max-w-[16rem] grid-cols-2 gap-x-6 gap-y-2.5 justify-items-center sm:mx-0 sm:justify-items-start">
               {NAV.map((l) => (
                 <li key={l.href}>
                   <Link
@@ -50,7 +50,7 @@ export function SiteFooter() {
             </ul>
           </div>
 
-          <div>
+          <div className="text-center sm:text-left">
             <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
               Kontakt
             </p>
@@ -68,7 +68,7 @@ export function SiteFooter() {
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center">
+        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-white/10 pt-6 sm:flex-row">
           <p className="text-xs text-muted-foreground">
             © {year} REIDEY · Alle Rechte vorbehalten
           </p>
