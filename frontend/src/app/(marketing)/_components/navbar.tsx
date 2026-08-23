@@ -50,12 +50,11 @@ export function Navbar() {
     <>
       <div className="fixed inset-x-0 top-9 z-50 flex justify-center px-4">
         <header
-          className="glass w-full max-w-5xl rounded-2xl transition-all duration-300"
-          style={{
-            boxShadow: scrolled
-              ? "0 8px 30px -12px rgba(10,12,18,0.18)"
-              : "0 2px 12px -6px rgba(10,12,18,0.12)",
-          }}
+          className={`glass w-full max-w-5xl rounded-2xl transition-all duration-300 ${
+            scrolled
+              ? "shadow-[0_8px_30px_-12px_rgba(10,12,18,0.18)]"
+              : "shadow-[0_2px_12px_-6px_rgba(10,12,18,0.12)]"
+          }`}
         >
           <div className="flex h-14 items-center justify-between pl-3 pr-3 sm:pr-4">
             <Link href="/#top" className="flex items-center gap-2.5 text-white">
