@@ -7,7 +7,7 @@ type Tone = "success" | "danger" | "warning" | "info" | "default";
 const MAP: Record<string, { icon: LucideIcon; tone: Tone }> = {
   session_connected: { icon: Plug, tone: "success" },
   session_needs_relink: { icon: Plug, tone: "danger" },
-  company_registered: { icon: Building2, tone: "info" },
+  company_registered: { icon: Building2, tone: "success" },
   company_banned: { icon: Ban, tone: "danger" },
   subscription_activated: { icon: CheckCircle2, tone: "success" },
   subscription_free: { icon: Gift, tone: "success" },
