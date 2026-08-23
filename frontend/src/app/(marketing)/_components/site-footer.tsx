@@ -36,7 +36,7 @@ export function SiteFooter() {
             <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
               Navigation
             </p>
-            <ul className="mt-4 flex flex-col gap-3">
+            <ul className="mt-4 grid grid-cols-2 gap-x-8 gap-y-3">
               {NAV.map((l) => (
                 <li key={l.href}>
                   <Link
