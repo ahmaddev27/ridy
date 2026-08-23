@@ -60,7 +60,14 @@ export function Navbar() {
         >
           <div className="flex h-14 items-center justify-between pl-3 pr-3 sm:pr-4">
             <Link href="/#top" className="flex items-center gap-2.5 text-white">
-              <Logo size={40} className="rounded-xl text-[#10b981]" />
+              {/* White monogram in a subtle rounded tile — matches the reference's
+                  inverted (white-on-dark) logo look, sized w-10/h-10. */}
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
+              >
+                <Logo size={22} className="text-white" />
+              </span>
               <span className="font-heading text-[15px] font-bold tracking-tight">
                 REIDEY
               </span>
