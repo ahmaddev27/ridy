@@ -32,7 +32,6 @@ export function OfferCard({
   const dim = status === "rejected" || status === "canceled";
   const live = status === "pending";
   const perKm = perKmValue(offer.fare_amount, offer.distance_m);
-  const hero = perKm?.value ?? fareLabel(offer.fare_formatted, offer.fare_amount);
 
   return (
     <Pressable
@@ -44,7 +43,7 @@ export function OfferCard({
         opacity: dim ? 0.55 : pressed ? 0.85 : 1,
       })}
     >
-      {/* 1 · Badge + hero €/km  |  total price */}
+      {/* 1 · Badge + hero total price  |  secondary €/km */}
       <View style={{ flexDirection: rowDir(), alignItems: "flex-start", justifyContent: "space-between" }}>
         <View style={{ gap: 8, alignItems: isRTL() ? "flex-end" : "flex-start" }}>
           {live ? (
@@ -52,21 +51,20 @@ export function OfferCard({
           ) : (
             <StatusBadge status={status} label={t(`status.${status}`)} />
           )}
-          <View style={{ flexDirection: rowDir(), alignItems: "flex-end", gap: 3 }}>
-            <Text style={{ color: c.ink, fontSize: 33, fontWeight: "700", letterSpacing: -1, textAlign: start() }}>
-              {hero}
-            </Text>
-            {perKm && (
-              <Text style={{ color: c.inkSubtle, fontSize: 15, fontWeight: "500", marginBottom: 5 }}>/km</Text>
-            )}
-          </View>
-        </View>
-        <View style={{ alignItems: isRTL() ? "flex-start" : "flex-end", gap: 2 }}>
-          <Text style={{ color: c.ink, fontSize: 17, fontWeight: "600" }}>
+          {/* Hero is the total trip price. */}
+          <Text style={{ color: c.ink, fontSize: 33, fontWeight: "700", letterSpacing: -1, textAlign: start() }}>
             {fareLabel(offer.fare_formatted, offer.fare_amount)}
           </Text>
-          <Text style={{ color: c.inkSubtle, fontSize: 11 }}>{t("offer.total")}</Text>
         </View>
+        {/* Secondary: €/km rate, top-end. */}
+        {perKm && (
+          <View style={{ alignItems: isRTL() ? "flex-start" : "flex-end", gap: 2 }}>
+            <View style={{ flexDirection: rowDir(), alignItems: "flex-end", gap: 3 }}>
+              <Text style={{ color: c.ink, fontSize: 17, fontWeight: "600" }}>{perKm.value}</Text>
+              <Text style={{ color: c.inkSubtle, fontSize: 11, marginBottom: 1 }}>/km</Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* 2 · Metadata strip — hairline framed, equal columns */}
