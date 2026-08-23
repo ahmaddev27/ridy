@@ -1,103 +1,134 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { PhoneMockup } from "./phone-mockup";
-import { SCREENS } from "./phone-screens";
+import { SCREENS, SCREEN_INFO } from "./phone-screens";
 import { Container, SectionHeading } from "./ui";
-
-const ROWS = [
-  { n: "01", label: "Start", note: "DE · Hell" },
-  { n: "02", label: "Angebot", note: "Countdown" },
-  { n: "03", label: "Liste", note: "DE · Dunkel" },
-  { n: "04", label: "Statistik", note: "Kennzahlen" },
-];
 
 export function AppShowcase() {
   const [active, setActive] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(false);
   const Screen = SCREENS[active];
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
   const go = (dir: number) =>
     setActive((i) => (i + dir + SCREENS.length) % SCREENS.length);
 
   return (
     <section id="app" className="relative overflow-hidden py-14 lg:py-28">
-      <div className="mkt-glow" style={{ top: 80, left: -120, width: 500, height: 500 }} />
+      <div
+        className="bg-gradient-accent pointer-events-none absolute left-1/2 top-40 h-[300px] w-[600px] -translate-x-1/2 rounded-full"
+        style={{ opacity: 0.06, filter: "blur(120px)" }}
+      />
       <Container className="relative">
         <SectionHeading
           eyebrow="Ein Blick ins Produkt"
+          eyebrowColor="#67e8f9"
+          align="left"
           title="Bildschirme, die wirklich benutzt werden."
           sub="Echte Module, die deine Fahrer jeden Tag nutzen. Tippe durch die Screens."
         />
 
-        <div className="mt-12 grid items-center gap-12 lg:grid-cols-[1fr_1.1fr]">
-          <div className="flex flex-col items-center gap-6">
-            <PhoneMockup width={280}>
-              <Screen />
-            </PhoneMockup>
-            <div className="flex items-center gap-5">
+        <div className="mt-12 grid items-center gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
+          <div className="relative" style={{ perspective: 1500 }}>
+            <div className="relative mx-auto w-[280px] sm:w-[300px]">
+              <div
+                className="bg-gradient-accent pointer-events-none absolute -inset-10 rounded-full opacity-20"
+                style={{ filter: "blur(48px)" }}
+              />
+              <PhoneMockup
+                width={isDesktop ? 300 : 280}
+                style={{
+                  transform: isDesktop
+                    ? "rotateY(-14deg) rotateX(6deg)"
+                    : "rotateY(0deg) rotateX(0deg)",
+                  transformStyle: "preserve-3d",
+                  transition: "transform 500ms ease",
+                }}
+              >
+                <Screen />
+              </PhoneMockup>
+            </div>
+
+            <div className="mt-8 flex items-center justify-center gap-3">
               <button
                 type="button"
-                aria-label="Vorheriger Screen"
+                aria-label="Zurück"
                 onClick={() => go(-1)}
-                className="glass flex h-10 w-10 items-center justify-center rounded-full text-white"
+                className="glass flex h-11 w-11 items-center justify-center rounded-xl text-white transition-colors hover:border-white/10"
               >
-                <ChevronLeft size={18} />
+                <ChevronLeft className="h-5 w-5" />
               </button>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 {SCREENS.map((_, i) => (
                   <button
                     key={i}
                     type="button"
-                    aria-label={`Screen ${i + 1}`}
+                    aria-label={SCREEN_INFO[i].label}
                     onClick={() => setActive(i)}
-                    className="h-2 w-2 rounded-full transition-all"
+                    className="h-2 rounded-full transition-all"
                     style={{
-                      background: i === active ? "#10b981" : "rgba(255,255,255,0.2)",
-                      width: i === active ? 20 : 8,
+                      width: i === active ? 32 : 8,
+                      background: i === active
+                        ? "linear-gradient(100deg,#10b981,#059669)"
+                        : "rgba(255,255,255,0.15)",
                     }}
                   />
                 ))}
               </div>
               <button
                 type="button"
-                aria-label="Nächster Screen"
+                aria-label="Weiter"
                 onClick={() => go(1)}
-                className="glass flex h-10 w-10 items-center justify-center rounded-full text-white"
+                className="glass flex h-11 w-11 items-center justify-center rounded-xl text-white transition-colors hover:border-white/10"
               >
-                <ChevronRight size={18} />
+                <ChevronRight className="h-5 w-5" />
               </button>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3">
-            {ROWS.map((row, i) => {
+          <div className="space-y-3">
+            {SCREEN_INFO.map((row, i) => {
               const on = i === active;
               return (
                 <button
-                  key={row.n}
+                  key={row.label}
                   type="button"
                   onClick={() => setActive(i)}
-                  className="card-modern flex items-center justify-between rounded-2xl px-5 py-4 text-left transition-colors"
-                  style={on ? { borderColor: "rgba(16,185,129,0.5)" } : undefined}
+                  className={`card-modern flex w-full items-center gap-4 rounded-3xl p-5 text-left transition-all ${
+                    on ? "" : "opacity-80 hover:opacity-100"
+                  }`}
                 >
-                  <div className="flex items-center gap-4">
-                    <span
-                      className="font-mono-mkt text-sm"
-                      style={{ color: on ? "#10b981" : "#6b7280" }}
-                    >
-                      {row.n}
-                    </span>
-                    <div>
-                      <p
-                        className="text-base font-semibold"
-                        style={{ color: on ? "#10b981" : "#ffffff" }}
-                      >
-                        {row.label}
-                      </p>
-                      <p className="text-xs text-[#9ca3af]">{row.note}</p>
+                  <span
+                    className={`font-heading flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold transition-colors ${
+                      on ? "text-white" : "text-muted-foreground"
+                    }`}
+                    style={
+                      on
+                        ? { background: "linear-gradient(100deg,#10b981,#059669)" }
+                        : { background: "rgba(255,255,255,0.05)" }
+                    }
+                  >
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <div className="flex-1">
+                    <div className="font-heading text-lg font-semibold text-white">
+                      {row.label}
                     </div>
+                    <div className="text-sm text-muted-foreground">{row.note}</div>
                   </div>
-                  {on ? <ChevronRight size={18} className="text-[#10b981]" /> : null}
+                  <ChevronRight
+                    className="h-5 w-5 transition-opacity"
+                    style={{ color: "#67e8f9", opacity: on ? 1 : 0 }}
+                  />
                 </button>
               );
             })}

@@ -1,4 +1,5 @@
 import { Container, SectionHeading } from "./ui";
+import { TiltCard } from "./tilt-card";
 
 const STEPS = [
   {
@@ -24,23 +25,28 @@ export function HowItWorks() {
       <Container>
         <SectionHeading
           eyebrow="So funktioniert es"
+          eyebrowColor="#67e8f9"
           title="Drei Schritte. Keine Einlernphase."
         />
-        <div className="mt-12 grid gap-5 lg:grid-cols-3">
+        <div className="mt-12 grid gap-4 md:grid-cols-3">
           {STEPS.map((step) => (
-            <div key={step.n} className="card-modern relative overflow-hidden rounded-3xl p-7">
-              <span className="pointer-events-none absolute right-4 top-2 text-7xl font-bold text-white/[0.05]">
+            <TiltCard
+              key={step.n}
+              className="card-modern relative overflow-hidden rounded-3xl p-7"
+            >
+              <span className="font-heading pointer-events-none absolute -right-2 -top-2 text-7xl font-bold text-white/[0.05]">
                 {step.n}
               </span>
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-2xl text-sm font-bold text-white"
-                style={{ background: "linear-gradient(100deg,#10b981,#059669)" }}
-              >
-                {step.n}
+              <div className="relative">
+                <div className="bg-gradient-accent font-heading mb-5 inline-flex h-10 w-10 items-center justify-center rounded-xl font-bold text-white">
+                  {step.n}
+                </div>
+                <h3 className="font-heading mb-3 text-xl font-semibold text-white">
+                  {step.title}
+                </h3>
+                <p className="leading-relaxed text-muted-foreground">{step.body}</p>
               </div>
-              <h3 className="mt-5 text-lg font-semibold text-white">{step.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-[#9ca3af]">{step.body}</p>
-            </div>
+            </TiltCard>
           ))}
         </div>
       </Container>

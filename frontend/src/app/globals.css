@@ -260,9 +260,10 @@ html[lang="ar"] body,
   font-family: var(--font-mono-mkt), ui-monospace, monospace;
 }
 
-/* Chrome clearance for the fixed GazaBanner + floating Navbar. */
+/* Clearance for the fixed GazaBanner + floating Navbar is handled by the
+   Hero's own top padding (pt-36 / lg:pt-44), matching the reference layout. */
 .mkt-main {
-  padding-top: 6.5rem;
+  padding-top: 0;
 }
 
 .glass {
@@ -273,24 +274,25 @@ html[lang="ar"] body,
 }
 .glass-strong {
   background: rgba(10, 10, 10, 0.82);
-  backdrop-filter: blur(24px) saturate(140%);
-  -webkit-backdrop-filter: blur(24px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 .card-modern {
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.045),
-    rgba(255, 255, 255, 0.012)
+    rgba(255, 255, 255, 0.045) 0%,
+    rgba(255, 255, 255, 0.012) 100%
   );
   border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
 }
 .card-modern:hover {
   border-color: rgba(16, 185, 129, 0.4);
-  box-shadow: 0 20px 60px -20px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 12px 40px -14px rgba(16, 185, 129, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 .card-modern:hover .feat-tile {
   background: linear-gradient(100deg, #10b981, #059669) !important;
@@ -316,6 +318,77 @@ html[lang="ar"] body,
   letter-spacing: 0.15em;
   color: #10b981;
   font-weight: 500;
+}
+
+/* Brand gradient helpers mirrored from the reference index.css so cards,
+   tiles and text share the exact emerald ramp (#10b981 → #059669). */
+.bg-gradient-accent {
+  background-image: linear-gradient(100deg, #10b981 0%, #059669 100%);
+}
+.bg-gradient-accent-soft {
+  background-image: linear-gradient(
+    100deg,
+    rgba(16, 185, 129, 0.14) 0%,
+    rgba(5, 150, 105, 0.14) 100%
+  );
+}
+.text-gradient {
+  background: linear-gradient(100deg, #10b981 0%, #059669 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Interactive 3D tilt used by the Problem / Features / HowItWorks cards. */
+.mkt-tilt {
+  transform-style: preserve-3d;
+  transition: transform 0.25s ease-out;
+}
+
+/* ------------------------------------------------------------------ *
+ * Reference design tokens (from reidey-landing/src/index.css), scoped
+ * to the marketing root so the ported JSX can use the exact shadcn-style
+ * class names (bg-background, text-muted-foreground, border-border, …)
+ * and render identically to the reference without leaking into the app.
+ * ------------------------------------------------------------------ */
+.mkt-root {
+  --background: 0 0% 4%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 9%;
+  --card-foreground: 0 0% 100%;
+  --primary: 160 84% 39%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 12%;
+  --muted: 0 0% 12%;
+  --muted-foreground: 217 10% 65%;
+  --accent: 160 84% 39%;
+  --border: 0 0% 18%;
+  --input: 0 0% 18%;
+  --ring: 160 84% 39%;
+}
+
+/* Color utilities resolving the tokens above (scoped to marketing). */
+.mkt-root .bg-background { background-color: hsl(var(--background)); }
+.mkt-root .bg-card { background-color: hsl(var(--card)); }
+.mkt-root .bg-primary { background-color: hsl(var(--primary)); }
+.mkt-root .bg-muted { background-color: hsl(var(--muted)); }
+.mkt-root .text-foreground { color: hsl(var(--foreground)); }
+.mkt-root .text-primary { color: hsl(var(--primary)); }
+.mkt-root .text-muted-foreground { color: hsl(var(--muted-foreground)); }
+.mkt-root .border-border { border-color: hsl(var(--border)); }
+.mkt-root .hover\:text-foreground:hover { color: hsl(var(--foreground)); }
+.mkt-root .hover\:text-primary:hover { color: hsl(var(--primary)); }
+
+/* Grid dot backdrop + coloured glows from the reference utilities. */
+.grid-bg {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.glow-cyan {
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.2), 0 8px 40px -8px rgba(16, 185, 129, 0.35);
+}
+.glow-purple {
+  box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.2), 0 8px 40px -8px rgba(5, 150, 105, 0.35);
 }
 
 /* Accordion smooth height (FAQ). */

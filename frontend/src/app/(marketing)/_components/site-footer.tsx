@@ -13,28 +13,30 @@ const NAV = [
 export function SiteFooter() {
   const year = new Date().getFullYear();
   return (
-    <footer className="border-t border-white/10 py-14">
+    <footer className="relative py-12 lg:py-14">
       <Container>
         <div className="grid gap-10 md:grid-cols-3">
           <div>
-            <Link href="/#top" className="flex items-center gap-2 text-white">
-              <Logo size={26} className="text-[#10b981]" />
-              <span className="text-base font-semibold tracking-tight">REIDEY</span>
+            <Link href="/#top" className="flex items-center gap-2.5 text-white">
+              <Logo size={40} className="rounded-xl text-primary" />
+              <span className="font-heading font-bold tracking-tight">REIDEY</span>
             </Link>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-[#9ca3af]">
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
               Fahrtbewertung für Flotten. Jedes Angebot klar bewertet, bevor dein
               Fahrer zusagt.
             </p>
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-white">Navigation</p>
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              Navigation
+            </p>
             <ul className="mt-4 flex flex-col gap-3">
               {NAV.map((l) => (
                 <li key={l.href}>
                   <Link
                     href={l.href}
-                    className="text-sm text-[#9ca3af] transition-colors hover:text-white"
+                    className="text-sm text-muted-foreground transition-colors hover:text-white"
                   >
                     {l.label}
                   </Link>
@@ -44,15 +46,17 @@ export function SiteFooter() {
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-white">Kontakt</p>
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              Kontakt
+            </p>
             <div className="mt-4 flex flex-col gap-3">
               <a
                 href="mailto:vertrieb@reidey.de"
-                className="text-sm text-[#9ca3af] transition-colors hover:text-white"
+                className="text-sm text-white transition-colors hover:text-primary"
               >
                 vertrieb@reidey.de
               </a>
-              <p className="text-sm text-[#9ca3af]">
+              <p className="text-sm text-muted-foreground">
                 Server in der EU · DSGVO-konform
               </p>
             </div>
@@ -60,10 +64,10 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center">
-          <p className="text-xs text-[#9ca3af]">
+          <p className="text-xs text-muted-foreground">
             © {year} REIDEY · Alle Rechte vorbehalten
           </p>
-          <p className="text-xs text-[#9ca3af]">
+          <p className="text-xs text-muted-foreground">
             Gebaut für Ride-Hailing-Flotten in Deutschland
           </p>
         </div>

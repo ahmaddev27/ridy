@@ -301,3 +301,11 @@ export function StatsScreen() {
 }
 
 export const SCREENS = [HomeScreen, OfferScreen, ListScreen, StatsScreen];
+
+/** Labels / notes mirrored from the reference `screens.jsx` SCREENS metadata. */
+export const SCREEN_INFO = [
+  { label: "Start", note: "DE · Hell" },
+  { label: "Angebot", note: "Countdown" },
+  { label: "Liste", note: "DE · Dunkel" },
+  { label: "Statistik", note: "Kennzahlen" },
+];

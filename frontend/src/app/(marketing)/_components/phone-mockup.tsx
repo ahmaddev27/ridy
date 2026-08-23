@@ -30,23 +30,23 @@ export function PhoneMockup({
       <div
         style={{
           position: "relative",
-          borderRadius: "1.9rem",
+          borderRadius: "2rem",
           overflow: "hidden",
-          aspectRatio: "9 / 19",
-          background: "#0a0b0f",
+          aspectRatio: "512 / 1044",
+          background: "#0a0c12",
         }}
       >
         {/* Notch */}
         <div
           style={{
             position: "absolute",
-            top: 8,
+            top: 12,
             left: "50%",
             transform: "translateX(-50%)",
             width: 96,
-            height: 20,
-            borderRadius: 12,
-            background: "#0f1116",
+            height: 24,
+            borderRadius: 9999,
+            background: "#0a0b10",
             zIndex: 10,
           }}
         />

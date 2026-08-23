@@ -16,10 +16,15 @@ const LINKS = [
 export function GazaBanner() {
   return (
     <div
-      className="fixed inset-x-0 top-0 flex h-9 items-center justify-center bg-background/80 px-4 text-center text-xs backdrop-blur"
-      style={{ zIndex: 55, background: "rgba(10,10,10,0.8)", color: "#e5e7eb" }}
+      className="fixed inset-x-0 top-0 z-[55] flex justify-center backdrop-blur-md"
+      style={{ background: "rgba(10,10,10,0.8)" }}
     >
-      <span>🍉 Wir unterstützen Gaza — #FreePalestine</span>
+      <div className="flex w-full max-w-6xl items-center justify-center gap-2.5 px-5 py-2.5 text-center text-[12px] font-medium text-white sm:text-sm">
+        <span role="img" aria-label="watermelon" className="text-base leading-none">
+          🍉
+        </span>
+        <span>Wir unterstützen Gaza — #FreePalestine</span>
+      </div>
     </div>
   );
 }
@@ -45,86 +50,101 @@ export function Navbar() {
   return (
     <>
       <div className="fixed inset-x-0 top-9 z-50 flex justify-center px-4">
-        <nav
-          className="glass flex h-14 w-full max-w-5xl items-center gap-4 rounded-2xl px-4 transition-shadow"
+        <header
+          className="glass w-full max-w-5xl rounded-2xl transition-all duration-300"
           style={{
-            boxShadow: scrolled ? "0 10px 40px -12px rgba(0,0,0,0.7)" : "none",
+            boxShadow: scrolled
+              ? "0 8px 30px -12px rgba(10,12,18,0.18)"
+              : "0 2px 12px -6px rgba(10,12,18,0.12)",
           }}
         >
-          <Link href="/#top" className="flex items-center gap-2 text-white">
-            <Logo size={26} className="text-[#10b981]" />
-            <span className="text-base font-semibold tracking-tight">REIDEY</span>
-          </Link>
+          <div className="flex h-14 items-center justify-between pl-3 pr-3 sm:pr-4">
+            <Link href="/#top" className="flex items-center gap-2.5 text-white">
+              <Logo size={40} className="rounded-xl text-[#10b981]" />
+              <span className="font-heading text-[15px] font-bold tracking-tight">
+                REIDEY
+              </span>
+            </Link>
 
-          <div className="mx-auto hidden items-center gap-7 lg:flex">
+            <nav className="hidden items-center gap-7 md:flex">
+              {LINKS.map((l) => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  className="text-sm text-muted-foreground transition-colors hover:text-white"
+                >
+                  {l.label}
+                </a>
+              ))}
+            </nav>
+
+            <div className="flex items-center gap-3">
+              <a
+                href="#kontakt"
+                className="hidden items-center text-sm text-muted-foreground transition-colors hover:text-white md:inline-flex"
+              >
+                Anmelden
+              </a>
+              <a
+                href="#kontakt"
+                className="bg-gradient-accent hidden items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 sm:inline-flex"
+              >
+                Kostenlos testen
+              </a>
+              <button
+                type="button"
+                aria-label="Menü"
+                onClick={() => setOpen(true)}
+                className="p-2 text-white md:hidden"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </header>
+      </div>
+
+      <div
+        className={`fixed inset-0 z-[60] transition-all duration-300 md:hidden ${
+          open
+            ? "pointer-events-auto opacity-100"
+            : "pointer-events-none opacity-0"
+        }`}
+      >
+        <div className="glass-strong absolute inset-0" />
+        <div className="relative flex h-full flex-col px-5 pt-5">
+          <div className="flex h-11 items-center justify-between">
+            <span className="font-heading font-bold text-white">REIDEY</span>
+            <button
+              type="button"
+              aria-label="Schließen"
+              onClick={() => setOpen(false)}
+              className="text-white"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <nav className="flex flex-1 flex-col justify-center gap-1">
             {LINKS.map((l) => (
               <a
                 key={l.href}
                 href={l.href}
-                className="text-sm text-white/70 transition-colors hover:text-white"
+                onClick={() => setOpen(false)}
+                className="font-heading py-3 text-3xl font-semibold text-white"
               >
                 {l.label}
               </a>
             ))}
-          </div>
-
-          <div className="ml-auto hidden items-center gap-3 lg:flex">
-            <a
-              href="#kontakt"
-              className="text-sm font-medium text-white/70 transition-colors hover:text-white"
-            >
-              Anmelden
-            </a>
-            <a
-              href="#kontakt"
-              className="rounded-xl px-4 py-2 text-sm font-semibold text-white"
-              style={{ background: "linear-gradient(100deg,#10b981,#059669)" }}
-            >
-              Kostenlos testen
-            </a>
-          </div>
-
-          <button
-            type="button"
-            aria-label="Menü öffnen"
-            onClick={() => setOpen(true)}
-            className="ml-auto flex h-10 w-10 items-center justify-center rounded-xl text-white lg:hidden"
-          >
-            <Menu size={22} />
-          </button>
-        </nav>
-      </div>
-
-      {open && (
-        <div className="glass-strong fixed inset-0 z-[60] flex flex-col items-center justify-center gap-8 lg:hidden">
-          <button
-            type="button"
-            aria-label="Menü schließen"
-            onClick={() => setOpen(false)}
-            className="absolute right-5 top-6 flex h-11 w-11 items-center justify-center rounded-xl text-white"
-          >
-            <X size={26} />
-          </button>
-          {LINKS.map((l) => (
-            <a
-              key={l.href}
-              href={l.href}
-              onClick={() => setOpen(false)}
-              className="text-3xl font-semibold text-white"
-            >
-              {l.label}
-            </a>
-          ))}
+          </nav>
           <a
             href="#kontakt"
             onClick={() => setOpen(false)}
-            className="mt-4 rounded-2xl px-8 py-4 text-lg font-semibold text-white"
-            style={{ background: "linear-gradient(100deg,#10b981,#059669)" }}
+            className="bg-gradient-accent mb-8 inline-flex items-center justify-center rounded-xl px-6 py-3.5 font-semibold text-white"
           >
             Kostenlos testen
           </a>
         </div>
-      )}
+      </div>
     </>
   );
 }

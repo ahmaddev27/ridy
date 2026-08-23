@@ -36,7 +36,7 @@ export function FaqSection() {
         <div className="mx-auto max-w-3xl">
           <div className="text-center">
             <Eyebrow>Häufige Fragen</Eyebrow>
-            <h2 className="font-heading mt-3 text-3xl font-bold text-white sm:text-4xl">
+            <h2 className="font-heading mt-3 text-3xl font-bold leading-[1.08] tracking-[-0.02em] text-balance text-white sm:text-4xl lg:text-5xl">
               Alles, was du wissen musst.
             </h2>
           </div>
@@ -45,22 +45,22 @@ export function FaqSection() {
             {FAQS.map((item, i) => {
               const isOpen = i === open;
               return (
-                <div key={item.q} className="card-modern rounded-2xl">
+                <div key={item.q} className="card-modern overflow-hidden rounded-3xl">
                   <button
                     type="button"
                     onClick={() => setOpen(isOpen ? -1 : i)}
-                    className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
+                    className="flex w-full items-center justify-between gap-4 p-5 text-left"
                   >
-                    <span className="text-base font-semibold text-white">{item.q}</span>
-                    {isOpen ? (
-                      <Minus size={20} className="shrink-0 text-[#10b981]" />
-                    ) : (
-                      <Plus size={20} className="shrink-0 text-[#10b981]" />
-                    )}
+                    <span className="font-heading text-base font-medium text-white lg:text-lg">
+                      {item.q}
+                    </span>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 text-primary">
+                      {isOpen ? <Minus size={16} /> : <Plus size={16} />}
+                    </span>
                   </button>
                   <div className={`mkt-acc-body ${isOpen ? "open" : ""}`}>
                     <div>
-                      <p className="px-6 pb-5 text-sm leading-relaxed text-[#9ca3af]">
+                      <p className="px-5 pb-5 leading-relaxed text-muted-foreground">
                         {item.a}
                       </p>
                     </div>

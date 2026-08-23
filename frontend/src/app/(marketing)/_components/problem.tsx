@@ -1,5 +1,6 @@
 import { Timer, Calculator, Wallet, TrendingDown } from "lucide-react";
 import { Container, SectionHeading } from "./ui";
+import { TiltCard } from "./tilt-card";
 
 const ITEMS = [
   {
@@ -33,18 +34,17 @@ export function Problem() {
           title="Jedes Angebot kostet dich Sekunden — und oft Geld."
           sub="Ride-Hailing-Flotten verlieren Zeit und Umsatz mit manuellen Entscheidungen, die längst automatisch bewertet gehören."
         />
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {ITEMS.map((item) => (
-            <div key={item.title} className="card-modern rounded-3xl p-6">
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-2xl"
-                style={{ background: "rgba(16,185,129,0.12)" }}
-              >
-                <item.icon size={20} className="text-[#10b981]" />
+            <TiltCard key={item.title} className="card-modern rounded-3xl p-6">
+              <div className="bg-gradient-accent-soft mb-4 flex h-11 w-11 items-center justify-center rounded-xl">
+                <item.icon size={20} className="text-primary" />
               </div>
-              <h3 className="mt-5 text-base font-semibold text-white">{item.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-[#9ca3af]">{item.body}</p>
-            </div>
+              <h3 className="font-heading mb-2 text-lg font-semibold text-white">
+                {item.title}
+              </h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">{item.body}</p>
+            </TiltCard>
           ))}
         </div>
       </Container>

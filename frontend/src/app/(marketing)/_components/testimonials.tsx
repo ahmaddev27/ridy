@@ -33,43 +33,46 @@ export function Testimonials() {
           eyebrow="Aus dem Betrieb"
           title="Stille Abende statt Streit um Löhne."
         />
-        <div className="mt-12 grid gap-5 md:grid-cols-2">
+        <div className="mb-10 mt-12 grid gap-4 md:grid-cols-2">
           {QUOTES.map((q) => (
-            <div key={q.name} className="card-modern rounded-3xl p-7">
-              <div className="flex gap-1">
+            <div key={q.name} className="card-modern flex flex-col gap-5 rounded-3xl p-7">
+              <div className="flex items-center gap-1">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Star key={i} size={16} fill="#f59e0b" className="text-[#f59e0b]" />
                 ))}
               </div>
-              <p className="mt-5 text-base leading-relaxed text-white/90">“{q.quote}”</p>
-              <div className="mt-6 flex items-center gap-3">
+              <blockquote className="font-heading text-lg font-medium leading-relaxed text-balance text-white">
+                “{q.quote}”
+              </blockquote>
+              <div className="mt-auto flex items-center gap-3 border-t border-white/10 pt-4">
                 <div
-                  className="flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold text-white"
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold text-white"
                   style={{ background: "linear-gradient(100deg,#10b981,#059669)" }}
                 >
                   {q.initials}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white">{q.name}</p>
-                  <p className="text-xs text-[#9ca3af]">{q.role}</p>
+                  <p className="font-heading text-sm font-semibold text-white">
+                    {q.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{q.role}</p>
                 </div>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {BADGES.map((b) => (
-            <div key={b.title} className="card-modern flex items-center gap-4 rounded-3xl p-5">
-              <div
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
-                style={{ background: "rgba(16,185,129,0.12)" }}
-              >
-                <b.icon size={20} className="text-[#10b981]" />
+            <div key={b.title} className="card-modern flex items-center gap-3 rounded-3xl p-5">
+              <div className="bg-gradient-accent-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
+                <b.icon size={20} className="text-primary" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-white">{b.title}</p>
-                <p className="text-xs text-[#9ca3af]">{b.note}</p>
+                <p className="font-heading text-sm font-semibold text-white">
+                  {b.title}
+                </p>
+                <p className="text-xs text-muted-foreground">{b.note}</p>
               </div>
             </div>
           ))}

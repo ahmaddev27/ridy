@@ -24,8 +24,8 @@ function FieldLabel({
   children: React.ReactNode;
 }) {
   return (
-    <span className="mb-2 flex items-center gap-2 text-sm font-medium text-white/85">
-      <Icon size={15} className="text-[#10b981]" />
+    <span className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Icon size={14} className="text-primary" />
       {children}
     </span>
   );
@@ -65,40 +65,38 @@ export function ContactForm() {
   }
 
   return (
-    <section id="kontakt-formular" className="py-14 lg:py-28">
-      <Container>
+    <section
+      id="kontakt-formular"
+      className="relative overflow-hidden py-14 lg:py-28"
+    >
+      <div
+        className="bg-gradient-accent pointer-events-none absolute left-1/2 top-20 h-[300px] w-[600px] -translate-x-1/2 rounded-full"
+        style={{ opacity: 0.07, filter: "blur(120px)" }}
+      />
+      <Container className="relative">
         <div className="mx-auto max-w-3xl">
           <div className="text-center">
-            <span className="glass inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium text-white/85">
-              <span className="h-2 w-2 rounded-full bg-[#10b981]" />
+            <span className="glass mb-5 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs text-muted-foreground">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#10b981]" />
               Kontakt
             </span>
-            <h2 className="font-heading mt-5 text-3xl font-bold text-white sm:text-4xl">
+            <h2 className="font-heading text-3xl font-bold leading-[1.08] tracking-[-0.02em] text-balance text-white sm:text-4xl lg:text-5xl">
               Schreib uns — wir antworten{" "}
-              <span
-                style={{
-                  background: "linear-gradient(100deg,#34d399,#059669)",
-                  WebkitBackgroundClip: "text",
-                  backgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
-              >
-                innerhalb 24 Stunden.
-              </span>
+              <span className="text-gradient">innerhalb 24 Stunden.</span>
             </h2>
-            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-[#9ca3af]">
+            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
               Egal ob Flotte mit 5 oder 500 Fahrern — erzähl uns, was du brauchst.
             </p>
           </div>
 
-          <div className="card-modern mt-10 rounded-3xl p-6 lg:p-8">
+          <div className="card-modern mt-10 rounded-3xl p-6 sm:p-10">
             {status === "success" ? (
               <div className="flex flex-col items-center py-8 text-center">
-                <CheckCircle2 size={48} className="text-[#10b981]" />
+                <CheckCircle2 size={48} className="text-primary" />
                 <p className="mt-4 text-xl font-semibold text-white">
                   Nachricht gesendet!
                 </p>
-                <p className="mt-2 text-sm text-[#9ca3af]">
+                <p className="mt-2 text-sm text-muted-foreground">
                   Danke — wir melden uns innerhalb von 24 Stunden zurück.
                 </p>
                 <button
@@ -164,7 +162,7 @@ export function ContactForm() {
                 <button
                   type="submit"
                   disabled={status === "loading"}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold text-white disabled:opacity-70"
+                  className="group flex w-full items-center justify-center gap-2 rounded-2xl px-7 py-4 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-70"
                   style={{ background: "linear-gradient(100deg,#10b981,#059669)" }}
                 >
                   {status === "loading" ? (
@@ -172,7 +170,10 @@ export function ContactForm() {
                   ) : (
                     <>
                       Nachricht senden
-                      <Send size={16} />
+                      <Send
+                        size={16}
+                        className="transition-transform group-hover:translate-x-0.5"
+                      />
                     </>
                   )}
                 </button>
