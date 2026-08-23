@@ -24,6 +24,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // Enable Sanctum SPA (cookie) auth for the API group.
         $middleware->statefulApi();
 
+        // The app is only reachable through the Caddy reverse proxy (backend
+        // ports are internal-only). Trust it so $request->ip() reflects the real
+        // client — otherwise per-IP throttles key on the proxy address and would
+        // rate-limit every visitor as one, and access logs record the proxy.
+        $middleware->trustProxies(at: '*', headers: Request::HEADER_X_FORWARDED_FOR
+            | Request::HEADER_X_FORWARDED_HOST
+            | Request::HEADER_X_FORWARDED_PORT
+            | Request::HEADER_X_FORWARDED_PROTO);
+
         $middleware->alias([
             'dispatch.secret' => VerifyDispatchSecret::class,
             'super.admin' => EnsureSuperAdmin::class,
