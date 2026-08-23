@@ -17,7 +17,11 @@ const jetBrainsMono = JetBrains_Mono({
 
 export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
+    // The public site is always German + LTR + dark, independent of whatever
+    // language/theme a signed-in manager picked for the dashboard.
     <div
+      lang="de"
+      dir="ltr"
       className={`mkt-root dark ${inter.variable} ${interTight.variable} ${jetBrainsMono.variable}`}
     >
       <GazaBanner />

@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Preloader } from "./preloader";
+
+/** Public marketing routes — always dark/German, and NOT the app, so they must
+ *  not show the (theme-following) app splash. */
+const MARKETING_ROUTES = ["/", "/faq", "/datenschutz", "/impressum"];
 
 /**
  * Branded splash shown on every full page load (open / refresh). It renders in
@@ -9,6 +14,7 @@ import { Preloader } from "./preloader";
  * has loaded — with a comfortable minimum so the logo + car animation plays.
  */
 export function InitialLoader() {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(true);
   const [hiding, setHiding] = useState(false);
 
@@ -31,7 +37,8 @@ export function InitialLoader() {
     return () => clearTimeout(cap);
   }, []);
 
-  if (!visible) return null;
+  // Marketing pages are static + always dark; the app splash would flash light.
+  if (MARKETING_ROUTES.includes(pathname) || !visible) return null;
 
   return (
     <div
