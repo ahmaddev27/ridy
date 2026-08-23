@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Fleet\Models\Driver;
+use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 
@@ -14,10 +15,14 @@ use Illuminate\Http\JsonResponse;
  */
 class DriverInviteController extends Controller
 {
+    use AuthorizesTenantResource;
+
     public function __construct(private readonly DriverInvitationService $invitations) {}
 
     public function send(Driver $driver): JsonResponse
     {
+        $this->authorizeTenant($driver);
+
         $this->invitations->invite($driver);
 
         return response()->json([

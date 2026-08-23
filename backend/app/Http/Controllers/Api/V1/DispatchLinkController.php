@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Dispatch\DriverLinker;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\Models\Driver;
+use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class DispatchLinkController extends Controller
 {
+    use AuthorizesTenantResource;
+
     /**
      * Uber driverUUIDs seen in offers that are not yet linked to a driver — the
      * manager's manual-linking worklist. Grouped so each driver appears once with
@@ -37,6 +40,8 @@ class DispatchLinkController extends Controller
      */
     public function linkManual(Request $request, Driver $driver, DriverLinker $linker): JsonResponse
     {
+        $this->authorizeTenant($driver);
+
         $data = $request->validate([
             'uber_driver_uuid' => ['required', 'string'],
             'uber_email' => ['nullable', 'email'],

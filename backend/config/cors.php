@@ -9,19 +9,24 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
+    'allowed_origins' => array_values(array_filter([
         env('FRONTEND_URL', 'http://localhost:3000'),
-    ],
+        // Pin the published extension origin in production, e.g.
+        // EXTENSION_ORIGIN=chrome-extension://abcdefghijklmnop… — an exact origin
+        // is preferred over the broad pattern below (which any installed
+        // extension would match).
+        env('EXTENSION_ORIGIN'),
+    ])),
 
     /*
      * The Ridy browser extension posts the captured Uber session from its own
-     * chrome-extension:// (or moz-extension://) origin using a Bearer token, so
-     * these origins must be allowed too. The matched origin is echoed back, which
-     * keeps supports_credentials valid.
+     * chrome-extension:// (or moz-extension://) origin using a Bearer token. When
+     * EXTENSION_ORIGIN is set we rely on the exact origin above; otherwise (dev,
+     * or before the id is known) fall back to the anchored scheme patterns.
      */
-    'allowed_origins_patterns' => [
-        '#^chrome-extension://#',
-        '#^moz-extension://#',
+    'allowed_origins_patterns' => env('EXTENSION_ORIGIN') ? [] : [
+        '#^chrome-extension://[a-p]{32}$#',
+        '#^moz-extension://[0-9a-f-]{36}$#',
     ],
 
     'allowed_headers' => ['*'],

@@ -4,11 +4,13 @@ use App\Http\Middleware\EnsureDriverTenantActive;
 use App\Http\Middleware\EnsureFleetConnected;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureUserAccount;
+use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\VerifyDispatchSecret;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Sentry\Laravel\Integration;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -29,6 +31,15 @@ return Application::configure(basePath: dirname(__DIR__))
             'user.account' => EnsureUserAccount::class,
             'fleet.connected' => EnsureFleetConnected::class,
         ]);
+
+        // SECURITY: route-model binding must resolve AFTER the tenant context is
+        // set, otherwise implicit {driver}/{offer} bindings query unscoped and a
+        // manager can bind another tenant's record by id (cross-tenant IDOR).
+        // Force ResolveTenant ahead of SubstituteBindings in the priority order.
+        $middleware->prependToPriorityList(
+            before: SubstituteBindings::class,
+            prepend: ResolveTenant::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

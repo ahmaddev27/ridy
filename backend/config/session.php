@@ -173,7 +173,9 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    // Default to secure cookies in production (served only over HTTPS behind
+    // Caddy); still overridable via env for local HTTP development.
+    'secure' => env('SESSION_SECURE_COOKIE', env('APP_ENV') === 'production'),
 
     /*
     |--------------------------------------------------------------------------

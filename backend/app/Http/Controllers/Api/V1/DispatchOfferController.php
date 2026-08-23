@@ -6,6 +6,7 @@ use App\Domain\Dispatch\AddressNormalizer;
 use App\Domain\Dispatch\DispatchOfferIngestor;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\TripGeocoder;
+use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchOfferResource;
 use App\Support\FleetDay;
@@ -19,6 +20,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DispatchOfferController extends Controller
 {
+    use AuthorizesTenantResource;
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $offers = $this->filtered($request)
@@ -161,6 +164,8 @@ class DispatchOfferController extends Controller
      */
     public function show(Request $request, DispatchOffer $offer, TripGeocoder $geocoder): JsonResponse
     {
+        $this->authorizeTenant($offer);
+
         $geocoder->enrich($offer);
 
         return response()->json([
@@ -221,6 +226,8 @@ class DispatchOfferController extends Controller
     /** Delete a single offer. */
     public function destroy(DispatchOffer $offer): JsonResponse
     {
+        $this->authorizeTenant($offer);
+
         $offer->delete();
 
         return response()->json(['data' => ['deleted' => 1]]);

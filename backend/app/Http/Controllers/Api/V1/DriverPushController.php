@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\Contracts\PushSender;
 use App\Domain\Notifications\Models\DeviceToken;
+use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 
@@ -15,10 +16,14 @@ use Illuminate\Http\JsonResponse;
  */
 class DriverPushController extends Controller
 {
+    use AuthorizesTenantResource;
+
     public function __construct(private readonly PushSender $sender) {}
 
     public function test(Driver $driver): JsonResponse
     {
+        $this->authorizeTenant($driver);
+
         $tokens = DeviceToken::where('driver_id', $driver->id)->get();
 
         if ($tokens->isEmpty()) {

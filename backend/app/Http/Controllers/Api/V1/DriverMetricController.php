@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\DriverMetric;
+use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,8 @@ use Illuminate\Http\Request;
  */
 class DriverMetricController extends Controller
 {
+    use AuthorizesTenantResource;
+
     /** Upsert a driver's metrics for a window (posted by the extension). */
     public function store(Request $request): JsonResponse
     {
@@ -62,6 +65,8 @@ class DriverMetricController extends Controller
     /** Recent metric windows for one driver (newest first). */
     public function index(Driver $driver): JsonResponse
     {
+        $this->authorizeTenant($driver);
+
         $metrics = DriverMetric::where('driver_id', $driver->id)
             ->orderByDesc('period_end')
             ->limit(12)

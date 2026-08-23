@@ -8,6 +8,7 @@ use App\Domain\Dispatch\UberSupplierClient;
 use App\Domain\Fleet\DriverStatsService;
 use App\Domain\Fleet\DriverStatusIngestor;
 use App\Domain\Fleet\Models\Driver;
+use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DriverResource;
 use App\Support\FleetDay;
@@ -18,6 +19,8 @@ use Illuminate\Validation\Rule;
 
 class DriverController extends Controller
 {
+    use AuthorizesTenantResource;
+
     /** A driver whose status hasn't synced within this many minutes is stale. */
     private const LIVE_STALE_MINUTES = 10;
 
@@ -65,6 +68,8 @@ class DriverController extends Controller
     /** A single driver (tenant-scoped by route-model binding) for the profile page. */
     public function show(Driver $driver): DriverResource
     {
+        $this->authorizeTenant($driver);
+
         return new DriverResource($driver);
     }
 
@@ -75,6 +80,8 @@ class DriverController extends Controller
      */
     public function update(Request $request, Driver $driver): DriverResource
     {
+        $this->authorizeTenant($driver);
+
         $data = $request->validate([
             'email' => ['nullable', 'email', 'max:255', Rule::unique('drivers', 'email')->ignore($driver->id)],
         ]);
@@ -87,6 +94,8 @@ class DriverController extends Controller
     /** Work stats for one driver, computed from our own offers/acceptance data. */
     public function stats(Request $request, Driver $driver, DriverStatsService $stats): JsonResponse
     {
+        $this->authorizeTenant($driver);
+
         // Fleet-day windows (04:00 boundary), $to exclusive.
         $from = $request->filled('from')
             ? FleetDay::startOfDate($request->string('from'))
