@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureDashboardToken;
 use App\Http\Middleware\EnsureDriverTenantActive;
 use App\Http\Middleware\EnsureFleetConnected;
 use App\Http\Middleware\EnsureSuperAdmin;
@@ -39,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'driver.active' => EnsureDriverTenantActive::class,
             'user.account' => EnsureUserAccount::class,
             'fleet.connected' => EnsureFleetConnected::class,
+            'dashboard.only' => EnsureDashboardToken::class,
         ]);
 
         // SECURITY: route-model binding must resolve AFTER the tenant context is

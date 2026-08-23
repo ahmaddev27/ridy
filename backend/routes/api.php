@@ -154,7 +154,7 @@ Route::prefix('v1')->group(function () {
         Route::post('impersonate/stop', [ImpersonationController::class, 'stop']);
     });
 
-    Route::middleware(['auth:sanctum', 'user.account', ResolveTenant::class])->group(function () {
+    Route::middleware(['auth:sanctum', 'user.account', ResolveTenant::class, 'dashboard.only'])->group(function () {
         // Dashboard
         Route::get('dashboard/summary', [DashboardController::class, 'summary']);
 
