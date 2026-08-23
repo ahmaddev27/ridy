@@ -56,10 +56,10 @@ export function SiteFooter() {
             </p>
             <div className="mt-4 flex flex-col gap-3">
               <a
-                href="mailto:vertrieb@reidey.de"
+                href="mailto:info@reidey.de"
                 className="text-sm text-white transition-colors hover:text-primary"
               >
-                vertrieb@reidey.de
+                info@reidey.de
               </a>
               <p className="text-sm text-muted-foreground">
                 Server in der EU · DSGVO-konform

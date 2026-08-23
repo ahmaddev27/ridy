@@ -42,7 +42,7 @@ export function Cta() {
 
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a
-                href="mailto:vertrieb@reidey.de"
+                href="mailto:info@reidey.de"
                 className="bg-gradient-accent group inline-flex items-center gap-2 rounded-2xl px-7 py-4 font-semibold text-white transition-opacity hover:opacity-90"
               >
                 Termin vereinbaren
@@ -52,11 +52,11 @@ export function Cta() {
                 />
               </a>
               <a
-                href="mailto:vertrieb@reidey.de"
+                href="mailto:info@reidey.de"
                 className="glass inline-flex items-center gap-2 rounded-2xl px-7 py-4 font-semibold text-white transition-colors hover:border-white/20"
               >
                 <Mail size={16} className="text-primary" />
-                vertrieb@reidey.de
+                info@reidey.de
               </a>
             </div>
           </div>
