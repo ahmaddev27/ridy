@@ -1,5 +1,6 @@
 import { Tabs } from "expo-router";
-import { View, Pressable, Platform } from "react-native";
+import { View, Pressable, Platform, StyleSheet } from "react-native";
+import { BlurView } from "expo-blur";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Home, Package, BarChart3, User, type LucideIcon } from "lucide-react-native";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
@@ -31,44 +32,72 @@ function BottomBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const c = useColors();
   const insets = useSafeAreaInsets();
 
+  const dark = isDarkPalette(c);
   return (
     <View
       style={{
-        flexDirection: isRTL() ? "row-reverse" : "row",
-        backgroundColor: c.canvas,
-        borderTopWidth: 1,
-        borderTopColor: c.line,
-        paddingTop: 9,
-        paddingBottom: Math.max(insets.bottom, 12),
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+        overflow: "hidden",
         ...shadow(c),
       }}
     >
-      {state.routes.map((route, index) => {
-        const focused = state.index === index;
-        const { options } = descriptors[route.key];
-        const label = typeof options.title === "string" ? options.title : t(`tabs.${route.name}`);
-        const Icon = iconFor(route.name);
-        const tint = focused ? c.accent : c.inkSubtle;
+      {/* Frosted glass: a themed blur + a faint tint for contrast over content. */}
+      <BlurView intensity={dark ? 40 : 60} tint={dark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+      <View
+        style={[
+          StyleSheet.absoluteFillObject,
+          { backgroundColor: dark ? "rgba(20,23,26,0.55)" : "rgba(255,255,255,0.6)" },
+        ]}
+      />
 
-        const onPress = () => {
-          const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
-          if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
-        };
+      <View
+        style={{
+          flexDirection: isRTL() ? "row-reverse" : "row",
+          paddingTop: 9,
+          paddingHorizontal: 8,
+          paddingBottom: Math.max(insets.bottom, 12),
+        }}
+      >
+        {state.routes.map((route, index) => {
+          const focused = state.index === index;
+          const { options } = descriptors[route.key];
+          const label = typeof options.title === "string" ? options.title : t(`tabs.${route.name}`);
+          const Icon = iconFor(route.name);
+          const tint = focused ? c.accent : c.inkSubtle;
 
-        return (
-          <Pressable
-            key={route.key}
-            onPress={onPress}
-            accessibilityRole="button"
-            accessibilityState={focused ? { selected: true } : {}}
-            accessibilityLabel={label}
-            style={{ flex: 1, alignItems: "center", gap: 5 }}
-          >
-            <Icon size={21} strokeWidth={focused ? 2.3 : 1.9} color={tint} />
-            <Text style={{ color: tint, fontSize: 9.5, fontWeight: focused ? "700" : "500" }}>{label}</Text>
-          </Pressable>
-        );
-      })}
+          const onPress = () => {
+            const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
+            if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+          };
+
+          return (
+            <Pressable
+              key={route.key}
+              onPress={onPress}
+              accessibilityRole="button"
+              accessibilityState={focused ? { selected: true } : {}}
+              accessibilityLabel={label}
+              style={{ flex: 1, alignItems: "center" }}
+            >
+              {/* Active tab sits on a soft green pill so the live tab stands out. */}
+              <View
+                style={{
+                  alignItems: "center",
+                  gap: 4,
+                  paddingHorizontal: 14,
+                  paddingVertical: 6,
+                  borderRadius: 14,
+                  backgroundColor: focused ? (dark ? "rgba(16,185,129,0.16)" : "rgba(5,150,105,0.12)") : "transparent",
+                }}
+              >
+                <Icon size={21} strokeWidth={focused ? 2.3 : 1.9} color={tint} />
+                <Text style={{ color: tint, fontSize: 9.5, fontWeight: focused ? "700" : "500" }}>{label}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
