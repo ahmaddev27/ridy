@@ -10,6 +10,21 @@
 reidey.de {
 	encode zstd gzip
 
+	# Security headers (applied to every response). HSTS forces HTTPS for a year;
+	# nosniff/frame-ancestors/XFO block MIME-sniffing and clickjacking; the CSP is
+	# permissive enough for Next.js (inline/eval), Google Fonts, MapLibre's https
+	# raster tiles and Sentry (https/wss), while still pinning frame-ancestors,
+	# base-uri and form-action to self. -Server drops the software banner.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(self), microphone=(), camera=(), payment=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+
 	# Laravel API + Sanctum. The backend app is mounted so its public/ is the root.
 	@laravel path /api/* /sanctum/* /up
 	handle @laravel {
