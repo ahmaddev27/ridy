@@ -1,15 +1,17 @@
 import { apiFetch, apiUpload } from "./client";
 
-/** A platform-wide promotional ad managed by the super-admin. Image-first: the
- *  title/body are optional (kept only for legacy ads); the banner shows just the
- *  image + a CTA button. */
+/** A platform-wide promotional ad managed by the super-admin. Image-only: the
+ *  admin designs one image per device (mobile / tablet / desktop) with its own
+ *  baked-in button, and the whole image is the click target — no CTA button. */
 export type Ad = {
   id: number;
   title: string | null;
-  body: string | null;
+  image_mobile: string | null;
+  image_tablet: string | null;
+  image_desktop: string | null;
+  /** Legacy single image, kept only for old ads. */
   image_url: string | null;
   link_url: string | null;
-  cta_label: string | null;
   active: boolean;
   starts_at: string | null;
   ends_at: string | null;
@@ -17,17 +19,17 @@ export type Ad = {
 
 export type AdInput = {
   title?: string | null;
-  body?: string | null;
-  image_url?: string | null;
+  image_mobile?: string | null;
+  image_tablet?: string | null;
+  image_desktop?: string | null;
   link_url?: string | null;
-  cta_label?: string | null;
   active?: boolean;
   starts_at?: string | null;
   ends_at?: string | null;
 };
 
-/** The live ad shown to a company on its Offers view (or null when none). */
-export type CurrentAd = Pick<Ad, "id" | "title" | "body" | "image_url" | "link_url" | "cta_label">;
+/** The live ad shown to a company on its banner slot (empty when none). */
+export type CurrentAd = Pick<Ad, "id" | "image_mobile" | "image_tablet" | "image_desktop" | "link_url">;
 
 const adminBase = "/api/v1/admin/ads";
 

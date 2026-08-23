@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/context";
 import { getLiveAds, type CurrentAd } from "@/lib/api/ads";
 
@@ -15,10 +13,12 @@ function resolveImage(url: string | null): string {
 }
 
 /**
- * Full-width landscape banner slider for platform ads (super-admin authored).
- * Renders nothing when no ad is live (so pages don't reserve empty space). With
- * a single live ad it renders statically; with several it auto-advances every
- * 4s, pausing while hovered or focused, with clickable dot indicators.
+ * Full-width banner slider for platform ads (super-admin authored). Image-only:
+ * the admin uploads one image per device (mobile / tablet / desktop) with its own
+ * baked-in button, and the WHOLE image is the click target — no CTA button. The
+ * container's aspect ratio matches each device's image, so nothing is cropped.
+ * Renders nothing when no ad is live; auto-advances every 4s (pausing on hover)
+ * once there's more than one, with clickable dot indicators.
  */
 export function AdBanner() {
   const { t } = useI18n();
@@ -34,14 +34,12 @@ export function AdBanner() {
 
   const count = ads.length;
 
-  // Auto-advance only with more than one ad and while not paused.
   useEffect(() => {
     if (count <= 1 || paused) return;
     const id = setInterval(() => setIndex((i) => (i + 1) % count), ROTATE_MS);
     return () => clearInterval(id);
   }, [count, paused]);
 
-  // Keep the active index valid if the ad set changes size.
   useEffect(() => {
     if (index >= count && count > 0) setIndex(0);
   }, [count, index]);
@@ -58,7 +56,8 @@ export function AdBanner() {
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
-      <div className="relative h-[300px] w-full">
+      {/* Aspect matches each device's image so object-cover never crops it. */}
+      <div className="relative aspect-[16/10] w-full sm:aspect-[5/2] lg:aspect-[4/1]">
         {ads.map((ad, i) => (
           <AdSlide key={ad.id} ad={ad} active={i === current} t={t} />
         ))}
@@ -84,54 +83,38 @@ export function AdBanner() {
   );
 }
 
-function AdSlide({
-  ad,
-  active,
-  t,
-}: {
-  ad: CurrentAd;
-  active: boolean;
-  t: (k: string) => string;
-}) {
-  const imageSrc = resolveImage(ad.image_url);
-  const cta = ad.cta_label?.trim() || t("screens.ads.slotDefaultCta");
-  // Non-active slides are removed from the tab/pointer flow so hidden CTAs
-  // aren't focusable.
-  const ref = useRef<HTMLDivElement | null>(null);
+function AdSlide({ ad, active, t }: { ad: CurrentAd; active: boolean; t: (k: string) => string }) {
+  // Non-active slides are removed from the tab/pointer flow.
+  const ref = useRef<HTMLAnchorElement | null>(null);
   useEffect(() => {
     if (ref.current) ref.current.inert = !active;
   }, [active]);
 
   return (
-    <div
+    <a
       ref={ref}
+      href={ad.link_url ?? undefined}
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+      tabIndex={active ? 0 : -1}
       aria-hidden={!active}
-      className={`absolute inset-0 transition-opacity duration-700 ${
+      aria-label={t("screens.ads.slotSponsored")}
+      className={`absolute inset-0 block transition-opacity duration-700 ${
         active ? "z-10 opacity-100" : "z-0 opacity-0"
       }`}
     >
-      {/* Image-first: the ad is just the image + a CTA button, no promo text. */}
-      {imageSrc && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={imageSrc} alt="" className="absolute inset-0 h-full w-full object-cover" />
-      )}
+      {/* The whole image is the ad and the click target — one image per device. */}
+      <picture>
+        <source media="(min-width: 1024px)" srcSet={resolveImage(ad.image_desktop)} />
+        <source media="(min-width: 640px)" srcSet={resolveImage(ad.image_tablet)} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={resolveImage(ad.image_mobile)} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      </picture>
 
       {/* Small "Sponsored" tag, top-start. */}
       <span className="absolute top-3 z-10 rounded-md bg-black/45 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/90 ltr:left-3 rtl:right-3">
         {t("screens.ads.slotSponsored")}
       </span>
-
-      {/* CTA button, pinned bottom-end (right). */}
-      {ad.link_url && (
-        <div className="absolute bottom-4 z-10 ltr:right-4 rtl:left-4">
-          <a href={ad.link_url} target="_blank" rel="noopener noreferrer nofollow" tabIndex={active ? 0 : -1}>
-            <Button variant="secondary" size="sm">
-              {cta}
-              <ExternalLink className="h-3.5 w-3.5" />
-            </Button>
-          </a>
-        </div>
-      )}
-    </div>
+    </a>
   );
 }

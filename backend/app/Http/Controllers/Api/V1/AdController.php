@@ -35,11 +35,11 @@ class AdController extends Controller
     {
         return [
             'id' => $ad->id,
-            'title' => $ad->title,
-            'body' => $ad->body,
-            'image_url' => $ad->image_url,
+            // Per-device images; fall back to the legacy single image for old ads.
+            'image_mobile' => $ad->image_mobile ?? $ad->image_url,
+            'image_tablet' => $ad->image_tablet ?? $ad->image_url,
+            'image_desktop' => $ad->image_desktop ?? $ad->image_url,
             'link_url' => $ad->link_url,
-            'cta_label' => $ad->cta_label,
         ];
     }
 }

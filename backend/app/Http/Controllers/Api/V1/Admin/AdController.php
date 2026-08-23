@@ -27,13 +27,17 @@ class AdController extends Controller
         return response()->json(['data' => $this->present($ad)], 201);
     }
 
+    /** The per-device image columns the ad now uses (+ the legacy single image). */
+    private const IMAGE_FIELDS = ['image_url', 'image_mobile', 'image_tablet', 'image_desktop'];
+
     public function update(Request $request, Ad $ad): JsonResponse
     {
         $data = $this->validated($request);
-        // If the image changed (or was removed), delete the previous upload so
-        // replaced images do not accumulate as orphans on disk.
-        if (array_key_exists('image_url', $data) && $data['image_url'] !== $ad->image_url) {
-            $this->deleteImage($ad->image_url);
+        // Delete any device image that was replaced, so old uploads don't orphan.
+        foreach (self::IMAGE_FIELDS as $field) {
+            if (array_key_exists($field, $data) && $data[$field] !== $ad->{$field}) {
+                $this->deleteImage($ad->{$field});
+            }
         }
         $ad->update($data);
 
@@ -42,7 +46,9 @@ class AdController extends Controller
 
     public function destroy(Ad $ad): JsonResponse
     {
-        $this->deleteImage($ad->image_url);
+        foreach (self::IMAGE_FIELDS as $field) {
+            $this->deleteImage($ad->{$field});
+        }
         $ad->delete();
 
         return response()->json(['data' => ['deleted' => true]]);
@@ -83,6 +89,10 @@ class AdController extends Controller
             // image_url is set from our own upload endpoint (a relative same-origin
             // path), so it is a trusted string, not an external absolute URL.
             'image_url' => ['nullable', 'string', 'max:2048'],
+            // The three device images are the ad now — all required.
+            'image_mobile' => ['required', 'string', 'max:2048'],
+            'image_tablet' => ['required', 'string', 'max:2048'],
+            'image_desktop' => ['required', 'string', 'max:2048'],
             'link_url' => ['nullable', 'url', 'max:2048'],
             'cta_label' => ['nullable', 'string', 'max:80'],
             'active' => ['boolean'],
@@ -107,6 +117,9 @@ class AdController extends Controller
             'title' => $ad->title,
             'body' => $ad->body,
             'image_url' => $ad->image_url,
+            'image_mobile' => $ad->image_mobile,
+            'image_tablet' => $ad->image_tablet,
+            'image_desktop' => $ad->image_desktop,
             'link_url' => $ad->link_url,
             'cta_label' => $ad->cta_label,
             'active' => $ad->active,
