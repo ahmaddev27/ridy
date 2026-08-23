@@ -13,7 +13,7 @@ type Point = { label: string; value: number };
 export function BarChart({
   data,
   height = 200,
-  color = "#6366f1",
+  color = "var(--color-primary)",
   valueFormat,
 }: {
   data: Point[];

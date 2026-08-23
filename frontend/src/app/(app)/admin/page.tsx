@@ -140,7 +140,7 @@ export default function AdminDashboardPage() {
                   </div>
                   <div className="h-2.5 overflow-hidden rounded-full bg-surface-2">
                     <div
-                      className="h-full rounded-full bg-[#6366f1] transition-[width] duration-700 ease-out"
+                      className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
                       style={{ width: `${(tc.offers / topMax) * 100}%` }}
                     />
                   </div>
