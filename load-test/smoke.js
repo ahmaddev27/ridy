@@ -14,6 +14,9 @@ export const options = {
 
 const BASE = __ENV.BASE_URL || 'https://reidey.de';
 
+// 429 from the rate-limited public API is expected, not a failure.
+http.setResponseCallback(http.expectedStatuses(200, 429));
+
 export default function () {
   const home = http.get(`${BASE}/`);
   check(home, {

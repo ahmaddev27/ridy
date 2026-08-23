@@ -17,6 +17,10 @@ const PEAK = Number(__ENV.PEAK || 20);
 const pageLatency = new Trend('page_latency', true);
 const apiLatency = new Trend('api_latency', true);
 
+// 429 from the public API is the rate limiter working as intended, not a failure.
+// Count it as an expected status so it doesn't inflate http_req_failed.
+http.setResponseCallback(http.expectedStatuses(200, 429));
+
 export const options = {
   scenarios: {
     ramp: {
