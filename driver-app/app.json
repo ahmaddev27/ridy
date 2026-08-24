@@ -53,7 +53,17 @@
           "backgroundColor": "#14171a"
         }
       ],
-      "@sentry/react-native"
+      "@sentry/react-native",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0"
+          }
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "https://reidey.de",
