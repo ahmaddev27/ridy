@@ -106,6 +106,15 @@ export default function OfferScreen() {
   const isPending = status === "pending";
   const expired = isPending && secondsLeft != null && secondsLeft <= 0;
   const ringColor = pct > 0.5 ? c.completed : pct > 0.25 ? c.pending : c.canceled;
+
+  // Once the offer is taken, the ring stops being a countdown and becomes a
+  // lifecycle progress meter in our deep green: accepted (driver → pickup) →
+  // started (on trip) → completed (trip done). The percentage replaces the
+  // status word beneath the fare.
+  const PROGRESS_GREEN = "#059669";
+  const LIFECYCLE_PROGRESS: Record<string, number> = { accepted: 1 / 3, started: 2 / 3, completed: 1 };
+  const lifePct = LIFECYCLE_PROGRESS[status];
+  const showProgress = lifePct !== undefined;
   const hasMetrics = offer?.distance_m != null; // geo-synced offers only; hide the "—" placeholders otherwise
   // Rough ETA at ~30 km/h city average — same derivation the home ActiveOffer uses.
   const km = offer?.distance_m ? offer.distance_m / 1000 : null;
@@ -139,6 +148,13 @@ export default function OfferScreen() {
                     strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - pct)}
                   />
                 )}
+                {showProgress && (
+                  <Circle
+                    cx={RING / 2} cy={RING / 2} r={R}
+                    stroke={PROGRESS_GREEN} strokeWidth={STROKE} fill="none" strokeLinecap="round"
+                    strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - lifePct)}
+                  />
+                )}
               </Svg>
               {/* Hero is the €/km rate — the number the driver judges in ~5s. The
                   total fare sits beneath it as the secondary figure. Falls back to
@@ -167,6 +183,11 @@ export default function OfferScreen() {
             {isPending && !expired && secondsLeft != null ? (
               <Text style={{ color: ringColor, fontSize: 16, fontWeight: "600", marginTop: 6 }}>
                 {`${secondsLeft.toFixed(1)}s`}
+              </Text>
+            ) : showProgress ? (
+              // Trip lifecycle progress: the percentage replaces the status word.
+              <Text style={{ color: PROGRESS_GREEN, fontSize: 18, fontWeight: "700", marginTop: 8 }}>
+                {`${Math.round(lifePct * 100)}%`}
               </Text>
             ) : (
               <View style={{ marginTop: 8 }}>

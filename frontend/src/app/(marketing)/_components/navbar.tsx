@@ -83,18 +83,18 @@ export function Navbar() {
             </nav>
 
             <div className="flex items-center gap-3">
-              <a
-                href="#kontakt"
+              <Link
+                href="/login"
                 className="hidden items-center text-sm text-muted-foreground transition-colors hover:text-white md:inline-flex"
               >
                 Anmelden
-              </a>
-              <a
-                href="#kontakt"
+              </Link>
+              <Link
+                href="/register"
                 className="bg-gradient-accent hidden items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 sm:inline-flex"
               >
                 Kostenlos testen
-              </a>
+              </Link>
               <button
                 type="button"
                 aria-label="Menü"
@@ -143,13 +143,13 @@ export function Navbar() {
               </a>
             ))}
           </nav>
-          <a
-            href="#kontakt"
+          <Link
+            href="/register"
             onClick={() => setOpen(false)}
             className="bg-gradient-accent mb-8 inline-flex items-center justify-center rounded-xl px-6 py-3.5 font-semibold text-white"
           >
             Kostenlos testen
-          </a>
+          </Link>
         </div>
       </div>
     </>
