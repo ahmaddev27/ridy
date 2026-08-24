@@ -127,9 +127,15 @@ export class ApiClient {
       // must never log the owner out — otherwise tapping a notification (which can
       // briefly hit a driver screen before the identity settles) signs them out.
       const driverOnly = path.startsWith("/api/v1/driver/") && !path.startsWith("/api/v1/driver/fleet/");
+      // Only a request that actually carried a token can invalidate a session. A
+      // 401 with no token set is a call that raced ahead of session restore (e.g.
+      // a screen opened from a notification on cold start) — treating it as a dead
+      // session would wipe the still-valid stored token before restore reads it.
+      const authenticated = this.token !== null;
       const sessionDead =
-        (res.status === 403 && body?.message === "account_suspended") ||
-        (res.status === 401 && !(this.owner && driverOnly));
+        authenticated &&
+        ((res.status === 403 && body?.message === "account_suspended") ||
+          (res.status === 401 && !(this.owner && driverOnly)));
       if (sessionDead) {
         this.onSessionInvalid?.(body?.reason ?? null);
       }
