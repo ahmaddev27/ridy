@@ -5,6 +5,7 @@ namespace App\Domain\Fleet;
 use App\Domain\Dispatch\OfferLifecycle;
 use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
+use App\Support\RidyLog;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
@@ -119,7 +120,7 @@ class DriverStatusIngestor
      * failure it reports and returns instead of throwing, so one lost transition
      * never 500s the whole batch.
      */
-    private function retryOnDeadlock(callable $fn, int $attempts = 3): void
+    private function retryOnDeadlock(callable $fn, int $attempts = 5): void
     {
         for ($i = 1; ; $i++) {
             try {
@@ -127,8 +128,17 @@ class DriverStatusIngestor
 
                 return;
             } catch (QueryException $e) {
-                if ($i >= $attempts || ! $this->isLockError($e)) {
-                    report($e);
+                $lock = $this->isLockError($e);
+                if ($i >= $attempts || ! $lock) {
+                    // A non-lock error is a real bug → Sentry. An exhausted lock
+                    // retry is an expected, self-healing transient (the transition
+                    // re-derives on the next poll) → log it, but don't page anyone.
+                    $lock
+                        ? RidyLog::event('driver_status.transition_deadlock_retry_exhausted', [
+                            'error' => $e->getMessage(),
+                            'attempts' => $attempts,
+                        ])
+                        : report($e);
 
                     return;
                 }
