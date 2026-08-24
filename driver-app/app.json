@@ -61,15 +61,15 @@
         "origin": false
       },
       "eas": {
-        "projectId": "f12e29c1-5bed-499b-8bfb-7dd3f8f87cc3"
+        "projectId": "3a5c4d7f-5f4a-44b6-b3af-7c61f066d408"
       }
     },
-    "owner": "jaberahmed22s-team",
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/f12e29c1-5bed-499b-8bfb-7dd3f8f87cc3"
-    }
+      "url": "https://u.expo.dev/3a5c4d7f-5f4a-44b6-b3af-7c61f066d408"
+    },
+    "owner": "reidey"
   }
 }
