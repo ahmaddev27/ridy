@@ -266,16 +266,18 @@ html[lang="ar"] body,
   padding-top: 0;
 }
 
+/* Only the standard `backdrop-filter` is authored — lightningcss autoprefixes it
+   (emitting -webkit- for Safari) from the build targets. Writing the -webkit-
+   line by hand made the minifier treat the pair as duplicates and drop the
+   standard property, leaving Firefox with no blur (a transparent header). */
 .glass {
   background: rgba(18, 18, 18, 0.6);
   backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 .glass-strong {
   background: rgba(10, 10, 10, 0.82);
   backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 .card-modern {
