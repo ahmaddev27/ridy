@@ -1,9 +1,19 @@
-name: iOS Build (local, free minutes)
+name: iOS Build & Submit
 
-# Builds the driver app for iOS on GitHub's macOS runner with `eas build --local`,
-# so it runs on GitHub's Mac (no EAS Build quota) and costs only Actions minutes.
-# Requires a paid Apple Developer account and iOS signing credentials already set
-# up in EAS (run `eas credentials -p ios` once). Manual trigger only.
+# Builds the driver app for iOS on EAS (cloud) and, optionally, submits the
+# resulting build straight to App Store Connect — all from GitHub Actions, so no
+# local Mac is needed. Manual trigger only.
+#
+# One-time setup by the Apple account owner (interactive, done once, NOT in CI):
+#   1. npm i -g eas-cli && eas login
+#   2. eas credentials -p ios         # register de.reidey.driver, create the
+#                                      # Distribution certificate + provisioning
+#                                      # profile (let EAS manage them)
+#   3. Set up the App Store Connect API key for submit (eas credentials → iOS →
+#      "App Store Connect: Manage your API Key"), so `--auto-submit` is non-interactive.
+#
+# Required GitHub secret:
+#   EXPO_TOKEN  — an Expo access token (expo.dev → Account → Access Tokens).
 on:
   workflow_dispatch:
     inputs:
@@ -14,12 +24,15 @@ on:
         options:
           - preview
           - production
+      submit:
+        description: "Submit to App Store Connect after the build"
+        type: boolean
+        default: false
 
 jobs:
   ios:
-    name: Build iOS (${{ github.event.inputs.profile }})
-    # iOS builds require macOS (Xcode + code signing).
-    runs-on: macos-latest
+    name: iOS ${{ github.event.inputs.profile }}${{ github.event.inputs.submit == 'true' && ' + submit' || '' }}
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: driver-app
@@ -39,25 +52,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # --local builds on this runner (no EAS Build quota). EXPO_TOKEN authenticates
-      # so the build can pull the iOS distribution cert + provisioning profile that
-      # `eas credentials -p ios` stored on EAS. --non-interactive fails fast if any
-      # credential is missing rather than prompting.
-      - name: Build iOS (${{ github.event.inputs.profile }})
+      # Cloud build on EAS. --auto-submit (when requested) hands the finished build
+      # straight to App Store Connect using submit.production from eas.json + the
+      # App Store Connect API key stored in EAS credentials. --non-interactive fails
+      # fast if any credential is missing rather than hanging on a prompt.
+      - name: EAS build (+ submit)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           eas build \
             --platform ios \
             --profile "${{ github.event.inputs.profile }}" \
-            --local \
             --non-interactive \
-            --output "build/reidey-${{ github.event.inputs.profile }}.ipa"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: reidey-ios-${{ github.event.inputs.profile }}
-          path: driver-app/build/reidey-${{ github.event.inputs.profile }}.ipa
-          if-no-files-found: error
-          retention-days: 14
+            ${{ github.event.inputs.submit == 'true' && '--auto-submit' || '' }}

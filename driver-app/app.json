@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "Reidey Driver",
+    "name": "Reidey",
     "slug": "reidey",
     "scheme": "reidey",
-    "version": "1.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": false,
@@ -13,13 +13,13 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "de.fleeteye.reidey.driver",
+      "bundleIdentifier": "de.reidey.driver",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "de.fleeteye.reidey.driver",
+      "package": "de.reidey.app",
       "versionCode": 2,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {

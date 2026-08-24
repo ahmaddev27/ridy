@@ -1,23 +1,37 @@
-name: Android Build (local, free)
+name: Android Build & Submit
 
-# Builds the driver app on GitHub's runner with `eas build --local`, so it does
-# NOT consume the EAS Build quota (the build runs here, not on Expo servers) and
-# costs nothing beyond GitHub Actions minutes. Manual trigger only — no build
-# runs on every push, so minutes are spent only when you ask for one.
+# Builds the driver app for Android on EAS (cloud) and, optionally, submits the
+# resulting AAB straight to Google Play — all from GitHub Actions. Manual trigger.
+#
+# One-time setup by the account owner (interactive, done once, NOT in CI):
+#   1. npm i -g eas-cli && eas login
+#   2. eas credentials -p android      # let EAS generate/manage the upload keystore
+#   3. For submit: create a Google Play service-account JSON with the "Release
+#      manager" role, then set it in submit.production (serviceAccountKeyPath) or via
+#      eas credentials. NOTE: Google requires the VERY FIRST upload of a brand-new
+#      app (de.reidey.app is still "Draft") to be done manually in Play Console once;
+#      after that, `--auto-submit` works from CI.
+#
+# Required GitHub secret:
+#   EXPO_TOKEN  — an Expo access token (expo.dev → Account → Access Tokens).
 on:
   workflow_dispatch:
     inputs:
       profile:
         description: "EAS build profile"
         type: choice
-        default: preview
+        default: production
         options:
           - preview
           - production
+      submit:
+        description: "Submit to Google Play after the build (production only)"
+        type: boolean
+        default: false
 
 jobs:
   android:
-    name: Build Android (${{ github.event.inputs.profile }})
+    name: Android ${{ github.event.inputs.profile }}${{ github.event.inputs.submit == 'true' && ' + submit' || '' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -32,47 +46,21 @@ jobs:
           cache: npm
           cache-dependency-path: driver-app/package-lock.json
 
-      # eas build --local runs a Gradle build, which needs JDK 17 (not the
-      # runner's newer default) and the Android SDK (preinstalled on ubuntu).
-      - name: Setup JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
       - name: Install eas-cli
         run: npm install -g eas-cli
 
       - name: Install dependencies
         run: npm ci
 
-      # A preview profile emits an installable APK; production emits a Play AAB.
-      - name: Resolve output extension
-        id: ext
-        run: |
-          if [ "${{ github.event.inputs.profile }}" = "production" ]; then
-            echo "ext=aab" >> "$GITHUB_OUTPUT"
-          else
-            echo "ext=apk" >> "$GITHUB_OUTPUT"
-          fi
-
-      # --local builds on this runner (no EAS quota). EXPO_TOKEN authenticates so
-      # the build can pull the signing keystore already stored on Expo.
-      - name: Build Android (${{ github.event.inputs.profile }})
+      # Cloud build on EAS. --auto-submit (when requested) uploads the AAB to Google
+      # Play using submit.production from eas.json + the service-account key stored in
+      # EAS credentials. --non-interactive fails fast on any missing credential.
+      - name: EAS build (+ submit)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           eas build \
             --platform android \
             --profile "${{ github.event.inputs.profile }}" \
-            --local \
             --non-interactive \
-            --output "build/reidey-${{ github.event.inputs.profile }}.${{ steps.ext.outputs.ext }}"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: reidey-android-${{ github.event.inputs.profile }}
-          path: driver-app/build/reidey-${{ github.event.inputs.profile }}.${{ steps.ext.outputs.ext }}
-          if-no-files-found: error
-          retention-days: 14
+            ${{ github.event.inputs.submit == 'true' && '--auto-submit' || '' }}
