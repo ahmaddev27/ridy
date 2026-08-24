@@ -25,6 +25,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // Enable Sanctum SPA (cookie) auth for the API group.
         $middleware->statefulApi();
 
+        // This is an API-only backend with no `login` route. Never let the auth
+        // middleware try to redirect an unauthenticated guest to route('login') —
+        // that throws RouteNotFoundException (a 500) instead of a clean 401 JSON.
+        // Returning null skips the redirect so AuthenticationException renders as
+        // 401 via shouldRenderJsonWhen(api/*).
+        $middleware->redirectGuestsTo(fn () => null);
+
         // The app is only reachable through the Caddy reverse proxy (backend
         // ports are internal-only). Trust it so $request->ip() reflects the real
         // client — otherwise per-IP throttles key on the proxy address and would
