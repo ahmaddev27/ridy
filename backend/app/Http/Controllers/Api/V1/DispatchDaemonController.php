@@ -34,11 +34,17 @@ class DispatchDaemonController extends Controller
         $shards->reconcileAssignments();
 
         $sessions = UberFleetSession::withoutGlobalScopes()
-            ->with('tenant:id,proxy_url')
+            ->with('tenant:id,proxy_url,status,banned_at,activated_at,subscription_ends_at')
             ->where('status', UberFleetSession::STATUS_ACTIVE)
             ->where('shard_id', $shard->id) // only the companies this box owns
             ->get()
-            ->filter->isUsable()
+            // Never stream a company whose subscription has lapsed (expired /
+            // disabled / banned): keeping its RAMEN stream open would burn a proxy
+            // and process offers for a tenant that no longer pays. A resubscribe
+            // clears stateReason() and the stream resumes on the next poll.
+            ->filter(fn (UberFleetSession $s) => $s->isUsable()
+                && $s->tenant !== null
+                && $s->tenant->stateReason() === null)
             ->map(fn (UberFleetSession $s) => [
                 'id' => $s->id,
                 'tenant_id' => $s->tenant_id,

@@ -22,9 +22,13 @@ class DispatchDaemonTest extends TestCase
         config(['services.dispatch.ingest_secret' => self::SECRET]);
     }
 
-    private function makeSession(string $status = UberFleetSession::STATUS_ACTIVE): UberFleetSession
+    private function makeSession(string $status = UberFleetSession::STATUS_ACTIVE, array $tenantOverrides = []): UberFleetSession
     {
-        $tenant = Tenant::create(['name' => 'YA', 'country' => 'DE', 'uber_org_uuid' => self::ORG]);
+        $tenant = Tenant::create(array_merge([
+            'name' => 'YA', 'country' => 'DE', 'uber_org_uuid' => self::ORG,
+            // An active subscription — the daemon only streams paying companies.
+            'status' => 'active', 'activated_at' => now(),
+        ], $tenantOverrides));
         app(TenantContext::class)->set($tenant->id);
 
         return UberFleetSession::create([
@@ -49,6 +53,21 @@ class DispatchDaemonTest extends TestCase
             ->assertJsonPath('data.0.id', $session->id)
             ->assertJsonPath('data.0.uber_org_uuid', self::ORG)
             ->assertJsonPath('data.0.cookies.0.name', 'sid');
+    }
+
+    public function test_lapsed_subscription_company_is_not_streamed(): void
+    {
+        // Session is active, but the company's subscription has expired — the
+        // daemon must not stream it (no proxy burn / offer processing for a
+        // non-paying tenant).
+        $this->makeSession(UberFleetSession::STATUS_ACTIVE, [
+            'activated_at' => now()->subMonth(),
+            'subscription_ends_at' => now()->subDay(),
+        ]);
+
+        $this->daemon()->getJson('/api/v1/internal/dispatch/sessions')
+            ->assertOk()
+            ->assertJsonPath('data', []);
     }
 
     public function test_expired_and_relink_sessions_are_excluded(): void
