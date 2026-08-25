@@ -18,12 +18,14 @@ class ExportDriverEmails extends Command
 
     public function handle(): int
     {
+        // A driver who hasn't been invited yet has no login `email` — fall back to
+        // the Uber email captured when they were linked, so every driver is covered.
         $emails = Driver::withoutGlobalScopes()
-            ->whereNotNull('email')
-            ->where('email', '!=', '')
-            ->orderBy('email')
-            ->pluck('email')
+            ->get(['email', 'uber_email'])
+            ->map(fn (Driver $d): ?string => filled($d->email) ? $d->email : $d->uber_email)
+            ->filter()
             ->unique()
+            ->sort()
             ->values();
 
         if ($emails->isEmpty()) {
