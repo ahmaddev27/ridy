@@ -12,3 +12,6 @@ GoogleService-Info.plist
 
 # Play submit key (written from a CI secret; never commit)
 play-service-account.json
+
+# iOS App Store Connect key (written from a CI secret; never commit)
+ios-asc-key.p8
