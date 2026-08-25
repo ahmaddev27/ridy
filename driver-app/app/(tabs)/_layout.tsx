@@ -42,12 +42,14 @@ function BottomBar({ state, descriptors, navigation }: BottomTabBarProps) {
         ...shadow(c),
       }}
     >
-      {/* Frosted glass: a themed blur + a faint tint for contrast over content. */}
+      {/* Frosted glass where it renders (iOS), but the tint below is near-opaque
+          so the bar is always a clean solid colour — expo-blur is unreliable on
+          Android and would otherwise wash the bar white in dark mode. */}
       <BlurView intensity={dark ? 40 : 60} tint={dark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
       <View
         style={[
           StyleSheet.absoluteFillObject,
-          { backgroundColor: dark ? "rgba(20,23,26,0.55)" : "rgba(255,255,255,0.6)" },
+          { backgroundColor: dark ? "rgba(16,18,21,0.94)" : "rgba(255,255,255,0.94)" },
         ]}
       />
 
