@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { Sentry } from "@/lib/sentry";
 
 const BASE = (Constants.expoConfig?.extra?.apiUrl as string) ?? "https://reidey.de";
 
@@ -137,6 +138,13 @@ export class ApiClient {
         ((res.status === 403 && body?.message === "account_suspended") ||
           (res.status === 401 && !(this.owner && driverOnly)));
       if (sessionDead) {
+        // Diagnostic: record exactly which request forced the sign-out (path,
+        // status, owner flag) so an elusive owner-logout is traceable in Sentry.
+        Sentry.captureMessage("session_invalidated", {
+          level: "warning",
+          tags: { status: String(res.status), owner: String(this.owner) },
+          extra: { path, message: body?.message ?? null },
+        });
         this.onSessionInvalid?.(body?.reason ?? null);
       }
       throw new ApiError(res.status, body?.message ?? "request_failed", body);
