@@ -238,22 +238,40 @@ class TripGeocoder
             return $original;
         }
 
-        $hasCity = stripos($original, $city) !== false;
-        $hasPlz = $plz !== null && str_contains($original, $plz);
+        // Work on the location tail (the last comma segment) only, and match the
+        // city/PLZ as whole words. Searching the whole string by substring
+        // corrupted addresses whose STREET name contains the city — "Berliner
+        // Straße 12, 10115" would get the postcode spliced before the street
+        // ("10115 Berliner Straße …") because "Berliner" contains "Berlin".
+        $cityRe = '/\b'.preg_quote($city, '/').'\b/iu';
+        $plzRe = $plz !== null ? '/\b'.preg_quote($plz, '/').'\b/u' : null;
 
-        if ($hasCity) {
-            // City present; slot the postcode in front of it if it's missing.
-            return $hasPlz || $plz === null
-                ? $original
-                : (string) preg_replace('/'.preg_quote($city, '/').'/i', "{$plz} {$city}", $original, 1);
+        $segments = array_map('trim', explode(',', $original));
+        $lastKey = count($segments) - 1;
+        $tail = $segments[$lastKey];
+
+        $tailHasCity = preg_match($cityRe, $tail) === 1;
+        $tailHasPlz = $plzRe !== null && preg_match($plzRe, $tail) === 1;
+
+        if ($tailHasCity && ($tailHasPlz || $plz === null)) {
+            return $original; // tail already carries the location
         }
 
-        if ($hasPlz) {
-            // Postcode present but no city name → append the city after it.
-            return (string) preg_replace('/'.preg_quote($plz, '/').'/', "{$plz} {$city}", $original, 1);
+        if ($tailHasCity) {
+            // City in the tail, postcode missing → put the PLZ in front of it.
+            $segments[$lastKey] = (string) preg_replace($cityRe, "{$plz} {$city}", $tail, 1);
+
+            return implode(', ', $segments);
         }
 
-        // Neither present → append the full "PLZ City".
+        if ($tailHasPlz) {
+            // Postcode in the tail, city missing → append the city after it.
+            $segments[$lastKey] = (string) preg_replace($plzRe, "{$plz} {$city}", $tail, 1);
+
+            return implode(', ', $segments);
+        }
+
+        // No location in the tail → append the full "PLZ City".
         return rtrim($original, ', ').', '.$cityLabel;
     }
 
