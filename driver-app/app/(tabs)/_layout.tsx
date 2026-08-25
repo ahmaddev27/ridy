@@ -48,7 +48,7 @@ function BottomBar({ state, descriptors, navigation }: BottomTabBarProps) {
       <BlurView intensity={dark ? 40 : 60} tint={dark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
       <View
         style={[
-          StyleSheet.absoluteFillObject,
+          StyleSheet.absoluteFill,
           { backgroundColor: dark ? "rgba(16,18,21,0.94)" : "rgba(255,255,255,0.94)" },
         ]}
       />
@@ -61,7 +61,7 @@ function BottomBar({ state, descriptors, navigation }: BottomTabBarProps) {
           paddingBottom: Math.max(insets.bottom, 12),
         }}
       >
-        {state.routes.map((route, index) => {
+        {state.routes.map((route: BottomTabBarProps["state"]["routes"][number], index: number) => {
           const focused = state.index === index;
           const { options } = descriptors[route.key];
           const label = typeof options.title === "string" ? options.title : t(`tabs.${route.name}`);
