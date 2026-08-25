@@ -270,6 +270,20 @@ export default function DriversPage() {
                             <Smartphone className="me-1 inline h-3 w-3" />
                             {t("screens.drivers.appActive")}
                           </Badge>
+                          {/* Resend the invite even to an active driver — re-sends
+                              the download + activation link (e.g. new device). */}
+                          <button
+                            onClick={() => invite(d)}
+                            disabled={invitingId === d.id}
+                            title={t("screens.drivers.appResend")}
+                            className="rounded-lg border border-line p-1.5 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50"
+                          >
+                            {invitingId === d.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Send className="h-3.5 w-3.5" />
+                            )}
+                          </button>
                           <button
                             onClick={() => testPush(d)}
                             disabled={testingId === d.id}
