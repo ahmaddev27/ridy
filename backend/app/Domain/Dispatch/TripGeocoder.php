@@ -3,6 +3,7 @@
 namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Fleet\Models\Driver;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -50,8 +51,17 @@ class TripGeocoder
             return $offer; // already done
         }
 
-        $pickup = $this->geocode($offer->pickup_address);
-        $dropoff = $this->geocode($offer->dropoff_address);
+        // Bias ambiguous (postcode-less) addresses to where the trip actually is:
+        // the driver's last known position for the pickup, then the resolved
+        // pickup for the dropoff (a dispatch trip's ends are close together).
+        $driver = $offer->driver_id !== null
+            ? Driver::withoutGlobalScopes()->find($offer->driver_id)
+            : null;
+        $dLat = $driver?->latitude !== null ? (float) $driver->latitude : null;
+        $dLng = $driver?->longitude !== null ? (float) $driver->longitude : null;
+
+        $pickup = $this->geocode($offer->pickup_address, $dLat, $dLng);
+        $dropoff = $this->geocode($offer->dropoff_address, $pickup['lat'] ?? $dLat, $pickup['lng'] ?? $dLng);
 
         $offer->pickup_lat = $pickup['lat'] ?? null;
         $offer->pickup_lng = $pickup['lng'] ?? null;
@@ -80,8 +90,16 @@ class TripGeocoder
         return $offer;
     }
 
-    /** Address → {lat,lng}, cached in geocode_cache (dedupes across offers). */
-    private function geocode(?string $address): ?array
+    /**
+     * Address → {lat,lng}, cached in geocode_cache (dedupes across offers).
+     *
+     * When the address has no German postcode it is ambiguous — the same street
+     * name exists in dozens of towns, so Nominatim can resolve it to one 500 km
+     * away and blow up the distance/€-per-km. If a bias point is supplied (the
+     * driver's live position, or the already-resolved pickup) the lookup is
+     * restricted to a box around it so the result stays in the trip's region.
+     */
+    private function geocode(?string $address, ?float $biasLat = null, ?float $biasLng = null): ?array
     {
         // Strip any localised (non-Latin) country tail so Nominatim sees a clean
         // German address — this is what mixed-script offers were failing on.
@@ -91,7 +109,19 @@ class TripGeocoder
             return null;
         }
 
-        $cached = DB::table('geocode_cache')->where('query', $address)->first();
+        // A 5-digit postcode makes the address unambiguous; without one, bias to
+        // the supplied region when we have it.
+        $ambiguous = preg_match('/\b\d{5}\b/', $address) !== 1;
+        $useBias = $ambiguous && $biasLat !== null && $biasLng !== null;
+
+        // A biased ambiguous result depends on the region, so fold the (coarse)
+        // region into the cache key; a postcode-qualified address stays globally
+        // cached and shared across drivers.
+        $cacheKey = $useBias
+            ? $address.'|@'.round($biasLat, 1).','.round($biasLng, 1)
+            : $address;
+
+        $cached = DB::table('geocode_cache')->where('query', $cacheKey)->first();
         if ($cached !== null) {
             if ($cached->lat === null) {
                 return null;
@@ -104,17 +134,25 @@ class TripGeocoder
             return $result;
         }
 
+        $params = [
+            'q' => $address,
+            'format' => 'json',
+            'limit' => 1,
+            'countrycodes' => 'de', // fleet is German — bias + speed up resolution
+            'accept-language' => 'de', // return the German address, not the driver's app locale
+            'addressdetails' => 1, // structured fields so we can build a short "street, PLZ city" label
+        ];
+        if ($useBias) {
+            // ~50 km half-box around the bias point; bounded=1 keeps the result in it.
+            $d = 0.45;
+            $params['viewbox'] = ($biasLng - $d).','.($biasLat - $d).','.($biasLng + $d).','.($biasLat + $d);
+            $params['bounded'] = 1;
+        }
+
         try {
             $res = Http::withHeaders(['User-Agent' => self::UA])
                 ->timeout(6)
-                ->get($this->nominatimUrl(), [
-                    'q' => $address,
-                    'format' => 'json',
-                    'limit' => 1,
-                    'countrycodes' => 'de', // fleet is German — bias + speed up resolution
-                    'accept-language' => 'de', // return the German address, not the driver's app locale
-                    'addressdetails' => 1, // structured fields so we can build a short "street, PLZ city" label
-                ]);
+                ->get($this->nominatimUrl(), $params);
         } catch (\Throwable $e) {
             return null; // transient (timeout/network) — do NOT cache, so a retry can succeed
         }
@@ -144,7 +182,7 @@ class TripGeocoder
         // the same address concurrently would race a check-then-insert and trip the
         // unique key (1062). upsert lets the loser update instead of erroring.
         DB::table('geocode_cache')->upsert(
-            [['query' => $address, 'lat' => $coords['lat'] ?? null, 'lng' => $coords['lng'] ?? null, 'label' => $coords['address'] ?? null, 'updated_at' => now(), 'created_at' => now()]],
+            [['query' => $cacheKey, 'lat' => $coords['lat'] ?? null, 'lng' => $coords['lng'] ?? null, 'label' => $coords['address'] ?? null, 'updated_at' => now(), 'created_at' => now()]],
             ['query'],
             ['lat', 'lng', 'label', 'updated_at'],
         );
