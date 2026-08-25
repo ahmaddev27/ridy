@@ -137,15 +137,35 @@ class OfferLifecycle
     public function expirePending(?int $tenantId = null): int
     {
         $now = CarbonImmutable::now();
+        // Even a busy driver's offer can't linger forever (dead session / missed
+        // "idle" edge) — expire past this absolute cap regardless of engagement.
+        $hardCap = $now->subHours(2);
 
         // The accept window is per-row, so evaluate the deadline in PHP (portable
         // across sqlite/MySQL). The pending set is small, so this stays cheap.
         $expired = DispatchOffer::withoutGlobalScopes()
             ->where('status', OfferStatus::Pending)
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->get(['id', 'received_at', 'accept_window_seconds'])
-            ->filter(fn (DispatchOffer $o) => $o->received_at !== null
-                && $o->received_at->addSeconds((int) ($o->accept_window_seconds ?? 0) + 30)->isBefore($now))
+            ->with('driver:id,online_status')
+            ->get(['id', 'received_at', 'accept_window_seconds', 'driver_id'])
+            ->filter(function (DispatchOffer $o) use ($now, $hardCap) {
+                if ($o->received_at === null) {
+                    return false;
+                }
+                $windowPassed = $o->received_at
+                    ->addSeconds((int) ($o->accept_window_seconds ?? 0) + 30)
+                    ->isBefore($now);
+                if (! $windowPassed) {
+                    return false;
+                }
+                // Hold it while the driver is still on/heading to a trip: they take
+                // it back-to-back once free, so marking it "not taken" now would be
+                // wrong (it just flickers to accepted a poll later). Only expire an
+                // engaged driver's offer past the hard cap.
+                $engaged = $o->driver !== null && $o->driver->engagementStatus() >= 1;
+
+                return ! $engaged || $o->received_at->isBefore($hardCap);
+            })
             ->pluck('id');
 
         if ($expired->isEmpty()) {

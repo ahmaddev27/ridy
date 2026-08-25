@@ -274,6 +274,27 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame(OfferStatus::Rejected, $offer->fresh()->status);
     }
 
+    public function test_pending_offer_is_held_while_the_driver_is_on_a_trip(): void
+    {
+        // Busy driver: their back-to-back offer must stay pending (not "not taken")
+        // until they finish — otherwise it flickers rejected then accepted.
+        $driver = $this->driver();
+        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']);
+        $offer = $this->offer([
+            'driver_id' => $driver->id,
+            'received_at' => now()->subMinutes(2),
+            'accept_window_seconds' => 5,
+        ]);
+
+        app(OfferLifecycle::class)->expirePending($this->tenant->id);
+        $this->assertSame(OfferStatus::Pending, $offer->fresh()->status);
+
+        // …but not forever: past the 2h hard cap it expires even while engaged.
+        $offer->update(['received_at' => now()->subHours(3)]);
+        app(OfferLifecycle::class)->expirePending($this->tenant->id);
+        $this->assertSame(OfferStatus::Rejected, $offer->fresh()->status);
+    }
+
     public function test_invalid_transition_is_a_noop(): void
     {
         $this->driver();
