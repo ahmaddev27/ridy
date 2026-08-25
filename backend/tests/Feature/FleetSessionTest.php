@@ -26,7 +26,8 @@ class FleetSessionTest extends TestCase
     {
         parent::setUp();
         $this->seed(RolePermissionSeeder::class);
-        $this->tenant = Tenant::create(['name' => 'YA Mobility', 'country' => 'DE']);
+        // Active subscription so the daemon streams this company's session.
+        $this->tenant = Tenant::create(['name' => 'YA Mobility', 'country' => 'DE', 'status' => 'active', 'activated_at' => now()]);
         $this->manager = User::create([
             'name' => 'M', 'email' => 'm@ya.de', 'password' => Hash::make('password'), 'tenant_id' => $this->tenant->id,
         ]);
