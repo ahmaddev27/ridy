@@ -21,7 +21,7 @@ class EmailTemplate extends Model
     /** The variables offered to the admin for each template key. */
     public const VARIABLES = [
         'company_registration' => ['company_name', 'manager_name', 'login_url'],
-        'driver_invite' => ['company_name', 'driver_name', 'invite_link'],
+        'driver_invite' => ['company_name', 'driver_name', 'invite_link', 'download_link'],
         'company_otp' => ['name', 'otp'],
         'password_otp' => ['name', 'otp'],
         'notification' => ['title', 'body', 'action_url', 'action_label'],

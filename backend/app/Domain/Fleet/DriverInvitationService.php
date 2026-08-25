@@ -4,6 +4,7 @@ namespace App\Domain\Fleet;
 
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\SendTemplatedMail;
+use App\Support\Settings;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -44,6 +45,10 @@ class DriverInvitationService
             'company_name' => (string) ($driver->tenant?->name ?? 'Reidey'),
             'driver_name' => (string) $driver->name,
             'invite_link' => $this->activationLink($driver->invite_token),
+            // App download/install link — the same admin-configured URL the
+            // in-app force-update dialog points at (an APK before the store, a
+            // store link after). Empty until the admin sets it.
+            'download_link' => (string) (Settings::get('app_android_store_url') ?? ''),
         ]);
     }
 
