@@ -52,9 +52,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Materialize the Play service-account key (referenced by eas.json
+      # submit.production.android.serviceAccountKeyPath) from a secret, only when
+      # submitting. Written via env to avoid shell-quoting issues; never committed.
+      - name: Write Play service account
+        if: ${{ github.event.inputs.submit == 'true' }}
+        env:
+          PLAY_SA_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: printf '%s' "$PLAY_SA_JSON" > play-service-account.json
+
       # Cloud build on EAS. --auto-submit (when requested) uploads the AAB to Google
-      # Play using submit.production from eas.json + the service-account key stored in
-      # EAS credentials. --non-interactive fails fast on any missing credential.
+      # Play using submit.production from eas.json + the service-account key above.
+      # --non-interactive fails fast on any missing credential.
       - name: EAS build (+ submit)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -64,3 +73,7 @@ jobs:
             --profile "${{ github.event.inputs.profile }}" \
             --non-interactive \
             ${{ github.event.inputs.submit == 'true' && '--auto-submit' || '' }}
+
+      - name: Clean up service account key
+        if: ${{ always() }}
+        run: rm -f play-service-account.json
