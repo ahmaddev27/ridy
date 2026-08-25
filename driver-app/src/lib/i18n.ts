@@ -1,5 +1,6 @@
 import { I18nManager } from "react-native";
 import { useSyncExternalStore } from "react";
+import * as SecureStore from "expo-secure-store";
 
 type Dict = Record<string, string>;
 
@@ -418,6 +419,9 @@ export function setLocale(code: string) {
   if (DICTS[code] && code !== current) {
     current = code;
     applyDirection(code);
+    // Persist here too (not only in the picker) so the choice always survives a
+    // restart, from whichever path changed it.
+    SecureStore.setItemAsync("locale", code).catch(() => {});
     listeners.forEach((fn) => fn());
   }
 }

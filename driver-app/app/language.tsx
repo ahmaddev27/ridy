@@ -6,9 +6,11 @@ import * as SecureStore from "expo-secure-store";
 import { Text } from "@/components/typography";
 import { Logo, PrimaryButton } from "@/components/ui";
 import { useColors, radius } from "@/lib/theme";
-import { t, isRTL, setLocale } from "@/lib/i18n";
+import { t, isRTL, setLocale, getLocale } from "@/lib/i18n";
 
 type LangCode = "de" | "en" | "ar";
+
+const LANG_CODES: LangCode[] = ["de", "en", "ar"];
 
 const OPTIONS: { code: LangCode; native: string; latin: string }[] = [
   { code: "de", native: "Deutsch", latin: "German" },
@@ -26,7 +28,12 @@ export default function LanguageScreen() {
   const router = useRouter();
   const rtl = isRTL();
   const align = rtl ? "right" : "left";
-  const [selected, setSelected] = useState<LangCode>("de");
+  // Start on the language already in effect (not always German) so re-opening
+  // this screen from Settings never silently flips a chosen language back.
+  const [selected, setSelected] = useState<LangCode>(() => {
+    const cur = getLocale();
+    return (LANG_CODES as string[]).includes(cur) ? (cur as LangCode) : "de";
+  });
 
   const onContinue = () => {
     setLocale(selected);
