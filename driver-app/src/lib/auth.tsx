@@ -47,6 +47,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return;
     }
+    // Assert the owner flag on the api client BEFORE the token, so the very first
+    // request after a cold start / JS reload is classified correctly. Otherwise a
+    // driver-only endpoint hit before applyProfile runs (a screen restored from
+    // deep state) would 401 with api.owner still false and sign the owner out.
+    api.setOwner(owner);
     api.setToken(token);
     try {
       const me = owner ? await api.fleetMe() : await api.me();
