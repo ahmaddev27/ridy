@@ -17,8 +17,9 @@ return new class extends Migration
 
     private const NEW_HTML = '<h2>Hallo {{driver_name}},</h2>'
         .'<p>{{company_name}} lädt dich ein, Reidey zu nutzen — Fahrtangebote sofort auf deinem Handy.</p>'
-        .'<p><strong>1. App installieren:</strong></p>'
-        .'<p><a href="{{download_link}}" class="btn">App herunterladen</a></p>'
+        .'<p><strong>1. App installieren</strong> (wähle dein Gerät):</p>'
+        .'<p><a href="{{download_android}}" class="btn">Android</a>&nbsp;&nbsp;'
+        .'<a href="{{download_ios}}" class="btn">iPhone</a></p>'
         .'<p><strong>2. Konto aktivieren:</strong></p>'
         .'<p><a href="{{invite_link}}" class="btn">Einladung annehmen</a></p>';
 

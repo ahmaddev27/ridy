@@ -45,10 +45,12 @@ class DriverInvitationService
             'company_name' => (string) ($driver->tenant?->name ?? 'Reidey'),
             'driver_name' => (string) $driver->name,
             'invite_link' => $this->activationLink($driver->invite_token),
-            // App download/install link — the same admin-configured URL the
+            // Per-platform download links — the same admin-configured URLs the
             // in-app force-update dialog points at (an APK before the store, a
-            // store link after). Empty until the admin sets it.
-            'download_link' => (string) (Settings::get('app_android_store_url') ?? ''),
+            // store link after). The email can't know the driver's device, so we
+            // send both and let them pick. Empty until the admin sets them.
+            'download_android' => (string) (Settings::get('app_android_store_url') ?? ''),
+            'download_ios' => (string) (Settings::get('app_ios_store_url') ?? ''),
         ]);
     }
 
