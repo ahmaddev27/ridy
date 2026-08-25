@@ -50,6 +50,14 @@ export function TripMap({
   if (pickup) pts.push([pickup.lat, pickup.lng]);
   if (dropoff) pts.push([dropoff.lat, dropoff.lng]);
 
+  // A stable string identity for the route so the effect re-runs only when the
+  // actual geometry changes — depending on the object itself re-initialised the
+  // map on every parent render (the endless load + zoom-in/out loop).
+  const coords = routeGeometry?.coordinates;
+  const routeKey = coords?.length
+    ? `${coords.length}:${coords[0]?.join(",")}:${coords[coords.length - 1]?.join(",")}`
+    : "";
+
   useEffect(() => {
     if (pts.length === 0) return;
     let cancelled = false;
@@ -122,7 +130,7 @@ export function TripMap({
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng, routeGeometry]);
+  }, [pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng, routeKey]);
 
   if (pts.length === 0) return null;
 
