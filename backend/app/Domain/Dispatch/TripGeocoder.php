@@ -134,8 +134,14 @@ class TripGeocoder
             return $result;
         }
 
+        // A "PLZ City" address with no leading street is almost always a station
+        // pickup/dropoff (Uber sends station trips without a street). Steer
+        // Nominatim to the town's Bahnhof so the point + label land on the
+        // station instead of the postcode centroid.
+        $stationless = preg_match('/^\d{5}\s+\S/', $address) === 1;
+
         $params = [
-            'q' => $address,
+            'q' => $stationless ? 'Bahnhof, '.$address : $address,
             'format' => 'json',
             'limit' => 1,
             'countrycodes' => 'de', // fleet is German — bias + speed up resolution
@@ -172,9 +178,14 @@ class TripGeocoder
         // the address to one language regardless of the captured session's locale.
         // Carried on the fresh result so enrich() can replace the localized text.
         if ($coords !== null) {
-            $label = $this->shortGermanLabel($hit);
-            if ($label !== null) {
-                $coords['address'] = $label;
+            if ($stationless && $this->isStation($hit)) {
+                // Confirmed the town's station — say so, keeping the PLZ + city.
+                $coords['address'] = 'Bahnhof, '.$address;
+            } else {
+                $label = $this->shortGermanLabel($hit);
+                if ($label !== null) {
+                    $coords['address'] = $label;
+                }
             }
         }
 
@@ -199,6 +210,26 @@ class TripGeocoder
      *
      * @param  array<string, mixed>|null  $hit
      */
+    /**
+     * True when a Nominatim hit is a railway station/stop — used to confirm a
+     * street-less "PLZ City" address really resolved to the town's Bahnhof before
+     * we label it as one.
+     *
+     * @param  array<string, mixed>|null  $hit
+     */
+    private function isStation(?array $hit): bool
+    {
+        if ($hit === null) {
+            return false;
+        }
+        $class = strtolower((string) ($hit['class'] ?? ''));
+        $type = strtolower((string) ($hit['type'] ?? ''));
+        $name = strtolower((string) ($hit['display_name'] ?? ''));
+
+        return ($class === 'railway' && in_array($type, ['station', 'halt', 'stop'], true))
+            || str_contains($name, 'bahnhof');
+    }
+
     private function shortGermanLabel(?array $hit): ?string
     {
         $a = is_array($hit['address'] ?? null) ? $hit['address'] : [];
