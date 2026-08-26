@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(RolePermissionSeeder::class);
+        $this->call(PostalCodesSeeder::class);
 
         // Platform owner — cross-tenant super-admin (no tenant of their own).
         $admin = User::firstOrCreate(

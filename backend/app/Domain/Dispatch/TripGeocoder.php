@@ -4,6 +4,7 @@ namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Geo\PostalCodes;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -174,10 +175,16 @@ class TripGeocoder
             ? ['lat' => (float) $hit['lat'], 'lng' => (float) $hit['lon']]
             : null;
 
+        // Nominatim couldn't place it, but a valid PLZ still pins the town: fall
+        // back to the postal-code centroid so distance + €/km are never blank.
+        if ($coords === null) {
+            $coords = $this->plzCentroidFallback($address);
+        }
+
         // A short, German, human-readable label ("street nr, PLZ city") unifies
         // the address to one language regardless of the captured session's locale.
         // Carried on the fresh result so enrich() can replace the localized text.
-        if ($coords !== null) {
+        if ($coords !== null && $hit !== null) {
             if ($stationless && $this->isStation($hit)) {
                 // Confirmed the town's station — say so, keeping the PLZ + city.
                 $coords['address'] = 'Bahnhof, '.$address;
@@ -275,7 +282,46 @@ class TripGeocoder
             return $germanLabel;
         }
 
-        return $this->ensureCity($original, $this->cityPart($germanLabel));
+        // Prefer the authoritative city from the static PLZ table (PLZ ↔ city is
+        // 1:1 in Germany) so the tail is filled correctly even when Nominatim's
+        // label disagrees; fall back to the geocoder's own city part.
+        return $this->ensureCity($original, $this->authoritativeCity($original) ?? $this->cityPart($germanLabel));
+    }
+
+    /**
+     * The town centroid for an address's PLZ, or null when it has no valid PLZ or
+     * the code is unknown. Labelled with the authoritative "PLZ City".
+     *
+     * @return array{lat: float, lng: float, address?: string}|null
+     */
+    private function plzCentroidFallback(string $address): ?array
+    {
+        if (preg_match('/\b(\d{5})\b/', $address, $m) !== 1) {
+            return null;
+        }
+        $centroid = PostalCodes::centroid($m[1]);
+        if ($centroid === null) {
+            return null;
+        }
+
+        $result = ['lat' => $centroid['lat'], 'lng' => $centroid['lng']];
+        $city = PostalCodes::city($m[1]);
+        if ($city !== null) {
+            $result['address'] = "{$m[1]} {$city}";
+        }
+
+        return $result;
+    }
+
+    /** The authoritative "PLZ City" for an address's PLZ, from the static table. */
+    private function authoritativeCity(string $address): ?string
+    {
+        if (preg_match('/\b(\d{5})\b/', $address, $m) !== 1) {
+            return null;
+        }
+        $city = PostalCodes::city($m[1]);
+
+        return $city !== null ? "{$m[1]} {$city}" : null;
     }
 
     /** The "PLZ City" tail of a "Street Nr, PLZ City" label (last comma segment). */
