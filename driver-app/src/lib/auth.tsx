@@ -15,9 +15,11 @@ type AuthState = {
   offline: boolean;
   /** Retry restoring the session (used by the offline screen). */
   retry: () => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
-  activate: (inviteToken: string, password: string) => Promise<void>;
-  updateProfile: (patch: { name?: string; locale?: string; password?: string }) => Promise<void>;
+  /** Passwordless sign-in step 1: email a one-time code. */
+  requestCode: (email: string) => Promise<void>;
+  /** Passwordless sign-in step 2: verify the code and open the session. */
+  verifyCode: (email: string, otp: string) => Promise<void>;
+  updateProfile: (patch: { name?: string; locale?: string }) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -112,19 +114,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     applyProfile(d, owner);
   }
 
-  async function login(email: string, password: string) {
-    const res = await api.login(email, password);
+  async function requestCode(email: string) {
+    await api.loginRequest(email);
+  }
+
+  async function verifyCode(email: string, otp: string) {
+    const res = await api.loginVerify(email, otp);
     const owner = res.data.is_owner === true;
     const profile = (owner ? res.data.owner : res.data.driver) as DriverProfile;
     await persist(res.data.token, profile, owner);
   }
 
-  async function activate(inviteToken: string, password: string) {
-    const res = await api.activate(inviteToken, password);
-    await persist(res.data.token, res.data.driver, false);
-  }
-
-  async function updateProfile(patch: { name?: string; locale?: string; password?: string }) {
+  async function updateProfile(patch: { name?: string; locale?: string }) {
     // Owners update on their User token via the fleet endpoint; the driver /me
     // PATCH (auth:driver) would 401 an owner and bounce them to login.
     const res = await (isOwner ? api.fleetUpdateProfile(patch) : api.updateProfile(patch));
@@ -150,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ ready, driver, isOwner, offline, retry, login, activate, updateProfile, logout }}>
+    <AuthContext.Provider value={{ ready, driver, isOwner, offline, retry, requestCode, verifyCode, updateProfile, logout }}>
       {children}
     </AuthContext.Provider>
   );

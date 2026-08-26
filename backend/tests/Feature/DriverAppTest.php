@@ -220,6 +220,56 @@ class DriverAppTest extends TestCase
         $this->assertSame('completed', $res->json('data.0.status'));
     }
 
+    public function test_invite_emails_a_login_code_and_stores_it(): void
+    {
+        $driver = $this->driver();
+
+        $this->invitationService()->invite($driver);
+
+        // The one-time code is persisted for the passwordless sign-in to verify.
+        $this->assertDatabaseHas('password_resets', ['email' => $driver->email]);
+    }
+
+    public function test_passwordless_login_activates_driver_and_returns_token(): void
+    {
+        // Invited but never activated, no password on file.
+        $driver = $this->driver();
+        $this->invitationService()->invite($driver);
+
+        // Step 1: request a code (idempotent — invite already sent one).
+        $this->postJson('/api/v1/driver/login/request', ['email' => $driver->email])
+            ->assertOk()->assertJsonPath('data.sent', true);
+
+        // Step 2: verify with the non-production test code -> logged in, no password.
+        $res = $this->postJson('/api/v1/driver/login/verify', ['email' => $driver->email, 'otp' => '111111'])
+            ->assertOk()
+            ->assertJsonStructure(['data' => ['token', 'is_owner', 'driver' => ['id', 'name', 'company_name']]]);
+
+        $this->assertNotEmpty($res->json('data.token'));
+        $driver->refresh();
+        $this->assertNotNull($driver->activated_at, 'first successful code activates the driver');
+        $this->assertNull($driver->password, 'no password is ever set');
+        $this->assertDatabaseMissing('password_resets', ['email' => $driver->email]); // code is consumed
+    }
+
+    public function test_passwordless_login_rejects_a_wrong_code(): void
+    {
+        $driver = $this->driver();
+        $this->invitationService()->invite($driver);
+
+        $this->postJson('/api/v1/driver/login/verify', ['email' => $driver->email, 'otp' => '000000'])
+            ->assertStatus(422)->assertJsonPath('errors.otp.0', 'otp_incorrect');
+    }
+
+    public function test_login_request_does_not_disclose_unknown_emails(): void
+    {
+        // No account for this address — still a generic 200, no code stored.
+        $this->postJson('/api/v1/driver/login/request', ['email' => 'stranger@nowhere.de'])
+            ->assertOk()->assertJsonPath('data.sent', true);
+
+        $this->assertDatabaseMissing('password_resets', ['email' => 'stranger@nowhere.de']);
+    }
+
     private function offer(Driver $driver, string $uuid): DispatchOffer
     {
         return DispatchOffer::create([

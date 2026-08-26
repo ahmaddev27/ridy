@@ -99,6 +99,11 @@ Route::prefix('v1')->group(function () {
         Route::post('activate', [DriverAuthController::class, 'activate'])->middleware('throttle:10,1');
         Route::post('login', [DriverAuthController::class, 'login'])->middleware('throttle:10,1');
 
+        // Passwordless sign-in: email a one-time code, then exchange it for a token.
+        // Serves both drivers and fleet owners/managers; no password ever set.
+        Route::post('login/request', [DriverAuthController::class, 'loginRequest'])->middleware('throttle:6,1');
+        Route::post('login/verify', [DriverAuthController::class, 'loginVerify'])->middleware('throttle:12,1');
+
         // In-app "forgot password" via an email OTP (mirrors the manager flow).
         Route::post('password/forgot', [DriverPasswordResetController::class, 'start'])->middleware('throttle:6,1');
         Route::post('password/verify', [DriverPasswordResetController::class, 'verify'])->middleware('throttle:12,1');

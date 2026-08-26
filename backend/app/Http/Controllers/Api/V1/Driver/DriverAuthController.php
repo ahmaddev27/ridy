@@ -5,10 +5,14 @@ namespace App\Http\Controllers\Api\V1\Driver;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Notifications\SendTemplatedMail;
 use App\Domain\Tenancy\Models\Tenant;
+use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Http\Controllers\Controller;
+use App\Models\PasswordReset;
 use App\Models\User;
 use App\Support\Settings;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -21,7 +25,78 @@ use Illuminate\Validation\ValidationException;
  */
 class DriverAuthController extends Controller
 {
+    use GeneratesOtp;
+
+    private const OTP_TTL_MINUTES = 10;
+
+    private const MAX_ATTEMPTS = 5;
+
     public function __construct(private readonly DriverInvitationService $invitations) {}
+
+    /**
+     * Passwordless sign-in step 1: email a 6-digit code. Works for a driver
+     * (invited or activated) or a fleet owner/manager. Never discloses whether
+     * an account exists.
+     */
+    public function loginRequest(Request $request): JsonResponse
+    {
+        $data = $request->validate(['email' => ['required', 'email']]);
+
+        $name = $this->accountName($data['email']);
+        if ($name !== null) {
+            $reset = PasswordReset::updateOrCreate(
+                ['email' => $data['email']],
+                [
+                    'otp' => $this->newOtp(),
+                    'otp_expires_at' => CarbonImmutable::now()->addMinutes(self::OTP_TTL_MINUTES),
+                    'attempts' => 0,
+                ],
+            );
+
+            SendTemplatedMail::to($data['email'], 'driver_login_otp', ['name' => $name, 'otp' => $reset->otp]);
+        }
+
+        return response()->json(['data' => ['sent' => true]]);
+    }
+
+    /**
+     * Passwordless sign-in step 2: verify the code and issue a token. A driver is
+     * activated on first successful code; a fleet owner signs in read-only. No
+     * password is ever set or checked.
+     */
+    public function loginVerify(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'otp' => ['required', 'digits:6'],
+        ]);
+
+        $reset = $this->validOtpOrFail($data['email'], $data['otp']);
+
+        $driver = Driver::withoutGlobalScopes()->where('email', $reset->email)->first();
+        if ($driver !== null) {
+            $this->guardSuspendedTenant($driver->loadMissing('tenant')->tenant);
+            $driver->forceFill([
+                'activated_at' => $driver->activated_at ?? now(),
+                'invite_token' => null,
+                'last_login_at' => now(),
+            ])->save();
+            $reset->delete();
+
+            return $this->tokenResponse($driver);
+        }
+
+        $owner = $this->findOwnerByEmail($reset->email);
+        if ($owner !== null) {
+            $this->guardSuspendedTenant($owner->loadMissing('tenant')->tenant);
+            $reset->delete();
+
+            return $this->ownerTokenResponse($owner);
+        }
+
+        $reset->delete();
+        throw ValidationException::withMessages(['otp' => 'otp_none']);
+    }
 
     /** Preview an invitation so the activation screen can greet the driver. */
     public function invite(string $token): JsonResponse
@@ -152,6 +227,59 @@ class DriverAuthController extends Controller
         }
 
         return $user;
+    }
+
+    /**
+     * A display name for the OTP email, or null when no app account owns this
+     * email (driver — invited or activated — or an app-relevant owner/manager).
+     */
+    private function accountName(string $email): ?string
+    {
+        $driver = Driver::withoutGlobalScopes()->where('email', $email)->first();
+        if ($driver !== null) {
+            return (string) $driver->name;
+        }
+
+        $owner = $this->findOwnerByEmail($email);
+
+        return $owner !== null ? (string) $owner->name : null;
+    }
+
+    /** A dashboard owner/manager matched by email alone (passwordless sign-in). */
+    private function findOwnerByEmail(string $email): ?User
+    {
+        $user = User::where('email', $email)->first();
+        if ($user === null
+            || $user->tenant_id === null
+            || ! $user->hasAnyRole(['fleet_manager', 'owner'])) {
+            return null;
+        }
+
+        return $user;
+    }
+
+    /**
+     * Resolve a pending OTP whose code matches, or throw a coded validation error
+     * (the app localizes the code). A wrong code counts an attempt.
+     */
+    private function validOtpOrFail(string $email, string $otp): PasswordReset
+    {
+        $reset = PasswordReset::where('email', $email)->first();
+        if ($reset === null) {
+            throw ValidationException::withMessages(['otp' => 'otp_none']);
+        }
+        if ($reset->otp_expires_at->isPast()) {
+            throw ValidationException::withMessages(['otp' => 'otp_expired']);
+        }
+        if ($reset->attempts >= self::MAX_ATTEMPTS) {
+            throw ValidationException::withMessages(['otp' => 'otp_too_many']);
+        }
+        if (! hash_equals($reset->otp, $otp) && ! $this->isTestCode($otp)) {
+            $reset->increment('attempts');
+            throw ValidationException::withMessages(['otp' => 'otp_incorrect']);
+        }
+
+        return $reset;
     }
 
     private function tokenResponse(Driver $driver): JsonResponse

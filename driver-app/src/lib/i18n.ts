@@ -84,6 +84,18 @@ const de: Dict = {
   "forgot.codeError": "Ungültiger oder abgelaufener Code.",
   "forgot.tooShort": "Mindestens 8 Zeichen.",
   "signin.inviteNote": "Zugang erhältst du per Einladung deiner Flotte.",
+  "otp.emailTitle": "Anmelden",
+  "otp.emailIntro": "Gib deine E-Mail ein — wir senden dir einen Anmeldecode. Kein Passwort nötig.",
+  "otp.codeTitle": "Code eingeben",
+  "otp.codeIntro": "Wir haben einen Code an {email} gesendet.",
+  "otp.send": "Code senden",
+  "otp.verify": "Anmelden",
+  "otp.code": "Code",
+  "otp.resend": "Code erneut senden",
+  "otp.resent": "Neuer Code gesendet.",
+  "otp.sendError": "Konnte den Code nicht senden. Versuche es erneut.",
+  "otp.codeError": "Ungültiger oder abgelaufener Code.",
+  "otp.changeEmail": "Andere E-Mail verwenden",
   "offline.title": "Keine Internetverbindung",
   "offline.body": "Bitte prüfe deine Verbindung und versuche es erneut.",
   "offline.retry": "Erneut versuchen",
@@ -225,6 +237,18 @@ const en: Dict = {
   "forgot.codeError": "Invalid or expired code.",
   "forgot.tooShort": "At least 8 characters.",
   "signin.inviteNote": "Access is granted by your fleet's invitation.",
+  "otp.emailTitle": "Sign in",
+  "otp.emailIntro": "Enter your email — we'll send you a sign-in code. No password needed.",
+  "otp.codeTitle": "Enter code",
+  "otp.codeIntro": "We sent a code to {email}.",
+  "otp.send": "Send code",
+  "otp.verify": "Sign in",
+  "otp.code": "Code",
+  "otp.resend": "Resend code",
+  "otp.resent": "New code sent.",
+  "otp.sendError": "Couldn't send the code. Try again.",
+  "otp.codeError": "Invalid or expired code.",
+  "otp.changeEmail": "Use a different email",
   "offline.title": "No internet connection",
   "offline.body": "Please check your connection and try again.",
   "offline.retry": "Try again",
@@ -366,6 +390,18 @@ const ar: Dict = {
   "forgot.codeError": "رمز غير صالح أو منتهي.",
   "forgot.tooShort": "8 أحرف على الأقل.",
   "signin.inviteNote": "الوصول يكون عبر دعوة من أسطولك.",
+  "otp.emailTitle": "تسجيل الدخول",
+  "otp.emailIntro": "أدخل بريدك الإلكتروني — سنرسل لك رمز دخول. بدون كلمة مرور.",
+  "otp.codeTitle": "أدخل الرمز",
+  "otp.codeIntro": "أرسلنا رمزاً إلى {email}.",
+  "otp.send": "إرسال الرمز",
+  "otp.verify": "دخول",
+  "otp.code": "الرمز",
+  "otp.resend": "إعادة إرسال الرمز",
+  "otp.resent": "تم إرسال رمز جديد.",
+  "otp.sendError": "تعذّر إرسال الرمز. حاول مجدداً.",
+  "otp.codeError": "رمز غير صالح أو منتهي.",
+  "otp.changeEmail": "استخدم بريداً آخر",
   "offline.title": "لا يوجد اتصال بالإنترنت",
   "offline.body": "تأكد من اتصالك بالإنترنت وحاول مرة أخرى.",
   "offline.retry": "إعادة المحاولة",
@@ -484,6 +520,8 @@ export function isRTL(): boolean {
   return current === "ar";
 }
 
-export function t(key: string): string {
-  return DICTS[current]?.[key] ?? DICTS.de[key] ?? key;
+export function t(key: string, vars?: Record<string, string>): string {
+  const raw = DICTS[current]?.[key] ?? DICTS.de[key] ?? key;
+  if (!vars) return raw;
+  return raw.replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? `{${name}}`);
 }

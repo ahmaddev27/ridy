@@ -120,7 +120,7 @@ function Gate() {
     if (offline && !driver) return;
     const seg = segments[0];
     if (seg === "splash" || seg === "language" || seg === "onboarding") return;
-    const inAuth = seg === "login" || seg === "activate";
+    const inAuth = seg === "login";
     if (!driver && !inAuth) router.replace("/login");
     else if (driver && inAuth) router.replace("/");
   }, [ready, driver, offline, segments, router]);
@@ -183,7 +183,6 @@ function Gate() {
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.canvas } }}>
       <Stack.Screen name="login" />
-      <Stack.Screen name="activate" />
       <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
       <Stack.Screen name="language" />
       <Stack.Screen name="splash" options={{ gestureEnabled: false }} />

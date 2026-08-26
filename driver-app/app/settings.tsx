@@ -32,7 +32,6 @@ export default function SettingsScreen() {
 
   const [prefs, setPrefs] = useState<PrefState>(DEFAULT_PREFS);
   const [name, setName] = useState(driver?.name ?? "");
-  const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -64,17 +63,15 @@ export default function SettingsScreen() {
 
   // Owners are read-only monitors; only real drivers can edit their profile.
   const canEdit = !driver?.is_owner;
-  const dirty = name.trim() !== (driver?.name ?? "") || password.length > 0;
+  const dirty = name.trim() !== (driver?.name ?? "");
 
   async function save() {
     if (!dirty || saving) return;
     setSaving(true);
     try {
-      const patch: { name?: string; password?: string } = {};
+      const patch: { name?: string } = {};
       if (name.trim() && name.trim() !== driver?.name) patch.name = name.trim();
-      if (password.length >= 6) patch.password = password;
       await updateProfile(patch);
-      setPassword("");
       toast.show(t("settings.saved"), "success");
     } catch {
       toast.show(t("settings.saveError"), "error");
@@ -129,13 +126,12 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* ACCOUNT — real, editable profile (name + password) via updateProfile. */}
+        {/* ACCOUNT — real, editable profile (name) via updateProfile. */}
         {canEdit && (
           <View style={{ gap: 10 }}>
             <SectionLabel>{t("settings.account")}</SectionLabel>
             <View style={{ gap: 10 }}>
               <Field label={t("settings.name")} value={name} onChangeText={setName} autoCapitalize="words" />
-              <Field label={t("settings.newPassword")} value={password} onChangeText={setPassword} secure autoCapitalize="none" />
               <PrimaryButton label={t("settings.save")} onPress={save} loading={saving} disabled={!dirty} />
             </View>
           </View>
