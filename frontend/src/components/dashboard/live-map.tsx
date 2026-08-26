@@ -42,35 +42,43 @@ type DriverMarker = {
   marker: Marker;
   /** The car <img> inside the marker element — restyled (rotation) each poll. */
   car: HTMLImageElement;
-  /** The small status dot on the car's corner — recolored each poll. */
-  dot: HTMLSpanElement;
+  /** The translucent halo ring behind the car — recolored each poll. */
+  halo: HTMLSpanElement;
   raf: number | null;
 };
 
 /**
- * Build the DOM element for a driver marker: just the clean car icon, with a
- * small status-colored dot on its corner (no halo bubble). The car <img> is
- * rotated by heading; the marker is anchored on the driver's coordinate.
+ * Build the DOM element for a driver marker: a fixed-size halo ring with the
+ * rotatable car icon centered on top. Mirrors the old Leaflet divIcon + halo.
  */
-function createMarkerElement(): { el: HTMLDivElement; car: HTMLImageElement; dot: HTMLSpanElement } {
+function createMarkerElement(): { el: HTMLDivElement; car: HTMLImageElement; halo: HTMLSpanElement } {
   const el = document.createElement("div");
-  el.style.cssText = "position:relative;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer";
+  el.style.cssText = "position:relative;width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer";
+
+  const halo = document.createElement("span");
+  halo.style.cssText = "position:absolute;inset:0;border-radius:9999px;border-width:2px;border-style:solid;box-sizing:border-box";
 
   const car = document.createElement("img");
   car.src = "/markers/car.png";
   car.alt = "";
-  car.style.cssText = "width:38px;height:38px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))";
+  car.style.cssText = "position:relative;width:42px;height:42px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))";
 
-  const dot = document.createElement("span");
-  dot.style.cssText = "position:absolute;right:0;bottom:0;width:11px;height:11px;border-radius:9999px;border:2px solid #fff;box-sizing:border-box;box-shadow:0 1px 2px rgba(0,0,0,.3)";
-
+  el.appendChild(halo);
   el.appendChild(car);
-  el.appendChild(dot);
-  return { el, car, dot };
+  return { el, car, halo };
 }
 
-function styleDot(dot: HTMLSpanElement, color: string): void {
-  dot.style.backgroundColor = color;
+function styleHalo(halo: HTMLSpanElement, color: string): void {
+  halo.style.borderColor = hexToRgba(color, 0.5);
+  halo.style.backgroundColor = hexToRgba(color, 0.12);
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 /**
@@ -172,18 +180,18 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
         let entry = registry.get(d.id);
         if (!entry) {
           // First sighting — create the halo + car marker at the position.
-          const { el, car, dot } = createMarkerElement();
-          styleDot(dot, color);
+          const { el, car, halo } = createMarkerElement();
+          styleHalo(halo, color);
           car.style.transform = `rotate(${rot}deg)`;
           const marker = new maplibregl.Marker({ element: el })
             .setLngLat([d.lng, d.lat])
             .setPopup(new maplibregl.Popup({ offset: 24, closeButton: false }).setHTML(popupHtml))
             .addTo(map);
-          entry = { marker, car, dot, raf: null };
+          entry = { marker, car, halo, raf: null };
           registry.set(d.id, entry);
         } else {
           // Existing — glide from the current spot to the new one; refresh style.
-          styleDot(entry.dot, color);
+          styleHalo(entry.halo, color);
           entry.car.style.transform = `rotate(${rot}deg)`;
           entry.marker.getPopup()?.setHTML(popupHtml);
           animateTo(entry, entry.marker.getLngLat(), to);
