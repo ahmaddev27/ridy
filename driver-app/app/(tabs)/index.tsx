@@ -192,11 +192,13 @@ function RecentRow({ offer, onPress, last, showDriver, c }: { offer: Offer; onPr
       style={({ pressed }) => ({ flexDirection: row, alignItems: "center", gap: 12, padding: 15, borderBottomWidth: last ? 0 : 1, borderColor: c.line, opacity: dim ? 0.5 : pressed ? 0.7 : 1 })}
     >
       <View style={{ minWidth: 76 }}>
+        {/* Primary = the total trip fare (what the driver earns); the €/km rate is
+            the secondary line beneath it. */}
         <Text style={{ color: c.ink, fontSize: 17, fontWeight: "700", letterSpacing: -0.5, textAlign: align }}>
-          {perKm?.value ?? fareLabel(offer.fare_formatted, offer.fare_amount)}
+          {fareLabel(offer.fare_formatted, offer.fare_amount)}
         </Text>
         <Text style={{ color: c.inkSubtle, fontSize: 10.5, textAlign: align }}>
-          {perKm ? "€/km" : distanceLabel(offer.distance_m)}
+          {perKm ? `${perKm.value} €/km` : distanceLabel(offer.distance_m)}
         </Text>
       </View>
       <View style={{ flex: 1 }}>
