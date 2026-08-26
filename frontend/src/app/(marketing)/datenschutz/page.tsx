@@ -32,15 +32,15 @@ export default function DatenschutzPage() {
           <p className="mt-3">
             Reidey (Einzelunternehmen)
             <br />
-            Plus Code P4GG+CHF
+            Hölderlinstraße 17
             <br />
-            Bloudan, Syrien
+            42699 Solingen, Deutschland
             <br />
             Vertretungsberechtigt: Ahmed Jaber
             <br />
             E-Mail: info@reidey.de
             <br />
-            Telefon: +972 56 619 2186
+            Telefon: +49 176 56074780
           </p>
           <p className="mt-3">
             Einen Datenschutzbeauftragten erreichen Sie, sofern bestellt, unter info@reidey.de.

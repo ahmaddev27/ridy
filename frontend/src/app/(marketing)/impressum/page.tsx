@@ -16,11 +16,11 @@ export default function ImpressumPage() {
             <br />
             Einzelunternehmen
             <br />
-            Plus Code P4GG+CHF
+            Hölderlinstraße 17
             <br />
-            Bloudan
+            42699 Solingen
             <br />
-            Syrien
+            Deutschland
           </p>
         </section>
 
@@ -32,7 +32,7 @@ export default function ImpressumPage() {
         <section>
           <h2 className="text-xl font-semibold text-ink">Kontakt</h2>
           <p className="mt-3">
-            Telefon: +972 56 619 2186
+            Telefon: +49 176 56074780
             <br />
             E-Mail: info@reidey.de
           </p>
@@ -45,7 +45,7 @@ export default function ImpressumPage() {
           <p className="mt-3">
             Ahmed Jaber
             <br />
-            Plus Code P4GG+CHF, Bloudan, Syrien
+            Hölderlinstraße 17, 42699 Solingen, Deutschland
           </p>
         </section>
       </div>
