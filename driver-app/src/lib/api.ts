@@ -164,43 +164,25 @@ export class ApiClient {
     }
   }
 
-  invitePreview(token: string) {
-    return this.request<{ data: { driver_name: string; company_name: string | null } }>(
-      `/api/v1/driver/invite/${encodeURIComponent(token)}`,
-    );
-  }
-
-  activate(token: string, password: string) {
-    return this.request<{ data: { token: string; driver: DriverProfile } }>("/api/v1/driver/activate", {
-      method: "POST",
-      body: JSON.stringify({ token, password }),
-    });
-  }
-
-  login(email: string, password: string) {
-    // The response branches on `is_owner`: a driver carries `driver`, a fleet
-    // owner/manager carries `owner` (same profile shape).
-    return this.request<{
-      data: { token: string; is_owner: boolean; driver?: DriverProfile; owner?: DriverProfile };
-    }>("/api/v1/driver/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
-  }
-
-  /** Forgot-password step 1: email a reset code (always 200, no enumeration). */
-  passwordForgot(email: string) {
-    return this.request<{ data: { sent: boolean } }>("/api/v1/driver/password/forgot", {
+  /** Passwordless sign-in step 1: email a one-time code (always 200, no enumeration). */
+  loginRequest(email: string) {
+    return this.request<{ data: { sent: boolean } }>("/api/v1/driver/login/request", {
       method: "POST",
       body: JSON.stringify({ email }),
     });
   }
 
-  /** Forgot-password step 2: set a new password with the emailed code. */
-  passwordReset(email: string, otp: string, password: string) {
-    return this.request<{ data: { reset: boolean } }>("/api/v1/driver/password/reset", {
+  /**
+   * Passwordless sign-in step 2: exchange the code for a token. The response
+   * branches on `is_owner`: a driver carries `driver`, a fleet owner/manager
+   * carries `owner` (same profile shape).
+   */
+  loginVerify(email: string, otp: string) {
+    return this.request<{
+      data: { token: string; is_owner: boolean; driver?: DriverProfile; owner?: DriverProfile };
+    }>("/api/v1/driver/login/verify", {
       method: "POST",
-      body: JSON.stringify({ email, otp, password, password_confirmation: password }),
+      body: JSON.stringify({ email, otp }),
     });
   }
 

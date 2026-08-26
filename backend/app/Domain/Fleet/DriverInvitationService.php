@@ -4,26 +4,35 @@ namespace App\Domain\Fleet;
 
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\SendTemplatedMail;
+use App\Http\Controllers\Concerns\GeneratesOtp;
+use App\Models\PasswordReset;
 use App\Support\Settings;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Owns the driver app onboarding lifecycle: a manager invites a driver by email,
- * the driver activates (sets a password) via the emailed link, and the token is
- * then consumed. Keeps the invitation rules in one place so the controllers stay
- * thin.
+ * the driver signs in passwordlessly with an emailed one-time code, and is
+ * activated on first success. Keeps the invitation rules in one place so the
+ * controllers stay thin.
  */
 class DriverInvitationService
 {
+    use GeneratesOtp;
+
     /** An unused invite link stops working after this — a leaked/old link can't be replayed. */
     public const INVITE_TTL_DAYS = 7;
 
+    /** How long the emailed sign-in code stays valid. */
+    private const OTP_TTL_MINUTES = 30;
+
     /**
-     * Issue (or re-issue) an invitation and email the activation link. Falls back
+     * Issue (or re-issue) an invitation: email a one-time sign-in code. Falls back
      * to the driver's Uber email (captured when they were linked) so a manager
      * doesn't have to type it; the chosen address becomes the driver's login email.
+     * No password is involved — the code the driver enters is the credential.
      */
     public function invite(Driver $driver): void
     {
@@ -41,10 +50,19 @@ class DriverInvitationService
             'invited_at' => now(),
         ])->save();
 
+        $reset = PasswordReset::updateOrCreate(
+            ['email' => $email],
+            [
+                'otp' => $this->newOtp(),
+                'otp_expires_at' => CarbonImmutable::now()->addMinutes(self::OTP_TTL_MINUTES),
+                'attempts' => 0,
+            ],
+        );
+
         SendTemplatedMail::to($email, 'driver_invite', [
             'company_name' => (string) ($driver->tenant?->name ?? 'Reidey'),
             'driver_name' => (string) $driver->name,
-            'invite_link' => $this->activationLink($driver->invite_token),
+            'otp' => $reset->otp,
             // Per-platform download links — the same admin-configured URLs the
             // in-app force-update dialog points at (an APK before the store, a
             // store link after). The email can't know the driver's device, so we
