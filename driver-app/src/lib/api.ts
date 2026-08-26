@@ -188,6 +188,22 @@ export class ApiClient {
     });
   }
 
+  /** Forgot-password step 1: email a reset code (always 200, no enumeration). */
+  passwordForgot(email: string) {
+    return this.request<{ data: { sent: boolean } }>("/api/v1/driver/password/forgot", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  /** Forgot-password step 2: set a new password with the emailed code. */
+  passwordReset(email: string, otp: string, password: string) {
+    return this.request<{ data: { reset: boolean } }>("/api/v1/driver/password/reset", {
+      method: "POST",
+      body: JSON.stringify({ email, otp, password, password_confirmation: password }),
+    });
+  }
+
   me() {
     return this.request<{ data: DriverProfile }>("/api/v1/driver/me");
   }

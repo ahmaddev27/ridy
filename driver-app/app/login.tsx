@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { View, KeyboardAvoidingView, Platform, Pressable, Alert } from "react-native";
+import { View, KeyboardAvoidingView, Platform, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { Text } from "@/components/typography";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
@@ -10,6 +11,7 @@ import { LogIn } from "lucide-react-native";
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const router = useRouter();
   const c = useColors();
   const align = isRTL() ? "right" : "left";
   const [email, setEmail] = useState("");
@@ -61,7 +63,7 @@ export default function LoginScreen() {
             <PrimaryButton label={t("login.submit")} onPress={submit} loading={loading} icon={LogIn} />
           </View>
           <Pressable
-            onPress={() => Alert.alert(t("signin.forgot"), t("signin.forgotHint"))}
+            onPress={() => router.push("/forgot-password")}
             style={{ alignSelf: "center", paddingVertical: 12 }}
           >
             <Text style={{ color: c.inkMuted, fontSize: 14, fontWeight: "500" }}>{t("signin.forgot")}</Text>
