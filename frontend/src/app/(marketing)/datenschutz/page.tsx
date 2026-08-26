@@ -38,7 +38,7 @@ export default function DatenschutzPage() {
             <br />
             E-Mail: info@reidey.de
             <br />
-            Telefon: +49 176 56074780
+            Telefon: +49 1590 5655286
           </p>
           <p className="mt-3">
             Einen Datenschutzbeauftragten erreichen Sie, sofern bestellt, unter info@reidey.de.

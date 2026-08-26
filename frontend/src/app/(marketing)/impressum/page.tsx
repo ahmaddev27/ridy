@@ -32,7 +32,7 @@ export default function ImpressumPage() {
         <section>
           <h2 className="text-xl font-semibold text-ink">Kontakt</h2>
           <p className="mt-3">
-            Telefon: +49 176 56074780
+            Telefon: +49 1590 5655286
             <br />
             E-Mail: info@reidey.de
           </p>
