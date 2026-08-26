@@ -203,6 +203,9 @@ class DispatchOfferController extends Controller
             'distance_km' => $distanceKm,
             'fare_amount' => $fare,
             'price_per_km' => $pricePerKm,
+            // How precisely the trip was located: exact|street|area|postal|approx|
+            // estimated. Lets the UI flag a rough distance instead of implying it's exact.
+            'geo_confidence' => $offer->geo_confidence,
         ];
     }
 

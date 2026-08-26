@@ -52,6 +52,52 @@ class AddressNormalizer
     }
 
     /**
+     * Best-effort split of a German dispatch address into {street, plz, city} for
+     * structured geocoding. `street` is whatever precedes the 5-digit PLZ (road +
+     * house number, last comma-segment); `city` is the town right after the PLZ,
+     * with a "(Rheinland)"-style parenthetical dropped. Any part may be null. Runs
+     * clean() first so a localized country tail never leaks in.
+     *
+     * The city is intentionally NOT hyphen-trimmed — real towns are hyphenated
+     * (Kamp-Lintfort, Castrop-Rauxel); callers prefer the authoritative PLZ→city
+     * table over this parse anyway.
+     *
+     * @return array{street: ?string, plz: ?string, city: ?string}
+     */
+    public static function parse(?string $address): array
+    {
+        $address = trim((string) self::clean($address));
+        if ($address === '') {
+            return ['street' => null, 'plz' => null, 'city' => null];
+        }
+
+        if (preg_match('/\b(\d{5})\b/', $address, $m, PREG_OFFSET_CAPTURE) !== 1) {
+            // No PLZ — the leading comma segment is the best guess at a street.
+            $first = trim(explode(',', $address)[0]);
+
+            return ['street' => $first !== '' ? $first : null, 'plz' => null, 'city' => null];
+        }
+
+        $plz = $m[1][0];
+        $at = (int) $m[1][1];
+
+        // Street: the segment immediately before the PLZ ("Street Nr, PLZ City").
+        $before = trim(rtrim(trim(substr($address, 0, $at)), ','));
+        if ($before !== '' && str_contains($before, ',')) {
+            $segs = array_map('trim', explode(',', $before));
+            $before = (string) end($segs);
+        }
+        $street = $before !== '' ? $before : null;
+
+        // City: text after the PLZ up to the next comma, minus a "(…)" note.
+        $after = trim(explode(',', trim(substr($address, $at + 5)))[0]);
+        $after = trim((string) preg_replace('/\s*\([^)]*\)/', '', $after));
+        $city = $after !== '' ? $after : null;
+
+        return ['street' => $street, 'plz' => $plz, 'city' => $city];
+    }
+
+    /**
      * Return the address with any non-Latin (localised country) segment removed,
      * digits Latinized, and whitespace tidied. Splits on both the Latin (,) and
      * Arabic (،) comma. Idempotent, safe on write and read. Falls back to the

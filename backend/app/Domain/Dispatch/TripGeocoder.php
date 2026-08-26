@@ -76,6 +76,7 @@ class TripGeocoder
             $route = $this->route($pickup, $dropoff);
             $offer->distance_m = $route['distance_m'] ?? null;
             $offer->route_geometry = $route['geometry'] ?? null;
+            $offer->geo_confidence = $this->combinedConfidence($pickup['confidence'] ?? null, $dropoff['confidence'] ?? null, $route);
             $offer->geo_synced_at = CarbonImmutable::now(); // success — done for good
         } else {
             // Couldn't resolve both ends (transient rate-limit or unknown address).
@@ -131,81 +132,166 @@ class TripGeocoder
             if (! empty($cached->label)) {
                 $result['address'] = $cached->label; // unify to German even from cache
             }
+            if (! empty($cached->confidence)) {
+                $result['confidence'] = $cached->confidence;
+            }
 
             return $result;
         }
 
-        // A "PLZ City" address with no leading street is almost always a station
-        // pickup/dropoff (Uber sends station trips without a street). Steer
-        // Nominatim to the town's Bahnhof so the point + label land on the
-        // station instead of the postcode centroid.
-        $stationless = preg_match('/^\d{5}\s+\S/', $address) === 1;
+        // Resolve through a precision cascade, stopping at the first tier that
+        // returns a point and recording its confidence. Structured Nominatim
+        // params (street/postalcode/city) are far more robust to Uber's garbled
+        // free-text than a single `q`. A transient failure (network / rate-limit)
+        // aborts WITHOUT caching so a later call retries instead of caching a miss.
+        $parsed = AddressNormalizer::parse($address);
+        $plz = $parsed['plz'];
+        // Prefer the authoritative PLZ→city (1:1 in Germany) over Uber's parse.
+        $city = $plz !== null ? (PostalCodes::city($plz) ?? $parsed['city']) : $parsed['city'];
+        $street = $parsed['street'];
 
-        $params = [
-            'q' => $stationless ? 'Bahnhof, '.$address : $address,
+        $base = [
             'format' => 'json',
             'limit' => 1,
             'countrycodes' => 'de', // fleet is German — bias + speed up resolution
             'accept-language' => 'de', // return the German address, not the driver's app locale
-            'addressdetails' => 1, // structured fields so we can build a short "street, PLZ city" label
+            'addressdetails' => 1, // structured fields for the short "street, PLZ city" label
         ];
-        if ($useBias) {
-            // ~50 km half-box around the bias point; bounded=1 keeps the result in it.
-            $d = 0.45;
-            $params['viewbox'] = ($biasLng - $d).','.($biasLat - $d).','.($biasLng + $d).','.($biasLat + $d);
-            $params['bounded'] = 1;
+
+        $coords = null;
+
+        // Tier 1 — street + PLZ + city (structured). House number → exact, else street.
+        if ($coords === null && $street !== null && $plz !== null && $city !== null) {
+            $r = $this->queryNominatim($base + ['street' => $street, 'postalcode' => $plz, 'city' => $city]);
+            if ($r['transient']) {
+                return null;
+            }
+            if ($r['hit'] !== null) {
+                $coords = $this->fromHit($r['hit'], preg_match('/\d/', $street) === 1 ? 'exact' : 'street');
+            }
         }
 
-        try {
-            $res = Http::withHeaders(['User-Agent' => self::UA])
-                ->timeout(6)
-                ->get($this->nominatimUrl(), $params);
-        } catch (\Throwable $e) {
-            return null; // transient (timeout/network) — do NOT cache, so a retry can succeed
-        }
-
-        if (! $res->ok()) {
-            return null; // transient (rate-limited 429 / 5xx) — do NOT cache, retry later
-        }
-
-        // Definitive 200 response: a hit, or a genuine "not found" worth caching so
-        // we never re-query an address that truly doesn't resolve.
-        $hit = $res->json()[0] ?? null;
-        $coords = ($hit && isset($hit['lat'], $hit['lon']))
-            ? ['lat' => (float) $hit['lat'], 'lng' => (float) $hit['lon']]
-            : null;
-
-        // Nominatim couldn't place it, but a valid PLZ still pins the town: fall
-        // back to the postal-code centroid so distance + €/km are never blank.
-        if ($coords === null) {
-            $coords = $this->plzCentroidFallback($address);
-        }
-
-        // A short, German, human-readable label ("street nr, PLZ city") unifies
-        // the address to one language regardless of the captured session's locale.
-        // Carried on the fresh result so enrich() can replace the localized text.
-        if ($coords !== null && $hit !== null) {
-            if ($stationless && $this->isStation($hit)) {
-                // Confirmed the town's station — say so, keeping the PLZ + city.
-                $coords['address'] = 'Bahnhof, '.$address;
+        // Tier 2 — PLZ + city, no street. A street-less "PLZ City" is usually a
+        // station pickup/dropoff, so try the town's Bahnhof first, then the town.
+        if ($coords === null && $plz !== null && $city !== null) {
+            $st = $this->queryNominatim($base + ['q' => 'Bahnhof, '.$plz.' '.$city]);
+            if ($st['transient']) {
+                return null;
+            }
+            if ($st['hit'] !== null && $this->isStation($st['hit'])) {
+                $coords = $this->fromHit($st['hit'], 'area');
+                $coords['address'] = 'Bahnhof, '.$plz.' '.$city;
             } else {
-                $label = $this->shortGermanLabel($hit);
-                if ($label !== null) {
-                    $coords['address'] = $label;
+                $r = $this->queryNominatim($base + ['postalcode' => $plz, 'city' => $city]);
+                if ($r['transient']) {
+                    return null;
                 }
+                if ($r['hit'] !== null) {
+                    $coords = $this->fromHit($r['hit'], 'area');
+                }
+            }
+        }
+
+        // Tier 3 — PLZ centroid from the static table (network-free safety net).
+        if ($coords === null && $plz !== null) {
+            $coords = $this->plzCentroidFallback($address);
+            if ($coords !== null) {
+                $coords['confidence'] = 'postal';
+            }
+        }
+
+        // Tier 4 — postcode-less free text, biased to the trip's region when we
+        // have a bias point (otherwise the same street name resolves 500 km away).
+        if ($coords === null && $plz === null) {
+            $params = $base + ['q' => $address];
+            if ($useBias) {
+                $d = 0.45; // ~50 km half-box; bounded=1 keeps the result inside it
+                $params['viewbox'] = ($biasLng - $d).','.($biasLat - $d).','.($biasLng + $d).','.($biasLat + $d);
+                $params['bounded'] = 1;
+            }
+            $r = $this->queryNominatim($params);
+            if ($r['transient']) {
+                return null;
+            }
+            if ($r['hit'] !== null) {
+                $coords = $this->fromHit($r['hit'], 'approx');
             }
         }
 
         // Atomic upsert (INSERT ... ON DUPLICATE KEY UPDATE): two requests geocoding
         // the same address concurrently would race a check-then-insert and trip the
-        // unique key (1062). upsert lets the loser update instead of erroring.
+        // unique key (1062). upsert lets the loser update instead of erroring. A
+        // definitive miss ($coords null) is cached too, so it isn't re-queried.
         DB::table('geocode_cache')->upsert(
-            [['query' => $cacheKey, 'lat' => $coords['lat'] ?? null, 'lng' => $coords['lng'] ?? null, 'label' => $coords['address'] ?? null, 'updated_at' => now(), 'created_at' => now()]],
+            [['query' => $cacheKey, 'lat' => $coords['lat'] ?? null, 'lng' => $coords['lng'] ?? null, 'label' => $coords['address'] ?? null, 'confidence' => $coords['confidence'] ?? null, 'updated_at' => now(), 'created_at' => now()]],
             ['query'],
-            ['lat', 'lng', 'label', 'updated_at'],
+            ['lat', 'lng', 'label', 'confidence', 'updated_at'],
         );
 
         return $coords;
+    }
+
+    /**
+     * The trip's overall geo confidence: the weaker of the two endpoints (a
+     * distance is only as trustworthy as its worse point). Downgraded to
+     * `estimated` when the route has no road geometry — OSRM was unreachable, so
+     * the distance is a straight-line haversine estimate.
+     *
+     * @param  array{geometry: mixed}  $route
+     */
+    private function combinedConfidence(?string $pickup, ?string $dropoff, array $route): string
+    {
+        $rank = ['exact' => 5, 'street' => 4, 'area' => 3, 'postal' => 2, 'approx' => 1];
+        $worst = min($rank[$pickup] ?? 1, $rank[$dropoff] ?? 1);
+        $confidence = array_search($worst, $rank, true) ?: 'approx';
+
+        return ($route['geometry'] ?? null) === null ? 'estimated' : $confidence;
+    }
+
+    /**
+     * One Nominatim call. Returns {transient, hit}: `transient` true on a
+     * network/timeout/non-200 (caller must abort without caching so a retry can
+     * still succeed); `hit` is the first result with coordinates, or null for a
+     * definitive "not found".
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{transient: bool, hit: array<string, mixed>|null}
+     */
+    private function queryNominatim(array $params): array
+    {
+        try {
+            $res = Http::withHeaders(['User-Agent' => self::UA])
+                ->timeout(6)
+                ->get($this->nominatimUrl(), $params);
+        } catch (\Throwable $e) {
+            return ['transient' => true, 'hit' => null];
+        }
+
+        if (! $res->ok()) {
+            return ['transient' => true, 'hit' => null];
+        }
+
+        $hit = $res->json()[0] ?? null;
+
+        return ['transient' => false, 'hit' => ($hit && isset($hit['lat'], $hit['lon'])) ? $hit : null];
+    }
+
+    /**
+     * A resolved coordinate from a Nominatim hit, tagged with its confidence and a
+     * short German label.
+     *
+     * @param  array<string, mixed>  $hit
+     * @return array{lat: float, lng: float, confidence: string, address?: string}
+     */
+    private function fromHit(array $hit, string $confidence): array
+    {
+        $result = ['lat' => (float) $hit['lat'], 'lng' => (float) $hit['lon'], 'confidence' => $confidence];
+        $label = $this->shortGermanLabel($hit);
+        if ($label !== null) {
+            $result['address'] = $label;
+        }
+
+        return $result;
     }
 
     /**
