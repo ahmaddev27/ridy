@@ -47,7 +47,7 @@
       "android": {
         "serviceAccountKeyPath": "./play-service-account.json",
         "track": "internal",
-        "releaseStatus": "draft"
+        "releaseStatus": "completed"
       },
       "ios": {
         "ascApiKeyPath": "./ios-asc-key.p8",
