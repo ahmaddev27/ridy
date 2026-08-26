@@ -295,6 +295,32 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame(OfferStatus::Rejected, $offer->fresh()->status);
     }
 
+    public function test_a_new_offer_supersedes_the_drivers_prior_pending_offer(): void
+    {
+        // A driver can't hold two pending offers: a newer one supersedes the older.
+        $this->driver(); // idle
+        $older = $this->offer(['received_at' => now()->subMinutes(2)]);
+        $newer = $this->offer(['received_at' => now()]);
+
+        app(OfferLifecycle::class)->supersedePendingFor($this->tenant->id, self::DRIVER_UUID, $newer->id);
+
+        $this->assertSame(OfferStatus::Rejected, $older->fresh()->status);
+        $this->assertSame(OfferStatus::Pending, $newer->fresh()->status);
+    }
+
+    public function test_supersede_leaves_an_engaged_drivers_prior_offer_alone(): void
+    {
+        $driver = $this->driver();
+        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']);
+        $older = $this->offer(['received_at' => now()->subMinutes(2)]);
+        $newer = $this->offer(['received_at' => now()]);
+
+        app(OfferLifecycle::class)->supersedePendingFor($this->tenant->id, self::DRIVER_UUID, $newer->id);
+
+        // Busy driver took the earlier one back-to-back — the transition resolves it.
+        $this->assertSame(OfferStatus::Pending, $older->fresh()->status);
+    }
+
     public function test_invalid_transition_is_a_noop(): void
     {
         $this->driver();

@@ -25,6 +25,7 @@ class DispatchOfferIngestor
         private TenantContext $context,
         private DispatchNotifier $notifier,
         private TripGeocoder $geocoder,
+        private OfferLifecycle $lifecycle,
     ) {}
 
     /**
@@ -86,6 +87,13 @@ class DispatchOfferIngestor
                 return ['status' => 'duplicate', 'offer_id' => $dupe->id, 'driver_id' => $dupe->driver_id];
             }
             throw $e;
+        }
+
+        // A driver can only hold one pending offer at a time — this new one
+        // supersedes any older still-pending offer of theirs (unless they are
+        // engaged, i.e. took the earlier one back-to-back).
+        if ($driverUuid !== '') {
+            $this->lifecycle->supersedePendingFor($tenantId, $driverUuid, $record->id);
         }
 
         // Notify the driver's devices as soon as the offer is routed. The 5-second

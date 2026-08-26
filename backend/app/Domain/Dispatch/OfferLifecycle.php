@@ -3,6 +3,7 @@
 namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Fleet\Models\Driver;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -134,6 +135,36 @@ class OfferLifecycle
      *
      * @return int rows expired
      */
+    /**
+     * A driver holds at most one pending offer: when a newer one arrives, any
+     * still-pending older offer for the same driver is superseded ("not taken") —
+     * a new offer means Uber moved past the previous one. Skip it while the driver
+     * is engaged (they took the earlier one back-to-back; the transition accepts
+     * it). Returns rows changed.
+     */
+    public function supersedePendingFor(int $tenantId, string $driverUuid, int $keepOfferId): int
+    {
+        if ($driverUuid === '') {
+            return 0;
+        }
+
+        $driver = Driver::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('uber_driver_uuid', $driverUuid)
+            ->first(['id', 'online_status']);
+
+        if ($driver !== null && $driver->engagementStatus() >= 1) {
+            return 0; // busy — leave the earlier offer for the back-to-back transition
+        }
+
+        return DispatchOffer::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('driver_uuid', $driverUuid)
+            ->where('id', '!=', $keepOfferId)
+            ->where('status', OfferStatus::Pending)
+            ->update(['status' => OfferStatus::Rejected, 'rejected_at' => CarbonImmutable::now()]);
+    }
+
     public function expirePending(?int $tenantId = null): int
     {
         $now = CarbonImmutable::now();
