@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\V1\Driver\DriverAuthController;
 use App\Http\Controllers\Api\V1\Driver\DriverDashboardController;
 use App\Http\Controllers\Api\V1\Driver\DriverDeviceController;
 use App\Http\Controllers\Api\V1\Driver\DriverOfferController;
+use App\Http\Controllers\Api\V1\Driver\DriverPasswordResetController;
 use App\Http\Controllers\Api\V1\Driver\FleetController;
 use App\Http\Controllers\Api\V1\Driver\FleetDeviceController;
 use App\Http\Controllers\Api\V1\DriverController;
@@ -97,6 +98,11 @@ Route::prefix('v1')->group(function () {
         Route::get('invite/{token}', [DriverAuthController::class, 'invite'])->middleware('throttle:20,1');
         Route::post('activate', [DriverAuthController::class, 'activate'])->middleware('throttle:10,1');
         Route::post('login', [DriverAuthController::class, 'login'])->middleware('throttle:10,1');
+
+        // In-app "forgot password" via an email OTP (mirrors the manager flow).
+        Route::post('password/forgot', [DriverPasswordResetController::class, 'start'])->middleware('throttle:6,1');
+        Route::post('password/verify', [DriverPasswordResetController::class, 'verify'])->middleware('throttle:12,1');
+        Route::post('password/reset', [DriverPasswordResetController::class, 'reset'])->middleware('throttle:12,1');
 
         Route::middleware('auth:driver')->group(function () {
             // Logout must work even when suspended (so the app can clear its token).
