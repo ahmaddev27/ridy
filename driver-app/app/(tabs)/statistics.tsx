@@ -14,8 +14,8 @@ import { SectionLabel } from "@/components/ui";
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] as const;
 const mondayIndex = (d: Date) => (d.getDay() + 6) % 7;
 
-type Range = "today" | "7d" | "30d";
-const RANGES: Range[] = ["today", "7d", "30d"];
+type Range = "today" | "week" | "month";
+const RANGES: Range[] = ["today", "week", "month"];
 
 /** Local yyyy-mm-dd (native date range for the stats endpoint). */
 function ymd(d: Date): string {
@@ -24,12 +24,13 @@ function ymd(d: Date): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
-/** from/to for a rolling range (today / last 7 / last 30 days), in fleet-days. */
+/** from/to for the selected range, in fleet-days: today, the current calendar
+ *  week (from Monday), or the current calendar month (from the 1st). */
 function rangeDates(r: Range): { from: string; to: string } {
   const now = fleetNow();
   const start = new Date(now);
-  if (r === "7d") start.setDate(now.getDate() - 6);
-  else if (r === "30d") start.setDate(now.getDate() - 29);
+  if (r === "week") start.setDate(now.getDate() - mondayIndex(now)); // back to Monday
+  else if (r === "month") start.setDate(1); // first of this month
   return { from: ymd(start), to: ymd(now) };
 }
 
@@ -37,7 +38,7 @@ export default function StatisticsScreen() {
   const c = useColors();
   const { isOwner } = useAuth();
   const align = isRTL() ? "right" : "left";
-  const [range, setRange] = useState<Range>("7d");
+  const [range, setRange] = useState<Range>("week");
   const [day, setDay] = useState<Date | null>(null); // tapping a chart bar filters to one day
   const [stats, setStats] = useState<DriverStats | null>(null);
   const [week, setWeek] = useState<Offer[]>([]);
@@ -49,7 +50,9 @@ export default function StatisticsScreen() {
       // Stats for the picked day (if any) or the selected range; the chart always
       // shows the last 7 days so you can tap another bar.
       const window = d ? { from: ymd(d), to: ymd(d) } : rangeDates(r);
-      const w = rangeDates("7d");
+      // The bar chart always shows the current week (Mon–Sun), independent of the
+      // selected range.
+      const w = rangeDates("week");
       // A fleet owner authenticates on a User token; the driver endpoints
       // (auth:driver) would 401 and log them out. Use the tenant-wide fleet
       // endpoints for owners, the personal ones for a driver.
