@@ -57,6 +57,7 @@ use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\ResellerController;
 use App\Http\Controllers\Api\V1\UberLoginController;
 use App\Http\Controllers\Api\V1\VehicleController;
+use App\Http\Middleware\LogDriverAuthContext;
 use App\Http\Middleware\ResolveTenant;
 use Illuminate\Support\Facades\Route;
 
@@ -94,7 +95,7 @@ Route::prefix('v1')->group(function () {
 
     // Mobile driver app. Public onboarding + Sanctum-guarded session. No tenant
     // middleware: a driver's tenant is derived from the driver, not the request.
-    Route::prefix('driver')->group(function () {
+    Route::prefix('driver')->middleware(LogDriverAuthContext::class)->group(function () {
         Route::get('invite/{token}', [DriverAuthController::class, 'invite'])->middleware('throttle:20,1');
         Route::post('activate', [DriverAuthController::class, 'activate'])->middleware('throttle:10,1');
         Route::post('login', [DriverAuthController::class, 'login'])->middleware('throttle:10,1');
