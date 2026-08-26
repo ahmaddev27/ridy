@@ -137,11 +137,11 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
     if (!map) return;
     // essential:true so the fly still happens under a "prefers-reduced-motion"
     // setting — MapLibre silently skips non-essential camera animations there,
-    // which made clicking a driver appear to do nothing.
+    // which made clicking a driver appear to do nothing. Don't auto-open the
+    // popup: centred on the car, its white box sat right on top of the marker and
+    // hid the car icon — the point of the click is to SEE the car. The label still
+    // opens on tapping the marker itself.
     map.flyTo({ center: [dr.lng, dr.lat], zoom: 16, essential: true });
-    // Pop the driver's label too, for immediate visual confirmation of which car.
-    const entry = markersRef.current.get(dr.id);
-    if (entry && !entry.marker.getPopup()?.isOpen()) entry.marker.togglePopup();
   }
 
   useEffect(() => {
