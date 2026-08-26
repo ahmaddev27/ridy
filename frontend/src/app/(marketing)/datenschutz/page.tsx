@@ -36,8 +36,6 @@ export default function DatenschutzPage() {
             <br />
             42699 Solingen, Deutschland
             <br />
-            Vertretungsberechtigt: Ahmed Jaber
-            <br />
             E-Mail: info@reidey.de
             <br />
             Telefon: +49 176 56074780

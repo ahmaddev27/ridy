@@ -26,7 +26,7 @@ export default function ImpressumPage() {
 
         <section>
           <h2 className="text-xl font-semibold text-ink">Vertreten durch</h2>
-          <p className="mt-3">Ahmed Jaber</p>
+          <p className="mt-3">Reidey</p>
         </section>
 
         <section>
@@ -43,7 +43,7 @@ export default function ImpressumPage() {
             Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV
           </h2>
           <p className="mt-3">
-            Ahmed Jaber
+            Reidey
             <br />
             Hölderlinstraße 17, 42699 Solingen, Deutschland
           </p>
