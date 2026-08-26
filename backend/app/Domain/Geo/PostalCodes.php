@@ -36,25 +36,35 @@ class PostalCodes
     {
         $row = self::row($plz);
 
-        return $row !== null ? ['lat' => (float) $row->lat, 'lng' => (float) $row->lng] : null;
+        return $row !== null ? ['lat' => $row['lat'], 'lng' => $row['lng']] : null;
     }
 
     /** The authoritative city name for a PLZ, or null when unknown. */
     public static function city(string $plz): ?string
     {
-        return self::row($plz)?->city;
+        return self::row($plz)['city'] ?? null;
     }
 
-    /** Cached single-row lookup (returns null and caches the miss too). */
-    private static function row(string $plz): ?object
+    /**
+     * Cached single-row lookup as a plain array (returns null and caches the miss
+     * too). A plain array is cached — never the query builder's stdClass, which
+     * deserializes to an "incomplete object" under some cache stores.
+     *
+     * @return array{city: string, lat: float, lng: float}|null
+     */
+    private static function row(string $plz): ?array
     {
         $key = self::normalize($plz);
         if ($key === null) {
             return null;
         }
 
-        $row = Cache::remember("plz:{$key}", self::TTL, function () use ($key) {
-            return DB::table('postal_codes')->where('plz', $key)->first(['city', 'lat', 'lng']) ?? false;
+        // Key is versioned (v2) so any previously-cached stdClass rows from the
+        // earlier object-caching bug are ignored rather than re-read as arrays.
+        $row = Cache::remember("plz:v2:{$key}", self::TTL, function () use ($key) {
+            $r = DB::table('postal_codes')->where('plz', $key)->first(['city', 'lat', 'lng']);
+
+            return $r === null ? false : ['city' => (string) $r->city, 'lat' => (float) $r->lat, 'lng' => (float) $r->lng];
         });
 
         return $row === false ? null : $row;
