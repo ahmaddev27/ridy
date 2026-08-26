@@ -53,7 +53,7 @@ type DriverMarker = {
  */
 function createMarkerElement(): { el: HTMLDivElement; car: HTMLImageElement; halo: HTMLSpanElement } {
   const el = document.createElement("div");
-  el.style.cssText = "position:relative;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer";
+  el.style.cssText = "position:relative;width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer";
 
   const halo = document.createElement("span");
   halo.style.cssText = "position:absolute;inset:0;border-radius:9999px;border-width:2px;border-style:solid;box-sizing:border-box";
@@ -61,7 +61,7 @@ function createMarkerElement(): { el: HTMLDivElement; car: HTMLImageElement; hal
   const car = document.createElement("img");
   car.src = "/markers/car.png";
   car.alt = "";
-  car.style.cssText = "position:relative;width:26px;height:26px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))";
+  car.style.cssText = "position:relative;width:42px;height:42px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))";
 
   el.appendChild(halo);
   el.appendChild(car);
@@ -133,15 +133,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
   /** Pan + zoom the map onto one driver (from the side list). */
   function focusDriver(dr: LiveDriver) {
-    const map = mapRef.current;
-    if (!map) return;
-    // essential:true so the fly still happens under a "prefers-reduced-motion"
-    // setting — MapLibre silently skips non-essential camera animations there,
-    // which made clicking a driver appear to do nothing. Don't auto-open the
-    // popup: centred on the car, its white box sat right on top of the marker and
-    // hid the car icon — the point of the click is to SEE the car. The label still
-    // opens on tapping the marker itself.
-    map.flyTo({ center: [dr.lng, dr.lat], zoom: 16, essential: true });
+    mapRef.current?.flyTo({ center: [dr.lng, dr.lat], zoom: 16 });
   }
 
   useEffect(() => {
