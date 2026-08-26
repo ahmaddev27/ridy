@@ -133,7 +133,15 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
   /** Pan + zoom the map onto one driver (from the side list). */
   function focusDriver(dr: LiveDriver) {
-    mapRef.current?.flyTo({ center: [dr.lng, dr.lat], zoom: 16 });
+    const map = mapRef.current;
+    if (!map) return;
+    // essential:true so the fly still happens under a "prefers-reduced-motion"
+    // setting — MapLibre silently skips non-essential camera animations there,
+    // which made clicking a driver appear to do nothing.
+    map.flyTo({ center: [dr.lng, dr.lat], zoom: 16, essential: true });
+    // Pop the driver's label too, for immediate visual confirmation of which car.
+    const entry = markersRef.current.get(dr.id);
+    if (entry && !entry.marker.getPopup()?.isOpen()) entry.marker.togglePopup();
   }
 
   useEffect(() => {
