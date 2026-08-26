@@ -3,43 +3,60 @@
 namespace App\Http\Middleware;
 
 use Closure;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * TEMPORARY diagnostic: logs exactly why a driver request would fail auth, so the
- * recurring "session_invalidated" 401 on /driver/home can be pinned to a cause —
- * a deleted token vs. a token whose driver row is gone (orphan). Runs BEFORE the
- * auth:driver guard and only when a bearer token is present. Remove once the
- * root cause is confirmed.
+ * TEMPORARY diagnostic: whenever a driver endpoint answers 401 (the recurring
+ * "session_invalidated" cause), log at error level (so a raised LOG_LEVEL can't
+ * hide it) exactly WHY — no bearer sent, a deleted token, an orphaned driver, or
+ * a token that resolves fine yet the guard still rejects it. Handles both the
+ * thrown AuthenticationException and any plain 401 response. Remove once the root
+ * cause is confirmed.
  */
 class LogDriverAuthContext
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $bearer = $request->bearerToken();
-        if ($bearer !== null && $bearer !== '') {
-            $pat = PersonalAccessToken::findToken($bearer);
-            if ($pat === null) {
-                Log::warning('driver_auth_debug', [
-                    'result' => 'token_not_found',
-                    'path' => $request->path(),
-                    'prefix' => substr($bearer, 0, 12),
-                ]);
-            } elseif ($pat->tokenable === null) {
-                Log::warning('driver_auth_debug', [
-                    'result' => 'tokenable_missing',
-                    'path' => $request->path(),
-                    'token_id' => $pat->id,
-                    'tokenable_type' => $pat->tokenable_type,
-                    'tokenable_id' => $pat->tokenable_id,
-                ]);
-            }
-            // A token that resolves fine but still 401s would point at the guard.
+        try {
+            $response = $next($request);
+        } catch (AuthenticationException $e) {
+            $this->log($request);
+
+            throw $e;
         }
 
-        return $next($request);
+        if ($response->getStatusCode() === 401) {
+            $this->log($request);
+        }
+
+        return $response;
+    }
+
+    private function log(Request $request): void
+    {
+        if (! $request->is('api/v1/driver/*') || $request->is('api/v1/driver/fleet/*')) {
+            return;
+        }
+
+        $bearer = $request->bearerToken();
+        $pat = $bearer !== null && $bearer !== '' ? PersonalAccessToken::findToken($bearer) : null;
+
+        $state = match (true) {
+            $bearer === null || $bearer === '' => 'no_bearer',
+            $pat === null => 'token_not_found',
+            $pat->tokenable === null => 'orphan_driver_deleted',
+            default => 'resolves_ok_but_guard_rejected',
+        };
+
+        Log::error('driver_auth_401', [
+            'path' => $request->path(),
+            'token_state' => $state,
+            'tokenable_type' => $pat?->tokenable_type,
+            'tokenable_id' => $pat?->tokenable_id,
+        ]);
     }
 }
