@@ -2,6 +2,7 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+import { getMessaging, getToken, registerDeviceForRemoteMessages } from "@react-native-firebase/messaging";
 import { api } from "./api";
 import { t } from "./i18n";
 
@@ -70,7 +71,18 @@ export async function registerForPush(owner = false): Promise<string | null> {
     });
   }
 
-  const { data: token } = await Notifications.getDevicePushTokenAsync();
+  // The backend delivers via FCM HTTP v1, so every device must present an FCM
+  // registration token. On Android expo-notifications already returns one; on iOS
+  // it returns the raw APNs token (which FCM rejects), so mint a real FCM token
+  // through Firebase Messaging — it registers with APNs under the hood first.
+  let token: string;
+  if (Platform.OS === "ios") {
+    const fcm = getMessaging();
+    await registerDeviceForRemoteMessages(fcm);
+    token = await getToken(fcm);
+  } else {
+    token = (await Notifications.getDevicePushTokenAsync()).data as string;
+  }
   const platform = Platform.OS === "ios" ? "ios" : "android";
   // Remember the token so logout can deregister THIS device and stop its pushes.
   await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token).catch(() => {});
