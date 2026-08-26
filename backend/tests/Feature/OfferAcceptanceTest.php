@@ -97,6 +97,24 @@ class OfferAcceptanceTest extends TestCase
         $this->getJson('/api/v1/drivers/live')->assertOk()->assertJsonCount(0, 'data');
     }
 
+    public function test_a_fix_outside_germany_is_rejected_as_bad_data(): void
+    {
+        $this->driver();
+
+        // Uber sometimes returns a garbage position (here: Zhytomyr, Ukraine). It
+        // must never plot the driver thousands of km away — the car drops off the
+        // map instead, like an offline driver, until a valid German fix arrives.
+        $this->postJson('/api/v1/drivers/statuses', [
+            'statuses' => [[
+                'driver_uuid' => self::DRIVER_UUID,
+                'status' => 'MONITORING_SUPPLY_STATUS_EN_ROUTE',
+                'latitude' => 50.45, 'longitude' => 28.6,
+            ]],
+        ])->assertOk();
+
+        $this->getJson('/api/v1/drivers/live')->assertOk()->assertJsonCount(0, 'data');
+    }
+
     public function test_transition_to_en_route_marks_acceptance_earliest(): void
     {
         // EN_ROUTE (heading to the rider) is the first sign of acceptance, before ON_TRIP.

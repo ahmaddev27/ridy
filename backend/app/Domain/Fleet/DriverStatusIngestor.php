@@ -58,6 +58,14 @@ class DriverStatusIngestor
             $lat = $this->coord($row['latitude'] ?? null);
             $lng = $this->coord($row['longitude'] ?? null);
 
+            // The fleet operates in Germany; Uber occasionally returns a garbage
+            // fix (a driver plotted in Ukraine/mid-ocean). Reject anything outside a
+            // generous DACH box so a bad position drops the car off the map instead
+            // of teleporting it across Europe until the next valid fix arrives.
+            if ($lat !== null && $lng !== null && ! $this->inGermanyBox($lat, $lng)) {
+                $lat = $lng = null;
+            }
+
             try {
                 $driver->update([
                     'online_status' => $row['status'] ?? null,
@@ -253,5 +261,15 @@ class DriverStatusIngestor
         $n = is_numeric($value) ? (float) $value : 0.0;
 
         return abs($n) < 0.0001 ? null : $n;
+    }
+
+    /**
+     * Whether a fix falls inside a generous Germany/DACH-and-neighbours box —
+     * wide enough for border trips, tight enough to reject an obviously wrong
+     * position (e.g. Uber returning coordinates in Ukraine or the ocean).
+     */
+    private function inGermanyBox(float $lat, float $lng): bool
+    {
+        return $lat >= 45.0 && $lat <= 56.0 && $lng >= 4.0 && $lng <= 17.0;
     }
 }
