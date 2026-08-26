@@ -47,6 +47,12 @@ class DriverController extends Controller
         $drivers = Driver::query()
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
+            // Belt-and-suspenders with the ingestor's bounds check: never plot a
+            // fix outside a generous Germany/DACH box, so a bad coordinate already
+            // stored (from before the ingest guard) is hidden immediately instead
+            // of waiting for the next status sync to overwrite it.
+            ->whereBetween('latitude', [45.0, 56.0])
+            ->whereBetween('longitude', [4.0, 17.0])
             ->where('status_synced_at', '>=', $freshSince)
             ->get()
             ->map(fn (Driver $d) => [
