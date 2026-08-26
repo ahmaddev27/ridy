@@ -124,6 +124,25 @@ class RosterSyncTest extends TestCase
         $this->assertDatabaseHas('dispatch_offers', ['offer_uuid' => 'o-dupe', 'driver_id' => $keep->id]);
     }
 
+    public function test_dedupe_preserves_the_drivers_login_token(): void
+    {
+        // Both rows are activated; the driver's live app token sits on the one that
+        // will be merged away (the newer duplicate). It must not be orphaned.
+        $keep = Driver::create(['tenant_id' => $this->tenant->id, 'name' => 'Old', 'uber_driver_uuid' => self::DRIVER_UUID, 'activated_at' => now()->subDay()]);
+        $dupe = Driver::create(['tenant_id' => $this->tenant->id, 'name' => 'Dupe', 'uber_driver_uuid' => self::DRIVER_UUID, 'activated_at' => now()]);
+        $tokenId = $dupe->createToken('driver-app')->accessToken->id;
+
+        app(RosterSyncService::class)->sync($this->tenant->id, [$this->driver()]);
+
+        $this->assertDatabaseMissing('drivers', ['id' => $dupe->id]);
+        // The token now points at the surviving canonical row — the session lives.
+        $this->assertDatabaseHas('personal_access_tokens', [
+            'id' => $tokenId,
+            'tokenable_type' => $keep->getMorphClass(),
+            'tokenable_id' => $keep->id,
+        ]);
+    }
+
     public function test_manager_roster_refresh_requires_a_connected_session(): void
     {
         $this->seed(RolePermissionSeeder::class);

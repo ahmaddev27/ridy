@@ -9,6 +9,7 @@ use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Upserts a tenant's driver roster from Uber's supplier /api/getDrivers payload.
@@ -113,6 +114,13 @@ class RosterSyncService
         $extraIds = $rows->where('id', '!=', $canonical->id)->pluck('id');
         DispatchOffer::whereIn('driver_id', $extraIds)->update(['driver_id' => $canonical->id]);
         DeviceToken::whereIn('driver_id', $extraIds)->update(['driver_id' => $canonical->id]);
+        // Carry the driver's app session (Sanctum tokens) onto the canonical row
+        // BEFORE deleting the extras — otherwise a merge orphans the token to a
+        // now-gone driver id and the driver's very next request 401s them out.
+        DB::table('personal_access_tokens')
+            ->where('tokenable_type', $canonical->getMorphClass())
+            ->whereIn('tokenable_id', $extraIds)
+            ->update(['tokenable_id' => $canonical->id]);
         DriverMetric::whereIn('driver_id', $extraIds)->delete();
         Driver::whereIn('id', $extraIds)->delete();
 
