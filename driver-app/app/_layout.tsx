@@ -164,12 +164,16 @@ function Gate() {
 
     // Cold start: the notification tap that LAUNCHED the app is not delivered to
     // the listener below, so pick it up explicitly — this is what makes a tap open
-    // the offer instead of the home screen when the app was closed.
-    Notifications.getLastNotificationResponseAsync().then(handle).catch(() => {});
+    // the offer instead of the home screen when the app was closed. Defer a tick so
+    // the root navigator is mounted before we push (a push fired too early is
+    // silently dropped, which is the "tap didn't open the offer" cold-start case).
+    const coldStart = setTimeout(() => {
+      Notifications.getLastNotificationResponseAsync().then(handle).catch(() => {});
+    }, 400);
 
     // Warm taps (app already running / backgrounded).
     const sub = Notifications.addNotificationResponseReceivedListener(handle);
-    return () => sub.remove();
+    return () => { clearTimeout(coldStart); sub.remove(); };
   }, [driver, isOwner, router]);
 
   // A stored session we couldn't restore because the server is unreachable:

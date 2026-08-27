@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, FlatList, Pressable, RefreshControl, ActivityIndicator, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Notifications from "expo-notifications";
 import { Text, TextInput } from "@/components/typography";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Search, SlidersHorizontal } from "lucide-react-native";
 import { api, type Offer, type OffersQuery, type FleetDriver } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -95,6 +96,31 @@ export default function OffersScreen() {
     const h = setTimeout(reload, 300);
     return () => clearTimeout(h);
   }, [reload]);
+
+  // Refresh page 1 without the pull-to-refresh spinner — used by the background
+  // triggers (focus / poll / incoming push) so a new offer surfaces on its own.
+  const silentReload = useCallback(async () => {
+    try { await fetchPage(1); } catch { /* keep current list */ }
+  }, [fetchPage]);
+
+  // Only auto-refresh while the driver is at the top of the feed (page 1); a
+  // silent reset to page 1 mustn't yank away pages they scrolled into. A ref
+  // keeps the guard current inside the long-lived listener/interval closures.
+  const atTopRef = useRef(true);
+  useEffect(() => { atTopRef.current = page <= 1 && !loadingMore; }, [page, loadingMore]);
+
+  // Keep the feed live: catch up on focus, poll every 15s, and refresh the moment
+  // a dispatch push lands — so a freshly offered ride appears without a manual pull.
+  useFocusEffect(
+    useCallback(() => {
+      silentReload();
+      const poll = setInterval(() => { if (atTopRef.current) silentReload(); }, 15000);
+      const sub = Notifications.addNotificationReceivedListener(() => {
+        if (atTopRef.current) silentReload();
+      });
+      return () => { clearInterval(poll); sub.remove(); };
+    }, [silentReload]),
+  );
 
   async function loadMore() {
     if (loadingMore || refreshing || page >= lastPage) return;
