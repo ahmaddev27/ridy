@@ -43,7 +43,9 @@ class BackfillOfferGeo extends Command
             if ($offer->geo_synced_at !== null && $offer->distance_m !== null) {
                 $done++;
             }
-            usleep(1_100_000); // ~1.1s between offers — under Nominatim's rate limit
+            // Self-hosted Nominatim/OSRM have no rate limit; a light pause just keeps
+            // the batch from monopolising the local services.
+            usleep(50_000); // 50ms
         }
 
         $this->info("Backfilled geo for {$done}/{$offers->count()} offer(s).");
