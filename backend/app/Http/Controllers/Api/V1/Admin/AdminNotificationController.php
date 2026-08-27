@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Fleet\Models\Driver;
 use App\Http\Controllers\Controller;
 use App\Jobs\SendAdminBroadcast;
 use App\Models\User;
@@ -30,11 +31,21 @@ class AdminNotificationController extends Controller
             'role' => ['nullable', 'string', 'in:'.implode(',', self::TARGETABLE_ROLES)],
             'user_ids' => ['array'],
             'user_ids.*' => ['integer'],
+            'driver_ids' => ['array'],
+            'driver_ids.*' => ['integer'],
         ]);
 
         $userIds = $this->resolveTargetIds($data);
 
-        if ($userIds === []) {
+        // Drivers are always an explicit selection (a separate model/guard); only
+        // activated ones can receive an app push.
+        $driverIds = Driver::withoutGlobalScopes()
+            ->whereIn('id', $data['driver_ids'] ?? [])
+            ->whereNotNull('activated_at')
+            ->pluck('id')
+            ->all();
+
+        if ($userIds === [] && $driverIds === []) {
             return response()->json(['message' => 'no_recipients'], 422);
         }
 
@@ -43,9 +54,10 @@ class AdminNotificationController extends Controller
             $data['title'],
             $data['body'],
             $data['href'] ?? null,
+            $driverIds,
         );
 
-        return response()->json(['queued' => count($userIds)]);
+        return response()->json(['queued' => count($userIds) + count($driverIds)]);
     }
 
     /**

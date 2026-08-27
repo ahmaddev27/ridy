@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Collections\Models\Collector;
+use App\Domain\Fleet\Models\Driver;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +23,7 @@ class UserDirectoryController extends Controller
             ->get()
             ->map(fn (User $u) => [
                 'id' => $u->id,
+                'kind' => 'user',
                 'name' => $u->name,
                 'email' => $u->email,
                 'phone' => $u->phone,
@@ -33,7 +35,27 @@ class UserDirectoryController extends Controller
                 'status' => $u->tenant !== null ? ($u->tenant->stateReason() ?? 'active') : 'active',
             ]);
 
-        return response()->json(['data' => $users]);
+        // Activated app drivers, so a super-admin can send them a test push. They
+        // carry kind:'driver' (their id lives in a separate table from users) and
+        // are pushed via their device tokens, not a bell entry.
+        $drivers = Driver::withoutGlobalScopes()
+            ->whereNotNull('activated_at')
+            ->with('tenant:id,name,status,banned_at,subscription_ends_at')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Driver $d) => [
+                'id' => $d->id,
+                'kind' => 'driver',
+                'name' => $d->name,
+                'email' => $d->email,
+                'phone' => $d->phone,
+                'role' => 'driver',
+                'company' => $d->tenant?->name,
+                'company_id' => $d->tenant_id,
+                'status' => $d->tenant?->stateReason() ?? 'active',
+            ]);
+
+        return response()->json(['data' => $users->concat($drivers)->values()]);
     }
 
     public function destroy(Request $request, User $user): JsonResponse

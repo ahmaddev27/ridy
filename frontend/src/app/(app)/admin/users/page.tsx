@@ -39,8 +39,10 @@ export default function UsersPage() {
   const [roles, setRoles] = useState<Set<string>>(new Set());
   const [confirmDel, setConfirmDel] = useState<PlatformUser | null>(null);
   const [busy, setBusy] = useState(false);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  // Keyed by kind+id — a user and a driver can share the same numeric id.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const rowKey = (u: PlatformUser) => `${u.kind}:${u.id}`;
 
   // Distinct roles present, for the multi-select filter chips.
   const availableRoles = useMemo(() => Array.from(new Set(users.map((u) => u.role))), [users]);
@@ -54,22 +56,22 @@ export default function UsersPage() {
     });
   }, [users, q, roles]);
 
-  function toggleSelected(id: number) {
+  function toggleSelected(key: string) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
 
-  const allVisibleSelected = filtered.length > 0 && filtered.every((u) => selected.has(u.id));
+  const allVisibleSelected = filtered.length > 0 && filtered.every((u) => selected.has(rowKey(u)));
 
   function toggleSelectAll() {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (allVisibleSelected) filtered.forEach((u) => next.delete(u.id));
-      else filtered.forEach((u) => next.add(u.id));
+      if (allVisibleSelected) filtered.forEach((u) => next.delete(rowKey(u)));
+      else filtered.forEach((u) => next.add(rowKey(u)));
       return next;
     });
   }
@@ -165,12 +167,12 @@ export default function UsersPage() {
               </thead>
               <tbody className="divide-y divide-line">
                 {filtered.map((u) => (
-                  <tr key={u.id} className="hover:bg-surface-2">
+                  <tr key={rowKey(u)} className="hover:bg-surface-2">
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
-                        checked={selected.has(u.id)}
-                        onChange={() => toggleSelected(u.id)}
+                        checked={selected.has(rowKey(u))}
+                        onChange={() => toggleSelected(rowKey(u))}
                         aria-label={`select ${u.name}`}
                         className="h-4 w-4 cursor-pointer accent-primary"
                       />
@@ -192,7 +194,7 @@ export default function UsersPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-end">
-                      {u.role !== "super_admin" && (
+                      {u.kind === "user" && u.role !== "super_admin" && (
                         <button
                           onClick={() => setConfirmDel(u)}
                           className="rounded p-1.5 text-ink-subtle hover:bg-danger-bg hover:text-danger-fg"
@@ -225,7 +227,7 @@ export default function UsersPage() {
       <BroadcastModal
         open={broadcastOpen}
         onClose={() => setBroadcastOpen(false)}
-        selectedIds={Array.from(selected)}
+        selected={users.filter((u) => selected.has(rowKey(u)))}
         t={(k) => c(`broadcast.${k}`)}
         roleLabel={(r) => c(`role_${r}`)}
       />

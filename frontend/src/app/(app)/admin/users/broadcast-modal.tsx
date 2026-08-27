@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
-import { broadcastNotification, type BroadcastInput } from "@/lib/api/admin";
+import { broadcastNotification, type BroadcastInput, type PlatformUser } from "@/lib/api/admin";
 
 type Audience = "all" | "role" | "selected";
 
@@ -13,13 +13,13 @@ const ROLES = ["super_admin", "owner", "fleet_manager", "driver", "viewer", "res
 export function BroadcastModal({
   open,
   onClose,
-  selectedIds,
+  selected,
   t,
   roleLabel,
 }: {
   open: boolean;
   onClose: () => void;
-  selectedIds: number[];
+  selected: PlatformUser[];
   /** Translator scoped to `screens.users.broadcast.*`. */
   t: (k: string) => string;
   /** Localized label for a role key (e.g. "super_admin" → "Admin"). */
@@ -45,10 +45,10 @@ export function BroadcastModal({
     body.trim().length > 0 &&
     (audience === "all" ||
       (audience === "role" && role !== "") ||
-      (audience === "selected" && selectedIds.length > 0));
+      (audience === "selected" && selected.length > 0));
 
   async function submit() {
-    if (audience === "selected" && selectedIds.length === 0) {
+    if (audience === "selected" && selected.length === 0) {
       toast.error(t("noRecipients"));
       return;
     }
@@ -58,7 +58,11 @@ export function BroadcastModal({
       if (href.trim()) input.href = href.trim();
       if (audience === "all") input.all = true;
       else if (audience === "role") input.role = role;
-      else input.user_ids = selectedIds;
+      else {
+        // Split the selection back into its two id spaces.
+        input.user_ids = selected.filter((u) => u.kind === "user").map((u) => u.id);
+        input.driver_ids = selected.filter((u) => u.kind === "driver").map((u) => u.id);
+      }
 
       const { queued } = await broadcastNotification(input);
       toast.success(t("queued").replace("{n}", String(queued)));
@@ -114,7 +118,7 @@ export function BroadcastModal({
           <div className="flex flex-wrap gap-1.5">
             {audienceBtn("all", t("audAll"))}
             {audienceBtn("role", t("audRole"))}
-            {audienceBtn("selected", `${t("audSelected")} (${selectedIds.length})`)}
+            {audienceBtn("selected", `${t("audSelected")} (${selected.length})`)}
           </div>
           {audience === "role" && (
             <select
@@ -130,7 +134,7 @@ export function BroadcastModal({
               ))}
             </select>
           )}
-          {audience === "selected" && selectedIds.length === 0 && (
+          {audience === "selected" && selected.length === 0 && (
             <p className="mt-2 text-xs text-ink-subtle">{t("selectHint")}</p>
           )}
         </div>

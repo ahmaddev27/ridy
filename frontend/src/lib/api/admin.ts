@@ -577,6 +577,9 @@ export async function deletePlan(id: number): Promise<void> {
 // ── User directory ───────────────────────────────────────────────────────────
 export type PlatformUser = {
   id: number;
+  /** "user" (manager/admin/reseller) or "driver" (app driver) — their ids come
+   *  from separate tables, so callers must key on kind + id. */
+  kind: "user" | "driver";
   name: string;
   email: string;
   phone: string | null;
@@ -604,6 +607,7 @@ export type BroadcastInput = {
   all?: boolean;
   role?: string;
   user_ids?: number[];
+  driver_ids?: number[];
 };
 
 /** Send a bell + push notification to the chosen audience. Returns how many

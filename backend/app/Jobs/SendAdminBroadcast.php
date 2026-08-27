@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Domain\Notifications\Contracts\PushSender;
+use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Notifications\Notifier;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
@@ -26,15 +28,17 @@ class SendAdminBroadcast implements ShouldQueue
 
     /**
      * @param  array<int, int>  $userIds
+     * @param  array<int, int>  $driverIds  activated app drivers to push (no bell)
      */
     public function __construct(
         private readonly array $userIds,
         private readonly string $title,
         private readonly string $body,
         private readonly ?string $href = null,
+        private readonly array $driverIds = [],
     ) {}
 
-    public function handle(Notifier $notifier): void
+    public function handle(Notifier $notifier, PushSender $sender): void
     {
         $params = ['title' => $this->title, 'body' => $this->body];
 
@@ -46,6 +50,20 @@ class SendAdminBroadcast implements ShouldQueue
                     // One dead push token or transient failure must never abort the batch.
                 }
             });
+        }
+
+        // Drivers get a straight FCM push to every device they're signed in on —
+        // the driver app has no bell inbox, so there's nothing else to write.
+        $data = ['type' => 'admin_broadcast', 'href' => (string) ($this->href ?? '')];
+        foreach (array_chunk($this->driverIds, self::CHUNK) as $chunk) {
+            DeviceToken::withoutGlobalScopes()->whereIn('driver_id', $chunk)->pluck('token')
+                ->each(function (string $token) use ($sender, $data): void {
+                    try {
+                        $sender->send($token, $this->title, $this->body, $data);
+                    } catch (Throwable) {
+                        // A dead token must never abort the batch.
+                    }
+                });
         }
     }
 }
