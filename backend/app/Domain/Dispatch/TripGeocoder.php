@@ -272,7 +272,9 @@ class TripGeocoder
             return null;
         }
 
-        $label = $this->shortGermanLabel($res->json());
+        // tidy() strips a "…, Deutschland" tail the display_name fallback leaves on
+        // POIs (airports, stations) so the map label stays clean "Name, PLZ City".
+        $label = AddressFormatter::tidy($this->shortGermanLabel($res->json()));
 
         DB::table('geocode_cache')->upsert(
             [['query' => $key, 'lat' => $lat, 'lng' => $lng, 'label' => $label, 'confidence' => 'exact', 'updated_at' => now(), 'created_at' => now()]],
@@ -379,10 +381,16 @@ class TripGeocoder
     {
         $a = is_array($hit['address'] ?? null) ? $hit['address'] : [];
 
-        // Street line: road/pedestrian/footway (+ house number), else a named place.
+        // Street line: road/pedestrian/footway (+ house number), else a named place
+        // (airport/station/amenity) so a POI reads "Flughafen Düsseldorf" instead
+        // of collapsing to a bare "PLZ City" or the raw country-tailed display_name.
         $street = $a['road'] ?? $a['pedestrian'] ?? $a['footway'] ?? $a['neighbourhood'] ?? null;
         if ($street !== null && ! empty($a['house_number'])) {
             $street = "{$street} {$a['house_number']}";
+        }
+        if ($street === null) {
+            $name = $hit['name'] ?? $a['aeroway'] ?? $a['amenity'] ?? $a['building'] ?? $a['railway'] ?? null;
+            $street = is_string($name) && trim($name) !== '' ? trim($name) : null;
         }
 
         // City line: the settlement, prefixed with its postal code when present.
