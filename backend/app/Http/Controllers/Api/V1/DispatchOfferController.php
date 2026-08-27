@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Domain\Dispatch\AddressNormalizer;
+use App\Domain\Dispatch\AddressFormatter;
 use App\Domain\Dispatch\DispatchOfferIngestor;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\TripGeocoder;
@@ -63,8 +63,8 @@ class DispatchOfferController extends Controller
                     $offer->rider_first_name,
                     $offer->driver?->name
                         ?? (trim(($offer->driver_first_name ?? '').' '.($offer->driver_last_name ?? '')) ?: null),
-                    $offer->pickup_address,
-                    $offer->dropoff_address,
+                    AddressFormatter::tidy($offer->pickup_address),
+                    AddressFormatter::tidy($offer->dropoff_address),
                     $fare !== null ? number_format($fare, 2, '.', '') : null,
                     $distanceKm !== null ? number_format($distanceKm, 2, '.', '') : null,
                     $pricePerKm !== null ? number_format($pricePerKm, 2, '.', '') : null,
@@ -197,8 +197,8 @@ class DispatchOfferController extends Controller
                 ? ['lat' => $offer->pickup_lat, 'lng' => $offer->pickup_lng] : null,
             'dropoff' => $offer->dropoff_lat !== null
                 ? ['lat' => $offer->dropoff_lat, 'lng' => $offer->dropoff_lng] : null,
-            'pickup_address' => AddressNormalizer::clean($offer->pickup_address),
-            'dropoff_address' => AddressNormalizer::clean($offer->dropoff_address),
+            'pickup_address' => AddressFormatter::tidy($offer->pickup_address),
+            'dropoff_address' => AddressFormatter::tidy($offer->dropoff_address),
             'route_geometry' => $offer->route_geometry, // GeoJSON LineString or null
             'distance_km' => $distanceKm,
             'fare_amount' => $fare,

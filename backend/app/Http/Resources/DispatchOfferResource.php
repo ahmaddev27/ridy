@@ -2,7 +2,7 @@
 
 namespace App\Http\Resources;
 
-use App\Domain\Dispatch\AddressNormalizer;
+use App\Domain\Dispatch\AddressFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -35,8 +35,8 @@ class DispatchOfferResource extends JsonResource
             'rider_first_name' => $this->rider_first_name,
             // Alias the driver app reads as the customer/rider name.
             'rider_name' => $this->rider_first_name,
-            'pickup_address' => AddressNormalizer::clean($this->pickup_address),
-            'dropoff_address' => AddressNormalizer::clean($this->dropoff_address),
+            'pickup_address' => AddressFormatter::tidy($this->pickup_address),
+            'dropoff_address' => AddressFormatter::tidy($this->dropoff_address),
             'fare_formatted' => $this->fare_formatted,
             'fare_amount' => $this->fare_amount !== null ? (float) $this->fare_amount : null,
             // Road distance once the trip is geocoded — lets the driver app show
