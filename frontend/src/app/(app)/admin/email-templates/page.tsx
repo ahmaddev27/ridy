@@ -172,6 +172,25 @@ export default function EmailTemplatesPage() {
               <ToolBtn onClick={() => exec("underline")} title="Underline"><Underline className="h-4 w-4" /></ToolBtn>
               <ToolBtn onClick={() => exec("strikeThrough")} title="Strikethrough"><Strikethrough className="h-4 w-4" /></ToolBtn>
               <span className="mx-1 h-5 w-px bg-line-strong" />
+              <select
+                onChange={(e) => {
+                  if (e.target.value) exec("fontSize", e.target.value);
+                  e.target.value = "";
+                }}
+                defaultValue=""
+                title={c("fontSize")}
+                className="rounded border border-line bg-surface px-1.5 py-1 text-xs text-ink"
+              >
+                <option value="" disabled>
+                  {c("fontSize")}
+                </option>
+                <option value="1">XS</option>
+                <option value="2">S</option>
+                <option value="3">M</option>
+                <option value="5">L</option>
+                <option value="6">XL</option>
+                <option value="7">XXL</option>
+              </select>
               <ToolBtn onClick={() => exec("formatBlock", "H1")} title="Heading 1"><Heading className="h-4 w-4" /></ToolBtn>
               <ToolBtn onClick={() => exec("formatBlock", "H2")} title="Heading 2"><Heading2 className="h-4 w-4" /></ToolBtn>
               <ToolBtn onClick={() => exec("insertUnorderedList")} title="Bulleted list"><List className="h-4 w-4" /></ToolBtn>
