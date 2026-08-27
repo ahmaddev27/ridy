@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { latnLocale } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Building2, Trash2, ChevronLeft, ChevronRight, MailCheck, Power, PowerOff } from "lucide-react";
+import { Building2, Trash2, ChevronLeft, ChevronRight, Power, PowerOff } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { SearchInput } from "@/components/ui/search-input";
 import { Badge, type Status } from "@/components/ui/badge";
@@ -15,13 +15,17 @@ import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { listCompanies, deleteCompany, setCompanyActive, type Company } from "@/lib/api/admin";
 
-type Filter = "all" | "linked" | "proxy" | "expired" | "banned";
+type Filter = "all" | "linked" | "expired" | "banned";
 
 const sessionTone: Record<string, Status> = {
   active: "connected",
   needs_relink: "expiring",
   expired: "error",
 };
+
+/** A paid/free subscription that hasn't lapsed yet. */
+const subActive = (co: Company): boolean =>
+  co.subscription_ends_at !== null && new Date(co.subscription_ends_at).getTime() > Date.now();
 
 export default function CompaniesPage() {
   const { t, locale } = useI18n();
@@ -43,8 +47,6 @@ export default function CompaniesPage() {
         return co.banned;
       case "linked":
         return co.session_status === "active"; // Uber fleet session live
-      case "proxy":
-        return co.has_proxy;
       case "expired":
         return co.state === "expired";
       default:
@@ -68,7 +70,6 @@ export default function CompaniesPage() {
       all: all.length,
       banned: all.filter((c) => c.banned).length,
       linked: all.filter((c) => c.session_status === "active").length,
-      proxy: all.filter((c) => c.has_proxy).length,
       expired: all.filter((c) => c.state === "expired").length,
     }),
     [all],
@@ -122,7 +123,7 @@ export default function CompaniesPage() {
 
       {/* Filter chips */}
       <div className="flex flex-wrap gap-2">
-        {(["all", "linked", "proxy", "expired", "banned"] as Filter[]).map((f) => (
+        {(["all", "linked", "expired", "banned"] as Filter[]).map((f) => (
           <button
             key={f}
             onClick={() => {
@@ -162,7 +163,6 @@ export default function CompaniesPage() {
                   <th className="px-4 py-3 font-semibold">{c("colSession")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colDrivers")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colOffers")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colProxy")}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -179,15 +179,13 @@ export default function CompaniesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col items-start gap-1">
-                        <Badge status={co.status === "active" ? "connected" : "neutral"} dot>
-                          {co.status === "active" ? c("statusActive") : c("statusDisabled")}
+                        <Badge status={subActive(co) ? "connected" : "error"} dot>
+                          {subActive(co) ? c("subOk") : c("subNone")}
                         </Badge>
-                        {co.email_verified ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-success-fg">
-                            <MailCheck className="h-3 w-3" /> {c("emailVerified")}
+                        {co.subscription_ends_at && (
+                          <span className="text-[11px] text-ink-subtle">
+                            {new Date(co.subscription_ends_at).toLocaleDateString(latnLocale(locale))}
                           </span>
-                        ) : (
-                          <span className="text-[11px] text-ink-subtle">{c("emailUnverified")}</span>
                         )}
                       </div>
                     </td>
@@ -202,15 +200,6 @@ export default function CompaniesPage() {
                     </td>
                     <td className="px-4 py-3 text-ink-muted">{co.driver_count.toLocaleString(latnLocale(locale))}</td>
                     <td className="px-4 py-3 text-ink-muted">{co.offer_count.toLocaleString(latnLocale(locale))}</td>
-                    <td className="px-4 py-3">
-                      {co.has_proxy ? (
-                        <span className="rounded bg-success-bg px-2 py-0.5 text-[11px] font-semibold text-success-fg">
-                          {c("proxyDedicated")}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-ink-subtle">{c("proxyGlobal")}</span>
-                      )}
-                    </td>
                     <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <button
