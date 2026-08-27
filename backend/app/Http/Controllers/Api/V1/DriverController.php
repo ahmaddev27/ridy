@@ -72,7 +72,13 @@ class DriverController extends Controller
                     'lat' => (float) $d->latitude,
                     'lng' => (float) $d->longitude,
                     'heading' => $d->heading !== null ? (float) $d->heading : null,
-                    'waypoints' => $d->trip_waypoints,
+                    // Enrich each pickup/dropoff with its nearest town so the map
+                    // can label the point with an address instead of "Pickup".
+                    'waypoints' => collect($d->trip_waypoints ?? [])->map(function ($w) {
+                        $near = PostalCodes::nearest((float) ($w['lat'] ?? 0), (float) ($w['lng'] ?? 0));
+
+                        return array_merge($w, ['city' => $near['city'] ?? null, 'plz' => $near['plz'] ?? null]);
+                    })->all(),
                     'location_updated_at' => $d->location_updated_at,
                 ];
             });
