@@ -2,7 +2,26 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Save, Bold, Heading, Link2, Image as ImageIcon, Braces } from "lucide-react";
+import {
+  Loader2,
+  Save,
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  Heading,
+  Heading2,
+  List,
+  ListOrdered,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Undo2,
+  Redo2,
+  Link2,
+  Image as ImageIcon,
+  Braces,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -149,12 +168,26 @@ export default function EmailTemplatesPage() {
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 border-line-strong bg-surface-2 p-1.5">
               <ToolBtn onClick={() => exec("bold")} title="Bold"><Bold className="h-4 w-4" /></ToolBtn>
-              <ToolBtn onClick={() => exec("formatBlock", "H2")} title="Heading"><Heading className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("italic")} title="Italic"><Italic className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("underline")} title="Underline"><Underline className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("strikeThrough")} title="Strikethrough"><Strikethrough className="h-4 w-4" /></ToolBtn>
+              <span className="mx-1 h-5 w-px bg-line-strong" />
+              <ToolBtn onClick={() => exec("formatBlock", "H1")} title="Heading 1"><Heading className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("formatBlock", "H2")} title="Heading 2"><Heading2 className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("insertUnorderedList")} title="Bulleted list"><List className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("insertOrderedList")} title="Numbered list"><ListOrdered className="h-4 w-4" /></ToolBtn>
+              <span className="mx-1 h-5 w-px bg-line-strong" />
+              <ToolBtn onClick={() => exec("justifyLeft")} title="Align left"><AlignLeft className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("justifyCenter")} title="Align center"><AlignCenter className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("justifyRight")} title="Align right"><AlignRight className="h-4 w-4" /></ToolBtn>
+              <span className="mx-1 h-5 w-px bg-line-strong" />
               <ToolBtn onClick={addLink} title="Link"><Link2 className="h-4 w-4" /></ToolBtn>
               <label className="cursor-pointer rounded p-1.5 text-ink-muted hover:bg-surface-2" title={c("insertImage")}>
                 <ImageIcon className="h-4 w-4" />
                 <input type="file" accept="image/*" className="hidden" onChange={onImage} />
               </label>
+              <ToolBtn onClick={() => exec("undo")} title="Undo"><Undo2 className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("redo")} title="Redo"><Redo2 className="h-4 w-4" /></ToolBtn>
               <span className="mx-1 h-5 w-px bg-line-strong" />
               <span className="px-1 text-xs font-medium text-ink-subtle">{c("variablesLabel")}</span>
               {(active?.variables ?? []).map((v) => (
