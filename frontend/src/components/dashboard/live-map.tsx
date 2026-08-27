@@ -44,6 +44,70 @@ const CAR_IMAGE = "car";
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
+const PIN_PICKUP = "pin-pickup";
+const PIN_DROPOFF = "pin-dropoff";
+
+/**
+ * Draw a map-pin (teardrop) in the given colour on a canvas and return its pixels,
+ * so pickup/dropoff render as clearly-recognisable pins instead of faint dots. The
+ * tip sits at the bottom, matching the symbol layer's "bottom" anchor.
+ */
+function pinImage(color: string): ImageData {
+  const w = 36;
+  const h = 46;
+  const cx = w / 2;
+  const r = 12;
+  const cy = r + 3;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = color;
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 3;
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, Math.PI * 0.75, Math.PI * 0.25); // top ¾ of the head
+  ctx.lineTo(cx, h - 2); // down to the tip
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4.5, 0, Math.PI * 2); // white centre dot
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  return ctx.getImageData(0, 0, w, h);
+}
+
+/**
+ * A round "rider" marker: a coloured disc with a white person silhouette, so the
+ * pickup point reads as "the passenger is here" at a glance.
+ */
+function personImage(color: string): ImageData {
+  const s = 34;
+  const cx = s / 2;
+  const cy = s / 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = s;
+  canvas.height = s;
+  const ctx = canvas.getContext("2d")!;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 14, 0, Math.PI * 2); // coloured disc
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(cx, cy - 4, 4, 0, Math.PI * 2); // head
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy + 8, 7, Math.PI, Math.PI * 2); // shoulders (upper half)
+  ctx.fill();
+  return ctx.getImageData(0, 0, s, s);
+}
+
 /**
  * The live fleet map. Self-contained (own MapLibre instance + polling) so it can
  * be embedded on the dashboard and used full-page alike. `heightClass` sets the
@@ -140,7 +204,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
             const isPickup = (w.type ?? "").toUpperCase().includes("PICKUP");
             pointFeatures.push({
               type: "Feature",
-              properties: { color: isPickup ? "#2563eb" : "#dc2626", label: isPickup ? c("pickup") : c("dropoff") },
+              properties: { icon: isPickup ? PIN_PICKUP : PIN_DROPOFF, label: isPickup ? c("pickup") : c("dropoff") },
               geometry: { type: "Point", coordinates: [w.lng, w.lat] },
             });
             points.push([w.lat, w.lng]);
@@ -192,6 +256,10 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
         // stay pinned to the coordinate and scale with zoom (no DOM-marker drift).
         const img = await map.loadImage("/markers/car.png").catch(() => null);
         if (img && !map.hasImage(CAR_IMAGE)) map.addImage(CAR_IMAGE, img.data);
+        // Pickup = a blue "rider" person marker; dropoff = a red pin — clear
+        // recognisable symbols instead of faint dots.
+        if (!map.hasImage(PIN_PICKUP)) map.addImage(PIN_PICKUP, personImage("#2563eb"));
+        if (!map.hasImage(PIN_DROPOFF)) map.addImage(PIN_DROPOFF, pinImage("#dc2626"));
 
         map.addSource(DRIVER_SOURCE, { type: "geojson", data: EMPTY_FC });
         map.addSource(LINE_SOURCE, { type: "geojson", data: EMPTY_FC });
@@ -206,13 +274,16 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
         });
         map.addLayer({
           id: POINT_SOURCE,
-          type: "circle",
+          type: "symbol",
           source: POINT_SOURCE,
-          paint: {
-            "circle-radius": 5,
-            "circle-color": ["get", "color"],
-            "circle-stroke-color": "#fff",
-            "circle-stroke-width": 2,
+          layout: {
+            "icon-image": ["get", "icon"],
+            "icon-size": ["interpolate", ["linear"], ["zoom"], 6, 0.6, 12, 0.85, 16, 1],
+            // The pin's tip marks the spot (bottom); the round rider marker is
+            // centred on it.
+            "icon-anchor": ["case", ["==", ["get", "icon"], PIN_DROPOFF], "bottom", "center"],
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
           },
         });
 
