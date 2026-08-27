@@ -31,6 +31,16 @@ class DriverAuthController extends Controller
 
     private const MAX_ATTEMPTS = 5;
 
+    /**
+     * App Store review demo account: the app is invite + email-OTP only, so
+     * Apple's reviewer can't receive a code. This single whitelisted email accepts
+     * a fixed code (even in production) so they can sign in. It unlocks ONLY its own
+     * demo driver — no other account is affected. Remove after the app is approved.
+     */
+    private const REVIEW_DEMO_EMAIL = 'aa20589@gmail.com';
+
+    private const REVIEW_DEMO_OTP = '000000';
+
     public function __construct(private readonly DriverInvitationService $invitations) {}
 
     /**
@@ -70,6 +80,23 @@ class DriverAuthController extends Controller
             'email' => ['required', 'email'],
             'otp' => ['required', 'digits:6'],
         ]);
+
+        // App Store reviewer sign-in: the whitelisted demo email + fixed code
+        // bypasses the emailed OTP (they can't receive one), opening only its own
+        // demo driver.
+        if ($this->isReviewDemoLogin($data['email'], $data['otp'])) {
+            $driver = Driver::withoutGlobalScopes()->where('email', self::REVIEW_DEMO_EMAIL)->first();
+            if ($driver !== null) {
+                $this->guardSuspendedTenant($driver->loadMissing('tenant')->tenant);
+                $driver->forceFill([
+                    'activated_at' => $driver->activated_at ?? now(),
+                    'invite_token' => null,
+                    'last_login_at' => now(),
+                ])->save();
+
+                return $this->tokenResponse($driver);
+            }
+        }
 
         $reset = $this->validOtpOrFail($data['email'], $data['otp']);
 
@@ -243,6 +270,13 @@ class DriverAuthController extends Controller
         $owner = $this->findOwnerByEmail($email);
 
         return $owner !== null ? (string) $owner->name : null;
+    }
+
+    /** The App Store reviewer's whitelisted demo email + fixed code (constant-time). */
+    private function isReviewDemoLogin(string $email, string $otp): bool
+    {
+        return strcasecmp($email, self::REVIEW_DEMO_EMAIL) === 0
+            && hash_equals(self::REVIEW_DEMO_OTP, $otp);
     }
 
     /** A dashboard owner/manager matched by email alone (passwordless sign-in). */
