@@ -3,6 +3,7 @@
 namespace App\Domain\Notifications;
 
 use App\Domain\Notifications\Contracts\PushSender;
+use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Notifications\Models\UserPushToken;
 use App\Models\EmailTemplate;
 use App\Models\User;
@@ -132,10 +133,18 @@ class Notifier
         }
     }
 
-    /** Best-effort FCM web push to each of the user's browser tokens. */
+    /**
+     * Best-effort FCM push to every device this user can be reached on: their
+     * browser tokens (UserPushToken) AND their mobile owner-app tokens
+     * (DeviceToken keyed by user_id) — so a broadcast lands on the dashboard and
+     * the phone, not just one of them.
+     */
     private function webPush(User $user, string $type, array $params, ?string $href): void
     {
-        $tokens = UserPushToken::where('user_id', $user->id)->get();
+        $tokens = UserPushToken::where('user_id', $user->id)->pluck('token')
+            ->merge(DeviceToken::withoutGlobalScopes()->where('user_id', $user->id)->pluck('token'))
+            ->unique()
+            ->values();
         if ($tokens->isEmpty()) {
             return;
         }
@@ -145,7 +154,7 @@ class Notifier
 
         foreach ($tokens as $token) {
             try {
-                $this->sender->send($token->token, $copy['title'], $copy['body'], $data);
+                $this->sender->send($token, $copy['title'], $copy['body'], $data);
             } catch (Throwable) {
                 // A dead token or transport hiccup must never break the bell write.
             }
