@@ -114,12 +114,16 @@ export default function OffersScreen() {
   useFocusEffect(
     useCallback(() => {
       silentReload();
+      // Opening the feed clears the app-icon badge and marks offers seen server-side
+      // (owners view read-only and have no driver feed to mark).
+      Notifications.setBadgeCountAsync(0).catch(() => { /* badge unsupported */ });
+      if (!isOwner) api.markOffersSeen().catch(() => { /* offline — retried next focus */ });
       const poll = setInterval(() => { if (atTopRef.current) silentReload(); }, 15000);
       const sub = Notifications.addNotificationReceivedListener(() => {
         if (atTopRef.current) silentReload();
       });
       return () => { clearInterval(poll); sub.remove(); };
-    }, [silentReload]),
+    }, [silentReload, isOwner]),
   );
 
   async function loadMore() {

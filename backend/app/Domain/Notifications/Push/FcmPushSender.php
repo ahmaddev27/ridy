@@ -78,13 +78,26 @@ class FcmPushSender implements PushSender
             $aps['category'] = (string) $data['categoryId'];
         }
 
+        // App-icon badge count (unread offers). iOS sets it straight from the aps
+        // payload; Android carries it as notification_count for launchers that show
+        // a numbered badge. Only when the caller supplied a numeric value.
+        $badge = isset($data['badge']) && is_numeric($data['badge']) ? (int) $data['badge'] : null;
+        if ($badge !== null) {
+            $aps['badge'] = $badge;
+        }
+
+        $androidNotification = ['channel_id' => 'offers', 'sound' => 'default'];
+        if ($badge !== null) {
+            $androidNotification['notification_count'] = $badge;
+        }
+
         return [
             'token' => $token,
             'notification' => ['title' => $title, 'body' => $body],
             'data' => array_map('strval', $data),
             'android' => [
                 'priority' => 'high',
-                'notification' => ['channel_id' => 'offers', 'sound' => 'default'],
+                'notification' => $androidNotification,
             ],
             'apns' => [
                 'headers' => ['apns-priority' => '10'],

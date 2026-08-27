@@ -123,6 +123,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('home', [DriverDashboardController::class, 'home']);
                 Route::get('stats', [DriverDashboardController::class, 'stats']);
                 Route::get('offers', [DriverOfferController::class, 'index']);
+                Route::post('offers/seen', [DriverOfferController::class, 'markSeen']);
             });
         });
 

@@ -3,6 +3,7 @@
 namespace App\Domain\Notifications;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\Contracts\PushSender;
 use App\Domain\Notifications\Models\DeviceToken;
 
@@ -50,11 +51,15 @@ class DispatchNotifier
             'received_at' => optional($offer->received_at)->toIso8601String() ?? '',
         ];
 
+        // The driver's push carries the app-icon badge = offers still unread since
+        // they last opened the feed (owners get their own copy without it).
+        $driverData = $data + ['badge' => (string) $this->unreadCount($offer)];
+
         $tokens = DeviceToken::where('driver_id', $offer->driver_id)->get();
 
         $sent = 0;
         foreach ($tokens as $token) {
-            if ($this->sender->send($token->token, $title, $body, $data)) {
+            if ($this->sender->send($token->token, $title, $body, $driverData)) {
                 $sent++;
             }
         }
@@ -62,6 +67,27 @@ class DispatchNotifier
         $sent += $this->notifyOwners($offer, $title, $body, $data);
 
         return $sent;
+    }
+
+    /**
+     * How many offers this driver has received since they last opened their feed
+     * — the number shown on the app icon. Falls back to the driver's whole history
+     * when they've never opened it. Scope-free: notify runs outside a tenant.
+     */
+    private function unreadCount(DispatchOffer $offer): int
+    {
+        $driver = Driver::withoutGlobalScopes()->find($offer->driver_id);
+        if ($driver === null) {
+            return 0;
+        }
+
+        $query = DispatchOffer::withoutGlobalScopes()->where('driver_id', $offer->driver_id);
+        $since = $driver->offers_seen_at ?? $driver->created_at;
+        if ($since !== null) {
+            $query->where('received_at', '>', $since);
+        }
+
+        return $query->count();
     }
 
     /**

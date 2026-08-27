@@ -32,7 +32,7 @@ class Driver extends Authenticatable
         'uber_picture_url', 'uber_rating', 'uber_total_trips', 'uber_status', 'roster_synced_at',
         'online_status', 'location_updated_at', 'status_synced_at',
         'latitude', 'longitude', 'heading', 'trip_waypoints',
-        'email', 'password', 'locale', 'invite_token', 'invited_at', 'activated_at', 'last_login_at',
+        'email', 'password', 'locale', 'invite_token', 'invited_at', 'activated_at', 'last_login_at', 'offers_seen_at',
     ];
 
     protected $hidden = ['password', 'invite_token'];
@@ -52,6 +52,7 @@ class Driver extends Authenticatable
         'invited_at' => 'datetime',
         'activated_at' => 'datetime',
         'last_login_at' => 'datetime',
+        'offers_seen_at' => 'datetime',
     ];
 
     /** True once the driver has completed activation (set a password) for the app. */

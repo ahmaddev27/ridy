@@ -300,6 +300,11 @@ export class ApiClient {
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return this.request<{ data: Offer[]; meta: PaginationMeta }>(`/api/v1/driver/offers${suffix}`);
   }
+
+  /** Mark the offer feed as seen — clears the server-side unread count (app-icon badge). */
+  markOffersSeen() {
+    return this.request<{ data: { unread: number } }>("/api/v1/driver/offers/seen", { method: "POST" });
+  }
 }
 
 export class ApiError extends Error {

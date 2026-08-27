@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchOfferResource;
 use App\Support\FleetDay;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -26,6 +27,17 @@ class DriverOfferController extends Controller
             ->withQueryString();
 
         return DispatchOfferResource::collection($offers);
+    }
+
+    /**
+     * Mark the driver's offer feed as seen (they opened the list). Resets the
+     * "unread offers" app-icon badge — the next push counts from this moment.
+     */
+    public function markSeen(Request $request): JsonResponse
+    {
+        $request->user()->forceFill(['offers_seen_at' => now()])->save();
+
+        return response()->json(['data' => ['unread' => 0]]);
     }
 
     /** The driver's offers with the list's filters (search / status / date range) applied. */
