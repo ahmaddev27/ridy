@@ -69,8 +69,8 @@ class TripGeocoder
         $offer->dropoff_lat = $dropoff['lat'] ?? null;
         $offer->dropoff_lng = $dropoff['lng'] ?? null;
 
-        $offer->pickup_address = $this->normalizeDisplay($offer->pickup_address, $pickup['address'] ?? null);
-        $offer->dropoff_address = $this->normalizeDisplay($offer->dropoff_address, $dropoff['address'] ?? null);
+        $offer->pickup_address = $this->normalizeDisplay($offer->pickup_address, $pickup);
+        $offer->dropoff_address = $this->normalizeDisplay($offer->dropoff_address, $dropoff);
 
         if ($pickup && $dropoff) {
             $route = $this->route($pickup, $dropoff);
@@ -180,7 +180,11 @@ class TripGeocoder
             }
             if ($st['hit'] !== null && $this->isStation($st['hit'])) {
                 $coords = $this->fromHit($st['hit'], 'area');
-                $coords['address'] = 'Bahnhof, '.$plz.' '.$city;
+                // Use the station's real name ("Solingen Hauptbahnhof") from the
+                // hit rather than a generic "Bahnhof", so a street-less station
+                // pickup shows the actual stop it resolved to.
+                $name = trim(explode(',', (string) ($st['hit']['display_name'] ?? ''))[0]);
+                $coords['address'] = AddressFormatter::format($name !== '' ? $name : 'Bahnhof', $plz, $city);
             } else {
                 $r = $this->queryNominatim($base + ['postalcode' => $plz, 'city' => $city]);
                 if ($r['transient']) {
@@ -398,28 +402,26 @@ class TripGeocoder
     }
 
     /**
-     * Decide the address a driver sees, given the original (from Uber) and the
-     * geocoder's German label:
-     *  - non-Latin original (Arabic/foreign) → replace wholesale, it's unreadable
-     *    and doesn't match Uber anyway.
-     *  - Latin original (Uber's own German) → keep the street exactly as Uber
-     *    sent it and only guarantee the "PLZ City" tail is complete, so the two
-     *    Uber variants ("…, 42117" vs "…, Wuppertal") both end up as "42117
-     *    Wuppertal" without ever shifting the city.
+     * Decide the address a driver sees, given Uber's original text and the
+     * geocoder result (`['address' => label, 'confidence' => …]`). The
+     * {@see AddressFormatter} picks whichever is more complete — the station's
+     * real name for a street-less pickup, the filled-in town for a street-only
+     * one, Uber's own text only when the geocoder had nothing better — then we
+     * guarantee the "PLZ City" tail with the authoritative PLZ→city table
+     * (PLZ ↔ city is 1:1 in Germany) so the town is never wrong.
+     *
+     * @param  array{address?: ?string, confidence?: ?string}|null  $geo
      */
-    private function normalizeDisplay(?string $original, ?string $germanLabel): ?string
+    private function normalizeDisplay(?string $original, ?array $geo): ?string
     {
-        if ($original === null || empty($germanLabel)) {
+        $display = AddressFormatter::canonical($original, $geo);
+        if ($display === null) {
             return $original;
         }
-        if (AddressNormalizer::hasNonLatinLetters($original)) {
-            return $germanLabel;
-        }
 
-        // Prefer the authoritative city from the static PLZ table (PLZ ↔ city is
-        // 1:1 in Germany) so the tail is filled correctly even when Nominatim's
-        // label disagrees; fall back to the geocoder's own city part.
-        return $this->ensureCity($original, $this->authoritativeCity($original) ?? $this->cityPart($germanLabel));
+        $authoritativeCity = $this->authoritativeCity($display);
+
+        return $authoritativeCity !== null ? $this->ensureCity($display, $authoritativeCity) : $display;
     }
 
     /**
@@ -456,15 +458,6 @@ class TripGeocoder
         $city = PostalCodes::city($m[1]);
 
         return $city !== null ? "{$m[1]} {$city}" : null;
-    }
-
-    /** The "PLZ City" tail of a "Street Nr, PLZ City" label (last comma segment). */
-    private function cityPart(string $label): ?string
-    {
-        $parts = array_map('trim', explode(',', $label));
-        $tail = end($parts);
-
-        return $tail !== false && $tail !== '' ? $tail : null;
     }
 
     /**
