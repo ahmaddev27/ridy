@@ -123,13 +123,14 @@ export default function EmailTemplatesPage() {
     <div className="space-y-6">
       <PageHeader tkey="emailTemplates" />
 
-      {/* Template switcher */}
-      <div className="flex gap-2">
+      {/* Template switcher — a single horizontal scroll row so each chip keeps its
+          full width instead of cramming/wrapping. */}
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2">
         {templates.map((tpl) => (
           <button
             key={tpl.key}
             onClick={() => loadInto(tpl)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium ${
+            className={`shrink-0 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium ${
               tpl.key === activeKey ? "bg-primary text-primary-ink" : "bg-surface text-ink-muted hover:bg-surface-2 border border-line"
             }`}
           >
@@ -155,11 +156,12 @@ export default function EmailTemplatesPage() {
                 <input type="file" accept="image/*" className="hidden" onChange={onImage} />
               </label>
               <span className="mx-1 h-5 w-px bg-line-strong" />
+              <span className="px-1 text-xs font-medium text-ink-subtle">{c("variablesLabel")}</span>
               {(active?.variables ?? []).map((v) => (
                 <button
                   key={v}
                   onClick={() => insertVariable(v)}
-                  className="flex items-center gap-1 rounded bg-surface-2 px-2 py-1 text-xs font-medium text-ink hover:bg-surface-2"
+                  className="flex items-center gap-1 rounded bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20"
                   title={c("insertVariable")}
                 >
                   <Braces className="h-3 w-3" /> {v}

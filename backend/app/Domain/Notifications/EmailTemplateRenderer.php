@@ -85,12 +85,12 @@ class EmailTemplateRenderer
 
         return <<<HTML
 <div style="background:#f1f5f9;padding:24px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;color:#1e293b">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border-top:4px solid {$accent};padding:32px;color:#1e293b">
     {$header}
     <div style="font-size:15px;line-height:1.6">{$body}</div>
   </div>
   <p style="max-width:560px;margin:16px auto 0;text-align:center;color:#94a3b8;font-size:12px">{$footer}</p>
-  <style>.btn{display:inline-block;background:{$accent};color:#fff!important;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600;margin-top:8px}</style>
+  <style>.btn{display:inline-block;background:{$accent};color:#fff!important;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600;margin-top:8px}a{color:{$accent}}</style>
 </div>
 HTML;
     }
