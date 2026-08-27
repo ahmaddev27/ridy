@@ -65,8 +65,8 @@ class DispatchOfferIngestor
                 'rider_first_name' => Arr::get($offer, 'riderFirstName'),
                 'driver_first_name' => Arr::get($offer, 'driverInfo.firstName'),
                 'driver_last_name' => Arr::get($offer, 'driverInfo.lastName'),
-                'pickup_address' => AddressNormalizer::clean(Arr::get($offer, 'pickupAddress')),
-                'dropoff_address' => AddressNormalizer::clean(Arr::get($offer, 'dropoffAddress')),
+                'pickup_address' => AddressFormatter::tidy(Arr::get($offer, 'pickupAddress')),
+                'dropoff_address' => AddressFormatter::tidy(Arr::get($offer, 'dropoffAddress')),
                 // Latinize Uber's localized fare so the number parses and displays
                 // in Latin digits regardless of the captured session's language.
                 'fare_formatted' => AddressNormalizer::latinizeDigits(Arr::get($offer, 'formattedUFP')),

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Notifications;
 
+use App\Domain\Dispatch\AddressFormatter;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\Contracts\PushSender;
@@ -213,11 +214,9 @@ class DispatchNotifier
         };
     }
 
-    /** Keep "Street No, Postcode City"; drop the trailing country. */
+    /** Canonical "Street No, PLZ City" for the push — same formatter as everywhere. */
     private function cleanAddress(?string $address): string
     {
-        $address = trim((string) $address);
-
-        return (string) preg_replace('/,\s*(Deutschland|Germany|Alemania|ألمانيا)\s*$/iu', '', $address);
+        return AddressFormatter::tidy($address) ?? '';
     }
 }
