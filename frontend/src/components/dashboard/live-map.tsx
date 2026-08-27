@@ -322,7 +322,11 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-ink">{dr.name}</span>
-                  {dr.phone && <span className="block truncate text-[11px] text-ink-subtle" dir="ltr">{dr.phone}</span>}
+                  {dr.city && (
+                    <span className="block truncate text-[11px] text-ink-subtle">
+                      {dr.plz ? `${dr.plz} ${dr.city}` : dr.city}
+                    </span>
+                  )}
                 </span>
                 <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${PRESENCE_TONE[p]}`}>
                   {c(PRESENCE_LABEL_KEY[p])}

@@ -46,6 +46,34 @@ class PostalCodes
     }
 
     /**
+     * The nearest town to a coordinate — {plz, city} — for a live "current city"
+     * label from a driver's GPS. Network-free: scans the cached centroid table by
+     * squared distance (exact enough for the nearest within a small country).
+     *
+     * @return array{plz: string, city: string}|null
+     */
+    public static function nearest(float $lat, float $lng): ?array
+    {
+        $all = Cache::remember('plz:all:v1', self::TTL, function () {
+            return DB::table('postal_codes')->get(['plz', 'city', 'lat', 'lng'])
+                ->map(fn ($r) => ['plz' => $r->plz, 'city' => $r->city, 'lat' => (float) $r->lat, 'lng' => (float) $r->lng])
+                ->all();
+        });
+
+        $best = null;
+        $bestD = INF;
+        foreach ($all as $row) {
+            $d = ($row['lat'] - $lat) ** 2 + ($row['lng'] - $lng) ** 2;
+            if ($d < $bestD) {
+                $bestD = $d;
+                $best = $row;
+            }
+        }
+
+        return $best !== null ? ['plz' => $best['plz'], 'city' => $best['city']] : null;
+    }
+
+    /**
      * Cached single-row lookup as a plain array (returns null and caches the miss
      * too). A plain array is cached — never the query builder's stdClass, which
      * deserializes to an "incomplete object" under some cache stores.

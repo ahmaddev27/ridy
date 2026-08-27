@@ -8,6 +8,7 @@ use App\Domain\Dispatch\UberSupplierClient;
 use App\Domain\Fleet\DriverStatsService;
 use App\Domain\Fleet\DriverStatusIngestor;
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Geo\PostalCodes;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DriverResource;
@@ -55,18 +56,26 @@ class DriverController extends Controller
             ->whereBetween('longitude', [4.0, 17.0])
             ->where('status_synced_at', '>=', $freshSince)
             ->get()
-            ->map(fn (Driver $d) => [
-                'id' => $d->id,
-                'name' => $d->name,
-                'phone' => $d->phone,
-                'picture' => $d->uber_picture_url,
-                'status' => $d->online_status,
-                'lat' => (float) $d->latitude,
-                'lng' => (float) $d->longitude,
-                'heading' => $d->heading !== null ? (float) $d->heading : null,
-                'waypoints' => $d->trip_waypoints,
-                'location_updated_at' => $d->location_updated_at,
-            ]);
+            ->map(function (Driver $d) {
+                // Reverse the live GPS to the nearest town so the fleet map can show
+                // where each driver currently is (updates every poll).
+                $near = PostalCodes::nearest((float) $d->latitude, (float) $d->longitude);
+
+                return [
+                    'id' => $d->id,
+                    'name' => $d->name,
+                    'phone' => $d->phone,
+                    'city' => $near['city'] ?? null,
+                    'plz' => $near['plz'] ?? null,
+                    'picture' => $d->uber_picture_url,
+                    'status' => $d->online_status,
+                    'lat' => (float) $d->latitude,
+                    'lng' => (float) $d->longitude,
+                    'heading' => $d->heading !== null ? (float) $d->heading : null,
+                    'waypoints' => $d->trip_waypoints,
+                    'location_updated_at' => $d->location_updated_at,
+                ];
+            });
 
         return response()->json(['data' => $drivers]);
     }

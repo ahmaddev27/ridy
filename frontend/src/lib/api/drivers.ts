@@ -99,6 +99,9 @@ export type LiveDriver = {
   id: number;
   name: string;
   phone: string | null;
+  /** Nearest town + postal code to the driver's live GPS (updates each poll). */
+  city: string | null;
+  plz: string | null;
   picture: string | null;
   status: string | null;
   lat: number;
