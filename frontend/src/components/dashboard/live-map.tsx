@@ -3,7 +3,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import { latnLocale } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
-import type { Map as MapLibreMap, Marker, StyleSpecification } from "maplibre-gl";
+import type { Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 import { RefreshCw } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { getLiveDrivers, type LiveDriver, type LiveWaypoint } from "@/lib/api/drivers";
@@ -35,81 +35,24 @@ const OSM_STYLE: StyleSpecification = {
   layers: [{ id: "osm", type: "raster", source: "osm" }],
 };
 
+const DRIVER_SOURCE = "drivers";
+const HALO_LAYER = "driver-halo";
+const CAR_LAYER = "driver-car";
 const LINE_SOURCE = "wp-lines";
 const POINT_SOURCE = "wp-points";
+const CAR_IMAGE = "car";
 
-type DriverMarker = {
-  marker: Marker;
-  /** The car <img> inside the marker element — restyled (rotation) each poll. */
-  car: HTMLImageElement;
-  /** The translucent halo ring behind the car — recolored each poll. */
-  halo: HTMLSpanElement;
-  raf: number | null;
-};
-
-/**
- * Build the DOM element for a driver marker: a fixed-size halo ring with the
- * rotatable car icon centered on top. Mirrors the old Leaflet divIcon + halo.
- */
-function createMarkerElement(): { el: HTMLDivElement; car: HTMLImageElement; halo: HTMLSpanElement } {
-  const el = document.createElement("div");
-  el.style.cssText = "position:relative;width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer";
-
-  const halo = document.createElement("span");
-  halo.style.cssText = "position:absolute;inset:0;border-radius:9999px;border-width:2px;border-style:solid;box-sizing:border-box";
-
-  const car = document.createElement("img");
-  car.src = "/markers/car.png";
-  car.alt = "";
-  car.style.cssText = "position:relative;width:42px;height:42px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))";
-
-  el.appendChild(halo);
-  el.appendChild(car);
-  return { el, car, halo };
-}
-
-function styleHalo(halo: HTMLSpanElement, color: string): void {
-  halo.style.borderColor = hexToRgba(color, 0.5);
-  halo.style.backgroundColor = hexToRgba(color, 0.12);
-}
-
-function hexToRgba(hex: string, alpha: number): string {
-  const h = hex.replace("#", "");
-  const r = parseInt(h.slice(0, 2), 16);
-  const g = parseInt(h.slice(2, 4), 16);
-  const b = parseInt(h.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
-/**
- * Glide a driver's marker from its current point to the new one over a short
- * duration (client-side only — no polling change, no server load), so cars
- * slide smoothly between position updates instead of teleporting.
- */
-function animateTo(entry: DriverMarker, from: { lng: number; lat: number }, to: [number, number]) {
-  if (entry.raf) cancelAnimationFrame(entry.raf);
-  const [lat, lng] = to;
-  const dLat = lat - from.lat;
-  const dLng = lng - from.lng;
-  if (Math.abs(dLat) < 1e-6 && Math.abs(dLng) < 1e-6) {
-    entry.marker.setLngLat([lng, lat]);
-    return;
-  }
-  const DURATION = 1400;
-  const start = performance.now();
-  const step = (now: number) => {
-    const t = Math.min(1, (now - start) / DURATION);
-    entry.marker.setLngLat([from.lng + dLng * t, from.lat + dLat * t]);
-    entry.raf = t < 1 ? requestAnimationFrame(step) : null;
-  };
-  entry.raf = requestAnimationFrame(step);
-}
+const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
 /**
  * The live fleet map. Self-contained (own MapLibre instance + polling) so it can
  * be embedded on the dashboard and used full-page alike. `heightClass` sets the
  * map height; everything else adapts. MapLibre GL runs on the free, token-less
  * OpenStreetMap raster style above.
+ *
+ * Drivers are drawn as a MapLibre SYMBOL layer (the car icon is painted onto the
+ * map canvas), not DOM markers — so a car stays pinned exactly to its coordinate
+ * and scales with the map on zoom instead of floating/drifting above it.
  */
 export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) {
   const { t, locale } = useI18n();
@@ -120,9 +63,6 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
   const MRef = useRef<typeof import("maplibre-gl") | null>(null);
   const readyRef = useRef(false);
   const firstFitRef = useRef(true);
-  // One persistent marker per driver, so positions animate (tween) between polls
-  // instead of the whole layer being cleared and redrawn (which made cars "jump").
-  const markersRef = useRef<Map<number, DriverMarker>>(new Map());
   // Last-known pickup/drop-off per driver, kept for the whole engaged trip — Uber
   // trims the pickup once ON_TRIP, so cache them so the stops never vanish mid-trip.
   const waypointsRef = useRef<Map<number, LiveWaypoint[]>>(new Map());
@@ -133,7 +73,9 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
   /** Pan + zoom the map onto one driver (from the side list). */
   function focusDriver(dr: LiveDriver) {
-    mapRef.current?.flyTo({ center: [dr.lng, dr.lat], zoom: 16 });
+    // essential:true so the fly still happens under a "prefers-reduced-motion" OS
+    // setting (MapLibre otherwise skips the camera animation).
+    mapRef.current?.flyTo({ center: [dr.lng, dr.lat], zoom: 16, essential: true });
   }
 
   useEffect(() => {
@@ -151,53 +93,31 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
       }
       if (cancelled) return;
 
-      const maplibregl = MRef.current;
-      if (!maplibregl) return;
-
-      const registry = markersRef.current;
       const points: [number, number][] = [];
-      const seen = new Set<number>();
+      const driverFeatures: GeoJSON.Feature[] = [];
       const lineFeatures: GeoJSON.Feature[] = [];
       const pointFeatures: GeoJSON.Feature[] = [];
 
       for (const d of drivers) {
         const color = STATUS_COLOR(d.status);
-        const to: [number, number] = [d.lat, d.lng];
-        points.push(to);
-        seen.add(d.id);
+        points.push([d.lat, d.lng]);
 
-        const rot = typeof d.heading === "number" ? d.heading : 0;
-        const popupHtml = `<b>${escapeHtml(d.name)}</b><br>${escapeHtml(statusLabel(d.status, c))}`;
+        driverFeatures.push({
+          type: "Feature",
+          properties: {
+            color,
+            heading: typeof d.heading === "number" ? d.heading : 0,
+            name: d.name,
+            label: statusLabel(d.status, c),
+          },
+          geometry: { type: "Point", coordinates: [d.lng, d.lat] },
+        });
 
-        let entry = registry.get(d.id);
-        if (!entry) {
-          // First sighting — create the halo + car marker at the position.
-          const { el, car, halo } = createMarkerElement();
-          styleHalo(halo, color);
-          car.style.transform = `rotate(${rot}deg)`;
-          const marker = new maplibregl.Marker({ element: el })
-            .setLngLat([d.lng, d.lat])
-            .setPopup(new maplibregl.Popup({ offset: 24, closeButton: false }).setHTML(popupHtml))
-            .addTo(map);
-          entry = { marker, car, halo, raf: null };
-          registry.set(d.id, entry);
-        } else {
-          // Existing — glide from the current spot to the new one; refresh style.
-          styleHalo(entry.halo, color);
-          entry.car.style.transform = `rotate(${rot}deg)`;
-          entry.marker.getPopup()?.setHTML(popupHtml);
-          animateTo(entry, entry.marker.getLngLat(), to);
-        }
-
-        // Draw the ACTIVE leg from the car itself to its current target: heading
-        // to pickup (en route) → car → pickup; rider aboard (on trip) → car →
-        // drop-off. So the line always originates at the driver, not between the
-        // two stops. Colored by presence so the leg reads at a glance.
+        // The ACTIVE leg from the car to its current target: heading to pickup (en
+        // route) or drop-off (on trip). Colored by presence so it reads at a glance.
         const phase = presence(d.status);
         const engaged = phase === "on_trip" || phase === "en_route";
         const wpCache = waypointsRef.current;
-        // Cache fresh waypoints; while engaged, fall back to the cached set when a
-        // poll trims them (so ON_TRIP keeps showing both pickup and drop-off).
         let wp = d.waypoints ?? [];
         if (wp.length > 0) wpCache.set(d.id, wp);
         else if (engaged && wpCache.has(d.id)) wp = wpCache.get(d.id)!;
@@ -214,7 +134,6 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
               properties: { color },
               geometry: { type: "LineString", coordinates: [[d.lng, d.lat], [target.lng, target.lat]] },
             });
-            points.push([d.lat, d.lng]); // keep the car in view when fitting
           }
 
           for (const w of wp) {
@@ -229,17 +148,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
         }
       }
 
-      // Remove drivers that dropped off the feed.
-      for (const [id, entry] of registry) {
-        if (!seen.has(id)) {
-          if (entry.raf) cancelAnimationFrame(entry.raf);
-          entry.marker.remove();
-          registry.delete(id);
-          waypointsRef.current.delete(id);
-        }
-      }
-
-      // Push the fresh waypoint geometry into the two GeoJSON sources.
+      (map.getSource(DRIVER_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: driverFeatures });
       (map.getSource(LINE_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: lineFeatures });
       (map.getSource(POINT_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: pointFeatures });
 
@@ -249,6 +158,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
       if (firstFitRef.current && points.length > 0) {
         firstFitRef.current = false;
+        const maplibregl = MRef.current!;
         if (points.length === 1) {
           map.setCenter([points[0][1], points[0][0]]);
           map.setZoom(15);
@@ -276,9 +186,18 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
       map.on("load", async () => {
         if (cancelled) return;
-        // Route line + pickup/dropoff dot layers, fed by GeoJSON sources refreshed each poll.
-        map.addSource(LINE_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-        map.addSource(POINT_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+
+        // Load the car icon once, then draw drivers as a symbol layer with a
+        // status-colored halo beneath — both painted on the map canvas so they
+        // stay pinned to the coordinate and scale with zoom (no DOM-marker drift).
+        const img = await map.loadImage("/markers/car.png").catch(() => null);
+        if (img && !map.hasImage(CAR_IMAGE)) map.addImage(CAR_IMAGE, img.data);
+
+        map.addSource(DRIVER_SOURCE, { type: "geojson", data: EMPTY_FC });
+        map.addSource(LINE_SOURCE, { type: "geojson", data: EMPTY_FC });
+        map.addSource(POINT_SOURCE, { type: "geojson", data: EMPTY_FC });
+
+        // Route leg + pickup/dropoff dots (drawn under the cars).
         map.addLayer({
           id: LINE_SOURCE,
           type: "line",
@@ -296,16 +215,54 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
             "circle-stroke-width": 2,
           },
         });
-        // Waypoint dots open a pickup/dropoff popup on click (like the old bindPopup).
+
+        // Status halo behind each car.
+        map.addLayer({
+          id: HALO_LAYER,
+          type: "circle",
+          source: DRIVER_SOURCE,
+          paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 7, 12, 12, 16, 18],
+            "circle-color": ["get", "color"],
+            "circle-opacity": 0.18,
+            "circle-stroke-color": ["get", "color"],
+            "circle-stroke-width": 2,
+            "circle-stroke-opacity": 0.6,
+          },
+        });
+        // The car icon, rotated by heading, scaled up as you zoom in.
+        map.addLayer({
+          id: CAR_LAYER,
+          type: "symbol",
+          source: DRIVER_SOURCE,
+          layout: {
+            "icon-image": CAR_IMAGE,
+            "icon-size": ["interpolate", ["linear"], ["zoom"], 6, 0.14, 12, 0.22, 16, 0.32],
+            "icon-rotate": ["get", "heading"],
+            "icon-rotation-alignment": "map",
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+          },
+        });
+
+        // Tapping a car shows the driver's name + status; a waypoint dot its label.
+        map.on("click", CAR_LAYER, (e) => {
+          const f = e.features?.[0];
+          if (!f) return;
+          const [lng, lat] = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+          const html = `<b>${escapeHtml(String(f.properties?.name ?? ""))}</b><br>${escapeHtml(String(f.properties?.label ?? ""))}`;
+          new maplibregl.Popup({ offset: 16, closeButton: false }).setLngLat([lng, lat]).setHTML(html).addTo(map);
+        });
         map.on("click", POINT_SOURCE, (e) => {
           const f = e.features?.[0];
           if (!f) return;
-          const label = String(f.properties?.label ?? "");
           const [lng, lat] = (f.geometry as GeoJSON.Point).coordinates as [number, number];
-          new maplibregl.Popup({ offset: 8, closeButton: false }).setLngLat([lng, lat]).setText(label).addTo(map);
+          new maplibregl.Popup({ offset: 8, closeButton: false }).setLngLat([lng, lat]).setText(String(f.properties?.label ?? "")).addTo(map);
         });
-        map.on("mouseenter", POINT_SOURCE, () => { map.getCanvas().style.cursor = "pointer"; });
-        map.on("mouseleave", POINT_SOURCE, () => { map.getCanvas().style.cursor = ""; });
+        for (const layer of [CAR_LAYER, POINT_SOURCE]) {
+          map.on("mouseenter", layer, () => { map.getCanvas().style.cursor = "pointer"; });
+          map.on("mouseleave", layer, () => { map.getCanvas().style.cursor = ""; });
+        }
 
         readyRef.current = true;
         await refresh();
@@ -316,11 +273,6 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
     return () => {
       cancelled = true;
       clearInterval(timer);
-      // Stop any in-flight marker animations before tearing down the map.
-      for (const entry of markersRef.current.values()) {
-        if (entry.raf) cancelAnimationFrame(entry.raf);
-      }
-      markersRef.current.clear();
       readyRef.current = false;
       mapRef.current?.remove();
       mapRef.current = null;
