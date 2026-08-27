@@ -222,7 +222,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
           type: "circle",
           source: DRIVER_SOURCE,
           paint: {
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 7, 12, 12, 16, 18],
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 9, 12, 16, 16, 24],
             "circle-color": ["get", "color"],
             "circle-opacity": 0.18,
             "circle-stroke-color": ["get", "color"],
@@ -237,7 +237,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
           source: DRIVER_SOURCE,
           layout: {
             "icon-image": CAR_IMAGE,
-            "icon-size": ["interpolate", ["linear"], ["zoom"], 6, 0.14, 12, 0.22, 16, 0.32],
+            "icon-size": ["interpolate", ["linear"], ["zoom"], 6, 0.2, 12, 0.32, 16, 0.46],
             "icon-rotate": ["get", "heading"],
             "icon-rotation-alignment": "map",
             "icon-allow-overlap": true,
