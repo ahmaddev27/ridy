@@ -7,11 +7,14 @@ use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureUserAccount;
 use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\VerifyDispatchSecret;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Support\Facades\Log;
+use Laravel\Sanctum\PersonalAccessToken;
 use Sentry\Laravel\Integration;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -63,6 +66,30 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );
+
+        // TEMPORARY diagnostic: every driver-endpoint 401 flows through here.
+        // Log (at error level) exactly WHY the token was rejected so the recurring
+        // "session_invalidated" logout can be pinned. Returns null so the normal
+        // 401 JSON still renders. Remove once the root cause is confirmed.
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if ($request->is('api/v1/driver/*') && ! $request->is('api/v1/driver/fleet/*')) {
+                $bearer = $request->bearerToken();
+                $pat = $bearer !== null && $bearer !== '' ? PersonalAccessToken::findToken($bearer) : null;
+
+                Log::error('driver_auth_401', [
+                    'path' => $request->path(),
+                    'token_state' => match (true) {
+                        $bearer === null || $bearer === '' => 'no_bearer',
+                        $pat === null => 'token_not_found',
+                        $pat->tokenable === null => 'orphan_driver_deleted',
+                        default => 'resolves_ok_but_guard_rejected',
+                    },
+                    'tokenable_id' => $pat?->tokenable_id,
+                ]);
+            }
+
+            return null;
+        });
         // Report exceptions to Sentry (no-op unless SENTRY_LARAVEL_DSN is set).
         // Guarded so a missing package (e.g. a stale image) never fatals boot.
         if (class_exists(Integration::class)) {
