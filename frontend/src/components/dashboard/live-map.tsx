@@ -202,9 +202,10 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
           for (const w of wp) {
             const isPickup = (w.type ?? "").toUpperCase().includes("PICKUP");
-            // Label the point with its address (nearest town + postcode); fall back
-            // to the generic Pickup/Dropoff word only when the town is unknown.
-            const addr = w.city ? (w.plz ? `${w.plz} ${w.city}` : w.city) : isPickup ? c("pickup") : c("dropoff");
+            // Label with the full street address; fall back to town+postcode, then
+            // to the generic Pickup/Dropoff word only when nothing is known.
+            const town = w.city ? (w.plz ? `${w.plz} ${w.city}` : w.city) : null;
+            const addr = w.address || town || (isPickup ? c("pickup") : c("dropoff"));
             pointFeatures.push({
               type: "Feature",
               properties: { icon: isPickup ? PIN_PICKUP : PIN_DROPOFF, label: addr },

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
+use App\Domain\Dispatch\TripGeocoder;
 use App\Domain\Dispatch\UberSupplierClient;
 use App\Domain\Fleet\DriverStatsService;
 use App\Domain\Fleet\DriverStatusIngestor;
@@ -38,7 +39,7 @@ class DriverController extends Controller
      * drivers to 0,0, which the ingestor stores as null — so the map naturally
      * shows only active trips, each with its pickup/dropoff waypoints.
      */
-    public function live(): JsonResponse
+    public function live(TripGeocoder $geo): JsonResponse
     {
         // Only show genuinely-live positions: a driver whose status hasn't been
         // synced within this window (dead session / closed extension) must drop
@@ -56,7 +57,7 @@ class DriverController extends Controller
             ->whereBetween('longitude', [4.0, 17.0])
             ->where('status_synced_at', '>=', $freshSince)
             ->get()
-            ->map(function (Driver $d) {
+            ->map(function (Driver $d) use ($geo) {
                 // Reverse the live GPS to the nearest town so the fleet map can show
                 // where each driver currently is (updates every poll).
                 $near = PostalCodes::nearest((float) $d->latitude, (float) $d->longitude);
@@ -72,12 +73,19 @@ class DriverController extends Controller
                     'lat' => (float) $d->latitude,
                     'lng' => (float) $d->longitude,
                     'heading' => $d->heading !== null ? (float) $d->heading : null,
-                    // Enrich each pickup/dropoff with its nearest town so the map
-                    // can label the point with an address instead of "Pickup".
-                    'waypoints' => collect($d->trip_waypoints ?? [])->map(function ($w) {
-                        $near = PostalCodes::nearest((float) ($w['lat'] ?? 0), (float) ($w['lng'] ?? 0));
+                    // Enrich each pickup/dropoff with a full street address (reverse
+                    // geocoded + cached) and the nearest town as a fallback, so the
+                    // map can label the point with a real address instead of "Pickup".
+                    'waypoints' => collect($d->trip_waypoints ?? [])->map(function ($w) use ($geo) {
+                        $lat = (float) ($w['lat'] ?? 0);
+                        $lng = (float) ($w['lng'] ?? 0);
+                        $near = PostalCodes::nearest($lat, $lng);
 
-                        return array_merge($w, ['city' => $near['city'] ?? null, 'plz' => $near['plz'] ?? null]);
+                        return array_merge($w, [
+                            'address' => $geo->reverse($lat, $lng),
+                            'city' => $near['city'] ?? null,
+                            'plz' => $near['plz'] ?? null,
+                        ]);
                     })->all(),
                     'location_updated_at' => $d->location_updated_at,
                 ];

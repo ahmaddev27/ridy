@@ -93,7 +93,7 @@ export async function updateDriverEmail(id: number, email: string | null): Promi
 }
 
 // ── Live map ─────────────────────────────────────────────────────────────────
-export type LiveWaypoint = { lat: number; lng: number; type: string | null; city?: string | null; plz?: string | null };
+export type LiveWaypoint = { lat: number; lng: number; type: string | null; address?: string | null; city?: string | null; plz?: string | null };
 
 export type LiveDriver = {
   id: number;

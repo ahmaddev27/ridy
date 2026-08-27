@@ -232,6 +232,54 @@ class TripGeocoder
     }
 
     /**
+     * Coordinate → a full German street address ("Street 12, 42117 Wuppertal"),
+     * cached in geocode_cache keyed by the rounded point so a fixed pickup/dropoff
+     * is reverse-geocoded once. Returns null on a transient failure (not cached)
+     * so a later call can still resolve it.
+     */
+    public function reverse(float $lat, float $lng): ?string
+    {
+        if (abs($lat) < 0.0001 && abs($lng) < 0.0001) {
+            return null;
+        }
+
+        $key = 'rev|'.round($lat, 5).','.round($lng, 5);
+        $cached = DB::table('geocode_cache')->where('query', $key)->first();
+        if ($cached !== null) {
+            return $cached->label !== null && $cached->label !== '' ? $cached->label : null;
+        }
+
+        try {
+            $res = Http::withHeaders(['User-Agent' => self::UA])
+                ->timeout(5)
+                ->get(rtrim((string) config('services.geo.nominatim_url'), '/').'/reverse', [
+                    'lat' => $lat,
+                    'lon' => $lng,
+                    'format' => 'json',
+                    'accept-language' => 'de',
+                    'addressdetails' => 1,
+                    'zoom' => 18,
+                ]);
+        } catch (\Throwable $e) {
+            return null; // transient — do NOT cache, retry next poll
+        }
+
+        if (! $res->ok()) {
+            return null;
+        }
+
+        $label = $this->shortGermanLabel($res->json());
+
+        DB::table('geocode_cache')->upsert(
+            [['query' => $key, 'lat' => $lat, 'lng' => $lng, 'label' => $label, 'confidence' => 'exact', 'updated_at' => now(), 'created_at' => now()]],
+            ['query'],
+            ['lat', 'lng', 'label', 'confidence', 'updated_at'],
+        );
+
+        return $label;
+    }
+
+    /**
      * The trip's overall geo confidence: the weaker of the two endpoints (a
      * distance is only as trustworthy as its worse point). Downgraded to
      * `estimated` when the route has no road geometry — OSRM was unreachable, so
