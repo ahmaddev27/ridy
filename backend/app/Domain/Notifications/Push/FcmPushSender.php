@@ -3,6 +3,7 @@
 namespace App\Domain\Notifications\Push;
 
 use App\Domain\Notifications\Contracts\PushSender;
+use App\Domain\Notifications\Models\DeviceToken;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -39,9 +40,24 @@ class FcmPushSender implements PushSender
 
         if (! $response->successful()) {
             Log::warning('push.fcm_failed', ['status' => $response->status(), 'body' => $response->body()]);
+
+            // A token FCM reports as UNREGISTERED / NotRegistered is permanently
+            // dead (app uninstalled, data cleared, or the token rotated). Delete it
+            // so it stops failing on every future offer and no longer lingers as a
+            // ghost device that "still gets notifications" after a sign-out.
+            if ($this->isDeadToken($response->status(), (string) $response->body())) {
+                DeviceToken::withoutGlobalScopes()->where('token', $deviceToken)->delete();
+            }
         }
 
         return $response->successful();
+    }
+
+    /** FCM's permanent "this token no longer exists" verdict (404 UNREGISTERED). */
+    private function isDeadToken(int $status, string $body): bool
+    {
+        return $status === 404
+            && (str_contains($body, 'UNREGISTERED') || str_contains($body, 'NotRegistered'));
     }
 
     /**
