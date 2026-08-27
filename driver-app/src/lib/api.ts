@@ -111,12 +111,18 @@ export class ApiClient {
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    // Capture the token AT SEND TIME. Re-reading this.token when the 401 response
+    // arrives is a race: a request sent with NO token (a tab that loaded a frame
+    // before restore() set it) would be judged "authenticated" if restore set the
+    // token in the meantime, and would then tear down the freshly-restored
+    // session — the recurring logout on app reopen.
+    const sentToken = this.token;
     const res = await fetch(BASE + path, {
       ...init,
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
+        ...(sentToken ? { Authorization: `Bearer ${sentToken}` } : {}),
         ...(init.headers ?? {}),
       },
     });
@@ -132,7 +138,7 @@ export class ApiClient {
       // 401 with no token set is a call that raced ahead of session restore (e.g.
       // a screen opened from a notification on cold start) — treating it as a dead
       // session would wipe the still-valid stored token before restore reads it.
-      const authenticated = this.token !== null;
+      const authenticated = sentToken !== null;
       const sessionDead =
         authenticated &&
         ((res.status === 403 && body?.message === "account_suspended") ||
