@@ -15,7 +15,7 @@ Schedule::command('offers:expire-pending')->everyMinute()->withoutOverlapping();
 Schedule::command('offers:finalize-stale')->everyFiveMinutes()->withoutOverlapping();
 
 // Backfill trip geocoding for offers whose lazy enrich failed (rate-limited services).
-Schedule::command('offers:backfill-geo')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('offers:backfill-geo --limit=100')->everyFiveMinutes()->withoutOverlapping();
 
 // Daily heads-up notifications: subscriptions/proxies expiring or expired.
 Schedule::command('notifications:scan')->dailyAt('08:00')->withoutOverlapping();
