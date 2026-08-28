@@ -12,6 +12,15 @@ export function fleetNow(ref: Date = new Date()): Date {
   return new Date(ref.getTime() - FLEET_DAY_START_HOUR * 3600 * 1000);
 }
 
+/** Fleet-day of the Monday that opens the current fleet-week (week starts Monday). */
+export function fleetWeekStart(ref: Date = new Date()): Date {
+  const d = fleetNow(ref);
+  const back = (d.getDay() + 6) % 7; // days since Monday (getDay: 0=Sun..6=Sat)
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - back);
+  return monday;
+}
+
 /** yyyy-mm-dd of the fleet-day for the given moment (now by default). */
 export function fleetYmd(ref: Date = new Date()): string {
   const d = fleetNow(ref);

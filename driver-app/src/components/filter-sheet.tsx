@@ -6,7 +6,7 @@ import { useColors, radius, isDarkPalette } from "@/lib/theme";
 import { t, isRTL } from "@/lib/i18n";
 
 export type SortKey = "new" | "rate" | "total";
-export type DayKey = "all" | "today" | "week";
+export type DayKey = "all" | "today" | "yesterday" | "week";
 export type StatusKey = "all" | "pending" | "accepted" | "completed" | "rejected" | "canceled";
 
 export type OfferFilters = { sort: SortKey; day: DayKey; status: StatusKey };
@@ -83,6 +83,7 @@ function SheetBody({ c, value, onApply, onClose }: { c: ReturnType<typeof useCol
           options={[
             { k: "all", label: t("filter.all") },
             { k: "today", label: t("filter.today") },
+            { k: "yesterday", label: t("filter.yesterday") },
             { k: "week", label: t("filter.week") },
           ]}
           selected={draft.day}

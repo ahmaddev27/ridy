@@ -9,7 +9,7 @@ import { api, type Offer, type OffersQuery, type FleetDriver } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, getLocale } from "@/lib/i18n";
 import { useColors, radius, isDarkPalette } from "@/lib/theme";
-import { fleetNow } from "@/lib/fleet-day";
+import { fleetNow, fleetWeekStart } from "@/lib/fleet-day";
 import { OfferCard } from "@/components/offer-card";
 import { FilterSheet, DEFAULT_FILTERS, type OfferFilters, type SortKey } from "@/components/filter-sheet";
 
@@ -27,8 +27,13 @@ function ymd(d: Date): string {
 function dateWindow(day: OfferFilters["day"]): { from?: string; to?: string } {
   if (day === "all") return {};
   const now = fleetNow();
-  const start = new Date(now);
-  if (day === "week") start.setDate(now.getDate() - 6);
+  if (day === "yesterday") {
+    const y = new Date(now);
+    y.setDate(now.getDate() - 1);
+    return { from: ymd(y), to: ymd(y) };
+  }
+  // "week" is the current fleet-week from Monday 04:00; "today" is now's fleet-day.
+  const start = day === "week" ? fleetWeekStart() : new Date(now);
   return { from: ymd(start), to: ymd(now) };
 }
 

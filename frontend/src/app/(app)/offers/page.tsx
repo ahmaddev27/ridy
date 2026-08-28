@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { listOffersPaged, getOfferStats, exportOffers, fareLabel, type DispatchOffer, type OfferStatus, type PageMeta, type OfferStats } from "@/lib/api/offers";
-import { fleetNow } from "@/lib/fleet-day";
+import { fleetNow, fleetWeekStart } from "@/lib/fleet-day";
 
 /** Format a Date as a local `yyyy-mm-dd` string for a native date input. */
 function ymd(d: Date): string {
@@ -63,7 +63,7 @@ export default function OffersPage() {
   // Which quick-range chip is active (today / week / month), or null for a
   // manual range. Tracked separately so the chip can highlight and manual edits
   // clear it.
-  const [datePreset, setDatePreset] = useState<"today" | "week" | "month" | null>(null);
+  const [datePreset, setDatePreset] = useState<"today" | "yesterday" | "week" | "month" | null>(null);
   const [meta, setMeta] = useState<PageMeta | null>(null);
   const [stats, setStats] = useState<OfferStats | null>(null);
 
@@ -168,14 +168,22 @@ export default function OffersPage() {
     setDriverUuids((prev) => (prev.includes(uuid) ? prev.filter((x) => x !== uuid) : [...prev, uuid]));
   }
 
-  /** Apply a rolling quick-range: today, last 7 days, or last 30 days.
-   *  Anchored to the fleet-day (Uber day starts 04:00), so "today" before 04:00
-   *  is still yesterday — matching the backend's date windows. */
-  function applyPreset(preset: "today" | "week" | "month") {
+  /** Apply a quick-range: today, yesterday, the current week (from Monday), or
+   *  the last 30 days. Anchored to the fleet-day (Uber day starts 04:00), so
+   *  "today" before 04:00 is still yesterday — matching the backend's windows. */
+  function applyPreset(preset: "today" | "yesterday" | "week" | "month") {
     const now = fleetNow();
-    const start = new Date(now);
-    if (preset === "week") start.setDate(now.getDate() - 6);
-    else if (preset === "month") start.setDate(now.getDate() - 29);
+    if (preset === "yesterday") {
+      const y = new Date(now);
+      y.setDate(now.getDate() - 1);
+      setFrom(ymd(y));
+      setTo(ymd(y));
+      setDatePreset(preset);
+      setPage(1);
+      return;
+    }
+    const start = preset === "week" ? fleetWeekStart() : new Date(now);
+    if (preset === "month") start.setDate(now.getDate() - 29);
     setFrom(ymd(start));
     setTo(ymd(now));
     setDatePreset(preset);
@@ -267,7 +275,7 @@ export default function OffersPage() {
 
         {/* Quick ranges: today / last 7 days / last 30 days */}
         <div className="flex items-center gap-1 rounded-lg border border-line bg-surface p-1">
-          {(["today", "week", "month"] as const).map((p) => (
+          {(["today", "yesterday", "week", "month"] as const).map((p) => (
             <button
               key={p}
               onClick={() => applyPreset(p)}
@@ -277,7 +285,7 @@ export default function OffersPage() {
                   : "text-ink-muted hover:bg-surface-2 hover:text-ink"
               }`}
             >
-              {c(p === "today" ? "presetToday" : p === "week" ? "presetWeek" : "presetMonth")}
+              {c(p === "today" ? "presetToday" : p === "yesterday" ? "presetYesterday" : p === "week" ? "presetWeek" : "presetMonth")}
             </button>
           ))}
         </div>
