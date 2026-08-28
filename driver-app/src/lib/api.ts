@@ -50,6 +50,9 @@ export type FleetHomeData = {
   recent: Offer[];
 };
 
+/** One fleet-day's income (SUM of completed fares), keyed by its 04:00 date. */
+export type DailyIncome = { date: string; income: number };
+
 /** Aggregate counters returned by the home + stats endpoints. */
 export type DriverStats = {
   total: number;
@@ -59,6 +62,8 @@ export type DriverStats = {
   acceptance_rate: number;
   earnings: number;
   km: number;
+  /** Per-fleet-day income for the requested window; present on the stats endpoints. */
+  daily?: DailyIncome[];
 };
 
 export type HomeData = {

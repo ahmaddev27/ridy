@@ -3,7 +3,7 @@ import { View, ScrollView, RefreshControl, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useFocusEffect } from "expo-router";
-import { api, type DriverStats, type Offer } from "@/lib/api";
+import { api, type DriverStats, type DailyIncome } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius, cardStyle } from "@/lib/theme";
@@ -41,29 +41,29 @@ export default function StatisticsScreen() {
   const [range, setRange] = useState<Range>("week");
   const [day, setDay] = useState<Date | null>(null); // tapping a chart bar filters to one day
   const [stats, setStats] = useState<DriverStats | null>(null);
-  const [week, setWeek] = useState<Offer[]>([]);
+  const [daily, setDaily] = useState<DailyIncome[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (r: Range, d: Date | null) => {
     setRefreshing(true);
     try {
       // Stats for the picked day (if any) or the selected range; the chart always
-      // shows the last 7 days so you can tap another bar.
+      // shows the current week so you can tap another bar.
       const window = d ? { from: ymd(d), to: ymd(d) } : rangeDates(r);
       // The bar chart always shows the current week (Mon–Sun), independent of the
-      // selected range.
+      // selected range. Its per-day totals come from the backend `daily` aggregate
+      // (SUM of fares GROUP BY fleet-day) — not from client-side bucketing of the
+      // truncated offers list, which dropped every day past the newest ~100 rows.
       const w = rangeDates("week");
       // A fleet owner authenticates on a User token; the driver endpoints
       // (auth:driver) would 401 and log them out. Use the tenant-wide fleet
       // endpoints for owners, the personal ones for a driver.
-      const [s, o] = await Promise.all([
+      const [s, wk] = await Promise.all([
         isOwner ? api.fleetStats(window.from, window.to) : api.stats(window.from, window.to),
-        isOwner
-          ? api.fleetOffers({ from: w.from, to: w.to, per_page: 100 })
-          : api.offers({ from: w.from, to: w.to, per_page: 100 }),
+        isOwner ? api.fleetStats(w.from, w.to) : api.stats(w.from, w.to),
       ]);
       setStats(s.data);
-      setWeek(o.data);
+      setDaily(wk.data.daily ?? []);
     } catch {
       /* keep last */
     } finally {
@@ -130,7 +130,7 @@ export default function StatisticsScreen() {
         )}
 
         {/* Last 7 days — income bars (tap a bar to filter to that day) */}
-        <WeeklyChart offers={week} c={c} selected={day} onSelect={setDay} />
+        <WeeklyChart daily={daily} c={c} selected={day} onSelect={setDay} />
 
         {/* 2×2 grid */}
         <View style={cardStyle(c)}>
@@ -164,7 +164,7 @@ const sameDay = (a: Date, b: Date) => ymd(a) === ymd(b);
  * screen to that day; the selected (or today's) bar is emphasised. Future days
  * aren't tappable.
  */
-function WeeklyChart({ offers, c, selected, onSelect }: { offers: Offer[]; c: Colors; selected: Date | null; onSelect: (d: Date | null) => void }) {
+function WeeklyChart({ daily, c, selected, onSelect }: { daily: DailyIncome[]; c: Colors; selected: Date | null; onSelect: (d: Date | null) => void }) {
   const { totals, monday } = useMemo(() => {
     const buckets = [0, 0, 0, 0, 0, 0, 0];
     // Anchor everything to the fleet-day (Uber day starts 04:00) so a 02:00 trip
@@ -173,17 +173,16 @@ function WeeklyChart({ offers, c, selected, onSelect }: { offers: Offer[]; c: Co
     const mon = new Date(now);
     mon.setHours(0, 0, 0, 0);
     mon.setDate(now.getDate() - mondayIndex(now));
-    const nextMonday = new Date(mon);
-    nextMonday.setDate(mon.getDate() + 7);
-    for (const o of offers) {
-      if (!o.received_at || o.fare_amount == null) continue;
-      if (o.status === "rejected" || o.status === "canceled") continue;
-      const at = fleetNow(new Date(o.received_at));
-      if (at < mon || at >= nextMonday) continue;
-      buckets[mondayIndex(at)] += o.fare_amount;
+    // Map each backend daily total (already fleet-day bucketed) onto its Mon–Sun
+    // slot. `date` is a fleet-day label (Y-m-d), so match it by the same string.
+    const byDate = new Map(daily.map((d) => [d.date, d.income]));
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(mon);
+      date.setDate(mon.getDate() + i);
+      buckets[i] = byDate.get(ymd(date)) ?? 0;
     }
     return { totals: buckets, monday: mon };
-  }, [offers]);
+  }, [daily]);
 
   const max = Math.max(...totals, 1);
   const now = fleetNow();

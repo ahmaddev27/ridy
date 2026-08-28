@@ -178,7 +178,34 @@ class FleetController extends Controller
             'acceptance_rate' => $total > 0 ? (int) round($accepted / $total * 100) : 0,
             'earnings' => round($earnings, 2),
             'km' => round($km, 1),
+            'daily' => $this->dailyIncome($base(), $from, $to),
         ];
+    }
+
+    /**
+     * Per-fleet-day income for [from,to): one grouped SUM(fare_amount) over
+     * completed offers (same status filter as `earnings`), keyed by the 04:00
+     * fleet-day. Zero-filled so every day in the window is present, in order.
+     *
+     * @return array<int, array{date: string, income: float}>
+     */
+    private function dailyIncome(Builder $base, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $dateExpr = FleetDay::dateExpr('received_at');
+
+        $incomeByDate = $base
+            ->where('status', OfferStatus::Completed)
+            ->selectRaw("{$dateExpr} as fleet_date, SUM(fare_amount) as income")
+            ->groupBy('fleet_date')
+            ->pluck('income', 'fleet_date');
+
+        $daily = [];
+        for ($cursor = $from; $cursor < $to; $cursor = $cursor->addDay()) {
+            $date = $cursor->toDateString();
+            $daily[] = ['date' => $date, 'income' => round((float) ($incomeByDate[$date] ?? 0), 2)];
+        }
+
+        return $daily;
     }
 
     private function scoped(int $tenantId): Builder
