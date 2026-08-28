@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Dispatch\Models\DispatchNetworkLog;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Dispatch\TripGeocoder;
@@ -160,6 +161,14 @@ class DriverController extends Controller
 
         $result = $roster->sync((int) $tenant->id, $data['drivers']);
 
+        rescue(fn () => DispatchNetworkLog::record(
+            (int) $tenant->id,
+            'roster',
+            $data['drivers'],
+            'Roster sync — '.count($data['drivers']).' drivers',
+            count($data['drivers']),
+        ), report: false);
+
         return response()->json(['data' => $result]);
     }
 
@@ -181,6 +190,14 @@ class DriverController extends Controller
         ]);
 
         $result = $ingestor->ingest((int) $request->user()->tenant_id, $data['statuses']);
+
+        rescue(fn () => DispatchNetworkLog::record(
+            (int) $request->user()->tenant_id,
+            'status',
+            $data['statuses'],
+            'Status sync — '.count($data['statuses']).' drivers',
+            count($data['statuses']),
+        ), report: false);
 
         return response()->json(['data' => $result]);
     }

@@ -838,19 +838,16 @@ function CompanyNetworkTab({ id }: { id: number }) {
               onClick={() => toggle(o.id)}
               className="flex w-full items-center gap-3 bg-surface-2 px-4 py-3 text-start hover:bg-surface-2"
             >
-              <Network className="h-4 w-4 shrink-0 text-ink-subtle" />
+              <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                o.kind === "offer" ? "bg-primary/15 text-primary"
+                  : o.kind === "status" ? "bg-blue-500/15 text-blue-500"
+                  : "bg-amber-500/15 text-amber-600"
+              }`}>{c(`net_${o.kind}`)}</span>
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-ink">
-                  <span className="font-medium">{o.pickup_address ?? "—"}</span>
-                  <span className="text-ink-subtle">→</span>
-                  <span className="font-medium">{o.dropoff_address ?? "—"}</span>
-                </div>
+                <div className="truncate text-sm text-ink">{o.summary ?? "—"}</div>
                 <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-ink-subtle" dir="ltr">
-                  {o.received_at && <span>{new Date(o.received_at).toLocaleString()}</span>}
-                  {o.driver && <span>· {o.driver}</span>}
-                  {o.fare_amount !== null && <span>· € {o.fare_amount.toFixed(2)}</span>}
-                  {o.distance_m !== null && <span>· {(o.distance_m / 1000).toFixed(1)} km</span>}
-                  {o.status && <span>· {o.status}</span>}
+                  {o.created_at && <span>{new Date(o.created_at).toLocaleString()}</span>}
+                  {o.count !== null && <span>· {o.count}×</span>}
                 </div>
               </div>
               <ChevronDown className={"h-4 w-4 shrink-0 text-ink-subtle transition-transform " + (isOpen ? "rotate-180" : "")} />

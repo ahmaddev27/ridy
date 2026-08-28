@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Dispatch\Models\DispatchNetworkLog;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\Vehicle;
@@ -40,35 +41,29 @@ class CompanyDataController extends Controller
     }
 
     /**
-     * The raw dispatch "network" feed: every offer this company received from the
-     * supplier (Uber), with the exact captured payload, so the super-admin can
-     * inspect precisely what came over the wire — both addresses, fare, waypoints,
-     * multi-stop, etc. Read-only, newest first, paginated.
+     * The raw dispatch "network" feed: every inbound request this company received
+     * from the supplier — offers, driver status/location syncs, roster pulls — with
+     * the exact captured payload, so the super-admin can inspect precisely what came
+     * over the wire. Read-only, newest first, paginated; filter by `kind`.
      */
-    public function network(Tenant $tenant): JsonResponse
+    public function network(Request $request, Tenant $tenant): JsonResponse
     {
-        $offers = DispatchOffer::withoutGlobalScopes()
+        $logs = DispatchNetworkLog::query()
             ->where('tenant_id', $tenant->id)
-            ->with('driver:id,name')
-            ->latest('received_at')
+            ->when($request->filled('kind'), fn ($q) => $q->where('kind', $request->string('kind')))
+            ->latest('created_at')
             ->paginate(30);
 
         return response()->json([
-            'data' => collect($offers->items())->map(fn (DispatchOffer $o) => [
-                'id' => $o->id,
-                'offer_uuid' => $o->offer_uuid,
-                'received_at' => $o->received_at,
-                'driver' => $o->driver?->name,
-                'driver_uuid' => $o->driver_uuid,
-                'pickup_address' => $o->pickup_address,
-                'dropoff_address' => $o->dropoff_address,
-                'fare_amount' => $o->fare_amount !== null ? (float) $o->fare_amount : null,
-                'distance_m' => $o->distance_m,
-                'status' => $o->status,
-                // The exact supplier payload as captured — the "network request".
-                'raw_payload' => $o->raw_payload,
+            'data' => collect($logs->items())->map(fn (DispatchNetworkLog $log) => [
+                'id' => $log->id,
+                'kind' => $log->kind,
+                'summary' => $log->summary,
+                'count' => $log->count,
+                'created_at' => $log->created_at,
+                'raw_payload' => $log->payload,
             ]),
-            'meta' => ['current_page' => $offers->currentPage(), 'last_page' => $offers->lastPage(), 'total' => $offers->total()],
+            'meta' => ['current_page' => $logs->currentPage(), 'last_page' => $logs->lastPage(), 'total' => $logs->total()],
         ]);
     }
 

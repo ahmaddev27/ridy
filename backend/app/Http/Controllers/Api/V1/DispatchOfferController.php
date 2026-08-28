@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\AddressFormatter;
 use App\Domain\Dispatch\DispatchOfferIngestor;
+use App\Domain\Dispatch\Models\DispatchNetworkLog;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\TripGeocoder;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
@@ -147,6 +148,14 @@ class DispatchOfferController extends Controller
             try {
                 $outcome = $ingestor->ingest($tenantId, $offer, $data['seq'] ?? null);
                 $results[$outcome['status']] = ($results[$outcome['status']] ?? 0) + 1;
+
+                // Capture the raw offer for the admin Network tab (best-effort).
+                rescue(fn () => DispatchNetworkLog::record(
+                    $tenantId,
+                    'offer',
+                    $offer,
+                    trim((string) Arr::get($offer, 'pickupAddress')).' → '.trim((string) Arr::get($offer, 'dropoffAddress')),
+                ), report: false);
             } catch (\Throwable $e) {
                 // One malformed/failed offer must never drop the rest of the batch.
                 $results['error']++;
