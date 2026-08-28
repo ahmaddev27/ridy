@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { latnLocale } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn, Globe } from "lucide-react";
+import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn, Globe, Network } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,8 @@ import {
   getCompanyDrivers,
   getCompanyOffers,
   getCompanyVehicles,
+  getCompanyNetwork,
+  type CompanyNetworkRow,
   listSubscriptionInvoices,
   listPlans,
   type Company,
@@ -63,7 +65,7 @@ export function CompanyDetail({
   const [orgUuid, setOrgUuid] = useState("");
   const [proxyId, setProxyId] = useState("");
   const [proxies, setProxies] = useState<Proxy[]>([]);
-  const [tab, setTab] = useState<"details" | "subscription" | "managers" | "drivers" | "offers" | "vehicles">("details");
+  const [tab, setTab] = useState<"details" | "subscription" | "managers" | "drivers" | "offers" | "vehicles" | "network">("details");
 
   // Sub-actions.
   const [confirm, setConfirm] = useState<null | "disable" | "relink" | "deleteSession" | "purgeData">(null);
@@ -297,6 +299,7 @@ export function CompanyDetail({
             { k: "managers", icon: ShieldCheck },
             { k: "drivers", icon: Users },
             { k: "offers", icon: Radio },
+            { k: "network", icon: Network },
             { k: "vehicles", icon: Car },
           ] as const).map(({ k: tk, icon: Icon }) => {
             const active = tab === tk;
@@ -327,6 +330,8 @@ export function CompanyDetail({
             </div>
           ) : tab === "offers" ? (
             <CompanyOffersTab id={id} />
+          ) : tab === "network" ? (
+            <CompanyNetworkTab id={id} />
           ) : tab === "drivers" || tab === "vehicles" ? (
             <CompanyDataTab id={id} tab={tab} />
           ) : tab === "subscription" ? (
@@ -779,6 +784,97 @@ function CompanyDataTab({ id, tab }: { id: number; tab: "drivers" | "vehicles" }
 }
 
 /** Company offers grouped by day, paginated (mirrors the manager offers page). */
+/** The raw supplier "network" feed — every captured Uber offer payload, expandable. */
+function CompanyNetworkTab({ id }: { id: number }) {
+  const { t } = useI18n();
+  const c = (k: string) => t(`screens.companies.${k}`);
+  const [rows, setRows] = useState<CompanyNetworkRow[]>([]);
+  const [page, setPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState<Set<number>>(() => new Set());
+  const toggle = (rid: number) =>
+    setOpen((s) => {
+      const n = new Set(s);
+      n.has(rid) ? n.delete(rid) : n.add(rid);
+      return n;
+    });
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    getCompanyNetwork(id, page)
+      .then((r) => {
+        if (!alive) return;
+        setRows(r.items);
+        setLastPage(r.lastPage);
+      })
+      .catch(() => alive && setRows([]))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [id, page]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-10 text-ink-subtle">
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </div>
+    );
+  }
+  if (rows.length === 0) {
+    return <p className="py-10 text-center text-sm text-ink-subtle">{c("noData")}</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-ink-subtle">{c("networkHint")}</p>
+      {rows.map((o) => {
+        const isOpen = open.has(o.id);
+        return (
+          <div key={o.id} className="overflow-hidden rounded-lg border border-line">
+            <button
+              onClick={() => toggle(o.id)}
+              className="flex w-full items-center gap-3 bg-surface-2 px-4 py-3 text-start hover:bg-surface-2"
+            >
+              <Network className="h-4 w-4 shrink-0 text-ink-subtle" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-ink">
+                  <span className="font-medium">{o.pickup_address ?? "—"}</span>
+                  <span className="text-ink-subtle">→</span>
+                  <span className="font-medium">{o.dropoff_address ?? "—"}</span>
+                </div>
+                <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-ink-subtle" dir="ltr">
+                  {o.received_at && <span>{new Date(o.received_at).toLocaleString()}</span>}
+                  {o.driver && <span>· {o.driver}</span>}
+                  {o.fare_amount !== null && <span>· € {o.fare_amount.toFixed(2)}</span>}
+                  {o.distance_m !== null && <span>· {(o.distance_m / 1000).toFixed(1)} km</span>}
+                  {o.status && <span>· {o.status}</span>}
+                </div>
+              </div>
+              <ChevronDown className={"h-4 w-4 shrink-0 text-ink-subtle transition-transform " + (isOpen ? "rotate-180" : "")} />
+            </button>
+            {isOpen && (
+              <pre className="max-h-96 overflow-auto bg-surface px-4 py-3 text-xs leading-relaxed text-ink" dir="ltr">
+                {JSON.stringify(o.raw_payload, null, 2)}
+              </pre>
+            )}
+          </div>
+        );
+      })}
+
+      {lastPage > 1 && (
+        <div className="flex items-center justify-center gap-3 pt-2 text-sm">
+          <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</Button>
+          <span className="text-ink-muted">{page} / {lastPage}</span>
+          <Button variant="secondary" disabled={page >= lastPage} onClick={() => setPage((p) => p + 1)}>›</Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CompanyOffersTab({ id }: { id: number }) {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.companies.${k}`);

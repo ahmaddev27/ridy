@@ -39,6 +39,39 @@ class CompanyDataController extends Controller
         return DispatchOfferResource::collection($offers);
     }
 
+    /**
+     * The raw dispatch "network" feed: every offer this company received from the
+     * supplier (Uber), with the exact captured payload, so the super-admin can
+     * inspect precisely what came over the wire — both addresses, fare, waypoints,
+     * multi-stop, etc. Read-only, newest first, paginated.
+     */
+    public function network(Tenant $tenant): JsonResponse
+    {
+        $offers = DispatchOffer::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->id)
+            ->with('driver:id,name')
+            ->latest('received_at')
+            ->paginate(30);
+
+        return response()->json([
+            'data' => collect($offers->items())->map(fn (DispatchOffer $o) => [
+                'id' => $o->id,
+                'offer_uuid' => $o->offer_uuid,
+                'received_at' => $o->received_at,
+                'driver' => $o->driver?->name,
+                'driver_uuid' => $o->driver_uuid,
+                'pickup_address' => $o->pickup_address,
+                'dropoff_address' => $o->dropoff_address,
+                'fare_amount' => $o->fare_amount !== null ? (float) $o->fare_amount : null,
+                'distance_m' => $o->distance_m,
+                'status' => $o->status,
+                // The exact supplier payload as captured — the "network request".
+                'raw_payload' => $o->raw_payload,
+            ]),
+            'meta' => ['current_page' => $offers->currentPage(), 'last_page' => $offers->lastPage(), 'total' => $offers->total()],
+        ]);
+    }
+
     public function vehicles(Tenant $tenant): JsonResponse
     {
         $vehicles = Vehicle::withoutGlobalScopes()

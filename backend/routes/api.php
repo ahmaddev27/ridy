@@ -313,6 +313,7 @@ Route::prefix('v1')->group(function () {
         Route::get('companies/{tenant}/drivers', [CompanyDataController::class, 'drivers']);
         Route::get('companies/{tenant}/offers', [CompanyDataController::class, 'offers']);
         Route::get('companies/{tenant}/vehicles', [CompanyDataController::class, 'vehicles']);
+        Route::get('companies/{tenant}/network', [CompanyDataController::class, 'network']);
 
         Route::get('companies/{tenant}/users', [CompanyUserController::class, 'index']);
         Route::post('companies/{tenant}/users', [CompanyUserController::class, 'store']);

@@ -246,6 +246,13 @@ export type CompanyVehicleRow = {
   id: number; make: string | null; model: string | null; year: number | null;
   license_plate: string | null; color: string | null; compliance_status: string | null;
 };
+export type CompanyNetworkRow = {
+  id: number; offer_uuid: string | null; received_at: string | null;
+  driver: string | null; driver_uuid: string | null;
+  pickup_address: string | null; dropoff_address: string | null;
+  fare_amount: number | null; distance_m: number | null; status: string | null;
+  raw_payload: unknown;
+};
 
 export async function getCompanyDrivers(id: number): Promise<CompanyDriverRow[]> {
   const res = await apiFetch<{ data: CompanyDriverRow[] }>(`${base}/${id}/drivers`);
@@ -257,6 +264,15 @@ export async function getCompanyOffers(
 ): Promise<{ items: CompanyOfferRow[]; lastPage: number; total: number }> {
   const res = await apiFetch<{ data: CompanyOfferRow[]; meta: { last_page: number; total: number } }>(
     `${base}/${id}/offers?page=${page}`,
+  );
+  return { items: res.data, lastPage: res.meta.last_page, total: res.meta.total };
+}
+export async function getCompanyNetwork(
+  id: number,
+  page = 1,
+): Promise<{ items: CompanyNetworkRow[]; lastPage: number; total: number }> {
+  const res = await apiFetch<{ data: CompanyNetworkRow[]; meta: { last_page: number; total: number } }>(
+    `${base}/${id}/network?page=${page}`,
   );
   return { items: res.data, lastPage: res.meta.last_page, total: res.meta.total };
 }
