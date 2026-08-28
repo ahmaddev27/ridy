@@ -43,9 +43,10 @@ class BackfillOfferGeo extends Command
             if ($offer->geo_synced_at !== null && $offer->distance_m !== null) {
                 $done++;
             }
-            // Self-hosted Nominatim/OSRM have no rate limit; a light pause just keeps
-            // the batch from monopolising the local services.
-            usleep(50_000); // 50ms
+            // Throttle so the background backfill never saturates the local
+            // Nominatim (it returns 429 under a fast batch) — this leaves the
+            // geocoder responsive for time-critical live offers.
+            usleep(300_000); // 300ms
         }
 
         $this->info("Backfilled geo for {$done}/{$offers->count()} offer(s).");
