@@ -14,8 +14,11 @@ Schedule::command('offers:expire-pending')->everyMinute()->withoutOverlapping();
 // Force-finalize stale offers (over-long trips / abandoned accepts) the poll missed.
 Schedule::command('offers:finalize-stale')->everyFiveMinutes()->withoutOverlapping();
 
-// Backfill trip geocoding for offers whose lazy enrich failed (rate-limited services).
-Schedule::command('offers:backfill-geo --limit=60')->everyFiveMinutes()->withoutOverlapping();
+// Backfill DISABLED — the self-hosted Nominatim 429s under batch load, which
+// starved time-critical live offers of geocoding. Live-offer inline enrich now
+// has Nominatim to itself. Re-enable (or run `offers:backfill-geo` manually
+// off-peak) only if the geocoder is given more headroom.
+// Schedule::command('offers:backfill-geo --limit=60')->everyFiveMinutes()->withoutOverlapping();
 
 // Daily heads-up notifications: subscriptions/proxies expiring or expired.
 Schedule::command('notifications:scan')->dailyAt('08:00')->withoutOverlapping();
@@ -32,3 +35,6 @@ Schedule::command('ads:expire')->hourly()->withoutOverlapping();
 // Refresh the local railway-station table from DB InfraGO OpenStation (weekly —
 // the dataset changes slowly; a failed run leaves the current data intact).
 Schedule::command('stations:sync')->weeklyOn(1, '04:00')->withoutOverlapping();
+
+// Keep the dispatch network log (admin Network tab) to a 48h retention window.
+Schedule::command('network-logs:prune')->hourly()->withoutOverlapping();
