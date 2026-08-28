@@ -5,6 +5,7 @@ namespace App\Domain\Dispatch;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Geo\PostalCodes;
+use App\Domain\Geo\StationResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -19,6 +20,8 @@ use Illuminate\Support\Facades\Http;
  */
 class TripGeocoder
 {
+    public function __construct(private readonly StationResolver $stations) {}
+
     private const UA = 'Reidey/1.0 (fleet dispatch; contact: ops@reidey.de)';
 
     /** Nominatim /search endpoint (self-hosted or public), from config. */
@@ -61,6 +64,11 @@ class TripGeocoder
         $dLat = $driver?->latitude !== null ? (float) $driver->latitude : null;
         $dLng = $driver?->longitude !== null ? (float) $driver->longitude : null;
 
+        // Upgrade a street-less "PLZ City" (station pickup) to the station's real
+        // street address from our local table BEFORE geocoding, so the very next
+        // geocode resolves a precise point and the driver sees the full address.
+        $this->applyStations($offer, $dLat, $dLng);
+
         $pickup = $this->geocode($offer->pickup_address, $dLat, $dLng);
         $dropoff = $this->geocode($offer->dropoff_address, $pickup['lat'] ?? $dLat, $pickup['lng'] ?? $dLng);
 
@@ -90,6 +98,27 @@ class TripGeocoder
         $offer->save();
 
         return $offer;
+    }
+
+    /**
+     * Replace a street-less endpoint with its railway-station address (and record
+     * the station name in its own field) when the local station table identifies
+     * exactly one station for the "PLZ City". Leaves real street addresses alone;
+     * the driver's live position disambiguates a PLZ that holds several stations.
+     */
+    private function applyStations(DispatchOffer $offer, ?float $dLat, ?float $dLng): void
+    {
+        $pickup = $this->stations->resolve($offer->pickup_address, $dLat, $dLng);
+        if ($pickup !== null) {
+            $offer->pickup_address = $pickup['formatted_address'];
+            $offer->pickup_station_name = $pickup['station_name'];
+        }
+
+        $dropoff = $this->stations->resolve($offer->dropoff_address, $dLat, $dLng);
+        if ($dropoff !== null) {
+            $offer->dropoff_address = $dropoff['formatted_address'];
+            $offer->dropoff_station_name = $dropoff['station_name'];
+        }
     }
 
     /**

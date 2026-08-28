@@ -28,3 +28,7 @@ Schedule::command('db:backup')->dailyAt('03:00')->withoutOverlapping();
 
 // Flip expired ads to inactive (scopeLive already hides them; this syncs the flag).
 Schedule::command('ads:expire')->hourly()->withoutOverlapping();
+
+// Refresh the local railway-station table from DB InfraGO OpenStation (weekly —
+// the dataset changes slowly; a failed run leaves the current data intact).
+Schedule::command('stations:sync')->weeklyOn(1, '04:00')->withoutOverlapping();

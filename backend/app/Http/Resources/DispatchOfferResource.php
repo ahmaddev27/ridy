@@ -37,6 +37,8 @@ class DispatchOfferResource extends JsonResource
             'rider_name' => $this->rider_first_name,
             'pickup_address' => AddressFormatter::tidy($this->pickup_address),
             'dropoff_address' => AddressFormatter::tidy($this->dropoff_address),
+            'pickup_station_name' => $this->pickup_station_name,
+            'dropoff_station_name' => $this->dropoff_station_name,
             'fare_formatted' => $this->fare_formatted,
             'fare_amount' => $this->fare_amount !== null ? (float) $this->fare_amount : null,
             // Road distance once the trip is geocoded — lets the driver app show
