@@ -24,6 +24,14 @@ class TripGeocoder
 
     private const UA = 'Reidey/1.0 (fleet dispatch; contact: ops@reidey.de)';
 
+    /**
+     * Nominatim + OSRM are our OWN containers on the internal Docker network.
+     * Empty the proxy on these calls so they are NOT sent through the residential
+     * proxy the app otherwise uses (which returns 429 for internal addresses).
+     * Uber and other outbound calls keep their proxy — this only affects geo.
+     */
+    private const NO_PROXY = ['proxy' => ''];
+
     /** Nominatim /search endpoint (self-hosted or public), from config. */
     private function nominatimUrl(): string
     {
@@ -283,7 +291,8 @@ class TripGeocoder
         }
 
         try {
-            $res = Http::withHeaders(['User-Agent' => self::UA])
+            $res = Http::withOptions(self::NO_PROXY)
+                ->withHeaders(['User-Agent' => self::UA])
                 ->timeout(5)
                 ->get(rtrim((string) config('services.geo.nominatim_url'), '/').'/reverse', [
                     'lat' => $lat,
@@ -343,7 +352,8 @@ class TripGeocoder
     private function queryNominatim(array $params): array
     {
         try {
-            $res = Http::withHeaders(['User-Agent' => self::UA])
+            $res = Http::withOptions(self::NO_PROXY)
+                ->withHeaders(['User-Agent' => self::UA])
                 ->timeout(6)
                 ->get($this->nominatimUrl(), $params);
         } catch (\Throwable $e) {
@@ -564,7 +574,7 @@ class TripGeocoder
     {
         try {
             $path = "{$from['lng']},{$from['lat']};{$to['lng']},{$to['lat']}";
-            $res = Http::timeout(6)->get($this->osrmUrl().'/'.$path, [
+            $res = Http::withOptions(self::NO_PROXY)->timeout(6)->get($this->osrmUrl().'/'.$path, [
                 'overview' => 'full',
                 'geometries' => 'geojson',
             ]);
