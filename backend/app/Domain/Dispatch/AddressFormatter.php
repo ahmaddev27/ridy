@@ -79,10 +79,12 @@ class AddressFormatter
 
         // clean() removes non-Latin (localised country) segments + Latinizes digits.
         $a = (string) AddressNormalizer::clean($address);
-        // Drop an explicit "Deutschland/Germany" tail the cleaner left in place.
-        $a = (string) preg_replace('/,\s*(Deutschland|Germany)\s*$/iu', '', $a);
-        // Collapse repeated commas/spaces produced by the strips above.
+        // Drop a "Deutschland/Germany" token ANYWHERE — Uber sometimes puts it
+        // mid-string ("Solingen, Deutschland 42697"), not only as a trailing tail.
+        $a = (string) preg_replace('/\s*,?\s*\b(Deutschland|Germany)\b\s*,?/iu', ' ', $a);
+        // Collapse repeated/leading/trailing commas + spaces produced by the strips.
         $a = (string) preg_replace('/\s*,\s*,+/', ', ', $a);
+        $a = trim((string) preg_replace('/^\s*,\s*|\s*,\s*$/', '', $a));
         $a = self::squash($a);
 
         return $a !== '' ? $a : null;
