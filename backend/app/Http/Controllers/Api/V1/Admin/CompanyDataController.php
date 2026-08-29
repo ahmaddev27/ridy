@@ -11,6 +11,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchOfferResource;
 use App\Http\Resources\DriverResource;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
