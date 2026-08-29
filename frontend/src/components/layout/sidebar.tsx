@@ -7,7 +7,7 @@ import { NavList } from "./nav-list";
 export function SidebarBrand() {
   // Height h-16 matches the topbar so their bottom borders line up.
   return (
-    <div className="flex min-h-16 items-center gap-2.5 border-b border-line px-4 py-2">
+    <div className="flex h-16 items-center gap-2 border-b border-line px-4">
       <Logo size={90} className="text-ink" />
       <div className="leading-tight">
         <div className="text-base font-bold text-ink">Reidey</div>
