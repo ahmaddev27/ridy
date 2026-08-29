@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { OtpInput } from "@/components/ui/otp-input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { WhatsAppButton } from "@/components/support/whatsapp-button";
-import { Logo } from "@/components/brand/logo";
+import { AuthLayout } from "@/components/auth/auth-layout";
 import { useI18n } from "@/lib/i18n/context";
 import { apiErrorMessage } from "@/lib/api/error-message";
 import { forgotPassword, verifyResetCode, resetPassword } from "@/lib/api/password-reset";
@@ -101,101 +101,97 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-2 p-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center justify-center gap-2.5">
-          <Logo size={72} className="text-ink" />
-          <div className="leading-tight">
-            <div className="text-lg font-bold text-ink">Reidey</div>
-            <div className="text-xs text-ink-subtle">Fleet Management</div>
-          </div>
-        </div>
+    <AuthLayout panelTitle={r("panelTitle")} panelSubtitle={r("panelSubtitle")}>
+      <div className="rounded-2xl border border-line bg-surface p-8 shadow-lg">
+        {step === "email" && (
+          <form onSubmit={submitEmail} className="space-y-4">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-ink">{r("title")}</h1>
+              <p className="mt-1.5 text-sm text-ink-muted">{r("subtitle")}</p>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-ink">{r("email")}</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full rounded-lg border border-line-strong bg-surface-2 px-3.5 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-subtle focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
+            <Button type="submit" disabled={busy} className="w-full">
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {r("sendCode")}
+            </Button>
+          </form>
+        )}
 
-        <div className="rounded-xl border border-line bg-surface p-6 shadow-sm">
-          {step === "email" && (
-            <form onSubmit={submitEmail} className="space-y-3">
-              <h1 className="text-lg font-semibold text-ink">{r("title")}</h1>
-              <p className="text-sm text-ink-subtle">{r("subtitle")}</p>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-ink">{r("email")}</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
-                />
-              </div>
-              <Button type="submit" disabled={busy} className="w-full">
-                {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-                {r("sendCode")}
-              </Button>
-            </form>
-          )}
+        {step === "code" && (
+          <form onSubmit={submitCode} className="space-y-4">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-ink">{r("resetTitle")}</h1>
+              <p className="mt-1.5 text-sm text-ink-muted">{r("resetSubtitle").replace("{email}", email)}</p>
+            </div>
+            <div className="py-2">
+              <OtpInput value={otp} onChange={setOtp} autoFocus />
+            </div>
+            <Button type="submit" disabled={busy || otp.length < 6} className="w-full">
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {r("verifyCta")}
+            </Button>
+            <button
+              type="button"
+              onClick={resend}
+              disabled={cooldown > 0}
+              className="w-full text-center text-xs font-medium text-ink-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {cooldown > 0 ? r("resendIn").replace("{s}", String(cooldown)) : r("resend")}
+            </button>
+          </form>
+        )}
 
-          {step === "code" && (
-            <form onSubmit={submitCode} className="space-y-3">
-              <h1 className="text-lg font-semibold text-ink">{r("resetTitle")}</h1>
-              <p className="text-sm text-ink-subtle">{r("resetSubtitle").replace("{email}", email)}</p>
-              <div className="py-2">
-                <OtpInput value={otp} onChange={setOtp} autoFocus />
-              </div>
-              <Button type="submit" disabled={busy || otp.length < 6} className="w-full">
-                {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-                {r("verifyCta")}
-              </Button>
-              <button
-                type="button"
-                onClick={resend}
-                disabled={cooldown > 0}
-                className="w-full text-center text-xs font-medium text-ink-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {cooldown > 0 ? r("resendIn").replace("{s}", String(cooldown)) : r("resend")}
-              </button>
-            </form>
-          )}
-
-          {step === "password" && (
-            <form onSubmit={submitPassword} className="space-y-3">
-              <h1 className="text-lg font-semibold text-ink">{r("newTitle")}</h1>
-              <p className="text-sm text-ink-subtle">{r("newSubtitle")}</p>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-ink">{r("newPassword")}</label>
-                <PasswordInput
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-ink">{r("confirmPassword")}</label>
-                <PasswordInput
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  required
-                  minLength={8}
-                />
-              </div>
-              <Button type="submit" disabled={busy || password.length < 8} className="w-full">
-                {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-                {r("resetCta")}
-              </Button>
-            </form>
-          )}
-        </div>
-
-        <p className="mt-4 text-center text-sm text-ink-muted">
-          <Link href="/login" className="font-medium text-ink hover:underline">
-            {r("backToLogin")}
-          </Link>
-        </p>
-
-        <div className="mt-4 flex justify-center">
-          <WhatsAppButton />
-        </div>
+        {step === "password" && (
+          <form onSubmit={submitPassword} className="space-y-4">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-ink">{r("newTitle")}</h1>
+              <p className="mt-1.5 text-sm text-ink-muted">{r("newSubtitle")}</p>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-ink">{r("newPassword")}</label>
+              <PasswordInput
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-ink">{r("confirmPassword")}</label>
+              <PasswordInput
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                required
+                minLength={8}
+              />
+            </div>
+            <Button type="submit" disabled={busy || password.length < 8} className="w-full">
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {r("resetCta")}
+            </Button>
+          </form>
+        )}
       </div>
-    </div>
+
+      <p className="mt-6 text-center text-sm text-ink-muted">
+        <Link href="/login" className="font-semibold text-primary hover:underline">
+          {r("backToLogin")}
+        </Link>
+      </p>
+
+      <div className="mt-4 flex justify-center">
+        <WhatsAppButton />
+      </div>
+    </AuthLayout>
   );
 }

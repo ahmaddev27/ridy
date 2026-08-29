@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { login, fetchMe } from "@/lib/api/auth";
 import type { AuthUser } from "@/lib/api/auth";
@@ -17,6 +16,11 @@ import { OtpInput } from "@/components/ui/otp-input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { SuspendedScreen, type SuspendedInfo } from "@/components/auth/suspended-screen";
 import { WhatsAppButton } from "@/components/support/whatsapp-button";
+import { AuthLayout } from "@/components/auth/auth-layout";
+
+const CARD = "rounded-2xl border border-line bg-surface p-8 shadow-lg";
+const INPUT =
+  "w-full rounded-lg border border-line-strong bg-surface-2 px-3.5 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-subtle focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/20";
 
 /** Where a signed-in user belongs, by role. */
 function homeFor(u: AuthUser): string {
@@ -110,70 +114,60 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-2 p-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <Logo size={88} className="text-ink" />
-          <div className="leading-tight">
-            <div className="text-2xl font-bold text-ink">Reidey</div>
-            <div className="text-sm text-ink-subtle">Fleet Management</div>
-          </div>
+    <AuthLayout panelTitle={t("login.panelTitle")} panelSubtitle={t("login.panelSubtitle")}>
+      {suspended ? (
+        <SuspendedScreen
+          info={suspended}
+          onActivated={() => {
+            setSuspended(null);
+            onSubmit(new Event("submit") as unknown as React.FormEvent);
+          }}
+        />
+      ) : activateMode ? (
+        <div className={CARD}>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">{t("suspended.activateTitle")}</h1>
+          <p className="mt-1.5 text-sm text-ink-muted">{t("suspended.activateHint")}</p>
+          <form className="mt-6 space-y-4" onSubmit={onActivate}>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-ink">{t("login.email")}</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={INPUT} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-ink">{t("login.password")}</label>
+              <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <div className="py-1">
+              <OtpInput value={code} onChange={setCode} autoFocus />
+            </div>
+            <Button type="submit" className="w-full" disabled={submitting || code.length < 6}>
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t("suspended.activateCta")}
+            </Button>
+            <button type="button" onClick={() => setActivateMode(false)}
+              className="w-full text-center text-xs font-medium text-ink-muted hover:text-ink">
+              {t("suspended.backToLogin")}
+            </button>
+          </form>
         </div>
+      ) : (
+        <div className={CARD}>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">{t("login.title")}</h1>
+          <p className="mt-1.5 text-sm text-ink-muted">{t("login.subtitle")}</p>
 
-        {suspended ? (
-          <SuspendedScreen
-            info={suspended}
-            onActivated={() => {
-              setSuspended(null);
-              onSubmit(new Event("submit") as unknown as React.FormEvent);
-            }}
-          />
-        ) : activateMode ? (
-          <div className="rounded-xl border border-line bg-surface p-6 shadow-sm">
-            <h1 className="text-lg font-semibold text-ink">{t("suspended.activateTitle")}</h1>
-            <p className="mt-1 text-sm text-ink-muted">{t("suspended.activateHint")}</p>
-            <form className="mt-5 space-y-4" onSubmit={onActivate}>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink">{t("login.email")}</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line" />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-ink">{t("login.password")}</label>
-                <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} />
-              </div>
-              <div className="py-1">
-                <OtpInput value={code} onChange={setCode} autoFocus />
-              </div>
-              <Button type="submit" className="w-full" disabled={submitting || code.length < 6}>
-                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {t("suspended.activateCta")}
-              </Button>
-              <button type="button" onClick={() => setActivateMode(false)}
-                className="w-full text-center text-xs font-medium text-ink-muted hover:text-ink">
-                {t("suspended.backToLogin")}
-              </button>
-            </form>
-          </div>
-        ) : (
-        <div className="rounded-xl border border-line bg-surface p-6 shadow-sm">
-          <h1 className="text-lg font-semibold text-ink">{t("login.title")}</h1>
-          <p className="mt-1 text-sm text-ink-muted">{t("login.subtitle")}</p>
-
-          <form className="mt-5 space-y-4" onSubmit={onSubmit}>
+          <form className="mt-6 space-y-4" onSubmit={onSubmit}>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-ink">{t("login.email")}</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
+                className={INPUT}
               />
             </div>
             <div>
               <div className="mb-1.5 flex items-center justify-between">
                 <label className="block text-sm font-medium text-ink">{t("login.password")}</label>
-                <Link href="/forgot-password" className="text-xs font-medium text-ink-muted hover:text-ink">
+                <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">
                   {t("login.forgotCta")}
                 </Link>
               </div>
@@ -187,7 +181,7 @@ export default function LoginPage() {
                 type="checkbox"
                 checked={remember}
                 onChange={(e) => setRemember(e.target.checked)}
-                className="h-4 w-4 rounded border-line-strong text-ink accent-ink focus:ring-2 focus:ring-line"
+                className="h-4 w-4 rounded border-line-strong accent-primary focus:ring-2 focus:ring-primary/20"
               />
               {t("login.remember")}
             </label>
@@ -201,19 +195,18 @@ export default function LoginPage() {
             </button>
           </form>
         </div>
-        )}
+      )}
 
-        <p className="mt-4 text-center text-sm text-ink-muted">
-          {t("login.noAccount")}{" "}
-          <Link href="/register" className="font-medium text-ink hover:underline">
-            {t("login.registerCta")}
-          </Link>
-        </p>
+      <p className="mt-6 text-center text-sm text-ink-muted">
+        {t("login.noAccount")}{" "}
+        <Link href="/register" className="font-semibold text-primary hover:underline">
+          {t("login.registerCta")}
+        </Link>
+      </p>
 
-        <div className="mt-4 flex justify-center">
-          <WhatsAppButton />
-        </div>
+      <div className="mt-4 flex justify-center">
+        <WhatsAppButton />
       </div>
-    </div>
+    </AuthLayout>
   );
 }
