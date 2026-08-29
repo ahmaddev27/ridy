@@ -791,6 +791,7 @@ function CompanyNetworkTab({ id }: { id: number }) {
   const [rows, setRows] = useState<CompanyNetworkRow[]>([]);
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<Set<number>>(() => new Set());
   const toggle = (rid: number) =>
@@ -808,6 +809,7 @@ function CompanyNetworkTab({ id }: { id: number }) {
         if (!alive) return;
         setRows(r.items);
         setLastPage(r.lastPage);
+        setTotal(r.total);
       })
       .catch(() => alive && setRows([]))
       .finally(() => alive && setLoading(false));
@@ -862,10 +864,22 @@ function CompanyNetworkTab({ id }: { id: number }) {
       })}
 
       {lastPage > 1 && (
-        <div className="flex items-center justify-center gap-3 pt-2 text-sm">
-          <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>‹</Button>
-          <span className="text-ink-muted">{page} / {lastPage}</span>
-          <Button variant="secondary" disabled={page >= lastPage} onClick={() => setPage((p) => p + 1)}>›</Button>
+        <div className="flex items-center justify-center gap-1.5 border-t border-line pt-4 text-sm">
+          {[
+            { l: "«", go: () => setPage(1), off: page <= 1 },
+            { l: "‹", go: () => setPage((p) => Math.max(1, p - 1)), off: page <= 1 },
+          ].map((b) => (
+            <button key={b.l} onClick={b.go} disabled={b.off}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-ink-muted transition hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40">{b.l}</button>
+          ))}
+          <span className="px-3 font-medium tabular-nums text-ink-muted">{page} / {lastPage} · {total.toLocaleString()}</span>
+          {[
+            { l: "›", go: () => setPage((p) => Math.min(lastPage, p + 1)), off: page >= lastPage },
+            { l: "»", go: () => setPage(lastPage), off: page >= lastPage },
+          ].map((b) => (
+            <button key={b.l} onClick={b.go} disabled={b.off}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-ink-muted transition hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40">{b.l}</button>
+          ))}
         </div>
       )}
     </div>
