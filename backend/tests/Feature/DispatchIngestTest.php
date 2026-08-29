@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Dispatch\Models\DispatchNetworkLog;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\Models\Driver;
@@ -87,7 +88,7 @@ class DispatchIngestTest extends TestCase
 
         // The raw offer is captured for the admin Network tab, exactly as it
         // arrived (pickup UUID intact, kind = offer, attributed to the tenant).
-        $log = \App\Domain\Dispatch\Models\DispatchNetworkLog::where('kind', 'offer')->first();
+        $log = DispatchNetworkLog::where('kind', 'offer')->first();
         $this->assertNotNull($log, 'daemon ingest must record the offer to the Network feed');
         $this->assertSame($tenant->id, $log->tenant_id);
         $this->assertSame(self::DRIVER_UUID, $log->payload['driverInfo']['driverUUID']);
