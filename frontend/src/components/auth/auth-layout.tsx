@@ -1,6 +1,6 @@
 "use client";
 
-import { Languages } from "lucide-react";
+import { Languages, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useI18n } from "@/lib/i18n/context";
@@ -25,8 +25,14 @@ export function AuthLayout({
   panelSubtitle: string;
   children: React.ReactNode;
 }) {
-  const { locale, setLocale } = useI18n();
+  const { t, locale, setLocale } = useI18n();
   const nextLang = () => setLocale(LANG_ORDER[(LANG_ORDER.indexOf(locale) + 1) % LANG_ORDER.length]);
+
+  const stats = [
+    { value: "2,400+", label: t("authPanel.statDrivers") },
+    { value: "99.9%", label: t("authPanel.statUptime") },
+    { value: "24/7", label: t("authPanel.statSupport") },
+  ];
 
   return (
     <div className="relative min-h-screen bg-surface lg:grid lg:grid-cols-[1.02fr_0.98fr]">
@@ -46,11 +52,29 @@ export function AuthLayout({
             <Logo size={40} className="text-white drop-shadow" />
             <span className="text-2xl font-extrabold tracking-tight drop-shadow">Reidey</span>
           </div>
-          <div className="max-w-md">
-            <h1 className="mb-3 text-3xl font-extrabold leading-[1.2] tracking-tight drop-shadow-lg xl:text-[2.5rem]">
-              {panelTitle}
-            </h1>
-            <p className="text-base leading-relaxed text-white/90 drop-shadow">{panelSubtitle}</p>
+          <div className="max-w-md space-y-6">
+            <div>
+              <h1 className="mb-3 text-3xl font-extrabold leading-[1.2] tracking-tight drop-shadow-lg xl:text-[2.5rem]">
+                {panelTitle}
+              </h1>
+              <p className="text-base leading-relaxed text-white/90 drop-shadow">{panelSubtitle}</p>
+            </div>
+
+            {/* glass stats card */}
+            <div className="grid grid-cols-3 divide-x divide-white/15 rounded-2xl border border-white/15 bg-white/10 shadow-lg backdrop-blur-md [direction:ltr]">
+              {stats.map((s) => (
+                <div key={s.label} className="px-3 py-4 text-center">
+                  <div className="text-2xl font-extrabold tracking-tight">{s.value}</div>
+                  <div className="mt-1 text-xs text-white/80">{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* trust line */}
+            <div className="flex items-center gap-2 text-sm text-white/85 drop-shadow">
+              <ShieldCheck className="h-4 w-4 shrink-0" />
+              {t("authPanel.security")}
+            </div>
           </div>
         </div>
       </aside>
