@@ -44,8 +44,10 @@ export function AuthLayout({
           aria-hidden="true"
           className="absolute inset-0 h-full w-full object-cover object-center"
         />
+        {/* brand tint — emerald wash over the photo, same hue as the mark */}
+        <div aria-hidden className="absolute inset-0 bg-primary/40 mix-blend-multiply" />
         {/* legibility scrim — darker at the top/bottom where the text sits */}
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/55" />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-black/45" />
 
         <div className="relative flex h-full flex-col justify-between p-12 text-white xl:p-14">
           <div className="flex items-center gap-3">
@@ -83,8 +85,8 @@ export function AuthLayout({
       <main className="relative flex min-h-screen flex-col bg-surface px-6 py-7 sm:px-10 lg:-ms-10 lg:rounded-s-[2.75rem] lg:ps-16 lg:shadow-[-24px_0_60px_-30px_rgba(0,0,0,.25)]">
         {/* floating logo badge at the seam (desktop) */}
         <div className="absolute -start-10 top-1/2 hidden -translate-y-1/2 lg:block">
-          <div className="flex h-[5.5rem] w-[5.5rem] items-center justify-center rounded-full bg-primary shadow-xl ring-4 ring-surface">
-            <Logo size={56} className="text-white" />
+          <div className="flex h-[90px] w-[90px] items-center justify-center rounded-full bg-primary shadow-xl ring-4 ring-surface">
+            <Logo size={64} className="text-white" />
           </div>
         </div>
 

@@ -101,7 +101,7 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout panelTitle={r("panelTitle")} panelSubtitle={r("panelSubtitle")}>
-      <div className="rounded-2xl border border-line bg-surface p-8 shadow-lg">
+      <div>
         {step === "form" ? (
           <form onSubmit={submitForm} className="space-y-4">
             <div>

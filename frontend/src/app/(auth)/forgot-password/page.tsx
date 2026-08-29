@@ -102,7 +102,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthLayout panelTitle={r("panelTitle")} panelSubtitle={r("panelSubtitle")}>
-      <div className="rounded-2xl border border-line bg-surface p-8 shadow-lg">
+      <div>
         {step === "email" && (
           <form onSubmit={submitEmail} className="space-y-4">
             <div>

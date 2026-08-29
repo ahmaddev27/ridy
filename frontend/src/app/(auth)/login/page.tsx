@@ -18,7 +18,8 @@ import { SuspendedScreen, type SuspendedInfo } from "@/components/auth/suspended
 import { WhatsAppButton } from "@/components/support/whatsapp-button";
 import { AuthLayout } from "@/components/auth/auth-layout";
 
-const CARD = "rounded-2xl border border-line bg-surface p-8 shadow-lg";
+// No card — the form sits directly on the form column (per design).
+const CARD = "";
 const INPUT =
   "w-full rounded-lg border border-line-strong bg-surface-2 px-3.5 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-subtle focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/20";
 
