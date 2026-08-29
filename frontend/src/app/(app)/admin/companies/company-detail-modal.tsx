@@ -793,6 +793,7 @@ function CompanyNetworkTab({ id }: { id: number }) {
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [kind, setKind] = useState("");
   const [open, setOpen] = useState<Set<number>>(() => new Set());
   const toggle = (rid: number) =>
     setOpen((s) => {
@@ -801,10 +802,23 @@ function CompanyNetworkTab({ id }: { id: number }) {
       return n;
     });
 
+  // Filter chips — clicking a kind narrows the feed to that request type and
+  // resets to the first page so the paginator stays consistent with the filter.
+  const filters: { v: string; l: string }[] = [
+    { v: "", l: c("filter_all") },
+    { v: "offer", l: c("net_offer") },
+    { v: "status", l: c("net_status") },
+    { v: "roster", l: c("net_roster") },
+  ];
+  const pick = (v: string) => {
+    setKind(v);
+    setPage(1);
+  };
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    getCompanyNetwork(id, page)
+    getCompanyNetwork(id, page, kind)
       .then((r) => {
         if (!alive) return;
         setRows(r.items);
@@ -816,23 +830,37 @@ function CompanyNetworkTab({ id }: { id: number }) {
     return () => {
       alive = false;
     };
-  }, [id, page]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-10 text-ink-subtle">
-        <Loader2 className="h-5 w-5 animate-spin" />
-      </div>
-    );
-  }
-  if (rows.length === 0) {
-    return <p className="py-10 text-center text-sm text-ink-subtle">{c("noData")}</p>;
-  }
+  }, [id, page, kind]);
 
   return (
     <div className="space-y-3">
       <p className="text-xs text-ink-subtle">{c("networkHint")}</p>
-      {rows.map((o) => {
+
+      <div className="flex flex-wrap gap-1.5">
+        {filters.map((f) => (
+          <button
+            key={f.v || "all"}
+            onClick={() => pick(f.v)}
+            className={
+              "rounded-full px-3 py-1 text-xs font-medium transition " +
+              (kind === f.v
+                ? "bg-primary text-primary-ink"
+                : "bg-surface-2 text-ink-muted hover:bg-surface-2 hover:text-ink")
+            }
+          >
+            {f.l}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-10 text-ink-subtle">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="py-10 text-center text-sm text-ink-subtle">{c("noData")}</p>
+      ) : (
+        rows.map((o) => {
         const isOpen = open.has(o.id);
         return (
           <div key={o.id} className="overflow-hidden rounded-lg border border-line">
@@ -861,7 +889,8 @@ function CompanyNetworkTab({ id }: { id: number }) {
             )}
           </div>
         );
-      })}
+        })
+      )}
 
       {lastPage > 1 && (
         <div className="flex items-center justify-center gap-1.5 border-t border-line pt-4 text-sm">

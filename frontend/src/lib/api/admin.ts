@@ -271,9 +271,11 @@ export async function getCompanyOffers(
 export async function getCompanyNetwork(
   id: number,
   page = 1,
+  kind = "",
 ): Promise<{ items: CompanyNetworkRow[]; lastPage: number; total: number }> {
+  const q = kind ? `&kind=${encodeURIComponent(kind)}` : "";
   const res = await apiFetch<{ data: CompanyNetworkRow[]; meta: { last_page: number; total: number } }>(
-    `${base}/${id}/network?page=${page}`,
+    `${base}/${id}/network?page=${page}${q}`,
   );
   return { items: res.data, lastPage: res.meta.last_page, total: res.meta.total };
 }
