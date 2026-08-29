@@ -136,6 +136,17 @@ class DispatchOfferController extends Controller
         $results = ['routed' => 0, 'unlinked_driver' => 0, 'duplicate' => 0, 'skipped_no_uuid' => 0, 'org_mismatch' => 0, 'error' => 0];
 
         foreach ($data['offers'] as $offer) {
+            // Capture EVERY inbound offer for the admin Network tab first — before
+            // the org filter or ingestion — so the feed reflects real supplier
+            // traffic even when an offer is later skipped (org mismatch) or fails
+            // to ingest. Best-effort: logging must never break ingestion.
+            rescue(fn () => DispatchNetworkLog::record(
+                $tenantId,
+                'offer',
+                $offer,
+                trim((string) Arr::get($offer, 'pickupAddress')).' → '.trim((string) Arr::get($offer, 'dropoffAddress')),
+            ), report: false);
+
             // Only accept offers from THIS company's own Uber org — never a
             // different account the manager happens to have open in another tab.
             $partnerUuid = (string) Arr::get($offer, 'partnerUUID', '');
@@ -148,14 +159,6 @@ class DispatchOfferController extends Controller
             try {
                 $outcome = $ingestor->ingest($tenantId, $offer, $data['seq'] ?? null);
                 $results[$outcome['status']] = ($results[$outcome['status']] ?? 0) + 1;
-
-                // Capture the raw offer for the admin Network tab (best-effort).
-                rescue(fn () => DispatchNetworkLog::record(
-                    $tenantId,
-                    'offer',
-                    $offer,
-                    trim((string) Arr::get($offer, 'pickupAddress')).' → '.trim((string) Arr::get($offer, 'dropoffAddress')),
-                ), report: false);
             } catch (\Throwable $e) {
                 // One malformed/failed offer must never drop the rest of the batch.
                 $results['error']++;

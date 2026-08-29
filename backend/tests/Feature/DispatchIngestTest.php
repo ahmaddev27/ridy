@@ -84,6 +84,13 @@ class DispatchIngestTest extends TestCase
         $this->assertSame('Bunsen-Kirchhoff-Straße 11, 44139 Dortmund', $offer->pickup_address);
         $this->assertSame(5, $offer->accept_window_seconds);
         $this->assertNotNull($offer->raw_payload['driverInfo']['driverUUID']);
+
+        // The raw offer is captured for the admin Network tab, exactly as it
+        // arrived (pickup UUID intact, kind = offer, attributed to the tenant).
+        $log = \App\Domain\Dispatch\Models\DispatchNetworkLog::where('kind', 'offer')->first();
+        $this->assertNotNull($log, 'daemon ingest must record the offer to the Network feed');
+        $this->assertSame($tenant->id, $log->tenant_id);
+        $this->assertSame(self::DRIVER_UUID, $log->payload['driverInfo']['driverUUID']);
     }
 
     public function test_offer_for_unlinked_driver_is_stored_without_driver_id(): void
