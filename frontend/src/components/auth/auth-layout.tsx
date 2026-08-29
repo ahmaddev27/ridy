@@ -25,31 +25,32 @@ export function AuthLayout({
   panelSubtitle: string;
   children: React.ReactNode;
 }) {
-  const { t, locale, setLocale } = useI18n();
+  const { locale, setLocale } = useI18n();
   const nextLang = () => setLocale(LANG_ORDER[(LANG_ORDER.indexOf(locale) + 1) % LANG_ORDER.length]);
 
   return (
     <div className="relative min-h-screen bg-surface lg:grid lg:grid-cols-[1.02fr_0.98fr]">
-      {/* Brand panel — hidden below lg */}
-      <aside className="relative hidden overflow-hidden bg-primary text-primary-ink lg:block">
-        {/* depth: gradient sheen, soft glows, faint mesh, oversized watermark logo */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_90%_at_85%_15%,rgba(255,255,255,.18),transparent_55%)]" />
-        <div aria-hidden className="pointer-events-none absolute -top-24 end-[-6rem] h-96 w-96 rounded-full bg-white/15 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute bottom-[-8rem] start-[-4rem] h-96 w-96 rounded-full bg-black/25 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.10] [background-image:linear-gradient(rgba(255,255,255,.7)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.7)_1px,transparent_1px)] [background-size:44px_44px] [mask-image:radial-gradient(circle_at_75%_20%,#000,transparent_70%)]" />
-        <Logo className="pointer-events-none absolute -bottom-16 -start-16 h-[26rem] w-[26rem] text-white/[0.06]" />
+      {/* Brand panel — full-bleed hero image, hidden below lg */}
+      <aside className="relative hidden overflow-hidden bg-primary lg:block">
+        <img
+          src="/brand/auth-hero.png"
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover object-center"
+        />
+        {/* legibility scrim — darker at the top/bottom where the text sits */}
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/55" />
 
-        {/* centred hero — big logo, wordmark, headline (no dead space) */}
-        <div className="relative flex h-full flex-col items-center justify-center gap-6 p-12 text-center xl:p-16">
-          <div className="flex items-center gap-3.5">
-            <Logo size={64} className="text-primary-ink drop-shadow-sm" />
-            <span className="text-4xl font-extrabold tracking-tight">Reidey</span>
+        <div className="relative flex h-full flex-col justify-between p-12 text-white xl:p-14">
+          <div className="flex items-center gap-3">
+            <Logo size={40} className="text-white drop-shadow" />
+            <span className="text-2xl font-extrabold tracking-tight drop-shadow">Reidey</span>
           </div>
           <div className="max-w-md">
-            <h1 className="mb-4 text-3xl font-extrabold leading-[1.2] tracking-tight xl:text-[2.5rem]">
+            <h1 className="mb-3 text-3xl font-extrabold leading-[1.2] tracking-tight drop-shadow-lg xl:text-[2.5rem]">
               {panelTitle}
             </h1>
-            <p className="text-base leading-relaxed text-primary-ink/85">{panelSubtitle}</p>
+            <p className="text-base leading-relaxed text-white/90 drop-shadow">{panelSubtitle}</p>
           </div>
         </div>
       </aside>
