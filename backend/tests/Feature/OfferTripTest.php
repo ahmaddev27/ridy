@@ -63,6 +63,54 @@ class OfferTripTest extends TestCase
         $this->assertNotNull($offer->fresh()->geo_synced_at);
     }
 
+    public function test_bare_hauptbahnhof_pickup_borrows_the_dropoff_city(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $user = User::create(['name' => 'M', 'email' => 'm@a.de', 'password' => Hash::make('password'), 'tenant_id' => $tenant->id]);
+        $user->assignRole('fleet_manager');
+        app(TenantContext::class)->set($tenant->id);
+
+        // The real-world failing shape: the supplier sends the pickup as the bare
+        // word "Hauptbahnhof" with no city, and a Düsseldorf dropoff. Without the
+        // city fill the pickup used to resolve to a Solingen street (the driver's
+        // town), inflating the distance and crushing €/km.
+        $offer = DispatchOffer::create([
+            'tenant_id' => $tenant->id,
+            'driver_uuid' => 'd1',
+            'offer_uuid' => 'hbf1',
+            'pickup_address' => 'Hauptbahnhof',
+            'dropoff_address' => 'Liegnitzer Str. 4a, 40231 Düsseldorf',
+            'fare_formatted' => '10,25 €',
+            'received_at' => now(),
+            'raw_payload' => ['offerUUID' => 'hbf1'],
+        ]);
+
+        // Dropoff (has a PLZ) resolves first, then the bare pickup. Both land in
+        // Düsseldorf; OSRM returns a short intra-city route.
+        Http::fake([
+            'nominatim.openstreetmap.org/*' => Http::sequence()
+                ->push([['lat' => '51.2200', 'lon' => '6.7900']])  // dropoff
+                ->push([['lat' => '51.2199', 'lon' => '6.7943']]), // Düsseldorf Hbf
+            'router.project-osrm.org/*' => Http::response([
+                'routes' => [['distance' => 3800, 'geometry' => ['type' => 'LineString', 'coordinates' => [[6.7943, 51.2199], [6.79, 51.22]]]]],
+            ]),
+        ]);
+
+        Sanctum::actingAs($user);
+        $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk();
+
+        // The pickup lookup must carry the borrowed Düsseldorf city — never a bare
+        // "Hauptbahnhof" that would drift to the nearest station.
+        Http::assertSent(function ($request) {
+            $url = urldecode($request->url());
+
+            return str_contains($url, 'nominatim')
+                && str_contains($url, 'Hauptbahnhof')
+                && str_contains($url, 'sseldorf');
+        });
+    }
+
     public function test_unresolved_address_with_a_valid_plz_falls_back_to_the_centroid(): void
     {
         $this->seed(RolePermissionSeeder::class);

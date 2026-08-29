@@ -72,13 +72,29 @@ class TripGeocoder
         $dLat = $driver?->latitude !== null ? (float) $driver->latitude : null;
         $dLng = $driver?->longitude !== null ? (float) $driver->longitude : null;
 
+        // A bare "Hauptbahnhof"/"Bahnhof" pickup carries no city of its own, so
+        // borrow the counterpart endpoint's city ("Hauptbahnhof" → "Hauptbahnhof,
+        // Düsseldorf") BEFORE geocoding. Without this the word alone resolves to
+        // whatever station is nearest the driver's town — a Solingen street for a
+        // Düsseldorf trip — blowing up the distance and €/km.
+        $this->fillBareStationCity($offer);
+
         // Upgrade a street-less "PLZ City" (station pickup) to the station's real
         // street address from our local table BEFORE geocoding, so the very next
         // geocode resolves a precise point and the driver sees the full address.
         $this->applyStations($offer, $dLat, $dLng);
 
-        $pickup = $this->geocode($offer->pickup_address, $dLat, $dLng);
-        $dropoff = $this->geocode($offer->dropoff_address, $pickup['lat'] ?? $dLat, $pickup['lng'] ?? $dLng);
+        // Resolve the endpoint that has a postcode first, then bias the ambiguous
+        // (postcode-less) one to it — a dispatch trip's ends are close together, so
+        // the resolved end is a far better bias than the driver's position, which
+        // may be a town away from where the trip actually is.
+        if ($this->hasPostcode($offer->dropoff_address) && ! $this->hasPostcode($offer->pickup_address)) {
+            $dropoff = $this->geocode($offer->dropoff_address, $dLat, $dLng);
+            $pickup = $this->geocode($offer->pickup_address, $dropoff['lat'] ?? $dLat, $dropoff['lng'] ?? $dLng);
+        } else {
+            $pickup = $this->geocode($offer->pickup_address, $dLat, $dLng);
+            $dropoff = $this->geocode($offer->dropoff_address, $pickup['lat'] ?? $dLat, $pickup['lng'] ?? $dLng);
+        }
 
         $offer->pickup_lat = $pickup['lat'] ?? null;
         $offer->pickup_lng = $pickup['lng'] ?? null;
@@ -106,6 +122,64 @@ class TripGeocoder
         $offer->save();
 
         return $offer;
+    }
+
+    /** True when the address carries a 5-digit German postcode. */
+    private function hasPostcode(?string $address): bool
+    {
+        return $address !== null && preg_match('/\b\d{5}\b/', $address) === 1;
+    }
+
+    /**
+     * A bare station word ("Hauptbahnhof", "Hbf", "Bahnhof", "Bf") with nothing
+     * else — no street, no city, no postcode — normalised to its full German form
+     * ("Hauptbahnhof" / "Bahnhof"), or null when the address is anything richer.
+     */
+    private function bareStationLabel(?string $address): ?string
+    {
+        $a = strtolower(trim((string) AddressNormalizer::clean($address)));
+        $a = trim(str_replace('.', '', $a));
+
+        return match ($a) {
+            'hauptbahnhof', 'hbf' => 'Hauptbahnhof',
+            'bahnhof', 'bf' => 'Bahnhof',
+            default => null,
+        };
+    }
+
+    /**
+     * The town for an address, preferring the authoritative PLZ→city table (1:1 in
+     * Germany) over the free-text parse. Null when the address names no town.
+     */
+    private function cityHint(?string $address): ?string
+    {
+        $parsed = AddressNormalizer::parse($address);
+
+        return $parsed['plz'] !== null
+            ? (PostalCodes::city($parsed['plz']) ?? $parsed['city'])
+            : $parsed['city'];
+    }
+
+    /**
+     * Give a bare "Hauptbahnhof"/"Bahnhof" endpoint the counterpart endpoint's
+     * town, so a city-less station word geocodes to the right city's station
+     * instead of the one nearest the driver. Only fires when the station end has
+     * no town of its own and the other end does — never overrides a real city.
+     */
+    private function fillBareStationCity(DispatchOffer $offer): void
+    {
+        $pickupCity = $this->cityHint($offer->pickup_address);
+        $dropoffCity = $this->cityHint($offer->dropoff_address);
+
+        $pickupStation = $this->bareStationLabel($offer->pickup_address);
+        if ($pickupStation !== null && $pickupCity === null && $dropoffCity !== null) {
+            $offer->pickup_address = $pickupStation.', '.$dropoffCity;
+        }
+
+        $dropoffStation = $this->bareStationLabel($offer->dropoff_address);
+        if ($dropoffStation !== null && $dropoffCity === null && $pickupCity !== null) {
+            $offer->dropoff_address = $dropoffStation.', '.$pickupCity;
+        }
     }
 
     /**
