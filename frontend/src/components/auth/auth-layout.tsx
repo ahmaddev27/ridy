@@ -86,7 +86,7 @@ export function AuthLayout({
         {/* floating logo badge at the seam (desktop) */}
         <div className="absolute -start-10 top-1/2 hidden -translate-y-1/2 lg:block">
           <div className="flex h-[90px] w-[90px] items-center justify-center rounded-full bg-primary shadow-xl ring-4 ring-surface">
-            <Logo size={64} className="text-white" />
+            <Logo size={72} className="text-white" />
           </div>
         </div>
 
