@@ -28,11 +28,17 @@ function isAllowedApiUrl(url) {
 // Announce presence so the dashboard can tell whether the extension is installed
 // (both on load and on demand, since the page may mount after this script runs).
 async function announce() {
-  const version = api.runtime.getManifest?.().version ?? null;
-  // Report whether we already hold a pairing token, so the dashboard can
-  // silently re-pair us if it was lost (e.g. the extension was reinstalled).
-  const { token } = await api.storage.local.get(["token"]);
-  window.postMessage({ source: "ridy-ext-present", version, paired: !!token }, location.origin);
+  try {
+    const version = api.runtime.getManifest?.().version ?? null;
+    // Report whether we already hold a pairing token, so the dashboard can
+    // silently re-pair us if it was lost (e.g. the extension was reinstalled).
+    const { token } = await api.storage.local.get(["token"]);
+    window.postMessage({ source: "ridy-ext-present", version, paired: !!token }, location.origin);
+  } catch {
+    // "Extension context invalidated" — the page still runs the old content
+    // script after the extension was reloaded/updated; it recovers on refresh.
+    // Swallow it instead of surfacing an uncaught error.
+  }
 }
 announce();
 window.addEventListener("message", (e) => {
