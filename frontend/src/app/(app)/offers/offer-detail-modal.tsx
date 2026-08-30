@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { X, MapPin, Flag, User, CircleDollarSign, Clock, Loader2, Route, Gauge, Wallet } from "lucide-react";
@@ -33,7 +34,15 @@ const TripMap = dynamic(() => import("./trip-map").then((m) => m.TripMap), {
 export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => void }) {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.offers.${k}`);
+  const router = useRouter();
   const [offer, setOffer] = useState<DispatchOfferDetail | null>(null);
+
+  // Jump to the matched driver's profile (closes this modal first).
+  const openDriver = () => {
+    if (offer?.driver_id == null) return;
+    onClose();
+    router.push(`/drivers/${offer.driver_id}`);
+  };
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,7 +71,13 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
             <h2 className="text-lg font-semibold text-ink">
               {offer?.rider_first_name || c("colRider") || "—"}
             </h2>
-            <p className="mt-0.5 text-sm text-ink-subtle">{offer?.driver_name ?? "—"}</p>
+            {offer?.driver_id != null ? (
+              <button onClick={openDriver} className="mt-0.5 text-sm font-medium text-primary hover:underline">
+                {offer.driver_name ?? "—"}
+              </button>
+            ) : (
+              <p className="mt-0.5 text-sm text-ink-subtle">{offer?.driver_name ?? "—"}</p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {offer && (() => {
@@ -143,7 +158,13 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
 
               {/* Known fields */}
               <dl className="divide-y divide-line">
-                <Row icon={User} label={c("colDriver")}>{offer.driver_name ?? "—"}</Row>
+                <Row icon={User} label={c("colDriver")}>
+                  {offer.driver_id != null ? (
+                    <button onClick={openDriver} className="font-medium text-primary hover:underline">
+                      {offer.driver_name ?? "—"}
+                    </button>
+                  ) : (offer.driver_name ?? "—")}
+                </Row>
                 <Row icon={CircleDollarSign} label={c("colFare")}>{toLatinDigits(fareLabel(offer, latnLocale(locale)))}</Row>
                 <Row icon={Clock} label={c("colTime")}>
                   {offer.received_at ? new Date(offer.received_at).toLocaleString(latnLocale(locale)) : "—"}
