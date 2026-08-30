@@ -60,6 +60,8 @@ use App\Http\Controllers\Api\V1\UberLoginController;
 use App\Http\Controllers\Api\V1\VehicleController;
 use App\Http\Middleware\LogDriverAuthContext;
 use App\Http\Middleware\ResolveTenant;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -125,6 +127,10 @@ Route::prefix('v1')->group(function () {
                 Route::get('stats', [DriverDashboardController::class, 'stats']);
                 Route::get('offers', [DriverOfferController::class, 'index']);
                 Route::post('offers/seen', [DriverOfferController::class, 'markSeen']);
+
+                // WebSocket (Reverb) channel authorisation for the driver's app —
+                // authenticates the private driver.{id} channel via the driver guard.
+                Route::post('broadcasting/auth', fn (Request $request) => Broadcast::auth($request));
             });
         });
 

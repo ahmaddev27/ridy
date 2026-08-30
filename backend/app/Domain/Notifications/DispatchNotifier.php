@@ -6,6 +6,7 @@ use App\Domain\Dispatch\AddressFormatter;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Notifications\Contracts\PushSender;
 use App\Domain\Notifications\Models\DeviceToken;
+use App\Events\OfferBroadcast;
 
 /**
  * Turns a routed dispatch offer into a push to every device of its linked driver.
@@ -33,6 +34,11 @@ class DispatchNotifier
         if ($offer->driver_id === null) {
             return 0; // unlinked offers have no one to notify
         }
+
+        // Real-time nudge to the driver's open app (WebSocket) so a fresh offer
+        // appears instantly, alongside the push that wakes a closed app. Best
+        // -effort: a broadcast failure (Reverb down) must never break ingestion.
+        rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->id, 'new')), report: false);
 
         $title = $this->buildTitle($offer);
         $body = $this->buildBody($offer);

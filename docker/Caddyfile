@@ -25,6 +25,14 @@ reidey.de {
 		-Server
 	}
 
+	# Reverb WebSocket (Pusher protocol): the app connects to wss://reidey.de/app/…
+	# and the backend posts events to /apps/…; both proxy to the reverb service.
+	# Caddy upgrades the connection to WebSocket automatically.
+	@reverb path /app/* /apps/*
+	handle @reverb {
+		reverse_proxy reverb:8080
+	}
+
 	# Laravel API + Sanctum. The backend app is mounted so its public/ is the root.
 	@laravel path /api/* /sanctum/* /up
 	handle @laravel {
