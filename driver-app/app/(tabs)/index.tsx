@@ -3,6 +3,7 @@ import { View, ScrollView, RefreshControl, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useFocusEffect, useRouter } from "expo-router";
+import * as Notifications from "expo-notifications";
 import { UserCircle, Map as MapIcon } from "lucide-react-native";
 import { api, type HomeData, type FleetHomeData, type Offer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -23,19 +24,31 @@ export default function HomeScreen() {
   const row = isRTL() ? "row-reverse" : "row";
   const align = isRTL() ? "right" : "left";
 
-  const load = useCallback(async () => {
-    setRefreshing(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setRefreshing(true);
     try {
       if (isOwner) setFleet((await api.fleetHome()).data);
       else setData((await api.home()).data);
     } catch {
       /* keep last */
     } finally {
-      setRefreshing(false);
+      if (!silent) setRefreshing(false);
     }
   }, [isOwner]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  // Live home: load on focus, then silently re-poll every few seconds while the
+  // screen is open so a new offer or a status change appears without a manual
+  // pull. The interval is cleared on blur so it never runs off-screen.
+  useFocusEffect(
+    useCallback(() => {
+      load();
+      const iv = setInterval(() => load(true), 4000);
+      // Refresh the instant a dispatch push lands, so a new offer / status change
+      // shows immediately rather than waiting for the next poll tick.
+      const sub = Notifications.addNotificationReceivedListener(() => load(true));
+      return () => { clearInterval(iv); sub.remove(); };
+    }, [load]),
+  );
 
   const greeting = new Date().getHours() >= 17 ? t("home.greetingEvening") : t("home.greetingDay");
   const today = isOwner ? fleet?.today : data?.today;
@@ -53,7 +66,7 @@ export default function HomeScreen() {
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: c.canvas }}>
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 18 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} tintColor={c.ink} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load()} tintColor={c.ink} />}
       >
         {/* Brand + greeting + status — one combined card */}
         <View style={{ ...cardStyle(c), padding: 16, gap: 13 }}>

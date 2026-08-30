@@ -114,14 +114,14 @@ export default function OffersScreen() {
   const atTopRef = useRef(true);
   useEffect(() => { atTopRef.current = page <= 1 && !loadingMore; }, [page, loadingMore]);
 
-  // Keep the feed live: catch up on focus, poll every 15s, and refresh the moment
+  // Keep the feed live: catch up on focus, poll every 5s, and refresh the moment
   // a dispatch push lands — so a freshly offered ride appears without a manual pull.
   useFocusEffect(
     useCallback(() => {
       silentReload();
       // Keep the app icon clean — no unread badge on this app.
       Notifications.setBadgeCountAsync(0).catch(() => { /* badge unsupported */ });
-      const poll = setInterval(() => { if (atTopRef.current) silentReload(); }, 15000);
+      const poll = setInterval(() => { if (atTopRef.current) silentReload(); }, 5000);
       const sub = Notifications.addNotificationReceivedListener(() => {
         if (atTopRef.current) silentReload();
       });
