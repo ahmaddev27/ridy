@@ -812,9 +812,8 @@ function CompanyNetworkTab({ id }: { id: number }) {
     { v: "status", l: c("net_status") },
     { v: "roster", l: c("net_roster") },
     { v: "vehicle", l: c("net_vehicle") },
-    { v: "metric", l: c("net_metric") },
-    { v: "session", l: c("net_session") },
     { v: "earnerbreakdownsv2", l: c("net_earnings") },
+    { v: "session", l: c("net_session") },
   ];
   const pick = (v: string) => {
     setKind(v);
