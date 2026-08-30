@@ -33,6 +33,7 @@ class EnsureDashboardToken
         'api/v1/drivers/metrics',
         'api/v1/vehicles',
         'api/v1/dispatch/offers/ingest',
+        'api/v1/supplier/capture',
     ];
 
     public function handle(Request $request, Closure $next): Response
