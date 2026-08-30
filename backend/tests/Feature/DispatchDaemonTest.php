@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Dispatch\Models\DispatchNetworkLog;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
@@ -42,6 +43,31 @@ class DispatchDaemonTest extends TestCase
     private function daemon(): self
     {
         return $this->withHeader('X-Dispatch-Secret', self::SECRET);
+    }
+
+    public function test_daemon_status_and_roster_syncs_are_recorded_to_the_network_feed(): void
+    {
+        $session = $this->makeSession();
+
+        $this->daemon()->postJson("/api/v1/internal/dispatch/sessions/{$session->id}/statuses", [
+            'statuses' => [
+                ['driver_uuid' => 'd1', 'status' => 'ON_TRIP'],
+                ['driver_uuid' => 'd2', 'status' => 'ONLINE'],
+            ],
+        ])->assertOk();
+
+        $this->daemon()->postJson("/api/v1/internal/dispatch/sessions/{$session->id}/roster", [
+            'drivers' => [['uuid' => 'd1'], ['uuid' => 'd2'], ['uuid' => 'd3']],
+        ])->assertOk();
+
+        $status = DispatchNetworkLog::where('kind', 'status')->first();
+        $this->assertNotNull($status, 'daemon status sync must reach the Network feed');
+        $this->assertSame($session->tenant_id, $status->tenant_id);
+        $this->assertSame(2, $status->count);
+
+        $roster = DispatchNetworkLog::where('kind', 'roster')->first();
+        $this->assertNotNull($roster, 'daemon roster sync must reach the Network feed');
+        $this->assertSame(3, $roster->count);
     }
 
     public function test_sessions_endpoint_returns_active_sessions_with_cookies(): void

@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Domain\Dispatch\Models\DispatchNetworkLog;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
+use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Domain\Dispatch\TripGeocoder;
 use App\Domain\Dispatch\UberSupplierClient;
 use App\Domain\Fleet\DriverStatsService;
@@ -142,7 +142,7 @@ class DriverController extends Controller
      * browser (real IP, so Uber responds) and posts the driver list here. This is
      * the reliable path — server-side pulls get blocked by Uber's datacenter check.
      */
-    public function ingestRoster(Request $request, RosterSyncService $roster): JsonResponse
+    public function ingestRoster(Request $request, RosterSyncService $roster, SupplierNetworkRecorder $recorder): JsonResponse
     {
         $data = $request->validate([
             'drivers' => ['required', 'array'],
@@ -159,15 +159,8 @@ class DriverController extends Controller
             abort(409, 'org_mismatch');
         }
 
+        $recorder->roster((int) $tenant->id, $data['drivers']);
         $result = $roster->sync((int) $tenant->id, $data['drivers']);
-
-        rescue(fn () => DispatchNetworkLog::record(
-            (int) $tenant->id,
-            'roster',
-            $data['drivers'],
-            'Roster sync — '.count($data['drivers']).' drivers',
-            count($data['drivers']),
-        ), report: false);
 
         return response()->json(['data' => $result]);
     }
@@ -176,7 +169,7 @@ class DriverController extends Controller
      * Live online/offline presence, posted by the extension after querying
      * Uber's GetDriverLiveLocation. Matched to drivers by Uber UUID.
      */
-    public function ingestStatuses(Request $request, DriverStatusIngestor $ingestor): JsonResponse
+    public function ingestStatuses(Request $request, DriverStatusIngestor $ingestor, SupplierNetworkRecorder $recorder): JsonResponse
     {
         $data = $request->validate([
             'statuses' => ['required', 'array'],
@@ -189,15 +182,8 @@ class DriverController extends Controller
             'statuses.*.waypoints' => ['nullable', 'array'],
         ]);
 
+        $recorder->statuses((int) $request->user()->tenant_id, $data['statuses']);
         $result = $ingestor->ingest((int) $request->user()->tenant_id, $data['statuses']);
-
-        rescue(fn () => DispatchNetworkLog::record(
-            (int) $request->user()->tenant_id,
-            'status',
-            $data['statuses'],
-            'Status sync — '.count($data['statuses']).' drivers',
-            count($data['statuses']),
-        ), report: false);
 
         return response()->json(['data' => $result]);
     }

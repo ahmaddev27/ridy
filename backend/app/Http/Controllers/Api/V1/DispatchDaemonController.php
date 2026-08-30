@@ -6,6 +6,7 @@ use App\Domain\Dispatch\FleetSessionService;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Dispatch\ShardService;
+use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Domain\Fleet\DriverStatusIngestor;
 use App\Http\Controllers\Controller;
 use Carbon\CarbonImmutable;
@@ -96,7 +97,7 @@ class DispatchDaemonController extends Controller
      * the statuses here. Same effect as the manager's extension sync (updates
      * presence + marks offers accepted on an ON_TRIP transition) but runs 24/7.
      */
-    public function statuses(Request $request, int $session, DriverStatusIngestor $ingestor): JsonResponse
+    public function statuses(Request $request, int $session, DriverStatusIngestor $ingestor, SupplierNetworkRecorder $recorder): JsonResponse
     {
         $data = $request->validate([
             'statuses' => ['required', 'array'],
@@ -110,6 +111,7 @@ class DispatchDaemonController extends Controller
         ]);
 
         $tenantId = (int) $this->find($session)->tenant_id;
+        $recorder->statuses($tenantId, $data['statuses']);
         $result = $ingestor->ingest($tenantId, $data['statuses']);
 
         return response()->json(['data' => $result]);
@@ -135,11 +137,12 @@ class DispatchDaemonController extends Controller
      * The daemon fetched supplier /api/getDrivers for a session's org and forwards
      * the driver list here to be upserted into the roster.
      */
-    public function roster(Request $request, int $session, RosterSyncService $roster): JsonResponse
+    public function roster(Request $request, int $session, RosterSyncService $roster, SupplierNetworkRecorder $recorder): JsonResponse
     {
         $data = $request->validate(['drivers' => ['required', 'array']]);
 
         $tenantId = (int) $this->find($session)->tenant_id;
+        $recorder->roster($tenantId, $data['drivers']);
         $result = $roster->sync($tenantId, $data['drivers']);
 
         return response()->json(['data' => $result]);

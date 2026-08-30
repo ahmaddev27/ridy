@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\AddressFormatter;
 use App\Domain\Dispatch\DispatchOfferIngestor;
-use App\Domain\Dispatch\Models\DispatchNetworkLog;
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Domain\Dispatch\TripGeocoder;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
@@ -123,7 +123,7 @@ class DispatchOfferController extends Controller
      * offers it sees here. Ingestion is idempotent on offer_uuid, so the same
      * offer arriving from the stream more than once is de-duplicated.
      */
-    public function ingest(Request $request, DispatchOfferIngestor $ingestor): JsonResponse
+    public function ingest(Request $request, DispatchOfferIngestor $ingestor, SupplierNetworkRecorder $recorder): JsonResponse
     {
         $data = $request->validate([
             'offers' => ['required', 'array'],
@@ -136,16 +136,10 @@ class DispatchOfferController extends Controller
         $results = ['routed' => 0, 'unlinked_driver' => 0, 'duplicate' => 0, 'skipped_no_uuid' => 0, 'org_mismatch' => 0, 'error' => 0];
 
         foreach ($data['offers'] as $offer) {
-            // Capture EVERY inbound offer for the admin Network tab first — before
-            // the org filter or ingestion — so the feed reflects real supplier
-            // traffic even when an offer is later skipped (org mismatch) or fails
-            // to ingest. Best-effort: logging must never break ingestion.
-            rescue(fn () => DispatchNetworkLog::record(
-                $tenantId,
-                'offer',
-                $offer,
-                trim((string) Arr::get($offer, 'pickupAddress')).' → '.trim((string) Arr::get($offer, 'dropoffAddress')),
-            ), report: false);
+            // Capture EVERY inbound offer for the admin Network feed first — before
+            // the org filter or ingestion — so it reflects real supplier traffic
+            // even when an offer is later skipped (org mismatch) or fails to ingest.
+            $recorder->offer($tenantId, $offer);
 
             // Only accept offers from THIS company's own Uber org — never a
             // different account the manager happens to have open in another tab.

@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\DispatchOfferIngestor;
-use App\Domain\Dispatch\Models\DispatchNetworkLog;
 use App\Domain\Dispatch\Models\UberFleetSession;
+use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +16,7 @@ use Illuminate\Support\Arr;
  */
 class DispatchIngestController extends Controller
 {
-    public function ingest(Request $request, DispatchOfferIngestor $ingestor): JsonResponse
+    public function ingest(Request $request, DispatchOfferIngestor $ingestor, SupplierNetworkRecorder $recorder): JsonResponse
     {
         $data = $request->validate([
             'offers' => ['required', 'array'],
@@ -47,16 +47,9 @@ class DispatchIngestController extends Controller
 
             $tenantId = (int) $session->tenant_id;
 
-            // Capture the RAW offer for the admin Network tab first — before
-            // ingestion, geocoding, or any normalisation — so the feed shows the
-            // supplier's payload exactly as it arrived. Best-effort: logging must
-            // never break the stream.
-            rescue(fn () => DispatchNetworkLog::record(
-                $tenantId,
-                'offer',
-                $offer,
-                trim((string) Arr::get($offer, 'pickupAddress')).' → '.trim((string) Arr::get($offer, 'dropoffAddress')),
-            ), report: false);
+            // Capture the RAW offer for the admin Network feed first — before
+            // ingestion/geocoding/normalisation — so it shows exactly as it arrived.
+            $recorder->offer($tenantId, $offer);
 
             $outcome = $ingestor->ingest($tenantId, $offer, $seq);
             $results[$outcome['status']] = ($results[$outcome['status']] ?? 0) + 1;
