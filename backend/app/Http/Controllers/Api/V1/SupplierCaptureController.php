@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\SupplierNetworkRecorder;
+use App\Domain\Fleet\EarnerBreakdownParser;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ use Illuminate\Http\Request;
  */
 class SupplierCaptureController extends Controller
 {
-    public function store(Request $request, SupplierNetworkRecorder $recorder): JsonResponse
+    public function store(Request $request, SupplierNetworkRecorder $recorder, EarnerBreakdownParser $earnings): JsonResponse
     {
         $data = $request->validate([
             'kind' => ['required', 'string', 'max:20'],
@@ -26,14 +27,17 @@ class SupplierCaptureController extends Controller
             'payload' => ['required'],
         ]);
 
-        $recorder->capture(
-            (int) $request->user()->tenant_id,
-            $data['kind'],
-            $data['payload'],
-            $data['summary'] ?? null,
-            $data['count'] ?? null,
-        );
+        $tenantId = (int) $request->user()->tenant_id;
 
-        return response()->json(['data' => ['captured' => true]]);
+        $recorder->capture($tenantId, $data['kind'], $data['payload'], $data['summary'] ?? null, $data['count'] ?? null);
+
+        // Known captures get parsed into structured data on top of the raw log.
+        // The Fleet Earnings breakdown fills every driver's metrics in one shot.
+        $stored = 0;
+        if (is_array($data['payload']) && EarnerBreakdownParser::handles($data['payload'])) {
+            $stored = rescue(fn () => $earnings->parse($tenantId, $data['payload']), 0, report: false);
+        }
+
+        return response()->json(['data' => ['captured' => true, 'metrics_stored' => $stored]]);
     }
 }

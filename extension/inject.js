@@ -30,18 +30,33 @@
   const onSupplier = /(^|\.)supplier\.uber\.com$/i.test(location.host);
   const isCapture = (u) =>
     onSupplier && typeof u === "string" && /(\/api\/|\/graphql)/i.test(u) && !isRamen(u);
-  function kindFor(u) {
+  // Prefer a graphql operationName as the kind ("getEarnerBreakdownsV2"), else the
+  // REST method name from the path. Capped to the 20-char kind column.
+  function kindFor(u, op) {
+    if (op) return op.toLowerCase().replace(/^get/, "").slice(0, 20);
     const m = /\/api\/([A-Za-z0-9_]+)/.exec(u);
     if (m) return (m[1].toLowerCase().replace(/^get/, "") || "api").slice(0, 20);
     if (/graphql/i.test(u)) return "graphql";
     return "api";
   }
-  async function teeJson(res, url) {
+  // Pull {operationName, variables} out of a graphql request body so the server
+  // knows which query it is and over what time range (earnings needs the period).
+  function graphqlMeta(body) {
+    try {
+      const b = typeof body === "string" ? JSON.parse(body) : null;
+      if (b && b.operationName) return { operationName: b.operationName, variables: b.variables ?? null };
+    } catch {
+      /* not JSON */
+    }
+    return null;
+  }
+  async function teeJson(res, url, meta) {
     try {
       const text = await res.text();
-      if (!text || text.length > 300000) return; // skip empty / very large bodies
-      const payload = JSON.parse(text);
-      window.postMessage({ source: "ridy-capture", kind: kindFor(url), url, payload }, location.origin);
+      if (!text || text.length > 1000000) return; // skip empty / very large bodies
+      const data = JSON.parse(text);
+      const payload = meta ? { operationName: meta.operationName, variables: meta.variables, data } : data;
+      window.postMessage({ source: "ridy-capture", kind: kindFor(url, meta && meta.operationName), url, payload }, location.origin);
     } catch {
       /* non-JSON — ignore */
     }
@@ -105,7 +120,8 @@
         .then((res) => tapStream(res.clone()))
         .catch(() => {});
     } else if (isCapture(url)) {
-      promise.then((res) => teeJson(res.clone(), url)).catch(() => {});
+      const meta = /graphql/i.test(url) ? graphqlMeta(init && init.body) : null;
+      promise.then((res) => teeJson(res.clone(), url, meta)).catch(() => {});
     }
     return promise;
   };
@@ -133,14 +149,17 @@
     if (this.__ridyCap) this.__ridyCapUrl = url;
     return origOpen.apply(this, arguments);
   };
-  XMLHttpRequest.prototype.send = function () {
+  XMLHttpRequest.prototype.send = function (body) {
     if (this.__ridyCap) {
+      const meta = /graphql/i.test(this.__ridyCapUrl) ? graphqlMeta(body) : null;
       this.addEventListener("load", () => {
         try {
           const text = this.responseText || "";
-          if (text && text.length <= 300000) {
+          if (text && text.length <= 1000000) {
+            const data = JSON.parse(text);
+            const payload = meta ? { operationName: meta.operationName, variables: meta.variables, data } : data;
             window.postMessage(
-              { source: "ridy-capture", kind: kindFor(this.__ridyCapUrl), url: this.__ridyCapUrl, payload: JSON.parse(text) },
+              { source: "ridy-capture", kind: kindFor(this.__ridyCapUrl, meta && meta.operationName), url: this.__ridyCapUrl, payload },
               location.origin,
             );
           }
