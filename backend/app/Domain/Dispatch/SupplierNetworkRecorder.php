@@ -31,6 +31,30 @@ class SupplierNetworkRecorder
         $this->capture($tenantId, 'roster', $drivers, 'Roster sync — '.count($drivers).' drivers', count($drivers));
     }
 
+    /** A fleet vehicle sync. */
+    public function vehicles(int $tenantId, array $vehicles): void
+    {
+        $this->capture($tenantId, 'vehicle', $vehicles, 'Vehicle sync — '.count($vehicles).' vehicles', count($vehicles));
+    }
+
+    /** One driver's earnings/metrics window. */
+    public function metric(int $tenantId, array $metric, ?string $driver = null): void
+    {
+        $this->capture($tenantId, 'metric', $metric, 'Driver metrics'.($driver !== null && $driver !== '' ? ' — '.$driver : ''));
+    }
+
+    /**
+     * A session-lifecycle event (link / cookie refresh / needs-relink). The
+     * payload is metadata ONLY — never cookie values, which are secrets — so the
+     * Network feed can show that a session changed without exposing credentials.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    public function session(int $tenantId, string $event, array $meta = []): void
+    {
+        $this->capture($tenantId, 'session', ['event' => $event] + $meta, 'Session — '.$event);
+    }
+
     /** One raw offer, exactly as the supplier sent it (pre-ingest, pre-geocode). */
     public function offer(int $tenantId, array $offer): void
     {

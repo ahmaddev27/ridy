@@ -73,7 +73,7 @@ class DispatchDaemonController extends Controller
      * stream. This rolling refresh keeps an actively-used session alive well
      * beyond its idle lifetime — no password required.
      */
-    public function refreshCookies(Request $request, int $session): JsonResponse
+    public function refreshCookies(Request $request, int $session, SupplierNetworkRecorder $recorder): JsonResponse
     {
         $data = $request->validate([
             'cookies' => ['required', 'array', 'min:1'],
@@ -88,6 +88,12 @@ class DispatchDaemonController extends Controller
             'expires_at' => isset($data['expires_at']) ? CarbonImmutable::parse($data['expires_at']) : $model->expires_at,
             'last_event_at' => CarbonImmutable::now(),
         ])->save();
+
+        // Log the event WITHOUT the cookie values (secrets) — count + expiry only.
+        $recorder->session((int) $model->tenant_id, 'cookies_refreshed', [
+            'cookie_count' => count($data['cookies']),
+            'expires_at' => $data['expires_at'] ?? null,
+        ]);
 
         return response()->json(['data' => ['status' => 'refreshed']]);
     }
@@ -118,9 +124,11 @@ class DispatchDaemonController extends Controller
     }
 
     /** The daemon saw Uber reject the session; flag it for manager re-link. */
-    public function needsRelink(int $session, FleetSessionService $service): JsonResponse
+    public function needsRelink(int $session, FleetSessionService $service, SupplierNetworkRecorder $recorder): JsonResponse
     {
-        $service->markNeedsRelink($this->find($session));
+        $model = $this->find($session);
+        $service->markNeedsRelink($model);
+        $recorder->session((int) $model->tenant_id, 'needs_relink');
 
         return response()->json(['data' => ['status' => UberFleetSession::STATUS_NEEDS_RELINK]]);
     }

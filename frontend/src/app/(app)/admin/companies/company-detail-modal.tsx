@@ -809,6 +809,9 @@ function CompanyNetworkTab({ id }: { id: number }) {
     { v: "offer", l: c("net_offer") },
     { v: "status", l: c("net_status") },
     { v: "roster", l: c("net_roster") },
+    { v: "vehicle", l: c("net_vehicle") },
+    { v: "metric", l: c("net_metric") },
+    { v: "session", l: c("net_session") },
   ];
   const pick = (v: string) => {
     setKind(v);
@@ -892,9 +895,14 @@ function CompanyNetworkTab({ id }: { id: number }) {
               className="flex w-full items-center gap-3 bg-surface-2 px-4 py-3 text-start hover:bg-surface-2"
             >
               <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                o.kind === "offer" ? "bg-primary/15 text-primary"
-                  : o.kind === "status" ? "bg-blue-500/15 text-blue-500"
-                  : "bg-amber-500/15 text-amber-600"
+                {
+                  offer: "bg-primary/15 text-primary",
+                  status: "bg-blue-500/15 text-blue-500",
+                  roster: "bg-amber-500/15 text-amber-600",
+                  vehicle: "bg-violet-500/15 text-violet-500",
+                  metric: "bg-teal-500/15 text-teal-500",
+                  session: "bg-rose-500/15 text-rose-500",
+                }[o.kind] ?? "bg-surface-2 text-ink-muted"
               }`}>{c(`net_${o.kind}`)}</span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm text-ink">{o.summary ?? "—"}</div>

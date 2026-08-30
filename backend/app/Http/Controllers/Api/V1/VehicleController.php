@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Domain\Fleet\Models\Vehicle;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -37,7 +38,7 @@ class VehicleController extends Controller
     }
 
     /** Upsert the fleet's vehicles (posted by the extension after a sync). */
-    public function ingest(Request $request): JsonResponse
+    public function ingest(Request $request, SupplierNetworkRecorder $recorder): JsonResponse
     {
         $request->validate([
             'vehicles' => ['required', 'array'],
@@ -45,6 +46,7 @@ class VehicleController extends Controller
         ]);
 
         $tenantId = (int) $request->user()->tenant_id;
+        $recorder->vehicles($tenantId, (array) $request->input('vehicles'));
         $count = 0;
 
         // Use the raw input (validate() would strip the unlisted vehicle fields).

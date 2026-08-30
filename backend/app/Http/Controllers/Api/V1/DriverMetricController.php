@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\DriverMetric;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
@@ -20,7 +21,7 @@ class DriverMetricController extends Controller
     use AuthorizesTenantResource;
 
     /** Upsert a driver's metrics for a window (posted by the extension). */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, SupplierNetworkRecorder $recorder): JsonResponse
     {
         $data = $request->validate([
             'driver_uuid' => ['required', 'string'],
@@ -39,6 +40,8 @@ class DriverMetricController extends Controller
         if ($driver === null) {
             return response()->json(['message' => 'Unknown driver.'], 404);
         }
+
+        $recorder->metric((int) $driver->tenant_id, $data, $driver->name);
 
         $metric = DriverMetric::updateOrCreate(
             [
