@@ -67,7 +67,7 @@ class SupplierNetworkRecorder
     }
 
     /** Persist one captured request. Best-effort — logging never breaks ingestion. */
-    private function capture(?int $tenantId, string $kind, mixed $payload, ?string $summary, ?int $count = null): void
+    public function capture(?int $tenantId, string $kind, mixed $payload, ?string $summary, ?int $count = null): void
     {
         rescue(fn () => DispatchNetworkLog::record($tenantId, $kind, $payload, $summary, $count), report: false);
     }

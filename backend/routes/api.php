@@ -55,6 +55,7 @@ use App\Http\Controllers\Api\V1\PublicPlanController;
 use App\Http\Controllers\Api\V1\PublicSupportController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\ResellerController;
+use App\Http\Controllers\Api\V1\SupplierCaptureController;
 use App\Http\Controllers\Api\V1\UberLoginController;
 use App\Http\Controllers\Api\V1\VehicleController;
 use App\Http\Middleware\LogDriverAuthContext;
@@ -200,6 +201,11 @@ Route::prefix('v1')->group(function () {
         // Fleet vehicles (synced from Uber via the extension)
         Route::get('vehicles', [VehicleController::class, 'index']);
         Route::post('vehicles', [VehicleController::class, 'ingest'])->middleware('fleet.connected');
+
+        // Generic supplier capture — the extension pulls any Uber Fleet tab
+        // (documents/reports/invoices/banking/promotions/inbox/…) and POSTs the raw
+        // payload here tagged with a kind, so it lands in the admin Network feed.
+        Route::post('supplier/capture', [SupplierCaptureController::class, 'store'])->middleware('fleet.connected');
 
         // Dispatch offers feed
         Route::get('dispatch/offers', [DispatchOfferController::class, 'index']);
