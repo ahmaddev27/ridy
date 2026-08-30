@@ -52,6 +52,24 @@ export async function getDriverStats(id: number, from?: string, to?: string): Pr
   return res.data;
 }
 
+/** Uber's OFFICIAL earnings, captured from the Fleet Earnings page (newest first). */
+export type DriverMetric = {
+  period_start: string;
+  period_end: string;
+  earnings: number | null;
+  net_outstanding: number | null;
+  earnings_label: string | null;
+  trips: number | null;
+  distance_km: number | null;
+  breakdown: Record<string, number> | null;
+  synced_at: string | null;
+};
+
+export async function getDriverMetrics(id: number): Promise<DriverMetric[]> {
+  const res = await apiFetch<{ data: DriverMetric[] }>(`/api/v1/drivers/${id}/metrics`);
+  return res.data;
+}
+
 /** Trigger an on-demand roster pull from Uber (best-effort). */
 export async function syncDrivers(): Promise<{ synced: number; created?: number; reason?: string }> {
   const res = await apiFetch<{ data: { synced: number; created?: number; reason?: string } }>(

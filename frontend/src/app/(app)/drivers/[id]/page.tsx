@@ -9,7 +9,7 @@ import { Badge, type Status } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
-import { getDriver, getDriverStats, type Driver, type DriverStats } from "@/lib/api/drivers";
+import { getDriver, getDriverStats, getDriverMetrics, type Driver, type DriverStats, type DriverMetric } from "@/lib/api/drivers";
 import { listOffersPaged, fareLabel, type DispatchOffer, type OfferStatus } from "@/lib/api/offers";
 import { OfferDetailModal } from "../../offers/offer-detail-modal";
 
@@ -61,6 +61,19 @@ function rangeMs(key: RangeKey): { from: number; to: number } {
   return { from: now - Number(key) * DAY_MS, to: now };
 }
 
+/** Currency amount with its symbol ("€1,481.04"), or "—" when absent. */
+function money(amount: number | null | undefined, label: string | null): string {
+  if (amount == null) return "—";
+  const symbol = label === "EUR" ? "€" : label ? `${label} ` : "";
+  return `${symbol}${amount.toFixed(2)}`;
+}
+
+/** "12 Aug – 19 Aug" for a captured earnings window. */
+function uberPeriod(m: DriverMetric, loc: string): string {
+  const fmt = (s: string) => new Date(s).toLocaleDateString(loc, { day: "numeric", month: "short" });
+  return `${fmt(m.period_start)} – ${fmt(m.period_end)}`;
+}
+
 function statusLabel(driver: Driver, d: (k: string) => string): { text: string; tone: string } {
   const s = (driver.online_status ?? "").toUpperCase();
   if (s.includes("ON_TRIP")) return { text: d("onTrip"), tone: "text-success-fg" };
@@ -78,6 +91,7 @@ export default function DriverProfilePage() {
 
   const [driver, setDriver] = useState<Driver | null>(null);
   const [stats, setStats] = useState<DriverStats | null>(null);
+  const [uber, setUber] = useState<DriverMetric | null>(null);
   const [tab, setTab] = useState<"performance" | "details">("performance");
   const [range, setRange] = useState<RangeKey>("today");
   const [customFrom, setCustomFrom] = useState("");
@@ -107,6 +121,13 @@ export default function DriverProfilePage() {
   useEffect(() => {
     getDriverStats(id, win.fromDate, win.toDate).then(setStats).catch(() => setStats(null));
   }, [id, win.fromDate, win.toDate]);
+
+  // Uber's OFFICIAL earnings (captured from the Fleet Earnings page). We show the
+  // most recent captured window, regardless of the selected preset, since Uber's
+  // period is whatever the manager last viewed on Uber.
+  useEffect(() => {
+    getDriverMetrics(id).then((m) => setUber(m[0] ?? null)).catch(() => setUber(null));
+  }, [id]);
 
   // This driver's own captured offers for the selected window.
   useEffect(() => {
@@ -314,6 +335,29 @@ export default function DriverProfilePage() {
                   })}
                 </div>
               )}
+            </Card>
+          )}
+
+          {/* Uber's official earnings — captured from the Fleet Earnings page */}
+          {uber && (
+            <Card className="p-5">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold text-ink">{d("uberData")}</h4>
+                <span className="text-xs text-ink-subtle" dir="ltr">{uberPeriod(uber, latnLocale(locale))}</span>
+              </div>
+              <p className="mb-3 mt-0.5 text-xs text-ink-subtle">{d("uberDataHint")}</p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                <MiniStat label={d("statEarnings")} value={money(uber.earnings, uber.earnings_label)} />
+                <MiniStat label={d("statTrips")} value={uber.trips != null ? String(uber.trips) : "—"} />
+                <MiniStat label={d("statKm")} value={uber.distance_km != null ? `${uber.distance_km} km` : "—"} />
+                <MiniStat label={d("statNet")} value={money(uber.net_outstanding, uber.earnings_label)} />
+                {uber.breakdown?.promotion != null && (
+                  <MiniStat label={d("statPromo")} value={money(uber.breakdown.promotion, uber.earnings_label)} />
+                )}
+                {uber.breakdown?.tip != null && (
+                  <MiniStat label={d("statTip")} value={money(uber.breakdown.tip, uber.earnings_label)} />
+                )}
+              </div>
             </Card>
           )}
 
