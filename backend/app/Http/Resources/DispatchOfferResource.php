@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Domain\Dispatch\AddressFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Arr;
 
 class DispatchOfferResource extends JsonResource
 {
@@ -35,8 +36,11 @@ class DispatchOfferResource extends JsonResource
             'rider_first_name' => $this->rider_first_name,
             // Alias the driver app reads as the customer/rider name.
             'rider_name' => $this->rider_first_name,
-            'pickup_address' => AddressFormatter::tidy($this->pickup_address),
-            'dropoff_address' => AddressFormatter::tidy($this->dropoff_address),
+            // Always show the supplier's ORIGINAL address, sourced from the raw
+            // payload — identical in the list and the detail modal, and immune to
+            // any legacy geocoder rewrite still stored on the columns.
+            'pickup_address' => AddressFormatter::tidy(Arr::get($this->raw_payload, 'pickupAddress') ?: $this->pickup_address),
+            'dropoff_address' => AddressFormatter::tidy(Arr::get($this->raw_payload, 'dropoffAddress') ?: $this->dropoff_address),
             'pickup_station_name' => $this->pickup_station_name,
             'dropoff_station_name' => $this->dropoff_station_name,
             'fare_formatted' => $this->fare_formatted,
