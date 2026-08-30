@@ -509,7 +509,36 @@ async function postOffers(offers, seq) {
   }
 }
 
+// Forward one passively-captured Uber Fleet API response to Reidey's generic
+// supplier-capture sink, tagged with a kind derived from the endpoint. Best
+// -effort: a failed capture must never disrupt browsing.
+async function postCapture(kind, url, payload) {
+  const pairing = await getPairing();
+  if (!pairing.ok) return { ok: false, reason: pairing.reason };
+  const { apiUrl, token } = pairing;
+  let summary = "";
+  try {
+    summary = new URL(url).pathname.slice(0, 250);
+  } catch {
+    summary = String(url || "").slice(0, 250);
+  }
+  try {
+    const res = await fetch(`${apiUrl}/api/v1/supplier/capture`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ kind: String(kind || "api").slice(0, 20), summary, payload }),
+    });
+    return { ok: res.ok };
+  } catch (e) {
+    return { ok: false, reason: e.message };
+  }
+}
+
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === "supplier_capture") {
+    postCapture(msg.kind, msg.url, msg.payload).then(sendResponse).catch(() => sendResponse({ ok: false }));
+    return true;
+  }
   if (msg?.type === "capture") {
     // orgUuid may be null (account.uber.com) — capture() discovers it in the
     // background. Do NOT gate on it here, or that whole flow never runs.

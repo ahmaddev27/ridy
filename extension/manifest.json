@@ -22,7 +22,7 @@
       "run_at": "document_start"
     },
     {
-      "matches": ["*://vsdispatch.uber.com/*"],
+      "matches": ["*://vsdispatch.uber.com/*", "*://supplier.uber.com/*"],
       "js": ["inject.js"],
       "run_at": "document_start",
       "world": "MAIN"

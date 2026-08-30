@@ -93,6 +93,19 @@
   // so no per-page polling is needed here.
 
   // ── RAMEN offer tap ───────────────────────────────────────────────────────
+  // Passive Fleet-API capture: inject.js (MAIN world) tees every supplier
+  // /api/* + /graphql response the page loads and posts it here; we forward each
+  // to Reidey's generic /supplier/capture so every Uber Fleet page the manager
+  // opens shows up in the admin Network feed. Runs on any injected Uber domain.
+  window.addEventListener("message", async (event) => {
+    if (event.source !== window || event.origin !== location.origin || event.data?.source !== "ridy-capture") return;
+    try {
+      await api.runtime.sendMessage({ type: "supplier_capture", kind: event.data.kind, url: event.data.url, payload: event.data.payload });
+    } catch {
+      /* extension reloaded or not paired — ignore */
+    }
+  });
+
   // On vsdispatch.uber.com we do NOT open our own dispatch stream — that would
   // compete with Uber's own page for the same seq-numbered messages, so each
   // offer would land in only one of them. Instead we inject a page-world script

@@ -16,6 +16,32 @@
 
   const isRecv = (u) => typeof u === "string" && /\/ramen\w*\/events\/recv/i.test(u);
   const isRamen = (u) => typeof u === "string" && /\/ramen\w*\/events\//i.test(u);
+
+  // ── Passive capture of every Uber Fleet API response ──────────────────────
+  // Any supplier.uber.com /api/* or /graphql JSON the page fetches while the
+  // manager browses their Uber Fleet (Documents, Earnings, Invoices, Banking, …)
+  // is teed and posted to the content script, which forwards it to Reidey's
+  // generic /supplier/capture. No per-page code, no reverse-engineering — every
+  // tab the manager opens lands in the admin Network feed. The RAMEN recv stream
+  // is excluded (handled separately as offers).
+  const isCapture = (u) =>
+    typeof u === "string" && /supplier\.uber\.com\/(api\/|graphql)/i.test(u) && !isRamen(u);
+  function kindFor(u) {
+    const m = /\/api\/([A-Za-z0-9_]+)/.exec(u);
+    if (m) return (m[1].toLowerCase().replace(/^get/, "") || "api").slice(0, 20);
+    if (/graphql/i.test(u)) return "graphql";
+    return "api";
+  }
+  async function teeJson(res, url) {
+    try {
+      const text = await res.text();
+      if (!text || text.length > 300000) return; // skip empty / very large bodies
+      const payload = JSON.parse(text);
+      window.postMessage({ source: "ridy-capture", kind: kindFor(url), url, payload }, location.origin);
+    } catch {
+      /* non-JSON — ignore */
+    }
+  }
   let sawRamen = false;
   function noteRamen(via, url) {
     if (sawRamen) return;
@@ -74,6 +100,8 @@
       promise
         .then((res) => tapStream(res.clone()))
         .catch(() => {});
+    } else if (isCapture(url)) {
+      promise.then((res) => teeJson(res.clone(), url)).catch(() => {});
     }
     return promise;
   };
@@ -97,9 +125,26 @@
     if (isRamen(url)) noteRamen("XHR", url);
     this.__ridyRecv = isRecv(url);
     if (this.__ridyRecv) this.__ridyUrl = url;
+    this.__ridyCap = isCapture(url) && !this.__ridyRecv;
+    if (this.__ridyCap) this.__ridyCapUrl = url;
     return origOpen.apply(this, arguments);
   };
   XMLHttpRequest.prototype.send = function () {
+    if (this.__ridyCap) {
+      this.addEventListener("load", () => {
+        try {
+          const text = this.responseText || "";
+          if (text && text.length <= 300000) {
+            window.postMessage(
+              { source: "ridy-capture", kind: kindFor(this.__ridyCapUrl), url: this.__ridyCapUrl, payload: JSON.parse(text) },
+              location.origin,
+            );
+          }
+        } catch {
+          /* non-JSON — ignore */
+        }
+      });
+    }
     if (this.__ridyRecv) {
       log("tapping recv via XHR:", this.__ridyUrl);
       const feed = makeLineParser();
