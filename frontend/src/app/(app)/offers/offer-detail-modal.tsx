@@ -45,7 +45,7 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
     return () => document.removeEventListener("keydown", onKey);
   }, [id, onClose]);
 
-  const stops = extractStops(offer?.raw);
+  const stops = extractStops(offer?.raw).map(tidyAddr).filter(Boolean);
 
   return (
     <div
@@ -206,6 +206,23 @@ function pricePerKm(offer: DispatchOfferDetail): number | null {
   // column) before parsing the formatted string.
   const fare = trip.fare_amount ?? offer.fare_amount ?? parseFareNum(offer.fare_formatted);
   return fare != null ? fare / trip.distance_km : null;
+}
+
+// Uber localises the address to the driver's app language, so it arrives with a
+// trailing country segment ("…, Germany" / "…, Deutschland") or a non-Latin one
+// (Arabic/Cyrillic). Strip those so the modal reads like the list row.
+function tidyAddr(a: string): string {
+  return a
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .filter((p) => !/[؀-ۿЀ-ӿ]/.test(p)) // drop Arabic/Cyrillic segments
+    .filter(
+      (p, i, arr) =>
+        !(i === arr.length - 1 &&
+          /^(germany|deutschland|allemagne|almanya|niemcy|alemania|germania|tyskland|duitsland|njemačka)$/i.test(p)),
+    )
+    .join(", ");
 }
 
 function extractStops(raw: Record<string, unknown> | null | undefined): string[] {
