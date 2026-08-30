@@ -123,7 +123,7 @@ jobs:
             # deploy does NOT restart it — its live Uber streams keep running and
             # only blip when the daemon's own code/config actually changed. mysql
             # is likewise left running (no needless DB restart).
-            $COMPOSE up -d --build --force-recreate backend caddy frontend scheduler queue
+            $COMPOSE up -d --build --force-recreate backend caddy frontend scheduler queue reverb
             # Daemon: recreate only if its image/config changed (streams stay up otherwise).
             $COMPOSE up -d --build dispatch-daemon
 
