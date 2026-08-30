@@ -52,6 +52,9 @@ class CompanyDataController extends Controller
         $logs = DispatchNetworkLog::query()
             ->where('tenant_id', $tenant->id)
             ->when($request->filled('kind'), fn ($q) => $q->where('kind', $request->string('kind')))
+            // Optional date-time range on capture time (ISO 8601 / any parseable form).
+            ->when($request->filled('from'), fn ($q) => $q->where('created_at', '>=', $request->date('from')))
+            ->when($request->filled('to'), fn ($q) => $q->where('created_at', '<=', $request->date('to')))
             ->latest('created_at')
             ->paginate(30);
 

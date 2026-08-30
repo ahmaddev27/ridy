@@ -272,10 +272,15 @@ export async function getCompanyNetwork(
   id: number,
   page = 1,
   kind = "",
+  from = "",
+  to = "",
 ): Promise<{ items: CompanyNetworkRow[]; lastPage: number; total: number }> {
-  const q = kind ? `&kind=${encodeURIComponent(kind)}` : "";
+  const p = new URLSearchParams({ page: String(page) });
+  if (kind) p.set("kind", kind);
+  if (from) p.set("from", from);
+  if (to) p.set("to", to);
   const res = await apiFetch<{ data: CompanyNetworkRow[]; meta: { last_page: number; total: number } }>(
-    `${base}/${id}/network?page=${page}${q}`,
+    `${base}/${id}/network?${p.toString()}`,
   );
   return { items: res.data, lastPage: res.meta.last_page, total: res.meta.total };
 }

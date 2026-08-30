@@ -794,6 +794,8 @@ function CompanyNetworkTab({ id }: { id: number }) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [kind, setKind] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [open, setOpen] = useState<Set<number>>(() => new Set());
   const toggle = (rid: number) =>
     setOpen((s) => {
@@ -834,7 +836,7 @@ function CompanyNetworkTab({ id }: { id: number }) {
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    getCompanyNetwork(id, page, kind)
+    getCompanyNetwork(id, page, kind, from, to)
       .then((r) => {
         if (!alive) return;
         setRows(r.items);
@@ -846,11 +848,40 @@ function CompanyNetworkTab({ id }: { id: number }) {
     return () => {
       alive = false;
     };
-  }, [id, page, kind]);
+  }, [id, page, kind, from, to]);
+
+  // Editing a date-time input resets to page 1 so the paginator stays valid.
+  const setRange = (which: "from" | "to", v: string) => {
+    (which === "from" ? setFrom : setTo)(v);
+    setPage(1);
+  };
 
   return (
     <div className="space-y-3">
       <p className="text-xs text-ink-subtle">{c("networkHint")}</p>
+
+      {/* Date-time range on capture time */}
+      <div className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+        <span className="font-medium">{c("dateRange")}</span>
+        <input
+          type="datetime-local"
+          value={from}
+          onChange={(e) => setRange("from", e.target.value)}
+          className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-ink"
+        />
+        <span>—</span>
+        <input
+          type="datetime-local"
+          value={to}
+          onChange={(e) => setRange("to", e.target.value)}
+          className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-ink"
+        />
+        {(from || to) && (
+          <button onClick={() => { setFrom(""); setTo(""); setPage(1); }} className="rounded-full px-2 py-1 font-medium text-primary hover:underline">
+            {c("clear")}
+          </button>
+        )}
+      </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
         {filters.map((f) => (
