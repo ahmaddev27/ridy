@@ -21,10 +21,12 @@ class EarnerBreakdownParserTest extends TestCase
         $uuid = '28e98804-0061-4a4d-87e7-4086d1c4a9b3';
         $driver = Driver::create(['tenant_id' => $tenant->id, 'name' => 'Abd', 'uber_driver_uuid' => $uuid]);
 
+        // The extension wraps the whole graphql response under `data`, so the real
+        // breakdown sits at data.data.getEarnerBreakdownsV2 (graphql's own envelope).
         $payload = [
             'operationName' => 'getEarnerBreakdownsV2',
             'variables' => ['timeRange' => ['startTimeUnixMillis' => '1787536889000', 'endTimeUnixMillis' => '1788141689000']],
-            'data' => ['getEarnerBreakdownsV2' => ['earnerEarningsBreakdowns' => [[
+            'data' => ['data' => ['getEarnerBreakdownsV2' => ['earnerEarningsBreakdowns' => [[
                 'earnerUuid' => $uuid,
                 'earnerMetadata' => ['name' => 'Abd Alhamid Hamou'],
                 'tripInfos' => [
@@ -43,7 +45,7 @@ class EarnerBreakdownParserTest extends TestCase
                 'payouts' => ['children' => [
                     ['categoryName' => 'cash_collected', 'amount' => ['amountE5' => '-49682000']],
                 ]],
-            ]]]],
+            ]]]]],
         ];
 
         $this->assertTrue(EarnerBreakdownParser::handles($payload));

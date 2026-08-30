@@ -20,6 +20,7 @@ class EarnerBreakdownParser
     public static function handles(array $payload): bool
     {
         return Arr::get($payload, 'operationName') === 'getEarnerBreakdownsV2'
+            || Arr::has($payload, 'data.data.getEarnerBreakdownsV2')
             || Arr::has($payload, 'data.getEarnerBreakdownsV2');
     }
 
@@ -29,7 +30,11 @@ class EarnerBreakdownParser
      */
     public function parse(int $tenantId, array $payload): int
     {
-        $earners = Arr::get($payload, 'data.getEarnerBreakdownsV2.earnerEarningsBreakdowns');
+        // The capture wraps the whole graphql response under `data`, so the real
+        // payload lives at data.data (graphql's own `data` envelope). Fall back to
+        // data.* for an already-unwrapped shape.
+        $gql = Arr::get($payload, 'data.data', Arr::get($payload, 'data', []));
+        $earners = Arr::get($gql, 'getEarnerBreakdownsV2.earnerEarningsBreakdowns');
         if (! is_array($earners) || $earners === []) {
             return 0;
         }
