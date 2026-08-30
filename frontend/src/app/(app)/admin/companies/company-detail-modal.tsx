@@ -860,7 +860,8 @@ function CompanyNetworkTab({ id }: { id: number }) {
     <div className="space-y-3">
       <p className="text-xs text-ink-subtle">{c("networkHint")}</p>
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      {/* One filter bar: kind chips first, then the date-time range on the right. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
         {filters.map((f) => (
           <button
             key={f.v || "all"}
@@ -875,39 +876,38 @@ function CompanyNetworkTab({ id }: { id: number }) {
             {f.l}
           </button>
         ))}
-        {rows.length > 0 && (
-          <button
-            onClick={copyAll}
-            title={c("copyAll")}
-            className="ms-auto inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-xs font-medium text-ink-muted transition hover:bg-surface-2 hover:text-ink"
-          >
-            <Files className="h-3.5 w-3.5" />
-            {c("copyAll")}
-          </button>
-        )}
-      </div>
 
-      {/* Date-time range on capture time — after the kind filters */}
-      <div className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
-        <span className="font-medium">{c("dateRange")}</span>
-        <input
-          type="datetime-local"
-          value={from}
-          onChange={(e) => setRange("from", e.target.value)}
-          className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-ink"
-        />
-        <span>—</span>
-        <input
-          type="datetime-local"
-          value={to}
-          onChange={(e) => setRange("to", e.target.value)}
-          className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-ink"
-        />
-        {(from || to) && (
-          <button onClick={() => { setFrom(""); setTo(""); setPage(1); }} className="rounded-full px-2 py-1 font-medium text-primary hover:underline">
-            {c("clear")}
-          </button>
-        )}
+        <div className="ms-auto flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+          <span className="font-medium">{c("dateRange")}</span>
+          <input
+            type="datetime-local"
+            value={from}
+            onChange={(e) => setRange("from", e.target.value)}
+            className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-ink"
+          />
+          <span>—</span>
+          <input
+            type="datetime-local"
+            value={to}
+            onChange={(e) => setRange("to", e.target.value)}
+            className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-ink"
+          />
+          {(from || to) && (
+            <button onClick={() => { setFrom(""); setTo(""); setPage(1); }} className="rounded-full px-2 py-1 font-medium text-primary hover:underline">
+              {c("clear")}
+            </button>
+          )}
+          {rows.length > 0 && (
+            <button
+              onClick={copyAll}
+              title={c("copyAll")}
+              className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 font-medium text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+            >
+              <Files className="h-3.5 w-3.5" />
+              {c("copyAll")}
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
