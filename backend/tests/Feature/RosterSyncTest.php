@@ -48,6 +48,31 @@ class RosterSyncTest extends TestCase
         ], $overrides);
     }
 
+    public function test_driver_dropped_from_uber_roster_is_marked_removed_not_deleted(): void
+    {
+        $other = 'aaaaaaaa-7497-45da-bbe1-27ab08080c10';
+        $svc = app(RosterSyncService::class);
+
+        // First sync lists two drivers.
+        $svc->sync($this->tenant->id, [$this->driver(), $this->driver(['driverUuid' => ['uuid' => ['uuid' => $other]]])]);
+        $this->assertSame(2, Driver::withoutGlobalScopes()->count());
+
+        // Second full sync drops the second driver.
+        $result = $svc->sync($this->tenant->id, [$this->driver()]);
+
+        // Nothing is deleted; the dropped driver is only marked removed.
+        $this->assertSame(2, Driver::withoutGlobalScopes()->count());
+        $this->assertSame(1, $result['removed']);
+        $dropped = Driver::withoutGlobalScopes()->where('uber_driver_uuid', $other)->first();
+        $this->assertNotNull($dropped->roster_removed_at);
+        $kept = Driver::withoutGlobalScopes()->where('uber_driver_uuid', self::DRIVER_UUID)->first();
+        $this->assertNull($kept->roster_removed_at);
+
+        // Reappearing in a later sync clears the mark.
+        $svc->sync($this->tenant->id, [$this->driver(), $this->driver(['driverUuid' => ['uuid' => ['uuid' => $other]]])]);
+        $this->assertNull($dropped->fresh()->roster_removed_at);
+    }
+
     public function test_roster_creates_drivers_with_full_profile(): void
     {
         app(RosterSyncService::class)->sync($this->tenant->id, [$this->driver()]);

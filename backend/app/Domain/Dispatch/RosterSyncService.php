@@ -22,7 +22,7 @@ class RosterSyncService
 
     /**
      * @param  array<int, array<string, mixed>>  $drivers  the `data.drivers` array
-     * @return array{synced: int, created: int}
+     * @return array{synced: int, created: int, removed: int}
      */
     public function sync(int $tenantId, array $drivers): array
     {
@@ -30,12 +30,14 @@ class RosterSyncService
 
         $created = 0;
         $synced = 0;
+        $seen = [];
 
         foreach ($drivers as $row) {
             $uuid = $this->extractUuid($row);
             if ($uuid === null) {
                 continue;
             }
+            $seen[] = $uuid;
 
             $driver = $this->canonicalDriver($tenantId, $uuid);
             $wasNew = $driver === null;
@@ -51,6 +53,9 @@ class RosterSyncService
                 'uber_total_trips' => Arr::get($row, 'tripsInfo.totalCompletedTrips'),
                 'uber_status' => Arr::get($row, 'onboardingInfo.status'),
                 'roster_synced_at' => CarbonImmutable::now(),
+                // Present in this roster → clear any earlier "removed" mark (a
+                // driver Uber had dropped and then re-added is active again).
+                'roster_removed_at' => null,
             ];
 
             // A driver first seen via the roster is auto-linked to its UUID.
@@ -72,7 +77,21 @@ class RosterSyncService
             $synced++;
         }
 
-        return ['synced' => $synced, 'created' => $created];
+        // Reconcile removals: a driver Uber no longer lists is marked removed from
+        // the fleet — NEVER deleted. The row and its offer history stay with the
+        // company (an admin can review or re-link later). Guarded on a non-empty
+        // roster so a failed/partial pull can't wipe the whole fleet's status.
+        $removed = 0;
+        if ($seen !== []) {
+            $removed = Driver::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->whereNotNull('uber_driver_uuid')
+                ->whereNotIn('uber_driver_uuid', $seen)
+                ->whereNull('roster_removed_at')
+                ->update(['roster_removed_at' => CarbonImmutable::now()]);
+        }
+
+        return ['synced' => $synced, 'created' => $created, 'removed' => $removed];
     }
 
     /**

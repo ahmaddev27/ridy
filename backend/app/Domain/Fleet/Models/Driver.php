@@ -29,7 +29,7 @@ class Driver extends Authenticatable
     protected $fillable = [
         'tenant_id', 'name', 'phone', 'license_no', 'employment_type', 'external_ids', 'pseudonym_id',
         'uber_driver_uuid', 'uber_email', 'uber_link_method',
-        'uber_picture_url', 'uber_rating', 'uber_total_trips', 'uber_status', 'roster_synced_at',
+        'uber_picture_url', 'uber_rating', 'uber_total_trips', 'uber_status', 'roster_synced_at', 'roster_removed_at',
         'online_status', 'location_updated_at', 'status_synced_at',
         'latitude', 'longitude', 'heading', 'trip_waypoints',
         'email', 'password', 'locale', 'invite_token', 'invited_at', 'activated_at', 'last_login_at', 'offers_seen_at',
@@ -42,6 +42,7 @@ class Driver extends Authenticatable
         'uber_rating' => 'decimal:2',
         'uber_total_trips' => 'integer',
         'roster_synced_at' => 'datetime',
+        'roster_removed_at' => 'datetime',
         'location_updated_at' => 'datetime',
         'status_synced_at' => 'datetime',
         'latitude' => 'decimal:7',
