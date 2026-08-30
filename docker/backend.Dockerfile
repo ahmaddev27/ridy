@@ -25,8 +25,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # bcmath    : precise numeric calculations
 # zip       : composer package extraction / archive handling
 # intl      : i18n (German + English), locale-aware formatting
+# pcntl     : signal handling for the Reverb WebSocket server (SIGINT/SIGTERM)
+# sockets   : the Reverb socket server transport
 RUN docker-php-ext-configure intl \
-    && docker-php-ext-install -j"$(nproc)" pdo_mysql bcmath zip intl
+    && docker-php-ext-install -j"$(nproc)" pdo_mysql bcmath zip intl pcntl sockets
 
 # redis : phpredis client for queues / cache / Horizon (installed via PECL)
 RUN pecl install redis \
