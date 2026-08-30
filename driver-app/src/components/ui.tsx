@@ -2,7 +2,9 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Platform,
   Pressable,
+  TextInput as RNTextInput,
   View,
   type TextInputProps,
   type ViewStyle,
@@ -156,6 +158,74 @@ export function Field({
         </Pressable>
       )}
     </View>
+  );
+}
+
+/**
+ * Segmented one-time-code input: one box per digit, numeric keypad only, with a
+ * single transparent field layered on top so the OS SMS/email autofill ("From
+ * Gmail 914070") still works and a tap anywhere focuses it. Stays LTR even in an
+ * RTL locale — a code reads left to right.
+ */
+export function OtpInput({
+  value,
+  onChangeText,
+  length = 6,
+  autoFocus,
+  onComplete,
+}: {
+  value: string;
+  onChangeText: (v: string) => void;
+  length?: number;
+  autoFocus?: boolean;
+  onComplete?: (code: string) => void;
+}) {
+  const c = useColors();
+  const ref = useRef<RNTextInput>(null);
+  const handle = (raw: string) => {
+    const clean = raw.replace(/\D/g, "").slice(0, length);
+    onChangeText(clean);
+    if (clean.length === length) onComplete?.(clean);
+  };
+  return (
+    <Pressable onPress={() => ref.current?.focus()} style={{ position: "relative" }}>
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        {Array.from({ length }).map((_, i) => {
+          const active = i === value.length;
+          const filled = i < value.length;
+          return (
+            <View
+              key={i}
+              style={{
+                flex: 1,
+                height: 56,
+                borderRadius: radius.lg,
+                borderWidth: 1.5,
+                borderColor: active ? c.ink : filled ? c.borderStrong : c.line,
+                backgroundColor: c.surface,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ color: c.ink, fontSize: 24, fontWeight: "700" }}>{value[i] ?? ""}</Text>
+            </View>
+          );
+        })}
+      </View>
+      <RNTextInput
+        ref={ref}
+        value={value}
+        onChangeText={handle}
+        keyboardType="number-pad"
+        inputMode="numeric"
+        textContentType="oneTimeCode"
+        autoComplete={Platform.OS === "android" ? "sms-otp" : "one-time-code"}
+        maxLength={length}
+        autoFocus={autoFocus}
+        caretHidden
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: 0 }}
+      />
+    </Pressable>
   );
 }
 

@@ -5,7 +5,7 @@ import { Text } from "@/components/typography";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
-import { Field, PrimaryButton, Logo } from "@/components/ui";
+import { Field, OtpInput, PrimaryButton, Logo } from "@/components/ui";
 import { LogIn, Mail } from "lucide-react-native";
 
 type Step = "email" | "code";
@@ -45,11 +45,11 @@ export default function LoginScreen() {
     }
   }
 
-  async function submitCode() {
+  async function submitCode(codeValue: string = code) {
     setLoading(true);
     setError(null);
     try {
-      await verifyCode(email.trim(), code.trim());
+      await verifyCode(email.trim(), codeValue.trim());
     } catch {
       setError(t("otp.codeError"));
     } finally {
@@ -91,15 +91,7 @@ export default function LoginScreen() {
           </View>
         ) : (
           <View style={{ gap: 12 }}>
-            <Field
-              label={t("otp.code")}
-              value={code}
-              onChangeText={setCode}
-              autoCapitalize="none"
-              keyboardType="number-pad"
-              autoComplete="one-time-code"
-              maxLength={6}
-            />
+            <OtpInput value={code} onChangeText={setCode} length={6} autoFocus onComplete={submitCode} />
             {error && <Text style={{ color: c.danger, fontSize: 14, textAlign: align }}>{error}</Text>}
             {notice && <Text style={{ color: c.inkMuted, fontSize: 14, textAlign: align }}>{notice}</Text>}
             <View style={{ marginTop: 8 }}>
