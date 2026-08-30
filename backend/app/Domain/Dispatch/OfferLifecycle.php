@@ -4,6 +4,7 @@ namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\Models\Driver;
+use App\Events\OfferBroadcast;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -216,7 +217,7 @@ class OfferLifecycle
      */
     private function transition(DispatchOffer $offer, OfferStatus $to, array $stamps): bool
     {
-        return DB::transaction(function () use ($offer, $to, $stamps) {
+        $changed = DB::transaction(function () use ($offer, $to, $stamps) {
             /** @var DispatchOffer $fresh */
             $fresh = DispatchOffer::withoutGlobalScopes()->lockForUpdate()->find($offer->id);
             if ($fresh === null || ! $fresh->status->canTransitionTo($to)) {
@@ -228,5 +229,13 @@ class OfferLifecycle
 
             return true;
         });
+
+        // Real-time nudge so the driver's open app reflects the new status (taken /
+        // on-trip / completed) instantly. Best-effort — never breaks the transition.
+        if ($changed && $offer->driver_id !== null) {
+            rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->id, 'status')), report: false);
+        }
+
+        return $changed;
     }
 }
