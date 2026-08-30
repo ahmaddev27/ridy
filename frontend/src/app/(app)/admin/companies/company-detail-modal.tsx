@@ -903,7 +903,7 @@ function CompanyNetworkTab({ id }: { id: number }) {
                   metric: "bg-teal-500/15 text-teal-500",
                   session: "bg-rose-500/15 text-rose-500",
                 }[o.kind] ?? "bg-surface-2 text-ink-muted"
-              }`}>{c(`net_${o.kind}`)}</span>
+              }`}>{["offer", "status", "roster", "vehicle", "metric", "session"].includes(o.kind) ? c(`net_${o.kind}`) : o.kind}</span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm text-ink">{o.summary ?? "—"}</div>
                 <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-ink-subtle" dir="ltr">
