@@ -814,6 +814,7 @@ function CompanyNetworkTab({ id }: { id: number }) {
     { v: "vehicle", l: c("net_vehicle") },
     { v: "metric", l: c("net_metric") },
     { v: "session", l: c("net_session") },
+    { v: "earnerbreakdownsv2", l: c("net_earnings") },
   ];
   const pick = (v: string) => {
     setKind(v);
@@ -933,8 +934,9 @@ function CompanyNetworkTab({ id }: { id: number }) {
                   vehicle: "bg-violet-500/15 text-violet-500",
                   metric: "bg-teal-500/15 text-teal-500",
                   session: "bg-rose-500/15 text-rose-500",
+                  earnerbreakdownsv2: "bg-emerald-500/15 text-emerald-500",
                 }[o.kind] ?? "bg-surface-2 text-ink-muted"
-              }`}>{["offer", "status", "roster", "vehicle", "metric", "session"].includes(o.kind) ? c(`net_${o.kind}`) : o.kind}</span>
+              }`}>{o.kind === "earnerbreakdownsv2" ? c("net_earnings") : ["offer", "status", "roster", "vehicle", "metric", "session"].includes(o.kind) ? c(`net_${o.kind}`) : o.kind}</span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm text-ink">{o.summary ?? "—"}</div>
                 <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-ink-subtle" dir="ltr">

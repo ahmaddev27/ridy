@@ -68,6 +68,12 @@ function money(amount: number | null | undefined, label: string | null): string 
   return `${symbol}${amount.toFixed(2)}`;
 }
 
+/** "cash_collected" → "Cash collected" for a breakdown category label. */
+function prettyCat(cat: string): string {
+  const s = cat.replace(/_/g, " ").trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 /** "12 Aug – 19 Aug" for a captured earnings window. */
 function uberPeriod(m: DriverMetric, loc: string): string {
   const fmt = (s: string) => new Date(s).toLocaleDateString(loc, { day: "numeric", month: "short" });
@@ -358,6 +364,20 @@ export default function DriverProfilePage() {
                   <MiniStat label={d("statTip")} value={money(uber.breakdown.tip, uber.earnings_label)} />
                 )}
               </div>
+
+              {uber.breakdown && Object.keys(uber.breakdown).length > 0 && (
+                <div className="mt-4 border-t border-line pt-3">
+                  <p className="mb-2 text-xs font-medium text-ink-subtle">{d("breakdown")}</p>
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                    {Object.entries(uber.breakdown).map(([cat, amt]) => (
+                      <div key={cat} className="flex items-center justify-between gap-2 text-sm">
+                        <span className="truncate text-ink-muted">{prettyCat(cat)}</span>
+                        <span className="font-medium tabular-nums text-ink" dir="ltr">{money(amt, uber.earnings_label)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </Card>
           )}
 
