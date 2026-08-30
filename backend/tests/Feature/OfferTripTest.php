@@ -60,7 +60,12 @@ class OfferTripTest extends TestCase
             ->assertJsonPath('data.trip.geo_confidence', 'exact');
 
         // Cached on the row — a second view does not re-hit the services.
-        $this->assertNotNull($offer->fresh()->geo_synced_at);
+        $fresh = $offer->fresh();
+        $this->assertNotNull($fresh->geo_synced_at);
+        // The display addresses are left EXACTLY as the supplier sent them —
+        // geocoding never rewrites them (no city duplication / postcode splicing).
+        $this->assertSame('Horather Straße 183, 42111 Wuppertal', $fresh->pickup_address);
+        $this->assertSame('Posener Str. 36, 42283 Wuppertal', $fresh->dropoff_address);
     }
 
     public function test_bare_hauptbahnhof_pickup_borrows_the_dropoff_city(): void

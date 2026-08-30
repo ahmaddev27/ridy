@@ -72,37 +72,49 @@ class TripGeocoder
         $dLat = $driver?->latitude !== null ? (float) $driver->latitude : null;
         $dLng = $driver?->longitude !== null ? (float) $driver->longitude : null;
 
-        // A bare "Hauptbahnhof"/"Bahnhof" pickup carries no city of its own, so
-        // borrow the counterpart endpoint's city ("Hauptbahnhof" → "Hauptbahnhof,
-        // Düsseldorf") BEFORE geocoding. Without this the word alone resolves to
-        // whatever station is nearest the driver's town — a Solingen street for a
-        // Düsseldorf trip — blowing up the distance and €/km.
-        $this->fillBareStationCity($offer);
+        // The pickup/dropoff shown to drivers stay EXACTLY as the supplier sent
+        // them — we never rewrite the display address. Geocoding runs on enhanced
+        // *copies* below, so a bare-station or street-less endpoint still resolves
+        // to a precise point without changing what is displayed.
+        $pickupQuery = (string) $offer->pickup_address;
+        $dropoffQuery = (string) $offer->dropoff_address;
+
+        // A bare "Hauptbahnhof"/"Bahnhof" endpoint carries no city of its own, so
+        // borrow the counterpart's ("Hauptbahnhof" → "Hauptbahnhof, Düsseldorf")
+        // for the geocode. Without this the word alone resolves to whatever station
+        // is nearest the driver's town — a Solingen street for a Düsseldorf trip.
+        [$pickupQuery, $dropoffQuery] = $this->fillBareStationCity($pickupQuery, $dropoffQuery);
 
         // Upgrade a street-less "PLZ City" (station pickup) to the station's real
-        // street address from our local table BEFORE geocoding, so the very next
-        // geocode resolves a precise point and the driver sees the full address.
-        $this->applyStations($offer, $dLat, $dLng);
+        // street address from the local table for a precise geocode, and record the
+        // resolved station's name for display alongside the raw address.
+        $pickupStation = $this->stations->resolve($pickupQuery, $dLat, $dLng);
+        if ($pickupStation !== null) {
+            $pickupQuery = $pickupStation['formatted_address'];
+            $offer->pickup_station_name = $pickupStation['station_name'];
+        }
+        $dropoffStation = $this->stations->resolve($dropoffQuery, $dLat, $dLng);
+        if ($dropoffStation !== null) {
+            $dropoffQuery = $dropoffStation['formatted_address'];
+            $offer->dropoff_station_name = $dropoffStation['station_name'];
+        }
 
         // Resolve the endpoint that has a postcode first, then bias the ambiguous
         // (postcode-less) one to it — a dispatch trip's ends are close together, so
         // the resolved end is a far better bias than the driver's position, which
         // may be a town away from where the trip actually is.
-        if ($this->hasPostcode($offer->dropoff_address) && ! $this->hasPostcode($offer->pickup_address)) {
-            $dropoff = $this->geocode($offer->dropoff_address, $dLat, $dLng);
-            $pickup = $this->geocode($offer->pickup_address, $dropoff['lat'] ?? $dLat, $dropoff['lng'] ?? $dLng);
+        if ($this->hasPostcode($dropoffQuery) && ! $this->hasPostcode($pickupQuery)) {
+            $dropoff = $this->geocode($dropoffQuery, $dLat, $dLng);
+            $pickup = $this->geocode($pickupQuery, $dropoff['lat'] ?? $dLat, $dropoff['lng'] ?? $dLng);
         } else {
-            $pickup = $this->geocode($offer->pickup_address, $dLat, $dLng);
-            $dropoff = $this->geocode($offer->dropoff_address, $pickup['lat'] ?? $dLat, $pickup['lng'] ?? $dLng);
+            $pickup = $this->geocode($pickupQuery, $dLat, $dLng);
+            $dropoff = $this->geocode($dropoffQuery, $pickup['lat'] ?? $dLat, $pickup['lng'] ?? $dLng);
         }
 
         $offer->pickup_lat = $pickup['lat'] ?? null;
         $offer->pickup_lng = $pickup['lng'] ?? null;
         $offer->dropoff_lat = $dropoff['lat'] ?? null;
         $offer->dropoff_lng = $dropoff['lng'] ?? null;
-
-        $offer->pickup_address = $this->normalizeDisplay($offer->pickup_address, $pickup);
-        $offer->dropoff_address = $this->normalizeDisplay($offer->dropoff_address, $dropoff);
 
         if ($pickup && $dropoff) {
             $route = $this->route($pickup, $dropoff);
@@ -165,42 +177,27 @@ class TripGeocoder
      * town, so a city-less station word geocodes to the right city's station
      * instead of the one nearest the driver. Only fires when the station end has
      * no town of its own and the other end does — never overrides a real city.
+     * Operates on (and returns) geocoding query strings; the display address is
+     * untouched.
+     *
+     * @return array{0: string, 1: string} the [pickup, dropoff] geocode queries
      */
-    private function fillBareStationCity(DispatchOffer $offer): void
+    private function fillBareStationCity(string $pickup, string $dropoff): array
     {
-        $pickupCity = $this->cityHint($offer->pickup_address);
-        $dropoffCity = $this->cityHint($offer->dropoff_address);
+        $pickupCity = $this->cityHint($pickup);
+        $dropoffCity = $this->cityHint($dropoff);
 
-        $pickupStation = $this->bareStationLabel($offer->pickup_address);
+        $pickupStation = $this->bareStationLabel($pickup);
         if ($pickupStation !== null && $pickupCity === null && $dropoffCity !== null) {
-            $offer->pickup_address = $pickupStation.', '.$dropoffCity;
+            $pickup = $pickupStation.', '.$dropoffCity;
         }
 
-        $dropoffStation = $this->bareStationLabel($offer->dropoff_address);
+        $dropoffStation = $this->bareStationLabel($dropoff);
         if ($dropoffStation !== null && $dropoffCity === null && $pickupCity !== null) {
-            $offer->dropoff_address = $dropoffStation.', '.$pickupCity;
-        }
-    }
-
-    /**
-     * Replace a street-less endpoint with its railway-station address (and record
-     * the station name in its own field) when the local station table identifies
-     * exactly one station for the "PLZ City". Leaves real street addresses alone;
-     * the driver's live position disambiguates a PLZ that holds several stations.
-     */
-    private function applyStations(DispatchOffer $offer, ?float $dLat, ?float $dLng): void
-    {
-        $pickup = $this->stations->resolve($offer->pickup_address, $dLat, $dLng);
-        if ($pickup !== null) {
-            $offer->pickup_address = $pickup['formatted_address'];
-            $offer->pickup_station_name = $pickup['station_name'];
+            $dropoff = $dropoffStation.', '.$pickupCity;
         }
 
-        $dropoff = $this->stations->resolve($offer->dropoff_address, $dLat, $dLng);
-        if ($dropoff !== null) {
-            $offer->dropoff_address = $dropoff['formatted_address'];
-            $offer->dropoff_station_name = $dropoff['station_name'];
-        }
+        return [$pickup, $dropoff];
     }
 
     /**
@@ -289,7 +286,12 @@ class TripGeocoder
             if ($st['transient']) {
                 return null;
             }
-            if ($st['hit'] !== null && $this->isStation($st['hit'])) {
+            // Accept the station ONLY when its own postcode matches the one asked
+            // for. A free-text "Bahnhof, PLZ City" otherwise returns the town's
+            // MAIN Hbf regardless of PLZ — a different-postcode station kilometres
+            // away — so a suburb pickup would snap to the Hauptbahnhof and blow up
+            // the distance. On a mismatch we fall through to the plain town lookup.
+            if ($st['hit'] !== null && $this->isStation($st['hit']) && $this->hitPostcodeMatches($st['hit'], $plz)) {
                 $coords = $this->fromHit($st['hit'], 'area');
                 // Use the station's real name ("Solingen Hauptbahnhof") from the
                 // hit rather than a generic "Bahnhof", so a street-less station
@@ -477,6 +479,21 @@ class TripGeocoder
      *
      * @param  array<string, mixed>|null  $hit
      */
+    /**
+     * True when a Nominatim hit's own postcode equals the one we searched for —
+     * the guard that stops a "Bahnhof, PLZ City" free-text lookup from snapping to
+     * a different-postcode main station. A hit without a postcode can't be
+     * confirmed, so it is rejected (strict).
+     *
+     * @param  array<string, mixed>  $hit
+     */
+    private function hitPostcodeMatches(array $hit, string $plz): bool
+    {
+        $postcode = $hit['address']['postcode'] ?? null;
+
+        return is_string($postcode) && $postcode === $plz;
+    }
+
     private function isStation(?array $hit): bool
     {
         if ($hit === null) {
@@ -523,29 +540,6 @@ class TripGeocoder
     }
 
     /**
-     * Decide the address a driver sees, given Uber's original text and the
-     * geocoder result (`['address' => label, 'confidence' => …]`). The
-     * {@see AddressFormatter} picks whichever is more complete — the station's
-     * real name for a street-less pickup, the filled-in town for a street-only
-     * one, Uber's own text only when the geocoder had nothing better — then we
-     * guarantee the "PLZ City" tail with the authoritative PLZ→city table
-     * (PLZ ↔ city is 1:1 in Germany) so the town is never wrong.
-     *
-     * @param  array{address?: ?string, confidence?: ?string}|null  $geo
-     */
-    private function normalizeDisplay(?string $original, ?array $geo): ?string
-    {
-        $display = AddressFormatter::canonical($original, $geo);
-        if ($display === null) {
-            return $original;
-        }
-
-        $authoritativeCity = $this->authoritativeCity($display);
-
-        return $authoritativeCity !== null ? $this->ensureCity($display, $authoritativeCity) : $display;
-    }
-
-    /**
      * The town centroid for an address's PLZ, or null when it has no valid PLZ or
      * the code is unknown. Labelled with the authoritative "PLZ City".
      *
@@ -568,74 +562,6 @@ class TripGeocoder
         }
 
         return $result;
-    }
-
-    /** The authoritative "PLZ City" for an address's PLZ, from the static table. */
-    private function authoritativeCity(string $address): ?string
-    {
-        if (preg_match('/\b(\d{5})\b/', $address, $m) !== 1) {
-            return null;
-        }
-        $city = PostalCodes::city($m[1]);
-
-        return $city !== null ? "{$m[1]} {$city}" : null;
-    }
-
-    /**
-     * Ensure the address carries both the postal code and the city name, filling
-     * in whichever half Uber omitted from the deterministic (PLZ ↔ city is 1:1 in
-     * Germany) geocoded "PLZ City", without duplicating what is already there.
-     */
-    private function ensureCity(string $original, ?string $cityLabel): string
-    {
-        if ($cityLabel === null) {
-            return $original;
-        }
-
-        // Split "42117 Wuppertal" → plz "42117", city "Wuppertal".
-        [$plz, $city] = array_pad(explode(' ', $cityLabel, 2), 2, null);
-        if ($plz !== null && ! ctype_digit($plz)) {
-            [$plz, $city] = [null, $cityLabel]; // no leading postcode
-        }
-        if ($city === null || $city === '') {
-            return $original;
-        }
-
-        // Work on the location tail (the last comma segment) only, and match the
-        // city/PLZ as whole words. Searching the whole string by substring
-        // corrupted addresses whose STREET name contains the city — "Berliner
-        // Straße 12, 10115" would get the postcode spliced before the street
-        // ("10115 Berliner Straße …") because "Berliner" contains "Berlin".
-        $cityRe = '/\b'.preg_quote($city, '/').'\b/iu';
-        $plzRe = $plz !== null ? '/\b'.preg_quote($plz, '/').'\b/u' : null;
-
-        $segments = array_map('trim', explode(',', $original));
-        $lastKey = count($segments) - 1;
-        $tail = $segments[$lastKey];
-
-        $tailHasCity = preg_match($cityRe, $tail) === 1;
-        $tailHasPlz = $plzRe !== null && preg_match($plzRe, $tail) === 1;
-
-        if ($tailHasCity && ($tailHasPlz || $plz === null)) {
-            return $original; // tail already carries the location
-        }
-
-        if ($tailHasCity) {
-            // City in the tail, postcode missing → put the PLZ in front of it.
-            $segments[$lastKey] = (string) preg_replace($cityRe, "{$plz} {$city}", $tail, 1);
-
-            return implode(', ', $segments);
-        }
-
-        if ($tailHasPlz) {
-            // Postcode in the tail, city missing → append the city after it.
-            $segments[$lastKey] = (string) preg_replace($plzRe, "{$plz} {$city}", $tail, 1);
-
-            return implode(', ', $segments);
-        }
-
-        // No location in the tail → append the full "PLZ City".
-        return rtrim($original, ', ').', '.$cityLabel;
     }
 
     /**
