@@ -6,6 +6,7 @@ import { Text, TextInput } from "@/components/typography";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Search, SlidersHorizontal } from "lucide-react-native";
 import { api, type Offer, type OffersQuery, type FleetDriver } from "@/lib/api";
+import { connectDriverRealtime } from "@/lib/realtime";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, getLocale } from "@/lib/i18n";
 import { useColors, radius, isDarkPalette } from "@/lib/theme";
@@ -54,7 +55,7 @@ function sortOffers(list: Offer[], sort: SortKey): Offer[] {
 export default function OffersScreen() {
   const c = useColors();
   const router = useRouter();
-  const { isOwner } = useAuth();
+  const { isOwner, driver } = useAuth();
   const align = isRTL() ? "right" : "left";
 
   const [search, setSearch] = useState("");
@@ -125,8 +126,14 @@ export default function OffersScreen() {
       const sub = Notifications.addNotificationReceivedListener(() => {
         if (atTopRef.current) silentReload();
       });
-      return () => { clearInterval(poll); sub.remove(); };
-    }, [silentReload, isOwner]),
+      // Real-time: the driver's channel reloads the feed instantly on an offer
+      // change; the 5s poll is the fallback.
+      const rt =
+        !isOwner && driver?.id
+          ? connectDriverRealtime(driver.id, api.getToken() ?? "", () => { if (atTopRef.current) silentReload(); })
+          : null;
+      return () => { clearInterval(poll); sub.remove(); rt?.disconnect(); };
+    }, [silentReload, isOwner, driver?.id]),
   );
 
   async function loadMore() {

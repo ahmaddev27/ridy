@@ -82,17 +82,9 @@ function BottomBar({ state, descriptors, navigation }: BottomTabBarProps) {
               accessibilityLabel={label}
               style={{ flex: 1, alignItems: "center" }}
             >
-              {/* Active tab sits on a soft green pill so the live tab stands out. */}
-              <View
-                style={{
-                  alignItems: "center",
-                  gap: 4,
-                  paddingHorizontal: 14,
-                  paddingVertical: 6,
-                  borderRadius: 14,
-                  backgroundColor: focused ? (dark ? "rgba(16,185,129,0.16)" : "rgba(5,150,105,0.12)") : "transparent",
-                }}
-              >
+              {/* No pill — the active tab is marked by the emerald tint + heavier
+                  weight on the icon and label alone. */}
+              <View style={{ alignItems: "center", gap: 4, paddingHorizontal: 14, paddingVertical: 6 }}>
                 <Icon size={21} strokeWidth={focused ? 2.3 : 1.9} color={tint} />
                 <Text style={{ color: tint, fontSize: 9.5, fontWeight: focused ? "700" : "500" }}>{label}</Text>
               </View>

@@ -6,6 +6,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { UserCircle, Map as MapIcon } from "lucide-react-native";
 import { api, type HomeData, type FleetHomeData, type Offer } from "@/lib/api";
+import { connectDriverRealtime } from "@/lib/realtime";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { openRouteInMaps } from "@/lib/maps";
@@ -46,8 +47,13 @@ export default function HomeScreen() {
       // Refresh the instant a dispatch push lands, so a new offer / status change
       // shows immediately rather than waiting for the next poll tick.
       const sub = Notifications.addNotificationReceivedListener(() => load(true));
-      return () => { clearInterval(iv); sub.remove(); };
-    }, [load]),
+      // Real-time (WebSocket): a driver's channel pushes offer changes instantly;
+      // the 4s poll stays as the safety net. Owners use the User token, not a
+      // driver channel, so they rely on the poll.
+      const rt =
+        !isOwner && driver?.id ? connectDriverRealtime(driver.id, api.getToken() ?? "", () => load(true)) : null;
+      return () => { clearInterval(iv); sub.remove(); rt?.disconnect(); };
+    }, [load, isOwner, driver?.id]),
   );
 
   const greeting = new Date().getHours() >= 17 ? t("home.greetingEvening") : t("home.greetingDay");

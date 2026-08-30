@@ -107,6 +107,11 @@ export class ApiClient {
 
   constructor(private token: string | null = null) {}
 
+  /** The current bearer token (for the WebSocket auth handshake). */
+  getToken(): string | null {
+    return this.token;
+  }
+
   setToken(token: string | null) {
     this.token = token;
   }

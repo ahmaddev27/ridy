@@ -73,6 +73,8 @@
     ],
     "extra": {
       "apiUrl": "https://reidey.de",
+      "reverbHost": "reidey.de",
+      "reverbKey": "",
       "router": {
         "origin": false
       },
