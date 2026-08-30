@@ -860,29 +860,6 @@ function CompanyNetworkTab({ id }: { id: number }) {
     <div className="space-y-3">
       <p className="text-xs text-ink-subtle">{c("networkHint")}</p>
 
-      {/* Date-time range on capture time */}
-      <div className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
-        <span className="font-medium">{c("dateRange")}</span>
-        <input
-          type="datetime-local"
-          value={from}
-          onChange={(e) => setRange("from", e.target.value)}
-          className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-ink"
-        />
-        <span>—</span>
-        <input
-          type="datetime-local"
-          value={to}
-          onChange={(e) => setRange("to", e.target.value)}
-          className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-ink"
-        />
-        {(from || to) && (
-          <button onClick={() => { setFrom(""); setTo(""); setPage(1); }} className="rounded-full px-2 py-1 font-medium text-primary hover:underline">
-            {c("clear")}
-          </button>
-        )}
-      </div>
-
       <div className="flex flex-wrap items-center gap-1.5">
         {filters.map((f) => (
           <button
@@ -906,6 +883,29 @@ function CompanyNetworkTab({ id }: { id: number }) {
           >
             <Files className="h-3.5 w-3.5" />
             {c("copyAll")}
+          </button>
+        )}
+      </div>
+
+      {/* Date-time range on capture time — after the kind filters */}
+      <div className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+        <span className="font-medium">{c("dateRange")}</span>
+        <input
+          type="datetime-local"
+          value={from}
+          onChange={(e) => setRange("from", e.target.value)}
+          className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-ink"
+        />
+        <span>—</span>
+        <input
+          type="datetime-local"
+          value={to}
+          onChange={(e) => setRange("to", e.target.value)}
+          className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-ink"
+        />
+        {(from || to) && (
+          <button onClick={() => { setFrom(""); setTo(""); setPage(1); }} className="rounded-full px-2 py-1 font-medium text-primary hover:underline">
+            {c("clear")}
           </button>
         )}
       </div>
