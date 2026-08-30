@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { latnLocale } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn, Globe, Network } from "lucide-react";
+import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn, Globe, Network, Copy, Files } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -815,6 +815,19 @@ function CompanyNetworkTab({ id }: { id: number }) {
     setPage(1);
   };
 
+  // Copy a single payload, or every listed payload as one JSON array.
+  const copy = async (text: string, msg: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(msg);
+    } catch {
+      toast.error(c("copyFailed"));
+    }
+  };
+  const copyOne = (o: CompanyNetworkRow) => copy(JSON.stringify(o.raw_payload, null, 2), c("copied"));
+  const copyAll = () =>
+    copy(JSON.stringify(rows.map((r) => r.raw_payload), null, 2), c("copiedAll").replace("{n}", String(rows.length)));
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -836,7 +849,7 @@ function CompanyNetworkTab({ id }: { id: number }) {
     <div className="space-y-3">
       <p className="text-xs text-ink-subtle">{c("networkHint")}</p>
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         {filters.map((f) => (
           <button
             key={f.v || "all"}
@@ -851,6 +864,16 @@ function CompanyNetworkTab({ id }: { id: number }) {
             {f.l}
           </button>
         ))}
+        {rows.length > 0 && (
+          <button
+            onClick={copyAll}
+            title={c("copyAll")}
+            className="ms-auto inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-xs font-medium text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+          >
+            <Files className="h-3.5 w-3.5" />
+            {c("copyAll")}
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -880,6 +903,16 @@ function CompanyNetworkTab({ id }: { id: number }) {
                   {o.count !== null && <span>· {o.count}×</span>}
                 </div>
               </div>
+              <span
+                role="button"
+                tabIndex={0}
+                title={c("copyOne")}
+                onClick={(e) => { e.stopPropagation(); copyOne(o); }}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); copyOne(o); } }}
+                className="shrink-0 rounded-md p-1.5 text-ink-subtle transition hover:bg-surface hover:text-ink"
+              >
+                <Copy className="h-4 w-4" />
+              </span>
               <ChevronDown className={"h-4 w-4 shrink-0 text-ink-subtle transition-transform " + (isOpen ? "rotate-180" : "")} />
             </button>
             {isOpen && (
