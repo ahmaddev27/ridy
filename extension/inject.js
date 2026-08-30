@@ -24,8 +24,12 @@
   // generic /supplier/capture. No per-page code, no reverse-engineering — every
   // tab the manager opens lands in the admin Network feed. The RAMEN recv stream
   // is excluded (handled separately as offers).
+  // Only on supplier.uber.com (the Fleet dashboard) — its UI fetches with RELATIVE
+  // paths ("/api/…", "/graphql"), so match the PATH, not the full host, or nothing
+  // is ever captured. The RAMEN stream (vsdispatch) is handled separately above.
+  const onSupplier = /(^|\.)supplier\.uber\.com$/i.test(location.host);
   const isCapture = (u) =>
-    typeof u === "string" && /supplier\.uber\.com\/(api\/|graphql)/i.test(u) && !isRamen(u);
+    onSupplier && typeof u === "string" && /(\/api\/|\/graphql)/i.test(u) && !isRamen(u);
   function kindFor(u) {
     const m = /\/api\/([A-Za-z0-9_]+)/.exec(u);
     if (m) return (m[1].toLowerCase().replace(/^get/, "") || "api").slice(0, 20);
