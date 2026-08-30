@@ -22,7 +22,7 @@ class DashboardController extends Controller
         $tenant = $request->user()?->tenant;
 
         return response()->json(['data' => [
-            'drivers' => Driver::count(),
+            'drivers' => Driver::activeFleet()->count(),
             'linked_drivers' => Driver::whereNotNull('uber_driver_uuid')->count(),
             'online_drivers' => Driver::online()->count(),
             'vehicles' => Vehicle::count(),

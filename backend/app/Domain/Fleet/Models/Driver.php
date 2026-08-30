@@ -126,6 +126,19 @@ class Driver extends Authenticatable
             });
     }
 
+    /**
+     * The active fleet: excludes drivers Uber dropped from the roster
+     * (roster_removed_at) or marked inactive on their side. Drivers we don't
+     * source from Uber (null uber_status) count as active. Shared by the fleet
+     * driver list and the dashboard driver count so both agree.
+     */
+    public function scopeActiveFleet(Builder $query): Builder
+    {
+        return $query
+            ->whereNull('roster_removed_at')
+            ->where(fn (Builder $q) => $q->whereNull('uber_status')->orWhere('uber_status', 'ONBOARDING_STATUS_ACTIVE'));
+    }
+
     protected static function booted(): void
     {
         // Assign a stable pseudonym used in analytics so driver identity is not exposed.
