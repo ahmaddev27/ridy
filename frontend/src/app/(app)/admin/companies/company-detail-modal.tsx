@@ -794,8 +794,9 @@ function CompanyNetworkTab({ id }: { id: number }) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [kind, setKind] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [from, setFrom] = useState(""); // YYYY-MM-DD (inclusive day)
+  const [to, setTo] = useState(""); // YYYY-MM-DD (inclusive day)
+  const [preset, setPreset] = useState<"today" | "yesterday" | "week" | "month" | null>(null);
   const [open, setOpen] = useState<Set<number>>(() => new Set());
   const toggle = (rid: number) =>
     setOpen((s) => {
@@ -833,10 +834,15 @@ function CompanyNetworkTab({ id }: { id: number }) {
   const copyAll = () =>
     copy(JSON.stringify(rows.map((r) => r.raw_payload), null, 2), c("copiedAll").replace("{n}", String(rows.length)));
 
+  // The day-level inputs map to inclusive datetime bounds: the whole "from" day
+  // through the end of the "to" day, so a same-day range still returns its rows.
+  const fromBound = from ? `${from}T00:00:00` : "";
+  const toBound = to ? `${to}T23:59:59` : "";
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    getCompanyNetwork(id, page, kind, from, to)
+    getCompanyNetwork(id, page, kind, fromBound, toBound)
       .then((r) => {
         if (!alive) return;
         setRows(r.items);
@@ -848,11 +854,39 @@ function CompanyNetworkTab({ id }: { id: number }) {
     return () => {
       alive = false;
     };
-  }, [id, page, kind, from, to]);
+  }, [id, page, kind, fromBound, toBound]);
 
-  // Editing a date-time input resets to page 1 so the paginator stays valid.
+  // Editing a date input clears the active preset and resets to page 1.
   const setRange = (which: "from" | "to", v: string) => {
     (which === "from" ? setFrom : setTo)(v);
+    setPreset(null);
+    setPage(1);
+  };
+
+  // Quick ranges mirror the Offers page: local YYYY-MM-DD bounds, no time zone drift.
+  const ymd = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const applyPreset = (p: "today" | "yesterday" | "week" | "month") => {
+    const now = new Date();
+    const end = new Date(now);
+    const start = new Date(now);
+    if (p === "yesterday") {
+      start.setDate(now.getDate() - 1);
+      end.setDate(now.getDate() - 1);
+    } else if (p === "week") {
+      start.setDate(now.getDate() - 6);
+    } else if (p === "month") {
+      start.setDate(now.getDate() - 29);
+    }
+    setFrom(ymd(start));
+    setTo(ymd(end));
+    setPreset(p);
+    setPage(1);
+  };
+  const clearDates = () => {
+    setFrom("");
+    setTo("");
+    setPreset(null);
     setPage(1);
   };
 
@@ -878,22 +912,39 @@ function CompanyNetworkTab({ id }: { id: number }) {
         ))}
 
         <div className="ms-auto flex flex-wrap items-center gap-2 text-xs text-ink-muted">
-          <span className="font-medium">{c("dateRange")}</span>
+          {/* Quick ranges — same look as the Offers page filter. */}
+          <div className="flex items-center gap-1 rounded-lg border border-line bg-surface p-1">
+            {(["today", "yesterday", "week", "month"] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => applyPreset(p)}
+                className={`rounded-md px-3 py-1 font-medium transition-colors ${
+                  preset === p
+                    ? "bg-primary text-primary-ink"
+                    : "text-ink-muted hover:bg-surface-2 hover:text-ink"
+                }`}
+              >
+                {c(p === "today" ? "presetToday" : p === "yesterday" ? "presetYesterday" : p === "week" ? "presetWeek" : "presetMonth")}
+              </button>
+            ))}
+          </div>
           <input
-            type="datetime-local"
+            type="date"
             value={from}
             onChange={(e) => setRange("from", e.target.value)}
-            className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-ink"
+            title={c("dateRange")}
+            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line"
           />
-          <span>—</span>
+          <span className="text-ink-subtle">–</span>
           <input
-            type="datetime-local"
+            type="date"
             value={to}
             onChange={(e) => setRange("to", e.target.value)}
-            className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-ink"
+            title={c("dateRange")}
+            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line"
           />
           {(from || to) && (
-            <button onClick={() => { setFrom(""); setTo(""); setPage(1); }} className="rounded-full px-2 py-1 font-medium text-primary hover:underline">
+            <button onClick={clearDates} className="rounded-full px-2 py-1 font-medium text-primary hover:underline">
               {c("clear")}
             </button>
           )}
