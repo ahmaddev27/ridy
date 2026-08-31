@@ -209,6 +209,11 @@ class DispatchOfferController extends Controller
             'pickup_address' => $offer->pickup_display ?? AddressFormatter::tidy(Arr::get($offer->raw_payload, 'pickupAddress') ?: $offer->pickup_address),
             'dropoff_address' => $offer->dropoff_display ?? AddressFormatter::tidy(Arr::get($offer->raw_payload, 'dropoffAddress') ?: $offer->dropoff_address),
             'route_geometry' => $offer->route_geometry, // GeoJSON LineString or null
+            // Uber live-map stops (pickup first, then each drop-off), present once
+            // resolved from the driver's engaged position. stops_count >= 2 = multi-stop.
+            'stops' => is_array($offer->stops) ? $offer->stops : null,
+            'stops_count' => $offer->stops_count,
+            'geo_source' => $offer->geo_source, // 'geocode' | 'uber'
             'distance_km' => $distanceKm,
             'fare_amount' => $fare,
             'price_per_km' => $pricePerKm,

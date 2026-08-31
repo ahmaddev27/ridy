@@ -125,11 +125,18 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
                     );
                   })}
                 </ol>
-                {stops.length > 2 && (
+                {/* Multi-stop badge — prefer Uber's authoritative stop count (from
+                    the live map after acceptance), else the raw address list. */}
+                {(offer.trip?.stops_count != null && offer.trip.stops_count >= 2) ? (
+                  <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-600">
+                    <Route className="h-3.5 w-3.5" />
+                    {c("multiStop") || "Multi-stop"} · {offer.trip.stops_count} {c("dropoffs") || "drop-offs"}
+                  </span>
+                ) : stops.length > 2 ? (
                   <p className="mt-3 text-xs font-medium text-ink">
                     {stops.length} {c("stops") || "stops"}
                   </p>
-                )}
+                ) : null}
               </div>
 
               {/* Trip map + distance / price-per-km */}
@@ -139,6 +146,7 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
                     pickup={offer.trip.pickup}
                     dropoff={offer.trip.dropoff}
                     routeGeometry={offer.trip.route_geometry}
+                    stops={offer.trip.stops}
                   />
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <StatCard

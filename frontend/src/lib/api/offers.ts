@@ -47,6 +47,11 @@ export type TripInfo = {
   pickup_address: string | null;
   dropoff_address: string | null;
   route_geometry: { coordinates: [number, number][] } | null;
+  // Uber live-map stops (pickup first, then each drop-off), once resolved from the
+  // driver's engaged position. stops_count >= 2 marks a multi-stop trip.
+  stops: { lat: number; lng: number; type: string | null }[] | null;
+  stops_count: number | null;
+  geo_source: string | null;
   distance_km: number | null;
   fare_amount: number | null;
   price_per_km: number | null;

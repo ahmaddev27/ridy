@@ -34,20 +34,37 @@ function pinElement(color: string): HTMLDivElement {
   return el;
 }
 
+/** A numbered marker for an intermediate multi-stop drop-off. */
+function numberedElement(color: string, n: number): HTMLDivElement {
+  const el = document.createElement("div");
+  el.textContent = String(n);
+  el.style.cssText = `width:20px;height:20px;border-radius:9999px;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);box-sizing:border-box;color:#fff;font:700 11px system-ui,sans-serif;display:flex;align-items:center;justify-content:center`;
+  return el;
+}
+
 export function TripMap({
   pickup,
   dropoff,
   routeGeometry,
+  stops,
 }: {
   pickup: Point | null;
   dropoff: Point | null;
   routeGeometry: { coordinates: [number, number][] } | null;
+  // Uber live-map stops (pickup first, then each drop-off). When there is more
+  // than one drop-off, the intermediate stops are drawn as numbered markers.
+  stops?: { lat: number; lng: number }[] | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
 
+  // Intermediate drop-offs = everything between the first (pickup) and last (final
+  // drop-off) stop. Empty for a normal single-drop trip.
+  const midStops = (stops?.length ?? 0) > 2 ? stops!.slice(1, -1) : [];
+
   const pts: [number, number][] = [];
   if (pickup) pts.push([pickup.lat, pickup.lng]);
+  for (const s of midStops) pts.push([s.lat, s.lng]);
   if (dropoff) pts.push([dropoff.lat, dropoff.lng]);
 
   // A stable string identity for the route so the effect re-runs only when the
@@ -107,6 +124,10 @@ export function TripMap({
         if (pickup) {
           markers.push(new maplibregl.Marker({ element: pinElement("#059669") }).setLngLat([pickup.lng, pickup.lat]).addTo(map));
         }
+        // Numbered amber markers for each intermediate drop-off on a multi-stop trip.
+        midStops.forEach((s, i) => {
+          markers.push(new maplibregl.Marker({ element: numberedElement("#f59e0b", i + 1) }).setLngLat([s.lng, s.lat]).addTo(map));
+        });
         if (dropoff) {
           markers.push(new maplibregl.Marker({ element: pinElement("#e11d48") }).setLngLat([dropoff.lng, dropoff.lat]).addTo(map));
         }
@@ -130,7 +151,7 @@ export function TripMap({
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng, routeKey]);
+  }, [pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng, routeKey, midStops.map((s) => `${s.lat},${s.lng}`).join("|")]);
 
   if (pts.length === 0) return null;
 
