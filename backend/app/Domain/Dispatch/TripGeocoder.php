@@ -863,13 +863,24 @@ class TripGeocoder
     private function labelForPoint(?string $rawAddress, array $point): ?string
     {
         $raw = AddressFormatter::tidy($rawAddress);
-        if ($raw !== null && $raw !== '' && $this->hasPostcode($raw)) {
-            return null; // already complete — never overwrite good supplier text
+        // Keep the supplier's own text only when it already names a STREET — a
+        // street-less "42697 Solingen" (a postcode + city with no street) is still
+        // incomplete, so reverse-geocode Uber's real point to add the actual street.
+        if ($raw !== null && $raw !== '' && $this->hasStreet($raw)) {
+            return null;
         }
 
         $label = $this->reverse($point['lat'], $point['lng']);
 
         return $label !== '' ? $label : null;
+    }
+
+    /** True when the address names a street (not just a PLZ + city / bare place). */
+    private function hasStreet(?string $address): bool
+    {
+        $street = AddressNormalizer::parse($address)['street'] ?? null;
+
+        return $street !== null && $street !== '';
     }
 
     /**

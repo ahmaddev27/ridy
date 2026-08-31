@@ -406,6 +406,15 @@ export default function DriverProfilePage() {
             </Card>
           )}
 
+          {/* No Uber earnings captured yet for this driver — tell the manager how
+              to populate it (incl. the cash / cashless split) instead of hiding it. */}
+          {!uber && (
+            <Card className="p-5">
+              <h4 className="text-sm font-semibold text-ink">{d("uberData")}</h4>
+              <p className="mt-2 text-sm text-ink-subtle">{d("metricsUnavailable")}</p>
+            </Card>
+          )}
+
           {/* Our own captured data */}
           {stats && (
             <Card className="p-5">
