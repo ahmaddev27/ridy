@@ -58,6 +58,21 @@ class SupplierNetworkRecorder
     /** One raw offer, exactly as the supplier sent it (pre-ingest, pre-geocode). */
     public function offer(int $tenantId, array $offer): void
     {
+        // The same offer can arrive on two paths at once (the daemon stream AND the
+        // manager's extension). De-duplicate on offerUUID within a short window so
+        // the Network feed shows it once, not twice.
+        $uuid = (string) Arr::get($offer, 'offerUUID', '');
+        if ($uuid !== '') {
+            $seen = rescue(fn () => DispatchNetworkLog::where('tenant_id', $tenantId)
+                ->where('kind', 'offer')
+                ->where('created_at', '>=', now()->subSeconds(20))
+                ->where('payload->offerUUID', $uuid)
+                ->exists(), false, report: false);
+            if ($seen) {
+                return;
+            }
+        }
+
         $this->capture(
             $tenantId,
             'offer',

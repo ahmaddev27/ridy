@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, Building2, Server } from "lucide-react";
+import { Activity, Building2, Server, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge, type Status } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
@@ -9,7 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ShardsPanel } from "@/components/admin/shards-panel";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { getSystemHealth, type SystemHealthRow } from "@/lib/api/admin";
+import { getSystemHealth, clearNetworkLogs, type SystemHealthRow } from "@/lib/api/admin";
 
 export default function SystemHealthPage() {
   const { t, locale } = useI18n();
@@ -41,6 +42,21 @@ export default function SystemHealthPage() {
             </button>
           );
         })}
+        <button
+          onClick={async () => {
+            if (!confirm(c("clearNetworkConfirm"))) return;
+            try {
+              const { deleted } = await clearNetworkLogs();
+              toast.success(c("clearNetworkDone").replace("{n}", deleted.toLocaleString()));
+            } catch {
+              toast.error(c("clearNetworkFailed"));
+            }
+          }}
+          className="ms-auto inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2.5 text-sm font-medium text-danger-fg transition hover:bg-danger-bg"
+        >
+          <Trash2 className="h-4 w-4" />
+          {c("clearNetwork")}
+        </button>
       </div>
 
       {tab === "shards" ? (

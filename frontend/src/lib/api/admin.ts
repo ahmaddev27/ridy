@@ -268,6 +268,12 @@ export async function getCompanyOffers(
   );
   return { items: res.data, lastPage: res.meta.last_page, total: res.meta.total };
 }
+/** Super-admin: wipe the captured Network feed for ALL companies. */
+export async function clearNetworkLogs(): Promise<{ deleted: number }> {
+  const res = await apiFetch<{ data: { deleted: number } }>(`/api/v1/admin/network-logs`, { method: "DELETE" });
+  return res.data;
+}
+
 export async function getCompanyNetwork(
   id: number,
   page = 1,

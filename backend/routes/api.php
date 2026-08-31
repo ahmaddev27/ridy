@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\Admin\CompanyUserController;
 use App\Http\Controllers\Api\V1\Admin\ContactMessageController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Api\V1\Admin\ImpersonationController;
+use App\Http\Controllers\Api\V1\Admin\NetworkLogController;
 use App\Http\Controllers\Api\V1\Admin\OverviewController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\ProxyController;
@@ -286,6 +287,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(function () {
         Route::get('overview', OverviewController::class);
         Route::get('system-health', SystemHealthController::class);
+        Route::delete('network-logs', [NetworkLogController::class, 'clear']);
         Route::get('settings', [SettingsController::class, 'show']);
         Route::put('settings', [SettingsController::class, 'update']);
         Route::post('settings/test-email', [SettingsController::class, 'testEmail']);
