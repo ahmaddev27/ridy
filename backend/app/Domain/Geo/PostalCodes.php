@@ -110,7 +110,7 @@ class PostalCodes
             return 0;
         }
 
-        fgetcsv($handle); // header
+        fgetcsv($handle, null, ',', '"', ''); // header — explicit $escape (PHP 8.4+)
 
         $rows = [];
         $imported = 0;
@@ -123,7 +123,7 @@ class PostalCodes
             $rows = [];
         };
 
-        while (($cols = fgetcsv($handle)) !== false) {
+        while (($cols = fgetcsv($handle, null, ',', '"', '')) !== false) {
             [$plz, $city, $lat, $lng] = array_pad($cols, 4, null);
             if (self::normalize($plz) === null || ! is_numeric($lat) || ! is_numeric($lng)) {
                 continue;
