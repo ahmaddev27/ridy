@@ -23,9 +23,14 @@ class OverviewController extends Controller
         $tenants = Tenant::query()->get();
         $sessions = UberFleetSession::withoutGlobalScopes()->orderByDesc('updated_at')->get()->keyBy('tenant_id');
 
+        // "Active" means truly active (subscription live, not banned/expired/
+        // disabled) — the same stateReason() rule the company row + ingest guards
+        // use — so the health donut can't disagree with the row's status badge.
+        $activeCompanies = $tenants->filter(fn (Tenant $t) => $t->stateReason() === null);
+
         $stats = [
             'companies' => $tenants->count(),
-            'active_companies' => $tenants->where('status', 'active')->count(),
+            'active_companies' => $activeCompanies->count(),
             'drivers' => Driver::withoutGlobalScopes()->count(),
             'offers' => DispatchOffer::withoutGlobalScopes()->count(),
             'sessions_active' => $sessions->where('status', 'active')->count(),
@@ -35,7 +40,9 @@ class OverviewController extends Controller
         // Alerts — companies the super-admin should act on.
         $alerts = [];
         foreach ($tenants as $tenant) {
-            if ($tenant->status !== 'active') {
+            // Only active companies raise session/proxy alerts — a stopped/expired/
+            // banned one isn't our concern until it's active again.
+            if ($tenant->stateReason() !== null) {
                 continue;
             }
             $session = $sessions->get($tenant->id);
@@ -71,7 +78,7 @@ class OverviewController extends Controller
                 'active' => $sessions->where('status', 'active')->count(),
                 'expired' => $sessions->where('status', 'expired')->count(),
                 'needs_relink' => $sessions->where('status', 'needs_relink')->count(),
-                'no_session' => max(0, $tenants->where('status', 'active')->count() - $sessions->count()),
+                'no_session' => max(0, $activeCompanies->count() - $sessions->count()),
             ],
             'offers_daily' => $this->offersDaily(),
             'top_companies' => $this->topCompanies($tenants),
