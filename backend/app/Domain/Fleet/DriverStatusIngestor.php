@@ -102,7 +102,7 @@ class DriverStatusIngestor
             // so it runs OFF this hot path on the queue; the multi-stop push fires
             // once the geo resolves. Only for engaged drivers with waypoints.
             if ($now >= 1 && ! empty($row['waypoints']) && is_array($row['waypoints'])) {
-                SyncTripFromWaypoints::dispatch($tenantId, $uuid, $row['waypoints']);
+                SyncTripFromWaypoints::dispatch($tenantId, $uuid);
             }
         }
 
