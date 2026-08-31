@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ChevronLeft, Phone, Mail, Star, Car, UserCheck, MapPin, ArrowRight, ChevronDown, Inbox } from "lucide-react";
+import { ChevronLeft, Phone, Mail, Star, Car, UserCheck, MapPin, ArrowRight, ChevronDown, Inbox, Banknote, CreditCard } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge, type Status } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -365,6 +365,29 @@ export default function DriverProfilePage() {
                 {uber.breakdown?.tip != null && (
                   <MiniStat label={d("statTip")} value={money(uber.breakdown.tip, uber.earnings_label)} />
                 )}
+              </div>
+
+              {/* Cash vs cashless — the cash the driver collected by hand (owed to
+                  the fleet) vs the amount that settles to the fleet through Uber. */}
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-line bg-surface-2 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-ink-subtle">
+                    <Banknote className="h-3.5 w-3.5" /> {d("statCash")}
+                  </div>
+                  <div className="mt-1 text-lg font-bold tabular-nums text-amber-600" dir="ltr">
+                    {money(Math.abs(uber.breakdown?.cash_collected ?? 0), uber.earnings_label)}
+                  </div>
+                  <div className="text-[11px] text-ink-subtle">{d("statCashHint")}</div>
+                </div>
+                <div className="rounded-lg border border-line bg-surface-2 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-ink-subtle">
+                    <CreditCard className="h-3.5 w-3.5" /> {d("statCashless")}
+                  </div>
+                  <div className="mt-1 text-lg font-bold tabular-nums text-emerald-600" dir="ltr">
+                    {money(uber.net_outstanding, uber.earnings_label)}
+                  </div>
+                  <div className="text-[11px] text-ink-subtle">{d("statCashlessHint")}</div>
+                </div>
               </div>
 
               {uber.breakdown && Object.keys(uber.breakdown).length > 0 && (
