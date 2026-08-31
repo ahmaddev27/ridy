@@ -10,6 +10,9 @@ import { Badge, type Status } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/context";
 import { getOffer, fareLabel, type DispatchOfferDetail, type OfferStatus } from "@/lib/api/offers";
 
+/** One row in the modal's stop list: an address with its per-leg + cumulative km. */
+type StopRow = { address: string; legKm: number | null; cumulativeKm: number | null };
+
 /** Offer lifecycle status → badge tone (mirrors the offers list). */
 const OFFER_TONE: Record<OfferStatus, Status> = {
   pending: "expiring",
@@ -65,29 +68,40 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
   // real coordinates — the same text the offers row shows), and only fall back to
   // the raw payload for a genuine multi-stop trip's intermediate stops. This keeps
   // the modal in sync with the row instead of showing the raw, uncorrected text.
-  const stops = useMemo(() => {
+  // The ordered stop rows shown in the modal: each an address plus the road
+  // distance from the previous stop (legKm) and the running total (cumulativeKm).
+  const stops = useMemo<StopRow[]>(() => {
     const pickup = tidyAddr(offer?.trip?.pickup_address ?? "");
     const dropoff = tidyAddr(offer?.trip?.dropoff_address ?? "");
 
     // Prefer Uber's authoritative live-map stops (each reverse-geocoded to an
-    // address on the backend) — the only source that names a multi-stop trip's
-    // INTERMEDIATE drop-offs, which the offer's raw text never carries.
+    // address + given a per-leg road distance on the backend) — the only source
+    // that names a multi-stop trip's INTERMEDIATE drop-offs and their distances.
     const tripStops = offer?.trip?.stops;
     if (tripStops && tripStops.length > 2) {
       return tripStops
-        .map((s, i) =>
-          i === 0 ? pickup || tidyAddr(s.address ?? "")
-            : i === tripStops.length - 1 ? dropoff || tidyAddr(s.address ?? "")
-            : tidyAddr(s.address ?? ""),
-        )
-        .filter(Boolean);
+        .map((s, i) => ({
+          address:
+            i === 0 ? pickup || tidyAddr(s.address ?? "")
+              : i === tripStops.length - 1 ? dropoff || tidyAddr(s.address ?? "")
+              : tidyAddr(s.address ?? ""),
+          legKm: s.leg_m != null ? s.leg_m / 1000 : null,
+          cumulativeKm: s.cumulative_m != null ? s.cumulative_m / 1000 : null,
+        }))
+        .filter((r) => r.address);
     }
 
     // Single drop-off (or stops not yet resolved): corrected pickup + drop-off,
-    // falling back to the raw offer text.
+    // falling back to the raw offer text. The drop-off carries the trip distance.
     const raw = extractStops(offer?.raw).map(tidyAddr).filter(Boolean);
-    return [pickup || raw[0] || "", dropoff || raw[raw.length - 1] || ""].filter(Boolean);
-  }, [offer?.raw, offer?.trip?.pickup_address, offer?.trip?.dropoff_address, offer?.trip?.stops]);
+    const p = pickup || raw[0] || "";
+    const d = dropoff || raw[raw.length - 1] || "";
+    const total = offer?.trip?.distance_km ?? null;
+    return [
+      { address: p, legKm: null, cumulativeKm: null },
+      { address: d, legKm: total, cumulativeKm: total },
+    ].filter((r) => r.address);
+  }, [offer?.raw, offer?.trip?.pickup_address, offer?.trip?.dropoff_address, offer?.trip?.stops, offer?.trip?.distance_km]);
 
   return (
     <div
@@ -146,14 +160,27 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
                 <ol className="space-y-3">
                   {stops.map((s, i) => {
                     const isLast = i === stops.length - 1;
+                    const isPickup = i === 0;
                     return (
                       <li key={i} className="flex items-start gap-3">
                         {isLast ? (
                           <Flag className="mt-0.5 h-4 w-4 shrink-0 text-danger-fg" />
                         ) : (
-                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-success-fg" />
+                          <MapPin className={`mt-0.5 h-4 w-4 shrink-0 ${isPickup ? "text-success-fg" : "text-amber-600"}`} />
                         )}
-                        <span className="text-sm text-ink">{s}</span>
+                        <div className="min-w-0 flex-1">
+                          <span className="text-sm text-ink">{s.address}</span>
+                          {/* Per-stop road distance: the leg from the previous stop,
+                              plus the running total once past the first drop-off. */}
+                          {s.legKm != null && !isPickup && (
+                            <div className="mt-0.5 text-xs text-ink-subtle" dir="ltr">
+                              +{toLatinDigits(s.legKm.toFixed(1))} km
+                              {s.cumulativeKm != null && i > 1 && (
+                                <span className="text-ink-muted"> · {toLatinDigits(s.cumulativeKm.toFixed(1))} km {c("total") || "total"}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </li>
                     );
                   })}

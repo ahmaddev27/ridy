@@ -51,7 +51,11 @@ export type TripInfo = {
   route_geometry: { coordinates: [number, number][] } | null;
   // Uber live-map stops (pickup first, then each drop-off), once resolved from the
   // driver's engaged position. stops_count >= 2 marks a multi-stop trip.
-  stops: { lat: number; lng: number; type: string | null; address: string | null }[] | null;
+  // Each stop carries its address plus the road distance from the previous stop
+  // (leg_m) and the running total to that stop (cumulative_m). Pickup has leg_m null.
+  stops:
+    | { lat: number; lng: number; type: string | null; address: string | null; leg_m: number | null; cumulative_m: number }[]
+    | null;
   stops_count: number | null;
   geo_source: string | null;
   distance_km: number | null;

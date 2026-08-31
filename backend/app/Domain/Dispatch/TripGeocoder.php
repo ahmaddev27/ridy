@@ -824,7 +824,8 @@ class TripGeocoder
         // drop-off by address (a multi-stop trip's intermediate stops have no address
         // in Uber's offer payload — only coordinates on the live map). The endpoints
         // reuse the corrected pickup/drop-off display; intermediates reverse-geocode.
-        $offer->stops = $this->labelStops($points, $offer->pickup_display, $offer->dropoff_display);
+        // Each stop also carries the road distance from the previous stop (its leg).
+        $offer->stops = $this->labelStops($points, $offer->pickup_display, $offer->dropoff_display, $route['legs']);
         $offer->stops_count = $stopsCount;
         $offer->geo_source = 'uber';
         $offer->geo_confidence = 'exact';
@@ -891,21 +892,34 @@ class TripGeocoder
      * address rather than blocking the others.
      *
      * @param  array<int, array{lat: float, lng: float, type: string|null}>  $points
-     * @return array<int, array{lat: float, lng: float, type: string|null, address: string|null}>
+     * @param  array<int, int>  $legs  road distance (m) of each leg: leg i = point i → i+1
+     * @return array<int, array{lat: float, lng: float, type: string|null, address: string|null, leg_m: int|null, cumulative_m: int}>
      */
-    private function labelStops(array $points, ?string $pickupLabel, ?string $dropoffLabel): array
+    private function labelStops(array $points, ?string $pickupLabel, ?string $dropoffLabel, array $legs = []): array
     {
         $last = count($points) - 1;
+        $cumulative = 0;
 
-        return array_map(function (array $p, int $i) use ($last, $pickupLabel, $dropoffLabel) {
+        $out = [];
+        foreach ($points as $i => $p) {
             $address = match ($i) {
                 0 => $pickupLabel,
                 $last => $dropoffLabel,
                 default => $this->reverse($p['lat'], $p['lng']),
             };
 
-            return $p + ['address' => $address !== '' ? $address : null];
-        }, $points, array_keys($points));
+            // Leg INTO this stop (from the previous one); the pickup has none.
+            $legM = $i === 0 ? null : ($legs[$i - 1] ?? null);
+            $cumulative += $legM ?? 0;
+
+            $out[] = $p + [
+                'address' => $address !== '' ? $address : null,
+                'leg_m' => $legM,
+                'cumulative_m' => $cumulative,
+            ];
+        }
+
+        return $out;
     }
 
     /** Rough completeness score of an address: +street, +house number, +postcode. */
@@ -928,15 +942,17 @@ class TripGeocoder
 
     /**
      * Road distance + geometry through an ordered list of points (multi-stop), via
-     * one OSRM request. Falls back to summed haversine legs when OSRM is unreachable.
+     * one OSRM request. Also returns the per-leg distances (leg i = point i → i+1),
+     * so each stop can show the road distance from the previous one. Falls back to
+     * straight-line legs when OSRM is unreachable.
      *
      * @param  array<int, array{lat: float, lng: float}>  $points
-     * @return array{distance_m: int|null, geometry: array|null}
+     * @return array{distance_m: int|null, geometry: array|null, legs: array<int, int>}
      */
     private function routeThrough(array $points): array
     {
         if (count($points) < 2) {
-            return ['distance_m' => null, 'geometry' => null];
+            return ['distance_m' => null, 'geometry' => null, 'legs' => []];
         }
 
         try {
@@ -947,18 +963,22 @@ class TripGeocoder
             ]);
             $route = $res->ok() ? ($res->json('routes.0') ?? null) : null;
             if ($route) {
-                return ['distance_m' => (int) round($route['distance']), 'geometry' => $route['geometry'] ?? null];
+                // OSRM returns one leg per consecutive point pair, each with its own
+                // road distance — the authoritative per-stop distance.
+                $legs = array_map(fn ($leg) => (int) round($leg['distance'] ?? 0), $route['legs'] ?? []);
+
+                return ['distance_m' => (int) round($route['distance']), 'geometry' => $route['geometry'] ?? null, 'legs' => $legs];
             }
         } catch (\Throwable $e) {
             // fall through to summed straight-line legs
         }
 
-        $sum = 0;
+        $legs = [];
         for ($i = 1, $n = count($points); $i < $n; $i++) {
-            $sum += $this->haversine($points[$i - 1], $points[$i]);
+            $legs[] = $this->haversine($points[$i - 1], $points[$i]);
         }
 
-        return ['distance_m' => $sum, 'geometry' => null];
+        return ['distance_m' => array_sum($legs), 'geometry' => null, 'legs' => $legs];
     }
 
     /** Straight-line distance in metres. */
