@@ -526,6 +526,56 @@ class TripGeocoder
     }
 
     /**
+     * The geocode_cache key for a reverse-geocoded point — the same rounding
+     * {@see reverse()} uses, so cached labels line up. Null for the 0,0 "no fix"
+     * point (never worth a lookup).
+     */
+    public function reverseCacheKey(float $lat, float $lng): ?string
+    {
+        if (abs($lat) < 0.0001 && abs($lng) < 0.0001) {
+            return null;
+        }
+
+        return 'rev|'.round($lat, 5).','.round($lng, 5);
+    }
+
+    /**
+     * Batch cache-only reverse lookup for the live map: one `whereIn` over
+     * geocode_cache for many points, NEVER a network call. Returns a map of
+     * cache-key → label for the warm hits only; cold points are simply absent
+     * (the caller falls back to the nearest town and backfills out-of-band).
+     *
+     * @param  array<int, array{0: float, 1: float}>  $points  [lat, lng] pairs
+     * @return array<string, string> key → label (non-empty hits only)
+     */
+    public function cachedReverseLabels(array $points): array
+    {
+        $keys = [];
+        foreach ($points as $p) {
+            $key = $this->reverseCacheKey((float) $p[0], (float) $p[1]);
+            if ($key !== null) {
+                $keys[$key] = true;
+            }
+        }
+        if ($keys === []) {
+            return [];
+        }
+
+        $labels = [];
+        DB::table('geocode_cache')
+            ->select(['query', 'label'])
+            ->whereIn('query', array_keys($keys))
+            ->get()
+            ->each(function ($row) use (&$labels) {
+                if ($row->label !== null && $row->label !== '') {
+                    $labels[$row->query] = $row->label;
+                }
+            });
+
+        return $labels;
+    }
+
+    /**
      * The trip's overall geo confidence: the weaker of the two endpoints (a
      * distance is only as trustworthy as its worse point). Downgraded to
      * `estimated` when the route has no road geometry — OSRM was unreachable, so

@@ -130,6 +130,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('stats', [DriverDashboardController::class, 'stats']);
                 Route::get('offers', [DriverOfferController::class, 'index']);
                 Route::post('offers/seen', [DriverOfferController::class, 'markSeen']);
+                Route::get('offers/{offer}', [DriverOfferController::class, 'show']);
 
                 // WebSocket (Reverb) channel authorisation for the driver's app —
                 // authenticates the private driver.{id} channel via the driver guard.

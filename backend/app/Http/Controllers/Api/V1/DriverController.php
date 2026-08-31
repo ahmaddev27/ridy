@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Dispatch\Jobs\BackfillWaypointLabels;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Dispatch\SupplierNetworkRecorder;
@@ -51,7 +52,7 @@ class DriverController extends Controller
         // off the map instead of freezing in place and looking live.
         $freshSince = now()->subMinutes(self::LIVE_STALE_MINUTES);
 
-        $drivers = Driver::query()
+        $liveDrivers = Driver::query()
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             // Belt-and-suspenders with the ingestor's bounds check: never plot a
@@ -61,40 +62,63 @@ class DriverController extends Controller
             ->whereBetween('latitude', [45.0, 56.0])
             ->whereBetween('longitude', [4.0, 17.0])
             ->where('status_synced_at', '>=', $freshSince)
-            ->get()
-            ->map(function (Driver $d) use ($geo) {
-                // Reverse the live GPS to the nearest town so the fleet map can show
-                // where each driver currently is (updates every poll).
-                $near = PostalCodes::nearest((float) $d->latitude, (float) $d->longitude);
+            ->get();
 
-                return [
-                    'id' => $d->id,
-                    'name' => $d->name,
-                    'phone' => $d->phone,
-                    'city' => $near['city'] ?? null,
-                    'plz' => $near['plz'] ?? null,
-                    'picture' => $d->uber_picture_url,
-                    'status' => $d->online_status,
-                    'lat' => (float) $d->latitude,
-                    'lng' => (float) $d->longitude,
-                    'heading' => $d->heading !== null ? (float) $d->heading : null,
-                    // Enrich each pickup/dropoff with a full street address (reverse
-                    // geocoded + cached) and the nearest town as a fallback, so the
-                    // map can label the point with a real address instead of "Pickup".
-                    'waypoints' => collect($d->trip_waypoints ?? [])->map(function ($w) use ($geo) {
-                        $lat = (float) ($w['lat'] ?? 0);
-                        $lng = (float) ($w['lng'] ?? 0);
-                        $near = PostalCodes::nearest($lat, $lng);
+        // Resolve every waypoint's street label from a SINGLE geocode_cache query
+        // (not one per waypoint per driver) and NEVER hit the network in this
+        // user-facing poll: cold points fall back to the nearest town and are
+        // reverse-geocoded out-of-band so the label appears on a later poll.
+        $allPoints = [];
+        foreach ($liveDrivers as $d) {
+            foreach ($d->trip_waypoints ?? [] as $w) {
+                $allPoints[] = [(float) ($w['lat'] ?? 0), (float) ($w['lng'] ?? 0)];
+            }
+        }
+        $cachedLabels = $geo->cachedReverseLabels($allPoints);
 
-                        return array_merge($w, [
-                            'address' => $geo->reverse($lat, $lng),
-                            'city' => $near['city'] ?? null,
-                            'plz' => $near['plz'] ?? null,
-                        ]);
-                    })->all(),
-                    'location_updated_at' => $d->location_updated_at,
-                ];
-            });
+        $misses = [];
+        $drivers = $liveDrivers->map(function (Driver $d) use ($geo, $cachedLabels, &$misses) {
+            // Reverse the live GPS to the nearest town so the fleet map can show
+            // where each driver currently is (updates every poll).
+            $near = PostalCodes::nearest((float) $d->latitude, (float) $d->longitude);
+
+            return [
+                'id' => $d->id,
+                'name' => $d->name,
+                'phone' => $d->phone,
+                'city' => $near['city'] ?? null,
+                'plz' => $near['plz'] ?? null,
+                'picture' => $d->uber_picture_url,
+                'status' => $d->online_status,
+                'lat' => (float) $d->latitude,
+                'lng' => (float) $d->longitude,
+                'heading' => $d->heading !== null ? (float) $d->heading : null,
+                // Label each pickup/dropoff from the batched cache; the nearest town
+                // is the always-available fallback while a cold point is backfilled.
+                'waypoints' => collect($d->trip_waypoints ?? [])->map(function ($w) use ($geo, $cachedLabels, &$misses) {
+                    $lat = (float) ($w['lat'] ?? 0);
+                    $lng = (float) ($w['lng'] ?? 0);
+                    $near = PostalCodes::nearest($lat, $lng);
+                    $key = $geo->reverseCacheKey($lat, $lng);
+                    $address = $key !== null ? ($cachedLabels[$key] ?? null) : null;
+                    if ($key !== null && $address === null) {
+                        $misses[$key] = [$lat, $lng]; // dedupe cold points by cache key
+                    }
+
+                    return array_merge($w, [
+                        'address' => $address,
+                        'city' => $near['city'] ?? null,
+                        'plz' => $near['plz'] ?? null,
+                    ]);
+                })->all(),
+                'location_updated_at' => $d->location_updated_at,
+            ];
+        });
+
+        // Fill cold labels off the request path so the next poll serves them warm.
+        if ($misses !== []) {
+            BackfillWaypointLabels::dispatch(array_values($misses));
+        }
 
         return response()->json(['data' => $drivers]);
     }

@@ -6,7 +6,9 @@ use App\Domain\Notifications\Contracts\PushSender;
 use App\Domain\Notifications\Push\FcmPushSender;
 use App\Domain\Notifications\Push\GoogleServiceAccountToken;
 use App\Domain\Notifications\Push\LogPushSender;
+use App\Domain\Tenancy\TenantContext;
 use App\Support\Settings;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Throwable;
@@ -39,6 +41,13 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->applyMailSettings();
+
+        // Clear any lingering tenant context before each queued job runs, so a
+        // long-lived worker never inherits the previous job's tenant scope. Each
+        // job that needs a tenant sets its own (or queries withoutGlobalScopes).
+        Queue::looping(function () {
+            $this->app->make(TenantContext::class)->forget();
+        });
     }
 
     /**

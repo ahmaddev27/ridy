@@ -30,6 +30,21 @@ class DriverOfferController extends Controller
     }
 
     /**
+     * A single offer by id, scoped to the authenticated driver. The app's offer
+     * detail screen uses this instead of scanning list page 1 — so an older offer
+     * (or one a push points at that newer offers pushed off page 1) resolves
+     * correctly instead of falsely reading as "expired".
+     */
+    public function show(Request $request, string $offer): DispatchOfferResource
+    {
+        $record = DispatchOffer::withoutGlobalScopes()
+            ->where('driver_id', $request->user()->id)
+            ->findOrFail($offer);
+
+        return new DispatchOfferResource($record);
+    }
+
+    /**
      * Mark the driver's offer feed as seen (they opened the list). Resets the
      * "unread offers" app-icon badge — the next push counts from this moment.
      */

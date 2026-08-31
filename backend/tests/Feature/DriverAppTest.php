@@ -176,6 +176,27 @@ class DriverAppTest extends TestCase
         $this->assertCount(1, $res->json('data'));
     }
 
+    public function test_driver_fetches_a_single_offer_by_id(): void
+    {
+        $mine = $this->driver(['activated_at' => now()]);
+        $offer = $this->offer($mine, 'off-by-id');
+
+        Sanctum::actingAs($mine, guard: 'driver');
+        $this->getJson("/api/v1/driver/offers/{$offer->id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $offer->id);
+    }
+
+    public function test_driver_cannot_fetch_another_drivers_offer_by_id(): void
+    {
+        $mine = $this->driver(['activated_at' => now()]);
+        $other = $this->driver(['email' => 'x@ya.de']);
+        $theirs = $this->offer($other, 'off-theirs');
+
+        Sanctum::actingAs($mine, guard: 'driver');
+        $this->getJson("/api/v1/driver/offers/{$theirs->id}")->assertNotFound();
+    }
+
     public function test_suspended_company_blocks_the_driver_app(): void
     {
         $driver = $this->driver(['activated_at' => now()]);

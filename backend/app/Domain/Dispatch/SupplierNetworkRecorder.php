@@ -63,10 +63,12 @@ class SupplierNetworkRecorder
         // the Network feed shows it once, not twice.
         $uuid = (string) Arr::get($offer, 'offerUUID', '');
         if ($uuid !== '') {
+            // Dedup on the indexed offer_uuid column (cheap index seek) rather than
+            // scanning the JSON payload on every ingest.
             $seen = rescue(fn () => DispatchNetworkLog::where('tenant_id', $tenantId)
                 ->where('kind', 'offer')
+                ->where('offer_uuid', $uuid)
                 ->where('created_at', '>=', now()->subSeconds(20))
-                ->where('payload->offerUUID', $uuid)
                 ->exists(), false, report: false);
             if ($seen) {
                 return;
@@ -78,12 +80,14 @@ class SupplierNetworkRecorder
             'offer',
             $offer,
             trim((string) Arr::get($offer, 'pickupAddress')).' → '.trim((string) Arr::get($offer, 'dropoffAddress')),
+            null,
+            $uuid !== '' ? $uuid : null,
         );
     }
 
     /** Persist one captured request. Best-effort — logging never breaks ingestion. */
-    public function capture(?int $tenantId, string $kind, mixed $payload, ?string $summary, ?int $count = null): void
+    public function capture(?int $tenantId, string $kind, mixed $payload, ?string $summary, ?int $count = null, ?string $offerUuid = null): void
     {
-        rescue(fn () => DispatchNetworkLog::record($tenantId, $kind, $payload, $summary, $count), report: false);
+        rescue(fn () => DispatchNetworkLog::record($tenantId, $kind, $payload, $summary, $count, $offerUuid), report: false);
     }
 }

@@ -24,7 +24,6 @@ class DispatchOfferIngestor
     public function __construct(
         private TenantContext $context,
         private DispatchNotifier $notifier,
-        private TripGeocoder $geocoder,
         private OfferLifecycle $lifecycle,
     ) {}
 
@@ -36,6 +35,22 @@ class DispatchOfferIngestor
     {
         $this->context->set($tenantId);
 
+        try {
+            return $this->route($tenantId, $offer, $seq);
+        } finally {
+            // Reset the request/job-lifetime tenant so a long-lived worker
+            // (queue/Octane) never inherits this tenant's scope into the next
+            // unit of work. Under FPM this is a harmless per-request no-op.
+            $this->context->forget();
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $offer
+     * @return array{status: string, offer_id?: int, driver_id?: int|null}
+     */
+    private function route(int $tenantId, array $offer, ?int $seq = null): array
+    {
         $offerUuid = (string) Arr::get($offer, 'offerUUID', '');
 
         if ($offerUuid === '') {
@@ -100,17 +115,10 @@ class DispatchOfferIngestor
         // accept window makes this notification time-sensitive — but a push failure
         // must never lose the offer.
         if ($driver !== null) {
-            // Geocode BEFORE the push so the notification carries the trip
-            // distance + €/km (the driver decides on it). Cached addresses —
-            // common for a city fleet — are instant; a cold one may add a second
-            // or two. A failure just drops the metrics line; it's retried async
-            // below and by the 5-min backfill sweep, and never loses the offer.
-            try {
-                $this->geocoder->enrich($record);
-            } catch (Throwable $e) {
-                RidyLog::event('dispatch_offer.geocode_failed', ['offer_id' => $record->id, 'error' => $e->getMessage()]);
-            }
-
+            // Push FIRST — the 5-second accept window makes this time-sensitive, so
+            // it must never wait on external geocoding (Nominatim/OSRM, multi-second
+            // timeouts). The distance + €/km fill in on the dashboard once the queued
+            // GeocodeOffer job resolves; the push simply goes out without them.
             try {
                 $sent = $this->notifier->notify($record);
                 RidyLog::event('dispatch_offer.notified', [
@@ -122,11 +130,9 @@ class DispatchOfferIngestor
                 RidyLog::event('dispatch_offer.notify_failed', ['offer_id' => $record->id, 'error' => $e->getMessage()]);
             }
 
-            // If the inline geocode didn't resolve (transient rate-limit), retry
-            // it off the hot path so the dashboard trip detail still fills in.
-            if ($record->geo_synced_at === null) {
-                GeocodeOffer::dispatch($record->id);
-            }
+            // Geocode off the hot path so a cold-cache address never blocks the
+            // ingest batch; the 5-min backfill sweep is the safety net.
+            GeocodeOffer::dispatch($record->id);
         }
 
         $status = $driver !== null ? 'routed' : 'unlinked_driver';

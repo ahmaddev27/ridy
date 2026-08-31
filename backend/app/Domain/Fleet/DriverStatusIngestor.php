@@ -2,11 +2,10 @@
 
 namespace App\Domain\Fleet;
 
+use App\Domain\Dispatch\Jobs\SyncTripFromWaypoints;
 use App\Domain\Dispatch\OfferLifecycle;
 use App\Domain\Dispatch\OfferStatus;
-use App\Domain\Dispatch\TripGeocoder;
 use App\Domain\Fleet\Models\Driver;
-use App\Domain\Notifications\DispatchNotifier;
 use App\Support\RidyLog;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
@@ -30,8 +29,6 @@ class DriverStatusIngestor
 
     public function __construct(
         private readonly OfferLifecycle $lifecycle,
-        private readonly TripGeocoder $geocoder,
-        private readonly DispatchNotifier $notifier,
     ) {}
 
     /**
@@ -99,14 +96,13 @@ class DriverStatusIngestor
             });
 
             // Once engaged, Uber's live map carries the trip's real pickup/drop-off
-            // (and any extra stops) as waypoints — the authoritative source. Use it
-            // to fix an offer whose text-only address couldn't be geocoded, and to
-            // surface + alert multi-stop trips. Cheap in steady state (a no-op until
-            // the stop count changes); only runs for engaged drivers with waypoints.
+            // (and any extra stops) as waypoints — the authoritative source for
+            // fixing an ungeocodable offer and surfacing/alerting multi-stop trips.
+            // The resolve is an OSRM route + reverse-geocode (multi-second, external),
+            // so it runs OFF this hot path on the queue; the multi-stop push fires
+            // once the geo resolves. Only for engaged drivers with waypoints.
             if ($now >= 1 && ! empty($row['waypoints']) && is_array($row['waypoints'])) {
-                $this->retryOnDeadlock(function () use ($tenantId, $uuid, $row, &$counts) {
-                    $this->syncTripFromWaypoints($tenantId, $uuid, $row['waypoints'], $counts);
-                });
+                SyncTripFromWaypoints::dispatch($tenantId, $uuid, $row['waypoints']);
             }
         }
 
@@ -239,31 +235,6 @@ class DriverStatusIngestor
             } elseif ($active->status === OfferStatus::Accepted && $this->lifecycle->cancel($active)) {
                 $counts['canceled']++;
             }
-        }
-    }
-
-    /**
-     * Resolve the driver's active offer's trip from Uber's live-map waypoints, and
-     * — when the trip has more than one drop-off (and the stop count just changed)
-     * — push a multi-stop alert to the driver and broadcast so the open app
-     * refreshes the offer detail live with the new stops/distance/€-per-km.
-     *
-     * @param  array<int, array<string, mixed>>  $waypoints
-     * @param  array<string, int>  $counts
-     */
-    private function syncTripFromWaypoints(int $tenantId, string $uuid, array $waypoints, array &$counts): void
-    {
-        $offer = $this->lifecycle->activeOfferFor($tenantId, $uuid);
-        if ($offer === null) {
-            return;
-        }
-
-        $stops = $this->geocoder->applyFromWaypoints($offer, $waypoints);
-        // Non-null only when it actually updated (first resolve, or the stop count
-        // changed). Alert only when it's a genuine multi-stop trip.
-        if ($stops !== null && $stops >= 2) {
-            $counts['multistop'] = ($counts['multistop'] ?? 0) + 1;
-            rescue(fn () => $this->notifier->notifyMultiStop($offer, $stops), report: false);
         }
     }
 

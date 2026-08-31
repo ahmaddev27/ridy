@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Dispatch\Jobs\GeocodeOffer;
 use App\Domain\Dispatch\Models\DispatchNetworkLog;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
@@ -10,6 +11,7 @@ use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class DispatchIngestTest extends TestCase
@@ -92,6 +94,20 @@ class DispatchIngestTest extends TestCase
         $this->assertNotNull($log, 'daemon ingest must record the offer to the Network feed');
         $this->assertSame($tenant->id, $log->tenant_id);
         $this->assertSame(self::DRIVER_UUID, $log->payload['driverInfo']['driverUUID']);
+    }
+
+    public function test_geocoding_is_enqueued_off_the_ingest_hot_path(): void
+    {
+        Queue::fake();
+        $this->tenantWithOrg();
+        app(TenantContext::class)->set(Tenant::first()->id);
+        Driver::create(['name' => 'Mhmoud Zedya', 'uber_driver_uuid' => self::DRIVER_UUID]);
+
+        $this->ingestOffers([$this->offer()])->assertOk()->assertJsonPath('data.routed', 1);
+
+        // The ingest path must not geocode inline — it enqueues GeocodeOffer so a
+        // cold-cache address never blocks the batch (or the time-sensitive push).
+        Queue::assertPushed(GeocodeOffer::class);
     }
 
     public function test_offer_for_unlinked_driver_is_stored_without_driver_id(): void
