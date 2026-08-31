@@ -62,10 +62,14 @@ function rangeMs(key: RangeKey): { from: number; to: number } {
 }
 
 /** Currency amount with its symbol ("€1,481.04"), or "—" when absent. */
-function money(amount: number | null | undefined, label: string | null): string {
+function money(amount: number | string | null | undefined, label: string | null): string {
   if (amount == null) return "—";
+  // Laravel serializes decimal casts as strings (e.g. "62595.12"), so coerce
+  // before formatting — amount.toFixed on a string throws.
+  const n = typeof amount === "number" ? amount : Number(amount);
+  if (Number.isNaN(n)) return "—";
   const symbol = label === "EUR" ? "€" : label ? `${label} ` : "";
-  return `${symbol}${amount.toFixed(2)}`;
+  return `${symbol}${n.toFixed(2)}`;
 }
 
 /** "cash_collected" → "Cash collected" for a breakdown category label. */
