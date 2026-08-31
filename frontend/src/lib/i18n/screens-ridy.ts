@@ -71,6 +71,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       activeTrips: "active trips", enRoute: "En route", onTrip: "On trip", online: "Online", offline: "Offline", active: "Active",
       pickup: "Pickup", dropoff: "Dropoff", updated: "Updated",
       emptyTitle: "No active trips", emptyDesc: "Drivers appear here once they're on the way to a rider or on a trip.",
+      fullscreen: "Fullscreen", exitFullscreen: "Exit fullscreen",
     },
     connections: {
       title: "Uber connection",
@@ -231,6 +232,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       activeTrips: "aktive Touren", enRoute: "Unterwegs", onTrip: "Auf Tour", online: "Online", offline: "Offline", active: "Aktiv",
       pickup: "Abholung", dropoff: "Ziel", updated: "Aktualisiert",
       emptyTitle: "Keine aktiven Touren", emptyDesc: "Fahrer erscheinen hier, sobald sie zur Abholung unterwegs oder auf Tour sind.",
+      fullscreen: "Vollbild", exitFullscreen: "Vollbild beenden",
     },
     connections: {
       title: "Uber-Verbindung",
@@ -389,6 +391,7 @@ export const screensRidy: Record<Locale, Record<string, unknown>> = {
       activeTrips: "رحلة نشطة", enRoute: "رايح يستلم", onTrip: "على رحلة", online: "أونلاين", offline: "أوفلاين", active: "نشط",
       pickup: "الاستلام", dropoff: "التنزيل", updated: "آخر تحديث",
       emptyTitle: "ما في رحلات نشطة", emptyDesc: "السائقين بيبانوا هون لما يكونوا طالعين ياخدوا راكب أو على رحلة.",
+      fullscreen: "ملء الشاشة", exitFullscreen: "إنهاء ملء الشاشة",
     },
     connections: {
       title: "ربط أوبر",

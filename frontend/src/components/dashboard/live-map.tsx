@@ -4,7 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { latnLocale } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import type { Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Maximize2, Minimize2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { getLiveDrivers, type LiveDriver, type LiveWaypoint } from "@/lib/api/drivers";
 import { presence, PRESENCE_COLOR, PRESENCE_TONE, PRESENCE_LABEL_KEY, type Presence } from "@/lib/driver-status";
@@ -123,6 +123,8 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
   const c = (k: string) => t(`screens.map.${k}`);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const mapRef = useRef<MapLibreMap | null>(null);
   const MRef = useRef<typeof import("maplibre-gl") | null>(null);
   const readyRef = useRef(false);
@@ -355,9 +357,40 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Fullscreen the whole map wrapper via the native Fullscreen API, and keep the
+  // map canvas sized to it (MapLibre needs an explicit resize on the transition).
+  const toggleFullscreen = () => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else el.requestFullscreen().catch(() => {});
+  };
+  useEffect(() => {
+    const onChange = () => {
+      setFullscreen(Boolean(document.fullscreenElement));
+      // The container's box changes on the transition — resize after it settles.
+      requestAnimationFrame(() => mapRef.current?.resize());
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-line/70 bg-surface shadow-[0_2px_10px_-2px_rgba(30,34,43,0.06)]">
-      <div ref={containerRef} className={`w-full ${heightClass}`} style={{ zIndex: 0 }} />
+    <div
+      ref={wrapperRef}
+      className="relative overflow-hidden rounded-2xl border border-line/70 bg-surface shadow-[0_2px_10px_-2px_rgba(30,34,43,0.06)]"
+    >
+      <div ref={containerRef} className={`w-full ${fullscreen ? "h-screen" : heightClass}`} style={{ zIndex: 0 }} />
+
+      {/* Fullscreen toggle — top-left corner (zoom control sits top-right). */}
+      <button
+        onClick={toggleFullscreen}
+        title={c(fullscreen ? "exitFullscreen" : "fullscreen")}
+        aria-label={c(fullscreen ? "exitFullscreen" : "fullscreen")}
+        className="pointer-events-auto absolute top-3 z-[1000] flex h-9 w-9 items-center justify-center rounded-lg bg-surface/95 text-ink-muted shadow-md backdrop-blur transition hover:text-ink ltr:left-3 rtl:right-3"
+      >
+        {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+      </button>
 
       {/* Legend — pinned bottom-left so it never rides over the zoom control
           (top-left) or the driver list (top-right). Colors come straight from
