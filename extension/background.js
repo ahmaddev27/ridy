@@ -572,14 +572,22 @@ async function postCapture(kind, url, payload) {
 // time the manager opens the page; here we replay it (with the driver swapped in)
 // so the data refreshes without the manager ever reopening the Uber tab.
 
-/** Deep-replace any UUID-valued variable whose key mentions "driver" — targets the
- *  driver id in a timeline query without touching partnerUuid/org ids. */
+// A GetTimelineInfo query is per-driver, and Uber names that id inconsistently
+// (driverUUID / earnerUUID / userUUID / uuid). The one id we must NOT touch is the
+// org/partner id. So we target UUID-valued vars whose key looks driver-ish, and
+// never those that look org-ish — broad enough to catch Uber's real key names.
+const DRIVER_KEY = /driver|earner|\buser\b|^uuid$/i;
+const ORG_KEY = /partner|supplier|org|company|fleet|account|tenant/i;
+
+/** Deep-replace the driver-identifying UUID variable in a timeline query, leaving
+ *  the org/partner id intact, so the replay returns THIS driver's timeline. */
 function overrideDriver(vars, uuid) {
   if (!vars || typeof vars !== "object" || !uuid) return vars;
   const out = Array.isArray(vars) ? [...vars] : { ...vars };
   for (const k of Object.keys(out)) {
     const v = out[k];
-    if (typeof v === "string" && /driver/i.test(k) && /^[0-9a-f-]{20,}$/i.test(v)) out[k] = uuid;
+    const isUuid = typeof v === "string" && /^[0-9a-f-]{20,}$/i.test(v);
+    if (isUuid && DRIVER_KEY.test(k) && !ORG_KEY.test(k)) out[k] = uuid;
     else if (v && typeof v === "object") out[k] = overrideDriver(v, uuid);
   }
   return out;
@@ -656,7 +664,15 @@ async function fetchDriverUber(driverUuid) {
     out.timeline = extractTimeline(tl.data);
     // Reconcile acceptances the coarse status poll missed (offers wrongly "not
     // taken"): the backend matches each assigned trip's time to a pending offer.
-    if (out.timeline.length && driverUuid) await postTimeline(driverUuid, out.timeline).catch(() => {});
+    // Guard: only reconcile when the replay was actually re-targeted to THIS driver
+    // (the override found the driver key). Otherwise the template still carries the
+    // seed driver's id, and posting it would attribute another driver's trips here.
+    const targeted = driverUuid && JSON.stringify(tl.variables || {}).includes(driverUuid);
+    if (out.timeline.length && targeted) {
+      await postTimeline(driverUuid, out.timeline).catch(() => {});
+    } else if (out.timeline.length && driverUuid) {
+      out.timelineUntargeted = true; // surfaced so we know the driver key didn't match
+    }
   }
   return out;
 }
