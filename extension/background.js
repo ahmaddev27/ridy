@@ -652,8 +652,29 @@ async function fetchDriverUber(driverUuid) {
     out.breakdown = true;
   }
   const tl = await replayGraphql("GetTimelineInfo", driverUuid);
-  if (tl.ok) out.timeline = extractTimeline(tl.data);
+  if (tl.ok) {
+    out.timeline = extractTimeline(tl.data);
+    // Reconcile acceptances the coarse status poll missed (offers wrongly "not
+    // taken"): the backend matches each assigned trip's time to a pending offer.
+    if (out.timeline.length && driverUuid) await postTimeline(driverUuid, out.timeline).catch(() => {});
+  }
   return out;
+}
+
+/** Send a driver's activity timeline to the backend for offer reconciliation. */
+async function postTimeline(driverUuid, events) {
+  const pairing = await getPairing();
+  if (!pairing.ok) return { ok: false, reason: pairing.reason };
+  try {
+    const res = await fetch(`${pairing.apiUrl}/api/v1/supplier/timeline`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${pairing.token}` },
+      body: JSON.stringify({ driver_uuid: driverUuid, events }),
+    });
+    return { ok: res.ok };
+  } catch (e) {
+    return { ok: false, reason: e.message };
+  }
 }
 
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {

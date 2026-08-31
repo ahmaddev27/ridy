@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\SupplierNetworkRecorder;
+use App\Domain\Dispatch\TimelineReconciler;
 use App\Domain\Fleet\EarnerBreakdownParser;
 use App\Domain\Fleet\SupplierBreakdownParser;
 use App\Http\Controllers\Controller;
@@ -46,5 +47,23 @@ class SupplierCaptureController extends Controller
         }
 
         return response()->json(['data' => ['captured' => true, 'metrics_stored' => $stored]]);
+    }
+
+    /**
+     * Reconcile a driver's offer acceptances from Uber's activity timeline
+     * (GetTimelineInfo), matched by time. Fixes acceptances the coarse status poll
+     * missed — offers wrongly stuck on "not taken" for a busy driver.
+     */
+    public function timeline(Request $request, TimelineReconciler $reconciler): JsonResponse
+    {
+        $data = $request->validate([
+            'driver_uuid' => ['required', 'string', 'max:64'],
+            'events' => ['required', 'array'],
+        ]);
+
+        $tenantId = (int) $request->user()->tenant_id;
+        $reconciled = rescue(fn () => $reconciler->reconcile($tenantId, $data['driver_uuid'], $data['events']), 0, report: false);
+
+        return response()->json(['data' => ['reconciled' => $reconciled]]);
     }
 }
