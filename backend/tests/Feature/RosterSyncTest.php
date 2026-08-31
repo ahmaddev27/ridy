@@ -29,7 +29,7 @@ class RosterSyncTest extends TestCase
     {
         parent::setUp();
         config(['services.dispatch.ingest_secret' => self::SECRET]);
-        $this->tenant = Tenant::create(['name' => 'YA', 'country' => 'DE', 'uber_org_uuid' => 'org1']);
+        $this->tenant = Tenant::create(['name' => 'YA', 'country' => 'DE', 'uber_org_uuid' => 'org1', 'status' => 'active', 'activated_at' => now()]);
         app(TenantContext::class)->set($this->tenant->id);
     }
 

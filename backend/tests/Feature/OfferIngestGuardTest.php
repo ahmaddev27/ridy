@@ -30,7 +30,8 @@ class OfferIngestGuardTest extends TestCase
     {
         parent::setUp();
         $this->seed(RolePermissionSeeder::class);
-        $this->tenant = Tenant::create(['name' => 'YA', 'country' => 'DE', 'uber_org_uuid' => self::ORG]);
+        // Active company: ingest is refused for a stopped/expired/banned one.
+        $this->tenant = Tenant::create(['name' => 'YA', 'country' => 'DE', 'uber_org_uuid' => self::ORG, 'status' => 'active', 'activated_at' => now()]);
         app(TenantContext::class)->set($this->tenant->id);
         $manager = User::create([
             'name' => 'M', 'email' => 'm@ya.de', 'password' => Hash::make('password'), 'tenant_id' => $this->tenant->id,
@@ -79,5 +80,19 @@ class OfferIngestGuardTest extends TestCase
         $this->postJson('/api/v1/dispatch/offers/ingest', ['offers' => [$this->offer(self::ORG)]])
             ->assertOk();
         $this->assertSame(1, DispatchOffer::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->count());
+    }
+
+    public function test_ingest_is_refused_for_an_inactive_company(): void
+    {
+        UberFleetSession::withoutGlobalScopes()->create([
+            'tenant_id' => $this->tenant->id, 'uber_org_uuid' => self::ORG, 'cookies' => [['name' => 'a', 'value' => 'b']],
+        ]);
+        // The subscription lapsed: no data may be pulled or accepted any more.
+        $this->tenant->update(['subscription_ends_at' => now()->subDay()]);
+
+        $this->postJson('/api/v1/dispatch/offers/ingest', ['offers' => [$this->offer(self::ORG)]])
+            ->assertStatus(403)
+            ->assertJsonPath('message', 'company_inactive');
+        $this->assertSame(0, DispatchOffer::withoutGlobalScopes()->count());
     }
 }
