@@ -111,8 +111,8 @@ export default function DriversPage() {
         await syncDrivers();
       }
 
-      await refetch();
-      await refreshStatuses();
+      const fresh = await refetch();
+      await refreshStatuses(fresh ?? []);
     } catch {
       /* best-effort — the cached roster stays visible */
     } finally {
@@ -120,10 +120,12 @@ export default function DriversPage() {
     }
   }
 
-  // Refresh live online/offline presence for the current drivers.
-  async function refreshStatuses() {
-    const list = await listDrivers().catch(() => []);
+  // Refresh live online/offline presence for the given drivers. Takes the already
+  // -loaded roster so it doesn't re-fetch the list just to read the UUIDs (that
+  // second identical GET was the "drivers fetched twice on open").
+  async function refreshStatuses(list: Driver[]) {
     const uuids = list.map((d) => d.uber_driver_uuid).filter((u): u is string => Boolean(u));
+    if (uuids.length === 0) return;
     const res = await fetchDriverStatusesViaExtension(uuids);
     if (res?.ok) await refetch();
   }
@@ -131,7 +133,9 @@ export default function DriversPage() {
   // Stale-while-revalidate: show the cached roster instantly, then silently
   // pull a fresh one from Uber on open — but at most once every few minutes.
   useEffect(() => {
-    if (didAutoSync.current) return;
+    // Wait for the first roster load (from useAsync) so the presence refresh can
+    // reuse it — running before data is ready is what forced the extra fetch.
+    if (didAutoSync.current || !data) return;
     didAutoSync.current = true;
     const KEY = "drivers-autosync-at";
     const last = Number(localStorage.getItem(KEY) || 0);
@@ -139,10 +143,10 @@ export default function DriversPage() {
       localStorage.setItem(KEY, String(Date.now()));
       runSync();
     } else {
-      refreshStatuses(); // cheap presence refresh even when the roster is fresh
+      refreshStatuses(data); // cheap presence refresh even when the roster is fresh
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [data]);
 
   return (
     <div className="space-y-6">

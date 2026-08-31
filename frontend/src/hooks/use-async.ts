@@ -41,11 +41,14 @@ export function useAsync<T>(fetcher: () => Promise<T>, options: AsyncOptions = {
     try {
       const data = await fetcherRef.current();
       setState({ data, loading: false, error: null });
+      return data; // let callers reuse the fresh data without a second fetch
     } catch (e) {
       const message = e instanceof Error ? e.message : "Something went wrong";
       // On a silent failure keep the last good data visible; only surface the
       // error on an explicit load so a blip doesn't blank the screen.
       setState((s) => (silent ? { ...s, error: message } : { data: null, loading: false, error: message }));
+
+      return null;
     }
   }, []);
 
