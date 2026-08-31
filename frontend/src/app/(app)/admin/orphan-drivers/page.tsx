@@ -11,6 +11,33 @@ import { useI18n } from "@/lib/i18n/context";
 import { latnLocale } from "@/lib/utils";
 import { getOrphanDrivers, type OrphanDriver } from "@/lib/api/admin";
 
+/**
+ * Driver thumbnail that falls back to an initials placeholder — the Uber picture
+ * URLs are often expired/blocked (they load with a referrer we can't send), so a
+ * broken <img> must degrade to the initials avatar rather than a broken icon.
+ */
+function DriverAvatar({ name, picture }: { name: string | null; picture: string | null }) {
+  const [broken, setBroken] = useState(false);
+  const initials = (name ?? "—").slice(0, 2).toUpperCase();
+  if (!picture || broken) {
+    return (
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-ink-muted">
+        {initials}
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={picture}
+      alt=""
+      referrerPolicy="no-referrer"
+      onError={() => setBroken(true)}
+      className="h-9 w-9 shrink-0 rounded-full object-cover"
+    />
+  );
+}
+
 export default function OrphanDriversPage() {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.orphanDrivers.${k}`);
@@ -84,14 +111,7 @@ export default function OrphanDriversPage() {
                   <tr key={d.id} className="hover:bg-surface-2">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        {d.uber_picture_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={d.uber_picture_url} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
-                        ) : (
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-ink-muted">
-                            {(d.name ?? "—").slice(0, 2).toUpperCase()}
-                          </span>
-                        )}
+                        <DriverAvatar name={d.name} picture={d.uber_picture_url} />
                         <div className="min-w-0">
                           <div className="truncate font-medium text-ink">{d.name ?? "—"}</div>
                           {d.app_registered ? (

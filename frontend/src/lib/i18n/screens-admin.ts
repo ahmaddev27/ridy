@@ -16,6 +16,13 @@ const en: Dict = {
     hint: "Drain stops new assignments to a box and moves its companies to a live one. Rebalance spreads everything evenly across live shards.",
     addTitle: "Add a shard box", addIntro: "Run these on the NEW box over SSH. It connects to this dashboard's server and shows up in the table above automatically — nothing to enter here.", addNameLabel: "Shard name", addSecretNote: "Use the SAME DISPATCH_INGEST_SECRET as the main box (never share it here).", addFillNote: "Replace <NEW_BOX_IP> and <REPO_URL> with your new server's IP and your repo URL.", addAppears: "It appears in the table above within a minute.", copyCmd: "Copy commands", copied: "Copied",
   },
+  orphanDrivers: {
+    title: "Free-agent drivers", subtitle: "Drivers we synced before who were dropped from their company roster — registered with us, no active company. Reach out to place them with a fleet.",
+    searchPlaceholder: "Search name, phone or email…", count: "{n} drivers", pageOf: "Page {p} of {t}", trips: "{n} trips",
+    colDriver: "Driver", colContact: "Contact", colUber: "Uber", colFormerCompany: "Former company", colRemoved: "Dropped",
+    appRegistered: "App registered", notRegistered: "Roster only",
+    emptyTitle: "No free-agent drivers", emptyDesc: "Drivers dropped from a company roster will appear here.",
+  },
   systemHealth: {
     colCompany: "Company", colSubscription: "Subscription", colSession: "Uber session", colDaemon: "Daemon", colProxy: "Proxy", clearNetwork: "Clear Network logs", clearNetworkConfirm: "Delete ALL captured Network logs for every company? This cannot be undone.", clearNetworkDone: "Cleared {n} entries", clearNetworkFailed: "Could not clear", resourcesTitle: "Server resources", resourcesHint: "Live host CPU, memory, disk and network.", resourcesEmpty: "Press refresh to load the current server metrics.", resourcesFailed: "Could not load metrics", metricsFailed: "Could not load metrics", refresh: "Refresh", sampledAt: "Sampled at {time}", cpu: "CPU", ram: "Memory", disk: "Disk", network: "Network", load: "Load", cores: "cores", free: "free",
     ok: "OK", down: "Down", noSession: "No session", noProxy: "No proxy",
@@ -227,6 +234,13 @@ const de: Dict = {
     hint: "Leeren stoppt neue Zuweisungen und verschiebt die Firmen auf eine aktive Box. Neu verteilen streut alles gleichmäßig auf die aktiven Shards.",
     addTitle: "Shard-Box hinzufügen", addIntro: "Führe diese Befehle auf der NEUEN Box per SSH aus. Sie verbindet sich mit dem Server dieses Dashboards und erscheint oben automatisch — hier ist keine Eingabe nötig.", addNameLabel: "Shard-Name", addSecretNote: "Verwende dasselbe DISPATCH_INGEST_SECRET wie die Haupt-Box (hier nie teilen).", addFillNote: "Ersetze <NEW_BOX_IP> und <REPO_URL> durch die IP der neuen Box und deine Repo-URL.", addAppears: "Erscheint innerhalb einer Minute in der Tabelle oben.", copyCmd: "Befehle kopieren", copied: "Kopiert",
   },
+  orphanDrivers: {
+    title: "Freie Fahrer", subtitle: "Fahrer, die wir früher synchronisiert haben und die aus der Firmen-Roster entfernt wurden — bei uns registriert, ohne aktive Firma. Kontaktiere sie für eine neue Flotte.",
+    searchPlaceholder: "Name, Telefon oder E-Mail suchen…", count: "{n} Fahrer", pageOf: "Seite {p} von {t}", trips: "{n} Fahrten",
+    colDriver: "Fahrer", colContact: "Kontakt", colUber: "Uber", colFormerCompany: "Frühere Firma", colRemoved: "Entfernt",
+    appRegistered: "App registriert", notRegistered: "Nur Roster",
+    emptyTitle: "Keine freien Fahrer", emptyDesc: "Aus einer Firmen-Roster entfernte Fahrer erscheinen hier.",
+  },
   systemHealth: {
     colCompany: "Firma", colSubscription: "Abonnement", colSession: "Uber-Sitzung", colDaemon: "Daemon", colProxy: "Proxy", clearNetwork: "Netzwerk-Logs leeren", clearNetworkConfirm: "ALLE erfassten Netzwerk-Logs aller Firmen löschen? Kann nicht rückgängig gemacht werden.", clearNetworkDone: "{n} Einträge gelöscht", clearNetworkFailed: "Konnte nicht leeren", resourcesTitle: "Server-Ressourcen", resourcesHint: "Live CPU, Speicher, Festplatte und Netzwerk des Hosts.", resourcesEmpty: "Auf Aktualisieren tippen, um die aktuellen Serverwerte zu laden.", resourcesFailed: "Werte konnten nicht geladen werden", metricsFailed: "Werte konnten nicht geladen werden", refresh: "Aktualisieren", sampledAt: "Gemessen um {time}", cpu: "CPU", ram: "Speicher", disk: "Festplatte", network: "Netzwerk", load: "Last", cores: "Kerne", free: "frei",
     ok: "OK", down: "Aus", noSession: "Keine Sitzung", noProxy: "Kein Proxy",
@@ -435,6 +449,13 @@ const ar: Dict = {
     drain: "تفريغ", enable: "تفعيل",
     hint: "التفريغ يوقف تعيين شركات جديدة لهذا البوكس وينقل شركاته لبوكس حيّ. إعادة التوزيع تعيد التوزيع بالتساوي على النشطة.",
     addTitle: "إضافة بوكس (شارد)", addIntro: "شغّل هذه الأوامر على البوكس الجديد عبر SSH. البوكس بيتّصل بسيرفر هذه اللوحة ويظهر بالجدول فوق تلقائياً — ما بتحتاج تدخل شي هنا.", addNameLabel: "اسم الشارد", addSecretNote: "استخدم نفس DISPATCH_INGEST_SECRET تبع البوكس الرئيسي (لا تشاركه هنا).", addFillNote: "بدّل <NEW_BOX_IP> و<REPO_URL> بـIP سيرفرك الجديد ورابط الريبو.", addAppears: "بيظهر بالجدول فوق خلال دقيقة.", copyCmd: "نسخ الأوامر", copied: "تم النسخ",
+  },
+  orphanDrivers: {
+    title: "سائقون بلا شركة", subtitle: "سائقون تمّت مزامنتهم عندنا سابقاً وانشالوا من روستر شركتهم — مسجّلون عندنا وبلا شركة نشطة. تواصل معهم لربطهم بأسطول.",
+    searchPlaceholder: "ابحث بالاسم أو الهاتف أو الإيميل…", count: "{n} سائق", pageOf: "صفحة {p} من {t}", trips: "{n} رحلة",
+    colDriver: "السائق", colContact: "التواصل", colUber: "أوبر", colFormerCompany: "الشركة السابقة", colRemoved: "تاريخ الإزالة",
+    appRegistered: "مسجّل بالتطبيق", notRegistered: "روستر فقط",
+    emptyTitle: "ما في سائقين بلا شركة", emptyDesc: "السائقون المُزالون من روستر شركة بيظهروا هون.",
   },
   systemHealth: {
     colCompany: "الشركة", colSubscription: "الاشتراك", colSession: "جلسة أوبر", colDaemon: "الخدمة", colProxy: "البروكسي", clearNetwork: "تصفير سجلات الشبكة", clearNetworkConfirm: "حذف كل سجلات الشبكة الملتقطة لكل الشركات؟ لا يمكن التراجع.", clearNetworkDone: "تم حذف {n} عنصر", clearNetworkFailed: "تعذّر التصفير", resourcesTitle: "موارد السيرفر", resourcesHint: "المعالج والذاكرة والقرص والشبكة للسيرفر مباشرة.", resourcesEmpty: "اضغط تحديث لتحميل قراءات السيرفر الحالية.", resourcesFailed: "تعذّر تحميل القراءات", metricsFailed: "تعذّر تحميل القراءات", refresh: "تحديث", sampledAt: "قُرئ في {time}", cpu: "المعالج", ram: "الذاكرة", disk: "القرص", network: "الشبكة", load: "الحمل", cores: "نواة", free: "متاح",
