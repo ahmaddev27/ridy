@@ -31,6 +31,7 @@ import {
   getCompanyOffers,
   getCompanyVehicles,
   getCompanyNetwork,
+  clearCompanyNetwork,
   type CompanyNetworkRow,
   listSubscriptionInvoices,
   listPlans,
@@ -834,6 +835,24 @@ function CompanyNetworkTab({ id }: { id: number }) {
   const copyAll = () =>
     copy(JSON.stringify(rows.map((r) => r.raw_payload), null, 2), c("copiedAll").replace("{n}", String(rows.length)));
 
+  const [clearing, setClearing] = useState(false);
+  const clearNet = async () => {
+    if (!confirm(c("clearNetConfirm"))) return;
+    setClearing(true);
+    try {
+      const { deleted } = await clearCompanyNetwork(id);
+      toast.success(c("clearNetDone").replace("{n}", deleted.toLocaleString()));
+      setRows([]);
+      setTotal(0);
+      setLastPage(1);
+      setPage(1);
+    } catch {
+      toast.error(c("clearNetFailed"));
+    } finally {
+      setClearing(false);
+    }
+  };
+
   // The day-level inputs map to inclusive datetime bounds: the whole "from" day
   // through the end of the "to" day, so a same-day range still returns its rows.
   const fromBound = from ? `${from}T00:00:00` : "";
@@ -956,6 +975,17 @@ function CompanyNetworkTab({ id }: { id: number }) {
             >
               <Files className="h-3.5 w-3.5" />
               {c("copyAll")}
+            </button>
+          )}
+          {total > 0 && (
+            <button
+              onClick={clearNet}
+              disabled={clearing}
+              title={c("clearNet")}
+              className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 font-medium text-danger-fg transition hover:bg-danger-bg disabled:opacity-50"
+            >
+              {clearing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              {c("clearNet")}
             </button>
           )}
         </div>

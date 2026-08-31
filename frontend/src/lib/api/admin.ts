@@ -274,6 +274,12 @@ export async function clearNetworkLogs(): Promise<{ deleted: number }> {
   return res.data;
 }
 
+/** Super-admin: wipe the captured Network feed for ONE company only. */
+export async function clearCompanyNetwork(id: number): Promise<{ deleted: number }> {
+  const res = await apiFetch<{ data: { deleted: number } }>(`${base}/${id}/network`, { method: "DELETE" });
+  return res.data;
+}
+
 export async function getCompanyNetwork(
   id: number,
   page = 1,

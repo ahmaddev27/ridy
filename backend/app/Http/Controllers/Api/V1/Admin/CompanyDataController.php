@@ -71,6 +71,14 @@ class CompanyDataController extends Controller
         ]);
     }
 
+    /** Purge every captured network log for a single company (scoped, irreversible). */
+    public function clearNetwork(Tenant $tenant): JsonResponse
+    {
+        $deleted = DispatchNetworkLog::query()->where('tenant_id', $tenant->id)->delete();
+
+        return response()->json(['data' => ['deleted' => $deleted]]);
+    }
+
     public function vehicles(Tenant $tenant): JsonResponse
     {
         $vehicles = Vehicle::withoutGlobalScopes()
