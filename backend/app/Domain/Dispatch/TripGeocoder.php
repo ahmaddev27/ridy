@@ -862,25 +862,39 @@ class TripGeocoder
      */
     private function labelForPoint(?string $rawAddress, array $point): ?string
     {
-        $raw = AddressFormatter::tidy($rawAddress);
-        // Keep the supplier's own text only when it already names a STREET — a
-        // street-less "42697 Solingen" (a postcode + city with no street) is still
-        // incomplete, so reverse-geocode Uber's real point to add the actual street.
-        if ($raw !== null && $raw !== '' && $this->hasStreet($raw)) {
-            return null;
+        $label = $this->reverse($point['lat'], $point['lng']);
+        if ($label === null || $label === '') {
+            return null; // reverse unavailable → keep whatever display we had
         }
 
-        $label = $this->reverse($point['lat'], $point['lng']);
+        // Uber's coordinate is authoritative, so ALWAYS prefer its reverse-geocoded
+        // address — unless the supplier's own text is at least as complete (e.g. it
+        // carries a house number the reverse lacks), so an accept never downgrades a
+        // good address. A street-less "42697 Solingen" always loses to the reverse.
+        $raw = AddressFormatter::tidy($rawAddress);
+        if ($raw !== null && $raw !== '' && $this->addressScore($raw) >= $this->addressScore($label)) {
+            return null; // supplier text is as good or better — keep the current display
+        }
 
-        return $label !== '' ? $label : null;
+        return $label;
     }
 
-    /** True when the address names a street (not just a PLZ + city / bare place). */
-    private function hasStreet(?string $address): bool
+    /** Rough completeness score of an address: +street, +house number, +postcode. */
+    private function addressScore(string $address): int
     {
-        $street = AddressNormalizer::parse($address)['street'] ?? null;
+        $street = (string) (AddressNormalizer::parse($address)['street'] ?? '');
+        $score = 0;
+        if ($street !== '') {
+            $score++;
+        }
+        if (preg_match('/\d/', $street) === 1) {
+            $score++; // a house number in the street segment
+        }
+        if ($this->hasPostcode($address)) {
+            $score++;
+        }
 
-        return $street !== null && $street !== '';
+        return $score;
     }
 
     /**
