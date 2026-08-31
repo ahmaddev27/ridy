@@ -10,6 +10,13 @@ import { config } from "./config.js";
 import { api } from "./api.js";
 
 // Filters the supplier getDrivers UI itself sends (all empty = "everyone").
+// NOTE: `complianceStatusFitler` is misspelled in Uber's OWN API contract — it
+// must match their field name verbatim, so do NOT "correct" it.
+// TODO(shared-contract): this object is duplicated in extension/background.js
+// (ROSTER_FILTERS). The extension ships unbundled (raw MV3 files, no build step)
+// and deploys separately from this Node daemon, so there is no shared module to
+// import today. If a bundler is added to the extension, extract this (and the
+// getDrivers request shape) into one shared source consumed by both.
 const ROSTER_FILTERS = {
   documentFilter: [],
   activationFilter: [],

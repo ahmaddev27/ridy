@@ -230,6 +230,12 @@ async function postRoster(drivers) {
  */
 // Uber's supplier getDrivers is a POST that pages through the roster. These are
 // the filters the supplier UI itself sends (all empty = "everyone").
+// NOTE: `complianceStatusFitler` is misspelled in Uber's OWN API contract — it
+// must match their field name verbatim, so do NOT "correct" it.
+// TODO(shared-contract): duplicated in dispatch-daemon/src/stream.js
+// (ROSTER_FILTERS). This extension ships unbundled (raw MV3 files, no build step)
+// and deploys separately from the daemon, so there is no shared module to import
+// today. If a bundler is added here, extract this into one shared source.
 const ROSTER_FILTERS = {
   documentFilter: [],
   activationFilter: [],
