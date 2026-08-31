@@ -12,14 +12,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { listOffersPaged, getOfferStats, exportOffers, fareLabel, type DispatchOffer, type OfferStatus, type PageMeta, type OfferStats } from "@/lib/api/offers";
-import { fleetNow, fleetWeekStart } from "@/lib/fleet-day";
-
-/** Format a Date as a local `yyyy-mm-dd` string for a native date input. */
-function ymd(d: Date): string {
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
-}
+import { fleetNow } from "@/lib/fleet-day";
+import { DateRangeFilter } from "@/components/ui/date-range-filter";
 
 /** Offer lifecycle status → badge tone. */
 const OFFER_TONE: Record<OfferStatus, Status> = {
@@ -63,7 +57,6 @@ export default function OffersPage() {
   // Which quick-range chip is active (today / week / month), or null for a
   // manual range. Tracked separately so the chip can highlight and manual edits
   // clear it.
-  const [datePreset, setDatePreset] = useState<"today" | "yesterday" | "week" | "month" | null>(null);
   const [meta, setMeta] = useState<PageMeta | null>(null);
   const [stats, setStats] = useState<OfferStats | null>(null);
 
@@ -168,28 +161,6 @@ export default function OffersPage() {
     setDriverUuids((prev) => (prev.includes(uuid) ? prev.filter((x) => x !== uuid) : [...prev, uuid]));
   }
 
-  /** Apply a quick-range: today, yesterday, the current week (from Monday), or
-   *  the last 30 days. Anchored to the fleet-day (Uber day starts 04:00), so
-   *  "today" before 04:00 is still yesterday — matching the backend's windows. */
-  function applyPreset(preset: "today" | "yesterday" | "week" | "month") {
-    const now = fleetNow();
-    if (preset === "yesterday") {
-      const y = new Date(now);
-      y.setDate(now.getDate() - 1);
-      setFrom(ymd(y));
-      setTo(ymd(y));
-      setDatePreset(preset);
-      setPage(1);
-      return;
-    }
-    const start = preset === "week" ? fleetWeekStart() : new Date(now);
-    if (preset === "month") start.setDate(now.getDate() - 29);
-    setFrom(ymd(start));
-    setTo(ymd(now));
-    setDatePreset(preset);
-    setPage(1);
-  }
-
   // Group the loaded offers into day buckets (feed is newest-first, so days stay ordered).
   const groupedByDay = useMemo(() => {
     const groups = new Map<string, DispatchOffer[]>();
@@ -273,58 +244,16 @@ export default function OffersPage() {
           )}
         </div>
 
-        {/* Quick ranges: today / last 7 days / last 30 days */}
-        <div className="flex items-center gap-1 rounded-lg border border-line bg-surface p-1">
-          {(["today", "yesterday", "week", "month"] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => applyPreset(p)}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                datePreset === p
-                  ? "bg-primary text-primary-ink"
-                  : "text-ink-muted hover:bg-surface-2 hover:text-ink"
-              }`}
-            >
-              {c(p === "today" ? "presetToday" : p === "yesterday" ? "presetYesterday" : p === "week" ? "presetWeek" : "presetMonth")}
-            </button>
-          ))}
-        </div>
-
-        {/* Date range */}
-        <input
-          type="date"
-          value={from}
-          onChange={(e) => {
-            setFrom(e.target.value);
-            setDatePreset(null);
+        {/* Uber-style date-range navigator (presets + custom + ‹ › stepping). */}
+        <DateRangeFilter
+          from={from}
+          to={to}
+          onChange={(f, t2) => {
+            setFrom(f);
+            setTo(t2);
+            setPage(1);
           }}
-          title={c("dateFrom")}
-          className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line"
         />
-        <span className="text-ink-subtle">–</span>
-        <input
-          type="date"
-          value={to}
-          onChange={(e) => {
-            setTo(e.target.value);
-            setDatePreset(null);
-          }}
-          title={c("dateTo")}
-          className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line"
-        />
-
-        {(from || to) && (
-          <button
-            onClick={() => {
-              setFrom("");
-              setTo("");
-              setDatePreset(null);
-            }}
-            className="text-xs font-medium text-ink hover:underline"
-          >
-            {c("clearDates")}
-          </button>
-        )}
 
         <Button
           variant="secondary"

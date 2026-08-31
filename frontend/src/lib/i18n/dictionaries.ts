@@ -97,7 +97,7 @@ const en = {
     loading: "Loading…",
     saving: "Saving…",
     presetToday: "Today", presetYesterday: "Yesterday", presetWeek: "Week", presetMonth: "Month",
-    dateFrom: "From", dateTo: "To", clearDates: "Clear",
+    dateFrom: "From", dateTo: "To", clearDates: "Clear", allDates: "All dates",
   },
   topbar: {
     search: "Search vehicles, drivers, trips…",
@@ -254,7 +254,7 @@ const de: typeof en = {
     loading: "Lädt…",
     saving: "Speichern…",
     presetToday: "Heute", presetYesterday: "Gestern", presetWeek: "Woche", presetMonth: "Monat",
-    dateFrom: "Von", dateTo: "Bis", clearDates: "Leeren",
+    dateFrom: "Von", dateTo: "Bis", clearDates: "Leeren", allDates: "Alle Daten",
   },
   topbar: {
     search: "Fahrzeuge, Fahrer, Fahrten suchen…",
@@ -412,7 +412,7 @@ const ar: typeof en = {
     loading: "جارٍ التحميل…",
     saving: "جارٍ الحفظ…",
     presetToday: "اليوم", presetYesterday: "الأمس", presetWeek: "أسبوع", presetMonth: "شهر",
-    dateFrom: "من", dateTo: "إلى", clearDates: "مسح",
+    dateFrom: "من", dateTo: "إلى", clearDates: "مسح", allDates: "كل التواريخ",
   },
   topbar: {
     search: "ابحث عن مركبات، سائقين، رحلات…",

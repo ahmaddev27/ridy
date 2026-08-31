@@ -81,4 +81,14 @@ return [
         'email' => env('ALERT_EMAIL'),
     ],
 
+    // Host-resource monitoring (admin System Health). The backend runs in a
+    // container, so to report the HOST's CPU/RAM/disk/network we read the host's
+    // /proc and root filesystem mounted read-only (see docker-compose). Both
+    // fall back to the container's own paths when the mounts are absent, so the
+    // feature degrades gracefully in local dev.
+    'system' => [
+        'proc' => env('HOST_PROC_PATH', '/host/proc'),
+        'disk' => env('HOST_DISK_PATH', '/host/root'),
+    ],
+
 ];
