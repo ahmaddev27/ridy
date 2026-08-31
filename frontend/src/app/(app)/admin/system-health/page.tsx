@@ -8,6 +8,7 @@ import { Badge, type Status } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ShardsPanel } from "@/components/admin/shards-panel";
+import { ServerResources } from "@/components/admin/server-resources";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getSystemHealth, clearNetworkLogs, type SystemHealthRow } from "@/lib/api/admin";
@@ -64,6 +65,8 @@ export default function SystemHealthPage() {
       ) : (
         <>
           <PageHeader tkey="systemHealth" />
+
+      <ServerResources />
 
       <Card className="overflow-hidden">
         {loading && rows.length === 0 ? (

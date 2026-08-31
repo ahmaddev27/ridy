@@ -61,6 +61,10 @@ x-app-env: &app-env
   FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
   # Fixed OTP for testing — leave OTP_TEST_CODE unset in prod for random codes.
   OTP_TEST_CODE: ${OTP_TEST_CODE:-}
+  # Host-resource monitoring (admin System Health): the container reads the HOST's
+  # /proc and root filesystem, mounted read-only on the backend service below.
+  HOST_PROC_PATH: ${HOST_PROC_PATH:-/host/proc}
+  HOST_DISK_PATH: ${HOST_DISK_PATH:-/host/root}
 
 services:
   # --- Caddy — TLS edge + reverse proxy -------------------------------------
@@ -122,6 +126,11 @@ services:
     volumes:
       - ./backend:/var/www
       - /var/www/vendor
+      # Host-resource monitoring (admin System Health): expose the HOST's /proc
+      # and root filesystem read-only so the backend can report the real machine's
+      # CPU / RAM / disk / network rather than the container's own limited view.
+      - /proc:/host/proc:ro
+      - /:/host/root:ro
 
   # --- Scheduler — runs Laravel's cron (offers:expire-pending, …) -----------
   # Reuses the backend image but runs `schedule:work` instead of PHP-FPM, so no

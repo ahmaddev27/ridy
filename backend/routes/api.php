@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\Admin\SettingsController;
 use App\Http\Controllers\Api\V1\Admin\ShardController;
 use App\Http\Controllers\Api\V1\Admin\SubscriptionController;
 use App\Http\Controllers\Api\V1\Admin\SystemHealthController;
+use App\Http\Controllers\Api\V1\Admin\SystemMetricsController;
 use App\Http\Controllers\Api\V1\Admin\UserDirectoryController;
 use App\Http\Controllers\Api\V1\AppVersionController;
 use App\Http\Controllers\Api\V1\AuditLogController;
@@ -287,6 +288,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(function () {
         Route::get('overview', OverviewController::class);
         Route::get('system-health', SystemHealthController::class);
+        Route::get('system-metrics', SystemMetricsController::class);
         Route::delete('network-logs', [NetworkLogController::class, 'clear']);
         Route::get('settings', [SettingsController::class, 'show']);
         Route::put('settings', [SettingsController::class, 'update']);

@@ -141,6 +141,19 @@ export async function getSystemHealth(): Promise<SystemHealthRow[]> {
   return res.data;
 }
 
+export type SystemMetrics = {
+  cpu: { usage_percent: number | null; cores: number; load: number[] | null };
+  memory: { total_bytes: number | null; used_bytes: number | null; available_bytes: number | null; used_percent: number | null };
+  disk: { total_bytes: number | null; used_bytes: number | null; free_bytes: number | null; used_percent: number | null };
+  network: { rx_bytes_per_sec: number; tx_bytes_per_sec: number; rx_total_bytes: number; tx_total_bytes: number };
+  sampled_at: string;
+};
+/** Super-admin: live host resource snapshot (CPU/RAM/disk/network). On-demand. */
+export async function getSystemMetrics(): Promise<SystemMetrics> {
+  const res = await apiFetch<{ data: SystemMetrics }>("/api/v1/admin/system-metrics");
+  return res.data;
+}
+
 export async function getSettings(): Promise<PlatformSettings> {
   const res = await apiFetch<{ data: PlatformSettings }>("/api/v1/admin/settings");
   return res.data;
