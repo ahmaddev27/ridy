@@ -28,13 +28,19 @@ class OverviewController extends Controller
         // use — so the health donut can't disagree with the row's status badge.
         $activeCompanies = $tenants->filter(fn (Tenant $t) => $t->stateReason() === null);
 
+        // Session health/counts cover only the companies we actually serve (active
+        // ones): a stopped/expired company's session is moot and must not inflate
+        // the "active sessions" count, or this donut disagrees with companies-health.
+        // ($sessions is keyed by tenant_id.)
+        $activeSessions = $sessions->only($activeCompanies->pluck('id')->all());
+
         $stats = [
             'companies' => $tenants->count(),
             'active_companies' => $activeCompanies->count(),
             'drivers' => Driver::withoutGlobalScopes()->count(),
             'offers' => DispatchOffer::withoutGlobalScopes()->count(),
-            'sessions_active' => $sessions->where('status', 'active')->count(),
-            'sessions_need_attention' => $sessions->whereIn('status', ['expired', 'needs_relink'])->count(),
+            'sessions_active' => $activeSessions->where('status', 'active')->count(),
+            'sessions_need_attention' => $activeSessions->whereIn('status', ['expired', 'needs_relink'])->count(),
         ];
 
         // Alerts — companies the super-admin should act on.
@@ -75,10 +81,10 @@ class OverviewController extends Controller
             'alerts' => $alerts,
             'expiring_proxies' => $expiringProxies,
             'session_breakdown' => [
-                'active' => $sessions->where('status', 'active')->count(),
-                'expired' => $sessions->where('status', 'expired')->count(),
-                'needs_relink' => $sessions->where('status', 'needs_relink')->count(),
-                'no_session' => max(0, $activeCompanies->count() - $sessions->count()),
+                'active' => $activeSessions->where('status', 'active')->count(),
+                'expired' => $activeSessions->where('status', 'expired')->count(),
+                'needs_relink' => $activeSessions->where('status', 'needs_relink')->count(),
+                'no_session' => max(0, $activeCompanies->count() - $activeSessions->count()),
             ],
             'offers_daily' => $this->offersDaily(),
             'top_companies' => $this->topCompanies($tenants),
