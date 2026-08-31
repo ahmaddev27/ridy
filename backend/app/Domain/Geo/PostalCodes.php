@@ -46,6 +46,23 @@ class PostalCodes
     }
 
     /**
+     * Whether a name is a known German town (case-insensitive exact match against
+     * the postal-code table). Used to validate a town parsed out of free text
+     * before trusting it — so a street word is never mistaken for a city.
+     */
+    public static function hasCity(string $name): bool
+    {
+        $name = mb_strtolower(trim($name));
+        if ($name === '') {
+            return false;
+        }
+
+        return Cache::remember("plz:cityknown:v1:{$name}", self::TTL, function () use ($name) {
+            return DB::table('postal_codes')->whereRaw('LOWER(city) = ?', [$name])->exists();
+        });
+    }
+
+    /**
      * The nearest town to a coordinate — {plz, city} — for a live "current city"
      * label from a driver's GPS. Network-free: scans the cached centroid table by
      * squared distance (exact enough for the nearest within a small country).

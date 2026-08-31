@@ -118,6 +118,57 @@ class OfferTripTest extends TestCase
         });
     }
 
+    public function test_street_only_end_borrows_the_counterpart_town_for_the_geocode_only(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $user = User::create(['name' => 'M', 'email' => 'm@a.de', 'password' => Hash::make('password'), 'tenant_id' => $tenant->id]);
+        $user->assignRole('fleet_manager');
+        app(TenantContext::class)->set($tenant->id);
+
+        // The failing real-world shape: a street-only pickup (no town, no postcode)
+        // and a dropoff that names a town but no postcode. Neither end can be placed
+        // on its own; the pickup must borrow the dropoff's town for the lookup.
+        $city = PostalCodes::city('42103'); // a known town for a real plz (Wuppertal)
+        $this->assertNotNull($city, 'test needs a known PLZ');
+
+        $offer = DispatchOffer::create([
+            'tenant_id' => $tenant->id,
+            'driver_uuid' => 'd1',
+            'offer_uuid' => 'so1',
+            'pickup_address' => 'Königsberger Straße 66F',
+            'dropoff_address' => "Fachinternistisches Zentrum {$city}",
+            'fare_formatted' => '12,08 €',
+            'received_at' => now(),
+            'raw_payload' => ['offerUUID' => 'so1'],
+        ]);
+
+        Http::fake([
+            'nominatim.openstreetmap.org/*' => Http::sequence()
+                ->push([['lat' => '51.256', 'lon' => '7.150']])   // pickup (borrowed town)
+                ->push([['lat' => '51.260', 'lon' => '7.160']]),  // dropoff
+            'router.project-osrm.org/*' => Http::response([
+                'routes' => [['distance' => 4200, 'geometry' => ['type' => 'LineString', 'coordinates' => [[7.15, 51.256], [7.16, 51.26]]]]],
+            ]),
+        ]);
+
+        Sanctum::actingAs($user);
+        $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk();
+
+        // The street-only pickup lookup must carry the borrowed town.
+        Http::assertSent(function ($request) use ($city) {
+            $url = urldecode($request->url());
+
+            return str_contains($url, 'nominatim')
+                && str_contains($url, 'nigsberger')
+                && str_contains($url, $city);
+        });
+
+        // The displayed pickup stays EXACTLY as sent — the borrowed town is a
+        // geocode-only bias and must never leak into the address.
+        $this->assertSame('Königsberger Straße 66F', $offer->fresh()->pickup_address);
+    }
+
     public function test_missing_postcode_is_filled_only_when_the_town_matches(): void
     {
         $geo = app(TripGeocoder::class);

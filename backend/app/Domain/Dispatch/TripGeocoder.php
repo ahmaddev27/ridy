@@ -85,6 +85,13 @@ class TripGeocoder
         // is nearest the driver's town — a Solingen street for a Düsseldorf trip.
         [$pickupQuery, $dropoffQuery] = $this->fillBareStationCity($pickupQuery, $dropoffQuery);
 
+        // A street-only end ("Königsberger Straße 66F" — no town, no postcode) can't
+        // be placed on its own, so borrow the counterpart's town for the geocode
+        // ("… 66F, Gevelsberg"). A dispatch trip's ends are in the same area, so the
+        // other end's town is a safe bias. Query-only — the displayed address never
+        // changes, so a borrowed town can never appear as a wrong city on the offer.
+        [$pickupQuery, $dropoffQuery] = $this->borrowCounterpartCity($pickupQuery, $dropoffQuery);
+
         // Upgrade a street-less "PLZ City" (station pickup) to the station's real
         // street address from the local table for a precise geocode, and record the
         // resolved station's name for display alongside the raw address.
@@ -252,6 +259,71 @@ class TripGeocoder
         }
 
         return [$pickup, $dropoff];
+    }
+
+    /**
+     * Give a street-only end (a street/house number with no town or postcode of
+     * its own) the counterpart end's town for the geocode, so it can be placed at
+     * all. Only fires when this end names no town and the other end does — the
+     * borrowed town is validated against the postal-code table, so a street word
+     * is never mistaken for a city. Operates on (and returns) geocoding query
+     * strings; the display address is untouched.
+     *
+     * @return array{0: string, 1: string} the [pickup, dropoff] geocode queries
+     */
+    private function borrowCounterpartCity(string $pickup, string $dropoff): array
+    {
+        $pickupCity = $this->townOf($pickup);
+        $dropoffCity = $this->townOf($dropoff);
+
+        if ($pickupCity === null && $dropoffCity !== null && $this->isStreetOnly($pickup)) {
+            $pickup .= ', '.$dropoffCity;
+        }
+        if ($dropoffCity === null && $pickupCity !== null && $this->isStreetOnly($dropoff)) {
+            $dropoff .= ', '.$pickupCity;
+        }
+
+        return [$pickup, $dropoff];
+    }
+
+    /**
+     * The town an address names, or null. Prefers the authoritative PLZ→city
+     * parse; when there is no postcode, accepts a trailing free-text town ("FIZ …
+     * Gevelsberg" → "Gevelsberg") ONLY when it is a known German town, so a street
+     * name is never taken for a city.
+     */
+    private function townOf(?string $address): ?string
+    {
+        $hint = $this->cityHint($address);
+        if ($hint !== null) {
+            return $hint;
+        }
+
+        $tidy = AddressFormatter::tidy($address); // drops the country tail
+        if ($tidy === null || $tidy === '') {
+            return null;
+        }
+
+        // Last comma segment, or the last word when there is no comma.
+        $segments = array_map('trim', explode(',', $tidy));
+        $tail = (string) end($segments);
+        $candidate = str_contains($tidy, ',') ? $tail : trim((string) mb_substr(strrchr(' '.$tail, ' '), 1));
+        $candidate = trim($candidate);
+
+        // A house number ("66F") disqualifies it as a town; then require a real match.
+        if ($candidate === '' || preg_match('/\d/', $candidate) === 1) {
+            return null;
+        }
+
+        return PostalCodes::hasCity($candidate) ? $candidate : null;
+    }
+
+    /** An address that is a street/place but names no town or postcode of its own. */
+    private function isStreetOnly(string $query): bool
+    {
+        return ! $this->hasPostcode($query)
+            && $this->bareStationLabel($query) === null // bare stations handled separately
+            && preg_match('/\p{L}/u', $query) === 1;
     }
 
     /**
