@@ -25,6 +25,16 @@ export type DashboardSummary = {
     current_days_left: number | null;
     queued: { count: number; days: number; starts_at: string | null } | null;
   } | null;
+  // Fleet-wide Uber earnings roll-up (captured from the Fleet Earnings page).
+  // Values arrive as decimal strings; null until first captured.
+  fleet_metric: {
+    earnings: string | number | null;
+    net_outstanding: string | number | null;
+    cash_collected: string | number | null;
+    fare: string | number | null;
+    currency: string | null;
+    synced_at: string | null;
+  } | null;
 };
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {

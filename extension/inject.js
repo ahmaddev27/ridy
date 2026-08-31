@@ -36,7 +36,8 @@
     /GetEarnerMetrics\b/i, // driver performance metrics
     /GetDriverLiveLocation\b/i, // live online/offline status + waypoints
     /SearchVehicles\b/i, // fleet vehicles
-    /getEarnerBreakdowns/i, // earnings breakdown
+    /getEarnerBreakdowns/i, // per-driver earnings breakdown
+    /getSupplierBreakdown/i, // fleet-level earnings summary (cash / net roll-up)
     /\bearnings\b/i, // earnings summaries
   ];
   const isAllowedCapture = (u, op) => {

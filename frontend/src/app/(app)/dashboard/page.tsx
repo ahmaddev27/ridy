@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { latnLocale } from "@/lib/utils";
-import { Users, Wifi, Car, Radio, KeyRound } from "lucide-react";
+import { Users, Wifi, Car, Radio, KeyRound, Wallet, Banknote, CreditCard } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/card";
 import { RedeemCodeModal } from "@/components/subscription/redeem-code-modal";
 import { useI18n } from "@/lib/i18n/context";
@@ -109,7 +109,62 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Fleet-wide Uber earnings: total, cash the drivers hold, net paid out. */}
+      <Card className="p-5">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Wallet className="h-4 w-4 text-ink-subtle" />
+            <h3 className="text-sm font-semibold text-ink">{k("fleetEarnings")}</h3>
+          </div>
+          {data?.fleet_metric?.synced_at && (
+            <span className="text-xs text-ink-subtle" dir="ltr">
+              {new Date(data.fleet_metric.synced_at).toLocaleDateString(latnLocale(locale))}
+            </span>
+          )}
+        </div>
+        {data?.fleet_metric ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <FleetTile icon={Wallet} label={k("fleetEarnings")} value={fleetMoney(data.fleet_metric.earnings, data.fleet_metric.currency)} />
+            <FleetTile icon={Banknote} label={k("fleetCash")} value={fleetMoney(data.fleet_metric.cash_collected, data.fleet_metric.currency)} tone="amber" />
+            <FleetTile icon={CreditCard} label={k("fleetNet")} value={fleetMoney(data.fleet_metric.net_outstanding, data.fleet_metric.currency)} tone="emerald" />
+          </div>
+        ) : (
+          <p className="text-sm text-ink-subtle">{k("fleetEarningsEmpty")}</p>
+        )}
+      </Card>
+
       <RedeemCodeModal open={redeemOpen} onClose={() => setRedeemOpen(false)} onSuccess={refetch} />
+    </div>
+  );
+}
+
+/** Currency (decimal string/number → "€1.234,56"), or "—". */
+function fleetMoney(amount: string | number | null | undefined, currency: string | null): string {
+  if (amount == null) return "—";
+  const n = typeof amount === "number" ? amount : Number(amount);
+  if (Number.isNaN(n)) return "—";
+  const symbol = currency === "EUR" ? "€" : currency ? `${currency} ` : "";
+  return `${symbol}${n.toFixed(2)}`;
+}
+
+function FleetTile({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: typeof Wallet;
+  label: string;
+  value: string;
+  tone?: "amber" | "emerald";
+}) {
+  const color = tone === "amber" ? "text-amber-600" : tone === "emerald" ? "text-emerald-600" : "text-ink";
+  return (
+    <div className="rounded-xl border border-line bg-surface-2 p-4">
+      <div className="flex items-center gap-1.5 text-xs text-ink-subtle">
+        <Icon className="h-3.5 w-3.5" /> {label}
+      </div>
+      <div className={`mt-1 text-xl font-bold tabular-nums ${color}`} dir="ltr">{value}</div>
     </div>
   );
 }

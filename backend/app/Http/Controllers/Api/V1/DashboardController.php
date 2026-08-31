@@ -6,6 +6,7 @@ use App\Domain\Billing\Models\SubscriptionPeriod;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Fleet\Models\FleetMetric;
 use App\Domain\Fleet\Models\Vehicle;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
@@ -34,6 +35,12 @@ class DashboardController extends Controller
                 ->first()
                 ?->only(['uber_org_uuid', 'status', 'last_event_at', 'expires_at']),
             'subscription' => $tenant ? $this->subscriptionSummary($tenant) : null,
+            // Fleet-wide Uber earnings roll-up (cash vs net), captured from the Fleet
+            // Earnings page. Null until the manager opens it with the extension.
+            'fleet_metric' => $tenant
+                ? FleetMetric::query()->where('tenant_id', $tenant->id)->first()
+                    ?->only(['earnings', 'net_outstanding', 'cash_collected', 'fare', 'currency', 'synced_at'])
+                : null,
         ]]);
     }
 

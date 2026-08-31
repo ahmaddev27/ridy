@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Domain\Fleet\EarnerBreakdownParser;
+use App\Domain\Fleet\SupplierBreakdownParser;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ use Illuminate\Http\Request;
  */
 class SupplierCaptureController extends Controller
 {
-    public function store(Request $request, SupplierNetworkRecorder $recorder, EarnerBreakdownParser $earnings): JsonResponse
+    public function store(Request $request, SupplierNetworkRecorder $recorder, EarnerBreakdownParser $earnings, SupplierBreakdownParser $fleet): JsonResponse
     {
         $data = $request->validate([
             'kind' => ['required', 'string', 'max:20'],
@@ -36,6 +37,12 @@ class SupplierCaptureController extends Controller
         $stored = 0;
         if (is_array($data['payload']) && EarnerBreakdownParser::handles($data['payload'])) {
             $stored = rescue(fn () => $earnings->parse($tenantId, $data['payload']), 0, report: false);
+        }
+
+        // The fleet-level earnings summary (getSupplierBreakdownV2) fills the company's
+        // total earnings / cash-collected / net-payout roll-up.
+        if (is_array($data['payload']) && SupplierBreakdownParser::handles($data['payload'])) {
+            rescue(fn () => $fleet->store($tenantId, $data['payload']), report: false);
         }
 
         return response()->json(['data' => ['captured' => true, 'metrics_stored' => $stored]]);
