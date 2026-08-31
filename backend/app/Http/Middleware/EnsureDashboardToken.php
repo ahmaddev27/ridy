@@ -27,6 +27,7 @@ class EnsureDashboardToken
     private const ALLOWED_URIS = [
         'api/v1/fleet-session',
         'api/v1/fleet-session/reconnect',
+        'api/v1/fleet-session/report-broken',
         'api/v1/drivers/sync',
         'api/v1/drivers/roster',
         'api/v1/drivers/statuses',

@@ -151,4 +151,34 @@ class FleetSessionTest extends TestCase
         $this->postJson('/api/v1/fleet-session', ['uber_org_uuid' => self::ORG, 'cookies' => []])
             ->assertStatus(422);
     }
+
+    public function test_report_broken_flags_an_active_session_for_relink(): void
+    {
+        $session = UberFleetSession::withoutGlobalScopes()->create([
+            'tenant_id' => $this->tenant->id, 'uber_org_uuid' => self::ORG,
+            'cookies' => [['name' => 'sid', 'value' => 'v']], 'status' => UberFleetSession::STATUS_ACTIVE,
+        ]);
+
+        Sanctum::actingAs($this->manager);
+        $this->postJson('/api/v1/fleet-session/report-broken')
+            ->assertOk()
+            ->assertJsonPath('data.status', UberFleetSession::STATUS_NEEDS_RELINK);
+
+        // The session is flagged so the daemon stops using it and the manager,
+        // who now sees the "reconnect" banner, is prompted to re-link.
+        $this->assertSame(UberFleetSession::STATUS_NEEDS_RELINK, $session->fresh()->status);
+    }
+
+    public function test_report_broken_leaves_an_already_broken_session_untouched(): void
+    {
+        $session = UberFleetSession::withoutGlobalScopes()->create([
+            'tenant_id' => $this->tenant->id, 'uber_org_uuid' => self::ORG,
+            'cookies' => [['name' => 'sid', 'value' => 'v']], 'status' => UberFleetSession::STATUS_NEEDS_RELINK,
+        ]);
+
+        Sanctum::actingAs($this->manager);
+        $this->postJson('/api/v1/fleet-session/report-broken')->assertOk();
+
+        $this->assertSame(UberFleetSession::STATUS_NEEDS_RELINK, $session->fresh()->status);
+    }
 }

@@ -162,6 +162,23 @@ export default function ConnectionsPage() {
         </a>
       )}
 
+      {/* Session broke (e.g. the company changed their Uber password → cookies
+          rejected). A distinct, prominent alert that drives the reconnect flow —
+          so the manager knows offers stopped and exactly what to do. */}
+      {data?.status === "needs_relink" && (
+        <div className="flex items-start gap-3 rounded-xl border border-line bg-danger-bg px-4 py-3 text-sm text-danger-fg">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="flex-1">
+            <p className="font-semibold">{c("brokenTitle")}</p>
+            <p className="mt-0.5 opacity-90">{c("brokenBody")}</p>
+            <Button size="sm" className="mt-3" onClick={connectViaExtension} disabled={working}>
+              {working ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {c("reconnect")}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Card className="p-8">
         {loading || extInstalled === null ? (
           <div className="flex items-center justify-center py-8 text-ink-muted">

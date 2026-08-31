@@ -52,6 +52,24 @@ class FleetSessionController extends Controller
     }
 
     /**
+     * The paired extension observed Uber reject THIS manager's session (a 401/403
+     * from supplier.uber.com — typically after the company changed its Uber
+     * password). Flag it needs_relink so the manager is alerted and prompted to
+     * reconnect. This is the detector for datacenter-IP deploys where the daemon's
+     * RAMEN stream is 404-blocked and never reaches the supplier polls itself.
+     * Idempotent: markNeedsRelink only notifies on the active→broken transition.
+     */
+    public function reportBroken(FleetSessionService $service): JsonResponse
+    {
+        $session = UberFleetSession::query()->orderByDesc('updated_at')->first();
+        if ($session !== null && $session->status === UberFleetSession::STATUS_ACTIVE) {
+            $service->markNeedsRelink($session);
+        }
+
+        return response()->json(['data' => ['status' => $session?->status ?? 'none']]);
+    }
+
+    /**
      * The manager pastes their captured Uber session (cookies + getUser org id).
      * We store it encrypted and bind the tenant to its Uber org.
      */

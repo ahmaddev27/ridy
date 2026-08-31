@@ -42,6 +42,26 @@ async function getPairing(extraKeys = []) {
   return { ...stored, ok: true };
 }
 
+/**
+ * Tell the backend that Uber rejected our session (a supplier 401/403 — usually
+ * after the company changed its Uber password). The backend flags it
+ * needs_relink and alerts the manager. Fire-and-forget + deduped server-side, so
+ * repeated poll failures don't spam. Only meaningful for a supplier auth failure.
+ */
+async function reportBrokenSession(status) {
+  if (status !== 401 && status !== 403) return;
+  const pairing = await getPairing();
+  if (!pairing.ok) return;
+  try {
+    await fetch(`${pairing.apiUrl}/api/v1/fleet-session/report-broken`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${pairing.token}`, accept: "application/json" },
+    });
+  } catch {
+    /* offline / transient — the daemon and the next poll also detect it */
+  }
+}
+
 async function readCookies() {
   // Capture exactly the cookies the browser sends to the RAMEN endpoint. A
   // per-URL query returns one correct value per name; getAll({domain}) instead
@@ -252,7 +272,10 @@ async function fetchRoster() {
         }),
       });
       console.log("[Reidey bg] getDrivers page", page, "->", res.status);
-      if (!res.ok) return { ok: false, reason: `supplier_http_${res.status}` };
+      if (!res.ok) {
+        await reportBrokenSession(res.status);
+        return { ok: false, reason: `supplier_http_${res.status}` };
+      }
 
       const result = await res.json();
       if (result.status !== "success") {
@@ -442,7 +465,10 @@ async function fetchDriverStatuses(driverUuids) {
         responseSelector: { includeStats: true },
       }),
     });
-    if (!res.ok) return { ok: false, reason: `supplier_http_${res.status}` };
+    if (!res.ok) {
+      await reportBrokenSession(res.status);
+      return { ok: false, reason: `supplier_http_${res.status}` };
+    }
     const body = await res.json();
     if (body.status !== "success") return { ok: false, reason: body?.data?.message || "status_failed" };
     locations = body.data?.driverLocations ?? [];

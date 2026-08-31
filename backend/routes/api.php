@@ -236,6 +236,7 @@ Route::prefix('v1')->group(function () {
         Route::get('fleet-session', [FleetSessionController::class, 'show']);
         Route::post('fleet-session', [FleetSessionController::class, 'capture']);
         Route::post('fleet-session/reconnect', [FleetSessionController::class, 'reconnect']);
+        Route::post('fleet-session/report-broken', [FleetSessionController::class, 'reportBroken']);
         Route::delete('fleet-session', [FleetSessionController::class, 'destroy']);
 
         // Uber driver linking

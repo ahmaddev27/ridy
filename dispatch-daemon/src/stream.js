@@ -104,6 +104,10 @@ export class RamenStream {
           }),
         });
         if (!res.ok) {
+          // A supplier 401/403 means the cookies were rejected — the exact
+          // "company changed their Uber password" case. Report it so the session
+          // is flagged needs_relink and the manager is alerted.
+          if (await this.handleAuthFailure(res.status)) return;
           console.warn(`[${this.tag()}] roster fetch -> ${res.status}`);
           return;
         }
@@ -149,7 +153,12 @@ export class RamenStream {
           responseSelector: { includeStats: true },
         }),
       });
-      if (!res.ok) return;
+      // A supplier 401/403 here is the clearest "session broken" signal (the
+      // status poll runs continuously), so flag needs_relink and alert the manager.
+      if (!res.ok) {
+        await this.handleAuthFailure(res.status);
+        return;
+      }
       const body = await res.json();
       if (body.status !== "success") return;
 
