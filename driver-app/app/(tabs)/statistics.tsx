@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
-import { View, ScrollView, RefreshControl, Pressable } from "react-native";
+import { View, ScrollView, RefreshControl, Pressable, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useFocusEffect } from "expo-router";
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, ChevronDown, Check } from "lucide-react-native";
 import { api, type DriverStats, type DailyIncome } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
@@ -127,34 +127,13 @@ export default function StatisticsScreen() {
       >
         <Text style={{ color: c.ink, fontSize: 26, fontWeight: "700", textAlign: align }}>{t("stats.title")}</Text>
 
-        {/* Range selector — picking a type resets to the current period. */}
-        <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", gap: 8 }}>
-          {RANGES.map((r) => {
-            const on = range === r;
-            return (
-              <Pressable
-                key={r}
-                onPress={() => { setRange(r); setOffset(0); }}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: radius.pill,
-                  backgroundColor: on ? c.primary : c.surface,
-                  borderWidth: 1,
-                  borderColor: on ? c.primary : c.line,
-                }}
-              >
-                <Text style={{ color: on ? c.primaryInk : c.inkMuted, fontSize: 13.5, fontWeight: "700" }}>
-                  {t(`range.${r}`)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {/* Period navigator — ‹ 24 Aug – 31 Aug › (can't step into the future). */}
+        {/* Uber-style range navigator: ‹ [ 24 Aug – 31 Aug ⌄ ] › — the centre pill
+            opens the range-type picker (today/week/month); the arrows step the
+            period and can't page into the future. */}
         <PeriodNavigator
           label={label}
+          range={range}
+          onRange={(r) => { setRange(r); setOffset(0); }}
           c={c}
           onPrev={() => setOffset((o) => o - 1)}
           onNext={() => setOffset((o) => Math.min(0, o + 1))}
@@ -206,17 +185,22 @@ const sameDay = (a: Date, b: Date) => ymd(a) === ymd(b);
  */
 function PeriodNavigator({
   label,
+  range,
+  onRange,
   c,
   onPrev,
   onNext,
   canNext,
 }: {
   label: string;
+  range: Range;
+  onRange: (r: Range) => void;
   c: Colors;
   onPrev: () => void;
   onNext: () => void;
   canNext: boolean;
 }) {
+  const [menu, setMenu] = useState(false);
   const rtl = isRTL();
   const Prev = rtl ? ChevronRight : ChevronLeft;
   const Next = rtl ? ChevronLeft : ChevronRight;
@@ -224,36 +208,67 @@ function PeriodNavigator({
     <Pressable
       onPress={on ? onPress : undefined}
       disabled={!on}
-      hitSlop={8}
-      style={{
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: c.surface,
-        borderWidth: 1,
-        borderColor: c.line,
-        opacity: on ? 1 : 0.4,
-      }}
+      hitSlop={10}
+      style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", opacity: on ? 1 : 0.3 }}
     >
-      <Icon size={18} color={c.ink} />
+      <Icon size={22} color={c.ink} />
     </Pressable>
   );
+
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        ...cardStyle(c),
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-      }}
-    >
+    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
       {arrow(Prev, onPrev, true)}
-      <Text style={{ color: c.ink, fontSize: 16, fontWeight: "700", writingDirection: "ltr" }}>{label}</Text>
+
+      {/* The centre pill — tap to open the range picker (⌄). */}
+      <Pressable
+        onPress={() => setMenu(true)}
+        hitSlop={8}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          paddingHorizontal: 18,
+          paddingVertical: 9,
+          borderRadius: radius.pill,
+          backgroundColor: c.surface,
+          borderWidth: 1,
+          borderColor: c.line,
+        }}
+      >
+        <Text style={{ color: c.ink, fontSize: 15.5, fontWeight: "700", writingDirection: "ltr" }}>{label}</Text>
+        <ChevronDown size={16} color={c.inkMuted} />
+      </Pressable>
+
       {arrow(Next, onNext, canNext)}
+
+      {/* Range-type picker sheet (today / week / month). */}
+      <Modal visible={menu} transparent animationType="fade" onRequestClose={() => setMenu(false)}>
+        <Pressable onPress={() => setMenu(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", padding: 32 }}>
+          <View style={{ ...cardStyle(c), padding: 6, gap: 2 }}>
+            {RANGES.map((r) => {
+              const on = r === range;
+              return (
+                <Pressable
+                  key={r}
+                  onPress={() => { onRange(r); setMenu(false); }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    paddingHorizontal: 14,
+                    paddingVertical: 13,
+                    borderRadius: radius.md,
+                    backgroundColor: on ? c.primary : "transparent",
+                  }}
+                >
+                  <Text style={{ color: on ? c.primaryInk : c.ink, fontSize: 15, fontWeight: "700" }}>{t(`range.${r}`)}</Text>
+                  {on && <Check size={18} color={c.primaryInk} />}
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
