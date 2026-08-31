@@ -23,7 +23,7 @@ use Illuminate\Foundation\Queue\Queueable;
  * to stay consistent even if the driver started a back-to-back trip between the
  * enqueue and the execution.
  */
-class SyncTripFromWaypoints implements ShouldQueue, ShouldBeUnique
+class SyncTripFromWaypoints implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
