@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, Building2, Server, Trash2 } from "lucide-react";
+import { Activity, Building2, Server, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge, type Status } from "@/components/ui/badge";
@@ -188,11 +188,18 @@ function SessionCell({ row, c, locale }: { row: SystemHealthRow; c: Tr; locale: 
   // health so the colour and the label agree: amber "Idle" for active-but-silent.
   const active = status === "active";
   const warn = active && !ok;
+  // A broken session (Uber rejected the cookies — e.g. the password changed) is
+  // actionable, not just "not ok": flag it with an alert icon so an admin can
+  // tell "needs re-link" apart from a merely idle/expired session at a glance.
+  const brokenRelink = status === "needs_relink";
   const label =
     status === null ? c("noSession") : ok ? c("st_active") : active ? c("st_idle") : c(`st_${status}`);
   return (
     <div className="space-y-1">
-      <Pill ok={ok} warn={warn}>{label}</Pill>
+      <Pill ok={ok} warn={warn}>
+        {brokenRelink && <AlertTriangle className="me-1 inline h-3 w-3 -translate-y-px" />}
+        {label}
+      </Pill>
       {status !== null && (
         <div className="text-[11px] text-ink-subtle">
           {c("lastSeen").replace("{t}", relTime(last_seen, locale, c("never")))}
