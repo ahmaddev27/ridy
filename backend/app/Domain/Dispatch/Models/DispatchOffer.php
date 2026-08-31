@@ -24,7 +24,7 @@ class DispatchOffer extends Model
         'fare_formatted', 'accept_window_seconds',
         'requested_at', 'offer_generated_at', 'received_at', 'accepted_at', 'raw_payload',
         'pickup_lat', 'pickup_lng', 'dropoff_lat', 'dropoff_lng',
-        'distance_m', 'route_geometry', 'geo_confidence', 'geo_synced_at', 'geo_attempts',
+        'distance_m', 'route_geometry', 'geo_confidence', 'geo_source', 'stops', 'stops_count', 'geo_synced_at', 'geo_attempts',
         'status', 'fare_amount', 'started_at', 'completed_at', 'rejected_at', 'canceled_at',
     ];
 
@@ -42,6 +42,8 @@ class DispatchOffer extends Model
         'dropoff_lng' => 'float',
         'distance_m' => 'integer',
         'route_geometry' => 'array',
+        'stops' => 'array',
+        'stops_count' => 'integer',
         'geo_synced_at' => 'datetime',
         'geo_attempts' => 'integer',
         'status' => OfferStatus::class,

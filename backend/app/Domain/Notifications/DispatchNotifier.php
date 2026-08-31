@@ -147,6 +147,50 @@ class DispatchNotifier
         return $rider !== '' ? $numbers.' | '.$rider : $numbers;
     }
 
+    /**
+     * Alert the DRIVER that Uber revealed more than one drop-off on their accepted
+     * trip, and broadcast so the open app refreshes the offer detail live with the
+     * new stops / distance / €-per-km. Word-free like the offer push (the app
+     * localises it from `stops_count`); best-effort, never breaks ingestion.
+     *
+     * @return int devices pushed
+     */
+    public function notifyMultiStop(DispatchOffer $offer, int $stopsCount): int
+    {
+        if ($offer->driver_id === null) {
+            return 0;
+        }
+
+        // Live nudge to the open app so it re-fetches the offer with the new stops.
+        rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->id, 'multistop')), report: false);
+
+        // "⚑N" flags the extra stops without any translated word; the numbers line
+        // and metrics stay identical to the offer push the app already renders.
+        $title = trim($this->buildNumbers($offer).' ⚑'.$stopsCount);
+        $metrics = $this->buildMetrics($offer);
+        $body = trim($this->buildBody($offer).($metrics !== '' ? "\n".$metrics : ''));
+
+        $data = [
+            'categoryId' => 'offer',
+            'offer_id' => (string) $offer->id,
+            'offer_uuid' => (string) $offer->offer_uuid,
+            'stops_count' => (string) $stopsCount,
+            'distance_m' => (string) ($offer->distance_m ?? ''),
+            'fare_amount' => (string) ($offer->fare_amount ?? ''),
+            'pickup' => $this->cleanAddress($offer->pickup_display ?? $offer->pickup_address),
+            'dropoff' => $this->cleanAddress($offer->dropoff_display ?? $offer->dropoff_address),
+        ];
+
+        $sent = 0;
+        foreach (DeviceToken::where('driver_id', $offer->driver_id)->get() as $token) {
+            if ($this->sender->send($token->token, $title, $body, $data)) {
+                $sent++;
+            }
+        }
+
+        return $sent;
+    }
+
     /** "pickup\ndropoff" — the two addresses, country stripped, no separator arrow. */
     private function buildBody(DispatchOffer $offer): string
     {

@@ -118,6 +118,51 @@ class OfferTripTest extends TestCase
         });
     }
 
+    public function test_uber_waypoints_resolve_an_incomplete_offer_and_flag_multi_stop(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        app(TenantContext::class)->set($tenant->id);
+
+        // A street-only offer our geocoder couldn't place (no distance yet).
+        $offer = DispatchOffer::create([
+            'tenant_id' => $tenant->id, 'driver_uuid' => 'd1', 'offer_uuid' => 'wp1',
+            'pickup_address' => 'Königsberger Straße 66F', 'dropoff_address' => 'Berchemallee 131',
+            'fare_formatted' => '12,08 €', 'received_at' => now(), 'raw_payload' => ['offerUUID' => 'wp1'],
+            'distance_m' => null, 'geo_confidence' => null,
+        ]);
+
+        Http::fake([
+            'nominatim.openstreetmap.org/*' => Http::response(['display_name' => 'X', 'address' => ['road' => 'Königsberger Straße', 'postcode' => '58285', 'city' => 'Gevelsberg']]),
+            'router.project-osrm.org/*' => Http::response([
+                'routes' => [['distance' => 8400, 'geometry' => ['type' => 'LineString', 'coordinates' => [[7.33, 51.32], [7.34, 51.33], [7.35, 51.34]]]]],
+            ]),
+        ]);
+
+        // Uber live-map waypoints: pickup + TWO drop-offs = a multi-stop trip.
+        $waypoints = [
+            ['lat' => 51.320, 'lng' => 7.330, 'type' => 'PICKUP'],
+            ['lat' => 51.330, 'lng' => 7.340, 'type' => 'DROPOFF'],
+            ['lat' => 51.340, 'lng' => 7.350, 'type' => 'DROPOFF'],
+        ];
+
+        $stops = app(TripGeocoder::class)->applyFromWaypoints($offer, $waypoints);
+
+        $this->assertSame(2, $stops, 'two drop-offs → multi-stop');
+        $fresh = $offer->fresh();
+        $this->assertSame('uber', $fresh->geo_source);
+        $this->assertSame('exact', $fresh->geo_confidence);
+        $this->assertSame(2, $fresh->stops_count);
+        $this->assertEqualsWithDelta(51.320, (float) $fresh->pickup_lat, 0.0001);
+        $this->assertEqualsWithDelta(51.340, (float) $fresh->dropoff_lat, 0.0001); // last waypoint
+        $this->assertSame(8400, $fresh->distance_m);
+        $this->assertCount(3, $fresh->stops);
+
+        // Idempotent: re-applying the same waypoints does nothing (already from Uber,
+        // stop count unchanged).
+        $this->assertNull(app(TripGeocoder::class)->applyFromWaypoints($fresh, $waypoints));
+    }
+
     public function test_street_only_end_borrows_the_counterpart_town_for_the_geocode_only(): void
     {
         $this->seed(RolePermissionSeeder::class);

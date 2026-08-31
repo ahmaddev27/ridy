@@ -718,6 +718,150 @@ class TripGeocoder
         return ['distance_m' => $this->haversine($from, $to), 'geometry' => null];
     }
 
+    /**
+     * Resolve an offer's trip from Uber's live-map waypoints — the authoritative
+     * pickup/drop-off (and any extra stops) captured once a driver accepts and
+     * goes en-route. Fixes offers whose text-only address couldn't be geocoded,
+     * and reveals multi-stop trips. Returns the number of drop-off stops when it
+     * updated the offer (>= 2 = multi-stop), or null when it did nothing.
+     *
+     * Query-of-truth: the coordinates are Uber's, so reverse-geocoding them to a
+     * label (formatted our way) carries no wrong-city risk. We only touch geo that
+     * isn't already precise from Uber and whose own geocode was incomplete — never
+     * overriding a good geocoded distance — but a change in the stop count always
+     * refreshes, so a stop added mid-trip is picked up.
+     *
+     * @param  array<int, array<string, mixed>>  $waypoints  [{lat,lng,type}, ...]
+     */
+    public function applyFromWaypoints(DispatchOffer $offer, array $waypoints): ?int
+    {
+        $points = $this->cleanWaypoints($waypoints);
+        if (count($points) < 2) {
+            return null; // need at least a pickup + one drop-off
+        }
+
+        $stopsCount = count($points) - 1; // everything after the pickup is a drop-off
+        $stopsChanged = (int) ($offer->stops_count ?? 0) !== $stopsCount;
+        $needs = $offer->geo_source !== 'uber' && $this->geoIncomplete($offer);
+        if (! $needs && ! $stopsChanged) {
+            return null;
+        }
+
+        $pickup = $points[0];
+        $dropoff = $points[count($points) - 1];
+
+        $offer->pickup_lat = $pickup['lat'];
+        $offer->pickup_lng = $pickup['lng'];
+        $offer->dropoff_lat = $dropoff['lat'];
+        $offer->dropoff_lng = $dropoff['lng'];
+
+        $route = $this->routeThrough($points);
+        if ($route['distance_m'] !== null) {
+            $offer->distance_m = $route['distance_m'];
+            $offer->route_geometry = $route['geometry'];
+        }
+
+        // Fill a missing/rough display address from the REAL point, our format.
+        $offer->pickup_display = $this->labelForPoint($offer->pickup_address, $pickup) ?? $offer->pickup_display;
+        $offer->dropoff_display = $this->labelForPoint($offer->dropoff_address, $dropoff) ?? $offer->dropoff_display;
+
+        $offer->stops = $points; // ordered [{lat,lng,type}] — pickup first, then drops
+        $offer->stops_count = $stopsCount;
+        $offer->geo_source = 'uber';
+        $offer->geo_confidence = 'exact';
+        $offer->geo_synced_at = CarbonImmutable::now();
+        $offer->save();
+
+        return $stopsCount;
+    }
+
+    /**
+     * Normalise raw waypoints to valid German-box coordinates, dropping the
+     * redacted 0,0 fixes Uber returns for un-engaged legs.
+     *
+     * @param  array<int, array<string, mixed>>  $waypoints
+     * @return array<int, array{lat: float, lng: float, type: string|null}>
+     */
+    private function cleanWaypoints(array $waypoints): array
+    {
+        $out = [];
+        foreach ($waypoints as $w) {
+            if (! isset($w['lat'], $w['lng'])) {
+                continue;
+            }
+            $lat = (float) $w['lat'];
+            $lng = (float) $w['lng'];
+            if (abs($lat) < 0.0001 && abs($lng) < 0.0001) {
+                continue; // redacted point
+            }
+            $out[] = ['lat' => $lat, 'lng' => $lng, 'type' => isset($w['type']) ? (string) $w['type'] : null];
+        }
+
+        return $out;
+    }
+
+    /** True when our own geocode never produced a precise, routable trip. */
+    private function geoIncomplete(DispatchOffer $offer): bool
+    {
+        if ($offer->distance_m === null || $offer->pickup_lat === null || $offer->dropoff_lat === null) {
+            return true;
+        }
+
+        return in_array($offer->geo_confidence, ['approx', 'estimated', 'postal', 'area'], true);
+    }
+
+    /**
+     * A display label for a point, ONLY when the supplier's own address was
+     * incomplete (no postcode): reverse-geocode the real coordinate, formatted our
+     * way. Returns null to keep the supplier's text when it's already complete.
+     */
+    private function labelForPoint(?string $rawAddress, array $point): ?string
+    {
+        $raw = AddressFormatter::tidy($rawAddress);
+        if ($raw !== null && $raw !== '' && $this->hasPostcode($raw)) {
+            return null; // already complete — never overwrite good supplier text
+        }
+
+        $label = $this->reverse($point['lat'], $point['lng']);
+
+        return $label !== '' ? $label : null;
+    }
+
+    /**
+     * Road distance + geometry through an ordered list of points (multi-stop), via
+     * one OSRM request. Falls back to summed haversine legs when OSRM is unreachable.
+     *
+     * @param  array<int, array{lat: float, lng: float}>  $points
+     * @return array{distance_m: int|null, geometry: array|null}
+     */
+    private function routeThrough(array $points): array
+    {
+        if (count($points) < 2) {
+            return ['distance_m' => null, 'geometry' => null];
+        }
+
+        try {
+            $path = implode(';', array_map(fn ($p) => "{$p['lng']},{$p['lat']}", $points));
+            $res = Http::withOptions(self::NO_PROXY)->timeout(8)->get($this->osrmUrl().'/'.$path, [
+                'overview' => 'full',
+                'geometries' => 'geojson',
+            ]);
+            $route = $res->ok() ? ($res->json('routes.0') ?? null) : null;
+            if ($route) {
+                return ['distance_m' => (int) round($route['distance']), 'geometry' => $route['geometry'] ?? null];
+            }
+        } catch (\Throwable $e) {
+            // fall through to summed straight-line legs
+        }
+
+        $sum = 0;
+        for ($i = 1, $n = count($points); $i < $n; $i++) {
+            $sum += $this->haversine($points[$i - 1], $points[$i]);
+        }
+
+        return ['distance_m' => $sum, 'geometry' => null];
+    }
+
     /** Straight-line distance in metres. */
     private function haversine(array $a, array $b): int
     {
