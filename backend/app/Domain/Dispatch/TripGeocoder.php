@@ -116,6 +116,12 @@ class TripGeocoder
         $offer->dropoff_lat = $dropoff['lat'] ?? null;
         $offer->dropoff_lng = $dropoff['lng'] ?? null;
 
+        // Fill ONLY a missing postcode from the geocoded result, and only when the
+        // geocoded town matches the raw one — the city is never changed, so a wrong
+        // geocode can't corrupt the address (it just stays raw).
+        $offer->pickup_display = $this->completePostcode($offer->pickup_address, $pickup);
+        $offer->dropoff_display = $this->completePostcode($offer->dropoff_address, $dropoff);
+
         if ($pickup && $dropoff) {
             $route = $this->route($pickup, $dropoff);
             $offer->distance_m = $route['distance_m'] ?? null;
@@ -140,6 +146,54 @@ class TripGeocoder
     private function hasPostcode(?string $address): bool
     {
         return $address !== null && preg_match('/\b\d{5}\b/', $address) === 1;
+    }
+
+    /**
+     * The supplier address with ONLY a missing postcode filled in from the
+     * geocoded result — and only when the geocoded town matches the raw one, so
+     * the city name is never altered. Returns the raw (tidied) address unchanged
+     * when it already has a postcode, the geocode gave none, or the towns differ
+     * (a possibly-wrong geocode must never rewrite the address).
+     *
+     * @param  array{address?: ?string}|null  $geo
+     */
+    private function completePostcode(?string $raw, ?array $geo): ?string
+    {
+        $raw = AddressFormatter::tidy($raw);
+        if ($raw === null || $raw === '' || $this->hasPostcode($raw)) {
+            return $raw; // nothing to add, or already complete
+        }
+
+        // The geocoded label's postcode + its authoritative town.
+        if (! is_string($geo['address'] ?? null) || preg_match('/\b(\d{5})\b/', $geo['address'], $m) !== 1) {
+            return $raw;
+        }
+        $plz = $m[1];
+        $geoCity = PostalCodes::city($plz);
+        if ($geoCity === null) {
+            return $raw;
+        }
+
+        // Same town only: the raw's last segment (its town/district) must share a
+        // name with the geocoded town — "Wuppertal-Elberfeld" matches "Wuppertal".
+        $segments = array_map('trim', explode(',', $raw));
+        $tail = (string) end($segments);
+        $rawNorm = $this->normCity($tail);
+        $geoNorm = $this->normCity($geoCity);
+        if ($rawNorm === '' || $geoNorm === '' || (! str_contains($rawNorm, $geoNorm) && ! str_contains($geoNorm, $rawNorm))) {
+            return $raw; // different town → leave raw, never risk a wrong postcode
+        }
+
+        // Insert the postcode before the town, keeping the raw town name as-is.
+        $segments[count($segments) - 1] = $plz.' '.$tail;
+
+        return implode(', ', $segments);
+    }
+
+    /** Lowercased letters-only town key for a tolerant same-town comparison. */
+    private function normCity(string $value): string
+    {
+        return (string) preg_replace('/[^a-zà-ÿ]/u', '', mb_strtolower($value));
     }
 
     /**

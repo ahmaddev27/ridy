@@ -206,8 +206,8 @@ class DispatchOfferController extends Controller
             // Same source as the list resource — the supplier's ORIGINAL address
             // from the raw payload — so the detail modal and the row read identical,
             // and legacy offers whose columns were rewritten still show correctly.
-            'pickup_address' => AddressFormatter::tidy(Arr::get($offer->raw_payload, 'pickupAddress') ?: $offer->pickup_address),
-            'dropoff_address' => AddressFormatter::tidy(Arr::get($offer->raw_payload, 'dropoffAddress') ?: $offer->dropoff_address),
+            'pickup_address' => $offer->pickup_display ?? AddressFormatter::tidy(Arr::get($offer->raw_payload, 'pickupAddress') ?: $offer->pickup_address),
+            'dropoff_address' => $offer->dropoff_display ?? AddressFormatter::tidy(Arr::get($offer->raw_payload, 'dropoffAddress') ?: $offer->dropoff_address),
             'route_geometry' => $offer->route_geometry, // GeoJSON LineString or null
             'distance_km' => $distanceKm,
             'fare_amount' => $fare,

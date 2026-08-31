@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Dispatch\TripGeocoder;
+use App\Domain\Geo\PostalCodes;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use App\Models\User;
@@ -114,6 +116,28 @@ class OfferTripTest extends TestCase
                 && str_contains($url, 'Hauptbahnhof')
                 && str_contains($url, 'sseldorf');
         });
+    }
+
+    public function test_missing_postcode_is_filled_only_when_the_town_matches(): void
+    {
+        $geo = app(TripGeocoder::class);
+        $m = new \ReflectionMethod($geo, 'completePostcode');
+        $m->setAccessible(true);
+        $complete = fn (string $raw, ?string $label) => $m->invoke($geo, $raw, $label !== null ? ['address' => $label] : null);
+
+        $city = PostalCodes::city('10115'); // authoritative town for the plz
+        $this->assertNotNull($city, 'test needs a known PLZ');
+
+        // Postcode-less raw, geocoded to the SAME town → the postcode is inserted,
+        // the raw town/district name is kept.
+        $this->assertSame(
+            "Foostraße, 10115 {$city}-Mitte",
+            $complete("Foostraße, {$city}-Mitte", "Foostraße, 10115 {$city}"),
+        );
+        // Already has a postcode → untouched.
+        $this->assertSame('Bar 3, 42285 Wuppertal', $complete('Bar 3, 42285 Wuppertal', 'Bar 3, 10115 Berlin'));
+        // Geocoded to a DIFFERENT town → left raw (never risk a wrong postcode).
+        $this->assertSame('Baz, Solingen', $complete('Baz, Solingen', "Baz, 10115 {$city}"));
     }
 
     public function test_unresolved_address_with_a_valid_plz_falls_back_to_the_centroid(): void

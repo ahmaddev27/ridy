@@ -39,8 +39,8 @@ class DispatchOfferResource extends JsonResource
             // Always show the supplier's ORIGINAL address, sourced from the raw
             // payload — identical in the list and the detail modal, and immune to
             // any legacy geocoder rewrite still stored on the columns.
-            'pickup_address' => AddressFormatter::tidy(Arr::get($this->raw_payload, 'pickupAddress') ?: $this->pickup_address),
-            'dropoff_address' => AddressFormatter::tidy(Arr::get($this->raw_payload, 'dropoffAddress') ?: $this->dropoff_address),
+            'pickup_address' => $this->pickup_display ?? AddressFormatter::tidy(Arr::get($this->raw_payload, 'pickupAddress') ?: $this->pickup_address),
+            'dropoff_address' => $this->dropoff_display ?? AddressFormatter::tidy(Arr::get($this->raw_payload, 'dropoffAddress') ?: $this->dropoff_address),
             'pickup_station_name' => $this->pickup_station_name,
             'dropoff_station_name' => $this->dropoff_station_name,
             'fare_formatted' => $this->fare_formatted,

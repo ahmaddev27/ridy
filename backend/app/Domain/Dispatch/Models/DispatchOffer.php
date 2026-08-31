@@ -20,7 +20,7 @@ class DispatchOffer extends Model
     protected $fillable = [
         'tenant_id', 'driver_uuid', 'driver_id', 'offer_uuid', 'real_offer_uuid',
         'partner_uuid', 'seq', 'rider_first_name', 'driver_first_name', 'driver_last_name',
-        'pickup_address', 'dropoff_address', 'pickup_station_name', 'dropoff_station_name',
+        'pickup_address', 'dropoff_address', 'pickup_display', 'dropoff_display', 'pickup_station_name', 'dropoff_station_name',
         'fare_formatted', 'accept_window_seconds',
         'requested_at', 'offer_generated_at', 'received_at', 'accepted_at', 'raw_payload',
         'pickup_lat', 'pickup_lng', 'dropoff_lat', 'dropoff_lng',
