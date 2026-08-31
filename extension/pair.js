@@ -4,6 +4,31 @@
 
 const api = globalThis.browser || globalThis["chrome"];
 
+// After the extension is reloaded/updated, an already-open page keeps running the
+// OLD content script whose `api.runtime` has been torn down ("Extension context
+// invalidated"). Touching api.runtime.* then throws synchronously, so EVERY
+// message handler below must first confirm the context is still alive — otherwise
+// `api.runtime.sendMessage` throws before it can return a catchable promise,
+// surfacing as an "Uncaught (in promise) TypeError: …reading 'sendMessage'".
+function extAlive() {
+  try {
+    return !!(api && api.runtime && api.runtime.id);
+  } catch {
+    return false;
+  }
+}
+
+// Ask the background worker something, but never throw on a dead context: a stale
+// page reports a clean {ok:false} the caller can surface, instead of crashing.
+async function callBackground(message) {
+  if (!extAlive()) return { ok: false, reason: "extension_stale" };
+  try {
+    return await api.runtime.sendMessage(message);
+  } catch (e) {
+    return { ok: false, reason: e?.message || "extension_error" };
+  }
+}
+
 // Only the real dashboard may pair the extension. Validating event.origin (not
 // just event.source === window) stops any other page on a matched origin — or an
 // XSS on the dashboard hosted elsewhere — from injecting a rogue apiUrl+token.
@@ -28,6 +53,14 @@ function isAllowedApiUrl(url) {
 // Announce presence so the dashboard can tell whether the extension is installed
 // (both on load and on demand, since the page may mount after this script runs).
 async function announce() {
+  // A stale content script can't reach storage/runtime, but it IS proof the
+  // extension is installed — just needs a page reload. Tell the dashboard so it
+  // can prompt a refresh ("reload to reconnect") instead of misreporting the
+  // extension as absent and showing "pair first", which no click could fix.
+  if (!extAlive()) {
+    window.postMessage({ source: "ridy-ext-present", version: null, paired: false, stale: true }, location.origin);
+    return;
+  }
   try {
     const version = api.runtime.getManifest?.().version ?? null;
     // Report whether we already hold a pairing token, so the dashboard can
@@ -35,9 +68,8 @@ async function announce() {
     const { token } = await api.storage.local.get(["token"]);
     window.postMessage({ source: "ridy-ext-present", version, paired: !!token }, location.origin);
   } catch {
-    // "Extension context invalidated" — the page still runs the old content
-    // script after the extension was reloaded/updated; it recovers on refresh.
-    // Swallow it instead of surfacing an uncaught error.
+    // Context invalidated between the check and the read — treat as stale.
+    window.postMessage({ source: "ridy-ext-present", version: null, paired: false, stale: true }, location.origin);
   }
 }
 announce();
@@ -56,11 +88,23 @@ window.addEventListener("message", async (event) => {
   // Never store a backend URL we wouldn't POST the Uber session to (E1).
   if (!isAllowedApiUrl(apiUrl)) return;
 
-  await api.storage.local.set({
-    apiUrl,
-    token: String(d.token),
-    lastSync: null, // force a fresh capture after re-pairing
-  });
+  // A stale context can't persist the pairing — storing would silently fail and
+  // the extension would keep reporting "not paired" (no offers flow). Tell the
+  // page to reload so a fresh content script can complete the pairing.
+  if (!extAlive()) {
+    window.postMessage({ source: "ridy-pair-fail", reason: "extension_stale" }, location.origin);
+    return;
+  }
+  try {
+    await api.storage.local.set({
+      apiUrl,
+      token: String(d.token),
+      lastSync: null, // force a fresh capture after re-pairing
+    });
+  } catch {
+    window.postMessage({ source: "ridy-pair-fail", reason: "extension_stale" }, location.origin);
+    return;
+  }
 
   // Let the page know pairing succeeded so it can show a confirmation.
   window.postMessage({ source: "ridy-pair-ack" }, location.origin);
@@ -72,7 +116,7 @@ window.addEventListener("message", async (event) => {
 // keeps their tab (it still syncs silently, but never closes on them).
 window.addEventListener("message", async (event) => {
   if (event.source !== window || event.data?.source !== "ridy-connect-intent") return;
-  await api.runtime.sendMessage({ type: "connectIntent" }).catch(() => {});
+  await callBackground({ type: "connectIntent" });
 });
 
 // The Drivers page asks the extension to pull the roster from supplier.uber.com
@@ -82,10 +126,7 @@ window.addEventListener("message", async (event) => {
   if (event.data?.source !== "ridy-sync-roster") return;
 
   console.log("%c[Reidey roster]", "color:#2563eb;font-weight:700", "dashboard asked for roster → fetching from supplier");
-  const res = await api.runtime.sendMessage({ type: "fetchRoster" }).catch((e) => ({
-    ok: false,
-    reason: e?.message || "extension_error",
-  }));
+  const res = await callBackground({ type: "fetchRoster" });
   console.log("%c[Reidey roster]", "color:#2563eb;font-weight:700", "background result:", res);
   window.postMessage({ source: "ridy-roster-done", ...res }, "*");
 });
@@ -95,26 +136,20 @@ window.addEventListener("message", async (event) => {
   if (event.source !== window) return;
   if (event.data?.source !== "ridy-fetch-metrics" || !event.data.driverUuid) return;
 
-  const res = await api.runtime
-    .sendMessage({ type: "fetchMetrics", driverUuid: event.data.driverUuid, from: event.data.from, to: event.data.to })
-    .catch((e) => ({ ok: false, reason: e?.message || "extension_error" }));
+  const res = await callBackground({ type: "fetchMetrics", driverUuid: event.data.driverUuid, from: event.data.from, to: event.data.to });
   window.postMessage({ source: "ridy-metrics-done", ...res }, "*");
 });
 
 // The Vehicles page asks the extension to pull the fleet's vehicles.
 window.addEventListener("message", async (event) => {
   if (event.source !== window || event.data?.source !== "ridy-fetch-vehicles") return;
-  const res = await api.runtime
-    .sendMessage({ type: "fetchVehicles" })
-    .catch((e) => ({ ok: false, reason: e?.message || "extension_error" }));
+  const res = await callBackground({ type: "fetchVehicles" });
   window.postMessage({ source: "ridy-vehicles-done", ...res }, "*");
 });
 
 // The Drivers page asks the extension to refresh live online/offline presence.
 window.addEventListener("message", async (event) => {
   if (event.source !== window || event.data?.source !== "ridy-fetch-statuses") return;
-  const res = await api.runtime
-    .sendMessage({ type: "fetchStatuses", driverUuids: event.data.driverUuids })
-    .catch((e) => ({ ok: false, reason: e?.message || "extension_error" }));
+  const res = await callBackground({ type: "fetchStatuses", driverUuids: event.data.driverUuids });
   window.postMessage({ source: "ridy-statuses-done", ...res }, "*");
 });

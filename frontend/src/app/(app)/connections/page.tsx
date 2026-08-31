@@ -43,11 +43,22 @@ export default function ConnectionsPage() {
   // If it's present but unpaired (e.g. reinstalled), re-pair it silently.
   useEffect(() => {
     let repaired = false;
+    let staleWarned = false;
     function onMessage(e: MessageEvent) {
-      const d = e.data as { source?: string; version?: string; paired?: boolean };
+      const d = e.data as { source?: string; version?: string; paired?: boolean; stale?: boolean };
       if (e.source === window && d?.source === "ridy-ext-present") {
         setExtInstalled(true);
         if (d.version) setExtVersion(d.version);
+        // A stale content script (extension was updated/reloaded under an open
+        // page) can neither pair nor capture. Re-pairing can't fix it — only a
+        // reload re-injects a live script — so prompt that instead of looping.
+        if (d.stale) {
+          if (!staleWarned) {
+            staleWarned = true;
+            toast.error(c("extensionStale"));
+          }
+          return;
+        }
         if (d.paired === false && !repaired) {
           repaired = true;
           pairExtension().catch(() => {});
@@ -67,9 +78,12 @@ export default function ConnectionsPage() {
   // Confirmation that the installed extension picked up the pairing.
   useEffect(() => {
     function onMessage(e: MessageEvent) {
-      if (e.source === window && (e.data as { source?: string })?.source === "ridy-pair-ack") {
-        toast.success(c("extensionPaired"));
-      }
+      const src = (e.data as { source?: string })?.source;
+      if (e.source !== window) return;
+      if (src === "ridy-pair-ack") toast.success(c("extensionPaired"));
+      // Pairing couldn't be stored because the content script is stale — a reload
+      // fixes it. Surface it so the manager isn't left on a silent "not paired".
+      if (src === "ridy-pair-fail") toast.error(c("extensionStale"));
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
