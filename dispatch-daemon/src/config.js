@@ -72,9 +72,13 @@ export const config = {
   // How often to re-pull the roster (ms). Default 30 min.
   rosterInterval: Number(process.env.ROSTER_INTERVAL_MS || 1800000),
 
-  // How often to poll live driver statuses (ms). Fast, so ON_TRIP transitions
-  // (offer acceptance) are caught promptly. Default 10s.
+  // How often to poll live driver statuses (ms) when everyone is idle. Default 10s.
   statusInterval: Number(process.env.STATUS_INTERVAL_MS || 10000),
+
+  // Faster status poll (ms) while ANY driver is engaged (EN_ROUTE/ON_TRIP), so a
+  // just-accepted offer's live-map waypoints (the real pickup/drop-off) are picked
+  // up within seconds. Default 4s. Adaptive: only fast when it matters.
+  statusIntervalActive: Number(process.env.STATUS_INTERVAL_ACTIVE_MS || 4000),
 
   // How often to re-read the active session list from the backend (ms).
   sessionPollInterval: Number(process.env.SESSION_POLL_INTERVAL_MS || 60000),

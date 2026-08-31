@@ -82,7 +82,8 @@ export class RamenStream {
     this.stopped = true;
     this.controller?.abort();
     if (this.rosterTimer) clearInterval(this.rosterTimer);
-    if (this.statusTimer) clearInterval(this.statusTimer);
+    if (this.statusTimer) clearTimeout(this.statusTimer); // adaptive loop uses setTimeout
+    this.statusPolling = false;
     this.dispatcher?.close?.();
   }
 
@@ -183,14 +184,44 @@ export class RamenStream {
         }))
         .filter((s) => s.driver_uuid);
 
-      if (statuses.length === 0) return;
+      if (statuses.length === 0) return false;
+
+      // Any engaged driver (just accepted / on a trip) → the caller polls faster so
+      // this trip's live-map waypoints are captured within seconds of acceptance.
+      const engaged = statuses.some((s) => {
+        const u = String(s.status || "").toUpperCase();
+        return u.includes("EN_ROUTE") || u.includes("ON_TRIP");
+      });
+
       const outcome = await api.statuses(this.session.id, statuses);
       if (outcome?.data?.accepted) {
         console.log(`[${this.tag()}] statuses: ${outcome.data.accepted} offer(s) marked accepted`);
       }
+
+      return engaged;
     } catch (e) {
       console.error(`[${this.tag()}] status sync failed: ${e.message}`);
+      return false;
     }
+  }
+
+  /**
+   * Poll driver statuses on an ADAPTIVE cadence: fast while any driver is engaged
+   * (so a just-accepted offer's real pickup/drop-off waypoints are captured within
+   * seconds), and slower when everyone is idle to keep supplier load low.
+   * Self-reschedules; the handle lives in statusTimer so stop() cancels it.
+   */
+  scheduleStatusPoll(delay) {
+    if (this.stopped) return;
+    this.statusTimer = setTimeout(async () => {
+      let engaged = false;
+      try {
+        engaged = await this.syncStatuses();
+      } catch {
+        /* syncStatuses logs its own errors */
+      }
+      this.scheduleStatusPoll(engaged ? config.statusIntervalActive : config.statusInterval);
+    }, delay);
   }
 
   headers() {
@@ -291,6 +322,17 @@ export class RamenStream {
             `offers rely on the browser extension. Set a residential proxy to stream server-side.`,
         );
       }
+      // RAMEN can't stream from this IP, but the supplier roster/status polls go
+      // out through the residential proxy and DO work — so still drive them here,
+      // so a driver's acceptance (and the accepted trip's real live-map waypoints)
+      // are captured server-side even when the stream itself is blocked. Started
+      // once (the guard survives the slow 404 retry loop).
+      if (this.primary && !this.statusPolling) {
+        this.syncRoster();
+        this.rosterTimer ??= setInterval(() => this.syncRoster(), config.rosterInterval);
+        this.statusPolling = true;
+        this.scheduleStatusPoll(0);
+      }
       this.reconnectDelay = config.reconnectMaxDelay;
       throw new Error("ramen_blocked_404");
     }
@@ -312,8 +354,12 @@ export class RamenStream {
     if (this.primary) {
       this.syncRoster();
       this.rosterTimer ??= setInterval(() => this.syncRoster(), config.rosterInterval);
-      this.syncStatuses();
-      this.statusTimer ??= setInterval(() => this.syncStatuses(), config.statusInterval);
+      // Adaptive status polling — start the self-rescheduling loop once (a reconnect
+      // must not stack a second chain). First poll fires immediately.
+      if (!this.statusPolling) {
+        this.statusPolling = true;
+        this.scheduleStatusPoll(0);
+      }
     }
 
     await this.readSse(recv.body);
