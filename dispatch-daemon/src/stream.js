@@ -322,17 +322,14 @@ export class RamenStream {
             `offers rely on the browser extension. Set a residential proxy to stream server-side.`,
         );
       }
-      // RAMEN can't stream from this IP, but the supplier roster/status polls go
-      // out through the residential proxy and DO work — so still drive them here,
-      // so a driver's acceptance (and the accepted trip's real live-map waypoints)
-      // are captured server-side even when the stream itself is blocked. Started
-      // once (the guard survives the slow 404 retry loop).
-      if (this.primary && !this.statusPolling) {
-        this.syncRoster();
-        this.rosterTimer ??= setInterval(() => this.syncRoster(), config.rosterInterval);
-        this.statusPolling = true;
-        this.scheduleStatusPoll(0);
-      }
+      // NOTE: we deliberately do NOT start the supplier roster/status polls here.
+      // A RAMEN 404 means this IP can't hold the STREAM; if the company also has no
+      // working residential proxy, the supplier polls would go out from the same
+      // datacenter IP and could be rejected (403) — which our auth-failure handler
+      // would misread as bad cookies and falsely flag the session needs_relink.
+      // When RAMEN is blocked, offers/statuses come from the browser extension
+      // (manager's real IP). The daemon streams + polls only once it has a working
+      // residential proxy (then RAMEN connects and polling starts normally below).
       this.reconnectDelay = config.reconnectMaxDelay;
       throw new Error("ramen_blocked_404");
     }
