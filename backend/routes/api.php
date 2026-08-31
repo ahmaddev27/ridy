@@ -149,6 +149,7 @@ Route::prefix('v1')->group(function () {
             Route::get('home', [FleetController::class, 'home']);
             Route::get('drivers', [FleetController::class, 'drivers']);
             Route::get('offers', [FleetController::class, 'offers']);
+            Route::get('offers/{offer}', [FleetController::class, 'showOffer']);
             Route::get('stats', [FleetController::class, 'stats']);
             // The owner's own push device (User token) — receives every driver's offers.
             Route::post('devices', [FleetDeviceController::class, 'store']);

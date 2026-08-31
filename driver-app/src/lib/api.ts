@@ -258,6 +258,11 @@ export class ApiClient {
     return this.request<{ data: Offer[]; meta: PaginationMeta }>(`/api/v1/driver/fleet/offers${suffix}`);
   }
 
+  /** One fleet offer by id (owner mode) — resolves offers off list page 1. */
+  fleetOffer(id: string | number) {
+    return this.request<{ data: Offer }>(`/api/v1/driver/fleet/offers/${id}`);
+  }
+
   updateProfile(patch: { name?: string; locale?: string; password?: string }) {
     return this.request<{ data: DriverProfile }>("/api/v1/driver/me", {
       method: "PATCH",
@@ -309,6 +314,12 @@ export class ApiClient {
     }
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return this.request<{ data: Offer[]; meta: PaginationMeta }>(`/api/v1/driver/offers${suffix}`);
+  }
+
+  /** One offer by id — the detail screen resolves an offer directly instead of
+   *  scanning list page 1 (which falsely reads as "expired" off that page). */
+  offer(id: string | number) {
+    return this.request<{ data: Offer }>(`/api/v1/driver/offers/${id}`);
   }
 
   /** Mark the offer feed as seen — clears the server-side unread count (app-icon badge). */

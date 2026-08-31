@@ -25,8 +25,13 @@ const STROKE = 10;
 const R = (RING - STROKE) / 2;
 const CIRC = 2 * Math.PI * R;
 
-/** How long the on-screen accept countdown runs (seconds). */
-const COUNTDOWN_SECONDS = 10;
+/** Accept-window fallback (seconds) when the offer carries no real window. */
+const COUNTDOWN_FALLBACK_SECONDS = 10;
+
+/** The offer's real accept window in seconds, falling back to the default. */
+function acceptWindow(offer: Offer | null): number {
+  return offer?.accept_window_seconds ?? COUNTDOWN_FALLBACK_SECONDS;
+}
 
 /**
  * Seconds remaining in the accept window, refreshed every animation frame so the
@@ -34,12 +39,18 @@ const COUNTDOWN_SECONDS = 10;
  * pending and the deadline is in the future; it stops itself the moment the
  * window elapses (or the status leaves "pending"), so no work is done once the
  * trip is active. Returns null when there is no accept window to count down.
+ *
+ * Keyed on the offer's identity/received_at/status (not the whole object) so a
+ * 4s re-fetch that returns an equivalent offer does NOT restart the RAF loop.
  */
 function useCountdown(offer: Offer | null): number | null {
   const [now, setNow] = useState(() => Date.now());
+  const receivedAt = offer?.received_at ?? null;
+  const status = offer?.status ?? null;
+  const windowSeconds = acceptWindow(offer);
   useEffect(() => {
-    if (!offer?.received_at || offer.status !== "pending") return;
-    const deadline = new Date(offer.received_at).getTime() + COUNTDOWN_SECONDS * 1000;
+    if (!receivedAt || status !== "pending") return;
+    const deadline = new Date(receivedAt).getTime() + windowSeconds * 1000;
     let raf = 0;
     const tick = () => {
       setNow(Date.now());
@@ -47,12 +58,12 @@ function useCountdown(offer: Offer | null): number | null {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [offer]);
+  }, [receivedAt, status, windowSeconds]);
   return useMemo(() => {
-    if (!offer?.received_at) return null;
-    const deadline = new Date(offer.received_at).getTime() + COUNTDOWN_SECONDS * 1000;
+    if (!receivedAt) return null;
+    const deadline = new Date(receivedAt).getTime() + windowSeconds * 1000;
     return Math.max(0, (deadline - now) / 1000);
-  }, [offer, now]);
+  }, [receivedAt, windowSeconds, now]);
 }
 
 export default function OfferScreen() {
@@ -71,13 +82,12 @@ export default function OfferScreen() {
   useEffect(() => {
     let alive = true;
     const load = () => {
-      const fetcher = isOwner ? api.fleetOffers({ per_page: 50 }) : api.offers();
+      const fetcher = isOwner ? api.fleetOffer(id) : api.offer(id);
       fetcher
         .then((r) => {
           if (!alive) return;
-          const found = r.data.find((o) => String(o.id) === String(id));
-          if (found) setOffer(found);
-          else setError(true);
+          setOffer(r.data);
+          setError(false);
         })
         .catch(() => alive && setError(true));
     };
@@ -98,7 +108,7 @@ export default function OfferScreen() {
   }
 
   const status = offer?.status ?? "pending";
-  const win = COUNTDOWN_SECONDS;
+  const win = acceptWindow(offer);
   const pct = secondsLeft != null && win > 0 ? Math.max(0, Math.min(1, secondsLeft / win)) : 0;
   // The accept window (and therefore "expired") only applies while the offer is
   // still open. Once it has been accepted/started/completed the trip is active,

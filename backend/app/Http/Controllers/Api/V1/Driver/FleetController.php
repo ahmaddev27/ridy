@@ -68,6 +68,20 @@ class FleetController extends Controller
         return DispatchOfferResource::collection($offers);
     }
 
+    /**
+     * A single offer by id, scoped to the owner's tenant. Lets the app's offer
+     * detail screen resolve an offer by id instead of scanning list page 1 (which
+     * falsely reads as "expired" for anything off that page).
+     */
+    public function showOffer(Request $request, string $offer): DispatchOfferResource
+    {
+        $record = $this->scoped($this->tenantId($request))
+            ->with('driver:id,name')
+            ->findOrFail($offer);
+
+        return new DispatchOfferResource($record);
+    }
+
     /** Tenant-wide stats over an optional date range. */
     public function stats(Request $request): JsonResponse
     {
