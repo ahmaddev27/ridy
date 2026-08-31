@@ -48,6 +48,9 @@ class DispatchOfferResource extends JsonResource
             // Road distance once the trip is geocoded — lets the driver app show
             // the distance and derive €/km (same data the dashboard trip view uses).
             'distance_m' => $this->distance_m,
+            // Number of drop-offs once resolved from Uber's live map (>= 2 = multi-
+            // stop). Lets the offers list badge a multi-stop trip without the detail.
+            'stops_count' => $this->stops_count,
             'accept_window_seconds' => $this->accept_window_seconds,
             'received_at' => $this->received_at?->toIso8601String(),
         ];

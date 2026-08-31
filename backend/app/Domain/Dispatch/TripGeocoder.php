@@ -820,7 +820,11 @@ class TripGeocoder
         $offer->pickup_display = $this->labelForPoint($offer->pickup_address, $pickup) ?? $offer->pickup_display;
         $offer->dropoff_display = $this->labelForPoint($offer->dropoff_address, $dropoff) ?? $offer->dropoff_display;
 
-        $offer->stops = $points; // ordered [{lat,lng,type}] — pickup first, then drops
+        // Label every stop from its real coordinate so the detail view can list each
+        // drop-off by address (a multi-stop trip's intermediate stops have no address
+        // in Uber's offer payload — only coordinates on the live map). The endpoints
+        // reuse the corrected pickup/drop-off display; intermediates reverse-geocode.
+        $offer->stops = $this->labelStops($points, $offer->pickup_display, $offer->dropoff_display);
         $offer->stops_count = $stopsCount;
         $offer->geo_source = 'uber';
         $offer->geo_confidence = 'exact';
@@ -877,6 +881,31 @@ class TripGeocoder
         }
 
         return $label;
+    }
+
+    /**
+     * Attach a display address to each ordered stop. The first/last stops reuse the
+     * already-corrected pickup/drop-off labels (endpoints the offer text describes);
+     * intermediate stops — which Uber's offer never names — are reverse-geocoded from
+     * their real coordinate. A stop whose reverse lookup is unavailable keeps a null
+     * address rather than blocking the others.
+     *
+     * @param  array<int, array{lat: float, lng: float, type: string|null}>  $points
+     * @return array<int, array{lat: float, lng: float, type: string|null, address: string|null}>
+     */
+    private function labelStops(array $points, ?string $pickupLabel, ?string $dropoffLabel): array
+    {
+        $last = count($points) - 1;
+
+        return array_map(function (array $p, int $i) use ($last, $pickupLabel, $dropoffLabel) {
+            $address = match ($i) {
+                0 => $pickupLabel,
+                $last => $dropoffLabel,
+                default => $this->reverse($p['lat'], $p['lng']),
+            };
+
+            return $p + ['address' => $address !== '' ? $address : null];
+        }, $points, array_keys($points));
     }
 
     /** Rough completeness score of an address: +street, +house number, +postcode. */

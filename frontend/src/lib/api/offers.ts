@@ -24,6 +24,8 @@ export type DispatchOffer = {
   accept_window_seconds: number | null;
   received_at: string | null;
   trip_duration_seconds: number | null;
+  // Number of drop-offs once resolved from Uber's live map (>= 2 = multi-stop).
+  stops_count: number | null;
 };
 
 /**
@@ -49,7 +51,7 @@ export type TripInfo = {
   route_geometry: { coordinates: [number, number][] } | null;
   // Uber live-map stops (pickup first, then each drop-off), once resolved from the
   // driver's engaged position. stops_count >= 2 marks a multi-stop trip.
-  stops: { lat: number; lng: number; type: string | null }[] | null;
+  stops: { lat: number; lng: number; type: string | null; address: string | null }[] | null;
   stops_count: number | null;
   geo_source: string | null;
   distance_km: number | null;

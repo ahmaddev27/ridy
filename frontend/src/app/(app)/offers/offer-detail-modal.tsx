@@ -66,15 +66,28 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
   // the raw payload for a genuine multi-stop trip's intermediate stops. This keeps
   // the modal in sync with the row instead of showing the raw, uncorrected text.
   const stops = useMemo(() => {
-    const raw = extractStops(offer?.raw).map(tidyAddr).filter(Boolean);
-    const pickup = tidyAddr(offer?.trip?.pickup_address ?? "") || raw[0] || "";
-    const dropoff = tidyAddr(offer?.trip?.dropoff_address ?? "") || raw[raw.length - 1] || "";
-    if (raw.length <= 2) {
-      return [pickup, dropoff].filter(Boolean);
+    const pickup = tidyAddr(offer?.trip?.pickup_address ?? "");
+    const dropoff = tidyAddr(offer?.trip?.dropoff_address ?? "");
+
+    // Prefer Uber's authoritative live-map stops (each reverse-geocoded to an
+    // address on the backend) — the only source that names a multi-stop trip's
+    // INTERMEDIATE drop-offs, which the offer's raw text never carries.
+    const tripStops = offer?.trip?.stops;
+    if (tripStops && tripStops.length > 2) {
+      return tripStops
+        .map((s, i) =>
+          i === 0 ? pickup || tidyAddr(s.address ?? "")
+            : i === tripStops.length - 1 ? dropoff || tidyAddr(s.address ?? "")
+            : tidyAddr(s.address ?? ""),
+        )
+        .filter(Boolean);
     }
-    // Multi-stop: corrected pickup + the raw intermediate stops + corrected drop-off.
-    return [pickup, ...raw.slice(1, -1), dropoff].filter(Boolean);
-  }, [offer?.raw, offer?.trip?.pickup_address, offer?.trip?.dropoff_address]);
+
+    // Single drop-off (or stops not yet resolved): corrected pickup + drop-off,
+    // falling back to the raw offer text.
+    const raw = extractStops(offer?.raw).map(tidyAddr).filter(Boolean);
+    return [pickup || raw[0] || "", dropoff || raw[raw.length - 1] || ""].filter(Boolean);
+  }, [offer?.raw, offer?.trip?.pickup_address, offer?.trip?.dropoff_address, offer?.trip?.stops]);
 
   return (
     <div

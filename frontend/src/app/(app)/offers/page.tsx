@@ -335,6 +335,11 @@ export default function OffersPage() {
                                     <div className="flex items-center gap-1 truncate text-ink-subtle">
                                       <ArrowRight className="h-3 w-3 shrink-0 rtl:rotate-180" />
                                       <span className="truncate">{o.dropoff_address ?? "—"}</span>
+                                      {o.stops_count != null && o.stops_count >= 2 && (
+                                        <span className="shrink-0 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">
+                                          +{o.stops_count - 1}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
