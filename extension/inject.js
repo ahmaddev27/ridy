@@ -17,17 +17,32 @@
   const isRecv = (u) => typeof u === "string" && /\/ramen\w*\/events\/recv/i.test(u);
   const isRamen = (u) => typeof u === "string" && /\/ramen\w*\/events\//i.test(u);
 
-  // ── Passive capture of every Uber Fleet API response ──────────────────────
-  // Any supplier.uber.com /api/* or /graphql JSON the page fetches while the
-  // manager browses their Uber Fleet (Documents, Earnings, Invoices, Banking, …)
-  // is teed and posted to the content script, which forwards it to Reidey's
-  // generic /supplier/capture. No per-page code, no reverse-engineering — every
-  // tab the manager opens lands in the admin Network feed. The RAMEN recv stream
-  // is excluded (handled separately as offers).
+  // ── Passive capture of ALLOWLISTED Uber Fleet API responses ───────────────
+  // DSGVO posture: "detect, don't surveil". We do NOT tee every supplier /api or
+  // /graphql response — that would forward banking, invoices, payouts and driver
+  // documents (financial/identity PII) to the backend whenever the manager browses
+  // those tabs. Instead we capture ONLY the handful of endpoints the app actually
+  // consumes: the roster, driver metrics, live status, vehicles and earnings.
+  // Everything else (Documents, Banking, Invoices, Compliance, …) is dropped.
   // Only on supplier.uber.com (the Fleet dashboard) — its UI fetches with RELATIVE
   // paths ("/api/…", "/graphql"), so match the PATH, not the full host, or nothing
   // is ever captured. The RAMEN stream (vsdispatch) is handled separately above.
   const onSupplier = /(^|\.)supplier\.uber\.com$/i.test(location.host);
+  // Endpoints/operationNames worth capturing — matched case-insensitively against
+  // the REST path segment ("/api/<Name>") or the graphql operationName. Keeping
+  // this tight is the DSGVO control: an endpoint not listed here is never teed.
+  const CAPTURE_ALLOWLIST = [
+    /getDrivers\b/i, // roster
+    /GetEarnerMetrics\b/i, // driver performance metrics
+    /GetDriverLiveLocation\b/i, // live online/offline status + waypoints
+    /SearchVehicles\b/i, // fleet vehicles
+    /getEarnerBreakdowns/i, // earnings breakdown
+    /\bearnings\b/i, // earnings summaries
+  ];
+  const isAllowedCapture = (u, op) => {
+    const subject = op || u;
+    return typeof subject === "string" && CAPTURE_ALLOWLIST.some((re) => re.test(subject));
+  };
   const isCapture = (u) =>
     onSupplier && typeof u === "string" && /(\/api\/|\/graphql)/i.test(u) && !isRamen(u);
   // Prefer a graphql operationName as the kind ("getEarnerBreakdownsV2"), else the
@@ -51,6 +66,9 @@
     return null;
   }
   async function teeJson(res, url, meta) {
+    // DSGVO allowlist gate — drop anything not explicitly captured (banking,
+    // invoices, documents, …). For graphql the kind lives in the request meta.
+    if (!isAllowedCapture(url, meta && meta.operationName)) return;
     try {
       const text = await res.text();
       if (!text || text.length > 1000000) return; // skip empty / very large bodies
@@ -152,6 +170,10 @@
   XMLHttpRequest.prototype.send = function (body) {
     if (this.__ridyCap) {
       const meta = /graphql/i.test(this.__ridyCapUrl) ? graphqlMeta(body) : null;
+      // DSGVO allowlist gate — same as the fetch path; drop non-listed endpoints.
+      if (!isAllowedCapture(this.__ridyCapUrl, meta && meta.operationName)) {
+        return origSend.apply(this, arguments);
+      }
       this.addEventListener("load", () => {
         try {
           const text = this.responseText || "";

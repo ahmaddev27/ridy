@@ -128,7 +128,7 @@ window.addEventListener("message", async (event) => {
   console.log("%c[Reidey roster]", "color:#2563eb;font-weight:700", "dashboard asked for roster → fetching from supplier");
   const res = await callBackground({ type: "fetchRoster" });
   console.log("%c[Reidey roster]", "color:#2563eb;font-weight:700", "background result:", res);
-  window.postMessage({ source: "ridy-roster-done", ...res }, "*");
+  window.postMessage({ source: "ridy-roster-done", ...res }, location.origin);
 });
 
 // The driver detail view asks the extension to pull that driver's metrics.
@@ -137,19 +137,19 @@ window.addEventListener("message", async (event) => {
   if (event.data?.source !== "ridy-fetch-metrics" || !event.data.driverUuid) return;
 
   const res = await callBackground({ type: "fetchMetrics", driverUuid: event.data.driverUuid, from: event.data.from, to: event.data.to });
-  window.postMessage({ source: "ridy-metrics-done", ...res }, "*");
+  window.postMessage({ source: "ridy-metrics-done", ...res }, location.origin);
 });
 
 // The Vehicles page asks the extension to pull the fleet's vehicles.
 window.addEventListener("message", async (event) => {
   if (event.source !== window || event.data?.source !== "ridy-fetch-vehicles") return;
   const res = await callBackground({ type: "fetchVehicles" });
-  window.postMessage({ source: "ridy-vehicles-done", ...res }, "*");
+  window.postMessage({ source: "ridy-vehicles-done", ...res }, location.origin);
 });
 
 // The Drivers page asks the extension to refresh live online/offline presence.
 window.addEventListener("message", async (event) => {
   if (event.source !== window || event.data?.source !== "ridy-fetch-statuses") return;
   const res = await callBackground({ type: "fetchStatuses", driverUuids: event.data.driverUuids });
-  window.postMessage({ source: "ridy-statuses-done", ...res }, "*");
+  window.postMessage({ source: "ridy-statuses-done", ...res }, location.origin);
 });
