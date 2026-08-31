@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Logo } from "@/components/brand/logo";
 import { useI18n } from "@/lib/i18n/context";
@@ -63,6 +63,10 @@ function ActivateContent() {
   const t = COPY[locale] ?? COPY.de;
   const [tried, setTried] = useState(false);
   const [storeUrl, setStoreUrl] = useState<string | null>(null);
+  // Read the (async) store URL from the deep-link effect without depending on it,
+  // so the handoff fires exactly once instead of again when the URL resolves.
+  const storeUrlRef = useRef<string | null>(null);
+  storeUrlRef.current = storeUrl;
 
   const deepLink = token ? `reidey://activate?token=${encodeURIComponent(token)}` : null;
 
@@ -86,12 +90,13 @@ function ActivateContent() {
     window.location.href = deepLink;
     setTried(true);
     const timer = setTimeout(() => {
-      if (storeUrl && document.visibilityState === "visible") {
-        window.location.href = storeUrl;
+      const store = storeUrlRef.current;
+      if (store && document.visibilityState === "visible") {
+        window.location.href = store;
       }
     }, 2500);
     return () => clearTimeout(timer);
-  }, [deepLink, storeUrl]);
+  }, [deepLink]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-canvas p-6">

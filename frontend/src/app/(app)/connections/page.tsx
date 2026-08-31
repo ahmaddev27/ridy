@@ -124,17 +124,23 @@ export default function ConnectionsPage() {
   // signal — polling flips the card to "connected" the moment the session lands.
   useEffect(() => {
     if (!awaitingLink) return;
-    if (data?.status === "active") {
-      setAwaitingLink(false);
-      toast.success(c("connectedToast"));
-      return;
-    }
+    // Depend ONLY on awaitingLink: including `data` restarted this effect on every
+    // 3s refetch, which reset the 120s stop timer so it never fired (endless poll).
     const poll = setInterval(() => refetch(), 3000);
     const stop = setTimeout(() => setAwaitingLink(false), 120000);
     return () => {
       clearInterval(poll);
       clearTimeout(stop);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaitingLink]);
+
+  // Flip the card to "connected" the moment a poll reports an active session.
+  useEffect(() => {
+    if (awaitingLink && data?.status === "active") {
+      setAwaitingLink(false);
+      toast.success(c("connectedToast"));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [awaitingLink, data]);
 

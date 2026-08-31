@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
 import { toast } from "sonner";
 import { Radio, MapPin, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Inbox, CheckCircle2, XCircle, Gauge, Wallet, Download } from "lucide-react";
@@ -41,6 +41,8 @@ export default function OffersPage() {
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
   const [driverFilterOpen, setDriverFilterOpen] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
+  // Stable identity so the modal's fetch effect doesn't re-run every render.
+  const closeDetail = useCallback(() => setDetailId(null), []);
 
   // Deep link: /offers?offer=<id> (from the new-offer alert) opens that offer.
   useEffect(() => {
@@ -86,7 +88,7 @@ export default function OffersPage() {
         to: to || undefined,
       })
         .then(setStats)
-        .catch(() => {});
+        .catch((e) => console.error("offer stats fetch failed", e));
     } catch (e) {
       if (!silent) setError(e instanceof Error ? e.message : "error");
     } finally {
@@ -391,7 +393,7 @@ export default function OffersPage() {
       </Card>
 
       {detailId !== null && (
-        <OfferDetailModal id={detailId} onClose={() => setDetailId(null)} />
+        <OfferDetailModal id={detailId} onClose={closeDetail} />
       )}
     </div>
   );

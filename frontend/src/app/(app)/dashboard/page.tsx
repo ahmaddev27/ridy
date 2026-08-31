@@ -35,7 +35,7 @@ export default function DashboardPage() {
         <div className="space-y-6">
         {data?.subscription && (
           <Card className="flex items-center gap-5 p-5">
-            <SubscriptionRing subscription={data.subscription} activeLabel={k("subActive")} inactiveLabel={k("subInactive")} daysLabel={k("subDaysShort")} />
+            <SubscriptionRing subscription={data.subscription} daysLabel={k("subDaysShort")} />
             <div className="min-w-0">
               <h3 className="font-semibold text-ink">{k("subTitle")}</h3>
               <div className="mt-1.5 flex items-center gap-2">
@@ -130,8 +130,6 @@ function SubscriptionRing({
   daysLabel,
 }: {
   subscription: SubInfo;
-  activeLabel: string;
-  inactiveLabel: string;
   daysLabel: string;
 }) {
   // The ring reflects the CURRENT period only; queued periods show separately.

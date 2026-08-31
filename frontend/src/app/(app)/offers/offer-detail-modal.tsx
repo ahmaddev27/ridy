@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
 import dynamic from "next/dynamic";
@@ -45,16 +45,27 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
   };
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch depends ONLY on id: onClose is a fresh inline function each parent
+  // render, so keeping it in the deps re-ran this and re-fetched the offer every
+  // few seconds. The Escape handler lives in its own effect keyed on onClose.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
     getOffer(id)
       .then(setOffer)
       .catch((e) => setError(e instanceof Error ? e.message : "error"));
-    return () => document.removeEventListener("keydown", onKey);
-  }, [id, onClose]);
+  }, [id]);
 
-  const stops = extractStops(offer?.raw).map(tidyAddr).filter(Boolean);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Memoize the raw-payload stop extraction so it only recomputes when the raw
+  // payload changes, not on every render (map/status/badge re-renders).
+  const stops = useMemo(
+    () => extractStops(offer?.raw).map(tidyAddr).filter(Boolean),
+    [offer?.raw],
+  );
 
   return (
     <div

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ChevronLeft, Phone, Mail, Star, Car, UserCheck, MapPin, ArrowRight, ChevronDown, Inbox } from "lucide-react";
@@ -105,6 +105,8 @@ export default function DriverProfilePage() {
   const [offers, setOffers] = useState<DispatchOffer[]>([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
+  // Stable identity so the modal's fetch effect doesn't re-run every render.
+  const closeDetail = useCallback(() => setDetailId(null), []);
   const [openDays, setOpenDays] = useState<Set<string>>(() => new Set([new Date().toDateString()]));
 
   useEffect(() => {
@@ -420,7 +422,7 @@ export default function DriverProfilePage() {
       )}
 
       {detailId !== null && (
-        <OfferDetailModal id={detailId} onClose={() => setDetailId(null)} />
+        <OfferDetailModal id={detailId} onClose={closeDetail} />
       )}
     </div>
   );
