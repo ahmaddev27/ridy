@@ -136,6 +136,35 @@ export type SystemHealthRow = {
   proxy: { label: string | null; expires_at: string | null; ok: boolean };
 };
 
+export type OrphanDriver = {
+  id: number;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  uber_email: string | null;
+  uber_picture_url: string | null;
+  uber_rating: number | null;
+  uber_total_trips: number | null;
+  former_company: string | null;
+  former_company_id: number | null;
+  app_registered: boolean;
+  roster_removed_at: string | null;
+  activated_at: string | null;
+  last_login_at: string | null;
+};
+/** Super-admin: drivers dropped from their company roster (registered, no active company). */
+export async function getOrphanDrivers(
+  page = 1,
+  search = "",
+): Promise<{ items: OrphanDriver[]; lastPage: number; total: number }> {
+  const p = new URLSearchParams({ page: String(page) });
+  if (search) p.set("search", search);
+  const res = await apiFetch<{ data: OrphanDriver[]; last_page: number; total: number }>(
+    `/api/v1/admin/orphan-drivers?${p.toString()}`,
+  );
+  return { items: res.data, lastPage: res.last_page, total: res.total };
+}
+
 export async function getSystemHealth(): Promise<SystemHealthRow[]> {
   const res = await apiFetch<{ data: SystemHealthRow[] }>("/api/v1/admin/system-health");
   return res.data;

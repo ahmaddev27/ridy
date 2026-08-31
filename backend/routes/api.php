@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\Admin\ContactMessageController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Api\V1\Admin\ImpersonationController;
 use App\Http\Controllers\Api\V1\Admin\NetworkLogController;
+use App\Http\Controllers\Api\V1\Admin\OrphanDriverController;
 use App\Http\Controllers\Api\V1\Admin\OverviewController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\ProxyController;
@@ -311,6 +312,8 @@ Route::prefix('v1')->group(function () {
         // Platform-wide user directory (managers, resellers, admins).
         Route::get('users', [UserDirectoryController::class, 'index']);
         Route::delete('users/{user}', [UserDirectoryController::class, 'destroy']);
+
+        Route::get('orphan-drivers', OrphanDriverController::class);
 
         // Broadcast a bell + push notification to a set of users (queued).
         Route::post('notifications/broadcast', [AdminNotificationController::class, 'broadcast']);

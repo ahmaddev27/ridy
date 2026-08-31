@@ -69,6 +69,11 @@ jobs:
               git clone "$REPO_URL" "$APP_DIR"
             fi
             cd "$APP_DIR"
+            # Re-point origin to the current REPO_URL every run, so a rotated
+            # access token in the REPO_URL secret self-heals the checkout instead
+            # of fetch failing forever against a stale/expired embedded token
+            # ("could not read Username for https://github.com").
+            git remote set-url origin "$REPO_URL"
             git fetch origin main
             git reset --hard origin/main
 

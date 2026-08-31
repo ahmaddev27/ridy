@@ -13,6 +13,7 @@ import {
   MapPin,
   FileBarChart,
   UserCog,
+  UserX,
   Ticket,
   ReceiptText,
   Activity,
@@ -79,6 +80,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: "/admin/companies", label: "nav.companies", icon: Building2 },
       { href: "/admin/users", label: "nav.users", icon: UserCog },
+      { href: "/admin/orphan-drivers", label: "nav.orphanDrivers", icon: UserX },
       { href: "/admin/collectors", label: "nav.collectors", icon: Banknote },
     ],
   },
