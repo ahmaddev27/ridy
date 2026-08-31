@@ -140,6 +140,28 @@ class OfferTripTest extends TestCase
         $this->assertSame('Baz, Solingen', $complete('Baz, Solingen', "Baz, 10115 {$city}"));
     }
 
+    public function test_street_only_address_adopts_the_geocoded_label_only_in_the_drivers_town(): void
+    {
+        $geo = app(TripGeocoder::class);
+        $m = new \ReflectionMethod($geo, 'displayAddress');
+        $m->setAccessible(true);
+        $display = fn (string $raw, ?string $label, ?string $city) => $m->invoke($geo, $raw, $label !== null ? ['address' => $label] : null, $city);
+
+        $city = PostalCodes::city('10115');
+        $this->assertNotNull($city);
+
+        // Anchored to the driver's town and resolved there → adopt the full label.
+        $this->assertSame(
+            "Wittener Str. 4, 10115 {$city}",
+            $display('Wittener Str. 4', "Wittener Str. 4, 10115 {$city}", $city),
+        );
+        // Resolved in a DIFFERENT town than the driver → keep it raw (no invented town).
+        $this->assertSame(
+            'Wittener Str. 4',
+            $display('Wittener Str. 4', "Wittener Str. 4, 10115 {$city}", 'Solingen'),
+        );
+    }
+
     public function test_unresolved_address_with_a_valid_plz_falls_back_to_the_centroid(): void
     {
         $this->seed(RolePermissionSeeder::class);

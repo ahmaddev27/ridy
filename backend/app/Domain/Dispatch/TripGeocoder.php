@@ -71,6 +71,10 @@ class TripGeocoder
             : null;
         $dLat = $driver?->latitude !== null ? (float) $driver->latitude : null;
         $dLng = $driver?->longitude !== null ? (float) $driver->longitude : null;
+        // The driver's current town — the anchor for a street-only endpoint (no
+        // city, no postcode), which otherwise resolves to a same-named street a
+        // town away and blows up the distance.
+        $driverCity = ($dLat !== null && $dLng !== null) ? (PostalCodes::nearest($dLat, $dLng)['city'] ?? null) : null;
 
         // The pickup/dropoff shown to drivers stay EXACTLY as the supplier sent
         // them — we never rewrite the display address. Geocoding runs on enhanced
@@ -99,6 +103,18 @@ class TripGeocoder
             $offer->dropoff_station_name = $dropoffStation['station_name'];
         }
 
+        // A street-only endpoint (a lone "Wittener Str. 4" — no city, no postcode)
+        // exists in dozens of towns, so anchor it to the driver's town for the
+        // geocode. Both ends then resolve in the same city → a real distance.
+        $pickupStreetOnly = $driverCity !== null && $this->isStreetOnly($pickupQuery);
+        $dropoffStreetOnly = $driverCity !== null && $this->isStreetOnly($dropoffQuery);
+        if ($pickupStreetOnly) {
+            $pickupQuery .= ', '.$driverCity;
+        }
+        if ($dropoffStreetOnly) {
+            $dropoffQuery .= ', '.$driverCity;
+        }
+
         // Resolve the endpoint that has a postcode first, then bias the ambiguous
         // (postcode-less) one to it — a dispatch trip's ends are close together, so
         // the resolved end is a far better bias than the driver's position, which
@@ -116,11 +132,11 @@ class TripGeocoder
         $offer->dropoff_lat = $dropoff['lat'] ?? null;
         $offer->dropoff_lng = $dropoff['lng'] ?? null;
 
-        // Fill ONLY a missing postcode from the geocoded result, and only when the
-        // geocoded town matches the raw one — the city is never changed, so a wrong
-        // geocode can't corrupt the address (it just stays raw).
-        $offer->pickup_display = $this->completePostcode($offer->pickup_address, $pickup);
-        $offer->dropoff_display = $this->completePostcode($offer->dropoff_address, $dropoff);
+        // Display completion: a street-only endpoint anchored to the driver's town
+        // adopts the geocoded full address when it resolves in that same town; every
+        // other case only fills a missing postcode when the town already matches.
+        $offer->pickup_display = $this->displayAddress($offer->pickup_address, $pickup, $pickupStreetOnly ? $driverCity : null);
+        $offer->dropoff_display = $this->displayAddress($offer->dropoff_address, $dropoff, $dropoffStreetOnly ? $driverCity : null);
 
         if ($pickup && $dropoff) {
             $route = $this->route($pickup, $dropoff);
@@ -194,6 +210,48 @@ class TripGeocoder
     private function normCity(string $value): string
     {
         return (string) preg_replace('/[^a-zà-ÿ]/u', '', mb_strtolower($value));
+    }
+
+    /**
+     * A lone street with no town and no postcode ("Wittener Str. 4") — a single
+     * comma-less segment that isn't a bare station. These can't be placed on their
+     * own, so they get anchored to the driver's town.
+     */
+    private function isStreetOnly(string $query): bool
+    {
+        $q = trim((string) AddressFormatter::clean($query));
+
+        return $q !== ''
+            && ! $this->hasPostcode($q)
+            && ! str_contains($q, ',')
+            && $this->bareStationLabel($q) === null
+            && preg_match('/\p{L}/u', $q) === 1;
+    }
+
+    /**
+     * The address to display. A street-only endpoint anchored to the driver's town
+     * ($driverCity set) adopts the geocoded full label ONLY when its postcode's
+     * town matches the driver's — so we never invent a town the street isn't in.
+     * Everything else falls back to filling just a missing postcode.
+     *
+     * @param  array{address?: ?string}|null  $geo
+     */
+    private function displayAddress(?string $raw, ?array $geo, ?string $driverCity): ?string
+    {
+        if ($driverCity !== null
+            && is_string($geo['address'] ?? null)
+            && preg_match('/\b(\d{5})\b/', $geo['address'], $m) === 1) {
+            $geoCity = PostalCodes::city($m[1]);
+            if ($geoCity !== null) {
+                $dn = $this->normCity($driverCity);
+                $gn = $this->normCity($geoCity);
+                if ($dn !== '' && $gn !== '' && (str_contains($dn, $gn) || str_contains($gn, $dn))) {
+                    return AddressFormatter::tidy($geo['address']);
+                }
+            }
+        }
+
+        return $this->completePostcode($raw, $geo);
     }
 
     /**
