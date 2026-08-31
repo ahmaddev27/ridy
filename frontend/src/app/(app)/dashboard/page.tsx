@@ -19,6 +19,21 @@ export default function DashboardPage() {
 
   const k = (key: string) => t(`screens.dashboard.${key}`);
 
+  // On open, ask the extension to refresh the fleet earnings roll-up on demand
+  // (replays getSupplierBreakdownV2 — no Uber tab needed), then reload the summary
+  // once it lands so the fleet card is current without the manager reopening Uber.
+  useEffect(() => {
+    function onDone(e: MessageEvent) {
+      if (e.source === window && (e.data as { source?: string })?.source === "ridy-fleet-earnings-done") {
+        setTimeout(() => refetch(), 400);
+      }
+    }
+    window.addEventListener("message", onDone);
+    window.postMessage({ source: "ridy-fetch-fleet-earnings" }, "*");
+    return () => window.removeEventListener("message", onDone);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* Sponsored banner — full width, at the top */}

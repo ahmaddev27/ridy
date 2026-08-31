@@ -38,8 +38,19 @@
     /SearchVehicles\b/i, // fleet vehicles
     /getEarnerBreakdowns/i, // per-driver earnings breakdown
     /getSupplierBreakdown/i, // fleet-level earnings summary (cash / net roll-up)
+    /GetTimelineInfo/i, // per-driver activity timeline (online/offer/assign events)
     /\bearnings\b/i, // earnings summaries
   ];
+
+  // GraphQL operations we later REPLAY on demand (dashboard / driver page open) so
+  // the data refreshes without the manager reopening the Uber page. When the page
+  // makes one of these, we stash its full request body as a template.
+  const REPLAY_TARGETS = ["getEarnerBreakdownsV2", "getSupplierBreakdownV2", "GetTimelineInfo"];
+  function maybeStashTemplate(url, op, body) {
+    if (!op || !REPLAY_TARGETS.includes(op)) return;
+    if (typeof body !== "string") return;
+    window.postMessage({ source: "ridy-graphql-template", operationName: op, url, body }, location.origin);
+  }
   const isAllowedCapture = (u, op) => {
     const subject = op || u;
     return typeof subject === "string" && CAPTURE_ALLOWLIST.some((re) => re.test(subject));
@@ -140,6 +151,7 @@
         .catch(() => {});
     } else if (isCapture(url)) {
       const meta = /graphql/i.test(url) ? graphqlMeta(init && init.body) : null;
+      if (meta) maybeStashTemplate(url, meta.operationName, init && typeof init.body === "string" ? init.body : null);
       promise.then((res) => teeJson(res.clone(), url, meta)).catch(() => {});
     }
     return promise;
@@ -175,6 +187,7 @@
       if (!isAllowedCapture(this.__ridyCapUrl, meta && meta.operationName)) {
         return origSend.apply(this, arguments);
       }
+      if (meta) maybeStashTemplate(this.__ridyCapUrl, meta.operationName, typeof body === "string" ? body : null);
       this.addEventListener("load", () => {
         try {
           const text = this.responseText || "";

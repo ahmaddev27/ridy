@@ -106,6 +106,23 @@
     }
   });
 
+  // Stash a graphql request template (from inject.js) so the background worker can
+  // later REPLAY it on demand — refreshing earnings/timeline without reopening the
+  // Uber page. Just the request body + url, keyed by operationName.
+  window.addEventListener("message", async (event) => {
+    if (event.source !== window || event.origin !== location.origin || event.data?.source !== "ridy-graphql-template") return;
+    try {
+      await api.runtime.sendMessage({
+        type: "store_graphql_template",
+        operationName: event.data.operationName,
+        url: event.data.url,
+        body: event.data.body,
+      });
+    } catch {
+      /* extension reloaded or not paired — ignore */
+    }
+  });
+
   // On vsdispatch.uber.com we do NOT open our own dispatch stream — that would
   // compete with Uber's own page for the same seq-numbered messages, so each
   // offer would land in only one of them. Instead we inject a page-world script

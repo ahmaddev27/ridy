@@ -153,3 +153,19 @@ window.addEventListener("message", async (event) => {
   const res = await callBackground({ type: "fetchStatuses", driverUuids: event.data.driverUuids });
   window.postMessage({ source: "ridy-statuses-done", ...res }, location.origin);
 });
+
+// The dashboard asks the extension to refresh the fleet earnings roll-up (replays
+// getSupplierBreakdownV2 → backend) — on-demand, no Uber tab needed.
+window.addEventListener("message", async (event) => {
+  if (event.source !== window || event.data?.source !== "ridy-fetch-fleet-earnings") return;
+  const res = await callBackground({ type: "fetchFleetEarnings" });
+  window.postMessage({ source: "ridy-fleet-earnings-done", ...res }, location.origin);
+});
+
+// The driver detail page asks the extension to refresh that driver's Uber data:
+// earnings breakdown (stored on the backend) + the activity timeline (returned here).
+window.addEventListener("message", async (event) => {
+  if (event.source !== window || event.data?.source !== "ridy-fetch-driver-uber" || !event.data.driverUuid) return;
+  const res = await callBackground({ type: "fetchDriverUber", driverUuid: event.data.driverUuid });
+  window.postMessage({ source: "ridy-driver-uber-done", ...res }, location.origin);
+});

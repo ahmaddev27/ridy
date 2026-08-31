@@ -566,7 +566,112 @@ async function postCapture(kind, url, payload) {
   }
 }
 
+// ── GraphQL replay: re-issue a request the page made earlier, on demand ──────
+// The Uber Fleet dashboard fetches earnings/timeline over graphql. We can't build
+// those queries ourselves, so inject.js stashes the full request body the FIRST
+// time the manager opens the page; here we replay it (with the driver swapped in)
+// so the data refreshes without the manager ever reopening the Uber tab.
+
+/** Deep-replace any UUID-valued variable whose key mentions "driver" — targets the
+ *  driver id in a timeline query without touching partnerUuid/org ids. */
+function overrideDriver(vars, uuid) {
+  if (!vars || typeof vars !== "object" || !uuid) return vars;
+  const out = Array.isArray(vars) ? [...vars] : { ...vars };
+  for (const k of Object.keys(out)) {
+    const v = out[k];
+    if (typeof v === "string" && /driver/i.test(k) && /^[0-9a-f-]{20,}$/i.test(v)) out[k] = uuid;
+    else if (v && typeof v === "object") out[k] = overrideDriver(v, uuid);
+  }
+  return out;
+}
+
+async function replayGraphql(operationName, driverUuid) {
+  const key = `gqltpl:${operationName}`;
+  const stored = await api.storage.local.get([key]);
+  const tpl = stored[key];
+  if (!tpl || !tpl.body) return { ok: false, reason: "no_template" };
+  let bodyObj;
+  try {
+    bodyObj = JSON.parse(tpl.body);
+  } catch {
+    return { ok: false, reason: "bad_template" };
+  }
+  if (driverUuid && bodyObj.variables) bodyObj.variables = overrideDriver(bodyObj.variables, driverUuid);
+  const gqlUrl = /^https?:/i.test(tpl.url || "") ? tpl.url : `https://supplier.uber.com${tpl.url || "/graphql"}`;
+  try {
+    const res = await fetch(gqlUrl, {
+      method: "POST",
+      credentials: "include",
+      headers: { accept: "*/*", "content-type": "application/json", "x-csrf-token": "x" },
+      body: JSON.stringify(bodyObj),
+    });
+    if (!res.ok) return { ok: false, reason: `supplier_http_${res.status}` };
+    return { ok: true, operationName, variables: bodyObj.variables, data: await res.json() };
+  } catch (e) {
+    return { ok: false, reason: e.message };
+  }
+}
+
+/** Refresh the fleet earnings roll-up (getSupplierBreakdownV2) → backend parser. */
+async function fetchFleetEarnings() {
+  const r = await replayGraphql("getSupplierBreakdownV2", null);
+  if (!r.ok) return r;
+  return await postCapture("supplierbreakdownv2", "https://supplier.uber.com/graphql", {
+    operationName: r.operationName,
+    variables: r.variables,
+    data: r.data,
+  });
+}
+
+/** Flatten a GetTimelineInfo response into a compact activity list for the page. */
+function extractTimeline(resp) {
+  const items = resp?.data?.GetTimelineInfo?.timelineInfo || resp?.GetTimelineInfo?.timelineInfo || [];
+  return (Array.isArray(items) ? items : []).slice(0, 200).map((it) => ({
+    timestamp: it.timestamp ?? null,
+    status: it.status ?? null,
+    jobuuid: it.jobuuid || null,
+    offlineReason: it.offlineReason || null,
+    offerExpireReason: it.offerExpireReason || null,
+    stateChange: Array.isArray(it.stateChange)
+      ? it.stateChange.map((s) => ({ type: s.type ?? null, timestamp: s.timestamp ?? null, offeruuid: s.offeruuid || null }))
+      : null,
+  }));
+}
+
+/** On opening a driver: refresh the earnings breakdown (stored, all drivers) and
+ *  return this driver's activity timeline for the page to render. */
+async function fetchDriverUber(driverUuid) {
+  const out = { ok: true };
+  const eb = await replayGraphql("getEarnerBreakdownsV2", null);
+  if (eb.ok) {
+    await postCapture("earnerbreakdownsv2", "https://supplier.uber.com/graphql", {
+      operationName: eb.operationName,
+      variables: eb.variables,
+      data: eb.data,
+    }).catch(() => {});
+    out.breakdown = true;
+  }
+  const tl = await replayGraphql("GetTimelineInfo", driverUuid);
+  if (tl.ok) out.timeline = extractTimeline(tl.data);
+  return out;
+}
+
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === "store_graphql_template" && msg.operationName) {
+    api.storage.local
+      .set({ [`gqltpl:${msg.operationName}`]: { url: msg.url, body: msg.body, at: Date.now() } })
+      .then(() => sendResponse({ ok: true }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+  if (msg?.type === "fetchFleetEarnings") {
+    fetchFleetEarnings().then(sendResponse);
+    return true;
+  }
+  if (msg?.type === "fetchDriverUber") {
+    fetchDriverUber(msg.driverUuid).then(sendResponse);
+    return true;
+  }
   if (msg?.type === "supplier_capture") {
     postCapture(msg.kind, msg.url, msg.payload).then(sendResponse).catch(() => sendResponse({ ok: false }));
     return true;
