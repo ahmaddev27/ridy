@@ -572,28 +572,7 @@ async function postCapture(kind, url, payload) {
 // time the manager opens the page; here we replay it (with the driver swapped in)
 // so the data refreshes without the manager ever reopening the Uber tab.
 
-// A GetTimelineInfo query is per-driver, and Uber names that id inconsistently
-// (driverUUID / earnerUUID / userUUID / uuid). The one id we must NOT touch is the
-// org/partner id. So we target UUID-valued vars whose key looks driver-ish, and
-// never those that look org-ish — broad enough to catch Uber's real key names.
-const DRIVER_KEY = /driver|earner|\buser\b|^uuid$/i;
-const ORG_KEY = /partner|supplier|org|company|fleet|account|tenant/i;
-
-/** Deep-replace the driver-identifying UUID variable in a timeline query, leaving
- *  the org/partner id intact, so the replay returns THIS driver's timeline. */
-function overrideDriver(vars, uuid) {
-  if (!vars || typeof vars !== "object" || !uuid) return vars;
-  const out = Array.isArray(vars) ? [...vars] : { ...vars };
-  for (const k of Object.keys(out)) {
-    const v = out[k];
-    const isUuid = typeof v === "string" && /^[0-9a-f-]{20,}$/i.test(v);
-    if (isUuid && DRIVER_KEY.test(k) && !ORG_KEY.test(k)) out[k] = uuid;
-    else if (v && typeof v === "object") out[k] = overrideDriver(v, uuid);
-  }
-  return out;
-}
-
-async function replayGraphql(operationName, driverUuid) {
+async function replayGraphql(operationName) {
   const key = `gqltpl:${operationName}`;
   const stored = await api.storage.local.get([key]);
   const tpl = stored[key];
@@ -604,7 +583,6 @@ async function replayGraphql(operationName, driverUuid) {
   } catch {
     return { ok: false, reason: "bad_template" };
   }
-  if (driverUuid && bodyObj.variables) bodyObj.variables = overrideDriver(bodyObj.variables, driverUuid);
   const gqlUrl = /^https?:/i.test(tpl.url || "") ? tpl.url : `https://supplier.uber.com${tpl.url || "/graphql"}`;
   try {
     const res = await fetch(gqlUrl, {
@@ -622,7 +600,7 @@ async function replayGraphql(operationName, driverUuid) {
 
 /** Refresh the fleet earnings roll-up (getSupplierBreakdownV2) → backend parser. */
 async function fetchFleetEarnings() {
-  const r = await replayGraphql("getSupplierBreakdownV2", null);
+  const r = await replayGraphql("getSupplierBreakdownV2");
   if (!r.ok) return r;
   return await postCapture("supplierbreakdownv2", "https://supplier.uber.com/graphql", {
     operationName: r.operationName,
@@ -631,26 +609,10 @@ async function fetchFleetEarnings() {
   });
 }
 
-/** Flatten a GetTimelineInfo response into a compact activity list for the page. */
-function extractTimeline(resp) {
-  const items = resp?.data?.GetTimelineInfo?.timelineInfo || resp?.GetTimelineInfo?.timelineInfo || [];
-  return (Array.isArray(items) ? items : []).slice(0, 200).map((it) => ({
-    timestamp: it.timestamp ?? null,
-    status: it.status ?? null,
-    jobuuid: it.jobuuid || null,
-    offlineReason: it.offlineReason || null,
-    offerExpireReason: it.offerExpireReason || null,
-    stateChange: Array.isArray(it.stateChange)
-      ? it.stateChange.map((s) => ({ type: s.type ?? null, timestamp: s.timestamp ?? null, offeruuid: s.offeruuid || null }))
-      : null,
-  }));
-}
-
-/** On opening a driver: refresh the earnings breakdown (stored, all drivers) and
- *  return this driver's activity timeline for the page to render. */
-async function fetchDriverUber(driverUuid) {
+/** On opening a driver: refresh the earnings breakdown (stored, all drivers). */
+async function fetchDriverUber() {
   const out = { ok: true };
-  const eb = await replayGraphql("getEarnerBreakdownsV2", null);
+  const eb = await replayGraphql("getEarnerBreakdownsV2");
   if (eb.ok) {
     await postCapture("earnerbreakdownsv2", "https://supplier.uber.com/graphql", {
       operationName: eb.operationName,
@@ -659,38 +621,7 @@ async function fetchDriverUber(driverUuid) {
     }).catch(() => {});
     out.breakdown = true;
   }
-  const tl = await replayGraphql("GetTimelineInfo", driverUuid);
-  if (tl.ok) {
-    out.timeline = extractTimeline(tl.data);
-    // Reconcile acceptances the coarse status poll missed (offers wrongly "not
-    // taken"): the backend matches each assigned trip's time to a pending offer.
-    // Guard: only reconcile when the replay was actually re-targeted to THIS driver
-    // (the override found the driver key). Otherwise the template still carries the
-    // seed driver's id, and posting it would attribute another driver's trips here.
-    const targeted = driverUuid && JSON.stringify(tl.variables || {}).includes(driverUuid);
-    if (out.timeline.length && targeted) {
-      await postTimeline(driverUuid, out.timeline).catch(() => {});
-    } else if (out.timeline.length && driverUuid) {
-      out.timelineUntargeted = true; // surfaced so we know the driver key didn't match
-    }
-  }
   return out;
-}
-
-/** Send a driver's activity timeline to the backend for offer reconciliation. */
-async function postTimeline(driverUuid, events) {
-  const pairing = await getPairing();
-  if (!pairing.ok) return { ok: false, reason: pairing.reason };
-  try {
-    const res = await fetch(`${pairing.apiUrl}/api/v1/supplier/timeline`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${pairing.token}` },
-      body: JSON.stringify({ driver_uuid: driverUuid, events }),
-    });
-    return { ok: res.ok };
-  } catch (e) {
-    return { ok: false, reason: e.message };
-  }
 }
 
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {

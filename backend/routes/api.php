@@ -217,7 +217,6 @@ Route::prefix('v1')->group(function () {
         // (documents/reports/invoices/banking/promotions/inbox/…) and POSTs the raw
         // payload here tagged with a kind, so it lands in the admin Network feed.
         Route::post('supplier/capture', [SupplierCaptureController::class, 'store'])->middleware('fleet.connected');
-        Route::post('supplier/timeline', [SupplierCaptureController::class, 'timeline'])->middleware('fleet.connected');
 
         // Dispatch offers feed
         Route::get('dispatch/offers', [DispatchOfferController::class, 'index']);

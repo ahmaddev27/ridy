@@ -25,16 +25,6 @@ const OFFER_TONE: Record<OfferStatus, Status> = {
   canceled: "personal",
 };
 
-/** One Uber activity-timeline event (GetTimelineInfo), returned by the extension. */
-type TimelineEvent = {
-  timestamp: number | null;
-  status: string | null;
-  jobuuid: string | null;
-  offlineReason: string | null;
-  offerExpireReason: string | null;
-  stateChange: { type: string | null; timestamp: number | null; offeruuid: string | null }[] | null;
-};
-
 // Uber measures a "day" as its business day: 04:00 → 04:00 in the fleet's
 // timezone (Europe/Berlin), NOT local midnight. Aligning our windows to the same
 // boundary is what makes the Uber performance cards match the Uber app exactly.
@@ -112,7 +102,6 @@ export default function DriverProfilePage() {
   const [driver, setDriver] = useState<Driver | null>(null);
   const [stats, setStats] = useState<DriverStats | null>(null);
   const [uber, setUber] = useState<DriverMetric | null>(null);
-  const [timeline, setTimeline] = useState<TimelineEvent[] | null>(null);
   const [tab, setTab] = useState<"performance" | "details">("performance");
   const [range, setRange] = useState<RangeKey>("today");
   const [customFrom, setCustomFrom] = useState("");
@@ -152,16 +141,15 @@ export default function DriverProfilePage() {
     getDriverMetrics(id).then((m) => setUber(m[0] ?? null)).catch(() => setUber(null));
   }, [id]);
 
-  // On open, ask the extension to refresh this driver's Uber data on demand
-  // (replays getEarnerBreakdownsV2 → backend, and GetTimelineInfo → returned here),
-  // so earnings + activity are current without the manager reopening the Uber tab.
+  // On open, ask the extension to refresh this driver's Uber earnings on demand
+  // (replays getEarnerBreakdownsV2 → backend), so earnings are current without the
+  // manager reopening the Uber tab.
   useEffect(() => {
     const uuid = driver?.uber_driver_uuid;
     if (!uuid) return;
     function onDone(e: MessageEvent) {
       if (e.source !== window || (e.data as { source?: string })?.source !== "ridy-driver-uber-done") return;
-      const d = e.data as { timeline?: TimelineEvent[]; breakdown?: boolean };
-      if (Array.isArray(d.timeline)) setTimeline(d.timeline);
+      const d = e.data as { breakdown?: boolean };
       if (d.breakdown) getDriverMetrics(id).then((m) => setUber(m[0] ?? null)).catch(() => {});
     }
     window.addEventListener("message", onDone);
@@ -460,31 +448,6 @@ export default function DriverProfilePage() {
                 <MiniStat label={d("statAccepted")} value={String(stats.accepted)} />
                 <MiniStat label={d("statKm")} value={`${stats.km} km`} />
               </div>
-            </Card>
-          )}
-
-          {/* Driver activity — Uber's timeline (online/offline + offer assign/expire),
-              refreshed on-demand from the extension when this page opens. */}
-          {timeline && timeline.length > 0 && (
-            <Card className="p-5">
-              <h4 className="text-sm font-semibold text-ink">{d("activity")}</h4>
-              <p className="mb-3 mt-0.5 text-xs text-ink-subtle">{d("activityHint")}</p>
-              <ol className="space-y-2">
-                {timeline.slice(0, 40).map((ev, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm">
-                    <span className="mt-0.5 w-16 shrink-0 text-xs tabular-nums text-ink-subtle" dir="ltr">
-                      {ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString(latnLocale(locale)) : "—"}
-                    </span>
-                    <span className="flex-1">
-                      <span className="font-medium text-ink">{ev.status ?? "—"}</span>
-                      {ev.stateChange?.map((s, j) => (
-                        <span key={j} className="ms-2 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] text-ink-muted">{s.type}</span>
-                      ))}
-                      {ev.offerExpireReason && <span className="ms-2 text-[11px] text-danger-fg">{ev.offerExpireReason}</span>}
-                    </span>
-                  </li>
-                ))}
-              </ol>
             </Card>
           )}
         </div>

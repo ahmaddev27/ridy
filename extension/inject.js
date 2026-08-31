@@ -38,24 +38,16 @@
     /SearchVehicles\b/i, // fleet vehicles
     /getEarnerBreakdowns/i, // per-driver earnings breakdown
     /getSupplierBreakdown/i, // fleet-level earnings summary (cash / net roll-up)
-    /GetTimelineInfo/i, // per-driver activity timeline (online/offer/assign events)
     /\bearnings\b/i, // earnings summaries
   ];
 
   // GraphQL operations we later REPLAY on demand (dashboard / driver page open) so
   // the data refreshes without the manager reopening the Uber page. When the page
   // makes one of these, we stash its full request body as a template.
-  const REPLAY_TARGETS = ["getEarnerBreakdownsV2", "getSupplierBreakdownV2", "GetTimelineInfo"];
+  const REPLAY_TARGETS = ["getEarnerBreakdownsV2", "getSupplierBreakdownV2"];
   function maybeStashTemplate(url, op, body) {
     if (!op || !REPLAY_TARGETS.includes(op)) return;
     if (typeof body !== "string") return;
-    // Surface the request variables (esp. GetTimelineInfo's driver/time keys) so we
-    // can wire precise per-driver replay — copy these from the page console.
-    try {
-      log(`graphql template ${op} variables:`, JSON.parse(body).variables);
-    } catch {
-      /* not JSON */
-    }
     window.postMessage({ source: "ridy-graphql-template", operationName: op, url, body }, location.origin);
   }
   const isAllowedCapture = (u, op) => {
