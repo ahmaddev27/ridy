@@ -792,7 +792,12 @@ class TripGeocoder
 
         $stopsCount = count($points) - 1; // everything after the pickup is a drop-off
         $stopsChanged = (int) ($offer->stops_count ?? 0) !== $stopsCount;
-        $needs = $offer->geo_source !== 'uber' && $this->geoIncomplete($offer);
+        // Uber's live-map coordinates are authoritative, so adopt them for ANY
+        // accepted offer not yet resolved from Uber — even one our geocoder already
+        // placed, because a text-only address ("Dorfwiese 1, Kipdorf") can resolve
+        // to a plausible-but-wrong point. geo_source=uber marks it done so this
+        // runs once; a changed stop count still refreshes (live multi-stop updates).
+        $needs = $offer->geo_source !== 'uber';
         if (! $needs && ! $stopsChanged) {
             return null;
         }
@@ -848,16 +853,6 @@ class TripGeocoder
         }
 
         return $out;
-    }
-
-    /** True when our own geocode never produced a precise, routable trip. */
-    private function geoIncomplete(DispatchOffer $offer): bool
-    {
-        if ($offer->distance_m === null || $offer->pickup_lat === null || $offer->dropoff_lat === null) {
-            return true;
-        }
-
-        return in_array($offer->geo_confidence, ['approx', 'estimated', 'postal', 'area'], true);
     }
 
     /**

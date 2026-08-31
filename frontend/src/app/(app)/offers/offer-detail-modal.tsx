@@ -60,12 +60,21 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Memoize the raw-payload stop extraction so it only recomputes when the raw
-  // payload changes, not on every render (map/status/badge re-renders).
-  const stops = useMemo(
-    () => extractStops(offer?.raw).map(tidyAddr).filter(Boolean),
-    [offer?.raw],
-  );
+  // The stop list shown in the modal. Prefer the trip's corrected pickup/drop-off
+  // (they carry the completed postcode / the address reverse-geocoded from Uber's
+  // real coordinates — the same text the offers row shows), and only fall back to
+  // the raw payload for a genuine multi-stop trip's intermediate stops. This keeps
+  // the modal in sync with the row instead of showing the raw, uncorrected text.
+  const stops = useMemo(() => {
+    const raw = extractStops(offer?.raw).map(tidyAddr).filter(Boolean);
+    const pickup = tidyAddr(offer?.trip?.pickup_address ?? "") || raw[0] || "";
+    const dropoff = tidyAddr(offer?.trip?.dropoff_address ?? "") || raw[raw.length - 1] || "";
+    if (raw.length <= 2) {
+      return [pickup, dropoff].filter(Boolean);
+    }
+    // Multi-stop: corrected pickup + the raw intermediate stops + corrected drop-off.
+    return [pickup, ...raw.slice(1, -1), dropoff].filter(Boolean);
+  }, [offer?.raw, offer?.trip?.pickup_address, offer?.trip?.dropoff_address]);
 
   return (
     <div
