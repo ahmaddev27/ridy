@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Download, RefreshCw, Loader2 } from "lucide-
 import { Card } from "@/components/ui/card";
 import { Badge, type Status } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
 import type { CodeFilters, CodeRow, CodeStatus, CodesPage } from "@/lib/api/reseller";
@@ -120,14 +121,15 @@ export function CodesLedger({ fetchCodes, exportCodes, showCollector = false, on
             <option value="expired">{c("st_expired")}</option>
           </select>
         </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-ink-muted">{c("from")}</span>
-          <input type="date" value={from} onChange={(e) => onFilterChange(setFrom)(e.target.value)} className="rounded-lg border border-line px-3 py-2 text-sm text-ink-muted outline-none focus:border-ink" />
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-ink-muted">{c("to")}</span>
-          <input type="date" value={to} onChange={(e) => onFilterChange(setTo)(e.target.value)} className="rounded-lg border border-line px-3 py-2 text-sm text-ink-muted outline-none focus:border-ink" />
-        </label>
+        <DateRangeFilter
+          from={from}
+          to={to}
+          onChange={(f, t2) => {
+            setPage(1);
+            setFrom(f);
+            setTo(t2);
+          }}
+        />
         <Button variant="ghost" onClick={resetFilters} className="text-sm">{c("clearFilters")}</Button>
         {exportCodes && (
           <Button variant="secondary" onClick={doExport} className="ms-auto text-sm">

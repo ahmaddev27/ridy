@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { PasswordInput } from "@/components/ui/password-input";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { useI18n } from "@/lib/i18n/context";
 import {
   getCompany,
@@ -797,7 +798,6 @@ function CompanyNetworkTab({ id }: { id: number }) {
   const [kind, setKind] = useState("");
   const [from, setFrom] = useState(""); // YYYY-MM-DD (inclusive day)
   const [to, setTo] = useState(""); // YYYY-MM-DD (inclusive day)
-  const [preset, setPreset] = useState<"today" | "yesterday" | "week" | "month" | null>(null);
   const [open, setOpen] = useState<Set<number>>(() => new Set());
   const toggle = (rid: number) =>
     setOpen((s) => {
@@ -875,37 +875,10 @@ function CompanyNetworkTab({ id }: { id: number }) {
     };
   }, [id, page, kind, fromBound, toBound]);
 
-  // Editing a date input clears the active preset and resets to page 1.
-  const setRange = (which: "from" | "to", v: string) => {
-    (which === "from" ? setFrom : setTo)(v);
-    setPreset(null);
-    setPage(1);
-  };
-
-  // Quick ranges mirror the Offers page: local YYYY-MM-DD bounds, no time zone drift.
-  const ymd = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const applyPreset = (p: "today" | "yesterday" | "week" | "month") => {
-    const now = new Date();
-    const end = new Date(now);
-    const start = new Date(now);
-    if (p === "yesterday") {
-      start.setDate(now.getDate() - 1);
-      end.setDate(now.getDate() - 1);
-    } else if (p === "week") {
-      start.setDate(now.getDate() - 6);
-    } else if (p === "month") {
-      start.setDate(now.getDate() - 29);
-    }
-    setFrom(ymd(start));
-    setTo(ymd(end));
-    setPreset(p);
-    setPage(1);
-  };
-  const clearDates = () => {
-    setFrom("");
-    setTo("");
-    setPreset(null);
+  // Any date change resets to page 1 so the paginator stays valid.
+  const onDateChange = (f: string, t2: string) => {
+    setFrom(f);
+    setTo(t2);
     setPage(1);
   };
 
@@ -931,42 +904,7 @@ function CompanyNetworkTab({ id }: { id: number }) {
         ))}
 
         <div className="ms-auto flex flex-wrap items-center gap-2 text-xs text-ink-muted">
-          {/* Quick ranges — same look as the Offers page filter. */}
-          <div className="flex items-center gap-1 rounded-lg border border-line bg-surface p-1">
-            {(["today", "yesterday", "week", "month"] as const).map((p) => (
-              <button
-                key={p}
-                onClick={() => applyPreset(p)}
-                className={`rounded-md px-3 py-1 font-medium transition-colors ${
-                  preset === p
-                    ? "bg-primary text-primary-ink"
-                    : "text-ink-muted hover:bg-surface-2 hover:text-ink"
-                }`}
-              >
-                {c(p === "today" ? "presetToday" : p === "yesterday" ? "presetYesterday" : p === "week" ? "presetWeek" : "presetMonth")}
-              </button>
-            ))}
-          </div>
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setRange("from", e.target.value)}
-            title={c("dateRange")}
-            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line"
-          />
-          <span className="text-ink-subtle">–</span>
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setRange("to", e.target.value)}
-            title={c("dateRange")}
-            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line"
-          />
-          {(from || to) && (
-            <button onClick={clearDates} className="rounded-full px-2 py-1 font-medium text-primary hover:underline">
-              {c("clear")}
-            </button>
-          )}
+          <DateRangeFilter from={from} to={to} onChange={onDateChange} />
           {rows.length > 0 && (
             <button
               onClick={copyAll}
