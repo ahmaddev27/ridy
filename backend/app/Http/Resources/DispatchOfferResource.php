@@ -51,6 +51,10 @@ class DispatchOfferResource extends JsonResource
             // Number of drop-offs once resolved from Uber's live map (>= 2 = multi-
             // stop). Lets the offers list badge a multi-stop trip without the detail.
             'stops_count' => $this->stops_count,
+            // Ordered stops (pickup first, then each drop-off), each with its address
+            // and the road distance from the previous stop — so the driver app can
+            // list a multi-stop trip's drop-offs with per-leg km. Null until resolved.
+            'stops' => is_array($this->stops) ? $this->stops : null,
             'accept_window_seconds' => $this->accept_window_seconds,
             'received_at' => $this->received_at?->toIso8601String(),
         ];

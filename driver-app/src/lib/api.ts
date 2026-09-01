@@ -23,6 +23,10 @@ export type Offer = {
   fare_formatted: string | null;
   fare_amount: number | null;
   distance_m: number | null;
+  /** Number of drop-offs once resolved from Uber's map (>= 2 = multi-stop). */
+  stops_count?: number | null;
+  /** Ordered stops (pickup first, then each drop-off) with per-leg road distance. */
+  stops?: { address: string | null; leg_m: number | null; cumulative_m?: number | null }[] | null;
   accept_window_seconds: number | null;
   trip_duration_seconds?: number | null;
   received_at: string | null;

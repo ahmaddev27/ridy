@@ -367,18 +367,65 @@ export function Metric({ label, value, unit }: { label: string; value: string; u
 }
 
 /** Route block: hollow-circle pickup → dotted line → green-square dropoff. */
+/** One stop in a multi-stop route: its address and the road km from the previous stop. */
+export type RouteStop = { address: string; legKm: number | null };
+
 export function RouteBlock({
   pickup,
   dropoff,
   pickupLabel,
   dropoffLabel,
+  stops,
 }: {
   pickup: string;
   dropoff: string;
   pickupLabel?: string;
   dropoffLabel?: string;
+  // When a trip has more than one drop-off, pass the ordered stops (pickup first)
+  // to render each with a numbered node and its per-leg km; else pickup → drop-off.
+  stops?: RouteStop[];
 }) {
   const c = useColors();
+
+  // Multi-stop: pickup + intermediate drop-offs + final drop-off, each on the rail.
+  if (stops && stops.length > 2) {
+    const row = isRTL() ? "row-reverse" : "row";
+    return (
+      <View>
+        {stops.map((s, i) => {
+          const isFirst = i === 0;
+          const isLast = i === stops.length - 1;
+          const mid = !isFirst && !isLast ? i : null; // 1-based drop-off number
+          return (
+            <View key={i} style={{ flexDirection: row, gap: 14 }}>
+              {/* rail: node + dotted connector to the next stop */}
+              <View style={{ alignItems: "center", width: 20 }}>
+                {isFirst ? (
+                  <View style={{ width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderColor: c.inkMuted, marginTop: 3 }} />
+                ) : isLast ? (
+                  <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: c.accent, marginTop: 3 }} />
+                ) : (
+                  <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: c.pending, alignItems: "center", justifyContent: "center", marginTop: 1 }}>
+                    <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>{mid}</Text>
+                  </View>
+                )}
+                {!isLast && <View style={{ flex: 1, width: 2, marginVertical: 3, borderLeftWidth: 2, borderStyle: "dotted", borderColor: c.inkSubtle }} />}
+              </View>
+              <View style={{ flex: 1, paddingBottom: isLast ? 0 : 14 }}>
+                <Text style={{ color: c.ink, fontSize: 16, textAlign: align() }}>{s.address}</Text>
+                {!isFirst && s.legKm != null && (
+                  <Text style={{ color: c.inkSubtle, fontSize: 12, marginTop: 2, writingDirection: "ltr", textAlign: align() }}>
+                    +{s.legKm.toFixed(1)} km
+                  </Text>
+                )}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    );
+  }
+
   return (
     <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", gap: 14 }}>
       {/* rail */}

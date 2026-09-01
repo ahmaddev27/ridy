@@ -3,7 +3,7 @@ import { View, Pressable, ActivityIndicator, Linking, ScrollView } from "react-n
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, ChevronRight, User, UserCircle, Map, type LucideIcon } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, User, UserCircle, Map, Route, type LucideIcon } from "lucide-react-native";
 import Svg, { Circle } from "react-native-svg";
 import { api, type Offer } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -230,13 +230,26 @@ export default function OfferScreen() {
             </View>
           )}
 
-          {/* Route card */}
-          <View style={{ ...cardStyle(c), padding: 18 }}>
+          {/* Route card — a multi-stop trip lists every drop-off with its per-leg km. */}
+          <View style={{ ...cardStyle(c), padding: 18, gap: 12 }}>
+            {(offer.stops_count ?? 0) >= 2 && (
+              <View style={{ flexDirection: row, alignItems: "center", gap: 6 }}>
+                <Route size={15} color={c.pending} />
+                <Text style={{ color: c.pending, fontSize: 13, fontWeight: "700" }}>
+                  {t("offer.multiStop")} · {offer.stops_count} {t("offer.dropoffs")}
+                </Text>
+              </View>
+            )}
             <RouteBlock
               pickup={cleanAddress(offer.pickup_address)}
               dropoff={cleanAddress(offer.dropoff_address)}
               pickupLabel={t("offer.abholung")}
               dropoffLabel={t("offer.ziel")}
+              stops={
+                offer.stops && offer.stops.length > 2
+                  ? offer.stops.map((s) => ({ address: cleanAddress(s.address ?? ""), legKm: s.leg_m != null ? s.leg_m / 1000 : null }))
+                  : undefined
+              }
             />
           </View>
 
