@@ -60,8 +60,10 @@ export const config = {
     .map((p) => p.trim())
     .filter(Boolean),
 
-  // Uber supplier host — the driver roster (/api/getDrivers) lives here.
-  uberSupplierBase: (process.env.UBER_SUPPLIER_BASE_URL || "https://supplier.uber.com").replace(/\/$/, ""),
+  // Uber Fleet Hub host — the driver roster (/api/getDrivers) + live status live here.
+  // Uber renamed supplier.uber.com → fleethub.uber.com (Sep 2026); the old host's
+  // session no longer resolves, so default to the new one.
+  uberSupplierBase: (process.env.UBER_SUPPLIER_BASE_URL || "https://fleethub.uber.com").replace(/\/$/, ""),
 
   // Residential proxy that all Uber traffic is routed through. Uber blocks our
   // datacenter IP (RAMEN 404s, getDrivers returns 0), so a residential exit is
