@@ -45,8 +45,14 @@ class LogDriverAuthContext
         $bearer = $request->bearerToken();
         $pat = $bearer !== null && $bearer !== '' ? PersonalAccessToken::findToken($bearer) : null;
 
+        // No token at all is an ordinary anonymous hit (app not signed in, or a poll
+        // firing during logout) — not a server error, so don't flood the log with it.
+        // The diagnostic only cares about a token that WAS sent yet rejected.
+        if ($bearer === null || $bearer === '') {
+            return;
+        }
+
         $state = match (true) {
-            $bearer === null || $bearer === '' => 'no_bearer',
             $pat === null => 'token_not_found',
             $pat->tokenable === null => 'orphan_driver_deleted',
             default => 'resolves_ok_but_guard_rejected',
