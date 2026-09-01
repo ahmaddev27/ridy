@@ -463,7 +463,12 @@ class TripGeocoder
         if ($coords === null && $plz === null) {
             $params = $base + ['q' => $address];
             if ($useBias) {
-                $d = 0.45; // ~50 km half-box; bounded=1 keeps the result inside it
+                // ~22 km half-box, bounded — a dispatch pickup→drop-off is local, so
+                // keeping the ambiguous end near the bias point (the driver, then the
+                // resolved pickup) stops the same street name from resolving to a
+                // town 50 km away and inflating the distance (e.g. a 6-min trip that
+                // came out as 52 km). A wide box was the cause of those bad routes.
+                $d = 0.2;
                 $params['viewbox'] = ($biasLng - $d).','.($biasLat - $d).','.($biasLng + $d).','.($biasLat + $d);
                 $params['bounded'] = 1;
             }
