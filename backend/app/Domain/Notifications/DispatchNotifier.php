@@ -164,11 +164,15 @@ class DispatchNotifier
         // Live nudge to the open app so it re-fetches the offer with the new stops.
         rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->id, 'multistop')), report: false);
 
-        // "⚑N" flags the extra stops without any translated word; the numbers line
-        // and metrics stay identical to the offer push the app already renders.
-        $title = trim($this->buildNumbers($offer).' ⚑'.$stopsCount);
+        // Lead the title with a bold, language-neutral multi-stop mark ("📍×N") so
+        // the driver spots the extra drop-offs at a glance — the pin-with-count reads
+        // the same in every language, unlike the subtle "⚑" that trailed before.
+        $mark = '📍×'.$stopsCount;
+        $title = trim($mark.' · '.$this->buildNumbers($offer));
+        // Body opens with the same mark, then the addresses + metrics, so the alert
+        // still signals multi-stop even when only the body is visible (lock screen).
         $metrics = $this->buildMetrics($offer);
-        $body = trim($this->buildBody($offer).($metrics !== '' ? "\n".$metrics : ''));
+        $body = trim($mark.'  '.$this->buildBody($offer).($metrics !== '' ? "\n".$metrics : ''));
 
         $data = [
             'categoryId' => 'offer',
