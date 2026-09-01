@@ -24,6 +24,12 @@ class TripGeocoder
 
     private const UA = 'Reidey/1.0 (fleet dispatch; contact: ops@reidey.de)';
 
+    /** Per-call HTTP timeout (seconds); tightened for the bounded pre-notify run. */
+    private int $httpTimeout = 6;
+
+    /** Wall-clock deadline for a bounded run (microtime), or null when unbounded. */
+    private ?float $deadline = null;
+
     /**
      * Nominatim + OSRM are our OWN containers on the internal Docker network.
      * Empty the proxy on these calls so they are NOT sent through the residential
@@ -57,6 +63,31 @@ class TripGeocoder
      * geo_synced_at null so a later call — or the backfill command — retries,
      * only giving up after {@see MAX_ATTEMPTS}.
      */
+    /**
+     * A bounded, synchronous enrich meant to run just BEFORE the offer push, so the
+     * notification can already carry the distance + €-per-km. The fleet works a fixed
+     * area, so its recurring streets are cache-warm and resolve instantly (DB only);
+     * a cold address that would eat the ~5-second accept window trips the deadline and
+     * is left to the async GeocodeOffer job to fill in a moment later. Never throws.
+     */
+    public function enrichForNotify(DispatchOffer $offer): DispatchOffer
+    {
+        $this->httpTimeout = 2;
+        $this->deadline = microtime(true) + 2.5;
+        try {
+            return $this->enrich($offer);
+        } finally {
+            $this->httpTimeout = 6;
+            $this->deadline = null;
+        }
+    }
+
+    /** True once a bounded run has spent its time budget — stop making network calls. */
+    private function pastDeadline(): bool
+    {
+        return $this->deadline !== null && microtime(true) >= $this->deadline;
+    }
+
     public function enrich(DispatchOffer $offer): DispatchOffer
     {
         if ($offer->geo_synced_at !== null) {
@@ -623,10 +654,16 @@ class TripGeocoder
      */
     private function queryNominatim(array $params): array
     {
+        // Out of the bounded pre-notify budget → treat as transient (abort without
+        // caching) so the async job resolves it later instead of blocking the push.
+        if ($this->pastDeadline()) {
+            return ['transient' => true, 'hit' => null];
+        }
+
         try {
             $res = Http::withOptions(self::NO_PROXY)
                 ->withHeaders(['User-Agent' => self::UA])
-                ->timeout(6)
+                ->timeout($this->httpTimeout)
                 ->get($this->nominatimUrl(), $params);
         } catch (\Throwable $e) {
             return ['transient' => true, 'hit' => null];
@@ -768,9 +805,15 @@ class TripGeocoder
      */
     private function route(array $from, array $to): array
     {
+        // Past the bounded budget → skip OSRM, use the instant haversine estimate so
+        // the push still carries a distance (the async job upgrades it to a road route).
+        if ($this->pastDeadline()) {
+            return ['distance_m' => $this->haversine($from, $to), 'geometry' => null];
+        }
+
         try {
             $path = "{$from['lng']},{$from['lat']};{$to['lng']},{$to['lat']}";
-            $res = Http::withOptions(self::NO_PROXY)->timeout(6)->get($this->osrmUrl().'/'.$path, [
+            $res = Http::withOptions(self::NO_PROXY)->timeout($this->httpTimeout)->get($this->osrmUrl().'/'.$path, [
                 'overview' => 'full',
                 'geometries' => 'geojson',
             ]);

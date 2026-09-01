@@ -25,6 +25,7 @@ class DispatchOfferIngestor
         private TenantContext $context,
         private DispatchNotifier $notifier,
         private OfferLifecycle $lifecycle,
+        private TripGeocoder $geocoder,
     ) {}
 
     /**
@@ -115,10 +116,13 @@ class DispatchOfferIngestor
         // accept window makes this notification time-sensitive — but a push failure
         // must never lose the offer.
         if ($driver !== null) {
-            // Push FIRST — the 5-second accept window makes this time-sensitive, so
-            // it must never wait on external geocoding (Nominatim/OSRM, multi-second
-            // timeouts). The distance + €/km fill in on the dashboard once the queued
-            // GeocodeOffer job resolves; the push simply goes out without them.
+            // Geocode BEFORE the push, but time-boxed (~2.5s): the notification's
+            // whole value is the distance + €/km, and the fleet's recurring streets
+            // are cache-warm so they resolve instantly. A cold address that would eat
+            // the 5-second accept window trips the deadline and is left to the async
+            // GeocodeOffer job below — the push still goes out, just without metrics.
+            rescue(fn () => $this->geocoder->enrichForNotify($record), report: false);
+
             try {
                 $sent = $this->notifier->notify($record);
                 RidyLog::event('dispatch_offer.notified', [
