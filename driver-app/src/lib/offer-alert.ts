@@ -1,6 +1,7 @@
+import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { Vibration } from "react-native";
-import { playOfferSound } from "./sound";
+import { cleanAddress, fareLabel } from "./format";
 import type { Offer } from "./api";
 
 /**
@@ -8,11 +9,13 @@ import type { Offer } from "./api";
  *
  * The OS push chimes only in the background; in the foreground a fresh offer surfaces
  * silently via the real-time socket (Reverb) / the poll, so the driver can miss it.
- * This plays a chime (directly, via expo-audio — reliable even on silent) plus a short
- * vibration, gated on the driver's notification / sound / haptic prefs.
+ * This presents a local notification — a banner (fare · destination) the foreground
+ * handler renders WITH the system sound — plus a vibration, gated on the driver's
+ * notification / sound / haptic prefs. Uses expo-notifications (already in the build)
+ * so it ships over-the-air, no native rebuild.
  *
- * Deduped per offer id, and only offers that ARRIVED after the app opened chime — so
- * the offers already on screen at launch stay quiet. Works from any screen (home or
+ * Deduped per offer id, and only offers that ARRIVED after the app opened alert — so
+ * the offers already on screen at launch stay quiet. Works from any screen (home and
  * the offers feed both call it on a socket/poll refresh).
  */
 
@@ -31,14 +34,14 @@ async function prefOn(key: string): Promise<boolean> {
 }
 
 /** Mark an offer as already alerted (e.g. a foreground OS push handled it), so the
- *  socket/poll refresh that follows doesn't chime for it a second time. */
+ *  socket/poll refresh that follows doesn't alert for it a second time. */
 export function markAlerted(id: number | null | undefined): void {
   if (typeof id === "number" && Number.isFinite(id)) seen.add(id);
 }
 
 /**
- * Chime + vibrate for a genuinely new pending offer. No-op for a non-pending offer,
- * one already alerted, or one that arrived before the app opened.
+ * Banner + sound + vibrate for a genuinely new pending offer. No-op for a non-pending
+ * offer, one already alerted, or one that arrived before the app opened.
  */
 export async function alertOffer(offer: Offer | null | undefined): Promise<void> {
   if (!offer || offer.status !== "pending" || seen.has(offer.id)) return;
@@ -49,6 +52,21 @@ export async function alertOffer(offer: Offer | null | undefined): Promise<void>
   seen.add(offer.id);
 
   if (!(await prefOn("pref.notifications"))) return;
-  if (await prefOn("pref.sound")) playOfferSound();
-  if (await prefOn("pref.haptic")) Vibration.vibrate(400);
+
+  if (await prefOn("pref.haptic")) {
+    Vibration.vibrate(400);
+  }
+
+  const sound = await prefOn("pref.sound");
+  const dropoff = cleanAddress(offer.dropoff_address);
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      // Word-free, data-driven — mirrors the backend push (fare · destination).
+      title: `${fareLabel(offer.fare_formatted, offer.fare_amount)}${dropoff ? ` · ${dropoff}` : ""}`,
+      body: cleanAddress(offer.pickup_address),
+      sound: sound ? "default" : undefined,
+      data: { offer_id: String(offer.id) },
+    },
+    trigger: null,
+  }).catch(() => {});
 }
