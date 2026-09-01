@@ -7,6 +7,7 @@ import * as Notifications from "expo-notifications";
 import { UserCircle, Map as MapIcon } from "lucide-react-native";
 import { api, type HomeData, type FleetHomeData, type Offer } from "@/lib/api";
 import { connectDriverRealtime } from "@/lib/realtime";
+import { alertOffer, baselineOffers, isBaselined, markAlerted } from "@/lib/offer-alert";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { openRouteInMaps } from "@/lib/maps";
@@ -28,8 +29,17 @@ export default function HomeScreen() {
   const load = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
     try {
-      if (isOwner) setFleet((await api.fleetHome()).data);
-      else setData((await api.home()).data);
+      if (isOwner) {
+        setFleet((await api.fleetHome()).data);
+      } else {
+        const home = (await api.home()).data;
+        setData(home);
+        // Chime/vibrate when a NEW offer arrives while the app is open (the OS push
+        // stays silent in the foreground). The first load only establishes a
+        // baseline so an offer already on screen doesn't chime.
+        if (isBaselined()) void alertOffer(home.active_offer);
+        else baselineOffers([home.active_offer?.id]);
+      }
     } catch {
       /* keep last */
     } finally {
@@ -46,7 +56,12 @@ export default function HomeScreen() {
       const iv = setInterval(() => load(true), 4000);
       // Refresh the instant a dispatch push lands, so a new offer / status change
       // shows immediately rather than waiting for the next poll tick.
-      const sub = Notifications.addNotificationReceivedListener(() => load(true));
+      // A foreground OS push already chimes on its own — record its offer so the
+      // poll/realtime reload that follows doesn't double-chime it.
+      const sub = Notifications.addNotificationReceivedListener((n) => {
+        markAlerted(Number(n.request.content.data?.offer_id));
+        load(true);
+      });
       // Real-time (WebSocket): a driver's channel pushes offer changes instantly;
       // the 4s poll stays as the safety net. Owners use the User token, not a
       // driver channel, so they rely on the poll.
