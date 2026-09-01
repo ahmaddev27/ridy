@@ -128,7 +128,15 @@ jobs:
             # deploy does NOT restart it — its live Uber streams keep running and
             # only blip when the daemon's own code/config actually changed. mysql
             # is likewise left running (no needless DB restart).
-            $COMPOSE up -d --build --force-recreate backend caddy frontend scheduler queue reverb
+            # --renew-anon-volumes: the app services mount an ANONYMOUS volume at
+            # /var/www/vendor (to keep the ./backend bind-mount from hiding the image's
+            # vendor). Docker populates that volume from the image ONLY on first
+            # creation and then reuses it — so a freshly built image with a NEW
+            # dependency (e.g. laravel/reverb) was shadowed by the stale vendor volume,
+            # crash-looping queue/scheduler with "ReverbServiceProvider not found" on
+            # every deploy. Renewing the anon volumes refreshes vendor from the new
+            # image each deploy. (Named volumes like the DB are untouched.)
+            $COMPOSE up -d --build --force-recreate --renew-anon-volumes backend caddy frontend scheduler queue reverb
             # Daemon: recreate only if its image/config changed (streams stay up otherwise).
             $COMPOSE up -d --build dispatch-daemon
 
