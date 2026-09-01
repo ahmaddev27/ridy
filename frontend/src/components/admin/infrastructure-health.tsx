@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Database, ListChecks, Clock, Radio, MapPin, Route, RefreshCw, Loader2, RotateCcw, Trash2, AlertTriangle, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getInfrastructureHealth, getFailedJobs, retryFailedJobs, clearFailedJobs, clearPendingJobs, type InfraStatus, type QueueFailures } from "@/lib/api/admin";
@@ -45,6 +46,14 @@ export function InfrastructureHealth() {
   const { data, loading, error, refetch } = useAsync(getInfrastructureHealth, { refetchInterval: 30000 });
   const [failures, setFailures] = useState<QueueFailures | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmKind, setConfirmKind] = useState<null | "flush" | "clearPending">(null);
+
+  // Destructive queue actions confirm through the styled dialog (like the delete
+  // confirms elsewhere), never the browser's native confirm().
+  const CONFIRMS = {
+    flush: { fn: clearFailedJobs, doneKey: "clearedFailed", titleKey: "clearFailed", messageKey: "confirmClearFailed" },
+    clearPending: { fn: clearPendingJobs, doneKey: "clearedPending", titleKey: "clearPending", messageKey: "confirmClearPending" },
+  } as const;
 
   const loadFailures = useCallback(async () => {
     try {
@@ -58,8 +67,7 @@ export function InfrastructureHealth() {
     loadFailures();
   }, [loadFailures]);
 
-  const act = async (fn: () => Promise<number>, confirmKey: string | null, doneKey: string) => {
-    if (confirmKey && !confirm(c(confirmKey))) return;
+  const act = async (fn: () => Promise<number>, doneKey: string) => {
     setBusy(true);
     try {
       const n = await fn();
@@ -70,6 +78,13 @@ export function InfrastructureHealth() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const runConfirm = async () => {
+    if (!confirmKind) return;
+    const cfg = CONFIRMS[confirmKind];
+    await act(cfg.fn, cfg.doneKey);
+    setConfirmKind(null);
   };
 
   const failedCount = data?.queue.failed ?? failures?.total ?? 0;
@@ -148,20 +163,20 @@ export function InfrastructureHealth() {
             <ActionButton
               icon={RotateCcw}
               label={`${c("retryFailed")}${failedCount > 0 ? ` (${failedCount.toLocaleString()})` : ""}`}
-              onClick={() => act(retryFailedJobs, null, "retryDone")}
+              onClick={() => act(retryFailedJobs, "retryDone")}
               disabled={busy || failedCount === 0}
             />
             <ActionButton
               icon={Trash2}
               label={c("clearFailed")}
-              onClick={() => act(clearFailedJobs, "confirmClearFailed", "clearedFailed")}
+              onClick={() => setConfirmKind("flush")}
               disabled={busy || failedCount === 0}
               danger
             />
             <ActionButton
               icon={Trash2}
               label={c("clearPending")}
-              onClick={() => act(clearPendingJobs, "confirmClearPending", "clearedPending")}
+              onClick={() => setConfirmKind("clearPending")}
               disabled={busy || pendingCount === 0}
               danger
             />
@@ -196,6 +211,18 @@ export function InfrastructureHealth() {
           )}
         </>
       )}
+
+      <ConfirmModal
+        open={confirmKind !== null}
+        title={confirmKind ? c(CONFIRMS[confirmKind].titleKey) : ""}
+        message={confirmKind ? c(CONFIRMS[confirmKind].messageKey) : ""}
+        confirmLabel={c("confirm")}
+        cancelLabel={c("cancel")}
+        onConfirm={runConfirm}
+        onCancel={() => { if (!busy) setConfirmKind(null); }}
+        busy={busy}
+        danger
+      />
     </Card>
   );
 }
