@@ -1,12 +1,13 @@
 "use client";
 
-import { Database, ListChecks, Clock, Radio, MapPin, Route, RefreshCw, Loader2, type LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Database, ListChecks, Clock, Radio, MapPin, Route, RefreshCw, Loader2, RotateCcw, Trash2, AlertTriangle, type LucideIcon } from "lucide-react";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { getInfrastructureHealth, type InfraStatus } from "@/lib/api/admin";
+import { getInfrastructureHealth, getFailedJobs, retryFailedJobs, clearFailedJobs, clearPendingJobs, type InfraStatus, type QueueFailures } from "@/lib/api/admin";
 
-/** Icon per known service key (falls back to a generic node). */
 const SERVICE_ICON: Record<string, LucideIcon> = {
   database: Database,
   queue: ListChecks,
@@ -16,7 +17,6 @@ const SERVICE_ICON: Record<string, LucideIcon> = {
   osrm: Route,
 };
 
-/** status → dot + text colour (calm green / amber / red). */
 const STATUS_TONE: Record<InfraStatus, { dot: string; text: string }> = {
   ok: { dot: "bg-emerald-500", text: "text-emerald-600" },
   warn: { dot: "bg-amber-500", text: "text-amber-600" },
@@ -34,14 +34,46 @@ function ageLabel(seconds: number | null | undefined): string {
 
 /**
  * Super-admin "System services" panel: live health of the queue, scheduler and the
- * external service containers (Reverb, Nominatim, OSRM). Polls every 30s (each probe
- * is time-boxed on the server) so a crash-looping worker or a stalled queue surfaces
- * on its own — the exact failure that used to leave offers ungeocoded.
+ * external service containers (Reverb, Nominatim, OSRM), plus hands-on queue recovery
+ * — retry or clear failed jobs and clear the pending backlog, with the dominant
+ * failure and recent errors surfaced so a stalled queue is diagnosable and fixable
+ * from the dashboard.
  */
 export function InfrastructureHealth() {
   const { t } = useI18n();
   const c = (k: string) => t(`screens.systemHealth.${k}`);
   const { data, loading, error, refetch } = useAsync(getInfrastructureHealth, { refetchInterval: 30000 });
+  const [failures, setFailures] = useState<QueueFailures | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const loadFailures = useCallback(async () => {
+    try {
+      setFailures(await getFailedJobs());
+    } catch {
+      /* keep last */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFailures();
+  }, [loadFailures]);
+
+  const act = async (fn: () => Promise<number>, confirmKey: string | null, doneKey: string) => {
+    if (confirmKey && !confirm(c(confirmKey))) return;
+    setBusy(true);
+    try {
+      const n = await fn();
+      toast.success(c(doneKey).replace("{n}", n.toLocaleString()));
+      await Promise.all([refetch(), loadFailures()]);
+    } catch {
+      toast.error(c("actionFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const failedCount = data?.queue.failed ?? failures?.total ?? 0;
+  const pendingCount = data?.queue.pending ?? failures?.pending ?? 0;
 
   return (
     <Card className="space-y-4 p-4">
@@ -51,7 +83,7 @@ export function InfrastructureHealth() {
           <p className="mt-0.5 text-xs text-ink-subtle">{c("infraHint")}</p>
         </div>
         <button
-          onClick={() => refetch()}
+          onClick={() => { refetch(); loadFailures(); }}
           disabled={loading}
           className="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-50"
         >
@@ -94,8 +126,8 @@ export function InfrastructureHealth() {
                 <span className="text-xs font-semibold uppercase tracking-wide">{c("svc_queue")}</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
-                <Stat label={c("queuePending")} value={data.queue.pending.toLocaleString()} />
-                <Stat label={c("queueFailed")} value={data.queue.failed.toLocaleString()} danger={data.queue.failed > 0} />
+                <Stat label={c("queuePending")} value={pendingCount.toLocaleString()} />
+                <Stat label={c("queueFailed")} value={failedCount.toLocaleString()} danger={failedCount > 0} />
                 <Stat label={c("queueOldest")} value={ageLabel(data.queue.oldest_pending_seconds)} />
               </div>
             </div>
@@ -109,9 +141,80 @@ export function InfrastructureHealth() {
               </div>
             </div>
           </div>
+
+          {/* Queue recovery actions */}
+          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
+            <span className="me-1 text-xs font-semibold uppercase tracking-wide text-ink-subtle">{c("queueActions")}</span>
+            <ActionButton
+              icon={RotateCcw}
+              label={`${c("retryFailed")}${failedCount > 0 ? ` (${failedCount.toLocaleString()})` : ""}`}
+              onClick={() => act(retryFailedJobs, null, "retryDone")}
+              disabled={busy || failedCount === 0}
+            />
+            <ActionButton
+              icon={Trash2}
+              label={c("clearFailed")}
+              onClick={() => act(clearFailedJobs, "confirmClearFailed", "clearedFailed")}
+              disabled={busy || failedCount === 0}
+              danger
+            />
+            <ActionButton
+              icon={Trash2}
+              label={c("clearPending")}
+              onClick={() => act(clearPendingJobs, "confirmClearPending", "clearedPending")}
+              disabled={busy || pendingCount === 0}
+              danger
+            />
+          </div>
+
+          {/* Failure breakdown + recent errors */}
+          {failures && failures.total > 0 && (
+            <div className="space-y-3">
+              {failures.by_name.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {failures.by_name.map((f) => (
+                    <span key={f.name} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                      <span className="font-medium text-ink">{f.name}</span>
+                      <span className="tabular-nums text-ink-subtle">{f.count}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-line bg-surface p-3">
+                {failures.jobs.map((j) => (
+                  <div key={j.id} className="text-xs">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-semibold text-ink">{j.name}</span>
+                      <span className="shrink-0 text-ink-subtle" dir="ltr">{new Date(j.failed_at).toLocaleString()}</span>
+                    </div>
+                    <p className="mt-0.5 break-words text-danger-fg" dir="ltr">{j.exception}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </Card>
+  );
+}
+
+function ActionButton({ icon: Icon, label, onClick, disabled, danger }: { icon: LucideIcon; label: string; onClick: () => void; disabled?: boolean; danger?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={
+        "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition disabled:opacity-40 " +
+        (danger
+          ? "border-line text-danger-fg hover:bg-danger-bg"
+          : "border-line text-ink-muted hover:bg-surface-2 hover:text-ink")
+      }
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+    </button>
   );
 }
 

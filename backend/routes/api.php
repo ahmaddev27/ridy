@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\Admin\OrphanDriverController;
 use App\Http\Controllers\Api\V1\Admin\OverviewController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\ProxyController;
+use App\Http\Controllers\Api\V1\Admin\QueueAdminController;
 use App\Http\Controllers\Api\V1\Admin\SettingsController;
 use App\Http\Controllers\Api\V1\Admin\ShardController;
 use App\Http\Controllers\Api\V1\Admin\SubscriptionController;
@@ -295,6 +296,10 @@ Route::prefix('v1')->group(function () {
         Route::get('system-health', SystemHealthController::class);
         Route::get('system-metrics', SystemMetricsController::class);
         Route::get('infrastructure', InfrastructureHealthController::class);
+        Route::get('queue/failed', [QueueAdminController::class, 'failed']);
+        Route::post('queue/retry', [QueueAdminController::class, 'retry']);
+        Route::post('queue/flush', [QueueAdminController::class, 'flush']);
+        Route::post('queue/clear-pending', [QueueAdminController::class, 'clearPending']);
         Route::delete('network-logs', [NetworkLogController::class, 'clear']);
         Route::get('settings', [SettingsController::class, 'show']);
         Route::put('settings', [SettingsController::class, 'update']);

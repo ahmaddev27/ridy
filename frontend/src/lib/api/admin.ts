@@ -196,6 +196,38 @@ export async function getInfrastructureHealth(): Promise<InfrastructureHealth> {
   return res.data;
 }
 
+export type FailedJob = { id: number; uuid: string; queue: string; name: string; exception: string; failed_at: string };
+export type QueueFailures = {
+  total: number;
+  pending: number;
+  by_name: { name: string; count: number }[];
+  jobs: FailedJob[];
+};
+
+/** Super-admin: recent failed jobs + counts, for the queue panel. */
+export async function getFailedJobs(): Promise<QueueFailures> {
+  const res = await apiFetch<{ data: QueueFailures }>("/api/v1/admin/queue/failed");
+  return res.data;
+}
+
+/** Retry every failed job (push back onto the queue). Returns how many. */
+export async function retryFailedJobs(): Promise<number> {
+  const res = await apiFetch<{ data: { retried: number } }>("/api/v1/admin/queue/retry", { method: "POST", withCsrf: true });
+  return res.data.retried;
+}
+
+/** Delete every failed job. Returns how many were removed. */
+export async function clearFailedJobs(): Promise<number> {
+  const res = await apiFetch<{ data: { cleared: number } }>("/api/v1/admin/queue/flush", { method: "POST", withCsrf: true });
+  return res.data.cleared;
+}
+
+/** Delete the pending backlog (hard reset). Returns how many were removed. */
+export async function clearPendingJobs(): Promise<number> {
+  const res = await apiFetch<{ data: { cleared: number } }>("/api/v1/admin/queue/clear-pending", { method: "POST", withCsrf: true });
+  return res.data.cleared;
+}
+
 export async function getSettings(): Promise<PlatformSettings> {
   const res = await apiFetch<{ data: PlatformSettings }>("/api/v1/admin/settings");
   return res.data;

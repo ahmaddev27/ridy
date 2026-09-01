@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, Building2, Server, Trash2, AlertTriangle } from "lucide-react";
+import { Activity, Building2, Server, Boxes, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge, type Status } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ export default function SystemHealthPage() {
   const c = (k: string) => t(`screens.systemHealth.${k}`);
   const { data, loading, error } = useAsync(getSystemHealth, { refetchInterval: 30000 });
   const rows = data ?? [];
-  const [tab, setTab] = useState<"health" | "shards">("health");
+  const [tab, setTab] = useState<"health" | "services" | "shards">("health");
 
   return (
     <div className="space-y-6">
@@ -27,6 +27,7 @@ export default function SystemHealthPage() {
       <div className="flex flex-wrap gap-1.5">
         {([
           { k: "health", icon: Activity, label: t("nav.systemHealth") },
+          { k: "services", icon: Boxes, label: c("infraTitle") },
           { k: "shards", icon: Server, label: t("nav.shards") },
         ] as const).map(({ k: tk, icon: Icon, label }) => {
           const active = tab === tk;
@@ -63,13 +64,13 @@ export default function SystemHealthPage() {
 
       {tab === "shards" ? (
         <ShardsPanel />
+      ) : tab === "services" ? (
+        <InfrastructureHealth />
       ) : (
         <>
           <PageHeader tkey="systemHealth" />
 
       <ServerResources />
-
-      <InfrastructureHealth />
 
       <Card className="overflow-hidden">
         {loading && rows.length === 0 ? (
