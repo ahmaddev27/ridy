@@ -74,13 +74,13 @@ async function readCookies() {
 }
 
 /**
- * Capture the supplier.uber.com-scoped cookie set. supplier's roster/status APIs
+ * Capture the fleethub.uber.com-scoped cookie set. supplier's roster/status APIs
  * need their own host cookies, which differ from the vsdispatch (RAMEN) set — so
  * the daemon can replay these to poll roster/status 24/7 without a browser open.
  * Kept a SEPARATE jar so it never disturbs the working RAMEN handshake.
  */
 async function readSupplierCookies() {
-  const cookies = await api.cookies.getAll({ url: "https://supplier.uber.com/" });
+  const cookies = await api.cookies.getAll({ url: "https://fleethub.uber.com/" });
   return cookies.map((c) => ({ name: c.name, value: c.value }));
 }
 
@@ -91,13 +91,13 @@ function fingerprint(orgUuid, cookies) {
 
 /**
  * Find the fleet org uuid from the manager's session without opening any page:
- * hitting supplier.uber.com while logged in redirects to /orgs/<uuid>/…, and we
+ * hitting fleethub.uber.com while logged in redirects to /orgs/<uuid>/…, and we
  * read that uuid off the final URL. Uses the manager's own IP (real browser), so
  * supplier responds (our server IP is blocked).
  */
 async function discoverOrgUuid() {
   try {
-    const res = await fetch("https://supplier.uber.com/", { credentials: "include", redirect: "follow" });
+    const res = await fetch("https://fleethub.uber.com/", { credentials: "include", redirect: "follow" });
     const m = res.url.match(/\/orgs\/([0-9a-f-]{36})/i);
     console.log("[Reidey bg] discoverOrgUuid: supplier ->", res.url, "org:", m ? m[1] : "(none)");
     return m ? m[1] : null;
@@ -223,7 +223,7 @@ async function postRoster(drivers) {
 }
 
 /**
- * Pull the roster straight from supplier.uber.com using the manager's own
+ * Pull the roster straight from fleethub.uber.com using the manager's own
  * cookies and real browser IP (Uber blocks datacenter IPs, so this is the
  * reliable path), then forward it to Reidey. Triggered on demand from the
  * dashboard — no supplier tab needs to be open.
@@ -263,7 +263,7 @@ async function fetchRoster() {
   let pageToken = "";
   try {
     for (let page = 1; page <= 100; page++) {
-      const res = await fetch("https://supplier.uber.com/api/getDrivers?localeCode=en-GB", {
+      const res = await fetch("https://fleethub.uber.com/api/getDrivers?localeCode=en-GB", {
         method: "POST",
         credentials: "include",
         headers: { accept: "*/*", "content-type": "application/json", "x-csrf-token": "x" },
@@ -330,7 +330,7 @@ async function fetchMetrics(driverUuid, from, to) {
 
   let uberData;
   try {
-    const res = await fetch("https://supplier.uber.com/api/GetEarnerMetrics?localeCode=en-GB", {
+    const res = await fetch("https://fleethub.uber.com/api/GetEarnerMetrics?localeCode=en-GB", {
       method: "POST",
       credentials: "include",
       headers: { accept: "*/*", "content-type": "application/json", "x-csrf-token": "x" },
@@ -394,7 +394,7 @@ async function fetchVehicles() {
 
   let vehicles;
   try {
-    const res = await fetch("https://supplier.uber.com/graphql", {
+    const res = await fetch("https://fleethub.uber.com/graphql", {
       method: "POST",
       credentials: "include",
       headers: { accept: "*/*", "content-type": "application/json", "x-csrf-token": "x" },
@@ -458,7 +458,7 @@ async function fetchDriverStatuses(driverUuids) {
 
   let locations;
   try {
-    const res = await fetch("https://supplier.uber.com/api/GetDriverLiveLocation?localeCode=en-GB", {
+    const res = await fetch("https://fleethub.uber.com/api/GetDriverLiveLocation?localeCode=en-GB", {
       method: "POST",
       credentials: "include",
       headers: { accept: "*/*", "content-type": "application/json", "x-csrf-token": "x" },
@@ -583,7 +583,7 @@ async function replayGraphql(operationName) {
   } catch {
     return { ok: false, reason: "bad_template" };
   }
-  const gqlUrl = /^https?:/i.test(tpl.url || "") ? tpl.url : `https://supplier.uber.com${tpl.url || "/graphql"}`;
+  const gqlUrl = /^https?:/i.test(tpl.url || "") ? tpl.url : `https://fleethub.uber.com${tpl.url || "/graphql"}`;
   try {
     const res = await fetch(gqlUrl, {
       method: "POST",
@@ -602,7 +602,7 @@ async function replayGraphql(operationName) {
 async function fetchFleetEarnings() {
   const r = await replayGraphql("getSupplierBreakdownV2");
   if (!r.ok) return r;
-  return await postCapture("supplierbreakdownv2", "https://supplier.uber.com/graphql", {
+  return await postCapture("supplierbreakdownv2", "https://fleethub.uber.com/graphql", {
     operationName: r.operationName,
     variables: r.variables,
     data: r.data,
@@ -614,7 +614,7 @@ async function fetchDriverUber() {
   const out = { ok: true };
   const eb = await replayGraphql("getEarnerBreakdownsV2");
   if (eb.ok) {
-    await postCapture("earnerbreakdownsv2", "https://supplier.uber.com/graphql", {
+    await postCapture("earnerbreakdownsv2", "https://fleethub.uber.com/graphql", {
       operationName: eb.operationName,
       variables: eb.variables,
       data: eb.data,

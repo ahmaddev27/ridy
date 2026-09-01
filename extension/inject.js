@@ -27,7 +27,9 @@
   // Only on supplier.uber.com (the Fleet dashboard) — its UI fetches with RELATIVE
   // paths ("/api/…", "/graphql"), so match the PATH, not the full host, or nothing
   // is ever captured. The RAMEN stream (vsdispatch) is handled separately above.
-  const onSupplier = /(^|\.)supplier\.uber\.com$/i.test(location.host);
+  // Uber migrated the fleet dashboard from supplier.uber.com to fleethub.uber.com
+  // (Aug 2026); support both so capture keeps working across the transition.
+  const onSupplier = /(^|\.)(supplier|fleethub)\.uber\.com$/i.test(location.host);
   // Endpoints/operationNames worth capturing — matched case-insensitively against
   // the REST path segment ("/api/<Name>") or the graphql operationName. Keeping
   // this tight is the DSGVO control: an endpoint not listed here is never teed.

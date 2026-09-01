@@ -17,12 +17,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://vsdispatch.uber.com/*", "*://supplier.uber.com/*", "*://account.uber.com/*", "*://auth.uber.com/*"],
+      "matches": ["*://vsdispatch.uber.com/*", "*://supplier.uber.com/*", "*://fleethub.uber.com/*", "*://account.uber.com/*", "*://auth.uber.com/*"],
       "js": ["content.js"],
       "run_at": "document_start"
     },
     {
-      "matches": ["*://vsdispatch.uber.com/*", "*://supplier.uber.com/*"],
+      "matches": ["*://vsdispatch.uber.com/*", "*://supplier.uber.com/*", "*://fleethub.uber.com/*"],
       "js": ["inject.js"],
       "run_at": "document_start",
       "world": "MAIN"
