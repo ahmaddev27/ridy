@@ -318,8 +318,10 @@ export class RamenStream {
       if (!this.blockedWarned) {
         this.blockedWarned = true;
         console.warn(
-          `[${this.tag()}] RAMEN 404 — server IP looks blocked by Uber; ` +
-            `offers rely on the browser extension. Set a residential proxy to stream server-side.`,
+          `[${this.tag()}] RAMEN 404 — Uber rejected this session's stream. Likely cause: ` +
+            `the company's captured Uber cookies are STALE (reconnect the company to refresh them). ` +
+            `If ALL companies 404 on the same proxy, the IP itself is blocked (needs a residential proxy). ` +
+            `Meanwhile offers for this company fall back to the browser extension.`,
         );
       }
       // NOTE: we deliberately do NOT start the supplier roster/status polls here.
