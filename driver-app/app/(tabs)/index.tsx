@@ -7,7 +7,7 @@ import * as Notifications from "expo-notifications";
 import { UserCircle, Map as MapIcon } from "lucide-react-native";
 import { api, type HomeData, type FleetHomeData, type Offer } from "@/lib/api";
 import { connectDriverRealtime } from "@/lib/realtime";
-import { alertOffer, baselineOffers, isBaselined, markAlerted } from "@/lib/offer-alert";
+import { alertOffer, markAlerted } from "@/lib/offer-alert";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { openRouteInMaps } from "@/lib/maps";
@@ -35,10 +35,9 @@ export default function HomeScreen() {
         const home = (await api.home()).data;
         setData(home);
         // Chime/vibrate when a NEW offer arrives while the app is open (the OS push
-        // stays silent in the foreground). The first load only establishes a
-        // baseline so an offer already on screen doesn't chime.
-        if (isBaselined()) void alertOffer(home.active_offer);
-        else baselineOffers([home.active_offer?.id]);
+        // stays silent in the foreground). alertOffer only fires for an offer that
+        // arrived after launch, so pre-existing offers stay quiet.
+        void alertOffer(home.active_offer);
       }
     } catch {
       /* keep last */

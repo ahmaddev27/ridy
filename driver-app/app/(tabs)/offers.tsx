@@ -13,6 +13,7 @@ import { useColors, radius, isDarkPalette } from "@/lib/theme";
 import { OfferCard } from "@/components/offer-card";
 import { FilterSheet, DEFAULT_FILTERS, type OfferFilters, type SortKey } from "@/components/filter-sheet";
 import { PeriodNavigator, periodWindow, type PeriodRange } from "@/components/period-navigator";
+import { alertOffer, markAlerted } from "@/lib/offer-alert";
 
 const PER_PAGE = 20;
 
@@ -64,6 +65,9 @@ export default function OffersScreen() {
       setTotal(res.meta?.total ?? res.data.length);
       setPage(res.meta?.current_page ?? target);
       setOffers((prev) => (target === 1 ? res.data : [...prev, ...res.data]));
+      // Chime for a new offer that arrives on the feed while the app is open (driver
+      // only). alertOffer ignores pre-existing offers and de-dupes per id.
+      if (target === 1 && !isOwner) void alertOffer(res.data.find((o) => o.status === "pending"));
     },
     [filters.status, range, offset, search, isOwner, driverId],
   );
@@ -104,7 +108,8 @@ export default function OffersScreen() {
       // Keep the app icon clean — no unread badge on this app.
       Notifications.setBadgeCountAsync(0).catch(() => { /* badge unsupported */ });
       const poll = setInterval(() => { if (atTopRef.current) silentReload(); }, 5000);
-      const sub = Notifications.addNotificationReceivedListener(() => {
+      const sub = Notifications.addNotificationReceivedListener((n) => {
+        markAlerted(Number(n.request.content.data?.offer_id));
         if (atTopRef.current) silentReload();
       });
       // Real-time: the driver's channel reloads the feed instantly on an offer
