@@ -3,7 +3,7 @@ import { Manrope, Inter_Tight, JetBrains_Mono } from "next/font/google";
 import { GazaBanner, Navbar } from "./_components/navbar";
 import { SiteFooter } from "./_components/site-footer";
 
-const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" });
+const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", adjustFontFallback: false });
 const interTight = Inter_Tight({
   subsets: ["latin"],
   weight: ["500", "600", "700", "800"],

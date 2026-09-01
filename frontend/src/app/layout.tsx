@@ -12,7 +12,10 @@ import { SentryInit } from "@/components/sentry-init";
 const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();`;
 
 // Uber-Move-like grotesque for all Latin text + digits (Uber Move itself is licensed).
-const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" });
+// adjustFontFallback:false stops next/font from injecting a system fallback into the
+// CSS variable — that fallback (no unicode-range) otherwise swallows Arabic glyphs
+// before they can fall through to Tajawal, breaking Arabic text.
+const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", adjustFontFallback: false });
 // Arabic UI font — applied via CSS when the document is in Arabic/RTL.
 const tajawal = Tajawal({
   subsets: ["arabic"],
