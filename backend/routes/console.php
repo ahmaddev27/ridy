@@ -49,6 +49,11 @@ Schedule::command('notifications:scan')->dailyAt('08:00')->withoutOverlapping();
 // Ops alerting: broken Uber sessions / down daemon shards (emailed once each).
 Schedule::command('alerts:check')->everyFiveMinutes()->withoutOverlapping();
 
+// Detect a silently-broken Uber connection: an active company whose live driver-status
+// sync has gone stale (extension down, session rotated, or a portal migration like
+// supplier.uber.com → fleethub.uber.com). Logs it to the admin Logs tab.
+Schedule::command('fleet:check-sync')->everyFiveMinutes()->withoutOverlapping();
+
 // Nightly gzipped database backup (kept 7 days in storage/app/backups).
 Schedule::command('db:backup')->dailyAt('03:00')->withoutOverlapping();
 
