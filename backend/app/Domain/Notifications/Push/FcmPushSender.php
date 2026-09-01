@@ -39,13 +39,21 @@ class FcmPushSender implements PushSender
         }
 
         if (! $response->successful()) {
-            Log::warning('push.fcm_failed', ['status' => $response->status(), 'body' => $response->body()]);
+            $dead = $this->isDeadToken($response->status(), (string) $response->body());
 
-            // A token FCM reports as UNREGISTERED / NotRegistered is permanently
-            // dead (app uninstalled, data cleared, or the token rotated). Delete it
-            // so it stops failing on every future offer and no longer lingers as a
-            // ghost device that "still gets notifications" after a sign-out.
-            if ($this->isDeadToken($response->status(), (string) $response->body())) {
+            // Log a COMPACT single line (FCM's error body is pretty-printed multi-line
+            // JSON that floods the log) — just the status, the one-line message and the
+            // token prefix, plus whether we pruned it.
+            Log::warning('push.fcm_failed', [
+                'status' => $response->status(),
+                'error' => (string) ($response->json('error.message') ?? 'unknown'),
+                'token' => substr($deviceToken, 0, 12).'…',
+                'pruned' => $dead,
+            ]);
+
+            // A permanently-dead token would otherwise fail on every future offer and
+            // linger as a ghost device. Delete it so the noise stops.
+            if ($dead) {
                 DeviceToken::withoutGlobalScopes()->where('token', $deviceToken)->delete();
             }
         }
@@ -53,11 +61,21 @@ class FcmPushSender implements PushSender
         return $response->successful();
     }
 
-    /** FCM's permanent "this token no longer exists" verdict (404 UNREGISTERED). */
+    /**
+     * A token FCM will NEVER deliver to, so we should drop it:
+     *  - 404 UNREGISTERED / NotRegistered — existed but is gone (uninstall / rotation).
+     *  - 400 INVALID_ARGUMENT "not a valid FCM registration token" — never a real FCM
+     *    token (e.g. a raw APNs token stored by an older iOS build).
+     */
     private function isDeadToken(int $status, string $body): bool
     {
-        return $status === 404
-            && (str_contains($body, 'UNREGISTERED') || str_contains($body, 'NotRegistered'));
+        if ($status === 404 && (str_contains($body, 'UNREGISTERED') || str_contains($body, 'NotRegistered'))) {
+            return true;
+        }
+
+        return $status === 400
+            && str_contains($body, 'INVALID_ARGUMENT')
+            && str_contains($body, 'not a valid FCM registration token');
     }
 
     /**
