@@ -2,7 +2,7 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import { getMessaging, getToken, registerDeviceForRemoteMessages } from "@react-native-firebase/messaging";
+import { getAPNSToken, getMessaging, getToken, registerDeviceForRemoteMessages } from "@react-native-firebase/messaging";
 import { api } from "./api";
 import { t } from "./i18n";
 
@@ -79,6 +79,15 @@ export async function registerForPush(owner = false): Promise<string | null> {
   if (Platform.OS === "ios") {
     const fcm = getMessaging();
     await registerDeviceForRemoteMessages(fcm);
+    // iOS hands Firebase the APNs token asynchronously AFTER registration resolves;
+    // calling getToken() before it lands throws "No APNS token specified before
+    // fetching FCM Token". Poll briefly for the APNs token first, then fetch FCM.
+    let apns = await getAPNSToken(fcm);
+    for (let i = 0; i < 10 && !apns; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      apns = await getAPNSToken(fcm);
+    }
+    if (!apns) return null; // APNs never registered (entitlement/network) — retry next launch
     token = await getToken(fcm);
   } else {
     token = (await Notifications.getDevicePushTokenAsync()).data as string;
