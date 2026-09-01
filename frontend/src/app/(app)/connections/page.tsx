@@ -109,7 +109,7 @@ export default function ConnectionsPage() {
       // extension reads the fleet org straight from the URL and captures the
       // session. It then shows "connected" and closes the tab; all data pulls
       // run in the background afterwards.
-      setTimeout(() => window.open("https://supplier.uber.com/", "_blank"), 500);
+      setTimeout(() => window.open("https://fleethub.uber.com/", "_blank"), 500);
       // Start polling so the card flips to "connected" once the extension captures.
       setAwaitingLink(true);
     } catch (e) {

@@ -20,7 +20,7 @@ class UberSupplierClient
             ->map(fn ($c) => ($c['name'] ?? '').'='.($c['value'] ?? ''))
             ->implode('; ');
 
-        $base = rtrim((string) config('services.uber.supplier_base_url', 'https://supplier.uber.com'), '/');
+        $base = rtrim((string) config('services.uber.supplier_base_url', 'https://fleethub.uber.com'), '/');
 
         $response = Http::withHeaders([
             'Cookie' => $cookieHeader,

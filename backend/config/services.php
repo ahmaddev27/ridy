@@ -45,7 +45,9 @@ return [
         // Live fleet dispatch stream (RAMEN). The Node daemon connects here with a
         // captured fleet session; see docs/10-implementation-plan.md.
         'dispatch_base_url' => env('UBER_DISPATCH_BASE_URL', 'https://vsdispatch.uber.com'),
-        'supplier_base_url' => env('UBER_SUPPLIER_BASE_URL', 'https://supplier.uber.com'),
+        // Uber renamed supplier.uber.com → fleethub.uber.com (Sep 2026); roster/status
+        // now resolve on the new host. Override via UBER_SUPPLIER_BASE_URL.
+        'supplier_base_url' => env('UBER_SUPPLIER_BASE_URL', 'https://fleethub.uber.com'),
     ],
 
     // A fixed OTP/activation code for testing (any environment). Leave empty in a
