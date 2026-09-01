@@ -34,8 +34,10 @@ class CompanyController extends Controller
             ->selectRaw('tenant_id, count(*) c')->groupBy('tenant_id')->pluck('c', 'tenant_id');
         $offerCounts = DispatchOffer::withoutGlobalScopes()
             ->selectRaw('tenant_id, count(*) c')->groupBy('tenant_id')->pluck('c', 'tenant_id');
+        // Newest session per tenant (unique() keeps the first of the desc-sorted rows,
+        // so keyBy can't fall back to the oldest for a tenant with several sessions).
         $sessions = UberFleetSession::withoutGlobalScopes()
-            ->orderByDesc('updated_at')->get()->keyBy('tenant_id');
+            ->orderByDesc('updated_at')->get()->unique('tenant_id')->keyBy('tenant_id');
 
         // Tenants with at least one email-verified user (self-registered companies
         // always have one). One grouped query — no N+1.

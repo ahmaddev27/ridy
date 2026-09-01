@@ -105,11 +105,12 @@ table,
   font-variant-numeric: tabular-nums;
 }
 
-/* Arabic: Latin glyphs + digits render in Manrope (the Uber-like face), Arabic
-   text falls back to Tajawal — so numbers match the rest of the UI even in RTL. */
+/* Arabic: Tajawal leads so Arabic text always renders in it (guaranteed, no reliance
+   on Manrope's unicode-range excluding Arabic). Manrope stays in the stack after it
+   for any glyph Tajawal lacks. */
 html[lang="ar"] body,
 [dir="rtl"] body {
-  font-family: var(--font-manrope), var(--font-tajawal), var(--font-sans);
+  font-family: var(--font-tajawal), var(--font-manrope), var(--font-sans);
 }
 [dir="rtl"] {
   line-height: 1.7;

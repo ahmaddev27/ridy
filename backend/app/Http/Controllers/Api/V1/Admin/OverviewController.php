@@ -21,26 +21,34 @@ class OverviewController extends Controller
     public function __invoke(): JsonResponse
     {
         $tenants = Tenant::query()->get();
-        $sessions = UberFleetSession::withoutGlobalScopes()->orderByDesc('updated_at')->get()->keyBy('tenant_id');
+        // Newest session per tenant. keyBy keeps the LAST row for a duplicate key, so
+        // with a desc sort that would keep the OLDEST — unique() (keeps the first)
+        // after the desc sort keeps the newest, which is the session that's live.
+        $sessions = UberFleetSession::withoutGlobalScopes()
+            ->orderByDesc('updated_at')->get()->unique('tenant_id')->keyBy('tenant_id');
 
         // "Active" means truly active (subscription live, not banned/expired/
         // disabled) — the same stateReason() rule the company row + ingest guards
         // use — so the health donut can't disagree with the row's status badge.
         $activeCompanies = $tenants->filter(fn (Tenant $t) => $t->stateReason() === null);
 
-        // Session health/counts cover only the companies we actually serve (active
-        // ones): a stopped/expired company's session is moot and must not inflate
-        // the "active sessions" count, or this donut disagrees with companies-health.
-        // ($sessions is keyed by tenant_id.)
-        $activeSessions = $sessions->only($activeCompanies->pluck('id')->all());
+        // Session health covers only the companies we actually serve (active ones):
+        // a stopped/expired company's session is moot. Bucket each active company by
+        // the SAME per-tenant session status the companies list reads ($sessions is
+        // keyed by tenant_id), so this donut can never disagree with the row's badge.
+        $breakdown = ['active' => 0, 'expired' => 0, 'needs_relink' => 0, 'no_session' => 0];
+        foreach ($activeCompanies as $tenant) {
+            $status = $sessions->get($tenant->id)?->status;
+            $breakdown[in_array($status, ['active', 'expired', 'needs_relink'], true) ? $status : 'no_session']++;
+        }
 
         $stats = [
             'companies' => $tenants->count(),
             'active_companies' => $activeCompanies->count(),
             'drivers' => Driver::withoutGlobalScopes()->count(),
             'offers' => DispatchOffer::withoutGlobalScopes()->count(),
-            'sessions_active' => $activeSessions->where('status', 'active')->count(),
-            'sessions_need_attention' => $activeSessions->whereIn('status', ['expired', 'needs_relink'])->count(),
+            'sessions_active' => $breakdown['active'],
+            'sessions_need_attention' => $breakdown['expired'] + $breakdown['needs_relink'],
         ];
 
         // Alerts — companies the super-admin should act on.
@@ -80,12 +88,7 @@ class OverviewController extends Controller
             'stats' => $stats,
             'alerts' => $alerts,
             'expiring_proxies' => $expiringProxies,
-            'session_breakdown' => [
-                'active' => $activeSessions->where('status', 'active')->count(),
-                'expired' => $activeSessions->where('status', 'expired')->count(),
-                'needs_relink' => $activeSessions->where('status', 'needs_relink')->count(),
-                'no_session' => max(0, $activeCompanies->count() - $activeSessions->count()),
-            ],
+            'session_breakdown' => $breakdown,
             'offers_daily' => $this->offersDaily(),
             'top_companies' => $this->topCompanies($tenants),
         ]]);

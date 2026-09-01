@@ -23,9 +23,11 @@ class SystemHealthService
         $now = now();
 
         $tenants = Tenant::query()->with('proxy')->get();
+        // Newest session per tenant — unique() keeps the first of the desc-sorted rows.
         $sessions = UberFleetSession::withoutGlobalScopes()
             ->orderByDesc('updated_at')
             ->get()
+            ->unique('tenant_id')
             ->keyBy('tenant_id');
 
         return $tenants
