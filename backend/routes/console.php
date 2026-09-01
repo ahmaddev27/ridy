@@ -14,11 +14,12 @@ Schedule::command('offers:expire-pending')->everyMinute()->withoutOverlapping();
 // Force-finalize stale offers (over-long trips / abandoned accepts) the poll missed.
 Schedule::command('offers:finalize-stale')->everyFiveMinutes()->withoutOverlapping();
 
-// Backfill DISABLED — the self-hosted Nominatim 429s under batch load, which
-// starved time-critical live offers of geocoding. Live-offer inline enrich now
-// has Nominatim to itself. Re-enable (or run `offers:backfill-geo` manually
-// off-peak) only if the geocoder is given more headroom.
-// Schedule::command('offers:backfill-geo --limit=60')->everyFiveMinutes()->withoutOverlapping();
+// Backfill for offers whose lazy/ingest-time enrich never resolved (hard street-
+// only addresses, transient 429s), so their distance/€-per-km shows in the mobile
+// "recent" list without anyone opening the detail on the dashboard. Kept GENTLE —
+// a tiny batch every 10 min at ~1 req/sec (see the 700ms throttle) — because a
+// large fast sweep once 429'd the self-hosted Nominatim and starved live offers.
+Schedule::command('offers:backfill-geo --limit=12')->everyTenMinutes()->withoutOverlapping();
 
 // Daily heads-up notifications: subscriptions/proxies expiring or expired.
 Schedule::command('notifications:scan')->dailyAt('08:00')->withoutOverlapping();

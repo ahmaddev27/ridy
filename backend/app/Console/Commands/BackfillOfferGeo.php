@@ -45,8 +45,10 @@ class BackfillOfferGeo extends Command
             }
             // Throttle so the background backfill never saturates the local
             // Nominatim (it returns 429 under a fast batch) — this leaves the
-            // geocoder responsive for time-critical live offers.
-            usleep(300_000); // 300ms
+            // geocoder responsive for time-critical live offers. A full stop each
+            // offer (both ends geocode inside enrich) keeps the sustained rate well
+            // under 1 req/sec, so a scheduled sweep can't starve a live offer.
+            usleep(700_000); // 700ms
         }
 
         $this->info("Backfilled geo for {$done}/{$offers->count()} offer(s).");

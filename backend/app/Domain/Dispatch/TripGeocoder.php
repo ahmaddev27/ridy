@@ -405,6 +405,21 @@ class TripGeocoder
             }
         }
 
+        // Tier 1b — street + city, NO postcode (structured). A dispatch offer often
+        // carries a bare "Street 18A" whose town we borrowed from the counterpart end
+        // (borrowCounterpartCity), but with no PLZ Tier 1 is skipped and the address
+        // used to fall straight through to free-text (Tier 4), which misses far more
+        // often. A structured street+city lookup places these precisely.
+        if ($coords === null && $street !== null && $city !== null) {
+            $r = $this->queryNominatim($base + ['street' => $street, 'city' => $city]);
+            if ($r['transient']) {
+                return null;
+            }
+            if ($r['hit'] !== null) {
+                $coords = $this->fromHit($r['hit'], preg_match('/\d/', $street) === 1 ? 'exact' : 'street');
+            }
+        }
+
         // Tier 2 — PLZ + city, no street. A street-less "PLZ City" is usually a
         // station pickup/dropoff, so try the town's Bahnhof first, then the town.
         if ($coords === null && $plz !== null && $city !== null) {
