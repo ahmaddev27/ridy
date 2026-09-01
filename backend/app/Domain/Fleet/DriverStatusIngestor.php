@@ -181,6 +181,21 @@ class DriverStatusIngestor
      */
     private function applyTransition(int $tenantId, string $uuid, int $was, int $now, array &$counts): void
     {
+        // Diagnostic: every real engagement-level change, with the offer it resolved to.
+        // Surfaces in the admin Logs tab so we can see WHY a busy driver's acceptance is
+        // (not) detected — e.g. an idle→engaged edge the coarse poll missed.
+        if ($was !== $now) {
+            $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
+            $pending = $this->lifecycle->pendingOfferFor($tenantId, $uuid);
+            RidyLog::event('driver_status.transition', [
+                'driver' => substr($uuid, 0, 8),
+                'was' => $was,
+                'now' => $now,
+                'active_offer' => $active?->id,
+                'pending_offer' => $pending?->id,
+            ]);
+        }
+
         // idle → engaged: attribute the pending offer and accept it.
         if ($was === 0 && $now >= 1) {
             $pending = $this->lifecycle->pendingOfferFor($tenantId, $uuid);
