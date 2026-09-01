@@ -141,7 +141,11 @@ export function CompanyDetail({
       setNewUser({ name: "", email: "", password: "" });
       await load();
     } catch (e) {
-      toast.error(c("userCreateFailed"), { description: e instanceof Error ? e.message : undefined });
+      // Localize the common "email already taken" validation instead of showing
+      // Laravel's raw English message.
+      const msg = e instanceof Error ? e.message : "";
+      const desc = /already been taken/i.test(msg) ? c("emailTaken") : msg || undefined;
+      toast.error(c("userCreateFailed"), { description: desc });
     } finally {
       setBusy(false);
     }
