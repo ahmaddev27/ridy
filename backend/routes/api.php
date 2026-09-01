@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\Admin\CompanyUserController;
 use App\Http\Controllers\Api\V1\Admin\ContactMessageController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Api\V1\Admin\ImpersonationController;
+use App\Http\Controllers\Api\V1\Admin\InfrastructureHealthController;
 use App\Http\Controllers\Api\V1\Admin\NetworkLogController;
 use App\Http\Controllers\Api\V1\Admin\OrphanDriverController;
 use App\Http\Controllers\Api\V1\Admin\OverviewController;
@@ -293,6 +294,7 @@ Route::prefix('v1')->group(function () {
         Route::get('overview', OverviewController::class);
         Route::get('system-health', SystemHealthController::class);
         Route::get('system-metrics', SystemMetricsController::class);
+        Route::get('infrastructure', InfrastructureHealthController::class);
         Route::delete('network-logs', [NetworkLogController::class, 'clear']);
         Route::get('settings', [SettingsController::class, 'show']);
         Route::put('settings', [SettingsController::class, 'update']);

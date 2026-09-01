@@ -183,6 +183,19 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
   return res.data;
 }
 
+export type InfraStatus = "ok" | "warn" | "down";
+export type InfrastructureHealth = {
+  queue: { pending: number; failed: number; oldest_pending_seconds: number | null; status: InfraStatus };
+  scheduler: { last_run_at: string | null; seconds_since: number | null; status: InfraStatus };
+  services: { key: string; status: InfraStatus }[];
+};
+
+/** Super-admin: platform infrastructure health (queue, scheduler, reverb, geo). */
+export async function getInfrastructureHealth(): Promise<InfrastructureHealth> {
+  const res = await apiFetch<{ data: InfrastructureHealth }>("/api/v1/admin/infrastructure");
+  return res.data;
+}
+
 export async function getSettings(): Promise<PlatformSettings> {
   const res = await apiFetch<{ data: PlatformSettings }>("/api/v1/admin/settings");
   return res.data;

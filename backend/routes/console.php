@@ -1,7 +1,9 @@
 <?php
 
+use App\Domain\System\InfrastructureHealthService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -17,6 +19,15 @@ Artisan::command('inspire', function () {
 // withoutOverlapping stops two runs stacking. Harmless if a real worker also runs.
 Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3 --sleep=1')
     ->everyMinute()
+    ->withoutOverlapping();
+
+// Scheduler heartbeat: stamp a shared (database-cache) timestamp every minute so the
+// admin System Health board can tell whether the scheduler container is actually
+// ticking — a stale/missing stamp means nothing scheduled (queue drain, backfill,
+// expiry) is running.
+Schedule::call(fn () => Cache::put(InfrastructureHealthService::HEARTBEAT_KEY, now()->toIso8601String(), 3600))
+    ->everyMinute()
+    ->name('scheduler-heartbeat')
     ->withoutOverlapping();
 
 // Expire pending offers whose accept window elapsed (safety net for idle tenants).
