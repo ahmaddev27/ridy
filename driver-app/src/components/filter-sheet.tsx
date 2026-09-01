@@ -6,11 +6,10 @@ import { useColors, radius, isDarkPalette } from "@/lib/theme";
 import { t, isRTL } from "@/lib/i18n";
 
 export type SortKey = "new" | "rate" | "total";
-export type DayKey = "all" | "today" | "yesterday" | "week";
 export type StatusKey = "all" | "pending" | "accepted" | "completed" | "rejected" | "canceled";
 
-export type OfferFilters = { sort: SortKey; day: DayKey; status: StatusKey };
-export const DEFAULT_FILTERS: OfferFilters = { sort: "new", day: "all", status: "all" };
+export type OfferFilters = { sort: SortKey; status: StatusKey };
+export const DEFAULT_FILTERS: OfferFilters = { sort: "new", status: "all" };
 
 /**
  * Bottom-sheet filter for the offers list: sort, date window and status. All
@@ -74,20 +73,6 @@ function SheetBody({ c, value, onApply, onClose }: { c: ReturnType<typeof useCol
           ]}
           selected={draft.sort}
           onSelect={(k) => setDraft({ ...draft, sort: k as SortKey })}
-        />
-      </Group>
-
-      <Group label={t("filter.date")}>
-        <Chips
-          c={c}
-          options={[
-            { k: "all", label: t("filter.all") },
-            { k: "today", label: t("filter.today") },
-            { k: "yesterday", label: t("filter.yesterday") },
-            { k: "week", label: t("filter.week") },
-          ]}
-          selected={draft.day}
-          onSelect={(k) => setDraft({ ...draft, day: k as DayKey })}
         />
       </Group>
 

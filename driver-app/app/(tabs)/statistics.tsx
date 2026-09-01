@@ -1,82 +1,25 @@
 import { useCallback, useMemo, useState } from "react";
-import { View, ScrollView, RefreshControl, Pressable, Modal } from "react-native";
+import { View, ScrollView, RefreshControl, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useFocusEffect } from "expo-router";
-import { ChevronLeft, ChevronRight, ChevronDown, Check } from "lucide-react-native";
 import { api, type DriverStats, type DailyIncome } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
-import { useColors, radius, cardStyle } from "@/lib/theme";
+import { useColors, cardStyle } from "@/lib/theme";
 import { fleetNow } from "@/lib/fleet-day";
 import { fareLabel } from "@/lib/format";
 import { SectionLabel } from "@/components/ui";
+import { PeriodNavigator, periodWindow, ymd, addDays, mondayOf, type PeriodRange } from "@/components/period-navigator";
 
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] as const;
 const mondayIndex = (d: Date) => (d.getDay() + 6) % 7;
-const DAY_LOCALE = "en-DE";
-
-type Range = "today" | "week" | "month";
-const RANGES: Range[] = ["today", "week", "month"];
-
-/** Local yyyy-mm-dd (native date range for the stats endpoint). */
-function ymd(d: Date): string {
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
-}
-
-const addDays = (d: Date, n: number) => {
-  const x = new Date(d);
-  x.setDate(d.getDate() + n);
-  return x;
-};
-
-/** Monday (00:00) of the fleet-week containing `d`. */
-function mondayOf(d: Date): Date {
-  const m = new Date(d);
-  m.setHours(0, 0, 0, 0);
-  m.setDate(d.getDate() - mondayIndex(m));
-  return m;
-}
-
-/**
- * The first fleet-day of a period, `offset` periods away from now: offset 0 is
- * the current period, -1 the previous, +1 the next. Days step by one, weeks by
- * Monday-to-Monday, months by the 1st.
- */
-function startOfPeriod(r: Range, offset: number): Date {
-  const now = fleetNow();
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  if (r === "today") d.setDate(now.getDate() + offset);
-  else if (r === "week") d.setDate(now.getDate() - mondayIndex(now) + offset * 7);
-  else d.setMonth(now.getMonth() + offset, 1);
-  return d;
-}
-
-/** The last fleet-day of the period that starts at `start`. */
-function endOfPeriod(r: Range, start: Date): Date {
-  if (r === "today") return start;
-  if (r === "week") return addDays(start, 6);
-  const e = new Date(start);
-  e.setMonth(start.getMonth() + 1, 0); // day 0 of next month = last of this
-  return e;
-}
-
-/** Human label for the period: "Mon, 25 Aug" · "24 Aug – 31 Aug" · "August 2026". */
-function periodLabel(r: Range, start: Date, end: Date): string {
-  const dm = (d: Date) => d.toLocaleDateString(DAY_LOCALE, { day: "numeric", month: "short" });
-  if (r === "today") return start.toLocaleDateString(DAY_LOCALE, { weekday: "short", day: "numeric", month: "short" });
-  if (r === "week") return `${dm(start)} – ${dm(end)}`;
-  return start.toLocaleDateString(DAY_LOCALE, { month: "long", year: "numeric" });
-}
 
 export default function StatisticsScreen() {
   const c = useColors();
   const { isOwner } = useAuth();
   const align = isRTL() ? "right" : "left";
-  const [range, setRange] = useState<Range>("week");
+  const [range, setRange] = useState<PeriodRange>("week");
   const [offset, setOffset] = useState(0); // 0 = current period, negative = past
   const [stats, setStats] = useState<DriverStats | null>(null);
   const [daily, setDaily] = useState<DailyIncome[]>([]);
@@ -84,15 +27,8 @@ export default function StatisticsScreen() {
 
   // The selected window + the Monday of the week its chart shows.
   const { window, weekMon, label } = useMemo(() => {
-    const now = fleetNow();
-    const start = startOfPeriod(range, offset);
-    const end = endOfPeriod(range, start);
-    const to = end > now ? now : end; // never query into the future
-    return {
-      window: { from: ymd(start), to: ymd(to) },
-      weekMon: mondayOf(start),
-      label: periodLabel(range, start, end),
-    };
+    const w = periodWindow(range, offset);
+    return { window: { from: w.from, to: w.to }, weekMon: w.weekMonday, label: w.label };
   }, [range, offset]);
 
   const load = useCallback(
@@ -134,7 +70,6 @@ export default function StatisticsScreen() {
           label={label}
           range={range}
           onRange={(r) => { setRange(r); setOffset(0); }}
-          c={c}
           onPrev={() => setOffset((o) => o - 1)}
           onNext={() => setOffset((o) => Math.min(0, o + 1))}
           canNext={offset < 0}
@@ -178,100 +113,6 @@ type Colors = ReturnType<typeof useColors>;
 
 const sameDay = (a: Date, b: Date) => ymd(a) === ymd(b);
 
-/**
- * The date-range stepper: a centred label flanked by ‹ › arrows. The chevrons
- * mirror in RTL (previous is always "back in time"); the "next" arrow is disabled
- * on the current period so you can't page into the future.
- */
-function PeriodNavigator({
-  label,
-  range,
-  onRange,
-  c,
-  onPrev,
-  onNext,
-  canNext,
-}: {
-  label: string;
-  range: Range;
-  onRange: (r: Range) => void;
-  c: Colors;
-  onPrev: () => void;
-  onNext: () => void;
-  canNext: boolean;
-}) {
-  const [menu, setMenu] = useState(false);
-  const rtl = isRTL();
-  const Prev = rtl ? ChevronRight : ChevronLeft;
-  const Next = rtl ? ChevronLeft : ChevronRight;
-  const arrow = (Icon: typeof ChevronLeft, onPress: () => void, on: boolean) => (
-    <Pressable
-      onPress={on ? onPress : undefined}
-      disabled={!on}
-      hitSlop={10}
-      style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", opacity: on ? 1 : 0.3 }}
-    >
-      <Icon size={22} color={c.ink} />
-    </Pressable>
-  );
-
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
-      {arrow(Prev, onPrev, true)}
-
-      {/* The centre pill — tap to open the range picker (⌄). */}
-      <Pressable
-        onPress={() => setMenu(true)}
-        hitSlop={8}
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 8,
-          paddingHorizontal: 18,
-          paddingVertical: 9,
-          borderRadius: radius.pill,
-          backgroundColor: c.surface,
-          borderWidth: 1,
-          borderColor: c.line,
-        }}
-      >
-        <Text style={{ color: c.ink, fontSize: 15.5, fontWeight: "700", writingDirection: "ltr" }}>{label}</Text>
-        <ChevronDown size={16} color={c.inkMuted} />
-      </Pressable>
-
-      {arrow(Next, onNext, canNext)}
-
-      {/* Range-type picker sheet (today / week / month). */}
-      <Modal visible={menu} transparent animationType="fade" onRequestClose={() => setMenu(false)}>
-        <Pressable onPress={() => setMenu(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", padding: 32 }}>
-          <View style={{ ...cardStyle(c), padding: 6, gap: 2 }}>
-            {RANGES.map((r) => {
-              const on = r === range;
-              return (
-                <Pressable
-                  key={r}
-                  onPress={() => { onRange(r); setMenu(false); }}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    paddingHorizontal: 14,
-                    paddingVertical: 13,
-                    borderRadius: radius.md,
-                    backgroundColor: on ? c.primary : "transparent",
-                  }}
-                >
-                  <Text style={{ color: on ? c.primaryInk : c.ink, fontSize: 15, fontWeight: "700" }}>{t(`range.${r}`)}</Text>
-                  {on && <Check size={18} color={c.primaryInk} />}
-                </Pressable>
-              );
-            })}
-          </View>
-        </Pressable>
-      </Modal>
-    </View>
-  );
-}
 
 /** Income bars for the week starting `monday` (Mon–Sun); future days are dimmed. */
 function WeeklyChart({ daily, c, monday }: { daily: DailyIncome[]; c: Colors; monday: Date }) {

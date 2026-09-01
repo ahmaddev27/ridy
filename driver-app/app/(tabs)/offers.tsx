@@ -10,33 +10,12 @@ import { connectDriverRealtime } from "@/lib/realtime";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, getLocale } from "@/lib/i18n";
 import { useColors, radius, isDarkPalette } from "@/lib/theme";
-import { fleetNow, fleetWeekStart } from "@/lib/fleet-day";
 import { OfferCard } from "@/components/offer-card";
 import { FilterSheet, DEFAULT_FILTERS, type OfferFilters, type SortKey } from "@/components/filter-sheet";
+import { PeriodNavigator, periodWindow, type PeriodRange } from "@/components/period-navigator";
 
 const PER_PAGE = 20;
 
-/** Local yyyy-mm-dd for the date window. */
-function ymd(d: Date): string {
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
-}
-
-/** from/to for the chosen date window (empty for "all"). Dates are fleet-days
- *  (the Uber day starts at 04:00), so "today" before 04:00 is still yesterday. */
-function dateWindow(day: OfferFilters["day"]): { from?: string; to?: string } {
-  if (day === "all") return {};
-  const now = fleetNow();
-  if (day === "yesterday") {
-    const y = new Date(now);
-    y.setDate(now.getDate() - 1);
-    return { from: ymd(y), to: ymd(y) };
-  }
-  // "week" is the current fleet-week from Monday 04:00; "today" is now's fleet-day.
-  const start = day === "week" ? fleetWeekStart() : new Date(now);
-  return { from: ymd(start), to: ymd(now) };
-}
 
 /** €/km for a sort comparison (missing metrics sink to the bottom). */
 function rate(o: Offer): number {
@@ -60,6 +39,8 @@ export default function OffersScreen() {
 
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<OfferFilters>(DEFAULT_FILTERS);
+  const [range, setRange] = useState<PeriodRange>("today");
+  const [offset, setOffset] = useState(0);
   // Fleet-owner mode: pick a single driver (or all) to scope the feed.
   const [drivers, setDrivers] = useState<FleetDriver[]>([]);
   const [driverId, setDriverId] = useState<number | null>(null);
@@ -73,8 +54,8 @@ export default function OffersScreen() {
 
   const fetchPage = useCallback(
     async (target: number) => {
-      const win = dateWindow(filters.day);
-      const params: OffersQuery = { per_page: PER_PAGE, page: target, ...win };
+      const { from, to } = periodWindow(range, offset);
+      const params: OffersQuery = { per_page: PER_PAGE, page: target, from, to };
       if (filters.status !== "all") params.status = filters.status;
       if (search.trim()) params.search = search.trim();
       if (isOwner && driverId != null) params.driver_id = driverId;
@@ -84,7 +65,7 @@ export default function OffersScreen() {
       setPage(res.meta?.current_page ?? target);
       setOffers((prev) => (target === 1 ? res.data : [...prev, ...res.data]));
     },
-    [filters.status, filters.day, search, isOwner, driverId],
+    [filters.status, range, offset, search, isOwner, driverId],
   );
 
   // Load the tenant's drivers once, for the owner-only driver filter.
@@ -147,9 +128,8 @@ export default function OffersScreen() {
 
   // The three quick pills mirror common filter combos.
   const quick: { key: string; label: string; active: boolean; apply: () => void }[] = [
-    { key: "all", label: t("filter.all"), active: filters.sort === "new" && filters.day === "all" && filters.status === "all", apply: () => setFilters(DEFAULT_FILTERS) },
+    { key: "all", label: t("filter.all"), active: filters.sort === "new" && filters.status === "all", apply: () => setFilters(DEFAULT_FILTERS) },
     { key: "rate", label: t("filter.bestKm"), active: filters.sort === "rate", apply: () => setFilters((f) => ({ ...f, sort: "rate" })) },
-    { key: "today", label: t("filter.today"), active: filters.day === "today", apply: () => setFilters((f) => ({ ...f, day: "today" })) },
   ];
 
   return (
@@ -177,6 +157,16 @@ export default function OffersScreen() {
                 autoCapitalize="none"
               />
             </View>
+
+            {/* Uber-style date range navigator */}
+            <PeriodNavigator
+              label={periodWindow(range, offset).label}
+              range={range}
+              onRange={(r) => { setRange(r); setOffset(0); }}
+              onPrev={() => setOffset((o) => o - 1)}
+              onNext={() => setOffset((o) => Math.min(0, o + 1))}
+              canNext={offset < 0}
+            />
 
             {/* Quick pills + full-filter button */}
             <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 8 }}>
