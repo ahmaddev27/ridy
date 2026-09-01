@@ -8,6 +8,17 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// Drain queued jobs (GeocodeOffer, SyncTripFromWaypoints, …) every minute via the
+// scheduler, so they actually run even without a dedicated `queue:work` daemon. A
+// missing worker was leaving the database queue's jobs unprocessed — offers never
+// geocoded (distance/€-per-km blank until a manager opened the detail) and accepted
+// trips never got their Uber-waypoint address/stop correction. --stop-when-empty
+// exits the moment the queue is drained; --max-time keeps each run under the minute;
+// withoutOverlapping stops two runs stacking. Harmless if a real worker also runs.
+Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3 --sleep=1')
+    ->everyMinute()
+    ->withoutOverlapping();
+
 // Expire pending offers whose accept window elapsed (safety net for idle tenants).
 Schedule::command('offers:expire-pending')->everyMinute()->withoutOverlapping();
 
