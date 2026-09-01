@@ -228,6 +228,29 @@ export async function clearPendingJobs(): Promise<number> {
   return res.data.cleared;
 }
 
+export type LogSource = "backend" | "frontend";
+export type LogTail = { source: LogSource; bytes: number; lines: string[] };
+
+/** Super-admin: tail a log source (backend Laravel log / frontend client-error log). */
+export async function getLogs(source: LogSource, lines = 300): Promise<LogTail> {
+  const res = await apiFetch<{ data: LogTail }>(`/api/v1/admin/logs?source=${source}&lines=${lines}`);
+  return res.data;
+}
+
+/** Super-admin: truncate a log source. */
+export async function clearLogs(source: LogSource): Promise<void> {
+  await apiFetch(`/api/v1/admin/logs?source=${source}`, { method: "DELETE", withCsrf: true });
+}
+
+/** Report a client-side error into the admin's frontend log (best-effort, silent). */
+export async function reportClientError(message: string, url?: string, level = "error"): Promise<void> {
+  try {
+    await apiFetch("/api/v1/client-log", { method: "POST", body: { message, url, level }, withCsrf: true });
+  } catch {
+    /* never let the reporter throw */
+  }
+}
+
 export async function getSettings(): Promise<PlatformSettings> {
   const res = await apiFetch<{ data: PlatformSettings }>("/api/v1/admin/settings");
   return res.data;

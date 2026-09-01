@@ -6,6 +6,7 @@ import { ExtensionBanner } from "@/components/layout/extension-banner";
 import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
 import { OfferAlerts } from "@/components/offer-alerts";
 import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
+import { ClientErrorReporter } from "@/components/client-error-reporter";
 
 export default function AppLayout({
   children,
@@ -15,6 +16,7 @@ export default function AppLayout({
   return (
     <AuthProvider>
       <AppGuard>
+        <ClientErrorReporter />
         <OfferAlerts />
         <OnboardingTour />
         {/* Fixed-height shell: the sidebar and topbar stay put; only the main

@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\Admin\ContactMessageController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Api\V1\Admin\ImpersonationController;
 use App\Http\Controllers\Api\V1\Admin\InfrastructureHealthController;
+use App\Http\Controllers\Api\V1\Admin\LogViewerController;
 use App\Http\Controllers\Api\V1\Admin\NetworkLogController;
 use App\Http\Controllers\Api\V1\Admin\OrphanDriverController;
 use App\Http\Controllers\Api\V1\Admin\OverviewController;
@@ -179,6 +180,9 @@ Route::prefix('v1')->group(function () {
         // Stop impersonating: mid-impersonation the caller is a manager, so this
         // lives outside the super-admin group (the session key gates it).
         Route::post('impersonate/stop', [ImpersonationController::class, 'stop']);
+        // Dashboard client-side error reporter → the admin's frontend log. Any signed-in
+        // dashboard user, throttled + size-capped in the controller.
+        Route::post('client-log', [LogViewerController::class, 'recordFrontend'])->middleware('throttle:30,1');
     });
 
     Route::middleware(['auth:sanctum', 'user.account', ResolveTenant::class, 'dashboard.only'])->group(function () {
@@ -300,6 +304,8 @@ Route::prefix('v1')->group(function () {
         Route::post('queue/retry', [QueueAdminController::class, 'retry']);
         Route::post('queue/flush', [QueueAdminController::class, 'flush']);
         Route::post('queue/clear-pending', [QueueAdminController::class, 'clearPending']);
+        Route::get('logs', [LogViewerController::class, 'index']);
+        Route::delete('logs', [LogViewerController::class, 'clear']);
         Route::delete('network-logs', [NetworkLogController::class, 'clear']);
         Route::get('settings', [SettingsController::class, 'show']);
         Route::put('settings', [SettingsController::class, 'update']);

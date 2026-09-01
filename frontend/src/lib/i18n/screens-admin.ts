@@ -7,7 +7,7 @@ const en: Dict = {
   inbox: { title: "Inbox", subtitle: "Messages from the landing page contact form.", unread: "unread", empty: "No messages yet", emptyDesc: "Contact-form submissions from the website will appear here.", markRead: "Mark as read", markUnread: "Mark as unread", delete: "Delete", deleteTitle: "Delete message", deleteConfirm: "This message will be permanently deleted.", cancel: "Cancel", deleted: "Message deleted", error: "Something went wrong" },
   shards: {
     title: "Shards", subtitle: "Daemon boxes and how companies are spread across them. Adding a box auto-takes new companies.",
-    rebalance: "Rebalance", rebalanced: "Rebalanced", actionFailed: "Action failed", confirm: "Confirm", cancel: "Cancel",
+    rebalance: "Rebalance", rebalanced: "Rebalanced", actionFailed: "Action failed", confirm: "Confirm", cancel: "Cancel", logsTitle: "Logs", logsHint: "Backend and frontend logs — watch and clear them.", log_backend: "Backend", log_frontend: "Frontend", logFilter: "Filter…", logAutoscroll: "Auto-scroll", logEmpty: "No log entries.", logClear: "Clear log", logCleared: "Log cleared", confirmLogClear: "Clear this log permanently?",
     statShards: "Shards", statLive: "Live", statCompanies: "Companies",
     loadError: "Could not load", emptyTitle: "No shards yet", emptyDesc: "As soon as a daemon starts, it registers here.",
     colShard: "Shard", colStatus: "Status", colCompanies: "Companies", colLastSeen: "Last seen", colAction: "Action",
@@ -225,7 +225,7 @@ const de: Dict = {
   inbox: { title: "Postfach", subtitle: "Nachrichten aus dem Kontaktformular der Landingpage.", unread: "ungelesen", empty: "Noch keine Nachrichten", emptyDesc: "Einsendungen aus dem Kontaktformular der Website erscheinen hier.", markRead: "Als gelesen markieren", markUnread: "Als ungelesen markieren", delete: "Löschen", deleteTitle: "Nachricht löschen", deleteConfirm: "Diese Nachricht wird dauerhaft gelöscht.", cancel: "Abbrechen", deleted: "Nachricht gelöscht", error: "Etwas ist schiefgelaufen" },
   shards: {
     title: "Shards", subtitle: "Daemon-Boxen und Firmenverteilung. Eine neue Box übernimmt neue Firmen automatisch.",
-    rebalance: "Neu verteilen", rebalanced: "Neu verteilt", actionFailed: "Aktion fehlgeschlagen", confirm: "Bestätigen", cancel: "Abbrechen",
+    rebalance: "Neu verteilen", rebalanced: "Neu verteilt", actionFailed: "Aktion fehlgeschlagen", confirm: "Bestätigen", cancel: "Abbrechen", logsTitle: "Logs", logsHint: "Backend- und Frontend-Logs — beobachten und leeren.", log_backend: "Backend", log_frontend: "Frontend", logFilter: "Filtern…", logAutoscroll: "Auto-Scroll", logEmpty: "Keine Log-Einträge.", logClear: "Log leeren", logCleared: "Log geleert", confirmLogClear: "Dieses Log endgültig leeren?",
     statShards: "Shards", statLive: "Aktiv", statCompanies: "Firmen",
     loadError: "Laden fehlgeschlagen", emptyTitle: "Noch keine Shards", emptyDesc: "Sobald ein Daemon startet, registriert er sich hier.",
     colShard: "Shard", colStatus: "Status", colCompanies: "Firmen", colLastSeen: "Zuletzt gesehen", colAction: "Aktion",
@@ -441,7 +441,7 @@ const ar: Dict = {
   inbox: { title: "الوارد", subtitle: "الرسائل الواردة من فورم التواصل بصفحة الهبوط.", unread: "غير مقروءة", empty: "لا توجد رسائل بعد", emptyDesc: "الرسائل المرسلة من فورم الموقع بتظهر هنا.", markRead: "تعليم كمقروءة", markUnread: "تعليم كغير مقروءة", delete: "حذف", deleteTitle: "حذف الرسالة", deleteConfirm: "سيتم حذف هذه الرسالة نهائيًا.", cancel: "إلغاء", deleted: "تم حذف الرسالة", error: "حدث خطأ ما" },
   shards: {
     title: "الشاردات", subtitle: "بوكسات الديمون وتوزيع الشركات. إضافة بوكس توزّع الشركات الجديدة تلقائياً.",
-    rebalance: "إعادة توزيع", rebalanced: "تمّت إعادة التوزيع", actionFailed: "فشل الإجراء", confirm: "تأكيد", cancel: "إلغاء",
+    rebalance: "إعادة توزيع", rebalanced: "تمّت إعادة التوزيع", actionFailed: "فشل الإجراء", confirm: "تأكيد", cancel: "إلغاء", logsTitle: "السجلات", logsHint: "سجلات الباك والفرونت — راقبها ونظّفها.", log_backend: "الباك اند", log_frontend: "الفرونت", logFilter: "تصفية…", logAutoscroll: "تمرير تلقائي", logEmpty: "لا سجلات.", logClear: "تفريغ السجل", logCleared: "تم تفريغ السجل", confirmLogClear: "تفريغ هذا السجل نهائياً؟",
     statShards: "الشاردات", statLive: "نشطة", statCompanies: "الشركات",
     loadError: "تعذّر التحميل", emptyTitle: "لا شاردات بعد", emptyDesc: "أول ما يشتغل ديمون، بيسجّل نفسه هنا.",
     colShard: "الشارد", colStatus: "الحالة", colCompanies: "الشركات", colLastSeen: "آخر ظهور", colAction: "إجراء",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, Building2, Server, Boxes, Trash2, AlertTriangle } from "lucide-react";
+import { Activity, Building2, Server, Boxes, FileText, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge, type Status } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ShardsPanel } from "@/components/admin/shards-panel";
 import { ServerResources } from "@/components/admin/server-resources";
 import { InfrastructureHealth } from "@/components/admin/infrastructure-health";
+import { LogsPanel } from "@/components/admin/logs-panel";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getSystemHealth, clearNetworkLogs, type SystemHealthRow } from "@/lib/api/admin";
@@ -19,7 +20,7 @@ export default function SystemHealthPage() {
   const c = (k: string) => t(`screens.systemHealth.${k}`);
   const { data, loading, error } = useAsync(getSystemHealth, { refetchInterval: 30000 });
   const rows = data ?? [];
-  const [tab, setTab] = useState<"health" | "services" | "shards">("health");
+  const [tab, setTab] = useState<"health" | "services" | "logs" | "shards">("health");
 
   return (
     <div className="space-y-6">
@@ -28,6 +29,7 @@ export default function SystemHealthPage() {
         {([
           { k: "health", icon: Activity, label: t("nav.systemHealth") },
           { k: "services", icon: Boxes, label: c("infraTitle") },
+          { k: "logs", icon: FileText, label: c("logsTitle") },
           { k: "shards", icon: Server, label: t("nav.shards") },
         ] as const).map(({ k: tk, icon: Icon, label }) => {
           const active = tab === tk;
@@ -66,6 +68,8 @@ export default function SystemHealthPage() {
         <ShardsPanel />
       ) : tab === "services" ? (
         <InfrastructureHealth />
+      ) : tab === "logs" ? (
+        <LogsPanel />
       ) : (
         <>
           <PageHeader tkey="systemHealth" />
