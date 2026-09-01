@@ -20,6 +20,15 @@ class OrphanDriverController extends Controller
     {
         $drivers = Driver::withoutGlobalScopes()
             ->whereNotNull('roster_removed_at')
+            // Drop anyone who has since been placed with another fleet: the same Uber
+            // driver (uber_driver_uuid) now has an ACTIVE roster record elsewhere. Their
+            // old orphaned record lingers, but they are no longer a free agent.
+            ->whereNotExists(function ($q) {
+                $q->selectRaw('1')->from('drivers as active_d')
+                    ->whereColumn('active_d.uber_driver_uuid', 'drivers.uber_driver_uuid')
+                    ->whereNotNull('active_d.uber_driver_uuid')
+                    ->whereNull('active_d.roster_removed_at');
+            })
             ->with('tenant:id,name')
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%'.$request->string('search').'%';
