@@ -5,7 +5,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     sans-serif;
 }
 
@@ -105,10 +105,11 @@ table,
   font-variant-numeric: tabular-nums;
 }
 
-/* Arabic: use Tajawal and slightly larger line-height for legibility. */
+/* Arabic: Latin glyphs + digits render in Manrope (the Uber-like face), Arabic
+   text falls back to Tajawal — so numbers match the rest of the UI even in RTL. */
 html[lang="ar"] body,
 [dir="rtl"] body {
-  font-family: var(--font-tajawal), var(--font-sans);
+  font-family: var(--font-manrope), var(--font-tajawal), var(--font-sans);
 }
 [dir="rtl"] {
   line-height: 1.7;
@@ -246,14 +247,14 @@ html[lang="ar"] body,
   --mkt-accent: linear-gradient(100deg, #10b981, #059669);
   background: var(--mkt-bg);
   color: var(--mkt-fg);
-  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 .mkt-root ::selection {
   background: rgba(16, 185, 129, 0.28);
 }
 .mkt-root .font-heading {
-  font-family: var(--font-heading), var(--font-inter), sans-serif;
+  font-family: var(--font-heading), var(--font-manrope), sans-serif;
   letter-spacing: -0.02em;
 }
 .mkt-root .font-mono-mkt {

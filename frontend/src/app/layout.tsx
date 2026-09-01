@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Tajawal } from "next/font/google";
+import { Manrope, Tajawal } from "next/font/google";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n/context";
 import { ThemeProvider } from "@/lib/theme/context";
@@ -11,7 +11,8 @@ import { SentryInit } from "@/components/sentry-init";
 // avoiding a light→dark flash on load. Kept tiny and dependency-free.
 const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();`;
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+// Uber-Move-like grotesque for all Latin text + digits (Uber Move itself is licensed).
+const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" });
 // Arabic UI font — applied via CSS when the document is in Arabic/RTL.
 const tajawal = Tajawal({
   subsets: ["arabic"],
@@ -29,7 +30,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" translate="no" className={`${inter.variable} ${tajawal.variable} h-full`}>
+    <html lang="en" translate="no" className={`${manrope.variable} ${tajawal.variable} h-full`}>
       <head>
         {/* The UI is already multilingual (user picks the language). Browser
             auto-translation rewrites text nodes out from under React, which

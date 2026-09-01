@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import { Inter, Inter_Tight, JetBrains_Mono } from "next/font/google";
+import { Manrope, Inter_Tight, JetBrains_Mono } from "next/font/google";
 import { GazaBanner, Navbar } from "./_components/navbar";
 import { SiteFooter } from "./_components/site-footer";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" });
 const interTight = Inter_Tight({
   subsets: ["latin"],
   weight: ["500", "600", "700", "800"],
@@ -22,7 +22,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
     <div
       lang="de"
       dir="ltr"
-      className={`mkt-root dark ${inter.variable} ${interTight.variable} ${jetBrainsMono.variable}`}
+      className={`mkt-root dark ${manrope.variable} ${interTight.variable} ${jetBrainsMono.variable}`}
     >
       <GazaBanner />
       <Navbar />
