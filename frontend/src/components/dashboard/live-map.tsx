@@ -190,7 +190,11 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
         if (!engaged) wpCache.delete(d.id);
 
         if (wp.length > 0) {
-          const pickup = wp.find((w) => (w.type ?? "").toUpperCase().includes("PICKUP"));
+          // The FIRST waypoint is always the origin/pickup — Uber sometimes types it
+          // CHECKPOINT_TYPE_VIA (not PICKUP), which used to fall through and render the
+          // pickup as a red drop-off pin (two red pins for one trip). Everything after
+          // the first is a drop-off (a multi-stop trip has several).
+          const pickup = wp.find((w) => (w.type ?? "").toUpperCase().includes("PICKUP")) ?? wp[0];
           const dropoff = wp.find((w) => (w.type ?? "").toUpperCase().includes("DROPOFF")) ?? wp.find((w) => w !== pickup);
           const target = phase === "on_trip" ? dropoff : phase === "en_route" ? pickup : null;
 
@@ -203,7 +207,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
           }
 
           for (const w of wp) {
-            const isPickup = (w.type ?? "").toUpperCase().includes("PICKUP");
+            const isPickup = w === pickup; // first waypoint = pickup (green), rest = drop-off (red)
             // Label with the full street address; fall back to town+postcode, then
             // to the generic Pickup/Dropoff word only when nothing is known.
             const town = w.city ? (w.plz ? `${w.plz} ${w.city}` : w.city) : null;
