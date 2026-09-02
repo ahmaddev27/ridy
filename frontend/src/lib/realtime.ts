@@ -26,6 +26,15 @@ function readCookie(name: string): string {
   return m ? decodeURIComponent(m[2]) : "";
 }
 
+// The bits of an Echo instance we use, as a structural type — so this file never
+// references laravel-echo's `Echo<T>` generic (its shape differs across v1/v2 and
+// tripped the CI type-check). We construct through a cast to this shape.
+type EchoLike = {
+  private(channel: string): { listen(event: string, cb: () => void): unknown };
+  leave(channel: string): void;
+  disconnect(): void;
+};
+
 /**
  * Subscribe the manager's own company channel over Laravel Reverb and call
  * `onOfferChange` whenever an offer arrives or its status moves, so the dashboard
@@ -45,12 +54,16 @@ export function useCompanyRealtime(tenantId: number | null | undefined, onOfferC
   useEffect(() => {
     if (!KEY || !tenantId || typeof window === "undefined") return;
 
-    let echo: Echo | null = null;
+    let echo: EchoLike | null = null;
     const channel = `company.${tenantId}`;
     try {
-      echo = new Echo({
+      // Cast the constructor to a plain (non-generic) signature so compilation
+      // never depends on laravel-echo's `Echo<T>` generic. The runtime accepts the
+      // reverb broadcaster + injected Pusher + custom authorizer on both v1 and v2.
+      const EchoCtor = Echo as unknown as new (options: Record<string, unknown>) => EchoLike;
+      echo = new EchoCtor({
         broadcaster: "reverb",
-        Pusher, // laravel-echo v1 needs the Pusher client injected
+        Pusher, // reverb uses the Pusher connector under the hood
         key: KEY,
         wsHost: HOST,
         wsPort: 443,
@@ -76,9 +89,7 @@ export function useCompanyRealtime(tenantId: number | null | undefined, onOfferC
               .catch((err) => callback(err));
           },
         }),
-        // laravel-echo v1's option typing predates the reverb broadcaster + custom
-        // authorizer shape; the runtime accepts both.
-      } as unknown as ConstructorParameters<typeof Echo>[0]);
+      });
 
       echo.private(channel).listen(".offer.changed", () => cb.current());
     } catch {
