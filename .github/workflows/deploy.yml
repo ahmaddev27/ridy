@@ -150,7 +150,13 @@ jobs:
             # crash-looping queue/scheduler with "ReverbServiceProvider not found" on
             # every deploy. Renewing the anon volumes refreshes vendor from the new
             # image each deploy. (Named volumes like the DB are untouched.)
-            $COMPOSE up -d --build --force-recreate --renew-anon-volumes backend caddy frontend scheduler queue reverb
+            # Self-heal a prior INTERRUPTED --force-recreate: Compose renames the old
+            # container to "<hash>_ridy-<svc>-1" before replacing it; if a deploy died
+            # in between, the next recreate fails with "container name /ridy-<svc>-1 is
+            # already in use". Sweep any parked leftovers first (they carry a "_ridy-"
+            # infix; healthy containers are "ridy-..." with no leading hash).
+            docker ps -aq --filter "name=_ridy-" | xargs -r docker rm -f || true
+            $COMPOSE up -d --build --force-recreate --renew-anon-volumes --remove-orphans backend caddy frontend scheduler queue reverb
             # Daemon: recreate only if its image/config changed (streams stay up otherwise).
             $COMPOSE up -d --build dispatch-daemon
 
