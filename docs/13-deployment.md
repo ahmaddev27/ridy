@@ -18,9 +18,18 @@
                      │backend│ │ frontend │  (Next.js)
                      │php-fpm│ └──────────┘
                      └───┬───┘
-                     ┌───▼───┐   ┌──────────────────┐
-                     │ mysql │   │ dispatch-daemon  │→ Uber RAMEN
-                     └───────┘   └──────────────────┘
+                         │  (scheduler + queue + reverb = نفس صورة backend)
+        ┌────────┬───────┼─────────┬──────────┐
+    ┌───▼───┐ ┌──▼─────┐ ┌▼──────┐ ┌▼───────┐
+    │ mysql │ │schedule│ │ queue │ │ reverb │  ← WebSocket للتطبيق
+    └───────┘ │ :work  │ │ :work │ └────────┘
+              └────────┘ └───────┘
+
+        ┌──────────────────┐   ┌──────────────────────────────┐
+        │ dispatch-daemon  │→  │ nominatim + osrm (اختياري،    │
+        │   RAMEN 24/7     │   │ profile geo — جيوكودنغ ذاتي)  │
+        └──────────────────┘   └──────────────────────────────┘
+              → Uber RAMEN
 ```
 
 ---
@@ -139,10 +148,17 @@ docker compose -f docker-compose.prod.yml exec backend php artisan migrate --for
 
 ## 9. التحديثات لاحقاً
 
+الـ`backend` **متّصل كـvolume** (مش مبني داخل الصورة)، فتحديث كود الباك = سحب + هجرة + مسح كاش + إعادة تشغيل، **بلا إعادة بناء**. النشر الآلي عبر CI (`git reset --hard origin/main` + `migrate --force`) هو المرجع الرسمي للنشر الروتيني — راجع **[16-server-migration-handoff.md](./16-server-migration-handoff.md)**.
+
 ```bash
 git pull
-docker compose -f docker-compose.prod.yml up -d --build
+# كود backend فقط (متّصل volume): هجرة + مسح كاش + إعادة تشغيل — بلا build
 docker compose -f docker-compose.prod.yml exec backend php artisan migrate --force
+docker compose -f docker-compose.prod.yml exec backend php artisan config:clear
+docker compose -f docker-compose.prod.yml restart backend scheduler queue
+
+# تغييرات frontend أو dispatch-daemon (داخل الصورة) تحتاج إعادة بناء:
+docker compose -f docker-compose.prod.yml up -d --build frontend dispatch-daemon
 ```
 
 ---

@@ -107,7 +107,7 @@ Keep this principle when extending the product. Anything that would *act on* Ube
 **Transport in.** The daemon posts raw offer batches to:
 
 ```
-POST /api/internal/dispatch/ingest      header: X-Dispatch-Secret: <DISPATCH_INGEST_SECRET>
+POST /api/v1/internal/dispatch/ingest      header: X-Dispatch-Secret: <DISPATCH_INGEST_SECRET>
 ```
 
 Guarded by the `dispatch.secret` middleware. Body: `{ offers: [...], seq?: int }`. There is a *second*, user-session-authenticated path used by the browser extension: `POST /api/v1/dispatch/offers/ingest` (`DispatchOfferController@ingest`).
@@ -256,7 +256,7 @@ Tenant-owned tables carry `tenant_id` and use `BelongsToTenant`. Key tables/mode
 | notifications (Laravel default) | — | in-app bell; `data->type`, `data->params`, `data->href`. |
 | email templates | (email-template model/controller) | admin-editable localized templates; rendered by `EmailTemplateRenderer`, sent by `SendTemplatedMail`. |
 
-Fleet session (the captured Uber session) is stored on the backend and served to the daemon via `GET /internal/dispatch/sessions` (carries `id, tenant_id, uber_org_uuid, cookies, supplier_cookies`).
+Fleet session (the captured Uber session) is stored on the backend and served to the daemon via `GET /api/v1/internal/dispatch/sessions` (carries `id, tenant_id, uber_org_uuid, cookies, supplier_cookies`).
 
 ---
 
@@ -369,7 +369,7 @@ docker compose -f docker-compose.prod.yml up -d --build dispatch-daemon
 
 **Offers not arriving at all.**
 - Check the daemon logs (`docker compose -f docker-compose.prod.yml logs -f dispatch-daemon`). Look for `starting stream …`, `stopping stream …`, `session poll failed`.
-- Is there an active fleet session? `GET /api/internal/dispatch/sessions` (with the secret) should list it. If the manager never linked, or the session flipped to `needs_relink` (Uber returned 401/403), no stream runs — the manager must re-link via the extension.
+- Is there an active fleet session? `GET /api/v1/internal/dispatch/sessions` (with the secret) should list it. If the manager never linked, or the session flipped to `needs_relink` (Uber returned 401/403), no stream runs — the manager must re-link via the extension.
 - **Proxy**: a company with no proxy (and no global `UBER_PROXY_URL`) connects directly → Uber blocks it (RAMEN 404, roster 0). Assign a proxy in the admin panel; the daemon restarts that stream automatically.
 - **After a re-link**: the supervisor now fingerprints cookies by value (`jarFingerprint`), so a reconnect restarts the stream on its own — a manual daemon restart should no longer be needed. If a re-link still doesn't take effect, check the daemon logs for `stopping stream … (cookies changed)` then `starting stream …`.
 - Verify `DISPATCH_INGEST_SECRET` matches on both sides (mismatch → 401 on `/ingest`).
