@@ -54,7 +54,7 @@ Because Uber blocks datacenter IPs, the live stream is held either by a **Node d
 flowchart LR
     subgraph Uber
         RAMEN[Uber RAMEN SSE<br/>vsdispatch.uber.com]
-        SUP[Uber supplier API<br/>roster + live status]
+        SUP[Uber Fleet Hub API<br/>fleethub.uber.com<br/>roster + live status]
     end
 
     subgraph Capture
@@ -178,7 +178,7 @@ CI (`.github/workflows/ci.yml`) runs Pint + `php artisan test` on PHP 8.4, and
 
 ## Documentation
 
-- **[HANDOFF.md](./HANDOFF.md)** — the full operational + architectural handbook (mental model, per-subsystem deep-dive, data model, conventions, env/config, deployment, driver-app release, runbook, gotchas).
+- **[HANDOFF.md](./HANDOFF.md)** — the full operational + architectural handbook and **living agent guide** (mental model, per-subsystem deep-dive, data model, conventions, env/config, deployment, driver-app release, runbook, gotchas). It opens with a dated **change log** of the latest work — start there when resuming. Keep it updated in the same commit as any subsystem change.
 - **[docs/](./docs)** — design, feasibility and deployment notes.
 </content>
 </invoke>

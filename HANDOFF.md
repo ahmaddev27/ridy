@@ -2,6 +2,22 @@
 
 A complete operational + architectural handbook. Audience: an engineer (or another AI model) picking up the project with no prior context. Everything here is verified against the code on `main`; file paths are relative to the repo root unless noted.
 
+> **This is the living agent guide — the canonical project memory, kept in git.** Whenever you change how a subsystem works, update this file in the same commit and push it, then add a dated line to the change log below. If anything here disagrees with the code, **the code wins** — fix this file. Start here before touching the project.
+
+---
+
+## 0. Change log (most recent first)
+
+Newest wave of changes, so an agent resuming work knows what moved. Older history lives in `git log` and `docs/04-progress.md`.
+
+- **2026-09-02 — Uber "Fleet Hub" host migration.** Uber renamed `supplier.uber.com` → `fleethub.uber.com` (roster + live-status APIs; the offer RAMEN host `vsdispatch.uber.com` is unchanged). Migrated everywhere: `config/services.php` `uber.supplier_base_url` default → `https://fleethub.uber.com` (env `UBER_SUPPLIER_BASE_URL`), `UberSupplierClient`, `dispatch-daemon` `config.uberSupplierBase`, the extension (`manifest.json` content-script match + all `background.js` fetches + `inject.js` `onSupplier` host regex now allow both `supplier|fleethub`), and the frontend connect/reconnect links. Extension bumped to **1.15.4**. If status sync silently dies (offers still flow, map empty, all offers show "Not taken") suspect a missed host ref.
+- **2026-09-02 — `fleet:check-sync` sync-breakage detector.** `App\Console\Commands\CheckFleetSync` (scheduled every 5 min) logs `fleet.sync_stale` for active companies that have linked drivers but no fresh `status_synced_at` (`STALE_MINUTES = 12`) — i.e. offers arrive but the status poll is broken (the failure mode the Fleet Hub migration caused). See it on the System Health page.
+- **2026-09-02 — Daemon self-heals after a reconnect (no manual restart).** The supervisor fingerprinted each session's cookie jar by **count**, so a re-link that rotated the token to a new value with the same count went undetected → the stream kept the dead cookies and RAMEN-404'd until someone restarted the daemon. Now fingerprinted by **value** via the shared `jarFingerprint()` (`dispatch-daemon/src/stream.js`, imported by `index.js`) — a reconnect restarts the stream on its own. Stable between reconnects, so it doesn't churn.
+- **2026-09-02 — Geocode-before-notify + multi-stop detail.** `TripGeocoder::enrichForNotify()` runs a **bounded (~2.5 s, deadline-guarded)** pre-push geocode so the FCM push carries distance/€-per-km instead of arriving bare (offers were pushing before the async enrich ran). Multi-stop rides now resolve per-leg: `labelStops()` reverse-geocodes each waypoint with `leg_m`/cumulative distance, surfaced in `DispatchOfferResource` as `stops_count` + `stops[]` (dashboard + driver app render per-stop detail). A scheduled `queue:work --stop-when-empty` (below) drains the async `GeocodeOffer`/`SyncTripFromWaypoints` jobs.
+- **2026-09-02 — Queue drains via the scheduler (prod has no queue container).** Prod queue = **database**, and there was no `queue:work` daemon, so queued jobs never ran (the real root cause of missing geocoding). `backend/routes/console.php` now schedules `queue:work --stop-when-empty --max-time=50 --tries=3` every minute, `offers:backfill-geo` every 10 min, `fleet:check-sync` every 5 min, and writes a scheduler heartbeat for the infra-health check. The single `scheduler` container (`schedule:work`) must be up. **A stale anonymous `vendor` volume once shadowed a rebuilt image and crash-looped the scheduler (`ReverbServiceProvider not found`); the deploy uses `--renew-anon-volumes` to prevent this.**
+- **2026-09-02 — Admin System Health: infrastructure, queue, logs.** `app/Domain/System/InfrastructureHealthService.php` reports queue depth, scheduler heartbeat, and TCP/HTTP reachability of Reverb/Nominatim/OSRM. `Admin/QueueAdminController` (failed / retry / flush / clearPending) and `Admin/LogViewerController` (tail + clear `laravel.log` and a frontend log; frontend errors POST in via `client-error-reporter`) power new tabs on the System Health page — order: **health · services · logs · shards**.
+- **2026-09-02 — Driver-app date picker.** The Statistics/Offers period pill gained a **"Pick a date"** row that swaps in a self-contained month calendar (day/month/year; future days disabled). A picked day maps to `range="today"` + its day-offset, so all downstream windows/charts/queries are unchanged. Pure JS/RN — **no native module, ships OTA**. Lives in `driver-app/src/components/period-navigator.tsx`.
+
 ---
 
 ## 1. Mental model
@@ -212,7 +228,8 @@ Read `.env.example` (dev compose), `.env.prod.example` (prod compose), and `back
 | `MAIL_*` | backend | mailer (dev default `log`). |
 | `SANCTUM_STATEFUL_DOMAINS`, `SESSION_DOMAIN` | backend (prod) | SPA cookie auth for the dashboard. |
 | `UBER_PROXY_URL` | daemon | residential proxy (`http://user:pass@host:port` or `socks5://…`); global fallback. |
-| `UBER_DISPATCH_BASE_URL` | daemon | default `https://vsdispatch.uber.com`. |
+| `UBER_DISPATCH_BASE_URL` | daemon | offer RAMEN host, default `https://vsdispatch.uber.com` (unchanged by the Fleet Hub rename). |
+| `UBER_SUPPLIER_BASE_URL` | backend + daemon | roster/live-status host, default `https://fleethub.uber.com` (was `supplier.uber.com` before the Sep-2026 migration). |
 | `UBER_RAMEN_PATHS` | daemon | default `/ramendca/events,/ramenphx/events`. |
 | `RIDY_API_URL` | daemon | backend base (prod: `https://${DOMAIN}` via Caddy hairpin). |
 | `STATUS_INTERVAL_MS` / `ROSTER_INTERVAL_MS` / `SESSION_POLL_INTERVAL_MS` | daemon | 10s / 30min / 60s defaults. |
@@ -288,6 +305,7 @@ docker compose -f docker-compose.prod.yml up -d --build dispatch-daemon
 - Check the daemon logs (`docker compose -f docker-compose.prod.yml logs -f dispatch-daemon`). Look for `starting stream …`, `stopping stream …`, `session poll failed`.
 - Is there an active fleet session? `GET /api/internal/dispatch/sessions` (with the secret) should list it. If the manager never linked, or the session flipped to `needs_relink` (Uber returned 401/403), no stream runs — the manager must re-link via the extension.
 - **Proxy**: a company with no proxy (and no global `UBER_PROXY_URL`) connects directly → Uber blocks it (RAMEN 404, roster 0). Assign a proxy in the admin panel; the daemon restarts that stream automatically.
+- **After a re-link**: the supervisor now fingerprints cookies by value (`jarFingerprint`), so a reconnect restarts the stream on its own — a manual daemon restart should no longer be needed. If a re-link still doesn't take effect, check the daemon logs for `stopping stream … (cookies changed)` then `starting stream …`.
 - Verify `DISPATCH_INGEST_SECRET` matches on both sides (mismatch → 401 on `/ingest`).
 
 **Our data disagrees with Uber (offer stuck / wrong lifecycle state).**
