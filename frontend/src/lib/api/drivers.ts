@@ -20,6 +20,8 @@ export type Driver = {
   email: string | null;
   /** Mobile-app onboarding state. */
   app_status: "none" | "invited" | "invite_expired" | "active";
+  /** Human label of the driver's most-recent app device, e.g. "Pixel 7 · Android 14". */
+  device_label: string | null;
 };
 
 export async function listDrivers(): Promise<Driver[]> {

@@ -3,6 +3,17 @@ import { Sentry } from "@/lib/sentry";
 
 const BASE = (Constants.expoConfig?.extra?.apiUrl as string) ?? "https://reidey.de";
 
+/** Human phone model + OS version, captured via expo-device on push registration. */
+export type DeviceInfo = { name?: string | null; osVersion?: string | null };
+
+/** Snake-case body fields for the device-register endpoints, omitting empty values. */
+function devicePayload(device?: DeviceInfo): Record<string, string> {
+  const payload: Record<string, string> = {};
+  if (device?.name) payload.device_name = device.name;
+  if (device?.osVersion) payload.os_version = device.osVersion;
+  return payload;
+}
+
 /** Result of the launch-time force-update check. */
 export type AppVersionInfo = {
   update_required: boolean;
@@ -223,10 +234,10 @@ export class ApiClient {
   }
 
   /** Owner-mode push registration (User token) — mirrors registerDevice for drivers. */
-  fleetRegisterDevice(token: string, platform: "android" | "ios") {
+  fleetRegisterDevice(token: string, platform: "android" | "ios", device?: DeviceInfo) {
     return this.request<{ data: { id: number } }>("/api/v1/driver/fleet/devices", {
       method: "POST",
-      body: JSON.stringify({ token, platform }),
+      body: JSON.stringify({ token, platform, ...devicePayload(device) }),
     });
   }
 
@@ -292,10 +303,10 @@ export class ApiClient {
     return this.request<{ message: string }>("/api/v1/driver/fleet/logout", { method: "POST" });
   }
 
-  registerDevice(token: string, platform: "android" | "ios") {
+  registerDevice(token: string, platform: "android" | "ios", device?: DeviceInfo) {
     return this.request<{ data: { id: number } }>("/api/v1/driver/devices", {
       method: "POST",
-      body: JSON.stringify({ token, platform }),
+      body: JSON.stringify({ token, platform, ...devicePayload(device) }),
     });
   }
 

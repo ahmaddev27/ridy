@@ -93,11 +93,14 @@ export async function registerForPush(owner = false): Promise<string | null> {
     token = (await Notifications.getDevicePushTokenAsync()).data as string;
   }
   const platform = Platform.OS === "ios" ? "ios" : "android";
+  // Human phone model + OS version, so the manager dashboard can show which
+  // device the driver is on. Best-effort — omitted when the OS doesn't expose it.
+  const device = { name: Device.modelName, osVersion: Device.osVersion };
   // Remember the token so logout can deregister THIS device and stop its pushes.
   await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token).catch(() => {});
   try {
-    if (owner) await api.fleetRegisterDevice(token, platform);
-    else await api.registerDevice(token, platform);
+    if (owner) await api.fleetRegisterDevice(token, platform, device);
+    else await api.registerDevice(token, platform, device);
   } catch {
     // Non-fatal: the driver is signed in; a later launch retries registration.
     return token;

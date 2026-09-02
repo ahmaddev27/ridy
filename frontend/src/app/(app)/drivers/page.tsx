@@ -259,6 +259,7 @@ export default function DriversPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                       <button
                         onClick={() => openEmailModal(d)}
@@ -334,6 +335,15 @@ export default function DriversPage() {
                           )}
                           {t("screens.drivers.appInvite")}
                         </button>
+                      )}
+                      </div>
+                      {d.app_status === "active" && d.device_label && (
+                        <p
+                          className="ps-0.5 text-[11px] text-ink-subtle"
+                          title={t("screens.drivers.appDevice")}
+                        >
+                          {d.device_label}
+                        </p>
                       )}
                       </div>
                     </td>

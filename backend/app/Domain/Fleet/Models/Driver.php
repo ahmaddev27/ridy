@@ -3,8 +3,10 @@
 namespace App\Domain\Fleet\Models;
 
 use App\Domain\Fleet\DriverInvitationService;
+use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
@@ -55,6 +57,15 @@ class Driver extends Authenticatable
         'last_login_at' => 'datetime',
         'offers_seen_at' => 'datetime',
     ];
+
+    /**
+     * The most-recently-used installed app instance, so the manager dashboard can
+     * show which phone the driver is on (model + OS). Eager-load to avoid N+1.
+     */
+    public function latestDeviceToken(): HasOne
+    {
+        return $this->hasOne(DeviceToken::class)->latestOfMany('last_used_at');
+    }
 
     /** True once the driver has completed activation (set a password) for the app. */
     public function isActivated(): bool

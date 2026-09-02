@@ -34,6 +34,9 @@ class DriverResource extends JsonResource
             'location_updated_at' => $this->location_updated_at?->toIso8601String(),
             'email' => $this->email,
             'app_status' => $this->appStatus(),
+            // Human label of the driver's most-recent app device (model + OS),
+            // e.g. "Pixel 7 · Android 14"; null until a build that reports it registers.
+            'device_label' => $this->latestDeviceToken?->label(),
         ];
     }
 }

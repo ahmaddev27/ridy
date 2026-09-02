@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Driver;
 
 use App\Domain\Notifications\Models\DeviceToken;
+use App\Http\Controllers\Concerns\CapturesDeviceInfo;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,11 +14,15 @@ use Illuminate\Http\Request;
  */
 class DriverDeviceController extends Controller
 {
+    use CapturesDeviceInfo;
+
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
             'token' => ['required', 'string', 'max:512'],
             'platform' => ['nullable', 'in:android,ios'],
+            'device_name' => ['nullable', 'string', 'max:120'],
+            'os_version' => ['nullable', 'string', 'max:40'],
         ]);
 
         $driver = $request->user();
@@ -33,6 +38,7 @@ class DriverDeviceController extends Controller
                 'user_id' => null,
                 'platform' => $data['platform'] ?? 'android',
                 'last_used_at' => now(),
+                ...$this->deviceInfo($data),
             ],
         );
 
