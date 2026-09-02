@@ -183,6 +183,9 @@ Route::prefix('v1')->group(function () {
         // Dashboard client-side error reporter → the admin's frontend log. Any signed-in
         // dashboard user, throttled + size-capped in the controller.
         Route::post('client-log', [LogViewerController::class, 'recordFrontend'])->middleware('throttle:30,1');
+        // Reverb broadcasting auth for the dashboard — authorises private channels
+        // (e.g. company.{tenantId}) for the signed-in user via routes/channels.php.
+        Route::post('broadcasting/auth', fn (Request $request) => Broadcast::auth($request));
     });
 
     Route::middleware(['auth:sanctum', 'user.account', ResolveTenant::class, 'dashboard.only'])->group(function () {

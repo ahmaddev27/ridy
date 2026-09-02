@@ -38,7 +38,7 @@ class DispatchNotifier
         // Real-time nudge to the driver's open app (WebSocket) so a fresh offer
         // appears instantly, alongside the push that wakes a closed app. Best
         // -effort: a broadcast failure (Reverb down) must never break ingestion.
-        rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->id, 'new')), report: false);
+        rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'new')), report: false);
 
         $title = $this->buildTitle($offer);
         $body = $this->buildBody($offer);
@@ -162,7 +162,7 @@ class DispatchNotifier
         }
 
         // Live nudge to the open app so it re-fetches the offer with the new stops.
-        rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->id, 'multistop')), report: false);
+        rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'multistop')), report: false);
 
         // Lead the title with a bold, language-neutral multi-stop mark ("📍×N") so
         // the driver spots the extra drop-offs at a glance — the pin-with-count reads

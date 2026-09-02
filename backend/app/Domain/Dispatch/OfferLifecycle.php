@@ -233,7 +233,7 @@ class OfferLifecycle
         // Real-time nudge so the driver's open app reflects the new status (taken /
         // on-trip / completed) instantly. Best-effort — never breaks the transition.
         if ($changed && $offer->driver_id !== null) {
-            rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->id, 'status')), report: false);
+            rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'status')), report: false);
         }
 
         return $changed;
