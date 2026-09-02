@@ -73,8 +73,12 @@ return [
     // OSM services; point these at self-hosted Nominatim/OSRM (no rate limits)
     // once imported — see docs/self-hosted-geo.md.
     'geo' => [
-        'nominatim_url' => env('NOMINATIM_URL') ?: 'https://nominatim.openstreetmap.org',
-        'osrm_url' => env('OSRM_URL') ?: 'https://router.project-osrm.org',
+        // trim() guards against a stray trailing newline/CR in the env value (e.g. a
+        // GitHub secret pasted with a Windows line-ending) — an untrimmed "http://…\r"
+        // builds a "http://…\r/search" URL that throws a Guzzle MalformedUriException,
+        // silently breaking BOTH geocoding and the System Health probe.
+        'nominatim_url' => trim((string) env('NOMINATIM_URL')) ?: 'https://nominatim.openstreetmap.org',
+        'osrm_url' => trim((string) env('OSRM_URL')) ?: 'https://router.project-osrm.org',
     ],
 
     // Ops alerting: where operational alerts (broken session / down shard) are
