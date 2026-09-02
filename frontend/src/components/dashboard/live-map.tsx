@@ -140,6 +140,13 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
   // Last-known pickup/drop-off per driver, kept for the whole engaged trip — Uber
   // trims the pickup once ON_TRIP, so cache them so the stops never vanish mid-trip.
   const waypointsRef = useRef<Map<number, LiveWaypoint[]>>(new Map());
+  // Smooth car movement: the cars GLIDE from their current rendered position to the
+  // latest one instead of snapping — otherwise the more frequent WebSocket updates
+  // make the marker jump. `carPosRef` holds each car's currently-rendered [lng,lat];
+  // `carFeaturesRef` the latest features (with target coords); `carRafRef` the tween.
+  const carPosRef = useRef<Map<number, [number, number]>>(new Map());
+  const carFeaturesRef = useRef<GeoJSON.Feature[]>([]);
+  const carRafRef = useRef<number | null>(null);
 
   const [count, setCount] = useState<number | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
@@ -179,6 +186,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
         driverFeatures.push({
           type: "Feature",
           properties: {
+            id: d.id,
             color,
             heading: typeof d.heading === "number" ? d.heading : 0,
             name: d.name,
@@ -230,7 +238,12 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
         }
       }
 
-      (map.getSource(DRIVER_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: driverFeatures });
+      // Cars glide to their new position (animateCars); lines/dots are static targets
+      // so they snap. Drop cars that disappeared so their tween state doesn't linger.
+      carFeaturesRef.current = driverFeatures;
+      const liveIds = new Set(driverFeatures.map((f) => f.properties!.id as number));
+      for (const id of carPosRef.current.keys()) if (!liveIds.has(id)) carPosRef.current.delete(id);
+      animateCars();
       (map.getSource(LINE_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: lineFeatures });
       (map.getSource(POINT_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: pointFeatures });
 
@@ -250,6 +263,37 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
           map.fitBounds(bounds, { padding: 60, maxZoom: 15 });
         }
       }
+    }
+
+    // Tween the cars from their currently-rendered position to their latest target
+    // over ~700ms (easeOutCubic) so the frequent WebSocket updates glide instead of
+    // jump. A newly-seen car starts at its target (no fly-in from the map's edge).
+    function animateCars() {
+      const map = mapRef.current;
+      if (!map) return;
+      if (carRafRef.current) cancelAnimationFrame(carRafRef.current);
+
+      const from = new Map(carPosRef.current);
+      const start = performance.now();
+      const DURATION = 700;
+
+      const step = () => {
+        const p = Math.min((performance.now() - start) / DURATION, 1);
+        const e = 1 - Math.pow(1 - p, 3); // easeOutCubic
+        const features: GeoJSON.Feature[] = carFeaturesRef.current.map((f) => {
+          const id = f.properties!.id as number;
+          const tgt = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+          const src = from.get(id) ?? tgt;
+          const cur: [number, number] = [src[0] + (tgt[0] - src[0]) * e, src[1] + (tgt[1] - src[1]) * e];
+          carPosRef.current.set(id, cur);
+          return { ...f, geometry: { type: "Point", coordinates: cur } };
+        });
+        (map.getSource(DRIVER_SOURCE) as import("maplibre-gl").GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features });
+        if (p < 1) carRafRef.current = requestAnimationFrame(step);
+        else carRafRef.current = null;
+      };
+
+      carRafRef.current = requestAnimationFrame(step);
     }
 
     (async () => {
@@ -363,6 +407,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
     return () => {
       cancelled = true;
       clearInterval(timer);
+      if (carRafRef.current) cancelAnimationFrame(carRafRef.current);
       readyRef.current = false;
       mapRef.current?.remove();
       mapRef.current = null;
