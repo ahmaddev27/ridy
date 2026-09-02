@@ -14,7 +14,7 @@
 | تيار الإرساليات الحيّ | `vsdispatch.uber.com/ramendca/events` (RAMEN: `ack?seq=-1` ثم `recv?seq=0` SSE) |
 | كل عرض يحمل `driverInfo.driverUUID` + الاسم + العنوان + الأجرة + `partnerUUID` | `uber-console/response.json` |
 | `getUser` يرجّع هوية من سجّل الدخول: **uuid + firstName + lastName + email** | `uber-console/driver-me-response.json` |
-| **uuid السائق = driverUUID** في العروض | تطابق البنية + رابط `supplier.uber.com/orgs/{org}/drivers/{driver}` |
+| **uuid السائق = driverUUID** في العروض | تطابق البنية + رابط `fleethub.uber.com/orgs/{org}/drivers/{driver}` |
 | **uuid الأسطول = partnerUUID** في العروض | تطابق `7b118561...` |
 
 **نتيجة:** الربط بالـUUID يجمع الطرفين بدون مطابقة أسماء. دخول السائق يعطينا إيميله كمان → ربط تلقائي نظيف.
@@ -86,7 +86,7 @@
 السائق يسجّل دخول أوبر من تطبيق رايدي → `getUser` → `driverUUID` + email → نربطه بحسابه فوراً. **بدون مطابقة أسماء.**
 
 ### 4.3 ربط السائق — يدوي (احتياطي، يشتغل الآن)
-- نجيب roster الأسطول من `supplier.uber.com/orgs/{org}/drivers` (يُتحقَّق منه).
+- نجيب roster الأسطول من `fleethub.uber.com/orgs/{org}/drivers` (يُتحقَّق منه).
 - المدير يشوف قائمة (اسم + email) ويطابق كل سائق بحساب رايدي بضغطة.
 - يستفيد من طابور المراجعة الموجود (`ReviewQueueController::linkIdentity` — نعمّمه للسائقين).
 

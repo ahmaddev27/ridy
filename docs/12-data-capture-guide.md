@@ -1,7 +1,7 @@
 # دليل التقاط بيانات أوبر — للاختبار على حساب شركة حقيقي
 
 > **الغرض:** خطة العمل + أدوات الالتقاط الثلاثة (كاملة) لاكتشاف endpoints بيانات أوبر وبناء السحب.
-> **يُنفَّذ على:** `supplier.uber.com` و `vsdispatch.uber.com` وأنت داخل حساب الشركة الحقيقي.
+> **يُنفَّذ على:** `fleethub.uber.com` و `vsdispatch.uber.com` وأنت داخل حساب الشركة الحقيقي.
 
 ---
 
@@ -20,7 +20,7 @@
 ## خطة العمل (نُنفّذها معاً)
 
 ```
-1. أنت: تدخل حساب الشركة الحقيقي على supplier.uber.com
+1. أنت: تدخل حساب الشركة الحقيقي على fleethub.uber.com
 2. أنت: تربط الجلسة عبر الإضافة (زر واحد) → جلسة حقيقية مخزّنة
 3. أنت: تشغّل find-roster.js على صفحة السواقين → ترسل الردّ
 4. المطوّر: يبني RosterSync — يسحب السواقين ويخزّنهم
@@ -37,7 +37,7 @@
 1. **صفحة السواقين** → `find-roster.js` → قائمة السواقين (أسماء/صور/UUID).
 2. **بروفايل سائق واحد** (اضغط على سائق) → `find-driver-me.js` → تفاصيل السائق الفردي (جوال؟ صورة؟ حالة؟).
 3. **صفحة الأرباح/الرحلات** (إن وُجدت) → `find-roster.js` → تفاصيل الرحلات/الأرباح.
-4. **رابط كل صفحة** — انسخه (مثال معروف: `supplier.uber.com/orgs/{ORG}/drivers/{DRIVER}`).
+4. **رابط كل صفحة** — انسخه (مثال معروف: `fleethub.uber.com/orgs/{ORG}/drivers/{DRIVER}`).
 
 > **مهم — الخصوصية:** احذف أي **كوكيز/توكن حقيقي** قبل إرسال أي ردّ. المطلوب فقط **بنية البيانات** (أسماء الحقول والشكل)، لا القيم السرّية.
 
@@ -55,16 +55,16 @@
 
 ## الأداة 1 — `find-roster.js` (قائمة السواقين)
 
-> شغّلها على صفحة **Drivers / Team / Fleet** في `supplier.uber.com`.
+> شغّلها على صفحة **Drivers / Team / Fleet** في `fleethub.uber.com`.
 > بعد الالتقاط: `copy(JSON.stringify(getRosterHits(), null, 2))`
 
 ```javascript
 // Roster endpoint finder — captures the Uber API call that returns the LIST of
-// drivers (names, photos, ids). Paste in the console on supplier.uber.com while
+// drivers (names, photos, ids). Paste in the console on fleethub.uber.com while
 // viewing your drivers/team page. Plain ASCII, safe to paste.
 //
 // HOW TO USE:
-//   1. Open supplier.uber.com and go to your Drivers / Team / Fleet page.
+//   1. Open fleethub.uber.com and go to your Drivers / Team / Fleet page.
 //   2. F12 -> Console. Paste ALL of this, press Enter -> prints "ROSTER WATCH ON".
 //   3. Navigate the drivers list (open it, refresh via in-app nav, page through).
 //   4. When a response with MULTIPLE drivers is seen it prints "ROSTER HIT" with

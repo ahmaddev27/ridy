@@ -5,6 +5,12 @@ fields below into App Store Connect. The store copy deliberately never names any
 ride-hailing platform (Uber/Bolt) or mentions capture/scraping — required to
 avoid rejection.
 
+> **Current status (2026-09-02):** the app is **approved** — current release is
+> **v1.0.3 (build 11)**. The listing still shows **"Cannot Sell"** in Germany
+> because the **DSA trader status is "In Review"**; it goes on sale once Apple
+> clears the trader verification. The checklist below remains the reference for
+> the review-readiness fields.
+
 ---
 
 ## URLs (ready to paste)
