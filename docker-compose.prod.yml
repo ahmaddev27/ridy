@@ -65,6 +65,13 @@ x-app-env: &app-env
   # /proc and root filesystem, mounted read-only on the backend service below.
   HOST_PROC_PATH: ${HOST_PROC_PATH:-/host/proc}
   HOST_DISK_PATH: ${HOST_DISK_PATH:-/host/root}
+  # Geocoding + routing (TripGeocoder). Empty = the public OSM services (rate-limited
+  # ~1 req/s). Point these at the self-hosted containers to remove the limits —
+  # NOMINATIM_URL=http://nominatim:8080, OSRM_URL=http://osrm:5000 (in the root .env),
+  # and start them with `--profile geo`. Without this passthrough the backend never
+  # sees the values and silently stays on public OSM. See docs/self-hosted-geo.md.
+  NOMINATIM_URL: ${NOMINATIM_URL:-}
+  OSRM_URL: ${OSRM_URL:-}
 
 services:
   # --- Caddy — TLS edge + reverse proxy -------------------------------------
