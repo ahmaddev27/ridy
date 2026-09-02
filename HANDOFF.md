@@ -20,6 +20,68 @@ Newest wave of changes, so an agent resuming work knows what moved. Older histor
 
 ---
 
+## How to work on this project (agent operating guide — start here)
+
+You are picking up a live production system. Work like the maintainer, not a prototyper: keep changes **scoped**, respect the invariants below, verify before you commit, and leave this file current.
+
+### The loop for every task
+
+1. **Orient.** Read the change log above, then `git log --oneline -20`. Grep for the feature you're touching before writing — reuse the existing service/helper (the architecture is service-layered; see §4).
+2. **Locate.** Use the task map below to jump to the right files. Business logic lives in `app/Domain/**`, never in controllers.
+3. **Change the smallest surface.** Don't re-architect a settled subsystem to fix a bug (see Invariants). If the fix implies a design change, confirm with the user first.
+4. **Verify** with the gate for the surface you touched (table below). Never commit a surface you didn't build/type-check.
+5. **Commit** with a Conventional Commit (`fix(daemon): …`, `feat(driver-app): …`, `docs: …`), body explaining *why*, and the `Co-Authored-By: Claude …` trailer. Work happens **directly on `main`** in this repo.
+6. **Update this file** — add a dated change-log line (and fix any section your change made stale) **in the same commit**. Then `git push origin main`. A change isn't done until the guide reflects it and it's pushed.
+
+### Verification gates (run before committing that surface)
+
+| You touched… | Gate |
+| --- | --- |
+| `backend/` | `cd backend && vendor/bin/pint --test && php artisan test` (sqlite `:memory:`). CI runs the same on PHP 8.4. |
+| `frontend/` | `cd frontend && npm run build` (the hard gate; lint is advisory). Read `node_modules/next/dist/docs/` first — Next 16 ≠ training data (see Gotchas). |
+| `driver-app/` | `cd driver-app && npx tsc --noEmit` (the `lint` script). |
+| `dispatch-daemon/` | `node -c src/<file>.js` on each changed file (ESM, no build step). |
+| `extension/` | Load unpacked in Chrome and check the console; bump `manifest.json` `version` for any store release. |
+
+### Deploy model (what a change actually needs to ship)
+
+| Surface | How it reaches prod |
+| --- | --- |
+| `backend/` | **Volume-mounted** — a `git pull` on the VPS + `migrate --force` + `config:clear` + `restart backend scheduler`. No image rebuild. `.github/workflows/deploy.yml` does this on push to `main`. See §6. |
+| `frontend/` / `dispatch-daemon/` | Built into images → `docker compose -f docker-compose.prod.yml up -d --build <service>`. |
+| `driver-app/` | **Prefer OTA** (`eas update`) — no store review. A change needs a **native rebuild** (`eas build`) only when it adds/updates a native module or changes `app.json` native config. Pure JS/TS/RN changes ship OTA. Call this out in the change log (the date picker did). |
+| `extension/` | Chrome Web Store (unlisted, auto-update). Bump `manifest.json` version, zip `extension/`, upload; users update automatically. |
+
+### Task map — "I want to…" → files
+
+| Goal | Touch |
+| --- | --- |
+| Add a field to the **offer push** | `DispatchNotifier` (payload/title/body) → `DispatchOfferResource` (dashboard/app JSON) → driver-app `offer-card`/`offer/[id]` + `frontend` offer views. |
+| Change **acceptance/lifecycle inference** | `Domain/Fleet/DriverStatusIngestor.php` (edges) + `Domain/Dispatch/OfferLifecycle.php` (guarded transitions). **Status-based inference only** — do not reintroduce a timeline reconciler (it was tried and reverted). |
+| Tune **geocoding / distance / addresses** | `Domain/Dispatch/TripGeocoder.php` (tiers, viewbox bias, `enrichForNotify`, `labelStops`, OSRM legs). Respect the city rule (Invariants). |
+| Add a **driver-app string** | `driver-app/src/lib/i18n.ts` — add the key to **all three** de/en/ar blocks. |
+| Add a **dashboard string** | `frontend/src/lib/i18n/` (`dictionaries.ts` for chrome, `screens-*.ts` for screens) — all three locales; watch for a duplicate key matching an earlier block. |
+| Add a **scheduled job / cron** | `backend/routes/console.php` (the scheduler container runs `schedule:work`). |
+| Add an **admin health/queue/log signal** | `Domain/System/InfrastructureHealthService.php`, `Admin/QueueAdminController`, `Admin/LogViewerController` → System Health tabs (`frontend/.../admin/system-health`). |
+| A **new tenant-owned table** | model uses `BelongsToTenant`; remember the global scope is silent in console/daemon contexts (Gotchas). |
+| **Daemon stream/session logic** | `dispatch-daemon/src/{index.js (supervisor),stream.js (RamenStream + jarFingerprint),config.js,api.js}`. |
+
+### Invariants — do NOT change these without explicit confirmation
+
+These are settled product rules. Treat a request that seems to break one as a misunderstanding to clarify, not an instruction to execute.
+
+- **Observe, don't control.** Never accept/reject/start/end a trip or message a rider. Acceptance is inferred from Uber status only. (See §1.)
+- **Time model.** Timezone is **Europe/Berlin**; the **week starts Monday**; the **Uber fleet-day starts at 04:00**. All stats/windows use fleet-days.
+- **Every offer push must carry** distance + dropoff + €/km with the €-quality badge. Geocode **before** notifying (`enrichForNotify`) so the push is never bare. A **multi-stop** ride pushes a new notification and shows per-stop addresses + per-leg km on both dashboard and app.
+- **Addresses.** Maximize geocoding; correct addresses from Uber waypoints after acceptance; **never change the city wrongly** — an authoritative city/PLZ must win over a mis-biased reverse-geocode.
+- **i18n & numerals.** German is the **default** language (de/en/ar everywhere, RTL for ar). Money/distance/dates always render **Latin digits**, even in Arabic (`format.ts` / `latnLocale()`).
+- **Scope discipline.** Keep bug fixes narrow; don't refactor working fundamentals to land a small fix.
+- **Idempotency.** Offer ingest (on `offer_uuid`) and lifecycle transitions are idempotent by design — re-delivery from daemon/extension is expected and safe.
+
+> **Sensitive/intentional:** a fixed **OTP test code** path exists (`services.otp_test_code` / `OTP_TEST_CODE`) so the team can log into the driver app without a live SMS — it is intentional; leave it unless the user says otherwise. Product posture is DSGVO "**detect, don't surveil**": don't add data collection beyond what a feature needs without flagging it.
+
+---
+
 ## 1. Mental model
 
 **What Reidey does.** German Uber-fleet operators run many drivers under one Uber "org". Uber sends ride **offers** to drivers with only a ~5-second accept window. Reidey taps the fleet's own **live Uber dispatch stream** (Uber's internal "RAMEN" server-sent-events feed), figures out which of the fleet's drivers each offer is for, and instantly pushes it to that driver's phone with the fare, €-quality, addresses and distance — so the driver can decide fast.
