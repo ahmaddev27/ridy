@@ -5,7 +5,7 @@ namespace App\Events;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -21,7 +21,7 @@ use Illuminate\Queue\SerializesModels;
  *     so a manager sees the feed live. Tenant isolation is enforced by the
  *     channel authorization: a user may only subscribe to their OWN company.
  */
-class OfferBroadcast implements ShouldBroadcast
+class OfferBroadcast implements ShouldBroadcastNow
 {
     use Dispatchable;
     use InteractsWithSockets;

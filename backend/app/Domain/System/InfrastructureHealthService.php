@@ -41,7 +41,10 @@ class InfrastructureHealthService
         $queue = $this->queue();
         $scheduler = $this->scheduler();
         $reverb = $this->tcpReachable($this->reverbHost(), $this->reverbPort());
-        $nominatim = $this->httpReachable((string) config('services.geo.nominatim_url'));
+        // Probe Nominatim's purpose-built /status.php (fast + present on both the
+        // self-hosted container and the public service) — hitting the bare root
+        // returns the web UI / no quick answer and false-negatived a working server.
+        $nominatim = $this->httpReachable(rtrim((string) config('services.geo.nominatim_url'), '/').'/status.php');
         $osrm = $this->httpReachable((string) config('services.geo.osrm_url'));
 
         return [
@@ -121,7 +124,7 @@ class InfrastructureHealthService
         }
 
         return (bool) rescue(
-            fn () => Http::withOptions(self::NO_PROXY)->timeout(2)->get($url)->status() > 0,
+            fn () => Http::withOptions(self::NO_PROXY)->timeout(4)->get($url)->status() > 0,
             false,
             report: false,
         );
