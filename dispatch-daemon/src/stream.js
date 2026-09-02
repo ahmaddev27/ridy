@@ -1,7 +1,23 @@
 // Holds one fleet's RAMEN dispatch stream: handshake, read SSE, forward offers,
 // and persist rolling cookies so an actively-used session outlives its idle TTL.
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+
+/**
+ * A fingerprint of a cookie jar's VALUES (not just its count), so the supervisor
+ * restarts a stream when the manager reconnects and the token ROTATES to a new value
+ * with the SAME cookie count — the count-only fingerprint missed that and left the
+ * stream stuck on the dead cookies (RAMEN 404) until a manual daemon restart.
+ * Stable between reconnects (stored cookies don't change), so it doesn't churn.
+ */
+export function jarFingerprint(cookies) {
+  if (!cookies?.length) return "0";
+  const joined = cookies
+    .map((c) => `${c.name}=${c.value}`)
+    .sort()
+    .join("|");
+  return createHash("sha1").update(joined).digest("hex").slice(0, 16);
+}
 // Import fetch from undici (not the global fetch): Node's global fetch ignores
 // the per-request `dispatcher` option, so a per-stream ProxyAgent only takes
 // effect when we call undici's own fetch.
@@ -54,12 +70,11 @@ export class RamenStream {
     this.supplierJar = new Map(
       (session.supplier_cookies?.length ? session.supplier_cookies : session.cookies).map((c) => [c.name, c.value]),
     );
-    // Jar fingerprint (counts, not values) so the supervisor can restart this
-    // stream when a re-link changes the captured cookies — e.g. supplier cookies
-    // get backfilled after the manager reconnects while logged into
-    // supplier.uber.com. Routine value rotation keeps the counts, so this won't
-    // churn the stream on every refresh.
-    this.cookieFp = `${session.cookies?.length ?? 0}:${session.supplier_cookies?.length ?? 0}`;
+    // Jar fingerprint over cookie VALUES so the supervisor restarts this stream
+    // whenever the manager reconnects — even when the new token has the same cookie
+    // COUNT (the old count-only fingerprint missed a value rotation and stuck the
+    // stream on dead cookies with a RAMEN 404 until a manual restart).
+    this.cookieFp = `${jarFingerprint(session.cookies)}:${jarFingerprint(session.supplier_cookies)}`;
     this.seq = 0;
     this.stopped = false;
     this.reconnectDelay = config.reconnectMinDelay;

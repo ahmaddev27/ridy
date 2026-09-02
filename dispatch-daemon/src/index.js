@@ -3,7 +3,7 @@
 
 import { config } from "./config.js";
 import { api } from "./api.js";
-import { RamenStream } from "./stream.js";
+import { RamenStream, jarFingerprint } from "./stream.js";
 import { initSentry, captureException, flush } from "./sentry.js";
 
 // Keyed by `${sessionId}:${ramenPath}` — one entry per (session × RAMEN channel),
@@ -55,12 +55,12 @@ async function reconcile() {
     sessions.map((s) => [s.id, s.proxy_url || config.proxyUrl || ""]),
   );
 
-  // Jar fingerprint per session (cookie counts) so a re-link that backfills the
-  // supplier cookies restarts the stream with the fresh jar — otherwise the old
-  // stream keeps polling supplier with the stale/empty jar and every offer
-  // expires to rejected until a manual daemon restart.
+  // Jar fingerprint per session over cookie VALUES so a re-link RESTARTS the stream
+  // with the fresh jar — even when the new token has the same cookie COUNT. The old
+  // count-only fingerprint missed a value rotation, so a reconnect left the stream
+  // stuck on the dead cookies (RAMEN 404) until a manual daemon restart.
   const effectiveFp = new Map(
-    sessions.map((s) => [s.id, `${s.cookies?.length ?? 0}:${s.supplier_cookies?.length ?? 0}`]),
+    sessions.map((s) => [s.id, `${jarFingerprint(s.cookies)}:${jarFingerprint(s.supplier_cookies)}`]),
   );
 
   // Stop streams whose session is gone, no longer active, OR whose proxy/cookies
