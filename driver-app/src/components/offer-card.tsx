@@ -61,7 +61,7 @@ export function OfferCard({
           <View style={{ alignItems: isRTL() ? "flex-start" : "flex-end", gap: 2 }}>
             <View style={{ flexDirection: rowDir(), alignItems: "flex-end", gap: 3 }}>
               <Text style={{ color: c.ink, fontSize: 17, fontWeight: "600" }}>{perKm.value}</Text>
-              <Text style={{ color: c.inkSubtle, fontSize: 11, marginBottom: 1 }}>/km</Text>
+              <Text style={{ color: c.inkSubtle, fontSize: 11, marginBottom: 1 }}>€/km</Text>
             </View>
           </View>
         )}

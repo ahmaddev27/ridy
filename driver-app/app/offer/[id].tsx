@@ -179,7 +179,7 @@ export default function OfferScreen() {
                     </Text>
                     {perKm && (
                       <Text style={{ color: c.inkMuted, fontSize: 15, marginTop: 3, writingDirection: "ltr" }}>
-                        {perKm.value} <Text style={{ color: c.inkSubtle }}>/km</Text>
+                        {perKm.value} <Text style={{ color: c.inkSubtle }}>€/km</Text>
                       </Text>
                     )}
                   </>
