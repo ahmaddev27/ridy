@@ -10,12 +10,18 @@ import { useAsync } from "@/hooks/use-async";
 import { getDashboardSummary } from "@/lib/api/dashboard";
 import { LiveMap } from "@/components/dashboard/live-map";
 import { AdBanner } from "@/components/ads/ad-banner";
+import { useAuth } from "@/components/auth/auth-provider";
+import { useCompanyRealtime } from "@/lib/realtime";
 
 
 export default function DashboardPage() {
   const { t, locale } = useI18n();
+  const { user } = useAuth();
   const { data, loading, error, refetch } = useAsync(getDashboardSummary, { refetchInterval: 10000 });
   const [redeemOpen, setRedeemOpen] = useState(false);
+
+  // Live: refresh the summary the moment an offer changes (poll stays as fallback).
+  useCompanyRealtime(user?.tenant?.id, refetch);
 
   const k = (key: string) => t(`screens.dashboard.${key}`);
 

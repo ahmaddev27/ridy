@@ -28,8 +28,11 @@ import { StatCard } from "@/components/ui/card";
 import { listDrivers, type Driver } from "@/lib/api/drivers";
 import { OfferDetailModal } from "./offer-detail-modal";
 import { AdBanner } from "@/components/ads/ad-banner";
+import { useAuth } from "@/components/auth/auth-provider";
+import { useCompanyRealtime } from "@/lib/realtime";
 
 export default function OffersPage() {
+  const { user } = useAuth();
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.offers.${k}`);
 
@@ -124,6 +127,10 @@ export default function OffersPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, driverKey, from, to, page, perPage]);
+
+  // Live: an offer change on the company channel refreshes the feed in place at
+  // once (the 5s poll above stays as the fallback).
+  useCompanyRealtime(user?.tenant?.id, () => load(true));
 
   // All of the company's drivers (with an Uber UUID) populate the filter list.
   useEffect(() => {

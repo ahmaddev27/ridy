@@ -204,6 +204,10 @@ services:
         # a rebuild. Override only to force an absolute API base.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
         NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        # Reverb (WebSocket) public app key — lets the dashboard subscribe to its
+        # company channel for live offer updates. Reuses REVERB_APP_KEY (already set
+        # for the reverb service); empty → the dashboard falls back to polling.
+        NEXT_PUBLIC_REVERB_KEY: ${NEXT_PUBLIC_REVERB_KEY:-${REVERB_APP_KEY:-}}
     restart: unless-stopped
 
   # --- Dispatch daemon — holds the Uber RAMEN stream ------------------------
