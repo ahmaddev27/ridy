@@ -15,7 +15,7 @@ Newest wave of changes, so an agent resuming work knows what moved. Older histor
 - **2026-09-02 — `fleet:check-sync` sync-breakage detector.** `App\Console\Commands\CheckFleetSync` (scheduled every 5 min) logs `fleet.sync_stale` for active companies that have linked drivers but no fresh `status_synced_at` (`STALE_MINUTES = 12`) — i.e. offers arrive but the status poll is broken (the failure mode the Fleet Hub migration caused). See it on the System Health page.
 - **2026-09-02 — Daemon self-heals after a reconnect (no manual restart).** The supervisor fingerprinted each session's cookie jar by **count**, so a re-link that rotated the token to a new value with the same count went undetected → the stream kept the dead cookies and RAMEN-404'd until someone restarted the daemon. Now fingerprinted by **value** via the shared `jarFingerprint()` (`dispatch-daemon/src/stream.js`, imported by `index.js`) — a reconnect restarts the stream on its own. Stable between reconnects, so it doesn't churn.
 - **2026-09-02 — Geocode-before-notify + multi-stop detail.** `TripGeocoder::enrichForNotify()` runs a **bounded (~2.5 s, deadline-guarded)** pre-push geocode so the FCM push carries distance/€-per-km instead of arriving bare (offers were pushing before the async enrich ran). Multi-stop rides now resolve per-leg: `labelStops()` reverse-geocodes each waypoint with `leg_m`/cumulative distance, surfaced in `DispatchOfferResource` as `stops_count` + `stops[]` (dashboard + driver app render per-stop detail). A scheduled `queue:work --stop-when-empty` (below) drains the async `GeocodeOffer`/`SyncTripFromWaypoints` jobs.
-- **2026-09-02 — Queue drains via the scheduler (prod has no queue container).** Prod queue = **database**, and there was no `queue:work` daemon, so queued jobs never ran (the real root cause of missing geocoding). `backend/routes/console.php` now schedules `queue:work --stop-when-empty --max-time=50 --tries=3` every minute, `offers:backfill-geo` every 10 min, `fleet:check-sync` every 5 min, and writes a scheduler heartbeat for the infra-health check. The single `scheduler` container (`schedule:work`) must be up. **A stale anonymous `vendor` volume once shadowed a rebuilt image and crash-looped the scheduler (`ReverbServiceProvider not found`); the deploy uses `--renew-anon-volumes` to prevent this.**
+- **2026-09-02 — Queue draining (dedicated `queue` container + scheduler backstop).** Prod queue = **database**. Prod runs a dedicated **`queue` container** (`php artisan queue:work --queue=default --tries=3 --backoff=10 --max-time=3600`) that is the primary worker; `backend/routes/console.php` ALSO schedules a `queue:work --stop-when-empty --max-time=50` every minute as a belt-and-suspenders backstop (covers a dead worker), plus `offers:backfill-geo` every 10 min, `fleet:check-sync` every 5 min, and a scheduler heartbeat for the infra-health check. The `scheduler` (`schedule:work`) and `queue` containers must both be up. **A stale anonymous `vendor` volume once shadowed a rebuilt image and crash-looped the scheduler (`ReverbServiceProvider not found`); the deploy uses `--renew-anon-volumes` to prevent this.**
 - **2026-09-02 — Admin System Health: infrastructure, queue, logs.** `app/Domain/System/InfrastructureHealthService.php` reports queue depth, scheduler heartbeat, and TCP/HTTP reachability of Reverb/Nominatim/OSRM. `Admin/QueueAdminController` (failed / retry / flush / clearPending) and `Admin/LogViewerController` (tail + clear `laravel.log` and a frontend log; frontend errors POST in via `client-error-reporter`) power new tabs on the System Health page — order: **health · services · logs · shards**.
 - **2026-09-02 — Driver-app date picker.** The Statistics/Offers period pill gained a **"Pick a date"** row that swaps in a self-contained month calendar (day/month/year; future days disabled). A picked day maps to `range="today"` + its day-offset, so all downstream windows/charts/queries are unchanged. Pure JS/RN — **no native module, ships OTA**. Lives in `driver-app/src/components/period-navigator.tsx`.
 
@@ -48,7 +48,7 @@ You are picking up a live production system. Work like the maintainer, not a pro
 
 | Surface | How it reaches prod |
 | --- | --- |
-| `backend/` | **Volume-mounted** — a `git pull` on the VPS + `migrate --force` + `config:clear` + `restart backend scheduler`. No image rebuild. `.github/workflows/deploy.yml` does this on push to `main`. See §6. |
+| `backend/` | **Volume-mounted** — a `git pull` on the VPS + `migrate --force` + `config:clear` + `restart backend scheduler queue`. No image rebuild. `.github/workflows/deploy.yml` does this on push to `main` (it auto-runs `migrate --force`). See §6. |
 | `frontend/` / `dispatch-daemon/` | Built into images → `docker compose -f docker-compose.prod.yml up -d --build <service>`. |
 | `driver-app/` | **Prefer OTA** (`eas update`) — no store review. A change needs a **native rebuild** (`eas build`) only when it adds/updates a native module or changes `app.json` native config. Pure JS/TS/RN changes ship OTA. Call this out in the change log (the date picker did). |
 | `extension/` | Chrome Web Store (unlisted, auto-update). Bump `manifest.json` version, zip `extension/`, upload; users update automatically. |
@@ -312,10 +312,13 @@ Prod stack `docker-compose.prod.yml` (domain `reidey.de`). Services:
 | `mysql` | MySQL 8, volume `dbdata`, healthcheck. |
 | `backend` | Laravel PHP-FPM. **`./backend` is volume-mounted** (`:/var/www` + anonymous `/var/www/vendor`) — so a deploy is a code sync, not an image rebuild. |
 | `scheduler` | same image, `command: php artisan schedule:work` — runs Laravel's cron in one long process (no host crontab). |
+| `queue` | same image, `command: php artisan queue:work --queue=default --tries=3 --backoff=10 --max-time=3600` — the primary queue worker (the scheduler's per-minute `queue:work --stop-when-empty` is a backstop). |
+| `reverb` | Laravel Reverb WebSocket server (broadcasting) — the driver app subscribes for live offer updates; the dashboard still polls. |
 | `frontend` | Next.js, built with `NEXT_PUBLIC_API_URL=https://${DOMAIN}`. |
 | `dispatch-daemon` | Node RAMEN daemon; env `RIDY_API_URL=https://${DOMAIN}`, `DISPATCH_INGEST_SECRET`, `UBER_*`. |
+| `nominatim`, `osrm` | optional self-hosted geocoding/routing (behind the `geo` profile — see `docs/self-hosted-geo.md`); `TripGeocoder` falls back to the public OSM services when unset. |
 
-Backend + scheduler share env via the `x-app-env` YAML anchor (prod uses **database** queue/cache; no Redis/Horizon — those are dev-only in `docker-compose.yml`).
+Backend, scheduler and queue share env via the `x-app-env` YAML anchor (prod uses **database** queue/cache; no Redis/Horizon — those are dev-only in `docker-compose.yml`).
 
 **First-time provision** (see `docs/13-deployment.md`): DNS A record → install Docker → clone → `cp .env.prod.example .env` and fill `DOMAIN`, DB passwords, `DISPATCH_INGEST_SECRET` → generate `APP_KEY` → then:
 
@@ -331,7 +334,7 @@ docker compose -f docker-compose.prod.yml exec backend php artisan migrate --for
 git pull
 docker compose -f docker-compose.prod.yml exec backend php artisan migrate --force
 docker compose -f docker-compose.prod.yml exec backend php artisan config:clear
-docker compose -f docker-compose.prod.yml restart backend scheduler
+docker compose -f docker-compose.prod.yml restart backend scheduler queue
 ```
 
 **Frontend / daemon changes** (built into images) need a rebuild:
