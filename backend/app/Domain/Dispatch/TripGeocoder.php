@@ -854,14 +854,18 @@ class TripGeocoder
         }
 
         $stopsCount = count($points) - 1; // everything after the pickup is a drop-off
-        $stopsChanged = (int) ($offer->stops_count ?? 0) !== $stopsCount;
-        // Uber's live-map coordinates are authoritative, so adopt them for ANY
-        // accepted offer not yet resolved from Uber — even one our geocoder already
-        // placed, because a text-only address ("Dorfwiese 1, Kipdorf") can resolve
-        // to a plausible-but-wrong point. geo_source=uber marks it done so this
-        // runs once; a changed stop count still refreshes (live multi-stop updates).
+        // Uber's waypoint list SHRINKS as the driver progresses: EN_ROUTE it holds the
+        // full itinerary [PICKUP, DROPOFF, …]; once ON_TRIP the pickup is dropped, so a
+        // 2-stop trip goes [PICKUP,D1,D2] → [D1,D2] → [D2]. The full EN_ROUTE capture is
+        // the source of truth, so only RE-resolve when the count GROWS — a shrink is just
+        // the driver completing a leg and must not overwrite the offer's real stop count.
+        $stopsGrew = $stopsCount > (int) ($offer->stops_count ?? 0);
+        // Uber's live-map coordinates are authoritative, so adopt them for ANY accepted
+        // offer not yet resolved from Uber — even one our geocoder already placed (a
+        // text-only address can resolve to a plausible-but-wrong point). geo_source=uber
+        // marks it done so this runs once; a larger itinerary still refreshes.
         $needs = $offer->geo_source !== 'uber';
-        if (! $needs && ! $stopsChanged) {
+        if (! $needs && ! $stopsGrew) {
             return null;
         }
 
