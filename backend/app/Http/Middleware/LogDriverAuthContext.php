@@ -58,11 +58,18 @@ class LogDriverAuthContext
             default => 'resolves_ok_but_guard_rejected',
         };
 
+        // Enough identity to pinpoint the culprit on the next hit: the tokenable
+        // TYPE tells us owner-vs-driver (a User token on a driver-only route is the
+        // known cause), tenant_id names the company, and ip/agent the device.
         Log::error('driver_auth_401', [
             'path' => $request->path(),
             'token_state' => $state,
             'tokenable_type' => $pat?->tokenable_type,
             'tokenable_id' => $pat?->tokenable_id,
+            'tenant_id' => $pat?->tokenable?->tenant_id,
+            'token_name' => $pat?->name,
+            'ip' => $request->ip(),
+            'agent' => substr((string) $request->userAgent(), 0, 120),
         ]);
     }
 }
