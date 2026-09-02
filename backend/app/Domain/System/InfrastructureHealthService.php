@@ -43,8 +43,10 @@ class InfrastructureHealthService
         $reverb = $this->tcpReachable($this->reverbHost(), $this->reverbPort());
         // Probe the exact endpoint the app uses — a trivial /search query — instead
         // of the bare root, which on the self-hosted container hangs (no quick answer)
-        // and false-negatived a working geocoder as Down. Any HTTP answer = reachable.
-        $nominatim = $this->httpReachable(rtrim((string) config('services.geo.nominatim_url'), '/').'/search?format=json&limit=1&q=a');
+        // and false-negatived a working geocoder as Down. The query MUST be passed as
+        // an array, not embedded in the URL: an embedded `?a=1&b=2` string trips
+        // Guzzle's URI handling here and throws → false-negative Down.
+        $nominatim = $this->httpReachable(rtrim((string) config('services.geo.nominatim_url'), '/').'/search', ['format' => 'json', 'limit' => 1, 'q' => 'a']);
         $osrm = $this->httpReachable((string) config('services.geo.osrm_url'));
 
         return [
@@ -116,15 +118,20 @@ class InfrastructureHealthService
         return true;
     }
 
-    /** True when the URL answers with ANY HTTP status (reachable), within 2s. */
-    private function httpReachable(string $url): bool
+    /**
+     * True when the URL answers with ANY HTTP status (reachable), within 4s.
+     * Pass query params as `$query`, never embedded in `$url` (see the caller).
+     *
+     * @param  array<string, mixed>  $query
+     */
+    private function httpReachable(string $url, array $query = []): bool
     {
         if ($url === '') {
             return false;
         }
 
         return (bool) rescue(
-            fn () => Http::withOptions(self::NO_PROXY)->timeout(4)->get($url)->status() > 0,
+            fn () => Http::withOptions(self::NO_PROXY)->timeout(4)->get($url, $query)->status() > 0,
             false,
             report: false,
         );
