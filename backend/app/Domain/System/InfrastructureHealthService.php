@@ -41,10 +41,10 @@ class InfrastructureHealthService
         $queue = $this->queue();
         $scheduler = $this->scheduler();
         $reverb = $this->tcpReachable($this->reverbHost(), $this->reverbPort());
-        // Probe Nominatim's purpose-built /status.php (fast + present on both the
-        // self-hosted container and the public service) — hitting the bare root
-        // returns the web UI / no quick answer and false-negatived a working server.
-        $nominatim = $this->httpReachable(rtrim((string) config('services.geo.nominatim_url'), '/').'/status.php');
+        // Probe the exact endpoint the app uses — a trivial /search query — instead
+        // of the bare root, which on the self-hosted container hangs (no quick answer)
+        // and false-negatived a working geocoder as Down. Any HTTP answer = reachable.
+        $nominatim = $this->httpReachable(rtrim((string) config('services.geo.nominatim_url'), '/').'/search?format=json&limit=1&q=a');
         $osrm = $this->httpReachable((string) config('services.geo.osrm_url'));
 
         return [
