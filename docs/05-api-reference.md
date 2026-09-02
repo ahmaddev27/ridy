@@ -1,176 +1,201 @@
-# مرجع الـ API للباك (Laravel) — DASHCAM (Living Document)
+# مرجع الـ API للباك-إند (Reidey · Laravel 13)
 
-> **يُحدَّث أول بأول** مع كل endpoint يُبنى. الفرونت (Next.js) يستهلك هذا العقد.
-> **يُقرأ مع:** [02-technical-plan.md](./02-technical-plan.md) · [04-progress.md](./04-progress.md)
-> **الحالة العامة:** ⬜ لم يُبنَ أي endpoint بعد — هذا العقد المخطّط لمرحلة P0→P4.
-
-**رموز الحالة:** ✅ مُنفّذ ومختبَر · 🔄 جارٍ · ⬜ مخطّط
+> **مصدر الحقيقة:** [`backend/routes/api.php`](../backend/routes/api.php) (النقاط) و[`backend/routes/console.php`](../backend/routes/console.php) (المهام المجدولة). هذا الملف يلخّصهما — عند أي اختلاف، **الكود هو الحقيقة**.
+> **للتفاصيل المعمارية** (المنطق خلف كل نقطة): [`HANDOFF.md`](../HANDOFF.md) §2.
+> آخر تحديث: **2026-09-02**
 
 ---
 
-## 1. الاتفاقيات العامة (Conventions)
+## 1. الاتفاقيات العامة
 
-- **Base URL:** `https://api.dashcam.de/api/v1` (محلياً `http://localhost:8080/api/v1`)
-- **التنسيق:** JSON فقط. الترميز UTF-8. الأوقات **UTC** بصيغة ISO-8601.
-- **المصادقة:** **Sanctum SPA (cookies)** — الفرونت أول-طرف على نفس الدومين الأب.
-  - قبل أي طلب كتابة: `GET /sanctum/csrf-cookie` لجلب كوكي `XSRF-TOKEN`.
-  - الطلبات ترسل `credentials: 'include'` + هيدر `X-XSRF-TOKEN`.
-- **العزل:** كل طلب يُحلّ الـ `tenant` من المستخدم المصادق (لا يُمرَّر `tenant_id` من العميل).
-- **التفويض:** RBAC — أدوار `owner/fleet_manager/analyst/viewer/dpo`. الوصول للموقع الخام need-to-know.
-
-### مغلّف الاستجابة (Response Envelope)
-```jsonc
-// نجاح (عنصر)
-{ "data": { ... } }
-
-// نجاح (قائمة مع صفحات)
-{ "data": [ ... ], "meta": { "current_page": 1, "per_page": 20, "total": 134, "last_page": 7 } }
-```
-### تنسيق الخطأ
-```jsonc
-{ "message": "The given data was invalid.", "errors": { "email": ["..."] } }
-```
-### أكواد الحالة
-`200` OK · `201` Created · `204` No Content · `400` Bad Request · `401` Unauthenticated · `403` Forbidden · `404` Not Found · `409` Conflict · `422` Validation · `429` Too Many Requests · `500` Server Error.
-
-### الصفحات والفلترة
-`?page=1&per_page=20&sort=-start_time&filter[vehicle_id]=...&filter[date_from]=...&filter[date_to]=...`
+- **Base URL:** كل النقاط تحت `‎/api/v1` (مثلاً `‎/api/v1/health`). محلياً `http://localhost:8000/api/v1`، وبالبرودكشن `https://reidey.de/api/v1`.
+- **التنسيق:** JSON. الترميز UTF-8.
+- **المصادقة — ثلاث مسارات** (تفصيل في HANDOFF §2.3):
+  - **لوحة التحكّم (SPA):** Sanctum — كوكي جلسة على نفس الدومين (حارس `web`/`users`).
+  - **تطبيق السائق:** Sanctum **bearer token** (حارس `driver` → موديل `Driver`). كثير من نقاط السائق محميّة إضافياً بـ`driver.active` (تمنع سائق شركة اشتراكها منتهٍ بـ`403`).
+  - **الديمون (داخلي):** سرّ مشترك في هيدر `X-Dispatch-Secret` (وسيط `dispatch.secret`)، وليس جلسة مستخدم.
+- **تعدّد المستأجرين:** لا يُمرَّر `tenant_id` من العميل أبداً — يُحلّ من المستخدم المصادق (`ResolveTenant`). النقاط تحت مجموعة اللوحة مقيّدة بـ`dashboard.only`. الأدمن يعمل cross-tenant (بلا `ResolveTenant`).
+- **الحدّ من المعدّل (throttle):** موضّح بجانب النقاط العامة (مثلاً `throttle:5,1` = 5 طلبات/دقيقة).
 
 ---
 
-## 2. المصادقة (Auth) — P0
+## 2. عام / بلا مصادقة
 
-| الحالة | Method | Path | الوصف |
+| Method | Path | الحماية | الغرض |
 |---|---|---|---|
-| ✅ | GET | `/sanctum/csrf-cookie` | جلب كوكي CSRF (خارج `/api/v1`) — مُفعّل، الواجهة مربوطة |
-| ✅ | POST | `/api/v1/login` | تسجيل دخول (email, password) → user + tenant + roles |
-| ✅ | POST | `/api/v1/logout` | تسجيل خروج |
-| ✅ | GET | `/api/v1/me` | المستخدم الحالي + الـ tenant + الأدوار/الصلاحيات |
-| ✅ | GET | `/api/v1/health` | فحص صحة الخدمة |
-
-> **مُتحقَّق بالـ curl (2026-06-09):** `health`→200 · `login` صحيح→200 يرجّع user+tenant+roles+permissions · `me` بدون مصادقة→401 · `login` خطأ→422.
-> **تدفّق Sanctum SPA (cookies) متحقَّق end-to-end:** `csrf-cookie`→204 → `login` (X-XSRF-TOKEN)→200 → `me` (بكوكي الجلسة)→200 → `logout`→204. الواجهة (`frontend/src/lib/api/`) مربوطة ومحميّة (`AuthProvider`+`AppGuard`).
-
-<details><summary>أمثلة P0</summary>
-
-```http
-POST /api/v1/login
-{ "email": "manager@fleet.de", "password": "secret" }
-→ 204 No Content   (الكوكي تُضبط)
-```
-```http
-GET /api/v1/me
-→ 200 { "data": { "id": 1, "name": "M. Köhler", "tenant": {"id": 4, "name": "Berlin Cabs GmbH"}, "roles": ["fleet_manager"], "permissions": ["trips.view", ...] } }
-```
-</details>
+| GET | `health` | — | فحص صحّة (`HealthController`). |
+| POST | `login` | `throttle:5,1` | دخول لوحة التحكّم (أدمن/مدير/ريسيلر). |
+| GET | `app/version` | `throttle:60,1` | بوابة التحديث الإجباري لتطبيق السائق. |
+| GET | `plans` | `throttle:60,1` | كتالوج الباقات لصفحة الأسعار التسويقية. |
+| POST | `contact` | `throttle:5,1` | نموذج «تواصل معنا» في اللاندينج. |
+| GET | `support-contact` | `throttle:60,1` | جهة دعم واتساب لأزرار «تواصل مع الدعم». |
+| POST | `register` · `register/verify` · `register/resend` | `throttle:6/12/3,1` | تسجيل ذاتي للشركة عبر OTP بالإيميل. |
+| POST | `password/forgot` · `password/verify` · `password/reset` | `throttle:6/12/12,1` | استعادة كلمة مرور اللوحة عبر OTP. |
+| POST | `company/activate` | `throttle:10,1` | إدخال كود التفعيل (3 محاولات → حظر). |
 
 ---
 
-## 3. الإدارة والمستخدمون (Identity) — P0
+## 3. تطبيق السائق (`prefix: driver`)
 
-| الحالة | Method | Path | الوصف |
-|---|---|---|---|
-| ⬜ | GET | `/api/v1/users` | قائمة مستخدمي الـ tenant |
-| ⬜ | POST | `/api/v1/users` | دعوة/إنشاء مستخدم (دور) |
-| ⬜ | PATCH | `/api/v1/users/{id}` | تعديل دور/حالة |
-| ⬜ | DELETE | `/api/v1/users/{id}` | إزالة مستخدم |
-| ⬜ | GET | `/api/v1/roles` | الأدوار والصلاحيات المتاحة |
+كلها ضمن وسيط `LogDriverAuthContext`.
 
----
+**تهيئة عامة (بلا توكن):**
 
-## 4. الموصّلات (Connections) — P1/P2/P5
+| Method | Path | الغرض |
+|---|---|---|
+| GET | `driver/invite/{token}` | معاينة دعوة سائق. |
+| POST | `driver/activate` | تفعيل الدعوة (تعيين كلمة مرور) → يُصدر bearer. |
+| POST | `driver/login` | دخول بكلمة مرور. |
+| POST | `driver/login/request` · `driver/login/verify` | دخول بلا كلمة مرور (OTP بالإيميل) — للسائقين وأصحاب الأسطول. |
+| POST | `driver/password/forgot` · `password/verify` · `password/reset` | استعادة كلمة المرور داخل التطبيق. |
 
-| الحالة | Method | Path | الوصف |
-|---|---|---|---|
-| ✅ | GET | `/api/v1/connections` | حالة الموصّلات (samsara/uber/bolt) — `{data:[{provider,status,last_synced_at}]}` |
-| ✅ | POST | `/api/v1/connections/samsara` | ربط Samsara بـ **API token** (`{api_token}`) → 201 |
-| ✅ | POST | `/api/v1/connections/uber` | ربط أوبر (`{client_id,client_secret,org_id}`) → 201 |
-| ✅ | POST | `/api/v1/connections/bolt` | ربط بولت (`{client_id,client_secret,company_id}`) → 201 |
-| ✅ | POST | `/api/v1/connections/{provider}/sync` | مزامنة يدوية (samsara/uber/bolt) → `{data:{...}}` |
-| ✅ | GET | `/api/v1/dashboard/summary` | KPIs: vehicles/drivers/trips_today/personal_flagged + connections |
-| ⬜ | GET | `/api/v1/connections/{provider}/authorize` | OAuth Marketplace (لاحقاً، بدل التوكن اليدوي) |
-| ⬜ | DELETE | `/api/v1/connections/{provider}` | فصل المزوّد |
+**بتوكن السائق (`auth:driver`):**
 
----
+| Method | Path | الغرض |
+|---|---|---|
+| POST | `driver/logout` | يعمل حتى مع اشتراك موقوف (لمسح التوكن). |
 
-## 5. الأسطول (Fleet) — P1
+**بتوكن السائق + شركة نشِطة (`auth:driver` + `driver.active`):**
 
-| الحالة | Method | Path | الوصف |
-|---|---|---|---|
-| ✅ | GET | `/api/v1/vehicles` | قائمة المركبات (صفحات) `{data:[{plate,name,vin,make,model,providers[]}]}` |
-| ⬜ | POST | `/api/v1/vehicles` | إضافة مركبة يدوياً |
-| ⬜ | GET | `/api/v1/vehicles/{id}` | تفاصيل + الهوية الموحّدة عبر المزوّدين |
-| ⬜ | PATCH | `/api/v1/vehicles/{id}` | تعديل |
-| ✅ | GET | `/api/v1/drivers` | قائمة السواقين (صفحات) |
-| ⬜ | GET | `/api/v1/drivers/{id}` | تفاصيل سائق |
-| ✅ | GET | `/api/v1/assignments` | ربط سائق↔مركبة (قائمة) |
-| ✅ | POST | `/api/v1/assignments` | إنشاء assignment |
-| ✅ | DELETE | `/api/v1/assignments/{id}` | حذف assignment |
+| Method | Path | الغرض |
+|---|---|---|
+| GET · PATCH | `driver/me` | قراءة/تعديل ملف السائق. |
+| POST · DELETE | `driver/devices` | تسجيل/حذف توكن جهاز الدفع (FCM). |
+| GET | `driver/home` · `driver/stats` | الرئيسية + الإحصائيات (يوم الأسطول 04:00). |
+| GET | `driver/offers` · `driver/offers/{offer}` | قائمة العروض + تفاصيل عرض. |
+| POST | `driver/offers/seen` | تعليم العروض كمقروءة. |
+| POST | `driver/broadcasting/auth` | تفويض قناة Reverb الخاصة `driver.{id}`. |
 
----
+**وضع صاحب الأسطول (`prefix: fleet`, `auth:sanctum` + `driver.active`):** مدير/مالك يدخل نفس التطبيق ويراقب كل سواقينه (قراءة فقط)؛ توكنه يُحلّ على `User`.
 
-## 6. الرحلات والمطابقة (Trips & Matching) — P2/P3
-
-| الحالة | Method | Path | الوصف |
-|---|---|---|---|
-| ✅ | GET | `/api/v1/trips/telematics` | رحلات Samsara (مصفوفة، صفحات) `{data:[...],meta,links}` |
-| ✅ | GET | `/api/v1/trips/platform` | رحلات المنصات (أوبر) — عناوين + geocoded + مسافة/سعر |
-| ⬜ | GET | `/api/v1/trips` | رحلات telematics + platform موحّدة (فلترة) — P3 |
-| ⬜ | GET | `/api/v1/trips/{id}` | تفاصيل رحلة |
-| ✅ | GET | `/api/v1/review-queue` | `{ambiguous:[...], identity:[...]}` (مطابقات غامضة + لوحات غير محلولة) |
-| ✅ | POST | `/api/v1/matches/{id}/approve` | تأكيد مطابقة غامضة (+ audit) |
-| ✅ | POST | `/api/v1/matches/{id}/reject` | رفض مطابقة (+ audit) |
-| ✅ | POST | `/api/v1/identity/link` | `{provider,provider_vehicle_id,vehicle_id}` يربط ويحلّ الرحلات (+ audit) |
+| Method | Path | الغرض |
+|---|---|---|
+| GET · PATCH | `fleet/me` | ملف المالك. |
+| POST | `fleet/logout` | خروج. |
+| GET | `fleet/home` · `fleet/drivers` · `fleet/stats` | نظرة الأسطول. |
+| GET | `fleet/offers` · `fleet/offers/{offer}` | كل عروض السواقين + تفصيل. |
+| POST · DELETE | `fleet/devices` | جهاز دفع المالك (توكن `User`). |
 
 ---
 
-## 7. الرحلات الشخصية والتقارير (Personal Trips & Reports) — P3/P4
+## 4. داخلي — الديمون (`prefix: internal/dispatch`, وسيط `dispatch.secret`)
 
-| الحالة | Method | Path | الوصف |
-|---|---|---|---|
-| ✅ | POST | `/api/v1/matching/run` | تشغيل محرك المطابقة → `{data:{matched,personal,gaps}}` |
-| ✅ | GET | `/api/v1/personal-trips` | الرحلات الشخصية المُعلَّمة (**buckets فقط**: vehicle, within_working_window, duration/distance bucket) |
-| ✅ | POST | `/api/v1/personal-trips/{id}/review` | `{status: reviewed\|dismissed}` |
-| ⬜ | GET | `/api/v1/personal-trips/{id}` | تفاصيل مصغّرة + access trail |
-| ✅ | GET | `/api/v1/reports/personal-use` | تجميعات لكل مركبة (total + outside-hours + by_vehicle) |
-| ✅ | GET | `/api/v1/reports/personal-use/export` | تصدير CSV **مصغّر** (بلا إحداثيات/عناوين) |
-| ✅ | GET/PUT | `/api/v1/billing/settings` | تعرفة per-km + عملة (PUT + audit) |
-| ✅ | GET | `/api/v1/billing/statement` | رسوم **تقديرية** (bucket midpoint × rate) + by_vehicle |
-
-> ⚠️ **DSGVO:** `personal-trips` لا يُرجِع أبداً polyline/وجهة — فقط buckets (مدة/مسافة) + within/outside working hours.
+| Method | Path | الغرض |
+|---|---|---|
+| POST | `internal/dispatch/ingest` | استيعاب دفعات العروض الخام (`DispatchIngestController`). |
+| GET | `internal/dispatch/sessions` | قائمة جلسات أوبر النشِطة (كوكيز + `uber_org_uuid`). |
+| POST | `internal/dispatch/sessions/{session}/cookies` | تدوير كوكيز الجلسة. |
+| POST | `internal/dispatch/sessions/{session}/needs-relink` | تعليم الجلسة بحاجة إعادة ربط. |
+| POST | `internal/dispatch/sessions/{session}/heartbeat` | نبضة حياة الديمون. |
+| POST | `internal/dispatch/sessions/{session}/roster` | رفع الروستر المسحوب من Fleet Hub. |
+| POST | `internal/dispatch/sessions/{session}/statuses` | رفع حالات السائقين (أساس استنتاج القبول). |
 
 ---
 
-## 8. الامتثال والحوكمة (Compliance) — P0/P6
+## 5. أساسيات الجلسة (`auth:sanctum` + `user.account`، بلا نطاق مستأجر)
 
-| الحالة | Method | Path | الوصف |
-|---|---|---|---|
-| ✅ | GET | `/api/v1/compliance/settings` | ساعات العمل، retention، private mode، regime |
-| ✅ | PUT | `/api/v1/compliance/settings` | تحديث الإعدادات (+ audit) |
-| ✅ | GET | `/api/v1/compliance/attestations` | حالة works agreement + DPIA + `detection_enabled` |
-| ✅ | POST | `/api/v1/compliance/attestations` | تسجيل attestation (يفتح gating) (+ audit) |
-| ✅ | GET | `/api/v1/audit-logs` | سجل الوصول/التغييرات (append-only، tenant-scoped) |
+تخدم حتى المستخدمين بلا مستأجر (الريسيلر) دون المرور على حارس الـtenant.
 
----
-
-## 9. التنبيهات (Notifications) — P4
-
-| الحالة | Method | Path | الوصف |
-|---|---|---|---|
-| ✅ | GET | `/api/v1/notifications` | قائمة الإشعارات + `meta.unread` |
-| ✅ | POST | `/api/v1/notifications/read` | تعليم الكل مقروء |
+| Method | Path | الغرض |
+|---|---|---|
+| GET | `me` | المستخدم المصادق. |
+| POST | `logout` | خروج اللوحة. |
+| POST | `impersonate/stop` | إنهاء انتحال الشركة. |
+| POST | `client-log` (`throttle:30,1`) | تقرير أخطاء الفرونت → لوج الأدمن. |
 
 ---
 
-## 10. شفافية السائق (Driver Transparency) — P4
+## 6. لوحة الشركة / المستأجر (`auth:sanctum` + `user.account` + `ResolveTenant` + `dashboard.only`)
 
-| الحالة | Method | Path | الوصف |
-|---|---|---|---|
-| ✅ | GET | `/api/v1/transparency/me` | ما يُجمع/لا يُجمع + الأساس القانوني + retention/mode/regime + Art.13 |
-| ✅ | POST | `/api/v1/transparency/data-request` | طلب بيانات (Art.15) → 202 + audit |
-| ✅ | POST | `/api/v1/transparency/object` | اعتراض (Art.21) → 202 + audit |
+نقاط الاستيعاب من المتصفّح مقيّدة إضافياً بـ`fleet.connected` (شركة ربطت حساب أوبر فعلاً).
+
+| Method | Path | الغرض |
+|---|---|---|
+| GET | `dashboard/summary` | ملخّص لوحة الشركة. |
+| GET | `ads/current` · `ads/media/{filename}` | الإعلان المنصّي الحالي لخانة العروض. |
+| GET · POST | `subscription/history` · `subscription/redeem` (`throttle:10,1`) | سجلّ الاشتراك + استبدال كود. |
+| GET | `drivers` · `drivers/live` · `drivers/{driver}` · `drivers/{driver}/stats` | السواقين + الخريطة الحيّة + التفصيل/الإحصاء. |
+| PATCH | `drivers/{driver}` | تعديل سائق. |
+| POST | `drivers/sync` · `drivers/roster` · `drivers/statuses` | استيعاب من المتصفّح (`fleet.connected`). |
+| POST · GET | `drivers/metrics` · `drivers/{driver}/metrics` | مقاييس أداء أوبر (استيعاب `fleet.connected` / قراءة). |
+| GET · POST | `vehicles` | المركبات (استيعاب `fleet.connected`). |
+| POST | `supplier/capture` | التقاط عام لأي تبويب Fleet Hub (`fleet.connected`) → Network feed. |
+| GET | `dispatch/offers` · `.../stats` · `.../export` · `.../{offer}` | تغذية العروض + إحصاء + تصدير + تفصيل. |
+| POST | `dispatch/offers/ingest` | عروض RAMEN من متصفّح المدير (`fleet.connected`). |
+| POST · DELETE | `dispatch/offers/bulk-delete` · `dispatch/offers/{offer}` | حذف جماعي / مفرد. |
+| POST | `uber-login/start` · `uber-login/mfa` | دخول أوبر تفاعلي (إيميل/كلمة مرور → MFA). |
+| POST | `extension/token` | إصدار توكن اقتران للإضافة من جلسة اللوحة. |
+| GET · POST · DELETE | `fleet-session` | حالة/التقاط/فصل جلسة أوبر. |
+| POST | `fleet-session/reconnect` · `fleet-session/report-broken` | إعادة ربط / بلاغ عطل. |
+| GET | `dispatch/unlinked-drivers` | سواقين بلا ربط UUID. |
+| POST | `drivers/{driver}/link-uber` · `dispatch/auto-link` | ربط يدوي / تلقائي بـUUID أوبر. |
+| POST | `drivers/{driver}/invite` · `drivers/{driver}/test-push` | دعوة للتطبيق / دفعة اختبار. |
+| POST | `devices` | تسجيل توكن جهاز السائق (`DeviceTokenController`). |
+| GET · POST · DELETE | `notifications` · `.../read` · `.../clear` · `.../{id}` | جرس الإشعارات. |
+| POST · DELETE | `notifications/device` | توكن FCM ويب للّوحة. |
+| GET · PUT | `notification-prefs` | تفضيلات الدفع/الإيميل لكل فئة. |
+| GET | `audit-logs` | سجلّ التدقيق. |
+| PUT | `profile` | تعديل المستخدم لحسابه. |
 
 ---
 
-## ملاحظة تحديث
-> عند بناء أي endpoint: غيّر حالته إلى ✅، أضف مثال طلب/استجابة فعلي، وحدّث `04-progress.md`.
+## 7. الريسيلر (`auth:sanctum` + `user.account` + `can:codes.generate`, `prefix: reseller`)
+
+المجموعة كلها محميّة بصلاحية `codes.generate` (بلا `ResolveTenant` — الريسيلر منصّي لا مستأجر).
+
+| Method | Path | الغرض |
+|---|---|---|
+| GET | `reseller/plans` | الباقات المتاحة. |
+| GET | `reseller/companies/search` | بحث الشركات لإصدار كود. |
+| POST | `reseller/activation` | توليد كود تفعيل على باقة. |
+| GET | `reseller/codes` | أكواد هذا الريسيلر فقط. |
+
+---
+
+## 8. الأدمن المنصّي (`auth:sanctum` + `super.admin`, `prefix: admin`)
+
+بلا `ResolveTenant` عمداً → السياق فارغ فالنطاق العام لا يعمل (cross-tenant).
+
+- **نظرة عامة/صحّة:** `GET overview`، `GET system-health`، `GET system-metrics`، `GET infrastructure`.
+- **الطابور:** `GET queue/failed`، `POST queue/retry`، `POST queue/flush`، `POST queue/clear-pending`.
+- **اللوجات:** `GET logs`، `DELETE logs`، `DELETE network-logs`.
+- **الإعدادات:** `GET/PUT settings`، `POST settings/test-email`.
+- **قوالب الإيميل:** `GET email-templates`، `POST email-templates/image`، `GET/PUT email-templates/{key}`، `POST email-templates/{key}/preview`.
+- **مجمّع البروكسي:** `GET/POST proxies`، `PUT/DELETE proxies/{proxy}`.
+- **دليل المستخدمين:** `GET users`، `DELETE users/{user}`.
+- **السواقون اليتامى:** `GET orphan-drivers`.
+- **البرودكاست:** `POST notifications/broadcast` (مصفوف عبر الطابور).
+- **الشاردز (توسّع الديمون):** `GET shards`، `PATCH shards/{shard}`، `POST shards/rebalance`.
+- **الشركات:** `GET/POST companies`، `GET/PUT/DELETE companies/{tenant}`.
+- **درِل بيانات الشركة:** `GET companies/{tenant}/drivers|offers|vehicles|network`، `DELETE companies/{tenant}/network`.
+- **مستخدمو الشركة:** `GET/POST companies/{tenant}/users`، `POST companies/{tenant}/users/{user}/reset-password`.
+- **الاشتراكات/الحظر:** `GET banned-companies`، `POST companies/{tenant}/activation`، `POST companies/{tenant}/free-subscription`، `POST companies/{tenant}/reactivate`، `DELETE companies/{tenant}/subscription`.
+- **جلسة الشركة:** `GET companies/{tenant}/session`، `POST companies/{tenant}/session/relink`، `DELETE companies/{tenant}/session`، `DELETE companies/{tenant}/data` (فصل + مسح بيانات التشغيل).
+- **الانتحال:** `POST companies/{tenant}/impersonate` (الإيقاف في مجموعة الجلسة أعلاه).
+- **المحصّلون + الدفعات:** `GET/POST collectors`، `PUT/DELETE collectors/{collector}`، `GET/POST collector-payments`، `GET collector-payments/export`، `DELETE collector-payments/{payment}`.
+- **الباقات:** `GET/POST plans`، `PUT/DELETE plans/{plan}`.
+- **الإعلانات المنصّية:** `GET/POST ads`، `POST ads/upload`، `PUT/DELETE ads/{ad}`.
+- **صندوق الوارد (تواصل):** `GET contact-messages`، `PATCH/DELETE contact-messages/{contactMessage}`.
+- **الفوترة:** `GET reports/billing-summary`، `GET subscription-invoices`، `GET subscription-invoices/export`، `POST subscription-invoices/{invoice}/settle`.
+- **سجلّ الأكواد:** `GET subscription-codes`، `GET subscription-codes/export`.
+
+---
+
+## 9. المهام المجدولة (`console.php`)
+
+يشغّلها حاوية `scheduler` (`schedule:work`). التفاصيل في HANDOFF §2.2 و§6.
+
+| الأمر | التكرار | الغرض |
+|---|---|---|
+| `queue:work --stop-when-empty --max-time=50` | كل دقيقة | تصريف احتياطي للطابور (الأساسي حاوية `queue`). |
+| نبضة الـscheduler (cache stamp) | كل دقيقة | إشارة حياة الـscheduler لصفحة الصحّة. |
+| `offers:expire-pending` | كل دقيقة | إنهاء العروض المعلّقة بعد نافذة القبول. |
+| `offers:finalize-stale` | كل 5د | إنهاء رحلات عالقة (>100د) / قبول مهجور (>20د). |
+| `offers:backfill-geo --limit=12` | كل 10د | جيوكودنغ متأخّر للعروض التي فشل إثراؤها. |
+| `fleet:check-sync` | كل 5د | كشف انكسار مزامنة أوبر الصامت. |
+| `alerts:check` | كل 5د | تنبيهات الجلسات المكسورة / الشاردز الميتة. |
+| `notifications:scan` | يومياً 08:00 | تنبيهات اشتراكات/بروكسيات قربت تنتهي. |
+| `ads:expire` | كل ساعة | تعطيل الإعلانات المنتهية. |
+| `network-logs:prune` | كل ساعة | إبقاء لوج الشبكة ضمن 48 ساعة. |
+| `db:backup` | يومياً 03:00 | نسخة احتياطية مضغوطة (تُحفظ 7 أيام). |
+| `stations:sync` | أسبوعياً (الإثنين 04:00) | تحديث جدول محطات القطارات المحلي. |

@@ -1,84 +1,57 @@
-# قائمة الإطلاق للإنتاج (Go-Live Checklist) — DASHCAM
+# قائمة الإطلاق للبرودكشن — Reidey
 
-> **الحالة:** المنتج مكتمل وظيفياً بنسبة **~98%** و**متوافق مع DSGVO بالتصميم** (P0–P7 منجزة، 38 اختبار باك أخضر). هذه القائمة تغطّي مهام **الإطلاق (go-live)** — **ليست** مهام تطوير ميزات. الميزات جاهزة؛ المطلوب هو الجاهزية التشغيلية + التكاملات الحقيقية + الغطاء القانوني.
-> **يُقرأ مع:** [01-project-analysis.md](./01-project-analysis.md) · [02-technical-plan.md](./02-technical-plan.md) · [04-progress.md](./04-progress.md) · [07-run-guide.md](./07-run-guide.md)
-> **اللغة:** شرح بالعربي + المصطلحات بالإنجليزي. كل بند checkbox مع ملاحظة سطر واحد.
-
----
-
-## 1. التقنية / Technical readiness
-
-- [ ] **Tests green** — `php artisan test` كلها خضراء (38+) قبل أي نشر.
-- [ ] **Frontend build green** — `npm run build` ينجح (exit 0) بلا أخطاء type/lint.
-- [ ] **Config + route + event cache** — `php artisan config:cache && route:cache && event:cache` في الإنتاج.
-- [ ] **APP_ENV=production / APP_DEBUG=false** — إخفاء آثار الأخطاء التفصيلية عن المستخدم.
-- [ ] **Error tracking (Sentry EU)** — ربط Sentry (إقليم EU) + structured logging لالتقاط الأخطاء.
-- [ ] **Health checks** — `GET /api/v1/health` موصول بـ uptime monitor + فحص اتصال DB/Redis/queue.
-- [ ] **Frontend production deploy** — Next.js مبنيّ ومخدوم production (مش `npm run dev`).
-- [ ] **Versioning/migrations gate** — `php artisan migrate --force` ضمن خط النشر بعد أخذ نسخة احتياطية.
+> **يعتمد على:** [`HANDOFF.md`](../HANDOFF.md) §5 (البيئة) و§6 (النشر)، و[`13-deployment.md`](./13-deployment.md) (خطوات التزويد الكاملة).
+> الستاك: Docker Compose + Caddy على VPS واحد (`docker-compose.prod.yml`, الدومين `reidey.de`).
+> آخر تحديث: **2026-09-02**
 
 ---
 
-## 2. التكاملات / Provider integrations
+## 1. DNS و TLS
+- [ ] سجلّ `A` للدومين (`reidey.de`) → IP السيرفر.
+- [ ] `DOMAIN` و`SITE_ADDRESS` في `.env` الجذري = الدومين (Caddy يصدر Let's Encrypt تلقائياً).
 
-- [ ] **Samsara — اعتماد حقيقي** — API token حقيقي، أو (الأفضل) OAuth **Marketplace app** (install لكل org → token لكل tenant).
-- [ ] **Samsara rate limits + cursors** — احترام 5 req/s و`Retry-After`، وآلية re-bootstrap للـ cursor (تنتهي صلاحيته بعد 30 يوم).
-- [ ] **Uber — Supplier credentials حقيقية** — `client_id`/`client_secret`/`org_id` فعليّة.
-- [ ] **Uber — Offline Reporting الكامل** — تأكيد دورة **request → poll → download** الحقيقية (بدل النداء المبسّط) + **field mapping** لـ `REPORT_TYPE_TRIP_ACTIVITY`.
-- [ ] **Bolt — partner onboarding** — اجتياز بوّابة Bolt (partner-gated) للحصول على وصول Fleet Integration API.
-- [ ] **Bolt — تأكيد أشكال الـ API** — تثبيت الحقول/الحدود الفعلية (المُعلَّمة "تُؤكَّد عند الـ onboarding") ومطابقتها للـ normalizer.
-- [ ] **HERE_API_KEY** — مفتاح HERE حقيقي للـ geocoding (تحويل عناوين Uber/Bolt → lat/lng) — مفقود حالياً، **حاجِب** للمطابقة الجغرافية.
-- [ ] **مراقبة فشل المزامنة** — تنبيه عند فشل أي connector + عكس الحالة على `integration_connections.status`.
+## 2. مفاتيح `.env` الجذرية (انسخ من `.env.prod.example`)
+- [ ] **`APP_KEY`** — ولّده: `docker compose -f docker-compose.prod.yml run --rm backend php artisan key:generate --show`.
+- [ ] **DB:** `DB_DATABASE=ridy`، `DB_USERNAME`، `DB_PASSWORD`، `DB_ROOT_PASSWORD` (كلمات قويّة).
+- [ ] **`DISPATCH_INGEST_SECRET`** — سلسلة عشوائية طويلة، **متطابقة** بين الباك والديمون (وإلا 401 على `/ingest`).
+- [ ] **Reverb:** `REVERB_APP_ID/KEY/SECRET` (ولّدها مرّة: `php artisan reverb:install`).
+- [ ] **FCM (اختياري لكن مطلوب لدفع السائق):** ارفع service-account JSON إلى حاوية الباك، واضبط `FCM_CREDENTIALS` (المسار داخل الحاوية) و`FCM_PROJECT_ID`. **بدونهما يقع الباك على `LogPushSender`** (الدفع يُسجَّل فقط لا يُرسَل — راجع HANDOFF §6). دفع الويب مستقل ومُهيّأ في حزمة الفرونت.
+- [ ] **SMTP/Mail:** ضبط `MAIL_*` (أو من إعدادات الأدمن) لإرسال الإيميلات الحقيقية.
+- [ ] **`OTP_TEST_CODE`** — **اتركه فارغاً في البرودكشن** (وإلا كود ثابت). البرودكشن أصلاً يرفض الكود الثابت.
+- [ ] `ALERT_EMAIL` (اختياري) لتنبيهات الجلسات المكسورة/الشاردز.
 
----
+## 3. البروكسي السكني (لكل شركة)
+- [ ] أوبر يحجب الداتاسنتر — عيّن **بروكسي سكني** من لوحة الأدمن لكل شركة (مخزّن مشفّراً في `proxies.url`). `UBER_PROXY_URL` في env مجرّد fallback عام.
 
-## 3. البنية التحتية / Infrastructure
+## 4. أول تزويد (First provision)
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec backend php artisan migrate --force --seed
+# البذرة تُنشئ manager@fleet.de / password — غيّرها فوراً.
+```
+- [ ] تأكّد من عمل حاويتَي **`scheduler`** (`schedule:work`) و**`queue`** (`queue:work`) — بدونهما لا يُصرَّف الطابور ولا تُنظَّف العروض العالقة.
+- [ ] الطابور/الكاش = **database** (لا Redis/Horizon بالبرودكشن).
 
-- [ ] **MySQL 8 (EU)** — قاعدة إنتاج MySQL 8 مستضافة داخل الـ EU (التحويل = `.env` فقط، التوافق متحقَّق).
-- [ ] **Redis + Horizon** — تفعيل Redis وتشغيل Horizon supervisors (بدل `database`/`sync` المحلي) للطوابير.
-- [ ] **مزوّد بريد حقيقي** — SMTP أو Resend (إقليم EU) بدل `MAIL_MAILER=log` لإرسال التنبيهات فعلياً.
-- [ ] **Hetzner + Docker Compose** — نشر على Hetzner (DE) عبر docker-compose (app/nginx/mysql/redis/horizon/scheduler/frontend).
-- [ ] **TLS (Let's Encrypt)** — شهادة HTTPS على nginx + إعادة توجيه HTTP→HTTPS.
-- [ ] **نسخ احتياطي مشفّرة (EU)** — backups دورية مشفّرة ومخزّنة داخل الـ EU + اختبار استرجاع.
-- [ ] **Queue worker + Scheduler كخدمات** — `queue:work` (أو Horizon) و`schedule:work` كـ services دائمة (systemd/Docker) مع auto-restart.
-- [ ] **إقامة البيانات (EU residency)** — تأكيد كل الخدمات والـ sub-processors داخل الـ EU (DSGVO).
+## 5. النشر الروتيني (الباك mounted — بلا إعادة بناء صورة)
+```bash
+git pull
+docker compose -f docker-compose.prod.yml exec backend php artisan migrate --force
+docker compose -f docker-compose.prod.yml exec backend php artisan config:clear
+docker compose -f docker-compose.prod.yml restart backend scheduler queue
+```
+تغييرات **frontend/daemon** (صور) تحتاج `up -d --build <service>`. الـCI (`.github/workflows/deploy.yml`) يؤتمت هذا على push لـ`main`.
 
----
+## 6. نشر الإضافة (Chrome Web Store)
+- [ ] ارفع `manifest.json` version (الحالي **1.15.4**) وزِب `extension/` وارفعه (unlisted، تحديث تلقائي). راجع [`14-publish-extension.md`](./14-publish-extension.md).
+- [ ] تأكّد أن `host_permissions` تشمل `fleethub.uber.com` (بعد هجرة Fleet Hub).
 
-## 4. الأمان / Security
+## 7. تطبيق السائق (المتجر + DSA)
+- [ ] بناء/نشر عبر EAS (Play). للتحديثات الخفيفة JS/TS: **OTA** (`eas update`). راجع [`15-publish-mobile-app.md`](./15-publish-mobile-app.md) و[`app-store-submission.md`](./app-store-submission.md).
+- [ ] **DSA (ألمانيا):** حالة «تاجر» يجب أن تُعتمَد؛ قبلها يظهر «Cannot Sell».
+- [ ] iOS: `GoogleService-Info.plist` + مفتاح APNs على Firebase (لسا ناقص — ROADMAP).
 
-- [ ] **تشفير التوكنات at-rest** — اعتمادات المزوّدين في `integration_connections` مشفّرة (encrypted casts) مع `APP_KEY` آمن.
-- [ ] **CORS / CSRF (Sanctum SPA)** — `supports_credentials=true` + `SANCTUM_STATEFUL_DOMAINS` + `SESSION_DOMAIN` ضبط إنتاج صحيح.
-- [ ] **إدارة الأسرار (secrets management)** — `.env`/الأسرار خارج الـ repo، عبر متغيّرات بيئة الخادم أو vault.
-- [ ] **Rate limiting** — حدود على endpoints الحساسة (login، مزامنة، تقارير) ضد الإساءة.
-- [ ] **Least-privilege DB** — مستخدم DB بصلاحيات محدودة (لا root) للتطبيق.
-- [ ] **No PII in logs** — لا بيانات شخصية (مواقع/أسماء سواقين) في اللوجات أو رسائل الأخطاء.
-- [ ] **HTTPS-only cookies** — كوكيز الجلسة `Secure` + `HttpOnly` + `SameSite` في الإنتاج.
-
----
-
-## 5. 🔴 القانوني / DSGVO & Legal (launch blockers)
-
-> 🔴 **حواجب إطلاق إلزامية** — الميزة الأساسية (كشف الرحلات الشخصية للموظفين) أشد فئة مقيّدة في ألمانيا. لا إطلاق فعلي قبل اكتمال هذا القسم. (قيود تصميم، **ليست** استشارة قانونية.)
-
-- [ ] **تعيين DPO ألماني** — مسؤول حماية بيانات (Datenschutzbeauftragter) معتمَد.
-- [ ] **اتفاق مجلس العمال (Betriebsvereinbarung)** — موافقة Betriebsrat قبل تفعيل التتبّع/الكشف.
-- [ ] **DPIA مكتمل (Art. 35)** — تقييم أثر حماية البيانات منجَز وموثَّق.
-- [ ] **RoPA** — سجلّ أنشطة المعالجة (Records of Processing Activities) مكتمل + قائمة sub-processors (Samsara, HERE, Hetzner, Sentry).
-- [ ] **DPA مع كل عميل (Art. 28)** — اتفاقية معالجة بيانات (أنت processor، الشركة controller) لكل tenant.
-- [ ] **ضبط الـ retention لكل tenant** — مدد الاحتفاظ + auto-delete مضبوطة per-tenant (`retention:purge` يحذف الموقع الخام).
-- [ ] **مسار حقوق صاحب البيانات (Art. 15/21)** — workflow فعّال لطلبات الوصول/الاعتراض (الـ endpoints جاهزة: `transparency/data-request` + `object`).
-- [ ] **تأكيد "اكشف بدون ما تراقب" في الإنتاج** — التحقق أن `personal_trips` تخزّن buckets فقط بلا polyline/وجهة (data minimization).
-- [ ] **Feature-gating مفعّل** — الكشف يبقى مقفولاً حتى إقرار الـ tenant بـ Betriebsvereinbarung + DPIA (`compliance/attestations`).
-- [ ] **إشعار الشفافية (Art. 13)** — شاشة شفافية السائق + الأساس القانوني معروضة بالألماني.
-
----
-
-## 6. التشغيل / Operations
-
-- [ ] **مسار onboarding لكل عميل** — تدفّق إعداد tenant جديد (ربط المزوّدين + الإعدادات + الإقرارات القانونية).
-- [ ] **مراقبة وتنبيهات لفشل المزامنة** — alerts عند فشل أي sync/connector أو تراكم الطابور/`failed_jobs`.
-- [ ] **Runbook** — دليل تشغيل للحوادث الشائعة (فشل مزوّد، انتهاء token، تراكم queue، استرجاع backup).
-- [ ] **دعم (Support)** — قناة دعم + SLA + توثيق للعملاء.
-- [ ] **مراقبة الأداء (observability)** — Horizon dashboard + metrics + تنبيهات على زمن الاستجابة/الأخطاء.
-- [ ] **خطة استرجاع كوارث (DR)** — اختبار استرجاع من النسخ الاحتياطية دورياً + RTO/RPO معرّفان.
+## 8. اختبارات دخان (Smoke tests)
+- [ ] `GET /api/v1/health` = 200.
+- [ ] دخول لوحة + ربط أوبر عبر الإضافة (المدير يفتح أوبر → التقاط الجلسة).
+- [ ] وصول عرض حيّ → إشعار على هاتف سائق مرتبط خلال ثوانٍ (تحقّق من `dispatch_offer.notified devices=N`).
+- [ ] صفحة **صحّة النظام** للأدمن: عمق الطابور، نبضة الـscheduler، وصول Reverb/Nominatim/OSRM، وطزاجة مزامنة الحالات.
