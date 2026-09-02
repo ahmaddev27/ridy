@@ -9,6 +9,17 @@ A multi-tenant SaaS for German Uber fleet operators — it captures each company
 
 <p align="center">Domain: <a href="https://reidey.de">reidey.de</a></p>
 
+<p align="center">
+  <a href="https://github.com/ahmaddev27/ridy/actions/workflows/ci.yml"><img src="https://github.com/ahmaddev27/ridy/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/status-production-2ea44f" alt="Status: production">
+  <img src="https://img.shields.io/badge/MVP-95%25-2ea44f" alt="MVP 95%">
+  <img src="https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white" alt="Laravel 13">
+  <img src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white" alt="Next.js 16">
+  <img src="https://img.shields.io/badge/Expo-SDK%2052-000020?logo=expo&logoColor=white" alt="Expo SDK 52">
+  <img src="https://img.shields.io/badge/Node-daemon-339933?logo=nodedotjs&logoColor=white" alt="Node daemon">
+  <img src="https://img.shields.io/badge/i18n-de_en_ar-4c9aff" alt="i18n de/en/ar">
+</p>
+
 ---
 
 ## What it is
@@ -18,6 +29,26 @@ Reidey observes a fleet's **live Uber dispatch stream** (Uber's internal "RAMEN"
 Crucially, Reidey **observes, it does not control**. It never accepts, rejects, or drives a trip. Acceptance still happens inside the Uber Driver app. Reidey watches Uber and *infers* the state of each offer (accepted / started / completed / canceled) from changes in the driver's live engagement status. This keeps the product on the right side of "detect, don't surveil / don't control."
 
 Because Uber blocks datacenter IPs, the live stream is held either by a **Node daemon through a per-company residential proxy** (server-side, 24/7) or by a **Chrome extension running in the manager's own browser** (residential IP, manual fallback). Both feed the same Laravel backend, which is the single source of truth.
+
+## Project status
+
+> **Production — the MVP is complete and running live.** Day-to-day status lives in **[ROADMAP.md](./ROADMAP.md)**; the latest engineering changes are logged at the top of **[HANDOFF.md](./HANDOFF.md)**.
+
+**Overall MVP progress** &nbsp; `▰▰▰▰▰▰▰▰▰▱` **95%**
+
+| Area | Progress | Status |
+| --- | :-- | :-- |
+| Offer pipeline — capture → match → geocode → push | `▰▰▰▰▰` | ✅ Done |
+| Driver app — Expo · OTP · offers · stats · push | `▰▰▰▰▰` | ✅ Done |
+| Manager & super-admin dashboard | `▰▰▰▰▰` | ✅ Done |
+| Notifications — FCM push · web push · email | `▰▰▰▰▰` | ✅ Done |
+| Billing & multi-tenancy — codes · plans · proxies · collectors | `▰▰▰▰▰` | ✅ Done |
+| Dispatch daemon — 24/7 · self-heal · sharding | `▰▰▰▰▰` | ✅ Done |
+| Chrome extension — capture · Fleet Hub | `▰▰▰▰▰` | ✅ v1.15.4 |
+| Geocoding & multi-stop detail | `▰▰▰▰▰` | ✅ Done |
+| Live dashboard over WebSocket | `▰▰▰▱▱` | 🔄 Partial — driver app live via Reverb; dashboard still polls |
+| iOS App Store release | `▰▰▰▰▱` | ⏳ Blocked — DSA trader verification in review |
+| Scale-out — self-hosted geo · sharding runbook | `▰▰▰▰▱` | 🔄 Ready when needed |
 
 ## Features
 
