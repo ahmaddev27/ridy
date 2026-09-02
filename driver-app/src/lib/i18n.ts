@@ -151,6 +151,7 @@ const de: Dict = {
   "range.today": "Heute",
   "range.week": "Diese Woche",
   "range.month": "Dieser Monat",
+  "range.pick": "Datum wählen",
   // Fleet-owner mode
   "home.fleetTitle": "Flotte",
   "fleet.driver": "Fahrer",
@@ -306,6 +307,7 @@ const en: Dict = {
   "range.today": "Today",
   "range.week": "This week",
   "range.month": "This month",
+  "range.pick": "Pick a date",
   // Fleet-owner mode
   "home.fleetTitle": "Fleet",
   "fleet.driver": "Driver",
@@ -461,6 +463,7 @@ const ar: Dict = {
   "range.today": "اليوم",
   "range.week": "هذا الأسبوع",
   "range.month": "هذا الشهر",
+  "range.pick": "اختر تاريخاً",
   // Fleet-owner mode
   "home.fleetTitle": "الأسطول",
   "fleet.driver": "السائق",

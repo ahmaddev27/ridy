@@ -10,7 +10,15 @@ import { useColors, cardStyle } from "@/lib/theme";
 import { fleetNow } from "@/lib/fleet-day";
 import { fareLabel } from "@/lib/format";
 import { SectionLabel } from "@/components/ui";
-import { PeriodNavigator, periodWindow, ymd, addDays, mondayOf, type PeriodRange } from "@/components/period-navigator";
+import { PeriodNavigator, periodWindow, startOfPeriod, ymd, addDays, mondayOf, type PeriodRange } from "@/components/period-navigator";
+
+/** Map a picked calendar day → range="today" + its day-offset from today. */
+function dayOffset(d: Date): number {
+  const t0 = startOfPeriod("today", 0);
+  const day = new Date(d);
+  day.setHours(0, 0, 0, 0);
+  return Math.min(0, Math.round((day.getTime() - t0.getTime()) / 86_400_000));
+}
 
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] as const;
 const mondayIndex = (d: Date) => (d.getDay() + 6) % 7;
@@ -26,9 +34,9 @@ export default function StatisticsScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   // The selected window + the Monday of the week its chart shows.
-  const { window, weekMon, label } = useMemo(() => {
+  const { window, weekMon, label, selectedStart } = useMemo(() => {
     const w = periodWindow(range, offset);
-    return { window: { from: w.from, to: w.to }, weekMon: w.weekMonday, label: w.label };
+    return { window: { from: w.from, to: w.to }, weekMon: w.weekMonday, label: w.label, selectedStart: startOfPeriod(range, offset) };
   }, [range, offset]);
 
   const load = useCallback(
@@ -69,7 +77,9 @@ export default function StatisticsScreen() {
         <PeriodNavigator
           label={label}
           range={range}
+          selected={selectedStart}
           onRange={(r) => { setRange(r); setOffset(0); }}
+          onDate={(d) => { setRange("today"); setOffset(dayOffset(d)); }}
           onPrev={() => setOffset((o) => o - 1)}
           onNext={() => setOffset((o) => Math.min(0, o + 1))}
           canNext={offset < 0}

@@ -12,7 +12,15 @@ import { t, isRTL, getLocale } from "@/lib/i18n";
 import { useColors, radius, isDarkPalette } from "@/lib/theme";
 import { OfferCard } from "@/components/offer-card";
 import { FilterSheet, DEFAULT_FILTERS, type OfferFilters, type SortKey } from "@/components/filter-sheet";
-import { PeriodNavigator, periodWindow, type PeriodRange } from "@/components/period-navigator";
+import { PeriodNavigator, periodWindow, startOfPeriod, type PeriodRange } from "@/components/period-navigator";
+
+/** Map a picked calendar day → range="today" + its day-offset from today. */
+function dayOffset(d: Date): number {
+  const t0 = startOfPeriod("today", 0);
+  const day = new Date(d);
+  day.setHours(0, 0, 0, 0);
+  return Math.min(0, Math.round((day.getTime() - t0.getTime()) / 86_400_000));
+}
 import { alertOffer, markAlerted } from "@/lib/offer-alert";
 
 const PER_PAGE = 20;
@@ -167,7 +175,9 @@ export default function OffersScreen() {
             <PeriodNavigator
               label={periodWindow(range, offset).label}
               range={range}
+              selected={startOfPeriod(range, offset)}
               onRange={(r) => { setRange(r); setOffset(0); }}
+              onDate={(d) => { setRange("today"); setOffset(dayOffset(d)); }}
               onPrev={() => setOffset((o) => o - 1)}
               onNext={() => setOffset((o) => Math.min(0, o + 1))}
               canNext={offset < 0}
