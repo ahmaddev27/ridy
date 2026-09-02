@@ -5,6 +5,7 @@ import { Text } from "@/components/typography";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
+import { useCooldown } from "@/lib/use-cooldown";
 import { Field, OtpInput, PrimaryButton, Logo } from "@/components/ui";
 import { LogIn, Mail } from "lucide-react-native";
 
@@ -20,6 +21,9 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // One code per minute: every successful send starts a 60s cooldown that gates
+  // the resend button until it elapses.
+  const resendCooldown = useCooldown(60);
 
   async function sendCode() {
     setLoading(true);
@@ -28,6 +32,7 @@ export default function LoginScreen() {
     try {
       await requestCode(email.trim());
       setStep("code");
+      resendCooldown.start();
     } catch {
       setError(t("otp.sendError"));
     } finally {
@@ -36,10 +41,12 @@ export default function LoginScreen() {
   }
 
   async function resend() {
+    if (resendCooldown.active) return; // still cooling down — ignore
     setError(null);
     try {
       await requestCode(email.trim());
       setNotice(t("otp.resent"));
+      resendCooldown.start();
     } catch {
       setError(t("otp.sendError"));
     }
@@ -97,8 +104,14 @@ export default function LoginScreen() {
             <View style={{ marginTop: 8 }}>
               <PrimaryButton label={t("otp.verify")} onPress={submitCode} loading={loading} icon={LogIn} />
             </View>
-            <Pressable onPress={resend} style={{ alignSelf: "center", paddingVertical: 12 }}>
-              <Text style={{ color: c.inkMuted, fontSize: 14, fontWeight: "500" }}>{t("otp.resend")}</Text>
+            <Pressable
+              onPress={resend}
+              disabled={resendCooldown.active}
+              style={{ alignSelf: "center", paddingVertical: 12, opacity: resendCooldown.active ? 0.5 : 1 }}
+            >
+              <Text style={{ color: c.inkMuted, fontSize: 14, fontWeight: "500" }}>
+                {resendCooldown.active ? t("otp.resendIn", { s: String(resendCooldown.remaining) }) : t("otp.resend")}
+              </Text>
             </Pressable>
             <Pressable
               onPress={() => { setStep("email"); setCode(""); setError(null); setNotice(null); }}
