@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 import { RefreshCw, Maximize2, Minimize2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
+import { useAuth } from "@/components/auth/auth-provider";
+import { useCompanyRealtime } from "@/lib/realtime";
 import { getLiveDrivers, type LiveDriver, type LiveWaypoint } from "@/lib/api/drivers";
 import { presence, PRESENCE_COLOR, PRESENCE_TONE, PRESENCE_LABEL_KEY, type Presence } from "@/lib/driver-status";
 
@@ -120,7 +122,13 @@ function personImage(color: string): ImageData {
  */
 export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) {
   const { t, locale } = useI18n();
+  const { user } = useAuth();
   const c = (k: string) => t(`screens.map.${k}`);
+  // Points at the map effect's live `refresh` so the WebSocket handler can trigger it.
+  const refreshRef = useRef<() => void>(() => {});
+  // Live: refetch driver positions the moment the daemon ingests new statuses
+  // (company channel), instead of only on the 12s poll — which stays as fallback.
+  useCompanyRealtime(user?.tenant?.id, () => refreshRef.current(), ".drivers.changed");
 
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -350,6 +358,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
       });
     })();
 
+    refreshRef.current = refresh; // expose the live refresh to the realtime handler
     const timer = setInterval(refresh, 12000);
     return () => {
       cancelled = true;

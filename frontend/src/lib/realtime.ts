@@ -47,9 +47,13 @@ type EchoLike = {
  * connection failure. The latest `onOfferChange` is always used without
  * resubscribing (kept in a ref), so callers need not memoize it.
  */
-export function useCompanyRealtime(tenantId: number | null | undefined, onOfferChange: () => void): void {
-  const cb = useRef(onOfferChange);
-  cb.current = onOfferChange;
+export function useCompanyRealtime(
+  tenantId: number | null | undefined,
+  onChange: () => void,
+  event = ".offer.changed",
+): void {
+  const cb = useRef(onChange);
+  cb.current = onChange;
 
   useEffect(() => {
     if (!KEY || !tenantId || typeof window === "undefined") return;
@@ -91,7 +95,7 @@ export function useCompanyRealtime(tenantId: number | null | undefined, onOfferC
         }),
       });
 
-      echo.private(channel).listen(".offer.changed", () => cb.current());
+      echo.private(channel).listen(event, () => cb.current());
     } catch {
       /* keep polling */
     }

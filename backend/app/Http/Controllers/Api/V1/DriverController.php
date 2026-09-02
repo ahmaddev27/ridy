@@ -12,6 +12,7 @@ use App\Domain\Fleet\DriverStatsService;
 use App\Domain\Fleet\DriverStatusIngestor;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Geo\PostalCodes;
+use App\Events\DriversBroadcast;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DriverResource;
@@ -210,8 +211,13 @@ class DriverController extends Controller
             'statuses.*.waypoints' => ['nullable', 'array'],
         ]);
 
-        $recorder->statuses((int) $request->user()->tenant_id, $data['statuses']);
-        $result = $ingestor->ingest((int) $request->user()->tenant_id, $data['statuses']);
+        $tenantId = (int) $request->user()->tenant_id;
+        $recorder->statuses($tenantId, $data['statuses']);
+        $result = $ingestor->ingest($tenantId, $data['statuses']);
+
+        // Live dashboard map: nudge the company's channel so it refetches driver
+        // positions instantly instead of waiting for its poll. Best-effort.
+        rescue(fn () => broadcast(new DriversBroadcast($tenantId)), report: false);
 
         return response()->json(['data' => $result]);
     }
