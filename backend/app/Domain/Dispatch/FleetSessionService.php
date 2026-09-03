@@ -78,9 +78,12 @@ class FleetSessionService
         $session->forceFill(['status' => UberFleetSession::STATUS_NEEDS_RELINK])->save();
 
         // Prompt the managers to reconnect — but only on the transition, and
-        // deduped, so a persistently-broken session doesn't spam the bell.
+        // deduped, so a persistently-broken session doesn't spam the bell. Pass
+        // `company`: the push/email copy is "{company}: the Uber session needs
+        // relinking" — without it the token rendered a literal "{company}".
         if ($wasActive) {
-            $this->notifier->toTenant($session->tenant_id, 'session_needs_relink', [], '/connections', dedupe: true);
+            $company = (string) (Tenant::whereKey($session->tenant_id)->value('name') ?? '');
+            $this->notifier->toTenant($session->tenant_id, 'session_needs_relink', ['company' => $company], '/connections', dedupe: true);
         }
     }
 }

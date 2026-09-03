@@ -42,12 +42,17 @@ class ScanNotifications extends Command
             ->get()
             ->each(fn (Tenant $t) => $notifier->toTenant($t->id, 'subscription_expired', [], '/subscription', dedupe: true));
 
-        // Proxies about to expire (admin heads-up).
+        // Proxies about to expire (admin heads-up). Pass `days` too: the push text
+        // ("{label} expires in {days} days") interpolates it — without it the token
+        // rendered a literal "{days}". Same day-count formula as the admin overview.
         Proxy::query()
             ->whereNotNull('expires_at')
             ->whereDate('expires_at', '<=', $now->addDays(self::PROXY_WARN_DAYS)->toDateString())
             ->get()
-            ->each(fn (Proxy $p) => $notifier->toAdmins('proxy_expiring', ['label' => $p->label], '/admin/proxies', dedupe: true));
+            ->each(fn (Proxy $p) => $notifier->toAdmins('proxy_expiring', [
+                'label' => $p->label,
+                'days' => max(0, (int) $now->startOfDay()->diffInDays($p->expires_at->startOfDay(), false)),
+            ], '/admin/proxies', dedupe: true));
 
         $this->info('Notification scan complete.');
 
