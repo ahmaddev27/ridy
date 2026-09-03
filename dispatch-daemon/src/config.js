@@ -74,13 +74,16 @@ export const config = {
   // How often to re-pull the roster (ms). Default 30 min.
   rosterInterval: Number(process.env.ROSTER_INTERVAL_MS || 1800000),
 
-  // How often to poll live driver statuses (ms) when everyone is idle. Default 10s.
-  statusInterval: Number(process.env.STATUS_INTERVAL_MS || 10000),
+  // How often to poll live driver statuses (ms) when everyone is idle. Default 6s.
+  statusInterval: Number(process.env.STATUS_INTERVAL_MS || 6000),
 
   // Faster status poll (ms) while ANY driver is engaged (EN_ROUTE/ON_TRIP), so a
   // just-accepted offer's live-map waypoints (the real pickup/drop-off) are picked
-  // up within seconds. Default 4s. Adaptive: only fast when it matters.
-  statusIntervalActive: Number(process.env.STATUS_INTERVAL_ACTIVE_MS || 4000),
+  // up within seconds AND the live-map car advances smoothly. Default 3s — near
+  // Uber's own ~4-5s location refresh, so we catch each new fix promptly without
+  // polling faster than Uber updates (which would just add load for no fresher
+  // data). Adaptive: only fast when it matters.
+  statusIntervalActive: Number(process.env.STATUS_INTERVAL_ACTIVE_MS || 3000),
 
   // How often to re-read the active session list from the backend (ms).
   sessionPollInterval: Number(process.env.SESSION_POLL_INTERVAL_MS || 60000),
