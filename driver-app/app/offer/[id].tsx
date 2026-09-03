@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { View, Pressable, ActivityIndicator, Linking, ScrollView } from "react-native";
+import { View, Pressable, ActivityIndicator, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, ChevronRight, User, UserCircle, Map, Route, type LucideIcon } from "lucide-react-native";
 import Svg, { Circle } from "react-native-svg";
 import { api, type Offer } from "@/lib/api";
+import { openRouteInMaps } from "@/lib/maps";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius, cardStyle } from "@/lib/theme";
@@ -101,10 +102,9 @@ export default function OfferScreen() {
 
   function openMaps() {
     if (!offer) return;
-    const origin = encodeURIComponent(offer.pickup_address ?? "");
-    const dest = encodeURIComponent(offer.dropoff_address ?? "");
-    // Opens the maps app with the full pickup → drop-off route (falls back to browser).
-    Linking.openURL(`https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`);
+    // Opens the maps app with the full pickup → drop-off route, including any
+    // intermediate stops of a multi-stop trip as waypoints (falls back to browser).
+    openRouteInMaps(offer.pickup_address, offer.dropoff_address, offer.stops);
   }
 
   const status = offer?.status ?? "pending";

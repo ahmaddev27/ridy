@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";
-import { UserCircle, Map as MapIcon } from "lucide-react-native";
+import { UserCircle, Map as MapIcon, Route } from "lucide-react-native";
 import { api, type HomeData, type FleetHomeData, type Offer } from "@/lib/api";
 import { connectDriverRealtime } from "@/lib/realtime";
 import { alertOffer, markAlerted } from "@/lib/offer-alert";
@@ -127,7 +127,7 @@ export default function HomeScreen() {
             <SectionLabel>{t("home.activeOffer")}</SectionLabel>
             <OfferCard offer={active} onPress={() => router.push(`/offer/${active.id}`)} />
             <Pressable
-              onPress={() => openRouteInMaps(active.pickup_address, active.dropoff_address)}
+              onPress={() => openRouteInMaps(active.pickup_address, active.dropoff_address, active.stops)}
               style={({ pressed }) => ({
                 flexDirection: row,
                 alignItems: "center",
@@ -240,6 +240,14 @@ function RecentRow({ offer, onPress, last, showDriver, c }: { offer: Offer; onPr
         )}
         <Text numberOfLines={1} style={{ color: c.inkMuted, fontSize: 12.5, textAlign: align }}>{cleanAddress(offer.pickup_address)}</Text>
         <Text numberOfLines={1} style={{ color: c.ink, fontSize: 13, fontWeight: "500", textAlign: align }}>{cleanAddress(offer.dropoff_address)}</Text>
+        {(offer.stops_count ?? 0) >= 2 && (
+          <View style={{ flexDirection: row, alignItems: "center", gap: 4, marginTop: 2 }}>
+            <Route size={11} color={c.pending} />
+            <Text numberOfLines={1} style={{ color: c.pending, fontSize: 11, fontWeight: "600", textAlign: align }}>
+              {t("offer.multiStop")} · {offer.stops_count} {t("offer.dropoffs")}
+            </Text>
+          </View>
+        )}
       </View>
       <StatusBadge status={status} label={t(`status.${status}`)} />
     </Pressable>

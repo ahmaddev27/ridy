@@ -1,5 +1,5 @@
 import { View, Pressable } from "react-native";
-import { Clock } from "lucide-react-native";
+import { Clock, Route } from "lucide-react-native";
 import { Text } from "@/components/typography";
 import { Badge, StatusBadge } from "@/components/ui";
 import { useColors, radius, cardStyle, isDarkPalette } from "@/lib/theme";
@@ -99,6 +99,16 @@ export function OfferCard({
           <Stop label={t("offers.dropoff")} value={cleanAddress(offer.dropoff_address)} c={c} />
         </View>
       </View>
+
+      {/* Multi-stop indicator — a compact line; full per-stop detail lives on the detail screen. */}
+      {(offer.stops_count ?? 0) >= 2 && (
+        <View style={{ flexDirection: rowDir(), alignItems: "center", gap: 6 }}>
+          <Route size={13} color={c.pending} />
+          <Text style={{ color: c.pending, fontSize: 12, fontWeight: "600", textAlign: start() }}>
+            {t("offer.multiStop")} · {offer.stops_count} {t("offer.dropoffs")}
+          </Text>
+        </View>
+      )}
 
       {/* 4 · Footer: rider (customer) + driver (owner mode) + countdown/received */}
       {(live || showDriver || offer.rider_name) && (
