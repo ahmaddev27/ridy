@@ -321,7 +321,7 @@ Prod stack `docker-compose.prod.yml` (domain `reidey.de`). Services:
 | `backend` | Laravel PHP-FPM. **`./backend` is volume-mounted** (`:/var/www` + anonymous `/var/www/vendor`) — so a deploy is a code sync, not an image rebuild. |
 | `scheduler` | same image, `command: php artisan schedule:work` — runs Laravel's cron in one long process (no host crontab). |
 | `queue` | same image, `command: php artisan queue:work --queue=default --tries=3 --backoff=10 --max-time=3600` — the primary queue worker (the scheduler's per-minute `queue:work --stop-when-empty` is a backstop). |
-| `reverb` | Laravel Reverb WebSocket server (broadcasting) — the driver app subscribes for live offer updates; the dashboard still polls. |
+| `reverb` | Laravel Reverb WebSocket server (broadcasting) — the driver app AND the manager dashboard subscribe for live offer + driver-map updates (isolated `company.{tenantId}` channel); the poll remains a fallback. |
 | `frontend` | Next.js, built with `NEXT_PUBLIC_API_URL=https://${DOMAIN}`. |
 | `dispatch-daemon` | Node RAMEN daemon; env `RIDY_API_URL=https://${DOMAIN}`, `DISPATCH_INGEST_SECRET`, `UBER_*`. |
 | `nominatim`, `osrm` | optional self-hosted geocoding/routing (behind the `geo` profile — see `docs/self-hosted-geo.md`); `TripGeocoder` falls back to the public OSM services when unset. |

@@ -46,9 +46,9 @@ Because Uber blocks datacenter IPs, the live stream is held either by a **Node d
 | Dispatch daemon — 24/7 · self-heal · sharding | `▰▰▰▰▰` | ✅ Done |
 | Chrome extension — capture · Fleet Hub | `▰▰▰▰▰` | ✅ v1.15.4 |
 | Geocoding & multi-stop detail | `▰▰▰▰▰` | ✅ Done |
-| Live dashboard over WebSocket | `▰▰▰▱▱` | 🔄 Partial — driver app live via Reverb; dashboard still polls |
-| iOS App Store release | `▰▰▰▰▱` | ⏳ Blocked — DSA trader verification in review |
-| Scale-out — self-hosted geo · sharding runbook | `▰▰▰▰▱` | 🔄 Ready when needed |
+| Live dashboard over WebSocket | `▰▰▰▰▰` | ✅ Done — dashboard, offers & driver map live on the isolated `company.{tenantId}` channel; poll is the fallback |
+| iOS App Store release | `▰▰▰▰▱` | ⏳ Blocked (external) — Apple's DSA trader verification in review; nothing to build |
+| Scale-out — self-hosted geo · sharding runbook | `▰▰▰▰▱` | 🔄 Self-hosted geo already live; sharding runbook ready to switch on when load needs it |
 
 ## Features
 
