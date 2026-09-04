@@ -73,7 +73,7 @@ export default function AdminDashboardPage() {
         {online.length === 0 ? (
           <p className="text-sm text-ink-subtle">{c("onlineEmpty")}</p>
         ) : (
-          <div className="grid max-h-80 gap-1.5 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid max-h-80 gap-1.5 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {online.map((d) => (
               <div key={d.id} className="flex items-center justify-between gap-2 rounded-lg border border-line/60 bg-surface-2/40 px-3 py-2">
                 <div className="min-w-0">
