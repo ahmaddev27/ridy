@@ -198,6 +198,10 @@ jobs:
             done
 
             $COMPOSE exec -T backend php artisan optimize:clear || true
+            # Link public/storage so uploaded assets (invoice + email logos on the
+            # public disk) are actually served at {APP_URL}/storage/... — without
+            # this the logo URL 404s and images never render in the PDF or preview.
+            $COMPOSE exec -T backend php artisan storage:link || true
             # Rebuild the package-discovery manifest: the image installs deps with
             # --no-scripts (so post-autoload-dump never runs discover), and
             # bootstrap/cache is bind-mounted, so a stale packages.php would keep a
