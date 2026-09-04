@@ -55,6 +55,8 @@ class DispatchNotifier
             'distance_m' => (string) ($offer->distance_m ?? ''),
             'accept_window' => (string) ($offer->accept_window_seconds ?? ''),
             'received_at' => optional($offer->received_at)->toIso8601String() ?? '',
+            // Every stop as JSON so the app can route the maps app through them all.
+            'stops' => $this->stopsPayload($offer),
         ];
 
         $tokens = DeviceToken::where('driver_id', $offer->driver_id)->get();
@@ -164,15 +166,18 @@ class DispatchNotifier
         // Live nudge to the open app so it re-fetches the offer with the new stops.
         rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'multistop')), report: false);
 
-        // Lead the title with a bold, language-neutral multi-stop mark ("📍×N") so
-        // the driver spots the extra drop-offs at a glance — the pin-with-count reads
-        // the same in every language, unlike the subtle "⚑" that trailed before.
-        $mark = '📍×'.$stopsCount;
+        // Lead the title with a bold, language-neutral multi-stop mark ("🔵×N") so
+        // the driver spots the extra drop-offs at a glance — the blue-stop mark +
+        // count reads the same in every language (a push can't embed our SVG stop
+        // icon, so the closest neutral glyph stands in; the app renders the real
+        // blue icon in its UI).
+        $mark = '🔵×'.$stopsCount;
         $title = trim($mark.' · '.$this->buildNumbers($offer));
-        // Body opens with the same mark, then the addresses + metrics, so the alert
-        // still signals multi-stop even when only the body is visible (lock screen).
+        // Body opens with the mark, then EVERY stop (pickup + each drop-off with its
+        // per-leg km) and the metrics — so the driver sees all destinations and the
+        // pricing even from the lock screen, not just the first and last.
         $metrics = $this->buildMetrics($offer);
-        $body = trim($mark.'  '.$this->buildBody($offer).($metrics !== '' ? "\n".$metrics : ''));
+        $body = trim($mark."\n".$this->buildStopList($offer).($metrics !== '' ? "\n".$metrics : ''));
 
         $data = [
             'categoryId' => 'offer',
@@ -183,6 +188,9 @@ class DispatchNotifier
             'fare_amount' => (string) ($offer->fare_amount ?? ''),
             'pickup' => $this->cleanAddress($offer->pickup_display ?? $offer->pickup_address),
             'dropoff' => $this->cleanAddress($offer->dropoff_display ?? $offer->dropoff_address),
+            // Every stop as JSON so the app's "open in map" routes through them all
+            // (Google Maps waypoints) and can render per-stop detail from the push.
+            'stops' => $this->stopsPayload($offer),
         ];
 
         $sent = 0;
@@ -193,6 +201,59 @@ class DispatchNotifier
         }
 
         return $sent;
+    }
+
+    /**
+     * Every stop as a compact JSON array — `[{"address":"…","leg_m":1234}, …]` in
+     * route order (pickup first, each drop-off after) — so the app can route the
+     * maps app through all of them and render per-stop detail from the push alone.
+     * Empty string when the trip has no resolved multi-stop itinerary.
+     */
+    private function stopsPayload(DispatchOffer $offer): string
+    {
+        $stops = is_array($offer->stops) ? $offer->stops : [];
+        $out = [];
+        foreach ($stops as $s) {
+            $address = $this->cleanAddress($s['address'] ?? null);
+            if ($address === '') {
+                continue;
+            }
+            $out[] = ['address' => $address, 'leg_m' => $s['leg_m'] ?? null];
+        }
+
+        return $out === [] ? '' : (string) json_encode($out, JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * The multi-stop body: every stop on its own line — pickup first, then each
+     * drop-off prefixed "→" with its per-leg km — so the driver reads the whole
+     * itinerary on the lock screen. Falls back to the two-address body when the
+     * stops itinerary is unresolved.
+     */
+    private function buildStopList(DispatchOffer $offer): string
+    {
+        $stops = is_array($offer->stops) ? $offer->stops : [];
+        if (count($stops) < 2) {
+            return $this->buildBody($offer);
+        }
+
+        $lines = [];
+        foreach ($stops as $i => $s) {
+            $address = $this->cleanAddress($s['address'] ?? null);
+            if ($address === '') {
+                continue;
+            }
+            if ($i === 0) {
+                $lines[] = $address; // pickup — no arrow, no leg
+
+                continue;
+            }
+            $legM = $s['leg_m'] ?? null;
+            $leg = $legM !== null ? ' (+'.number_format((float) $legM / 1000, 1, '.', '').' km)' : '';
+            $lines[] = '→ '.$address.$leg;
+        }
+
+        return $lines === [] ? $this->buildBody($offer) : implode("\n", $lines);
     }
 
     /** "pickup\ndropoff" — the two addresses, country stripped, no separator arrow. */
