@@ -15,7 +15,7 @@
         "image": "latest"
       },
       "env": {
-        "EXPO_PUBLIC_SENTRY_DSN": "https://5551568a1b4cf2c762ced68cbd2c51dc@o4511942452183040.ingest.de.sentry.io/4511943633403984",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://92105e781213e27f2d8026e2046d6cea@o4512028929294336.ingest.de.sentry.io/4512029017374800",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
@@ -37,7 +37,7 @@
         "image": "latest"
       },
       "env": {
-        "EXPO_PUBLIC_SENTRY_DSN": "https://5551568a1b4cf2c762ced68cbd2c51dc@o4511942452183040.ingest.de.sentry.io/4511943633403984",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://92105e781213e27f2d8026e2046d6cea@o4512028929294336.ingest.de.sentry.io/4512029017374800",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     }
