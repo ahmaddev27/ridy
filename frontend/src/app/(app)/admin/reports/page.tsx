@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { latnLocale } from "@/lib/utils";
 import { toast } from "sonner";
-import { Wallet, Clock, Download, ReceiptText, CheckCircle2, Loader2, AlertCircle, Package, Plus, Pencil, Trash2 } from "lucide-react";
+import { Wallet, Clock, Download, ReceiptText, CheckCircle2, Loader2, AlertCircle, Package, Plus, Pencil, Trash2, FileText } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -30,6 +30,7 @@ import {
   type CollectorPayment,
   type Plan,
 } from "@/lib/api/admin";
+import { downloadInvoicePdf } from "@/lib/api/invoice-template";
 
 export default function ReportsPage() {
   const { t, locale } = useI18n();
@@ -85,6 +86,14 @@ export default function ReportsPage() {
     } finally {
       setPlanBusy(false);
       setDeletingPlan(null);
+    }
+  }
+
+  async function doDownloadPdf(invoiceId: number) {
+    try {
+      await downloadInvoicePdf(invoiceId);
+    } catch (e) {
+      toast.error(c("pdfFailed"), { description: e instanceof Error ? e.message : undefined });
     }
   }
 
@@ -267,14 +276,23 @@ export default function ReportsPage() {
                     <td className="px-4 py-3 text-ink-muted">{new Date(inv.starts_at).toLocaleDateString(latnLocale(locale))}</td>
                     <td className="px-4 py-3 text-ink-muted">{new Date(inv.ends_at).toLocaleDateString(latnLocale(locale))}</td>
                     <td className="px-4 py-3 text-end">
-                      {!inv.paid && (
+                      <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => setSettling(inv)}
-                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg"
+                          onClick={() => doDownloadPdf(inv.id)}
+                          title={c("pdf")}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-ink-muted hover:bg-surface-2 hover:text-ink"
                         >
-                          <CheckCircle2 className="h-4 w-4" /> {c("settle")}
+                          <FileText className="h-4 w-4" /> {c("pdf")}
                         </button>
-                      )}
+                        {!inv.paid && (
+                          <button
+                            onClick={() => setSettling(inv)}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg"
+                          >
+                            <CheckCircle2 className="h-4 w-4" /> {c("settle")}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

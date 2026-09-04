@@ -16,6 +16,7 @@ import {
   UserX,
   Ticket,
   ReceiptText,
+  FileText,
   Activity,
   Megaphone,
   Inbox,
@@ -89,6 +90,7 @@ export const navGroups: NavGroup[] = [
     requiresRole: "super_admin",
     items: [
       { href: "/admin/reports", label: "nav.subscriptions", icon: FileBarChart },
+      { href: "/admin/invoice-template", label: "nav.invoiceTemplate", icon: FileText },
     ],
   },
   {

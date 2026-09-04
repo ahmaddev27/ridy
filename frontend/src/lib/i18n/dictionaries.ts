@@ -36,6 +36,7 @@ const en = {
     adminDashboard: "Dashboard",
     settings: "Settings",
     emailTemplates: "Email Templates",
+    invoiceTemplate: "Invoice Template",
     profile: "Profile",
   },
   pages: {
@@ -68,6 +69,7 @@ const en = {
     adminDashboard: { title: "Admin Dashboard", subtitle: "Platform overview and alerts." },
     settings: { title: "Platform Settings", subtitle: "SMTP and the global proxy — applied live." },
     emailTemplates: { title: "Email Templates", subtitle: "Customize the registration and driver-invite emails." },
+    invoiceTemplate: { title: "Invoice Template", subtitle: "Branding, issuer, bank and tax details for the subscription-invoice PDFs." },
     profile: { title: "Profile", subtitle: "Edit your account." },
   },
   extBanner: { missing: "Reidey not installed — offers won’t be captured.", outdated: "Reidey is outdated — please update it.", unpaired: "Reidey isn’t paired yet.", action: "Fix" },
@@ -193,6 +195,7 @@ const de: typeof en = {
     adminDashboard: "Dashboard",
     settings: "Einstellungen",
     emailTemplates: "E-Mail-Vorlagen",
+    invoiceTemplate: "Rechnungsvorlage",
     profile: "Profil",
   },
   pages: {
@@ -225,6 +228,7 @@ const de: typeof en = {
     adminDashboard: { title: "Admin-Dashboard", subtitle: "Plattform-Überblick und Warnungen." },
     settings: { title: "Plattform-Einstellungen", subtitle: "SMTP und der globale Proxy — sofort aktiv." },
     emailTemplates: { title: "E-Mail-Vorlagen", subtitle: "Registrierungs- und Einladungs-E-Mails anpassen." },
+    invoiceTemplate: { title: "Rechnungsvorlage", subtitle: "Branding, Aussteller, Bank und Steuerangaben für die Abo-Rechnungs-PDFs." },
     profile: { title: "Profil", subtitle: "Dein Konto bearbeiten." },
   },
   extBanner: { missing: "Reidey nicht installiert — Angebote werden nicht erfasst.", outdated: "Reidey ist veraltet — bitte aktualisieren.", unpaired: "Reidey ist noch nicht gekoppelt.", action: "Beheben" },
@@ -351,6 +355,7 @@ const ar: typeof en = {
     adminDashboard: "لوحة التحكّم",
     settings: "الإعدادات",
     emailTemplates: "قوالب الإيميل",
+    invoiceTemplate: "قالب الفاتورة",
     profile: "الملف الشخصي",
   },
   pages: {
@@ -383,6 +388,7 @@ const ar: typeof en = {
     adminDashboard: { title: "لوحة الأدمن", subtitle: "نظرة عامة على المنصة والتنبيهات." },
     settings: { title: "إعدادات المنصة", subtitle: "SMTP والبروكسي العام — تُطبّق فوراً." },
     emailTemplates: { title: "قوالب الإيميل", subtitle: "خصّص إيميلات التسجيل ودعوة السائق." },
+    invoiceTemplate: { title: "قالب الفاتورة", subtitle: "الهوية البصرية وبيانات المُصدِر والبنك والضريبة لملفات فواتير الاشتراك PDF." },
     profile: { title: "الملف الشخصي", subtitle: "تعديل حسابك." },
   },
   extBanner: { missing: "رايدي غير مثبّتة — لن تُلتقط العروض.", outdated: "رايدي قديمة — رجاءً حدّثها.", unpaired: "رايدي غير مقترنة بعد.", action: "إصلاح" },
