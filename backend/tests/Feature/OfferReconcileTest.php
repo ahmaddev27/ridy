@@ -169,11 +169,41 @@ class OfferReconcileTest extends TestCase
             ], 200),
         ]);
 
-        $offer = $this->offer(['pickup_address' => 'A Str 1', 'dropoff_address' => 'B Str 2']);
+        // Both ends fully qualified (house number + PLZ + city) → they resolve to
+        // 'exact', so we trust the route distance.
+        $offer = $this->offer([
+            'pickup_address' => 'Elberfelder Straße 12, 42103 Wuppertal',
+            'dropoff_address' => 'Bahnstraße 5, 42105 Wuppertal',
+        ]);
         app(TripGeocoder::class)->enrich($offer->fresh());
 
         $offer->refresh();
         $this->assertNotNull($offer->geo_synced_at);
         $this->assertSame(4820, $offer->distance_m);
+    }
+
+    public function test_incomplete_address_leaves_the_distance_blank_no_guess(): void
+    {
+        Http::fake([
+            'nominatim.openstreetmap.org/*' => Http::response([['lat' => '51.34', 'lon' => '7.04']], 200),
+            'router.project-osrm.org/*' => Http::response([
+                'routes' => [['distance' => 4820, 'geometry' => ['type' => 'LineString', 'coordinates' => []]]],
+            ], 200),
+        ]);
+
+        // The pickup has NO house number ("Hoheleye" only) → it resolves to a
+        // street-level ('street') point on an arbitrary part of the street, so we
+        // must NOT guess a distance. It stays blank until a reliable source fills it
+        // (the driver accepts → Uber waypoints, or a later exact geocode).
+        $offer = $this->offer([
+            'pickup_address' => 'Hoheleye, 58093 Hagen',
+            'dropoff_address' => 'Hoheleye 3, 58093 Hagen',
+        ]);
+        app(TripGeocoder::class)->enrich($offer->fresh());
+
+        $offer->refresh();
+        $this->assertNotNull($offer->geo_synced_at, 'marked done — we do not re-attempt the same address');
+        $this->assertNull($offer->distance_m, 'incomplete address → no guessed distance');
+        $this->assertNull($offer->route_geometry, 'no guessed route either');
     }
 }

@@ -266,9 +266,12 @@ class OfferTripTest extends TestCase
         Sanctum::actingAs($user);
 
         $res = $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk();
-        // Resolved from the static PLZ centroids (Berlin ~52.5, Munich ~48.1) → postal.
+        // Resolved only to the static PLZ centroids (Berlin ~52.5, Munich ~48.1) →
+        // 'postal', not 'exact'. Per the "no guessing" rule the coarse centroids are
+        // too rough to trust a distance/€-per-km, so distance stays BLANK until a
+        // reliable source fills it (the driver accepts → Uber waypoints).
         $res->assertJsonPath('data.trip.geo_confidence', 'postal');
         $this->assertNotNull($res->json('data.trip.pickup.lat'));
-        $this->assertNotNull($res->json('data.trip.distance_km'));
+        $this->assertNull($res->json('data.trip.distance_km'), 'centroid-only → no guessed distance');
     }
 }

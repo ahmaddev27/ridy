@@ -161,11 +161,30 @@ class TripGeocoder
         $offer->dropoff_display = $this->completePostcode($offer->dropoff_address, $dropoff);
 
         if ($pickup && $dropoff) {
-            $route = $this->route($pickup, $dropoff);
-            $offer->distance_m = $route['distance_m'] ?? null;
-            $offer->route_geometry = $route['geometry'] ?? null;
-            $offer->geo_confidence = $this->combinedConfidence($pickup['confidence'] ?? null, $dropoff['confidence'] ?? null, $route);
-            $offer->geo_synced_at = CarbonImmutable::now(); // success — done for good
+            $pConf = $pickup['confidence'] ?? null;
+            $dConf = $dropoff['confidence'] ?? null;
+
+            // Only trust a distance when BOTH ends resolved to a precise house number
+            // ('exact'). An incomplete address — a pickup with no house number lands on
+            // an arbitrary point of the street — produced garbage distances / €-per-km
+            // (a "Hoheleye" pickup geocoded to 877 m one run and 65 m another for the
+            // same trip). Per product decision we do NOT guess: leave the distance blank
+            // until a RELIABLE source fills it — the driver accepts / finishes the trip
+            // (Uber waypoints, via OfferLifecycle → applyFromWaypoints) or a later exact
+            // geocode. €-per-km derives from distance_m, so it stays hidden until then.
+            if ($pConf === 'exact' && $dConf === 'exact') {
+                $route = $this->route($pickup, $dropoff);
+                $offer->distance_m = $route['distance_m'] ?? null;
+                $offer->route_geometry = $route['geometry'] ?? null;
+                $offer->geo_confidence = $this->combinedConfidence($pConf, $dConf, $route);
+            } else {
+                $offer->distance_m = null;
+                $offer->route_geometry = null;
+                // Keep the address-level confidence (street/postal/…) — we resolved
+                // the points, we just don't trust a distance between them.
+                $offer->geo_confidence = $this->worstConfidence($pConf, $dConf);
+            }
+            $offer->geo_synced_at = CarbonImmutable::now(); // done — don't re-attempt this address
         } else {
             // Couldn't resolve both ends (transient rate-limit or unknown address).
             // Count the attempt and only give up after a few tries.
@@ -636,11 +655,16 @@ class TripGeocoder
      */
     private function combinedConfidence(?string $pickup, ?string $dropoff, array $route): string
     {
+        return ($route['geometry'] ?? null) === null ? 'estimated' : $this->worstConfidence($pickup, $dropoff);
+    }
+
+    /** The lower (more cautious) of the two endpoints' geocode confidences. */
+    private function worstConfidence(?string $pickup, ?string $dropoff): string
+    {
         $rank = ['exact' => 5, 'street' => 4, 'area' => 3, 'postal' => 2, 'approx' => 1];
         $worst = min($rank[$pickup] ?? 1, $rank[$dropoff] ?? 1);
-        $confidence = array_search($worst, $rank, true) ?: 'approx';
 
-        return ($route['geometry'] ?? null) === null ? 'estimated' : $confidence;
+        return array_search($worst, $rank, true) ?: 'approx';
     }
 
     /**
