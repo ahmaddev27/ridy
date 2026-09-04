@@ -123,7 +123,7 @@ export default function InvoiceTemplatePage() {
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">{c("logo")}</label>
               <div className="flex items-center gap-3">
-                <div className="flex h-16 w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-surface-2">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-surface-2">
                   {logoSrc ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={logoSrc} alt="" className="max-h-full max-w-full object-contain" />
@@ -231,7 +231,7 @@ export default function InvoiceTemplatePage() {
       </div>
 
       {cropFile && (
-        <ImageCropper file={cropFile} aspect={3 / 1} onCancel={() => setCropFile(null)} onCropped={onCropped} />
+        <ImageCropper file={cropFile} aspect={1} onCancel={() => setCropFile(null)} onCropped={onCropped} />
       )}
     </div>
   );
