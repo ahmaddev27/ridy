@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\Admin\ContactMessageController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Api\V1\Admin\ImpersonationController;
 use App\Http\Controllers\Api\V1\Admin\InfrastructureHealthController;
+use App\Http\Controllers\Api\V1\Admin\InvoiceTemplateController;
 use App\Http\Controllers\Api\V1\Admin\LogViewerController;
 use App\Http\Controllers\Api\V1\Admin\NetworkLogController;
 use App\Http\Controllers\Api\V1\Admin\OrphanDriverController;
@@ -410,7 +411,14 @@ Route::prefix('v1')->group(function () {
         Route::get('reports/billing-summary', [BillingReportController::class, 'summary']);
         Route::get('subscription-invoices', [BillingReportController::class, 'invoices']);
         Route::get('subscription-invoices/export', [BillingReportController::class, 'invoicesExport']);
+        Route::get('subscription-invoices/{invoice}/pdf', [InvoiceTemplateController::class, 'pdf']);
         Route::post('subscription-invoices/{invoice}/settle', [BillingReportController::class, 'settle']);
+
+        // Invoice template (issuer/bank/branding + VAT) + live preview.
+        Route::get('invoice-template', [InvoiceTemplateController::class, 'show']);
+        Route::put('invoice-template', [InvoiceTemplateController::class, 'update']);
+        Route::post('invoice-template/image', [InvoiceTemplateController::class, 'uploadImage']);
+        Route::get('invoice-template/preview', [InvoiceTemplateController::class, 'preview']);
 
         // Issued activation codes ledger (all resellers).
         Route::get('subscription-codes', [BillingReportController::class, 'codes']);

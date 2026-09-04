@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  */
 class SubscriptionPeriod extends Model
 {
-    protected $fillable = ['tenant_id', 'days', 'amount', 'paid_at', 'collector_payment_id', 'sold_by_collector_id', 'starts_at', 'ends_at'];
+    protected $fillable = ['invoice_no', 'tenant_id', 'days', 'amount', 'paid_at', 'collector_payment_id', 'sold_by_collector_id', 'starts_at', 'ends_at'];
 
     protected $casts = [
         'days' => 'integer',
@@ -28,6 +28,19 @@ class SubscriptionPeriod extends Model
     public function isPaid(): bool
     {
         return $this->paid_at !== null;
+    }
+
+    /**
+     * The invoice number to print. Older periods (created before numbering) fall
+     * back to a stable, year-scoped synthetic number so the PDF always has one.
+     */
+    public function invoiceNumber(): string
+    {
+        if ($this->invoice_no !== null) {
+            return $this->invoice_no;
+        }
+
+        return 'RE-'.$this->starts_at->format('Y').'-'.$this->id;
     }
 
     public function tenant(): BelongsTo

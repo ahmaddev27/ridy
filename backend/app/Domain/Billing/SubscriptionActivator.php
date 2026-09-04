@@ -2,13 +2,19 @@
 
 namespace App\Domain\Billing;
 
+use App\Domain\Billing\Mail\InvoiceMail;
+use App\Domain\Billing\Models\InvoiceSettings;
 use App\Domain\Billing\Models\Plan;
 use App\Domain\Billing\Models\SubscriptionCode;
 use App\Domain\Billing\Models\SubscriptionPeriod;
 use App\Domain\Notifications\Notifier;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\ProxyPool;
+use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 /**
  * Applies a validated subscription (from an activation code) to a tenant. Shared
@@ -20,7 +26,12 @@ use Carbon\CarbonImmutable;
  */
 class SubscriptionActivator
 {
-    public function __construct(private Notifier $notifier, private ProxyPool $proxies) {}
+    public function __construct(
+        private Notifier $notifier,
+        private ProxyPool $proxies,
+        private InvoiceNumberGenerator $invoiceNumbers,
+        private InvoiceRenderer $invoices,
+    ) {}
 
     /**
      * Grant `$days` to the tenant, stacking after any remaining time, record the
@@ -64,6 +75,9 @@ class SubscriptionActivator
             'ends_at' => $endsAt,
         ]);
 
+        $settings = InvoiceSettings::current();
+        $this->invoiceNumbers->assign($period, $settings->number_prefix, (int) $startsAt->format('Y'));
+
         $ledgerEntry = $usedCode === null ? null : SubscriptionCode::where('tenant_id', $tenant->id)
             ->where('code', $usedCode)
             ->whereNull('activated_at')
@@ -75,6 +89,12 @@ class SubscriptionActivator
         ])->save();
 
         $this->proxies->assign($tenant);
+
+        // Email the invoice PDF for a genuine paid activation only (free grants
+        // never reach here). Best-effort — a mail failure must not break activation.
+        if ($paid && $amount !== null) {
+            $this->emailInvoice($tenant, $period->fresh(), $settings);
+        }
 
         $this->notifier->toTenant($tenant->id, 'subscription_activated', ['days' => $days], '/subscription');
         $reseller = $ledgerEntry?->collector()->with('user')->first()?->user;
@@ -111,6 +131,30 @@ class SubscriptionActivator
         ]);
 
         return $this->apply($tenant, $days, $amount, true, null, $code);
+    }
+
+    /**
+     * Render and email the invoice PDF to the company's managers. Fully guarded:
+     * any rendering or transport failure is logged and swallowed so activation
+     * always succeeds.
+     */
+    private function emailInvoice(Tenant $tenant, SubscriptionPeriod $period, InvoiceSettings $settings): void
+    {
+        try {
+            $recipients = User::where('tenant_id', $tenant->id)
+                ->whereNotNull('email')
+                ->pluck('email')
+                ->all();
+            if ($recipients === []) {
+                return;
+            }
+
+            $pdf = $this->invoices->pdf($period, $settings)->output();
+            $mail = new InvoiceMail($period->invoiceNumber(), $tenant->name, $pdf);
+            Mail::to($recipients)->send($mail);
+        } catch (Throwable $e) {
+            Log::warning('invoice_email_failed', ['tenant_id' => $tenant->id, 'error' => $e->getMessage()]);
+        }
     }
 
     /** The monthly plan: an active ~30-day plan, else the shortest active plan. */
