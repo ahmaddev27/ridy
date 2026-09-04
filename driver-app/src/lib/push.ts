@@ -13,6 +13,13 @@ const PUSH_TOKEN_KEY = "reidey_push_token";
 export const OFFER_CATEGORY = "offer";
 export const OPEN_MAP_ACTION = "open_map";
 
+/** Android notification channels. `MULTISTOP_CHANNEL` is the louder channel for
+ *  multi-stop / new-stops alerts. For an FCM-rendered push to land here the
+ *  backend must set `android_channel_id: "multistop"` on the message (out of
+ *  scope in the app); a locally-built alert routes to it via its trigger. */
+export const OFFERS_CHANNEL = "offers";
+export const MULTISTOP_CHANNEL = "multistop";
+
 let categoryRegistered = false;
 
 /** Registers the "offer" notification category with a single "Open in map"
@@ -62,12 +69,27 @@ export async function registerForPush(owner = false): Promise<string | null> {
   if (status !== "granted") return null;
 
   if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("offers", {
+    await Notifications.setNotificationChannelAsync(OFFERS_CHANNEL, {
       name: "Ride offers",
       importance: Notifications.AndroidImportance.MAX,
       sound: "default",
       vibrationPattern: [0, 250, 250, 250],
       bypassDnd: true,
+    });
+    // A louder, more urgent channel for multi-stop / new-stops alerts: MAX
+    // importance, a distinct urgent vibration pattern, and notification lights.
+    // NOTE: a CUSTOM SOUND FILE is intentionally NOT set here — bundling an audio
+    // asset ships only via a native `eas build`, not OTA, so this stays on the
+    // default sound. To route an FCM push here the backend must set
+    // `android_channel_id: "multistop"` on the message (wired backend-side later).
+    await Notifications.setNotificationChannelAsync(MULTISTOP_CHANNEL, {
+      name: "Multi-stop offers",
+      importance: Notifications.AndroidImportance.MAX,
+      sound: "default",
+      vibrationPattern: [0, 400, 200, 400, 200, 600],
+      bypassDnd: false,
+      enableLights: true,
+      lightColor: "#2563EB",
     });
   }
 

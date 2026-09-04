@@ -110,11 +110,15 @@ export default function OfferScreen() {
   const status = offer?.status ?? "pending";
   const win = acceptWindow(offer);
   const pct = secondsLeft != null && win > 0 ? Math.max(0, Math.min(1, secondsLeft / win)) : 0;
-  // The accept window (and therefore "expired") only applies while the offer is
-  // still open. Once it has been accepted/started/completed the trip is active,
-  // so the countdown must never override the live status with an "expired" label.
+  // The status LABEL is driven ONLY by the backend `offer.status`, never by the
+  // local countdown. The backend deliberately HOLDS an offer as `pending` while
+  // the driver is busy (it's taken back-to-back, or rejected only once idle), so a
+  // depleted local timer must never relabel a pending offer as expired/declined —
+  // it keeps showing the pending/waiting state until the backend moves it on. The
+  // ring may still visually deplete; `counting` only decides whether the live
+  // seconds are shown, not the status.
   const isPending = status === "pending";
-  const expired = isPending && secondsLeft != null && secondsLeft <= 0;
+  const counting = isPending && secondsLeft != null && secondsLeft > 0;
   const ringColor = pct > 0.5 ? c.completed : pct > 0.25 ? c.pending : c.canceled;
 
   // Once the offer is taken, the ring stops being a countdown and becomes a
@@ -186,13 +190,14 @@ export default function OfferScreen() {
                 );
               })()}
             </View>
-            {/* While pending + counting: the seconds left. Once the window passes
-                (or the trip moves on): the offer's live status as a colored badge —
-                pending, then rejected / accepted / started / completed / canceled as
-                the backend updates it. This is the single status indicator. */}
-            {isPending && !expired && secondsLeft != null ? (
+            {/* While pending + counting: the seconds left. Once the local window
+                passes, a STILL-pending offer keeps showing the pending badge (the
+                backend holds it while the driver is busy) — never "expired". The
+                badge label always comes from the backend status: pending, then
+                rejected / accepted / started / completed / canceled. */}
+            {counting ? (
               <Text style={{ color: ringColor, fontSize: 16, fontWeight: "600", marginTop: 6 }}>
-                {`${secondsLeft.toFixed(1)}s`}
+                {`${secondsLeft!.toFixed(1)}s`}
               </Text>
             ) : showProgress ? (
               // Trip lifecycle progress: the percentage replaces the status word.

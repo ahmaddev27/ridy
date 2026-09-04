@@ -2,6 +2,7 @@ import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { Vibration } from "react-native";
 import { cleanAddress, fareLabel } from "./format";
+import { MULTISTOP_CHANNEL } from "./push";
 import type { Offer } from "./api";
 
 /**
@@ -59,6 +60,9 @@ export async function alertOffer(offer: Offer | null | undefined): Promise<void>
 
   const sound = await prefOn("pref.sound");
   const dropoff = cleanAddress(offer.dropoff_address);
+  // A multi-stop offer routes to the louder "multistop" Android channel (urgent
+  // vibration + lights); a single-drop offer delivers on the default channel.
+  const multiStop = (offer.stops_count ?? 0) >= 2;
   await Notifications.scheduleNotificationAsync({
     content: {
       // Word-free, data-driven — mirrors the backend push (fare · destination).
@@ -67,6 +71,6 @@ export async function alertOffer(offer: Offer | null | undefined): Promise<void>
       sound: sound ? "default" : undefined,
       data: { offer_id: String(offer.id) },
     },
-    trigger: null,
+    trigger: multiStop ? { channelId: MULTISTOP_CHANNEL } : null,
   }).catch(() => {});
 }

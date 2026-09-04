@@ -7,8 +7,8 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/toast";
-import { Linking } from "react-native";
 import { registerForPush, registerOfferCategory, OPEN_MAP_ACTION } from "@/lib/push";
+import { openRouteInMaps } from "@/lib/maps";
 import { useColors, setThemeMode, type ThemeMode } from "@/lib/theme";
 import { useAppFonts } from "@/lib/fonts";
 import { setLocale } from "@/lib/i18n";
@@ -78,20 +78,23 @@ function RootLayout() {
 // (a no-op passthrough when Sentry was not initialized).
 export default Sentry.wrap(RootLayout);
 
-/** Opens the maps app at the pickup → drop-off route. Falls back to a plain
- *  search when only one address is present, and no-ops when neither is. */
-function openRouteInMaps(pickup?: string, dropoff?: string): void {
-  const origin = (pickup ?? "").trim();
-  const dest = (dropoff ?? "").trim();
-
-  let url: string | null = null;
-  if (origin && dest) {
-    url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}&travelmode=driving`;
-  } else if (origin || dest) {
-    url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(origin || dest)}`;
+/**
+ * Parse the notification's `data.stops` JSON string into the route's ordered
+ * stops (pickup first, then each drop-off) so "Open in map" can route through the
+ * whole multi-stop trip. The payload is attacker-influenced, so any parse or shape
+ * failure falls back to `undefined` — a plain pickup → drop-off route.
+ */
+function parseStops(raw?: string): { address: string | null }[] | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return undefined;
+    return parsed
+      .filter((s): s is { address?: unknown } => !!s && typeof s === "object")
+      .map((s) => ({ address: typeof s.address === "string" ? s.address : null }));
+  } catch {
+    return undefined;
   }
-
-  if (url) Linking.openURL(url).catch(() => {});
 }
 
 /** Routes the user between auth screens and the app based on session state, and
@@ -149,11 +152,13 @@ function Gate() {
         offer_id?: string;
         pickup?: string;
         dropoff?: string;
+        stops?: string;
       };
 
-      // "Open in map" action button: open the route without opening the app.
+      // "Open in map" action button: open the route without opening the app,
+      // routing through every stop of a multi-stop trip (Google Maps waypoints).
       if (response.actionIdentifier === OPEN_MAP_ACTION) {
-        openRouteInMaps(data?.pickup, data?.dropoff);
+        openRouteInMaps(data?.pickup, data?.dropoff, parseStops(data?.stops));
         return;
       }
 

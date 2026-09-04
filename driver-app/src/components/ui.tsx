@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, type LucideIcon } from "lucide-react-native";
 import Svg, { Path } from "react-native-svg";
 import { Text, TextInput } from "@/components/typography";
+import { StopMarker } from "@/components/stop-marker";
 import { useColors, radius, statusColors, cardStyle, isDarkPalette, type Palette } from "@/lib/theme";
 import { isRTL } from "@/lib/i18n";
 
@@ -395,18 +396,17 @@ export function RouteBlock({
         {stops.map((s, i) => {
           const isFirst = i === 0;
           const isLast = i === stops.length - 1;
-          const mid = !isFirst && !isLast ? i : null; // 1-based drop-off number
           return (
             <View key={i} style={{ flexDirection: row, gap: 14 }}>
               {/* rail: node + dotted connector to the next stop */}
               <View style={{ alignItems: "center", width: 20 }}>
                 {isFirst ? (
+                  // Pickup keeps the hollow origin marker.
                   <View style={{ width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderColor: c.inkMuted, marginTop: 3 }} />
-                ) : isLast ? (
-                  <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: c.accent, marginTop: 3 }} />
                 ) : (
-                  <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: c.pending, alignItems: "center", justifyContent: "center", marginTop: 1 }}>
-                    <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>{mid}</Text>
+                  // Every drop-off (intermediate + final) is the blue stop glyph.
+                  <View style={{ marginTop: 2 }}>
+                    <StopMarker size={16} />
                   </View>
                 )}
                 {!isLast && <View style={{ flex: 1, width: 2, marginVertical: 3, borderLeftWidth: 2, borderStyle: "dotted", borderColor: c.inkSubtle }} />}
@@ -432,7 +432,8 @@ export function RouteBlock({
       <View style={{ alignItems: "center", paddingTop: pickupLabel ? 5 : 4 }}>
         <View style={{ width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderColor: c.inkMuted }} />
         <View style={{ flex: 1, width: 2, marginVertical: 3, backgroundColor: "transparent", borderLeftWidth: 2, borderStyle: "dotted", borderColor: c.inkSubtle }} />
-        <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: c.accent }} />
+        {/* Drop-off is the blue stop glyph. */}
+        <StopMarker size={16} />
       </View>
       <View style={{ flex: 1, gap: pickupLabel ? 14 : 12 }}>
         <View>
