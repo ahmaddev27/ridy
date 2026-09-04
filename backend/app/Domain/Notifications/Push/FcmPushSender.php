@@ -104,7 +104,13 @@ class FcmPushSender implements PushSender
             $aps['badge'] = $badge;
         }
 
-        $androidNotification = ['channel_id' => 'offers', 'sound' => 'default'];
+        // A multi-stop alert routes to the app's dedicated "multistop" channel
+        // (MAX importance + an urgent vibration pattern) so the extra drop-offs grab
+        // the driver's attention, distinct from a routine offer on "offers". The app
+        // creates both channels (src/lib/push.ts); an unknown id falls back to the
+        // default channel harmlessly. (A custom sound file still needs a native build.)
+        $isMultiStop = isset($data['stops_count']) && (int) $data['stops_count'] >= 2;
+        $androidNotification = ['channel_id' => $isMultiStop ? 'multistop' : 'offers', 'sound' => 'default'];
         if ($badge !== null) {
             $androidNotification['notification_count'] = $badge;
         }
