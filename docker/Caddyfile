@@ -41,7 +41,7 @@ reidey.de {
 	}
 
 	# Static assets Laravel serves from public/ (favicon, storage links, etc.).
-	handle_path /storage/* {
+	handle /storage/* {
 		root * /var/www/public
 		file_server
 	}
