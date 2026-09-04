@@ -91,7 +91,14 @@ class FcmPushSender implements PushSender
         // present reliably on Android and dropped the body on real devices, so we
         // keep the notification message; the map lives inside the offer detail.
         // iOS still shows the action button via aps.category.
-        $aps = ['sound' => 'default', 'content-available' => 1];
+        // A multi-stop alert plays a distinct sound (multi.wav) and rides the urgent
+        // "multistop" channel; a routine offer uses normal.wav on "offers". The wavs
+        // are bundled in the app (app.json expo-notifications `sounds`) and only ship
+        // via a native eas build — an unknown sound name falls back to the default.
+        $isMultiStop = isset($data['stops_count']) && (int) $data['stops_count'] >= 2;
+        $soundFile = $isMultiStop ? 'multi.wav' : 'normal.wav';
+
+        $aps = ['sound' => $soundFile, 'content-available' => 1];
         if (! empty($data['categoryId'])) {
             $aps['category'] = (string) $data['categoryId'];
         }
