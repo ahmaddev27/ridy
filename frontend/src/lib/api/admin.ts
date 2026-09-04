@@ -74,6 +74,7 @@ export type AdminOverview = {
     companies: number;
     active_companies: number;
     drivers: number;
+    drivers_online: number;
     offers: number;
     sessions_active: number;
     sessions_need_attention: number;
@@ -83,6 +84,7 @@ export type AdminOverview = {
   session_breakdown: { active: number; expired: number; needs_relink: number; no_session: number };
   offers_daily: { date: string; count: number }[];
   top_companies: { company_id: number; company: string; offers: number; drivers: number }[];
+  online_drivers: { id: number; name: string | null; company: string | null; engagement: number }[];
 };
 
 export type PlatformSettings = {

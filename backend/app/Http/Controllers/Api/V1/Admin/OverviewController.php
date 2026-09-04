@@ -42,10 +42,27 @@ class OverviewController extends Controller
             $breakdown[in_array($status, ['active', 'expired', 'needs_relink'], true) ? $status : 'no_session']++;
         }
 
+        // Live drivers across the whole platform — WHO is online right now and how
+        // many. `scopeOnline` excludes the offline tokens; engagementStatus() maps
+        // the raw Uber status to 0 idle-online / 1 EN_ROUTE / 2 ON_TRIP so the admin
+        // sees who is actually on a trip vs merely available.
+        $tenantsById = $tenants->keyBy('id');
+        $onlineDrivers = Driver::withoutGlobalScopes()->online()
+            ->orderByDesc('status_synced_at')
+            ->get(['id', 'name', 'tenant_id', 'online_status', 'status_synced_at'])
+            ->map(fn (Driver $d) => [
+                'id' => $d->id,
+                'name' => $d->name,
+                'company' => $tenantsById->get($d->tenant_id)?->name,
+                'engagement' => $d->engagementStatus(),
+            ])
+            ->values();
+
         $stats = [
             'companies' => $tenants->count(),
             'active_companies' => $activeCompanies->count(),
             'drivers' => Driver::withoutGlobalScopes()->count(),
+            'drivers_online' => $onlineDrivers->count(),
             'offers' => DispatchOffer::withoutGlobalScopes()->count(),
             'sessions_active' => $breakdown['active'],
             'sessions_need_attention' => $breakdown['expired'] + $breakdown['needs_relink'],
@@ -91,6 +108,7 @@ class OverviewController extends Controller
             'session_breakdown' => $breakdown,
             'offers_daily' => $this->offersDaily(),
             'top_companies' => $this->topCompanies($tenants),
+            'online_drivers' => $onlineDrivers,
         ]]);
     }
 
