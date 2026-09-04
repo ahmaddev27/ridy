@@ -34,6 +34,17 @@ function pinElement(color: string): HTMLDivElement {
   return el;
 }
 
+/** The blue "stop" marker for a drop-off — a filled disc with a white rounded
+ *  square (⏹), matching the StopMarker used in the itinerary list. */
+function stopElement(color: string): HTMLDivElement {
+  const el = document.createElement("div");
+  el.style.cssText = `width:18px;height:18px;border-radius:9999px;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);box-sizing:border-box;display:flex;align-items:center;justify-content:center`;
+  const inner = document.createElement("div");
+  inner.style.cssText = "width:7px;height:7px;border-radius:2px;background:#fff";
+  el.appendChild(inner);
+  return el;
+}
+
 /** A numbered marker for an intermediate multi-stop drop-off. */
 function numberedElement(color: string, n: number): HTMLDivElement {
   const el = document.createElement("div");
@@ -124,12 +135,12 @@ export function TripMap({
         if (pickup) {
           markers.push(new maplibregl.Marker({ element: pinElement("#059669") }).setLngLat([pickup.lng, pickup.lat]).addTo(map));
         }
-        // Numbered amber markers for each intermediate drop-off on a multi-stop trip.
+        // Numbered blue markers for each intermediate drop-off on a multi-stop trip.
         midStops.forEach((s, i) => {
-          markers.push(new maplibregl.Marker({ element: numberedElement("#f59e0b", i + 1) }).setLngLat([s.lng, s.lat]).addTo(map));
+          markers.push(new maplibregl.Marker({ element: numberedElement("#2563eb", i + 1) }).setLngLat([s.lng, s.lat]).addTo(map));
         });
         if (dropoff) {
-          markers.push(new maplibregl.Marker({ element: pinElement("#e11d48") }).setLngLat([dropoff.lng, dropoff.lat]).addTo(map));
+          markers.push(new maplibregl.Marker({ element: stopElement("#2563eb") }).setLngLat([dropoff.lng, dropoff.lat]).addTo(map));
         }
 
         // Fit to the pickup/dropoff pair, or center on the single known point.
