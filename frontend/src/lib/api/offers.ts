@@ -2,6 +2,19 @@ import { apiFetch, apiDownload } from "./client";
 
 export type OfferStatus = "pending" | "accepted" | "started" | "completed" | "rejected" | "canceled";
 
+/**
+ * The badge status for an offer — the backend `status` is the single source of
+ * truth for the offer lifecycle. A fresh offer is held `pending` while the
+ * driver is busy (kept for back-to-back) and is only moved to `rejected` once
+ * the driver goes idle; the accept-window countdown is a client-side hint and
+ * must NOT flip the label. So a missing status resolves to `pending` (a waiting
+ * state), never a terminal "not taken" — only `rejected`/`canceled` read as
+ * declined.
+ */
+export function offerBadgeStatus(offer: { status: OfferStatus | null }): OfferStatus {
+  return offer.status ?? "pending";
+}
+
 export type DispatchOffer = {
   id: number;
   offer_uuid: string;
@@ -54,7 +67,7 @@ export type TripInfo = {
   // Each stop carries its address plus the road distance from the previous stop
   // (leg_m) and the running total to that stop (cumulative_m). Pickup has leg_m null.
   stops:
-    | { lat: number; lng: number; type: string | null; address: string | null; leg_m: number | null; cumulative_m: number }[]
+    | { lat: number; lng: number; type: string | null; address: string | null; leg_m: number | null; cumulative_m: number | null }[]
     | null;
   stops_count: number | null;
   geo_source: string | null;

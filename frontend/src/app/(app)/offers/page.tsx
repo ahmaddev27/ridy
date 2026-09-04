@@ -11,7 +11,7 @@ import { Badge, type Status } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
-import { listOffersPaged, getOfferStats, exportOffers, fareLabel, type DispatchOffer, type OfferStatus, type PageMeta, type OfferStats } from "@/lib/api/offers";
+import { listOffersPaged, getOfferStats, exportOffers, fareLabel, offerBadgeStatus, type DispatchOffer, type OfferStatus, type PageMeta, type OfferStats } from "@/lib/api/offers";
 import { fleetNow } from "@/lib/fleet-day";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 
@@ -356,7 +356,7 @@ export default function OffersPage() {
                               </td>
                               <td className="px-4 py-3">
                                 {(() => {
-                                  const st = o.status ?? (o.accepted ? "accepted" : "pending");
+                                  const st = offerBadgeStatus(o);
                                   return <Badge status={OFFER_TONE[st]} dot>{c(`st_${st}`)}</Badge>;
                                 })()}
                               </td>

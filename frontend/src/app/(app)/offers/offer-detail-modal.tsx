@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
 import dynamic from "next/dynamic";
-import { X, MapPin, Flag, User, CircleDollarSign, Clock, Loader2, Route, Gauge, Wallet } from "lucide-react";
+import { X, MapPin, User, CircleDollarSign, Clock, Loader2, Route, Gauge, Wallet } from "lucide-react";
 import { StatCard } from "@/components/ui/card";
 import { Badge, type Status } from "@/components/ui/badge";
+import { StopMarker } from "@/components/ui/stop-marker";
 import { useI18n } from "@/lib/i18n/context";
-import { getOffer, fareLabel, type DispatchOfferDetail, type OfferStatus } from "@/lib/api/offers";
+import { getOffer, fareLabel, offerBadgeStatus, type DispatchOfferDetail, type OfferStatus } from "@/lib/api/offers";
 
 /** One row in the modal's stop list: an address with its per-leg + cumulative km. */
 type StopRow = { address: string; legKm: number | null; cumulativeKm: number | null };
@@ -128,7 +129,7 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
           </div>
           <div className="flex items-center gap-2">
             {offer && (() => {
-              const st = offer.status ?? (offer.accepted ? "accepted" : "pending");
+              const st = offerBadgeStatus(offer);
               return <Badge status={OFFER_TONE[st]} dot>{c(`st_${st}`)}</Badge>;
             })()}
             {(offer?.fare_amount != null || offer?.fare_formatted) && (
@@ -159,14 +160,15 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
               <div className="border-b border-line p-5">
                 <ol className="space-y-3">
                   {stops.map((s, i) => {
-                    const isLast = i === stops.length - 1;
                     const isPickup = i === 0;
                     return (
                       <li key={i} className="flex items-start gap-3">
-                        {isLast ? (
-                          <Flag className="mt-0.5 h-4 w-4 shrink-0 text-danger-fg" />
+                        {/* Pickup keeps the green origin pin; every drop-off and
+                            intermediate stop uses the blue stop marker. */}
+                        {isPickup ? (
+                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-success-fg" />
                         ) : (
-                          <MapPin className={`mt-0.5 h-4 w-4 shrink-0 ${isPickup ? "text-success-fg" : "text-amber-600"}`} />
+                          <StopMarker size={16} className="mt-0.5 shrink-0" />
                         )}
                         <div className="min-w-0 flex-1">
                           <span className="text-sm text-ink">{s.address}</span>

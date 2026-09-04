@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
 import { getDriver, getDriverStats, getDriverMetrics, type Driver, type DriverStats, type DriverMetric } from "@/lib/api/drivers";
-import { listOffersPaged, fareLabel, type DispatchOffer, type OfferStatus } from "@/lib/api/offers";
+import { listOffersPaged, fareLabel, offerBadgeStatus, type DispatchOffer, type OfferStatus } from "@/lib/api/offers";
 import { OfferDetailModal } from "../../offers/offer-detail-modal";
 
 type RangeKey = "today" | "yesterday" | "7" | "30" | "custom";
@@ -348,7 +348,7 @@ export default function DriverProfilePage() {
                                     </td>
                                     <td className="px-4 py-3">
                                       {(() => {
-                                        const st = offer.status ?? (offer.accepted ? "accepted" : "pending");
+                                        const st = offerBadgeStatus(offer);
                                         return <Badge status={OFFER_TONE[st]} dot>{o(`st_${st}`)}</Badge>;
                                       })()}
                                     </td>
