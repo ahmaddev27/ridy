@@ -72,20 +72,20 @@ export async function registerForPush(owner = false): Promise<string | null> {
     await Notifications.setNotificationChannelAsync(OFFERS_CHANNEL, {
       name: "Ride offers",
       importance: Notifications.AndroidImportance.MAX,
-      sound: "default",
+      sound: "normal.wav", // bundled via the expo-notifications `sounds` config (app.json)
       vibrationPattern: [0, 250, 250, 250],
       bypassDnd: true,
     });
     // A louder, more urgent channel for multi-stop / new-stops alerts: MAX
-    // importance, a distinct urgent vibration pattern, and notification lights.
-    // NOTE: a CUSTOM SOUND FILE is intentionally NOT set here — bundling an audio
-    // asset ships only via a native `eas build`, not OTA, so this stays on the
-    // default sound. To route an FCM push here the backend must set
-    // `android_channel_id: "multistop"` on the message (wired backend-side later).
+    // importance, a distinct alert SOUND (multi.wav), an urgent vibration pattern,
+    // and notification lights — so the driver clearly tells a multi-stop offer from
+    // a routine one. The custom sounds are bundled by the expo-notifications
+    // `sounds` array (app.json) and ship via a native `eas build` (NOT OTA). To
+    // route an FCM push here the backend sets `android_channel_id: "multistop"`.
     await Notifications.setNotificationChannelAsync(MULTISTOP_CHANNEL, {
       name: "Multi-stop offers",
       importance: Notifications.AndroidImportance.MAX,
-      sound: "default",
+      sound: "multi.wav",
       vibrationPattern: [0, 400, 200, 400, 200, 600],
       bypassDnd: false,
       enableLights: true,

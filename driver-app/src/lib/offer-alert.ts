@@ -61,14 +61,17 @@ export async function alertOffer(offer: Offer | null | undefined): Promise<void>
   const sound = await prefOn("pref.sound");
   const dropoff = cleanAddress(offer.dropoff_address);
   // A multi-stop offer routes to the louder "multistop" Android channel (urgent
-  // vibration + lights); a single-drop offer delivers on the default channel.
+  // vibration + lights) and plays the distinct multi.wav; a single-drop offer uses
+  // the routine channel + normal.wav. The `sound` name (iOS foreground) matches the
+  // wav bundled via app.json's expo-notifications `sounds`; Android takes its sound
+  // from the channel. Both ship via a native eas build (not OTA).
   const multiStop = (offer.stops_count ?? 0) >= 2;
   await Notifications.scheduleNotificationAsync({
     content: {
       // Word-free, data-driven — mirrors the backend push (fare · destination).
       title: `${fareLabel(offer.fare_formatted, offer.fare_amount)}${dropoff ? ` · ${dropoff}` : ""}`,
       body: cleanAddress(offer.pickup_address),
-      sound: sound ? "default" : undefined,
+      sound: sound ? (multiStop ? "multi.wav" : "normal.wav") : undefined,
       data: { offer_id: String(offer.id) },
     },
     trigger: multiStop ? { channelId: MULTISTOP_CHANNEL } : null,
