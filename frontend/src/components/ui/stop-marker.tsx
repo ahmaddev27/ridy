@@ -24,8 +24,8 @@ export function StopMarker({
       className={className}
       aria-hidden="true"
     >
-      <circle cx="12" cy="12" r="10" fill={color} />
-      <rect x="8" y="8" width="8" height="8" rx="2.5" fill="#fff" />
+      <circle cx="12" cy="12" r="11" fill={color} />
+      <rect x="7" y="7" width="10" height="10" rx="2.8" fill="#fff" />
     </svg>
   );
 }

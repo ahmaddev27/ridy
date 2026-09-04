@@ -6,7 +6,7 @@ import Svg, { Circle, Rect } from "react-native-svg";
  * distinct from the hollow origin (pickup) marker.
  */
 export function StopMarker({ size = 16, color = "#2563EB" }: { size?: number; color?: string }) {
-  const inner = size * 0.42; // side of the white square
+  const inner = size * 0.45; // side of the white square (~45% of the disc, symmetric)
   const offset = (size - inner) / 2;
   const corner = inner * 0.28; // rounded-corner radius of the square
   return (

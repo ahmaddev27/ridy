@@ -38,9 +38,10 @@ function pinElement(color: string): HTMLDivElement {
  *  square (⏹), matching the StopMarker used in the itinerary list. */
 function stopElement(color: string): HTMLDivElement {
   const el = document.createElement("div");
-  el.style.cssText = `width:18px;height:18px;border-radius:9999px;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);box-sizing:border-box;display:flex;align-items:center;justify-content:center`;
+  el.style.cssText = `width:20px;height:20px;border-radius:9999px;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);box-sizing:border-box;display:flex;align-items:center;justify-content:center`;
   const inner = document.createElement("div");
-  inner.style.cssText = "width:7px;height:7px;border-radius:2px;background:#fff";
+  // ~45% of the disc, moderately rounded — a clear, symmetric ⏹ stop square.
+  inner.style.cssText = "width:9px;height:9px;border-radius:2.5px;background:#fff";
   el.appendChild(inner);
   return el;
 }
