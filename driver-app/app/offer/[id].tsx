@@ -246,8 +246,8 @@ export default function OfferScreen() {
               </View>
             )}
             <RouteBlock
-              pickup={cleanAddress(offer.pickup_address)}
-              dropoff={cleanAddress(offer.dropoff_address)}
+              pickup={offer.pickup_station_name ? `${offer.pickup_station_name}, ${cleanAddress(offer.pickup_address)}` : cleanAddress(offer.pickup_address)}
+              dropoff={offer.dropoff_station_name ? `${offer.dropoff_station_name}, ${cleanAddress(offer.dropoff_address)}` : cleanAddress(offer.dropoff_address)}
               pickupLabel={t("offer.abholung")}
               dropoffLabel={t("offer.ziel")}
               stops={

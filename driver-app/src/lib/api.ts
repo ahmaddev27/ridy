@@ -30,7 +30,11 @@ export type Offer = {
   /** Rider's (first) name when the captured payload carried it. */
   rider_name?: string | null;
   pickup_address: string | null;
+  /** Resolved station name (e.g. "Solingen Hbf") when the endpoint is a street-less
+   *  station/area — Uber sends only "PLZ City" for these. Shown above the raw address. */
+  pickup_station_name?: string | null;
   dropoff_address: string | null;
+  dropoff_station_name?: string | null;
   fare_formatted: string | null;
   fare_amount: number | null;
   distance_m: number | null;
