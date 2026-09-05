@@ -166,12 +166,12 @@ class DispatchNotifier
         // Live nudge to the open app so it re-fetches the offer with the new stops.
         rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'multistop')), report: false);
 
-        // Lead the title with a bold, language-neutral multi-stop mark ("🔵×N") so
-        // the driver spots the extra drop-offs at a glance — the blue-stop mark +
-        // count reads the same in every language (a push can't embed our SVG stop
-        // icon, so the closest neutral glyph stands in; the app renders the real
-        // blue icon in its UI).
-        $mark = '🔵×'.$stopsCount;
+        // Lead the title with a bold, language-neutral multi-stop mark ("🟦×N") so
+        // the driver spots the extra drop-offs at a glance — a blue SQUARE that
+        // mirrors the app/dashboard blue stop marker, count reads the same in every
+        // language (a push can't embed our SVG stop icon, so the closest neutral
+        // glyph stands in; the app renders the real blue stop marker in its UI).
+        $mark = '🟦×'.$stopsCount;
         $title = trim($mark.' · '.$this->buildNumbers($offer));
         // Body opens with the mark, then EVERY stop (pickup + each drop-off with its
         // per-leg km) and the metrics — so the driver sees all destinations and the
