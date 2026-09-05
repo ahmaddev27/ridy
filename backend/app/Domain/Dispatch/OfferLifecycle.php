@@ -26,6 +26,13 @@ class OfferLifecycle
     /** An ACCEPTED-but-never-started offer older than this is force-canceled. */
     public const ACCEPTED_STALE_MINUTES = 20;
 
+    /**
+     * How long a driver must have been continuously OFFLINE before their STARTED
+     * trip is force-completed — a grace so a brief mid-trip connection blip (offline
+     * then back to ON_TRIP) doesn't end a live trip early.
+     */
+    public const OFFLINE_GRACE_MINUTES = 5;
+
     /** PENDING → ACCEPTED. Stamps accepted_at (kept forever = "was ever taken"). */
     public function accept(DispatchOffer $offer): bool
     {
@@ -122,14 +129,17 @@ class OfferLifecycle
             ->where('started_at', '<', $now->subMinutes(self::MAX_TRIP_MINUTES))
             ->update(['status' => OfferStatus::Completed, 'completed_at' => $now]);
 
-        // A driver who has gone OFFLINE cannot still be on a trip — their close edge
-        // was simply never observed (an abrupt disconnect / poll gap). Complete it now
-        // instead of waiting out the 100-minute cap, so it never lingers as a phantom
-        // trip. Only offers actually linked to a driver are considered.
+        // A driver who has been OFFLINE past the grace can't still be on a trip — the
+        // close edge was never observed (a sign-off / abrupt disconnect). Complete it
+        // now instead of waiting out the 100-minute cap, but only after the grace so a
+        // brief mid-trip blip (offline → back ON_TRIP) doesn't end a live trip early.
+        // The grace is measured from went_offline_at (cleared when the driver returns),
+        // so a blip that reconnects resets it. Only offers linked to a driver count.
         $offlineCompleted = DispatchOffer::withoutGlobalScopes()
             ->where('status', OfferStatus::Started)
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->whereHas('driver', fn ($q) => $q->offline())
+            ->whereHas('driver', fn ($q) => $q->offline()
+                ->where('went_offline_at', '<', $now->subMinutes(self::OFFLINE_GRACE_MINUTES)))
             ->update(['status' => OfferStatus::Completed, 'completed_at' => $now]);
 
         $canceled = DispatchOffer::withoutGlobalScopes()

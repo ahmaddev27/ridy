@@ -32,7 +32,7 @@ class Driver extends Authenticatable
         'tenant_id', 'name', 'phone', 'license_no', 'employment_type', 'external_ids', 'pseudonym_id',
         'uber_driver_uuid', 'uber_email', 'uber_link_method',
         'uber_picture_url', 'uber_rating', 'uber_total_trips', 'uber_status', 'roster_synced_at', 'roster_removed_at',
-        'online_status', 'location_updated_at', 'status_synced_at',
+        'online_status', 'went_offline_at', 'location_updated_at', 'status_synced_at',
         'latitude', 'longitude', 'heading', 'trip_waypoints',
         'email', 'password', 'locale', 'invite_token', 'invited_at', 'activated_at', 'last_login_at', 'offers_seen_at',
     ];
@@ -45,6 +45,7 @@ class Driver extends Authenticatable
         'uber_total_trips' => 'integer',
         'roster_synced_at' => 'datetime',
         'roster_removed_at' => 'datetime',
+        'went_offline_at' => 'datetime',
         'location_updated_at' => 'datetime',
         'status_synced_at' => 'datetime',
         'latitude' => 'decimal:7',
@@ -111,7 +112,13 @@ class Driver extends Authenticatable
     /** True when Uber reports a live status for the driver that isn't an offline one. */
     public function isOnline(): bool
     {
-        $s = strtoupper(trim((string) $this->online_status));
+        return self::statusIsOnline($this->online_status);
+    }
+
+    /** Whether a raw Uber status string counts as online (present and not an offline token). */
+    public static function statusIsOnline(?string $status): bool
+    {
+        $s = strtoupper(trim((string) $status));
         if ($s === '') {
             return false;
         }

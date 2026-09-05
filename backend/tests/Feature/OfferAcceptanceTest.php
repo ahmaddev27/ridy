@@ -261,22 +261,48 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame(OfferStatus::Started, $fresh->fresh()->status, 'the new offer is the one active trip');
     }
 
-    public function test_finalizer_completes_a_started_offer_once_the_driver_is_offline(): void
+    public function test_finalizer_completes_a_started_offer_once_the_driver_is_offline_past_the_grace(): void
     {
-        // A driver who abruptly went offline (we never saw the idle edge) can't still
-        // be on a trip — their stuck STARTED offer is completed now, not left phantom
-        // until the 100-min cap.
+        // A driver offline past the grace can't still be on a trip — their stuck
+        // STARTED offer is completed now, not left phantom until the 100-min cap.
         $driver = $this->driver();
-        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_OFFLINE']);
+        $driver->update([
+            'online_status' => 'MONITORING_SUPPLY_STATUS_OFFLINE',
+            'went_offline_at' => now()->subMinutes(6), // past the 5-min grace
+        ]);
         $offer = $this->offer([
             'driver_id' => $driver->id,
             'status' => OfferStatus::Started,
-            'accepted_at' => now()->subMinutes(5),
-            'started_at' => now()->subMinutes(5), // NOT past the 100-min cap
+            'accepted_at' => now()->subMinutes(8),
+            'started_at' => now()->subMinutes(8), // NOT past the 100-min cap
         ]);
 
         app(OfferLifecycle::class)->finalizeStale();
 
+        $this->assertSame(OfferStatus::Completed, $offer->fresh()->status);
+    }
+
+    public function test_a_mid_trip_offline_blip_keeps_the_trip_running(): void
+    {
+        // Real trip in progress; the driver's internet drops (Uber → OFFLINE) then
+        // returns. The trip must NOT end on the blip — it keeps running (finalizeStale
+        // only closes it after the offline grace, which a quick reconnect resets).
+        $this->driver();
+        $offer = $this->offer();
+
+        $this->postStatus('EN_ROUTE'); // accepted
+        $this->postStatus('ON_TRIP');  // started
+        $offer->update(['started_at' => now()->subMinutes(3)]); // a real trip in progress
+        $this->postStatus('OFFLINE');  // internet blip
+        $this->assertSame(OfferStatus::Started, $offer->fresh()->status, 'offline blip keeps the trip started');
+
+        // Within the grace, the sweep leaves it running too.
+        app(OfferLifecycle::class)->finalizeStale();
+        $this->assertSame(OfferStatus::Started, $offer->fresh()->status, 'within grace, still running');
+
+        // Driver reconnects and finishes normally (idle-online end → completed).
+        $this->postStatus('ON_TRIP');
+        $this->postStatus('ONLINE');
         $this->assertSame(OfferStatus::Completed, $offer->fresh()->status);
     }
 

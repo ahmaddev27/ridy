@@ -80,9 +80,14 @@ class DriverStatusIngestor
                 $lat = $lng = null;
             }
 
+            // Stamp WHEN the driver first went offline (kept until they're back online)
+            // so the lifecycle can tell a real sign-off from a brief mid-trip blip.
+            $onlineNow = Driver::statusIsOnline($row['status'] ?? null);
+
             try {
                 $driver->update([
                     'online_status' => $row['status'] ?? null,
+                    'went_offline_at' => $onlineNow ? null : ($driver->went_offline_at ?? now()),
                     'location_updated_at' => $this->timestampMs($row['location_updated_at'] ?? null),
                     'status_synced_at' => now(),
                     'latitude' => $lat,
@@ -102,8 +107,8 @@ class DriverStatusIngestor
             // locks on, so they can deadlock (1213). Retry a couple of times, then
             // report and move on: a lost transition is re-derived on the next poll and
             // must never 500 the batch (which would drop every driver + acceptance).
-            $this->retryOnDeadlock(function () use ($tenantId, $uuid, $was, $now, &$counts) {
-                $this->applyTransition($tenantId, $uuid, $was, $now, $counts);
+            $this->retryOnDeadlock(function () use ($tenantId, $uuid, $was, $now, $onlineNow, &$counts) {
+                $this->applyTransition($tenantId, $uuid, $was, $now, $onlineNow, $counts);
             });
 
             // Once engaged, Uber's live map carries the trip's real pickup/drop-off
@@ -190,7 +195,7 @@ class DriverStatusIngestor
      *
      * @param  array<string, int>  $counts
      */
-    private function applyTransition(int $tenantId, string $uuid, int $was, int $now, array &$counts): void
+    private function applyTransition(int $tenantId, string $uuid, int $was, int $now, bool $onlineNow, array &$counts): void
     {
         // Diagnostic: every real engagement-level change, with the offer it resolved to.
         // Surfaces in the admin Logs tab so we can see WHY a busy driver's acceptance is
@@ -259,13 +264,19 @@ class DriverStatusIngestor
             if ($active === null) {
                 return;
             }
-            if ($this->tripLooksReal($active) && $this->lifecycle->complete($active)) {
-                $counts['completed']++;
+            // A STARTED trip is completed only on a genuine idle-ONLINE end (the driver
+            // is now available). Going OFFLINE — a sign-off OR a brief mid-trip
+            // connection blip — is left for finalizeStale to close after a short grace,
+            // so a driver whose internet drops for a moment and returns to ON_TRIP keeps
+            // their live trip instead of it ending early. (A sub-min flicker still stays
+            // Started too.) An ACCEPTED-but-never-started offer is dropped either way.
+            if ($active->status === OfferStatus::Started) {
+                if ($onlineNow && $this->tripLooksReal($active) && $this->lifecycle->complete($active)) {
+                    $counts['completed']++;
+                }
             } elseif ($active->status === OfferStatus::Accepted && $this->lifecycle->cancel($active)) {
                 $counts['canceled']++;
             }
-            // A Started offer below the min-trip floor is a flicker, not a dropoff —
-            // it stays Started for a later real idle (or the stale sweep) to finalize.
             // Any OLDER stuck offer, though, is closed now (the latest is kept).
             $this->lifecycle->supersedeActiveFor($tenantId, $uuid, $active->id);
         }
