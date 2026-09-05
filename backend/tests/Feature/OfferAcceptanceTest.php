@@ -261,6 +261,25 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame(OfferStatus::Started, $fresh->fresh()->status, 'the new offer is the one active trip');
     }
 
+    public function test_finalizer_completes_a_started_offer_once_the_driver_is_offline(): void
+    {
+        // A driver who abruptly went offline (we never saw the idle edge) can't still
+        // be on a trip — their stuck STARTED offer is completed now, not left phantom
+        // until the 100-min cap.
+        $driver = $this->driver();
+        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_OFFLINE']);
+        $offer = $this->offer([
+            'driver_id' => $driver->id,
+            'status' => OfferStatus::Started,
+            'accepted_at' => now()->subMinutes(5),
+            'started_at' => now()->subMinutes(5), // NOT past the 100-min cap
+        ]);
+
+        app(OfferLifecycle::class)->finalizeStale();
+
+        $this->assertSame(OfferStatus::Completed, $offer->fresh()->status);
+    }
+
     public function test_canceled_when_accepted_then_idle_without_a_trip(): void
     {
         $this->driver();

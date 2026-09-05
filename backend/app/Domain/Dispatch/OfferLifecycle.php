@@ -107,8 +107,10 @@ class OfferLifecycle
 
     /**
      * Safety net for edges the poll never observed (driver went offline mid-trip,
-     * a long poll gap): force-complete STARTED offers past the max trip length and
-     * force-cancel ACCEPTED offers that never started. Returns rows changed.
+     * a long poll gap): force-complete STARTED offers past the max trip length,
+     * force-complete a STARTED offer whose driver is now OFFLINE (they can't be on a
+     * trip — the close edge was just never seen), and force-cancel ACCEPTED offers
+     * that never started. Returns rows changed.
      */
     public function finalizeStale(?int $tenantId = null): int
     {
@@ -120,13 +122,23 @@ class OfferLifecycle
             ->where('started_at', '<', $now->subMinutes(self::MAX_TRIP_MINUTES))
             ->update(['status' => OfferStatus::Completed, 'completed_at' => $now]);
 
+        // A driver who has gone OFFLINE cannot still be on a trip — their close edge
+        // was simply never observed (an abrupt disconnect / poll gap). Complete it now
+        // instead of waiting out the 100-minute cap, so it never lingers as a phantom
+        // trip. Only offers actually linked to a driver are considered.
+        $offlineCompleted = DispatchOffer::withoutGlobalScopes()
+            ->where('status', OfferStatus::Started)
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereHas('driver', fn ($q) => $q->offline())
+            ->update(['status' => OfferStatus::Completed, 'completed_at' => $now]);
+
         $canceled = DispatchOffer::withoutGlobalScopes()
             ->where('status', OfferStatus::Accepted)
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->where('accepted_at', '<', $now->subMinutes(self::ACCEPTED_STALE_MINUTES))
             ->update(['status' => OfferStatus::Canceled, 'canceled_at' => $now]);
 
-        return $completed + $canceled;
+        return $completed + $offlineCompleted + $canceled;
     }
 
     /**
