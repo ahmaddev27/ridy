@@ -193,10 +193,12 @@ export async function getAdminDrivers(
   page = 1,
   search = "",
   status = "",
+  companyId?: number,
 ): Promise<{ items: AdminDriver[]; lastPage: number; total: number; stats: DriverDirectoryStats }> {
   const p = new URLSearchParams({ page: String(page) });
   if (search) p.set("search", search);
   if (status) p.set("status", status);
+  if (companyId) p.set("company_id", String(companyId));
   const res = await apiFetch<{ data: AdminDriver[]; last_page: number; total: number; stats: DriverDirectoryStats }>(
     `/api/v1/admin/drivers?${p.toString()}`,
   );

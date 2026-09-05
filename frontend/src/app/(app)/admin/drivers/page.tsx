@@ -9,7 +9,9 @@ import { SearchInput } from "@/components/ui/search-input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale } from "@/lib/utils";
-import { getAdminDrivers, type AdminDriver, type DriverDirectoryStats } from "@/lib/api/admin";
+import { getAdminDrivers, listCompanies, type AdminDriver, type DriverDirectoryStats, type Company } from "@/lib/api/admin";
+
+type StatusFilter = "" | "online" | "available" | "en_route" | "on_trip" | "offline";
 
 /**
  * Driver thumbnail that falls back to an initials placeholder — the Uber picture
@@ -58,14 +60,22 @@ export default function AdminDriversPage() {
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<"" | "online">("");
+  const [status, setStatus] = useState<StatusFilter>("");
+  const [companyId, setCompanyId] = useState<number | "">("");
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    listCompanies()
+      .then((c) => setCompanies([...c].sort((a, b) => a.name.localeCompare(b.name))))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
     const id = setTimeout(() => {
-      getAdminDrivers(page, search, status)
+      getAdminDrivers(page, search, status, companyId || undefined)
         .then((r) => {
           if (!alive) return;
           setRows(r.items);
@@ -80,7 +90,7 @@ export default function AdminDriversPage() {
       alive = false;
       clearTimeout(id);
     };
-  }, [page, search, status]);
+  }, [page, search, status, companyId]);
 
   const num = (n: number) => n.toLocaleString(latnLocale(locale));
 
@@ -113,21 +123,37 @@ export default function AdminDriversPage() {
           }}
           placeholder={c("searchPlaceholder")}
         />
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-line p-0.5 text-sm">
-            {(["", "online"] as const).map((k) => (
-              <button
-                key={k || "all"}
-                onClick={() => {
-                  setStatus(k);
-                  setPage(1);
-                }}
-                className={`rounded-md px-3 py-1 font-medium transition ${status === k ? "bg-surface-2 text-ink" : "text-ink-subtle hover:text-ink"}`}
-              >
-                {c(k === "online" ? "filterOnline" : "filterAll")}
-              </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={companyId}
+            onChange={(e) => {
+              setCompanyId(e.target.value ? Number(e.target.value) : "");
+              setPage(1);
+            }}
+            className="max-w-[180px] rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+          >
+            <option value="">{c("allCompanies")}</option>
+            {companies.map((co) => (
+              <option key={co.id} value={co.id}>
+                {co.name}
+              </option>
             ))}
-          </div>
+          </select>
+          <select
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as StatusFilter);
+              setPage(1);
+            }}
+            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+          >
+            <option value="">{c("filterAll")}</option>
+            <option value="online">{c("filterOnline")}</option>
+            <option value="available">{c("filterAvailable")}</option>
+            <option value="en_route">{c("filterEnRoute")}</option>
+            <option value="on_trip">{c("filterOnTrip")}</option>
+            <option value="offline">{c("filterOffline")}</option>
+          </select>
           <span className="shrink-0 text-sm text-ink-subtle">{c("count").replace("{n}", num(total))}</span>
         </div>
       </div>

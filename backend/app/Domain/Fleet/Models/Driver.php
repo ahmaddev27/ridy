@@ -137,6 +137,17 @@ class Driver extends Authenticatable
             });
     }
 
+    /** The complement of {@see scopeOnline()}: no status, empty, or an offline token. */
+    public function scopeOffline(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q) {
+            $q->whereNull('online_status')->orWhere('online_status', '');
+            foreach (self::OFFLINE_TOKENS as $token) {
+                $q->orWhere('online_status', 'like', "%{$token}%");
+            }
+        });
+    }
+
     /**
      * The active fleet: excludes drivers Uber dropped from the roster
      * (roster_removed_at) or marked inactive on their side. Drivers we don't

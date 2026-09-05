@@ -6,6 +6,7 @@ use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,8 +22,10 @@ class DriverDirectoryController extends Controller
 {
     public function __invoke(Request $request): JsonResponse
     {
-        // A fresh query for the active fleet — drivers still on a company roster.
-        $fleet = fn () => Driver::withoutGlobalScopes()->activeFleet();
+        // A fresh query for the active fleet — drivers still on a company roster,
+        // narrowed to one company when filtered (so the stat row reflects that scope).
+        $fleet = fn () => Driver::withoutGlobalScopes()->activeFleet()
+            ->when($request->filled('company_id'), fn ($q) => $q->where('tenant_id', (int) $request->integer('company_id')));
 
         $total = $fleet()->count();
         $online = $fleet()->online()->count();
@@ -34,7 +37,7 @@ class DriverDirectoryController extends Controller
 
         $drivers = $fleet()
             ->with('tenant:id,name')
-            ->when($request->input('status') === 'online', fn ($q) => $q->online())
+            ->when($request->filled('status'), fn ($q) => $this->applyStatus($q, (string) $request->input('status')))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%'.$request->string('search').'%';
                 $q->where(fn ($sub) => $sub
@@ -93,5 +96,21 @@ class DriverDirectoryController extends Controller
         });
 
         return response()->json($drivers->toArray() + ['stats' => $stats]);
+    }
+
+    /**
+     * Narrow the query to one live-status bucket: online (any), offline, available
+     * (online + idle), en_route or on_trip. An unknown value is a no-op.
+     */
+    private function applyStatus(Builder $query, string $status): Builder
+    {
+        return match ($status) {
+            'online' => $query->online(),
+            'offline' => $query->offline(),
+            'available' => $query->where('online_status', 'like', '%ONLINE%'),
+            'en_route' => $query->where('online_status', 'like', '%EN_ROUTE%'),
+            'on_trip' => $query->where('online_status', 'like', '%ON_TRIP%'),
+            default => $query,
+        };
     }
 }
