@@ -17,6 +17,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libzip-dev \
         libicu-dev \
         libonig-dev \
+        libpng-dev \
+        libjpeg62-turbo-dev \
+        libfreetype6-dev \
+        libwebp-dev \
         default-mysql-client \
     && rm -rf /var/lib/apt/lists/*
 
@@ -27,8 +31,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # intl      : i18n (German + English), locale-aware formatting
 # pcntl     : signal handling for the Reverb WebSocket server (SIGINT/SIGTERM)
 # sockets   : the Reverb socket server transport
+# gd        : image handling for dompdf — WITH webp, so an uploaded webp invoice
+#             logo can be converted/embedded (dompdf calls imagecreatefromwebp()).
 RUN docker-php-ext-configure intl \
-    && docker-php-ext-install -j"$(nproc)" pdo_mysql bcmath zip intl pcntl sockets
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    && docker-php-ext-install -j"$(nproc)" pdo_mysql bcmath zip intl pcntl sockets gd
 
 # redis : phpredis client for queues / cache / Horizon (installed via PECL)
 RUN pecl install redis \
