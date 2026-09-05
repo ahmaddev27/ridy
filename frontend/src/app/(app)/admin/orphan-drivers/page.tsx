@@ -123,15 +123,16 @@ export default function OrphanDriversPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-col gap-1" dir="ltr">
+                      <div className="flex flex-col items-start gap-1">
                         {d.phone && (
-                          <a href={`tel:${d.phone}`} className="inline-flex items-center gap-1.5 text-ink hover:underline">
+                          <a href={`tel:${d.phone}`} dir="ltr" className="inline-flex items-center gap-1.5 text-ink hover:underline">
                             <Phone className="h-3.5 w-3.5 text-ink-subtle" /> {d.phone}
                           </a>
                         )}
                         {(d.email || d.uber_email) && (
                           <a
                             href={`mailto:${d.email ?? d.uber_email}`}
+                            dir="ltr"
                             className="inline-flex items-center gap-1.5 text-ink hover:underline"
                           >
                             <Mail className="h-3.5 w-3.5 text-ink-subtle" /> {d.email ?? d.uber_email}
