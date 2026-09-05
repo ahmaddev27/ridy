@@ -80,6 +80,7 @@ class OfferReconcileTest extends TestCase
         $this->postStatus('EN_ROUTE'); // first accepted
         $this->postStatus('ON_TRIP');  // first started
         $this->assertSame(OfferStatus::Started, $first->fresh()->status);
+        $first->update(['started_at' => now()->subMinutes(3)]); // a real, multi-minute trip
 
         // The next offer arrives while the driver is on the first trip.
         $second = $this->offer(['received_at' => now()]);
@@ -99,6 +100,7 @@ class OfferReconcileTest extends TestCase
 
         $this->postStatus('EN_ROUTE'); // accepts the most recent pending = $active
         $this->postStatus('ON_TRIP');
+        $active->update(['started_at' => now()->subMinutes(3)]); // a real, multi-minute trip
         $this->postStatus('EN_ROUTE'); // 2→1: complete active; no NEWER pending exists
 
         // The pre-trip offer must stay untouched (not attributed to this driver's next trip).

@@ -105,9 +105,9 @@ class DispatchOfferIngestor
             throw $e;
         }
 
-        // A driver can only hold one pending offer at a time — this new one
-        // supersedes any older still-pending offer of theirs (unless they are
-        // engaged, i.e. took the earlier one back-to-back).
+        // A driver holds one live offer at a time — Uber sends the next only once
+        // the previous is gone. So this new offer supersedes (→ rejected) any older
+        // still-pending offer of theirs, whether idle or on a trip.
         if ($driverUuid !== '') {
             $this->lifecycle->supersedePendingFor($tenantId, $driverUuid, $record->id);
         }

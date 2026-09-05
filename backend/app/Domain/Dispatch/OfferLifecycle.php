@@ -3,7 +3,6 @@
 namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
-use App\Domain\Fleet\Models\Driver;
 use App\Events\OfferBroadcast;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -137,25 +136,17 @@ class OfferLifecycle
      * @return int rows expired
      */
     /**
-     * A driver holds at most one pending offer: when a newer one arrives, any
-     * still-pending older offer for the same driver is superseded ("not taken") —
-     * a new offer means Uber moved past the previous one. Skip it while the driver
-     * is engaged (they took the earlier one back-to-back; the transition accepts
-     * it). Returns rows changed.
+     * A driver holds at most one live offer: Uber sends the next one only once the
+     * previous is gone. So when a newer offer arrives, any still-pending older offer
+     * of the same driver is superseded → rejected (Uber moved past it). This holds
+     * whether the driver is idle or on a trip: a busy driver's single back-to-back
+     * offer is itself the newest (the kept one), so it is never the row rejected
+     * here — only a genuinely superseded older one is. Returns rows changed.
      */
     public function supersedePendingFor(int $tenantId, string $driverUuid, int $keepOfferId): int
     {
         if ($driverUuid === '') {
             return 0;
-        }
-
-        $driver = Driver::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('uber_driver_uuid', $driverUuid)
-            ->first(['id', 'online_status']);
-
-        if ($driver !== null && $driver->engagementStatus() >= 1) {
-            return 0; // busy — leave the earlier offer for the back-to-back transition
         }
 
         return DispatchOffer::withoutGlobalScopes()

@@ -208,11 +208,37 @@ class OfferAcceptanceTest extends TestCase
 
         $this->postStatus('EN_ROUTE');   // accepted
         $this->postStatus('ON_TRIP');    // started
+        $offer->update(['started_at' => now()->subMinutes(3)]); // a real, multi-minute trip
         $this->postStatus('ONLINE');     // back to available → completed
 
         $done = $offer->fresh();
         $this->assertSame(OfferStatus::Completed, $done->status);
         $this->assertNotNull($done->completed_at);
+    }
+
+    public function test_a_brief_on_trip_flicker_does_not_falsely_complete_a_fresh_offer(): void
+    {
+        // Prod bug (offer 5807): Uber briefly reported ON_TRIP (~10s) before the
+        // driver's real EN_ROUTE. The flicker walked a just-accepted offer straight
+        // to "completed" as a seconds-long trip, and the genuine engagement a poll
+        // later could no longer reopen the terminal offer.
+        $this->driver();
+        $offer = $this->offer();
+
+        $this->postStatus('ON_TRIP');   // idle→ON_TRIP: accept + start (flicker begins)
+        $this->assertSame(OfferStatus::Started, $offer->fresh()->status);
+
+        $this->postStatus('ONLINE');    // ON_TRIP→idle seconds later: must NOT complete
+        $this->assertSame(OfferStatus::Started, $offer->fresh()->status, 'a sub-minute trip is a flicker, not a dropoff');
+
+        // The driver's genuine engagement follows — the offer is still live, on trip…
+        $this->postStatus('EN_ROUTE');
+        $this->assertSame(OfferStatus::Started, $offer->fresh()->status);
+
+        // …and a real, multi-minute trip then completes normally.
+        $offer->update(['started_at' => now()->subMinutes(5)]);
+        $this->postStatus('ONLINE');
+        $this->assertSame(OfferStatus::Completed, $offer->fresh()->status);
     }
 
     public function test_canceled_when_accepted_then_idle_without_a_trip(): void
@@ -326,8 +352,12 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame(OfferStatus::Pending, $newer->fresh()->status);
     }
 
-    public function test_supersede_leaves_an_engaged_drivers_prior_offer_alone(): void
+    public function test_a_new_offer_supersedes_even_an_engaged_drivers_prior_offer(): void
     {
+        // Uber sends the next offer only once the previous is gone — so an engaged
+        // driver's older pending offer is superseded (rejected) the moment a newer
+        // one arrives, exactly as for an idle driver. Their single back-to-back
+        // offer is the newest (the kept one), so it is never the one rejected here.
         $driver = $this->driver();
         $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']);
         $older = $this->offer(['received_at' => now()->subMinutes(2)]);
@@ -335,8 +365,8 @@ class OfferAcceptanceTest extends TestCase
 
         app(OfferLifecycle::class)->supersedePendingFor($this->tenant->id, self::DRIVER_UUID, $newer->id);
 
-        // Busy driver took the earlier one back-to-back — the transition resolves it.
-        $this->assertSame(OfferStatus::Pending, $older->fresh()->status);
+        $this->assertSame(OfferStatus::Rejected, $older->fresh()->status);
+        $this->assertSame(OfferStatus::Pending, $newer->fresh()->status);
     }
 
     public function test_invalid_transition_is_a_noop(): void
@@ -356,6 +386,7 @@ class OfferAcceptanceTest extends TestCase
 
         $this->postStatus('EN_ROUTE');
         $this->postStatus('ON_TRIP');
+        $offer->update(['started_at' => now()->subMinutes(3)]); // a real, multi-minute trip
         $this->postStatus('ONLINE');   // completed
 
         // A duplicated engage→idle cycle must not re-complete or re-earn.
@@ -397,6 +428,7 @@ class OfferAcceptanceTest extends TestCase
 
         $this->postStatus('EN_ROUTE');
         $this->postStatus('ON_TRIP');
+        $first->update(['started_at' => now()->subMinutes(3)]); // a real, multi-minute trip
         $this->postStatus('ONLINE');   // first completed
         $this->assertSame(OfferStatus::Completed, $first->fresh()->status);
 

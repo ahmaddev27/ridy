@@ -3,6 +3,7 @@
 namespace App\Domain\Fleet;
 
 use App\Domain\Dispatch\Jobs\SyncTripFromWaypoints;
+use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\OfferLifecycle;
 use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
@@ -26,6 +27,16 @@ class DriverStatusIngestor
 {
     /** How often (seconds) the opportunistic stale-offer sweep may run per tenant. */
     private const SWEEP_THROTTLE_SECONDS = 15;
+
+    /**
+     * A "trip" that returns to idle within this many seconds of starting never
+     * really began — it's an Uber status flicker (a brief ON_TRIP reported before
+     * the driver's real EN_ROUTE). Completing it would finalize a freshly-accepted
+     * offer as a seconds-long trip and lock out the driver's genuine engagement a
+     * poll later. Below this floor we leave the offer STARTED; a later real idle —
+     * or the 100-minute stale sweep — completes it correctly.
+     */
+    private const MIN_TRIP_SECONDS = 60;
 
     public function __construct(
         private readonly OfferLifecycle $lifecycle,
@@ -226,7 +237,7 @@ class DriverStatusIngestor
         // it once the driver is already on a trip). Not started yet — it's EN_ROUTE.
         if ($was === 2 && $now === 1) {
             $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
-            if ($active !== null && $active->status === OfferStatus::Started && $this->lifecycle->complete($active)) {
+            if ($this->tripLooksReal($active) && $this->lifecycle->complete($active)) {
                 $counts['completed']++;
             }
             if ($active !== null && $active->received_at !== null) {
@@ -245,12 +256,26 @@ class DriverStatusIngestor
             if ($active === null) {
                 return;
             }
-            if ($active->status === OfferStatus::Started && $this->lifecycle->complete($active)) {
+            if ($this->tripLooksReal($active) && $this->lifecycle->complete($active)) {
                 $counts['completed']++;
             } elseif ($active->status === OfferStatus::Accepted && $this->lifecycle->cancel($active)) {
                 $counts['canceled']++;
             }
+            // A Started offer below the min-trip floor is a flicker, not a dropoff —
+            // it stays Started for a later real idle (or the stale sweep) to finalize.
         }
+    }
+
+    /**
+     * A started offer whose trip lasted long enough to be a genuine dropoff rather
+     * than a status flicker — see {@see self::MIN_TRIP_SECONDS}.
+     */
+    private function tripLooksReal(?DispatchOffer $active): bool
+    {
+        return $active !== null
+            && $active->status === OfferStatus::Started
+            && $active->started_at !== null
+            && $active->started_at->diffInSeconds(now()) >= self::MIN_TRIP_SECONDS;
     }
 
     /** Engagement level of a raw Uber status: 2 = on trip, 1 = heading to pickup, 0 = idle. */
