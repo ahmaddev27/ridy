@@ -30,7 +30,9 @@ export default function AdminDashboardPage() {
   }));
   const top = data?.top_companies ?? [];
   const topMax = Math.max(1, ...top.map((tc) => tc.offers));
-  const online = data?.online_drivers ?? [];
+  const dTotal = s?.drivers_total ?? 0;
+  const dOnline = s?.drivers_online ?? 0;
+  const dRate = dTotal > 0 ? Math.round((dOnline / dTotal) * 100) : 0;
 
   const money = (n: number) => new Intl.NumberFormat(latnLocale(locale), { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
   const revenueChart = (billing?.revenue_by_month ?? []).map((r) => ({ label: r.month.slice(5), value: r.total }));
@@ -58,34 +60,31 @@ export default function AdminDashboardPage() {
         <Kpi icon={Wallet} href="/admin/reports" label={c("totalRevenue")} value={billing ? money(billing.totals.total_revenue) : undefined} tone="positive" />
       </div>
 
-      {/* Online drivers — who is live right now, across all companies */}
-      <Card className="p-5">
-        <div className="mb-4 flex items-center gap-2">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-fg opacity-60" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success-fg" />
-          </span>
-          <h3 className="font-semibold text-ink">{c("onlineDriversTitle")}</h3>
-          <span className="ms-auto rounded-full bg-success-bg px-2.5 py-0.5 text-sm font-bold tabular-nums text-success-fg">
-            {s?.drivers_online ?? 0}
-          </span>
-        </div>
-        {online.length === 0 ? (
-          <p className="text-sm text-ink-subtle">{c("onlineEmpty")}</p>
-        ) : (
-          <div className="grid max-h-80 gap-1.5 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {online.map((d) => (
-              <div key={d.id} className="flex items-center justify-between gap-2 rounded-lg border border-line/60 bg-surface-2/40 px-3 py-2">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-ink">{d.name ?? "—"}</div>
-                  {d.company && <div className="truncate text-xs text-ink-subtle">{d.company}</div>}
-                </div>
-                <EngagementBadge engagement={d.engagement} c={c} />
+      {/* Drivers — live fleet stat (online / rate / total), links to the directory */}
+      <Link href="/admin/drivers" className="group block">
+        <Card className="p-5 transition hover:border-line-strong hover:shadow-md">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-fg opacity-60" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success-fg" />
+            </span>
+            <h3 className="font-semibold text-ink">{c("driversTitle")}</h3>
+            <ArrowRight className="ms-auto h-4 w-4 text-ink-subtle transition group-hover:text-ink rtl:rotate-180" />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: c("dOnline"), value: dOnline.toLocaleString(latnLocale(locale)), color: "text-success-fg" },
+              { label: c("dRate"), value: `${dRate}%`, color: "text-ink" },
+              { label: c("dTotal"), value: dTotal.toLocaleString(latnLocale(locale)), color: "text-ink" },
+            ].map((x) => (
+              <div key={x.label} className="rounded-xl border border-line bg-surface-2/40 p-3 text-center">
+                <div className={`text-2xl font-bold tabular-nums ${x.color}`}>{x.value}</div>
+                <div className="mt-0.5 text-xs text-ink-subtle">{x.label}</div>
               </div>
             ))}
           </div>
-        )}
-      </Card>
+        </Card>
+      </Link>
 
       {/* Billing & subscriptions */}
       <Card className="p-5">
@@ -302,20 +301,4 @@ function AlertIcon({ type }: { type: string }) {
   if (type === "no_proxy") return <Plug className="h-4 w-4 text-danger-fg" />;
   if (type === "no_session") return <Building2 className="h-4 w-4 text-ink-subtle" />;
   return <Radio className="h-4 w-4 text-warning-fg" />;
-}
-
-/** Live engagement chip: 0 idle-online (green), 1 EN_ROUTE (amber), 2 ON_TRIP (blue). */
-function EngagementBadge({ engagement, c }: { engagement: number; c: (k: string) => string }) {
-  const map: Record<number, { key: string; color: string }> = {
-    0: { key: "engOnline", color: "#059669" },
-    1: { key: "engEnRoute", color: "#d97706" },
-    2: { key: "engOnTrip", color: "#2563eb" },
-  };
-  const m = map[engagement] ?? map[0];
-  return (
-    <span className="flex flex-none items-center gap-1.5 rounded-full bg-surface px-2 py-0.5 text-xs font-medium text-ink-muted">
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: m.color }} />
-      {c(m.key)}
-    </span>
-  );
 }

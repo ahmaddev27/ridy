@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\Admin\InfrastructureHealthController;
 use App\Http\Controllers\Api\V1\Admin\InvoiceTemplateController;
 use App\Http\Controllers\Api\V1\Admin\LogViewerController;
 use App\Http\Controllers\Api\V1\Admin\NetworkLogController;
+use App\Http\Controllers\Api\V1\Admin\DriverDirectoryController;
 use App\Http\Controllers\Api\V1\Admin\OrphanDriverController;
 use App\Http\Controllers\Api\V1\Admin\OverviewController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
@@ -332,6 +333,7 @@ Route::prefix('v1')->group(function () {
         Route::get('users', [UserDirectoryController::class, 'index']);
         Route::delete('users/{user}', [UserDirectoryController::class, 'destroy']);
 
+        Route::get('drivers', DriverDirectoryController::class);
         Route::get('orphan-drivers', OrphanDriverController::class);
 
         // Broadcast a bell + push notification to a set of users (queued).

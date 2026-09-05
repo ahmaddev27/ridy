@@ -74,6 +74,7 @@ export type AdminOverview = {
     companies: number;
     active_companies: number;
     drivers: number;
+    drivers_total: number;
     drivers_online: number;
     offers: number;
     sessions_active: number;
@@ -84,7 +85,6 @@ export type AdminOverview = {
   session_breakdown: { active: number; expired: number; needs_relink: number; no_session: number };
   offers_daily: { date: string; count: number }[];
   top_companies: { company_id: number; company: string; offers: number; drivers: number }[];
-  online_drivers: { id: number; name: string | null; company: string | null; engagement: number }[];
 };
 
 export type PlatformSettings = {
@@ -165,6 +165,42 @@ export async function getOrphanDrivers(
     `/api/v1/admin/orphan-drivers?${p.toString()}`,
   );
   return { items: res.data, lastPage: res.last_page, total: res.total };
+}
+
+// ── Driver directory (all active-fleet drivers across every company) ─────────
+export type AdminDriver = {
+  id: number;
+  name: string | null;
+  company: string | null;
+  company_id: number | null;
+  phone: string | null;
+  email: string | null;
+  uber_email: string | null;
+  uber_picture_url: string | null;
+  uber_rating: number | null;
+  uber_total_trips: number | null;
+  online: boolean;
+  engagement: number; // 0 idle-online · 1 EN_ROUTE · 2 ON_TRIP
+  app_registered: boolean;
+  last_seen: string | null;
+  active_offer: { id: number; pickup: string | null; dropoff: string | null; fare: string | null; stops_count: number } | null;
+};
+
+export type DriverDirectoryStats = { total: number; online: number; rate: number };
+
+/** Super-admin: the whole active fleet with live status, current offer, contact + company. */
+export async function getAdminDrivers(
+  page = 1,
+  search = "",
+  status = "",
+): Promise<{ items: AdminDriver[]; lastPage: number; total: number; stats: DriverDirectoryStats }> {
+  const p = new URLSearchParams({ page: String(page) });
+  if (search) p.set("search", search);
+  if (status) p.set("status", status);
+  const res = await apiFetch<{ data: AdminDriver[]; last_page: number; total: number; stats: DriverDirectoryStats }>(
+    `/api/v1/admin/drivers?${p.toString()}`,
+  );
+  return { items: res.data, lastPage: res.last_page, total: res.total, stats: res.stats };
 }
 
 export async function getSystemHealth(): Promise<SystemHealthRow[]> {
