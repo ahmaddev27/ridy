@@ -124,7 +124,9 @@ class FleetOwnerTest extends TestCase
     {
         $owner = $this->owner();
         $a = $this->driver(['name' => 'Omar', 'email' => 'omar@ya.de', 'online_status' => 'ONLINE']);
-        $b = $this->driver(['name' => 'Sara', 'email' => 'sara@ya.de']);
+        // Sara is ON_TRIP — her started offer is a real live trip (an offline driver's
+        // started offer is stale and must NOT show as an active trip).
+        $b = $this->driver(['name' => 'Sara', 'email' => 'sara@ya.de', 'online_status' => 'ON_TRIP']);
         $this->offer($a, 'a1', ['status' => OfferStatus::Completed, 'accepted_at' => now(), 'fare_amount' => 10]);
         $this->offer($b, 'b1', ['status' => OfferStatus::Started, 'accepted_at' => now()]);
 
@@ -135,7 +137,7 @@ class FleetOwnerTest extends TestCase
             ->assertJsonPath('data.today.accepted', 2)
             ->assertJsonPath('data.today.completed', 1)
             ->assertJsonPath('data.today.earnings', 10)
-            ->assertJsonPath('data.online_drivers', 1)
+            ->assertJsonPath('data.online_drivers', 2)
             ->assertJsonPath('data.owner.company_name', 'YA Mobility');
         $this->assertCount(2, $res->json('data.recent'));
         $this->assertCount(1, $res->json('data.active_offers'));

@@ -32,11 +32,18 @@ class FleetController extends Controller
         $online = Driver::withoutGlobalScopes()->where('tenant_id', $tenantId)->online()->count();
 
         $active = $this->scoped($tenantId)
-            ->with('driver:id,name')
+            ->with('driver:id,name,online_status')
             ->whereIn('status', [OfferStatus::Accepted, OfferStatus::Started])
             ->latest('received_at')
-            ->limit(10)
-            ->get();
+            ->limit(30)
+            ->get()
+            // Show a LIVE trip only: the driver must still be online (a stale started
+            // offer for a driver who has gone offline is not a real trip), and at most
+            // ONE trip per driver — the newest — so nobody appears on two trips.
+            ->filter(fn ($o) => $o->driver?->isOnline() === true)
+            ->unique('driver_id')
+            ->take(10)
+            ->values();
 
         $recent = $this->scoped($tenantId)
             ->with('driver:id,name')

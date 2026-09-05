@@ -223,7 +223,11 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
           }
 
           for (const w of wp) {
-            const isPickup = w === pickup; // first waypoint = pickup (green), rest = drop-off (red)
+            // Pickup = blue rider disc, drop-off = red pin. A waypoint Uber typed
+            // DROPOFF stays a drop-off even when it's the only one left — once ON_TRIP
+            // Uber trims the pickup, so the lone remaining DROPOFF was falling through
+            // the wp[0] pickup-fallback and rendering as a blue rider instead of a pin.
+            const isPickup = w === pickup && !(w.type ?? "").toUpperCase().includes("DROPOFF");
             // Label with the full street address; fall back to town+postcode, then
             // to the generic Pickup/Dropoff word only when nothing is known.
             const town = w.city ? (w.plz ? `${w.plz} ${w.city}` : w.city) : null;

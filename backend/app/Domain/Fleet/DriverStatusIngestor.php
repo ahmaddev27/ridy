@@ -216,6 +216,8 @@ class DriverStatusIngestor
                 if ($now === 2 && $this->lifecycle->start($pending)) {
                     $counts['started']++;
                 }
+                // A driver holds one active trip — finalize any older stuck offer.
+                $this->lifecycle->supersedeActiveFor($tenantId, $uuid, $pending->id);
             }
 
             return;
@@ -244,6 +246,7 @@ class DriverStatusIngestor
                 $next = $this->lifecycle->nextTakeableOfferAfter($tenantId, $uuid, $active->received_at);
                 if ($next !== null && $this->lifecycle->accept($next)) {
                     $counts['accepted']++;
+                    $this->lifecycle->supersedeActiveFor($tenantId, $uuid, $next->id);
                 }
             }
 
@@ -263,6 +266,8 @@ class DriverStatusIngestor
             }
             // A Started offer below the min-trip floor is a flicker, not a dropoff —
             // it stays Started for a later real idle (or the stale sweep) to finalize.
+            // Any OLDER stuck offer, though, is closed now (the latest is kept).
+            $this->lifecycle->supersedeActiveFor($tenantId, $uuid, $active->id);
         }
     }
 

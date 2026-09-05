@@ -157,6 +157,39 @@ class OfferLifecycle
             ->update(['status' => OfferStatus::Rejected, 'rejected_at' => CarbonImmutable::now()]);
     }
 
+    /**
+     * A driver holds exactly ONE active trip. When a newer offer becomes active (or
+     * the driver goes idle), any OTHER offer of theirs still ACCEPTED/STARTED is a
+     * trip whose close edge we missed — a rapid trip-to-trip jump, or a sub-minute
+     * flicker that {@see tripLooksReal} left STARTED. Finalize it: complete a STARTED
+     * one (the driver was on the trip) and cancel an ACCEPTED-but-never-started one,
+     * so a driver never shows two live trips and phantom trips don't linger until the
+     * 100-minute stale sweep. Returns rows changed.
+     */
+    public function supersedeActiveFor(int $tenantId, string $driverUuid, int $keepOfferId): int
+    {
+        if ($driverUuid === '') {
+            return 0;
+        }
+
+        $stale = DispatchOffer::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('driver_uuid', $driverUuid)
+            ->where('id', '!=', $keepOfferId)
+            ->whereIn('status', [OfferStatus::Accepted, OfferStatus::Started])
+            ->get();
+
+        $changed = 0;
+        foreach ($stale as $offer) {
+            $ok = $offer->status === OfferStatus::Started
+                ? $this->complete($offer)
+                : $this->cancel($offer);
+            $changed += $ok ? 1 : 0;
+        }
+
+        return $changed;
+    }
+
     public function expirePending(?int $tenantId = null): int
     {
         $now = CarbonImmutable::now();

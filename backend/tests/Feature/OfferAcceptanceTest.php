@@ -241,6 +241,26 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame(OfferStatus::Completed, $offer->fresh()->status);
     }
 
+    public function test_a_new_trip_finalizes_the_drivers_stale_started_offer(): void
+    {
+        // A rapid trip-to-trip jump can leave an OLD offer stuck STARTED. When the
+        // driver's next trip is taken, that stale one must be finalized (completed),
+        // so a driver never shows two active trips at once.
+        $this->driver();
+        $stale = $this->offer([
+            'received_at' => now()->subMinutes(10),
+            'status' => OfferStatus::Started,
+            'accepted_at' => now()->subMinutes(10),
+            'started_at' => now()->subMinutes(10),
+        ]);
+        $fresh = $this->offer(['received_at' => now()->subMinute()]); // new pending offer
+
+        $this->postStatus('ON_TRIP'); // driver takes the new offer
+
+        $this->assertSame(OfferStatus::Completed, $stale->fresh()->status, 'stale started offer finalized');
+        $this->assertSame(OfferStatus::Started, $fresh->fresh()->status, 'the new offer is the one active trip');
+    }
+
     public function test_canceled_when_accepted_then_idle_without_a_trip(): void
     {
         $this->driver();
