@@ -452,6 +452,8 @@ export async function getCompanyVehicles(id: number): Promise<CompanyVehicleRow[
 }
 
 // ── Proxy pool ──────────────────────────────────────────────────────────────
+export type ProxyRenewal = { id: number; amount: number; starts_at: string | null; ends_at: string | null; note: string | null };
+
 export type Proxy = {
   id: number;
   label: string;
@@ -461,14 +463,20 @@ export type Proxy = {
   free: number;
   near_full: boolean;
   price: number | null;
+  total_paid: number;
   source: string | null;
   notes: string | null;
-  expires_at: string | null;
+  starts_at: string | null;
+  expires_at: string | null; // base (first) period end — edited via the form
+  ends_at: string | null; // effective expiry after renewals — used by the badge
   days_left: number | null;
   expiring: boolean;
+  renewals: ProxyRenewal[];
 };
 
-export type ProxyInput = { label: string; url?: string; capacity: number; price?: number; source?: string; notes?: string; expires_at?: string };
+export type ProxyInput = { label: string; url?: string; capacity: number; price?: number; source?: string; notes?: string; starts_at?: string; expires_at?: string };
+
+export type ProxyRenewInput = { amount: number; starts_at: string; ends_at: string; note?: string };
 
 const proxyBase = "/api/v1/admin/proxies";
 
@@ -489,6 +497,12 @@ export async function updateProxy(id: number, input: ProxyInput): Promise<Proxy>
 
 export async function deleteProxy(id: number): Promise<void> {
   await apiFetch(`${proxyBase}/${id}`, { method: "DELETE", withCsrf: true });
+}
+
+/** Renew a proxy on the same credentials: records a paid period + moves the expiry. */
+export async function renewProxy(id: number, input: ProxyRenewInput): Promise<Proxy> {
+  const res = await apiFetch<{ data: Proxy }>(`${proxyBase}/${id}/renew`, { method: "POST", body: input, withCsrf: true });
+  return res.data;
 }
 
 // ── Cash collectors + payment ledger ─────────────────────────────────────────

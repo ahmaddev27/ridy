@@ -326,6 +326,7 @@ Route::prefix('v1')->group(function () {
         // Residential proxy pool
         Route::get('proxies', [ProxyController::class, 'index']);
         Route::post('proxies', [ProxyController::class, 'store']);
+        Route::post('proxies/{proxy}/renew', [ProxyController::class, 'renew']);
         Route::put('proxies/{proxy}', [ProxyController::class, 'update']);
         Route::delete('proxies/{proxy}', [ProxyController::class, 'destroy']);
 

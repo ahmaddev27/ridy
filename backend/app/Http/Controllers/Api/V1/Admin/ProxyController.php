@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Tenancy\Models\Proxy;
+use App\Domain\Tenancy\Models\ProxyRenewal;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,9 +16,28 @@ class ProxyController extends Controller
 {
     public function index(): JsonResponse
     {
-        $proxies = Proxy::orderBy('label')->get()->map(fn (Proxy $p) => $this->present($p));
+        $proxies = Proxy::with('renewals')->orderBy('label')->get()->map(fn (Proxy $p) => $this->present($p));
 
         return response()->json(['data' => $proxies]);
+    }
+
+    /**
+     * Renew a proxy on the SAME credentials: record another paid period (amount +
+     * start/end) so the spend accumulates and the expiry moves to the new end. The
+     * base row is untouched — the history and running total live in the renewals.
+     */
+    public function renew(Request $request, Proxy $proxy): JsonResponse
+    {
+        $data = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0', 'max:99999999'],
+            'starts_at' => ['required', 'date'],
+            'ends_at' => ['required', 'date', 'after_or_equal:starts_at'],
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $proxy->renewals()->create($data);
+
+        return response()->json(['data' => $this->present($proxy->load('renewals'))]);
     }
 
     public function store(Request $request): JsonResponse
@@ -58,6 +78,7 @@ class ProxyController extends Controller
             'price' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'source' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:500'],
+            'starts_at' => ['nullable', 'date'],
             'expires_at' => ['nullable', 'date'],
         ]);
     }
@@ -67,8 +88,10 @@ class ProxyController extends Controller
     {
         $used = $p->usedCount();
 
-        $daysLeft = $p->expires_at !== null
-            ? (int) now()->startOfDay()->diffInDays($p->expires_at->startOfDay(), false)
+        // The real expiry is the furthest end across the base period and renewals.
+        $end = $p->effectiveEndsAt();
+        $daysLeft = $end !== null
+            ? (int) now()->startOfDay()->diffInDays($end->startOfDay(), false)
             : null;
 
         return [
@@ -80,11 +103,23 @@ class ProxyController extends Controller
             'free' => max(0, $p->capacity - $used),
             'near_full' => $p->capacity > 0 && $used / $p->capacity >= 0.8,
             'price' => $p->price !== null ? (float) $p->price : null,
+            'total_paid' => $p->totalPaid(),
             'source' => $p->source,
             'notes' => $p->notes,
+            'starts_at' => $p->starts_at?->toDateString(),
+            // The base (first) period end — what the edit form edits.
             'expires_at' => $p->expires_at?->toDateString(),
+            // The effective expiry after renewals — what the badge/countdown uses.
+            'ends_at' => $end?->toDateString(),
             'days_left' => $daysLeft,
             'expiring' => $daysLeft !== null && $daysLeft <= 5,
+            'renewals' => $p->renewals->map(fn (ProxyRenewal $r) => [
+                'id' => $r->id,
+                'amount' => (float) $r->amount,
+                'starts_at' => $r->starts_at?->toDateString(),
+                'ends_at' => $r->ends_at?->toDateString(),
+                'note' => $r->note,
+            ])->values(),
         ];
     }
 }
