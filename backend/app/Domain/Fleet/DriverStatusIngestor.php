@@ -223,6 +223,15 @@ class DriverStatusIngestor
                 }
                 // A driver holds one active trip — finalize any older stuck offer.
                 $this->lifecycle->supersedeActiveFor($tenantId, $uuid, $pending->id);
+            } elseif ($now === 2) {
+                // No fresh pending offer, but an offer that was ACCEPTED before a brief
+                // OFFLINE blip (which we no longer cancel) may now be starting — the
+                // driver reconnected straight to ON_TRIP. Start that accepted offer so
+                // the recovered trip is tracked instead of stranded.
+                $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
+                if ($active !== null && $active->status === OfferStatus::Accepted && $this->lifecycle->start($active)) {
+                    $counts['started']++;
+                }
             }
 
             return;
@@ -264,18 +273,22 @@ class DriverStatusIngestor
             if ($active === null) {
                 return;
             }
-            // A STARTED trip is completed only on a genuine idle-ONLINE end (the driver
-            // is now available). Going OFFLINE — a sign-off OR a brief mid-trip
-            // connection blip — is left for finalizeStale to close after a short grace,
-            // so a driver whose internet drops for a moment and returns to ON_TRIP keeps
-            // their live trip instead of it ending early. (A sub-min flicker still stays
-            // Started too.) An ACCEPTED-but-never-started offer is dropped either way.
+            // Neither a STARTED nor an ACCEPTED (EN_ROUTE) offer is closed on an
+            // OFFLINE edge — that may be a sign-off OR a brief connection blip. Both
+            // are left for finalizeStale to sweep after a grace (a STARTED trip
+            // completes, an ACCEPTED one cancels), so a driver whose internet drops
+            // for a moment and returns keeps their trip: a mid-trip blip stays Started,
+            // and an EN_ROUTE blip stays Accepted and is recovered when they go ON_TRIP
+            // (idle→engaged / EN_ROUTE→ON_TRIP start). Only a genuine idle-ONLINE end
+            // (the driver is available again) resolves the offer here.
             if ($active->status === OfferStatus::Started) {
                 if ($onlineNow && $this->tripLooksReal($active) && $this->lifecycle->complete($active)) {
                     $counts['completed']++;
                 }
-            } elseif ($active->status === OfferStatus::Accepted && $this->lifecycle->cancel($active)) {
-                $counts['canceled']++;
+            } elseif ($active->status === OfferStatus::Accepted) {
+                if ($onlineNow && $this->lifecycle->cancel($active)) {
+                    $counts['canceled']++;
+                }
             }
             // Any OLDER stuck offer, though, is closed now (the latest is kept).
             $this->lifecycle->supersedeActiveFor($tenantId, $uuid, $active->id);

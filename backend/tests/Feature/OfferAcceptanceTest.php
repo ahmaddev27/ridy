@@ -306,17 +306,55 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame(OfferStatus::Completed, $offer->fresh()->status);
     }
 
-    public function test_canceled_when_accepted_then_idle_without_a_trip(): void
+    public function test_canceled_when_accepted_then_available_without_a_trip(): void
     {
+        // EN_ROUTE (accepted) then back to ONLINE-idle without ever starting a trip:
+        // the driver is available again and never picked up, so the offer is canceled.
         $this->driver();
         $offer = $this->offer();
 
-        $this->postStatus('EN_ROUTE');   // accepted
-        $this->postStatus('OFFLINE');    // dropped before the trip began → canceled
+        $this->postStatus('EN_ROUTE'); // accepted
+        $this->postStatus('ONLINE');   // available again, no trip → canceled
 
         $c = $offer->fresh();
         $this->assertSame(OfferStatus::Canceled, $c->status);
         $this->assertNotNull($c->canceled_at);
+    }
+
+    public function test_en_route_offline_blip_does_not_cancel_and_recovers_on_trip(): void
+    {
+        // A brief OFFLINE blip while EN_ROUTE must NOT cancel the accepted offer (the
+        // driver may reconnect and pick up). It stays accepted through the grace and
+        // is recovered — started — when the driver reconnects straight to ON_TRIP.
+        $this->driver();
+        $offer = $this->offer();
+
+        $this->postStatus('EN_ROUTE'); // accepted
+        $this->postStatus('OFFLINE');  // blip before the trip began
+        $this->assertSame(OfferStatus::Accepted, $offer->fresh()->status, 'blip does not cancel the accepted offer');
+
+        // Within the grace the sweep leaves it accepted (accepted_at is still fresh).
+        app(OfferLifecycle::class)->finalizeStale();
+        $this->assertSame(OfferStatus::Accepted, $offer->fresh()->status);
+
+        // Reconnects straight to ON_TRIP — the accepted trip has begun.
+        $this->postStatus('ON_TRIP');
+        $this->assertSame(OfferStatus::Started, $offer->fresh()->status);
+    }
+
+    public function test_stale_accepted_offer_is_canceled_by_the_sweep_after_the_grace(): void
+    {
+        // If the EN_ROUTE offer truly never starts, finalizeStale cancels it once it
+        // is older than ACCEPTED_STALE_MINUTES — so a blip that never recovers closes.
+        $this->driver();
+        $offer = $this->offer();
+
+        $this->postStatus('EN_ROUTE'); // accepted
+        $this->postStatus('OFFLINE');  // never comes back
+        $offer->update(['accepted_at' => now()->subMinutes(OfferLifecycle::ACCEPTED_STALE_MINUTES + 1)]);
+
+        app(OfferLifecycle::class)->finalizeStale();
+        $this->assertSame(OfferStatus::Canceled, $offer->fresh()->status);
     }
 
     public function test_garbage_location_timestamp_does_not_break_the_batch(): void
