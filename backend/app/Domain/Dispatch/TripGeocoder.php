@@ -160,6 +160,13 @@ class TripGeocoder
         $offer->pickup_display = $this->completePostcode($offer->pickup_address, $pickup);
         $offer->dropoff_display = $this->completePostcode($offer->dropoff_address, $dropoff);
 
+        // Offer-time we have TEXT only (no coordinates): if the supplier text was
+        // localized to the rider's app language it is still non-Latin here, so pin
+        // the display to the German "<PLZ> City" from the always-Latin postcode —
+        // a driver must never see an unreadable foreign address.
+        $offer->pickup_display = $this->latinDisplay($offer->pickup_display, $offer->pickup_address);
+        $offer->dropoff_display = $this->latinDisplay($offer->dropoff_display, $offer->dropoff_address);
+
         if ($pickup && $dropoff) {
             $pConf = $pickup['confidence'] ?? null;
             $dConf = $dropoff['confidence'] ?? null;
@@ -203,6 +210,33 @@ class TripGeocoder
     private function hasPostcode(?string $address): bool
     {
         return $address !== null && preg_match('/\b\d{5}\b/', $address) === 1;
+    }
+
+    /**
+     * A guaranteed-Latin display value. Uber localizes the offer's address text to
+     * the RIDER's app language, so a Japanese rider yields e.g.
+     * "ドイツ 〒42781 ハーン グルイテン" — unreadable to a German driver and never fit to
+     * show. A Latin value (the normal case, a German address) is returned untouched;
+     * a non-Latin one is replaced with the authoritative "<PLZ> City" from the
+     * always-Latin postcode inside it (PLZ↔city is 1:1 in Germany, so this is correct,
+     * not a guess). With no usable postcode a blank beats an unreadable foreign string.
+     */
+    private function latinDisplay(?string $current, ?string $rawAddress): ?string
+    {
+        if ($current !== null && $current !== '' && ! AddressNormalizer::hasNonLatinLetters($current)) {
+            return $current;
+        }
+
+        foreach ([$current, $rawAddress] as $source) {
+            if ($source !== null && preg_match('/\b(\d{5})\b/', $source, $m) === 1) {
+                $city = PostalCodes::city($m[1]);
+                if ($city !== null) {
+                    return $m[1].' '.$city;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -910,6 +944,13 @@ class TripGeocoder
         // Fill a missing/rough display address from the REAL point, our format.
         $offer->pickup_display = $this->labelForPoint($offer->pickup_address, $pickup) ?? $offer->pickup_display;
         $offer->dropoff_display = $this->labelForPoint($offer->dropoff_address, $dropoff) ?? $offer->dropoff_display;
+
+        // The German reverse label is preferred, but if the reverse lookup FAILED
+        // the kept display may still be the rider-localized non-Latin text — fall
+        // back to "<PLZ> City" so a transient Nominatim outage never leaves a foreign
+        // string stuck, even though geo_source is now 'uber'.
+        $offer->pickup_display = $this->latinDisplay($offer->pickup_display, $offer->pickup_address);
+        $offer->dropoff_display = $this->latinDisplay($offer->dropoff_display, $offer->dropoff_address);
 
         // Label every stop from its real coordinate so the detail view can list each
         // drop-off by address (a multi-stop trip's intermediate stops have no address

@@ -3,6 +3,8 @@
 namespace App\Http\Resources;
 
 use App\Domain\Dispatch\AddressFormatter;
+use App\Domain\Dispatch\AddressNormalizer;
+use App\Domain\Geo\PostalCodes;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Arr;
@@ -39,8 +41,8 @@ class DispatchOfferResource extends JsonResource
             // Always show the supplier's ORIGINAL address, sourced from the raw
             // payload — identical in the list and the detail modal, and immune to
             // any legacy geocoder rewrite still stored on the columns.
-            'pickup_address' => $this->pickup_display ?? AddressFormatter::tidy(Arr::get($this->raw_payload, 'pickupAddress') ?: $this->pickup_address),
-            'dropoff_address' => $this->dropoff_display ?? AddressFormatter::tidy(Arr::get($this->raw_payload, 'dropoffAddress') ?: $this->dropoff_address),
+            'pickup_address' => $this->latinAddress($this->pickup_display, Arr::get($this->raw_payload, 'pickupAddress') ?: $this->pickup_address),
+            'dropoff_address' => $this->latinAddress($this->dropoff_display, Arr::get($this->raw_payload, 'dropoffAddress') ?: $this->dropoff_address),
             'pickup_station_name' => $this->pickup_station_name,
             'dropoff_station_name' => $this->dropoff_station_name,
             'fare_formatted' => $this->fare_formatted,
@@ -58,5 +60,25 @@ class DispatchOfferResource extends JsonResource
             'accept_window_seconds' => $this->accept_window_seconds,
             'received_at' => $this->received_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * The address to expose, guaranteed Latin. The stored *_display is preferred,
+     * else the supplier's tidied raw text. Uber localizes that raw text to the
+     * RIDER's app language, so an offer seen before geocoding can still carry an
+     * unreadable non-Latin string ("ドイツ 〒42781 ハーン グルイテン"); replace it with the
+     * authoritative German "<PLZ> City" from the always-Latin postcode inside it,
+     * or blank when it has none — a driver must never be shown a foreign address.
+     */
+    private function latinAddress(?string $display, mixed $raw): ?string
+    {
+        $value = $display ?? AddressFormatter::tidy(is_string($raw) ? $raw : null);
+        if ($value === null || ! AddressNormalizer::hasNonLatinLetters($value)) {
+            return $value;
+        }
+
+        return preg_match('/\b(\d{5})\b/', $value, $m) === 1 && ($city = PostalCodes::city($m[1])) !== null
+            ? $m[1].' '.$city
+            : null;
     }
 }

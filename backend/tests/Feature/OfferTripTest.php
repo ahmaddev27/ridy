@@ -236,6 +236,29 @@ class OfferTripTest extends TestCase
         $this->assertSame('Baz, Solingen', $complete('Baz, Solingen', "Baz, 10115 {$city}"));
     }
 
+    public function test_non_latin_display_falls_back_to_the_german_plz_city_and_leaves_latin_untouched(): void
+    {
+        $geo = app(TripGeocoder::class);
+        $m = new \ReflectionMethod($geo, 'latinDisplay');
+        $m->setAccessible(true);
+        $latin = fn (?string $current, ?string $raw) => $m->invoke($geo, $current, $raw);
+
+        $city = PostalCodes::city('42781'); // authoritative German town for the plz
+        $this->assertNotNull($city, 'test needs a known PLZ');
+
+        // A rider-localized (Japanese) address is unreadable to the driver and must
+        // never be shown; the always-Latin PLZ inside it yields the German "<PLZ> City".
+        $japanese = 'ドイツ 〒42781 ハーン グルイテン'; // "Germany 42781 Haan-Gruiten"
+        $this->assertSame("42781 {$city}", $latin($japanese, $japanese));
+
+        // A normal German address passes through completely unchanged.
+        $german = 'Schallbruch 15, 42781 Haan';
+        $this->assertSame($german, $latin($german, $german));
+
+        // Non-Latin with no usable postcode → blank beats an unreadable foreign string.
+        $this->assertNull($latin('ハーン', 'ハーン'));
+    }
+
     public function test_unresolved_address_with_a_valid_plz_falls_back_to_the_centroid(): void
     {
         $this->seed(RolePermissionSeeder::class);
