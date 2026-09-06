@@ -624,6 +624,45 @@ async function fetchDriverUber() {
   return out;
 }
 
+// ── Evict the operator's OTHER Uber sessions (opt-in) ───────────────────────
+// When the manager has explicitly opted in and just Connected, we open Uber's
+// OWN account devices page in a background tab and arm the content script there
+// to click Uber's real "sign out all OTHER devices" control. Uber then runs its
+// Arkose bot-defense transparently (no forged tokens, no raw endpoint call), and
+// the CURRENT session — this browser plus the cookies the daemon replays — is
+// preserved by design, since the button evicts everything EXCEPT current.
+const EVICT_DEVICES_URL = "https://account.uber.com/devices";
+
+/** Open the devices page and arm the click. Consumed by content.js on load. */
+async function armEviction() {
+  try {
+    const tab = await api.tabs.create({ url: EVICT_DEVICES_URL, active: false });
+    await api.storage.local.set({ evictArmed: { at: Date.now() }, evictTabId: tab?.id ?? null });
+    console.log("[Reidey bg] eviction armed — opened devices tab", tab?.id);
+    return { ok: true };
+  } catch (e) {
+    console.warn("[Reidey bg] armEviction failed:", e.message);
+    return { ok: false, reason: e.message };
+  }
+}
+
+/** Close the devices tab once the content script reports it clicked (or gave up). */
+async function finishEviction(result) {
+  const { evictTabId } = await api.storage.local.get(["evictTabId"]);
+  await api.storage.local.remove(["evictArmed", "evictTabId"]);
+  console.log("[Reidey bg] eviction result:", result?.ok ? "clicked" : result?.reason || "failed");
+  if (evictTabId != null) {
+    // Small delay so Uber's own request finishes before the tab is torn down.
+    setTimeout(() => api.tabs?.remove(evictTabId).catch(() => {}), 2000);
+  }
+}
+
+/** Honor the opt-in after a genuine dashboard "Connect" completed. */
+async function maybeArmEvictionAfterConnect() {
+  const { evictOtherSessions } = await api.storage.local.get(["evictOtherSessions"]);
+  if (evictOtherSessions === true) await armEviction();
+}
+
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "store_graphql_template" && msg.operationName) {
     api.storage.local
@@ -657,8 +696,19 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (res?.ok && res.closeTab && tabId != null) {
         setTimeout(() => api.tabs?.remove(tabId).catch(() => {}), 2500);
       }
+      // A genuine dashboard "Connect" just completed — honor the opt-in eviction.
+      if (res?.ok && res.closeTab) maybeArmEvictionAfterConnect();
     });
     return true; // async response
+  }
+  if (msg?.type === "evictSessions") {
+    // Explicit trigger from the popup after a manual Connect + opt-in.
+    armEviction().then(sendResponse);
+    return true;
+  }
+  if (msg?.type === "evictResult") {
+    finishEviction(msg).then(() => sendResponse({ ok: true }));
+    return true;
   }
   if (msg?.type === "connectIntent") {
     // The dashboard pressed connect — remember it so the next fresh capture's tab

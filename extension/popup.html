@@ -38,6 +38,10 @@
       .paired-badge { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #047857; margin-bottom: 12px; }
       .paired-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; }
       .unpaired { font-size: 13px; color: #b91c1c; background: #fef2f2; padding: 10px; border-radius: 8px; margin-bottom: 12px; line-height: 1.5; }
+      .evict { margin-top: 14px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
+      .evict label { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; }
+      .evict input { width: auto; margin-top: 2px; flex: 0 0 auto; }
+      .evict .warn { font-size: 12px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; padding: 8px 10px; border-radius: 8px; margin-top: 8px; line-height: 1.5; }
       .hidden { display: none; }
     </style>
   </head>
@@ -54,6 +58,18 @@
         <p class="hint">
           Melde dich zuerst bei <b>fleethub.uber.com</b> an und klicke dann hier.
         </p>
+
+        <div class="evict">
+          <label>
+            <input type="checkbox" id="evict-toggle" />
+            <span>Andere Uber-Sitzungen nach dem Verbinden abmelden</span>
+          </label>
+          <div class="warn">
+            Meldet <b>alle anderen</b> Geräte und Tools aus deinem Uber-Konto ab —
+            auch dein eigenes Handy. Deine aktuelle Verbindung zu Reidey bleibt
+            bestehen. Uber führt die Abmeldung selbst aus.
+          </div>
+        </div>
       </div>
 
       <!-- Not paired: no manual token entry. Pairing happens on the dashboard. -->

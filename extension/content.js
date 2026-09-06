@@ -166,4 +166,125 @@
       }
     });
   }
+
+  // ── Evict the operator's OTHER Uber sessions (opt-in) ──────────────────────
+  // Runs only on account.uber.com and only when the background worker armed it
+  // right after a Connect the manager opted into. We click Uber's OWN "sign out
+  // all OTHER devices" button so Uber runs its Arkose bot-defense transparently
+  // (no forged tokens, no raw endpoint call). We NEVER click a plain single
+  // "Log out" — the matcher requires a scope word (all/other/devices), so the
+  // CURRENT session (which the daemon replays) is preserved.
+  if (/(^|\.)account\.uber\.com$/i.test(location.host)) {
+    evictOtherSessionsIfArmed();
+  }
+
+  async function evictOtherSessionsIfArmed() {
+    let armed;
+    try {
+      ({ evictArmed: armed } = await api.storage.local.get(["evictArmed"]));
+    } catch {
+      return; // stale extension context
+    }
+    // Only a fresh arm (<2 min) may act, so a normal later visit signs out nobody.
+    if (!armed || typeof armed.at !== "number" || Date.now() - armed.at > 120000) return;
+    // Consume immediately so a reload or second frame can't double-fire.
+    try {
+      await api.storage.local.remove("evictArmed");
+    } catch {
+      /* ignore */
+    }
+
+    const report = (ok, reason) =>
+      api.runtime.sendMessage({ type: "evictResult", ok, reason }).catch(() => {});
+
+    try {
+      const btn = await waitForSignOutAllButton(25000);
+      if (!btn) return report(false, "button_not_found");
+      btn.click();
+      await confirmIfDialog(6000); // click the affirmative control if Uber asks
+      report(true, "clicked");
+    } catch (e) {
+      report(false, e?.message || "evict_error");
+    }
+  }
+
+  // A control that signs out ALL / all OTHER sessions: a sign-out verb AND a
+  // scope word. Requiring the scope word is the safety guard against clicking a
+  // plain single-session logout, which would evict the current session.
+  function isSignOutAllText(text) {
+    const t = (text || "").toLowerCase().trim();
+    if (!t || t.length > 80) return false;
+    const verb = /(sign out|log out|logout|abmelden|abgemeldet)/.test(t);
+    const scope =
+      /(all|other|every|alle|allen|andere|anderen|ger[äa]te|geraete|devices|sessions|sitzungen|[üu]berall|ueberall)/.test(t);
+    return verb && scope;
+  }
+
+  function findSignOutAllButton() {
+    const nodes = document.querySelectorAll(
+      'button, a[role="button"], [role="button"], input[type="button"], input[type="submit"]',
+    );
+    for (const el of nodes) {
+      // Skip elements that aren't actually visible/clickable.
+      if (el.offsetParent === null && el.getClientRects().length === 0) continue;
+      const label = el.getAttribute("aria-label") || el.value || el.textContent || "";
+      if (isSignOutAllText(label)) return el;
+    }
+    return null;
+  }
+
+  // Poll + observe the SPA until the button renders, or give up after timeoutMs.
+  function waitForSignOutAllButton(timeoutMs) {
+    return new Promise((resolve) => {
+      const immediate = findSignOutAllButton();
+      if (immediate) return resolve(immediate);
+
+      const started = Date.now();
+      const check = () => {
+        const b = findSignOutAllButton();
+        if (b) {
+          cleanup();
+          resolve(b);
+        } else if (Date.now() - started > timeoutMs) {
+          cleanup();
+          resolve(null);
+        }
+      };
+      const obs = new MutationObserver(check);
+      const iv = setInterval(check, 800);
+      function cleanup() {
+        obs.disconnect();
+        clearInterval(iv);
+      }
+      obs.observe(document.documentElement, { childList: true, subtree: true });
+    });
+  }
+
+  // If a confirmation dialog appears, click its affirmative control — but ONLY
+  // inside a real dialog element, never a stray page button, and never "Cancel".
+  function confirmIfDialog(timeoutMs) {
+    return new Promise((resolve) => {
+      const affirmative = /^(sign out|log out|logout|abmelden|confirm|best[äa]tigen|bestaetigen|continue|weiter|yes|ja|ok)$/i;
+      const negative = /(cancel|abbrechen|zur[üu]ck|zurueck|nein|dismiss|schlie[ßs]en|schliessen)/i;
+      const started = Date.now();
+      const iv = setInterval(() => {
+        const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]');
+        if (dialog) {
+          for (const b of dialog.querySelectorAll('button, [role="button"]')) {
+            const label = (b.getAttribute("aria-label") || b.textContent || "").trim();
+            if (!label || negative.test(label.toLowerCase())) continue;
+            if (affirmative.test(label)) {
+              b.click();
+              clearInterval(iv);
+              return resolve();
+            }
+          }
+        }
+        if (Date.now() - started > timeoutMs) {
+          clearInterval(iv);
+          resolve();
+        }
+      }, 500);
+    });
+  }
 })();

@@ -20,10 +20,15 @@ function setStatus(kind, message) {
 
 /** Show the paired or unpaired view based on whether the dashboard paired us. */
 async function render() {
-  const { apiUrl, token } = await api.storage.local.get(["apiUrl", "token"]);
+  const { apiUrl, token, evictOtherSessions } = await api.storage.local.get([
+    "apiUrl",
+    "token",
+    "evictOtherSessions",
+  ]);
   const paired = Boolean(apiUrl && token);
   $("paired-view").classList.toggle("hidden", !paired);
   $("unpaired-view").classList.toggle("hidden", paired);
+  $("evict-toggle").checked = evictOtherSessions === true;
 }
 
 /** Pull the logged-in fleet account's uuid (= org / partnerUUID) from the page. */
@@ -63,12 +68,23 @@ async function connect() {
   }
 
   const res = await api.runtime.sendMessage({ type: "capture", orgUuid, manual: true });
-  if (res?.ok) {
-    setStatus("ok", `Verbunden ✓ (${res.count ?? "aktualisiert"})`);
-  } else {
-    setStatus("err", res?.reason || "Verbindung fehlgeschlagen");
+  if (!res?.ok) {
+    return setStatus("err", res?.reason || "Verbindung fehlgeschlagen");
+  }
+  setStatus("ok", `Verbunden ✓ (${res.count ?? "aktualisiert"})`);
+
+  // Opt-in: sign out the operator's other Uber sessions via Uber's own button.
+  if ($("evict-toggle").checked) {
+    setStatus("ok", "Verbunden ✓ — melde andere Uber-Sitzungen ab…");
+    await api.runtime.sendMessage({ type: "evictSessions" }).catch(() => {});
   }
 }
+
+// Persist the opt-in the moment it changes, so both the popup flow and the
+// dashboard "Connect" flow (auto-armed in the background) honor the same choice.
+$("evict-toggle").addEventListener("change", (e) => {
+  api.storage.local.set({ evictOtherSessions: e.target.checked === true });
+});
 
 $("connect").addEventListener("click", connect);
 $("open-dashboard").addEventListener("click", () => api.tabs.create({ url: DASHBOARD_URL }));
