@@ -268,18 +268,29 @@ export class RamenStream {
 
   /** Merge any Set-Cookie from a response into the jar, then persist to backend. */
   async absorbCookies(response) {
-    // Only the primary channel persists rotated cookies, so a session's
-    // channels don't race each other writing back to the backend.
-    if (!this.primary) return;
-
     const setCookies = response.headers.getSetCookie?.() ?? [];
     if (setCookies.length === 0) return;
 
+    // Merge Uber's rotated cookies into THIS channel's jar (both channels, so a
+    // secondary's jar never goes stale against a rotated session token).
     for (const raw of setCookies) {
       const [pair] = raw.split(";");
       const eq = pair.indexOf("=");
       if (eq > 0) this.jar.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
     }
+
+    // Keep the change-detection fingerprint in step with the rotated jar. Without
+    // this, absorbing Uber's rolling-session cookie changed the backend jar (below)
+    // but not this.cookieFp, so the supervisor's reconcile() saw effectiveFp !=
+    // cookieFp within ~60s, mistook OUR OWN refresh for an external re-link, and
+    // tore the live stream down — resetting seq to 0 and dropping every offer
+    // dispatched in the reconnect gap. (A genuine re-link still restarts the stream:
+    // its fresh jar comes from a new browser capture, not from this Set-Cookie.)
+    this.cookieFp = `${jarFingerprint([...this.jar].map(([name, value]) => ({ name, value })))}:${jarFingerprint(this.session.supplier_cookies)}`;
+
+    // Only the primary channel persists the rotated jar to the backend, so a
+    // session's channels don't race each other writing it back.
+    if (!this.primary) return;
 
     const cookies = [...this.jar].map(([name, value]) => ({ name, value }));
     await api.refreshCookies(this.session.id, cookies).catch((e) =>
