@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Save, Upload, ImageOff } from "lucide-react";
+import { Loader2, Save, Upload, ImageOff, ChevronUp, ChevronDown, Trash2, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -15,12 +15,69 @@ import {
   fetchInvoicePreview,
   type InvoiceSettings,
   type InvoiceSettingsInput,
+  type FooterBlock,
 } from "@/lib/api/invoice-template";
 
 /** Absolute-ify a possibly-relative logo URL served by the backend. */
 function resolveSrc(url: string | null | undefined): string {
   if (!url) return "";
   return url.startsWith("http") ? url : `${process.env.NEXT_PUBLIC_API_URL ?? ""}${url}`;
+}
+
+/**
+ * The overridable heading keys and their built-in German defaults, shown as the
+ * placeholder of each label input. Kept in sync with InvoiceSettings::LABEL_DEFAULTS.
+ */
+const LABEL_KEYS = [
+  "bill_to", "invoice_date", "period", "activation_code", "customer_no", "invoice_no",
+  "description", "qty", "unit_price", "amount", "subtotal", "total",
+  "paid", "paid_at", "payment_method", "sold_by", "contact", "tax_bank",
+] as const;
+
+const GERMAN_DEFAULTS: Record<string, string> = {
+  bill_to: "Rechnung an", invoice_date: "Rechnungsdatum", period: "Leistungszeitraum",
+  activation_code: "Aktivierungscode", customer_no: "Kunden-Nr.", invoice_no: "Rechnungs-Nr.",
+  description: "Beschreibung", qty: "Menge", unit_price: "Einzelpreis", amount: "Betrag",
+  subtotal: "Zwischensumme (netto)", total: "Gesamtbetrag", paid: "Bezahlt", paid_at: "Bezahlt am",
+  payment_method: "Zahlungsart", sold_by: "Vermittelt von", contact: "Kontakt", tax_bank: "Steuer & Bank",
+};
+
+/**
+ * Mirror of InvoiceSettings::defaultFooterBlocks() — when the server has no saved
+ * footer_blocks (null), seed the editor from the flat issuer/bank fields so the
+ * admin sees the current 3 default columns ready to edit (skipping empty lines).
+ */
+function deriveFooterBlocks(s: InvoiceSettings): FooterBlock[] {
+  const contactHeading = s.labels?.contact?.trim() || GERMAN_DEFAULTS.contact;
+  const taxBankHeading = s.labels?.tax_bank?.trim() || GERMAN_DEFAULTS.tax_bank;
+  const line = (label: string | null, value: string | null | undefined) =>
+    value && value.trim() !== "" ? [{ label, value }] : [];
+
+  return [
+    { heading: s.issuer_name ?? "", lines: [...line(null, s.issuer_address)] },
+    {
+      heading: contactHeading,
+      lines: [...line(null, s.issuer_email), ...line(null, s.issuer_website), ...line(null, s.issuer_phone)],
+    },
+    {
+      heading: taxBankHeading,
+      lines: [
+        ...line("USt-IdNr.", s.issuer_tax_id),
+        ...line(null, s.bank_name),
+        ...line("IBAN", s.bank_iban),
+        ...line("BIC", s.bank_bic),
+      ],
+    },
+  ];
+}
+
+/** Move the item at `i` one step in `dir` (-1 up, +1 down); no-op at the edges. */
+function move<T>(list: T[], i: number, dir: -1 | 1): T[] {
+  const j = i + dir;
+  if (j < 0 || j >= list.length) return list;
+  const next = [...list];
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
 }
 
 export default function InvoiceTemplatePage() {
@@ -35,7 +92,11 @@ export default function InvoiceTemplatePage() {
 
   useEffect(() => {
     getInvoiceTemplate()
-      .then(setSettings)
+      .then((s) => {
+        // When the server has never saved custom footer_blocks, seed them from the
+        // issuer/bank fields so the admin sees the current 3 columns ready to edit.
+        setSettings(s.footer_blocks ? s : { ...s, footer_blocks: deriveFooterBlocks(s) });
+      })
       .catch(() => toast.error(c("loadFailed")));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -56,6 +117,26 @@ export default function InvoiceTemplatePage() {
   function set<K extends keyof InvoiceSettingsInput>(key: K, value: InvoiceSettingsInput[K]) {
     setSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
   }
+
+  /** Write one heading override into the labels map (kept as a flat object). */
+  function setLabel(key: string, value: string) {
+    setSettings((prev) => (prev ? { ...prev, labels: { ...(prev.labels ?? {}), [key]: value } } : prev));
+  }
+
+  /** Replace the whole footer_blocks array with a transformed copy. */
+  function setBlocks(update: (blocks: FooterBlock[]) => FooterBlock[]) {
+    setSettings((prev) => (prev ? { ...prev, footer_blocks: update(prev.footer_blocks ?? []) } : prev));
+  }
+
+  const patchBlock = (idx: number, patch: Partial<FooterBlock>) =>
+    setBlocks((blocks) => blocks.map((b, i) => (i === idx ? { ...b, ...patch } : b)));
+
+  const patchLine = (bi: number, li: number, patch: Partial<FooterBlock["lines"][number]>) =>
+    setBlocks((blocks) =>
+      blocks.map((b, i) =>
+        i === bi ? { ...b, lines: b.lines.map((l, j) => (j === li ? { ...l, ...patch } : l)) } : b,
+      ),
+    );
 
   function onPickLogo(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -221,6 +302,109 @@ export default function InvoiceTemplatePage() {
             <TextArea label={c("footerThanks")} value={settings.footer_thanks} onChange={(v) => set("footer_thanks", v)} />
             <TextArea label={c("footerTerms")} value={settings.footer_terms} onChange={(v) => set("footer_terms", v)} />
           </Section>
+
+          {/* Labels / headings — one override per fixed invoice heading. */}
+          <Section title={c("secLabels")}>
+            <p className="text-xs text-ink-muted">{c("labelsHint")}</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {LABEL_KEYS.map((key) => (
+                <div key={key}>
+                  <label className="mb-1 block text-xs font-medium text-ink-muted">{c(`labelKeys.${key}`)}</label>
+                  <input
+                    value={settings.labels?.[key] ?? ""}
+                    placeholder={GERMAN_DEFAULTS[key]}
+                    onChange={(e) => setLabel(key, e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+              ))}
+            </div>
+          </Section>
+
+          {/* Footer blocks — reorderable columns with reorderable label/value lines. */}
+          <Section title={c("secFooterBlocks")}>
+            <p className="text-xs text-ink-muted">{c("footerBlocksHint")}</p>
+            {(settings.footer_blocks ?? []).map((block, bi) => (
+              <div key={bi} className="space-y-3 rounded-lg border border-line bg-surface-2 p-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    value={block.heading}
+                    placeholder={c("blockHeading")}
+                    onChange={(e) => patchBlock(bi, { heading: e.target.value })}
+                    className={`${inputCls} font-medium`}
+                  />
+                  <IconBtn title={c("moveUp")} disabled={bi === 0} onClick={() => setBlocks((b) => move(b, bi, -1))}>
+                    <ChevronUp className="h-4 w-4" />
+                  </IconBtn>
+                  <IconBtn
+                    title={c("moveDown")}
+                    disabled={bi === (settings.footer_blocks?.length ?? 0) - 1}
+                    onClick={() => setBlocks((b) => move(b, bi, 1))}
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </IconBtn>
+                  <IconBtn title={c("removeBlock")} danger onClick={() => setBlocks((b) => b.filter((_, i) => i !== bi))}>
+                    <Trash2 className="h-4 w-4" />
+                  </IconBtn>
+                </div>
+
+                {block.lines.map((line, li) => (
+                  <div key={li} className="flex items-center gap-2">
+                    <input
+                      value={line.label ?? ""}
+                      placeholder={c("lineLabel")}
+                      onChange={(e) => patchLine(bi, li, { label: e.target.value || null })}
+                      className={`${inputCls} w-1/3`}
+                    />
+                    <input
+                      value={line.value}
+                      placeholder={c("lineValue")}
+                      onChange={(e) => patchLine(bi, li, { value: e.target.value })}
+                      className={inputCls}
+                    />
+                    <IconBtn
+                      title={c("moveUp")}
+                      disabled={li === 0}
+                      onClick={() => patchBlock(bi, { lines: move(block.lines, li, -1) })}
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </IconBtn>
+                    <IconBtn
+                      title={c("moveDown")}
+                      disabled={li === block.lines.length - 1}
+                      onClick={() => patchBlock(bi, { lines: move(block.lines, li, 1) })}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </IconBtn>
+                    <IconBtn
+                      title={c("removeLine")}
+                      danger
+                      onClick={() => patchBlock(bi, { lines: block.lines.filter((_, j) => j !== li) })}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </IconBtn>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => patchBlock(bi, { lines: [...block.lines, { label: null, value: "" }] })}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-ink-muted hover:text-ink"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {c("addLine")}
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setBlocks((b) => [...b, { heading: "", lines: [{ label: null, value: "" }] }])}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink hover:bg-surface-2"
+            >
+              <Plus className="h-4 w-4" />
+              {c("addBlock")}
+            </button>
+          </Section>
         </div>
 
         {/* Live preview */}
@@ -248,6 +432,36 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 const inputCls =
   "w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line";
+
+/** A small square icon button used for reorder/remove controls. */
+function IconBtn({
+  title,
+  onClick,
+  disabled,
+  danger,
+  children,
+}: {
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface hover:bg-surface-2 disabled:opacity-40 disabled:hover:bg-surface ${
+        danger ? "text-danger-fg" : "text-ink-muted"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
 function Field({
   label,

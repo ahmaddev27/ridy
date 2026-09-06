@@ -49,6 +49,18 @@ class InvoiceTemplateController extends Controller
             'header_note' => ['nullable', 'string', 'max:255'],
             'footer_thanks' => ['nullable', 'string', 'max:500'],
             'footer_terms' => ['nullable', 'string', 'max:2000'],
+
+            // Heading overrides: a flat map of key => custom text. An empty/missing
+            // value falls back to the built-in German default (see the model).
+            'labels' => ['nullable', 'array'],
+            'labels.*' => ['nullable', 'string', 'max:255'],
+
+            // Editable footer columns: [{heading, lines:[{label,value}]}].
+            'footer_blocks' => ['nullable', 'array'],
+            'footer_blocks.*.heading' => ['nullable', 'string', 'max:120'],
+            'footer_blocks.*.lines' => ['nullable', 'array'],
+            'footer_blocks.*.lines.*.label' => ['nullable', 'string', 'max:120'],
+            'footer_blocks.*.lines.*.value' => ['nullable', 'string', 'max:255'],
         ]);
 
         // Persist the emptied optional fields as NULL (not ''), so the Blade's @if
@@ -118,6 +130,8 @@ class InvoiceTemplateController extends Controller
             'header_note' => $s->header_note,
             'footer_thanks' => $s->footer_thanks,
             'footer_terms' => $s->footer_terms,
+            'labels' => $s->labels,
+            'footer_blocks' => $s->footer_blocks,
         ];
     }
 }

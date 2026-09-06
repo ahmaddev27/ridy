@@ -103,6 +103,66 @@ class InvoiceTemplateTest extends TestCase
         $this->assertStringNotContainsString('MwSt', $html);
     }
 
+    public function test_labels_override_replaces_a_fixed_heading(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        // The default German heading is present before any override.
+        $before = $this->get('/api/v1/admin/invoice-template/preview')->assertOk()->getContent();
+        $this->assertStringContainsString('Rechnung an', $before);
+
+        $this->putJson('/api/v1/admin/invoice-template', $this->validPayload([
+            'labels' => ['bill_to' => 'Billed to', 'total' => 'Amount due'],
+        ]))->assertOk()->assertJsonPath('data.labels.bill_to', 'Billed to');
+
+        $after = $this->get('/api/v1/admin/invoice-template/preview')->assertOk()->getContent();
+        $this->assertStringContainsString('Billed to', $after);
+        $this->assertStringContainsString('Amount due', $after);
+        $this->assertStringNotContainsString('Rechnung an', $after);
+        // An un-overridden key still falls back to its German default.
+        $this->assertStringContainsString('Rechnungsdatum', $after);
+    }
+
+    public function test_footer_blocks_array_renders_custom_columns(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        $this->putJson('/api/v1/admin/invoice-template', $this->validPayload([
+            'footer_blocks' => [
+                ['heading' => 'Rechtliches', 'lines' => [
+                    ['label' => 'HRB', 'value' => '12345'],
+                    ['label' => null, 'value' => 'Amtsgericht Wuppertal'],
+                    ['label' => 'Ignored', 'value' => ''], // empty value → skipped
+                ]],
+                ['heading' => 'Geschäftsführer', 'lines' => [
+                    ['label' => null, 'value' => 'Max Mustermann'],
+                ]],
+            ],
+        ]))->assertOk();
+
+        $html = $this->get('/api/v1/admin/invoice-template/preview')->assertOk()->getContent();
+
+        $this->assertStringContainsString('Rechtliches', $html);
+        $this->assertStringContainsString('HRB 12345', $html);
+        $this->assertStringContainsString('Amtsgericht Wuppertal', $html);
+        $this->assertStringContainsString('Geschäftsführer', $html);
+        $this->assertStringContainsString('Max Mustermann', $html);
+        // The empty-value line is stripped, leaving no orphan label.
+        $this->assertStringNotContainsString('Ignored', $html);
+    }
+
+    public function test_null_footer_blocks_derive_the_legacy_three_columns(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        // A fresh install (footer_blocks = null) still shows the derived columns.
+        $html = $this->get('/api/v1/admin/invoice-template/preview')->assertOk()->getContent();
+
+        $this->assertStringContainsString('Kontakt', $html);
+        $this->assertStringContainsString('Steuer', $html);
+        $this->assertStringContainsString('IBAN', $html);
+    }
+
     public function test_pdf_endpoint_streams_a_pdf_for_a_period(): void
     {
         Sanctum::actingAs($this->admin());

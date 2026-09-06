@@ -24,6 +24,20 @@ export type InvoiceSettings = {
   header_note: string;
   footer_thanks: string;
   footer_terms: string;
+  labels: Record<string, string> | null;
+  footer_blocks: FooterBlock[] | null;
+};
+
+/** One footer fine-print column: a heading plus key→value lines. */
+export type FooterBlock = {
+  heading: string;
+  lines: FooterLine[];
+};
+
+/** One line in a footer block; the label is optional ("label value"). */
+export type FooterLine = {
+  label: string | null;
+  value: string;
 };
 
 /** The editable slice sent on save — every field the form controls. */

@@ -89,7 +89,7 @@
             <td style="vertical-align: top; text-align: right; width: 40%;">
                 <div class="doc-title">{{ $title }}</div>
                 <div style="padding-top: 6px;">
-                    <span class="eyebrow">Rechnungs-Nr.</span><br>
+                    <span class="eyebrow">{{ $settings->label('invoice_no') }}</span><br>
                     <span class="val">{{ $invoice_no }}</span>
                 </div>
             </td>
@@ -102,25 +102,25 @@
     <table style="margin-top: 22px;">
         <tr>
             <td style="vertical-align: top; width: 42%;">
-                <div class="label">Rechnung an</div>
+                <div class="label">{{ $settings->label('bill_to') }}</div>
                 <div class="party-name" style="padding-top: 4px;">{{ $customer_name }}</div>
                 @if ($customer_address)
                     <div class="addr" style="padding-top: 2px;">{!! nl2br(e($customer_address)) !!}</div>
                 @endif
             </td>
             <td style="vertical-align: top; width: 29%;">
-                <div class="label">Rechnungsdatum</div>
+                <div class="label">{{ $settings->label('invoice_date') }}</div>
                 <div class="val" style="padding-top: 3px;">{{ $issue_date }}</div>
-                <div class="label" style="padding-top: 12px;">Leistungszeitraum</div>
+                <div class="label" style="padding-top: 12px;">{{ $settings->label('period') }}</div>
                 <div class="val" style="padding-top: 3px;">{{ $period_start }} – {{ $period_end }}</div>
             </td>
             <td style="vertical-align: top; width: 29%;">
                 @if ($activation_code)
-                    <div class="label">Aktivierungscode</div>
+                    <div class="label">{{ $settings->label('activation_code') }}</div>
                     <div class="val" style="padding-top: 3px;">{{ $activation_code }}</div>
                 @endif
                 @if ($customer_no)
-                    <div class="label" style="padding-top: 12px;">Kunden-Nr.</div>
+                    <div class="label" style="padding-top: 12px;">{{ $settings->label('customer_no') }}</div>
                     <div class="val" style="padding-top: 3px;">{{ $customer_no }}</div>
                 @endif
             </td>
@@ -131,10 +131,10 @@
     <table class="items" style="margin-top: 28px;">
         <thead>
             <tr>
-                <th style="width: 58%;">Beschreibung</th>
-                <th class="r" style="width: 10%;">Menge</th>
-                <th class="r" style="width: 16%;">Einzelpreis</th>
-                <th class="r" style="width: 16%;">Betrag</th>
+                <th style="width: 58%;">{{ $settings->label('description') }}</th>
+                <th class="r" style="width: 10%;">{{ $settings->label('qty') }}</th>
+                <th class="r" style="width: 16%;">{{ $settings->label('unit_price') }}</th>
+                <th class="r" style="width: 16%;">{{ $settings->label('amount') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -155,20 +155,20 @@
         <tr>
             <td style="vertical-align: bottom; width: 55%;">
                 @if ($paid)
-                    <table><tr><td class="paid-badge">&#10004;&nbsp;Bezahlt</td></tr></table>
+                    <table><tr><td class="paid-badge">&#10004;&nbsp;{{ $settings->label('paid') }}</td></tr></table>
                     <table class="paymeta" style="margin-top: 10px;">
                         @if ($paid_at)
-                            <tr><td class="k" style="width: 95px;">Bezahlt am</td><td>{{ $paid_at }}</td></tr>
+                            <tr><td class="k" style="width: 95px;">{{ $settings->label('paid_at') }}</td><td>{{ $paid_at }}</td></tr>
                         @endif
-                        <tr><td class="k">Zahlungsart</td><td>{{ $payment_method }}</td></tr>
-                        <tr><td class="k">Vermittelt von</td><td>{{ $sold_by }}</td></tr>
+                        <tr><td class="k">{{ $settings->label('payment_method') }}</td><td>{{ $payment_method }}</td></tr>
+                        <tr><td class="k">{{ $settings->label('sold_by') }}</td><td>{{ $sold_by }}</td></tr>
                     </table>
                 @endif
             </td>
             <td style="vertical-align: top; width: 45%;">
                 <table>
                     <tr class="totrow">
-                        <td>Zwischensumme (netto)</td>
+                        <td>{{ $settings->label('subtotal') }}</td>
                         <td class="v">{{ $net }}</td>
                     </tr>
                     @if ($kleinunternehmer)
@@ -182,7 +182,7 @@
                 </table>
                 <table style="margin-top: 6px; background: {{ $accent }};">
                     <tr>
-                        <td style="padding: 11px 14px; color: #ffffff; font-weight: bold; font-size: 13px;">Gesamtbetrag</td>
+                        <td style="padding: 11px 14px; color: #ffffff; font-weight: bold; font-size: 13px;">{{ $settings->label('total') }}</td>
                         <td style="padding: 11px 14px; color: #ffffff; font-weight: bold; font-size: 16px; text-align: right;">{{ $gross }}</td>
                     </tr>
                 </table>
@@ -198,43 +198,30 @@
         @if ($settings->footer_terms)
             <div class="terms">{{ $settings->footer_terms }}</div>
         @endif
-        @php
-            $hasIssuer = $settings->issuer_name || $settings->issuer_address;
-            $hasKontakt = $settings->issuer_email || $settings->issuer_website || $settings->issuer_phone;
-            $hasBank = $settings->issuer_tax_id || $settings->bank_name || $settings->bank_iban || $settings->bank_bic;
-        @endphp
-        {{-- Each fine-print column, and the whole block, renders only when it has
-             content — an emptied field leaves no orphan heading behind. --}}
-        @if ($hasIssuer || $hasKontakt || $hasBank)
+        {{-- Footer fine-print: an ordered set of editable columns. A saved
+             footer_blocks array drives this; otherwise the 3 legacy columns are
+             derived from the issuer/bank fields so nothing regresses. Empty
+             lines/blocks are already stripped in InvoiceSettings::footerBlocks(),
+             so no orphan heading is ever left behind. --}}
+        @php $footerBlocks = $settings->footerBlocks(); @endphp
+        @if (count($footerBlocks) > 0)
+            @php $colWidth = number_format(100 / count($footerBlocks), 4, '.', ''); @endphp
             <table class="fine" style="margin-top: 18px;">
                 <tr>
-                    @if ($hasIssuer)
-                        <td style="vertical-align: top; width: 34%;">
-                            @if ($settings->issuer_name)<div class="label">{{ $settings->issuer_name }}</div>@endif
-                            @if ($settings->issuer_address)<div class="v">{!! nl2br(e($settings->issuer_address)) !!}</div>@endif
+                    @foreach ($footerBlocks as $block)
+                        <td style="vertical-align: top; width: {{ $colWidth }}%;">
+                            @if (trim($block['heading']) !== '')
+                                <div class="label">{{ $block['heading'] }}</div>
+                            @endif
+                            @if (count($block['lines']) > 0)
+                                <div class="v">
+                                    @foreach ($block['lines'] as $line)
+                                        {{ trim(($line['label'] ?? '').' '.$line['value']) }}@if (! $loop->last)<br>@endif
+                                    @endforeach
+                                </div>
+                            @endif
                         </td>
-                    @endif
-                    @if ($hasKontakt)
-                        <td style="vertical-align: top; width: 33%;">
-                            <div class="label">Kontakt</div>
-                            <div class="v">
-                                @if ($settings->issuer_email){{ $settings->issuer_email }}<br>@endif
-                                @if ($settings->issuer_website){{ $settings->issuer_website }}<br>@endif
-                                @if ($settings->issuer_phone){{ $settings->issuer_phone }}@endif
-                            </div>
-                        </td>
-                    @endif
-                    @if ($hasBank)
-                        <td style="vertical-align: top; width: 33%;">
-                            <div class="label">Steuer &amp; Bank</div>
-                            <div class="v">
-                                @if ($settings->issuer_tax_id)USt-IdNr. {{ $settings->issuer_tax_id }}<br>@endif
-                                @if ($settings->bank_name){{ $settings->bank_name }}<br>@endif
-                                @if ($settings->bank_iban)IBAN {{ $settings->bank_iban }}<br>@endif
-                                @if ($settings->bank_bic)BIC {{ $settings->bank_bic }}@endif
-                            </div>
-                        </td>
-                    @endif
+                    @endforeach
                 </tr>
             </table>
         @endif
