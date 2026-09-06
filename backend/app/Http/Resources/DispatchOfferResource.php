@@ -56,7 +56,9 @@ class DispatchOfferResource extends JsonResource
             // Ordered stops (pickup first, then each drop-off), each with its address
             // and the road distance from the previous stop — so the driver app can
             // list a multi-stop trip's drop-offs with per-leg km. Null until resolved.
-            'stops' => is_array($this->stops) ? $this->stops : null,
+            // Each stop's address is Latinized too, so the itinerary in the detail view
+            // never shows the rider-localized (e.g. Japanese) text the list already hides.
+            'stops' => $this->latinStops(),
             'accept_window_seconds' => $this->accept_window_seconds,
             'received_at' => $this->received_at?->toIso8601String(),
         ];
@@ -80,5 +82,27 @@ class DispatchOfferResource extends JsonResource
         return preg_match('/\b(\d{5})\b/', $value, $m) === 1 && ($city = PostalCodes::city($m[1])) !== null
             ? $m[1].' '.$city
             : null;
+    }
+
+    /**
+     * The stops itinerary with every address Latinized the same way as the endpoint
+     * addresses, so the detail view / driver app never render a rider-localized
+     * (non-Latin) stop label while the list shows the clean German one.
+     *
+     * @return array<int, array<string, mixed>>|null
+     */
+    private function latinStops(): ?array
+    {
+        if (! is_array($this->stops)) {
+            return null;
+        }
+
+        return array_map(function ($stop) {
+            if (is_array($stop) && array_key_exists('address', $stop)) {
+                $stop['address'] = $this->latinAddress(is_string($stop['address']) ? $stop['address'] : null, null);
+            }
+
+            return $stop;
+        }, $this->stops);
     }
 }
