@@ -315,12 +315,28 @@ export class RamenStream {
         }
       }
       if (this.stopped) break;
-      await this.backoff();
+
+      // A stream that ACTUALLY OPENED and then ended/dropped is the normal RAMEN
+      // long-poll cycle (or a proxy connection reset) — NOT a failure. Reopen
+      // almost immediately, resuming from this.seq, so the blind window between
+      // streams is ~250ms instead of the 2s error-backoff (offers Uber dispatches
+      // in that gap would otherwise be missed). Exponential backoff is reserved
+      // for a failure BEFORE the stream opened (handshake/HTTP/404/connect) or a
+      // storm of instant drops (a hard-down proxy) — so we never hammer Uber.
+      if (this.streamOpened && !this.dropStorm()) {
+        this.reconnectDelay = config.reconnectMinDelay; // keep error-backoff reset
+        await this.sleep(config.streamCycleDelay);
+      } else {
+        await this.backoff();
+      }
     }
   }
 
   async connectOnce() {
     this.controller = new AbortController();
+    // Cleared until the stream truly opens; run() reads it to decide fast-reopen
+    // (opened → benign cycle) vs exponential backoff (failed before opening).
+    this.streamOpened = false;
 
     // 1. Handshake. Uber's client sends seq=0 here (seq=-1 returns 404).
     const ack = await fetch(this.url("/ack", 0), { headers: this.headers(), signal: this.controller.signal, dispatcher: this.dispatcher });
@@ -360,6 +376,8 @@ export class RamenStream {
     await this.absorbCookies(recv);
 
     console.log(`[${this.tag()}] stream open (seq ${this.seq})`);
+    this.streamOpened = true; // from here a drop is a mid-stream cycle, not a failure
+    this.openedAt = Date.now();
     this.reconnectDelay = config.reconnectMinDelay; // reset backoff on success
     this.lastHeartbeatAt = 0; // force an immediate heartbeat on the first frame
 
@@ -452,5 +470,24 @@ export class RamenStream {
     console.log(`[${this.tag()}] reconnecting in ${delay}ms`);
     await new Promise((r) => setTimeout(r, delay));
     this.reconnectDelay = Math.min(this.reconnectDelay * 2, config.reconnectMaxDelay);
+  }
+
+  sleep(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+
+  /**
+   * True when the stream keeps dying almost instantly — a hard-down proxy or a
+   * rejected session, not a healthy long-poll cycle. Counts consecutive opens
+   * that lived < STORM_MIN_LIFETIME_MS; once STORM_THRESHOLD in a row, run()
+   * switches from fast-reopen to exponential backoff so we don't hammer Uber. A
+   * stream that lived long enough resets the counter.
+   */
+  dropStorm() {
+    const STORM_MIN_LIFETIME_MS = 1500;
+    const STORM_THRESHOLD = 6;
+    const lifetime = Date.now() - (this.openedAt ?? 0);
+    this.rapidDrops = lifetime < STORM_MIN_LIFETIME_MS ? (this.rapidDrops ?? 0) + 1 : 0;
+    return this.rapidDrops >= STORM_THRESHOLD;
   }
 }

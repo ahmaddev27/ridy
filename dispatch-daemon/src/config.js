@@ -91,6 +91,13 @@ export const config = {
   // Reconnect backoff bounds (ms).
   reconnectMinDelay: Number(process.env.RECONNECT_MIN_MS || 2000),
   reconnectMaxDelay: Number(process.env.RECONNECT_MAX_MS || 60000),
+  // Delay before REOPENING a stream that had successfully opened and then ended
+  // or was dropped — the normal RAMEN long-poll cycle, or a residential-proxy
+  // connection reset. Kept tiny so the blind window between streams is tens of
+  // ms: an offer Uber dispatches during the 2s error-backoff would be missed.
+  // Exponential backoff (reconnect*Delay) is reserved for real failures (a
+  // handshake/HTTP/404 error before the stream opened) and drop storms.
+  streamCycleDelay: Number(process.env.STREAM_CYCLE_MS || 250),
 
   // Horizontal sharding is DB-driven and admin-controlled: this box identifies
   // itself by a stable shard NAME and the backend returns only the companies
