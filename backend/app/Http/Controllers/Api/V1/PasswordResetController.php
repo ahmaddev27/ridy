@@ -80,6 +80,9 @@ class PasswordResetController extends Controller
         }
 
         $user->forceFill(['password' => Hash::make($data['password'])])->save();
+        // Revoke existing tokens so a reset actually evicts a stolen bearer token
+        // (mirrors the driver reset). Cookie-session managers re-auth transparently.
+        $user->tokens()->delete();
         $reset->delete();
 
         return response()->json(['data' => ['reset' => true]]);

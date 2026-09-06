@@ -5,6 +5,7 @@ use App\Http\Middleware\EnsureDriverTenantActive;
 use App\Http\Middleware\EnsureFleetConnected;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureUserAccount;
+use App\Http\Middleware\EnsureUserTenantActive;
 use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\VerifyDispatchSecret;
 use Illuminate\Auth\AuthenticationException;
@@ -50,6 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'super.admin' => EnsureSuperAdmin::class,
             'driver.active' => EnsureDriverTenantActive::class,
             'user.account' => EnsureUserAccount::class,
+            'user.active' => EnsureUserTenantActive::class,
             'fleet.connected' => EnsureFleetConnected::class,
             'dashboard.only' => EnsureDashboardToken::class,
         ]);

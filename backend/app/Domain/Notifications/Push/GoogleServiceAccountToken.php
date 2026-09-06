@@ -62,7 +62,11 @@ class GoogleServiceAccountToken
 
         $jwt = $this->sign($claims, $creds['private_key']);
 
-        $response = Http::asForm()->post($creds['token_uri'], [
+        // Time-box the token mint: it runs INLINE on the offer-push hot path (when
+        // the 55-min cache is cold), and the FCM send that follows is already
+        // capped at 5s — a slow Google token endpoint must not stall the push past
+        // Uber's ~5s accept window (the default 30s read timeout would).
+        $response = Http::asForm()->connectTimeout(3)->timeout(4)->post($creds['token_uri'], [
             'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
             'assertion' => $jwt,
         ]);

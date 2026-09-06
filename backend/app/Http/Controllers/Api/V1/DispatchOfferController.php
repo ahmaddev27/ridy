@@ -41,10 +41,14 @@ class DispatchOfferController extends Controller
      */
     public function export(Request $request): StreamedResponse
     {
+        // Stream lazily (chunks of 1000) rather than ->get(): dispatch_offers is the
+        // fastest-growing table, so a filterless export on a mature fleet would pull
+        // 100k+ rows — each dragging its raw_payload JSON — into memory at once and
+        // exhaust the worker. lazy() keeps only one chunk resident while the CSV streams.
         $offers = $this->filtered($request)
             ->with('driver:id,name')
             ->orderByDesc('received_at')
-            ->get();
+            ->lazy();
 
         $filename = 'offers_'.now()->toDateString().'.csv';
 

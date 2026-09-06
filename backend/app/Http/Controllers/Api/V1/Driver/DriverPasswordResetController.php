@@ -81,6 +81,11 @@ class DriverPasswordResetController extends Controller
         }
 
         $driver->forceFill(['password' => Hash::make($data['password'])])->save();
+        // A password reset is the user's tool to evict an attacker who has their
+        // token — so revoke every existing Sanctum token (driver auth is purely
+        // bearer-based and tokens have no expiry, so a stolen one would otherwise
+        // survive the reset). The driver simply signs in again to get a fresh one.
+        $driver->tokens()->delete();
         $reset->delete();
 
         return response()->json(['data' => ['reset' => true]]);

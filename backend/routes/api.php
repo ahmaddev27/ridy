@@ -190,7 +190,7 @@ Route::prefix('v1')->group(function () {
         Route::post('broadcasting/auth', fn (Request $request) => Broadcast::auth($request));
     });
 
-    Route::middleware(['auth:sanctum', 'user.account', ResolveTenant::class, 'dashboard.only'])->group(function () {
+    Route::middleware(['auth:sanctum', 'user.account', ResolveTenant::class, 'dashboard.only', 'user.active'])->group(function () {
         // Dashboard
         Route::get('dashboard/summary', [DashboardController::class, 'summary']);
 
@@ -300,7 +300,7 @@ Route::prefix('v1')->group(function () {
         Route::get('codes', [ResellerController::class, 'codes']);
     });
 
-    Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(function () {
+    Route::middleware(['auth:sanctum', 'user.account', 'super.admin'])->prefix('admin')->group(function () {
         Route::get('overview', OverviewController::class);
         Route::get('system-health', SystemHealthController::class);
         Route::get('system-metrics', SystemMetricsController::class);
