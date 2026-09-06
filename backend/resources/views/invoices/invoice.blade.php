@@ -76,7 +76,9 @@
                             </td>
                         @endif
                         <td style="vertical-align: middle; padding-left: 10px;">
-                            <div class="brand-name">{{ $settings->issuer_name }}</div>
+                            @if ($settings->issuer_name)
+                                <div class="brand-name">{{ $settings->issuer_name }}</div>
+                            @endif
                             @if ($settings->header_note)
                                 <div class="brand-sub">{{ $settings->header_note }}</div>
                             @endif
@@ -190,32 +192,52 @@
 
     {{-- Footer --}}
     <footer>
-        <div class="thanks">{{ $settings->footer_thanks }}</div>
-        <div class="terms">{{ $settings->footer_terms }}</div>
-        <table class="fine" style="margin-top: 18px;">
-            <tr>
-                <td style="vertical-align: top; width: 34%;">
-                    <div class="label">{{ $settings->issuer_name }}</div>
-                    <div class="v">{!! nl2br(e($settings->issuer_address)) !!}</div>
-                </td>
-                <td style="vertical-align: top; width: 33%;">
-                    <div class="label">Kontakt</div>
-                    <div class="v">
-                        @if ($settings->issuer_email){{ $settings->issuer_email }}<br>@endif
-                        @if ($settings->issuer_website){{ $settings->issuer_website }}<br>@endif
-                        @if ($settings->issuer_phone){{ $settings->issuer_phone }}@endif
-                    </div>
-                </td>
-                <td style="vertical-align: top; width: 33%;">
-                    <div class="label">Steuer &amp; Bank</div>
-                    <div class="v">
-                        @if ($settings->issuer_tax_id)USt-IdNr. {{ $settings->issuer_tax_id }}<br>@endif
-                        @if ($settings->bank_iban)IBAN {{ $settings->bank_iban }}<br>@endif
-                        @if ($settings->bank_bic)BIC {{ $settings->bank_bic }}@endif
-                    </div>
-                </td>
-            </tr>
-        </table>
+        @if ($settings->footer_thanks)
+            <div class="thanks">{{ $settings->footer_thanks }}</div>
+        @endif
+        @if ($settings->footer_terms)
+            <div class="terms">{{ $settings->footer_terms }}</div>
+        @endif
+        @php
+            $hasIssuer = $settings->issuer_name || $settings->issuer_address;
+            $hasKontakt = $settings->issuer_email || $settings->issuer_website || $settings->issuer_phone;
+            $hasBank = $settings->issuer_tax_id || $settings->bank_name || $settings->bank_iban || $settings->bank_bic;
+        @endphp
+        {{-- Each fine-print column, and the whole block, renders only when it has
+             content — an emptied field leaves no orphan heading behind. --}}
+        @if ($hasIssuer || $hasKontakt || $hasBank)
+            <table class="fine" style="margin-top: 18px;">
+                <tr>
+                    @if ($hasIssuer)
+                        <td style="vertical-align: top; width: 34%;">
+                            @if ($settings->issuer_name)<div class="label">{{ $settings->issuer_name }}</div>@endif
+                            @if ($settings->issuer_address)<div class="v">{!! nl2br(e($settings->issuer_address)) !!}</div>@endif
+                        </td>
+                    @endif
+                    @if ($hasKontakt)
+                        <td style="vertical-align: top; width: 33%;">
+                            <div class="label">Kontakt</div>
+                            <div class="v">
+                                @if ($settings->issuer_email){{ $settings->issuer_email }}<br>@endif
+                                @if ($settings->issuer_website){{ $settings->issuer_website }}<br>@endif
+                                @if ($settings->issuer_phone){{ $settings->issuer_phone }}@endif
+                            </div>
+                        </td>
+                    @endif
+                    @if ($hasBank)
+                        <td style="vertical-align: top; width: 33%;">
+                            <div class="label">Steuer &amp; Bank</div>
+                            <div class="v">
+                                @if ($settings->issuer_tax_id)USt-IdNr. {{ $settings->issuer_tax_id }}<br>@endif
+                                @if ($settings->bank_name){{ $settings->bank_name }}<br>@endif
+                                @if ($settings->bank_iban)IBAN {{ $settings->bank_iban }}<br>@endif
+                                @if ($settings->bank_bic)BIC {{ $settings->bank_bic }}@endif
+                            </div>
+                        </td>
+                    @endif
+                </tr>
+            </table>
+        @endif
     </footer>
 
 </div>

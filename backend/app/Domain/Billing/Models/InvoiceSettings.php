@@ -55,13 +55,11 @@ class InvoiceSettings extends Model
             [
                 'issuer_name' => 'Reidey GmbH',
                 'issuer_address' => "Friedrich-Ebert-Straße 8\n42103 Wuppertal\nDeutschland",
-                'issuer_tax_id' => 'DE 123 456 789',
+                // Tax ID + bank details are left blank on a fresh install — a real
+                // invoice needs the real values, and a placeholder VAT/IBAN is worse
+                // than none. The super-admin fills them in the template editor.
                 'issuer_email' => 'billing@reidey.de',
-                'issuer_phone' => '+49 202 000 000',
                 'issuer_website' => 'reidey.de',
-                'bank_iban' => 'DE00 0000 0000 0000 00',
-                'bank_bic' => 'WELADEDXXX',
-                'bank_name' => 'Stadtsparkasse Wuppertal',
                 'accent_color' => '#0e6b4e',
                 'invoice_title' => 'Rechnung',
                 'number_prefix' => 'RE',

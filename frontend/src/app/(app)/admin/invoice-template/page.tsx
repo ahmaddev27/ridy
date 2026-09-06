@@ -165,21 +165,21 @@ export default function InvoiceTemplatePage() {
             <Field label={c("issuerName")} value={settings.issuer_name} onChange={(v) => set("issuer_name", v)} />
             <TextArea label={c("issuerAddress")} value={settings.issuer_address} onChange={(v) => set("issuer_address", v)} />
             <div className="grid grid-cols-2 gap-3">
-              <Field label={c("issuerTaxId")} value={settings.issuer_tax_id} onChange={(v) => set("issuer_tax_id", v)} />
-              <Field label={c("issuerPhone")} value={settings.issuer_phone} onChange={(v) => set("issuer_phone", v)} />
+              <Field label={c("issuerTaxId")} value={settings.issuer_tax_id} onChange={(v) => set("issuer_tax_id", v)} placeholder="DE123456789" />
+              <Field label={c("issuerPhone")} value={settings.issuer_phone} onChange={(v) => set("issuer_phone", v)} placeholder="+49 202 000000" />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label={c("issuerEmail")} value={settings.issuer_email} onChange={(v) => set("issuer_email", v)} />
-              <Field label={c("issuerWebsite")} value={settings.issuer_website} onChange={(v) => set("issuer_website", v)} />
+              <Field label={c("issuerEmail")} value={settings.issuer_email} onChange={(v) => set("issuer_email", v)} placeholder="billing@firma.de" />
+              <Field label={c("issuerWebsite")} value={settings.issuer_website} onChange={(v) => set("issuer_website", v)} placeholder="firma.de" />
             </div>
           </Section>
 
           {/* Bank */}
           <Section title={c("secBank")}>
-            <Field label={c("bankName")} value={settings.bank_name} onChange={(v) => set("bank_name", v)} />
+            <Field label={c("bankName")} value={settings.bank_name} onChange={(v) => set("bank_name", v)} placeholder="Sparkasse Wuppertal" />
             <div className="grid grid-cols-2 gap-3">
-              <Field label={c("bankIban")} value={settings.bank_iban} onChange={(v) => set("bank_iban", v)} />
-              <Field label={c("bankBic")} value={settings.bank_bic} onChange={(v) => set("bank_bic", v)} />
+              <Field label={c("bankIban")} value={settings.bank_iban} onChange={(v) => set("bank_iban", v)} placeholder="DE00 0000 0000 0000 00" />
+              <Field label={c("bankBic")} value={settings.bank_bic} onChange={(v) => set("bank_bic", v)} placeholder="WELADEDXXX" />
             </div>
           </Section>
 
@@ -249,21 +249,31 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 const inputCls =
   "w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line";
 
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string | null;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
-      <input value={value} onChange={(e) => onChange(e.target.value)} className={inputCls} />
+      <input value={value ?? ""} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={inputCls} />
     </div>
   );
 }
 
-function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function TextArea({ label, value, onChange }: { label: string; value: string | null; onChange: (v: string) => void }) {
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
       <textarea
-        value={value}
+        value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         rows={2}
         className={`${inputCls} resize-y`}

@@ -25,9 +25,13 @@ class InvoiceTemplateController extends Controller
 
     public function update(Request $request): JsonResponse
     {
+        // Everything is optional — an empty value is simply omitted from the rendered
+        // invoice (see the @if guards in the Blade), so the admin can strip any line
+        // they don't want. Only the structural fields that shape the number/money
+        // stay required (they have sensible defaults and can't render blank).
         $data = $request->validate([
-            'issuer_name' => ['required', 'string', 'max:255'],
-            'issuer_address' => ['required', 'string', 'max:1000'],
+            'issuer_name' => ['nullable', 'string', 'max:255'],
+            'issuer_address' => ['nullable', 'string', 'max:1000'],
             'issuer_tax_id' => ['nullable', 'string', 'max:120'],
             'issuer_email' => ['nullable', 'email', 'max:255'],
             'issuer_phone' => ['nullable', 'string', 'max:60'],
@@ -37,15 +41,23 @@ class InvoiceTemplateController extends Controller
             'bank_name' => ['nullable', 'string', 'max:255'],
             'logo_url' => ['nullable', 'string', 'max:1000'],
             'accent_color' => ['nullable', 'string', 'max:9'],
-            'invoice_title' => ['required', 'string', 'max:60'],
+            'invoice_title' => ['nullable', 'string', 'max:60'],
             'number_prefix' => ['required', 'string', 'max:12'],
             'vat_rate' => ['required', 'numeric', 'min:0', 'max:100'],
             'kleinunternehmer' => ['required', 'boolean'],
             'currency' => ['required', 'string', 'max:8'],
             'header_note' => ['nullable', 'string', 'max:255'],
-            'footer_thanks' => ['required', 'string', 'max:500'],
-            'footer_terms' => ['required', 'string', 'max:2000'],
+            'footer_thanks' => ['nullable', 'string', 'max:500'],
+            'footer_terms' => ['nullable', 'string', 'max:2000'],
         ]);
+
+        // Persist the emptied optional fields as NULL (not ''), so the Blade's @if
+        // guards drop them cleanly instead of rendering an empty line.
+        foreach (['issuer_name', 'issuer_address', 'issuer_tax_id', 'issuer_email', 'issuer_phone', 'issuer_website', 'bank_iban', 'bank_bic', 'bank_name', 'invoice_title', 'header_note', 'footer_thanks', 'footer_terms'] as $optional) {
+            if (array_key_exists($optional, $data) && trim((string) $data[$optional]) === '') {
+                $data[$optional] = null;
+            }
+        }
 
         $settings = InvoiceSettings::current();
         $settings->update($data);
