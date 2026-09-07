@@ -149,6 +149,16 @@ class DispatchNotifier
         return $rider !== '' ? $numbers.' | '.$rider : $numbers;
     }
 
+    /** Localized "multi-stop detected" title for the second (multi-stop) push. */
+    private function multiStopTitle(DispatchOffer $offer): string
+    {
+        return match ($offer->driver?->locale) {
+            'en' => 'Multi-stop detected',
+            'ar' => 'تم اكتشاف نقاط متعددة',
+            default => 'Zwischenstopp erkannt',
+        };
+    }
+
     /**
      * Alert the DRIVER that Uber revealed more than one drop-off on their accepted
      * trip, and broadcast so the open app refreshes the offer detail live with the
@@ -166,18 +176,18 @@ class DispatchNotifier
         // Live nudge to the open app so it re-fetches the offer with the new stops.
         rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'multistop')), report: false);
 
-        // Lead the title with a bold, language-neutral multi-stop mark ("🟦×N") so
-        // the driver spots the extra drop-offs at a glance — a blue SQUARE that
-        // mirrors the app/dashboard blue stop marker, count reads the same in every
-        // language (a push can't embed our SVG stop icon, so the closest neutral
-        // glyph stands in; the app renders the real blue stop marker in its UI).
-        $mark = '🟦×'.$stopsCount;
-        $title = trim($mark.' · '.$this->buildNumbers($offer));
-        // Body opens with the mark, then EVERY stop (pickup + each drop-off with its
-        // per-leg km) and the metrics — so the driver sees all destinations and the
-        // pricing even from the lock screen, not just the first and last.
+        // A worded, localized title so the driver instantly reads WHY a second push
+        // arrived (Uber revealed extra drop-offs). This one notification is
+        // intentionally localized (unlike the word-free single-offer push).
+        $title = $this->multiStopTitle($offer);
+        // Body: a blue stop marker + the stop count, distance and €/km on the first
+        // line, then EVERY stop on its own bulleted line (pickup, then each drop-off
+        // with its "+km") — so the driver reads all destinations and pricing from the
+        // lock screen. (An OS push carries only an emoji, not our blue-circle stop
+        // icon; the app renders the real marker in its own UI.)
         $metrics = $this->buildMetrics($offer);
-        $body = trim($mark."\n".$this->buildStopList($offer).($metrics !== '' ? "\n".$metrics : ''));
+        $head = trim('🔵 x'.$stopsCount.($metrics !== '' ? ' · '.$metrics : ''));
+        $body = trim($head."\n".$this->buildStopBullets($offer));
 
         $data = [
             'categoryId' => 'offer',
@@ -225,12 +235,12 @@ class DispatchNotifier
     }
 
     /**
-     * The multi-stop body: every stop on its own line — pickup first, then each
-     * drop-off prefixed "→" with its per-leg km — so the driver reads the whole
-     * itinerary on the lock screen. Falls back to the two-address body when the
-     * stops itinerary is unresolved.
+     * The multi-stop body: every stop on its own bulleted line — pickup first, then
+     * each drop-off with its per-leg "+km" — so the driver reads the whole itinerary
+     * on the lock screen. Falls back to the two-address body when the stops itinerary
+     * is unresolved.
      */
-    private function buildStopList(DispatchOffer $offer): string
+    private function buildStopBullets(DispatchOffer $offer): string
     {
         $stops = is_array($offer->stops) ? $offer->stops : [];
         if (count($stops) < 2) {
@@ -243,14 +253,10 @@ class DispatchNotifier
             if ($address === '') {
                 continue;
             }
-            if ($i === 0) {
-                $lines[] = $address; // pickup — no arrow, no leg
-
-                continue;
-            }
+            // Pickup carries no leg; each drop-off shows the extra km from the previous stop.
             $legM = $s['leg_m'] ?? null;
-            $leg = $legM !== null ? ' (+'.number_format((float) $legM / 1000, 1, '.', '').' km)' : '';
-            $lines[] = '→ '.$address.$leg;
+            $leg = $i > 0 && $legM !== null ? ' (+'.number_format((float) $legM / 1000, 1, '.', '').' km)' : '';
+            $lines[] = '• '.$address.$leg;
         }
 
         return $lines === [] ? $this->buildBody($offer) : implode("\n", $lines);
