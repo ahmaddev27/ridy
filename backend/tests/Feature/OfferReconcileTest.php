@@ -184,19 +184,20 @@ class OfferReconcileTest extends TestCase
         $this->assertSame(4820, $offer->distance_m);
     }
 
-    public function test_incomplete_address_leaves_the_distance_blank_no_guess(): void
+    public function test_short_street_level_trip_leaves_the_distance_blank_no_guess(): void
     {
         Http::fake([
             'nominatim.openstreetmap.org/*' => Http::response([['lat' => '51.34', 'lon' => '7.04']], 200),
             'router.project-osrm.org/*' => Http::response([
-                'routes' => [['distance' => 4820, 'geometry' => ['type' => 'LineString', 'coordinates' => []]]],
+                'routes' => [['distance' => 800, 'geometry' => ['type' => 'LineString', 'coordinates' => []]]],
             ], 200),
         ]);
 
-        // The pickup has NO house number ("Hoheleye" only) → it resolves to a
-        // street-level ('street') point on an arbitrary part of the street, so we
-        // must NOT guess a distance. It stays blank until a reliable source fills it
-        // (the driver accepts → Uber waypoints, or a later exact geocode).
+        // The pickup has NO house number ("Hoheleye" only) → a street-level point on
+        // an arbitrary part of the street. A street-level end is trusted only for a
+        // long-enough trip (its mid-street error is then small); this SHORT same-street
+        // hop (< MIN_APPROX_DISTANCE_M) is dominated by that error (it swung 65 m ↔ 877 m
+        // between runs), so the distance stays blank until Uber's waypoints fill it.
         $offer = $this->offer([
             'pickup_address' => 'Hoheleye, 58093 Hagen',
             'dropoff_address' => 'Hoheleye 3, 58093 Hagen',
@@ -205,7 +206,7 @@ class OfferReconcileTest extends TestCase
 
         $offer->refresh();
         $this->assertNotNull($offer->geo_synced_at, 'marked done — we do not re-attempt the same address');
-        $this->assertNull($offer->distance_m, 'incomplete address → no guessed distance');
+        $this->assertNull($offer->distance_m, 'short street-level trip → no guessed distance');
         $this->assertNull($offer->route_geometry, 'no guessed route either');
     }
 }

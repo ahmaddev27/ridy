@@ -455,12 +455,12 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame(OfferStatus::Pending, $newer->fresh()->status);
     }
 
-    public function test_a_new_offer_supersedes_even_an_engaged_drivers_prior_offer(): void
+    public function test_a_new_offer_does_not_supersede_an_engaged_drivers_prior_offer(): void
     {
-        // Uber sends the next offer only once the previous is gone — so an engaged
-        // driver's older pending offer is superseded (rejected) the moment a newer
-        // one arrives, exactly as for an idle driver. Their single back-to-back
-        // offer is the newest (the kept one), so it is never the one rejected here.
+        // While the driver is ON A TRIP, Uber batches back-to-back trips: an older
+        // pending offer may still be done next, so a newer arrival must NOT reject it
+        // (it would flash rejected then flip to accepted when they take it). Both stay
+        // pending; expirePending / the next engagement resolves them once idle.
         $driver = $this->driver();
         $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']);
         $older = $this->offer(['received_at' => now()->subMinutes(2)]);
@@ -468,7 +468,7 @@ class OfferAcceptanceTest extends TestCase
 
         app(OfferLifecycle::class)->supersedePendingFor($this->tenant->id, self::DRIVER_UUID, $newer->id);
 
-        $this->assertSame(OfferStatus::Rejected, $older->fresh()->status);
+        $this->assertSame(OfferStatus::Pending, $older->fresh()->status, 'engaged driver keeps the older offer for back-to-back');
         $this->assertSame(OfferStatus::Pending, $newer->fresh()->status);
     }
 

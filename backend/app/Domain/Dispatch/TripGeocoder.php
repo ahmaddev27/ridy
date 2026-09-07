@@ -58,6 +58,15 @@ class TripGeocoder
     private const MAX_ATTEMPTS = 20;
 
     /**
+     * A street-level (house-number-less) endpoint is trusted for a distance only
+     * when the trip is at least this long — below it the ~mid-street positional
+     * error is a large fraction of the trip (a same-street hop like
+     * "Hoheleye → Hoheleye 3" swung 65 m ↔ 877 m between runs), so the distance
+     * stays blank until Uber's waypoints. A both-ends-exact trip skips this gate.
+     */
+    private const MIN_APPROX_DISTANCE_M = 1500;
+
+    /**
      * Geocode + route an offer once it succeeds, caching on the row. Safe to call
      * repeatedly: a transient failure (rate-limited free services) leaves
      * geo_synced_at null so a later call — or the backfill command — retries,
@@ -182,9 +191,23 @@ class TripGeocoder
             // 877 m one run, 65 m another; a Wuppertal→Düsseldorf that came out 55 km).
             // Those stay blank until a RELIABLE source fills them — the accept's Uber
             // waypoints (via OfferLifecycle → applyFromWaypoints) or a later exact geocode.
+            $route = null;
+            $distance = null;
             if ($this->preciseEnoughForDistance($pConf, $dConf)) {
                 $route = $this->route($pickup, $dropoff);
-                $offer->distance_m = $route['distance_m'] ?? null;
+                $distance = $route['distance_m'] ?? null;
+                // A street-level (approximate) end is trusted only for a long-enough
+                // trip, where its mid-street error is a small fraction; a short trip is
+                // dominated by it, so drop the distance there. Both-exact trusts any length.
+                $bothExact = $pConf === 'exact' && $dConf === 'exact';
+                if ($distance !== null && ! $bothExact && $distance < self::MIN_APPROX_DISTANCE_M) {
+                    $route = null;
+                    $distance = null;
+                }
+            }
+
+            if ($distance !== null) {
+                $offer->distance_m = $distance;
                 $offer->route_geometry = $route['geometry'] ?? null;
                 $offer->geo_confidence = $this->combinedConfidence($pConf, $dConf, $route);
             } else {

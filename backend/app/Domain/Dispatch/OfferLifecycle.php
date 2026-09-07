@@ -3,6 +3,7 @@
 namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Fleet\Models\Driver;
 use App\Events\OfferBroadcast;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -158,17 +159,30 @@ class OfferLifecycle
      * @return int rows expired
      */
     /**
-     * A driver holds at most one live offer: Uber sends the next one only once the
-     * previous is gone. So when a newer offer arrives, any still-pending older offer
-     * of the same driver is superseded → rejected (Uber moved past it). This holds
-     * whether the driver is idle or on a trip: a busy driver's single back-to-back
-     * offer is itself the newest (the kept one), so it is never the row rejected
-     * here — only a genuinely superseded older one is. Returns rows changed.
+     * When a newer offer arrives while the driver is IDLE, any still-pending older
+     * offer of theirs is superseded → rejected: a free driver who lets one offer sit
+     * and gets another has passed on the first.
+     *
+     * But NOT while the driver is ENGAGED (en route / on a trip): Uber batches
+     * back-to-back trips, so an older pending offer may still be done next — proven
+     * in the field (a driver finished one trip, then did the offer we'd rejected).
+     * Rejecting it there is premature: it flashes "rejected" then flips to accepted
+     * when they take it. So we hold older offers pending while engaged; expirePending
+     * (past its window once idle, or the 2h hard cap) and the next engagement resolve
+     * them. Returns rows changed (0 while engaged, or driver-uuid missing).
      */
     public function supersedePendingFor(int $tenantId, string $driverUuid, int $keepOfferId): int
     {
         if ($driverUuid === '') {
             return 0;
+        }
+
+        $driver = Driver::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('uber_driver_uuid', $driverUuid)
+            ->first();
+        if ($driver !== null && $driver->engagementStatus() >= 1) {
+            return 0; // engaged — hold older offers for a possible back-to-back trip
         }
 
         return DispatchOffer::withoutGlobalScopes()
