@@ -69,7 +69,22 @@ async function reconcile() {
   for (const [key, stream] of streams) {
     const sessionId = Number(key.split(":")[0]);
     const proxyChanged = effectiveProxy.has(sessionId) && effectiveProxy.get(sessionId) !== stream.proxyUrl;
-    const cookiesChanged = effectiveFp.has(sessionId) && effectiveFp.get(sessionId) !== stream.cookieFp;
+    const fpNow = effectiveFp.get(sessionId);
+    const cookiesChanged = fpNow !== undefined && fpNow !== stream.cookieFp;
+
+    // A cookie change that MATCHES the primary channel's live fingerprint is the
+    // daemon's OWN rolling refresh (the primary absorbed + persisted Uber's rotated
+    // session cookie). Adopt it into this (secondary) stream WITHOUT a teardown, so a
+    // self-rotation never resets its seq and drops offers in the gap. Only a change the
+    // primary's live jar can't match — a fresh browser re-link — restarts the streams.
+    if (cookiesChanged && wantedKeys.has(key) && !proxyChanged) {
+      const primaryFp = streams.get(streamKey(sessionId, config.ramenPaths[0]))?.cookieFp;
+      if (primaryFp !== undefined && fpNow === primaryFp) {
+        stream.cookieFp = fpNow; // adopt the primary's rotation; keep the live stream + its seq
+        continue;
+      }
+    }
+
     if (!wantedKeys.has(key) || proxyChanged || cookiesChanged) {
       const reason = !wantedKeys.has(key) ? "no longer active" : proxyChanged ? "proxy changed" : "cookies changed";
       console.log(`stopping stream ${key} (${reason})`);

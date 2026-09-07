@@ -19,6 +19,17 @@ class PostalCodes
     /** Per-PLZ row cache TTL — the table is static, so cache for a day. */
     private const TTL = 86400;
 
+    /**
+     * In-process memo of the full centroid table for {@see nearest()}. The
+     * fleet-map endpoint calls nearest() once per driver AND once per waypoint, and
+     * each call's Cache::remember hits the (database) cache store — a full-table blob
+     * read + unserialize. Loading it once per process keeps a busy map poll to a
+     * single read instead of ~120. The table is static, so holding it is safe.
+     *
+     * @var array<int, array{plz: string, city: string, lat: float, lng: float}>|null
+     */
+    private static ?array $allCentroids = null;
+
     /** Normalize free input to a 5-digit PLZ, or null when it isn't one. */
     public static function normalize(?string $plz): ?string
     {
@@ -71,7 +82,7 @@ class PostalCodes
      */
     public static function nearest(float $lat, float $lng): ?array
     {
-        $all = Cache::remember('plz:all:v1', self::TTL, function () {
+        $all = self::$allCentroids ??= Cache::remember('plz:all:v1', self::TTL, function () {
             return DB::table('postal_codes')->get(['plz', 'city', 'lat', 'lng'])
                 ->map(fn ($r) => ['plz' => $r->plz, 'city' => $r->city, 'lat' => (float) $r->lat, 'lng' => (float) $r->lng])
                 ->all();

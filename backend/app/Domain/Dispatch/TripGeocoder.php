@@ -490,8 +490,13 @@ class TripGeocoder
         // aborts WITHOUT caching so a later call retries instead of caching a miss.
         $parsed = AddressNormalizer::parse($address);
         $plz = $parsed['plz'];
-        // Prefer the authoritative PLZ→city (1:1 in Germany) over Uber's parse.
-        $city = $plz !== null ? (PostalCodes::city($plz) ?? $parsed['city']) : $parsed['city'];
+        // Prefer the authoritative PLZ→city (1:1 in Germany) over Uber's parse. With no
+        // PLZ, parse() yields no city, so fall back to townOf() — the trailing town
+        // borrowed from the counterpart end (borrowCounterpartCity), validated against
+        // the postal-code table. Without this, a street-only "Street 66F, Gevelsberg"
+        // has city=null, Tier 1b (street+city) is skipped, and it falls through to the
+        // free-text 'approx' tier with no distance — the exact case that path exists for.
+        $city = ($plz !== null ? (PostalCodes::city($plz) ?? $parsed['city']) : $parsed['city']) ?? $this->townOf($address);
         $street = $parsed['street'];
 
         $base = [
@@ -1027,7 +1032,12 @@ class TripGeocoder
         $offer->stops = $this->labelStops($points, $offer->pickup_display, $offer->dropoff_display, $route['legs']);
         $offer->stops_count = $stopsCount;
         $offer->geo_source = 'uber';
-        $offer->geo_confidence = 'exact';
+        // When OSRM is unreachable, routeThrough() falls back to a straight-line
+        // (haversine) distance with NO geometry — flag it 'estimated' (shown with a
+        // "~"), not a fake 'exact', so an under-length distance isn't presented as
+        // precise. Uber's coordinates are still exact; only the road distance is an
+        // estimate until OSRM is reachable.
+        $offer->geo_confidence = $route['geometry'] !== null ? 'exact' : 'estimated';
         $offer->geo_synced_at = CarbonImmutable::now();
         $offer->save();
 

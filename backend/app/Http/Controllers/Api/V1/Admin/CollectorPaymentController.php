@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Domain\Collections\CollectorPaymentQuery;
 use App\Domain\Collections\Models\CollectorPayment;
 use App\Http\Controllers\Controller;
+use App\Support\Csv;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -69,8 +70,8 @@ class CollectorPaymentController extends Controller
             foreach ($rows as $p) {
                 fputcsv($out, [
                     $p->paid_on->toDateString(),
-                    $p->tenant?->name,
-                    $p->collector?->name,
+                    Csv::cell($p->tenant?->name),
+                    Csv::cell($p->collector?->name),
                     number_format((float) $p->amount, 2, '.', ''),
                     $p->note,
                 ]);

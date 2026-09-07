@@ -209,4 +209,30 @@ class OfferReconcileTest extends TestCase
         $this->assertNull($offer->distance_m, 'short street-level trip → no guessed distance');
         $this->assertNull($offer->route_geometry, 'no guessed route either');
     }
+
+    public function test_street_only_pickup_borrows_the_dropoff_town_so_tier1b_resolves_it(): void
+    {
+        Http::fake([
+            'nominatim.openstreetmap.org/*' => Http::sequence()
+                ->push([['lat' => '51.26', 'lon' => '7.18']]) // dropoff (street + PLZ + city → exact)
+                ->push([['lat' => '51.24', 'lon' => '7.15']]), // pickup (street + borrowed town → exact via Tier 1b)
+            'router.project-osrm.org/*' => Http::response([
+                'routes' => [['distance' => 4200, 'geometry' => ['type' => 'LineString', 'coordinates' => []]]],
+            ], 200),
+        ]);
+
+        // The pickup is a street + house number with NO PLZ and NO town of its own; its
+        // town is borrowed from the drop-off (Wuppertal). With the townOf() fallback for
+        // $city, Tier 1b (street + city) resolves it precisely — before this it fell
+        // through to the free-text 'approx' tier and produced no distance.
+        $offer = $this->offer([
+            'pickup_address' => 'Beispielstraße 12',
+            'dropoff_address' => 'Posener Str. 36, 42283 Wuppertal',
+        ]);
+        app(TripGeocoder::class)->enrich($offer->fresh());
+
+        $offer->refresh();
+        $this->assertSame('exact', $offer->geo_confidence, 'street + borrowed town resolves via Tier 1b, not free-text approx');
+        $this->assertSame(4200, $offer->distance_m);
+    }
 }

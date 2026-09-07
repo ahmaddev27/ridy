@@ -8,6 +8,7 @@ use App\Domain\Billing\SubscriptionCodeQuery;
 use App\Domain\Collections\Models\CollectorPayment;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
+use App\Support\Csv;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -91,7 +92,7 @@ class BillingReportController extends Controller
             foreach ($rows as $p) {
                 fputcsv($out, [
                     $p->id,
-                    $p->tenant?->name,
+                    Csv::cell($p->tenant?->name),
                     $p->days,
                     $p->amount !== null ? number_format((float) $p->amount, 2, '.', '') : '',
                     $p->isPaid() ? 'paid' : 'unpaid',
@@ -129,9 +130,9 @@ class BillingReportController extends Controller
             foreach ($rows as $c) {
                 fputcsv($out, [
                     $c->code,
-                    $c->plan?->name,
-                    $c->tenant?->name,
-                    $c->collector?->name,
+                    Csv::cell($c->plan?->name),
+                    Csv::cell($c->tenant?->name),
+                    Csv::cell($c->collector?->name),
                     $c->amount !== null ? number_format((float) $c->amount, 2, '.', '') : '',
                     $c->paid ? 'yes' : 'no',
                     $c->status(),

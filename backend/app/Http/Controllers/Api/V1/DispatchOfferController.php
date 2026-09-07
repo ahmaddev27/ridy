@@ -10,6 +10,7 @@ use App\Domain\Dispatch\TripGeocoder;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchOfferResource;
+use App\Support\Csv;
 use App\Support\FleetDay;
 use App\Support\RidyLog;
 use Illuminate\Database\Eloquent\Builder;
@@ -41,14 +42,17 @@ class DispatchOfferController extends Controller
      */
     public function export(Request $request): StreamedResponse
     {
-        // Stream lazily (chunks of 1000) rather than ->get(): dispatch_offers is the
-        // fastest-growing table, so a filterless export on a mature fleet would pull
-        // 100k+ rows — each dragging its raw_payload JSON — into memory at once and
-        // exhaust the worker. lazy() keeps only one chunk resident while the CSV streams.
+        // Stream in chunks rather than ->get(): dispatch_offers is the fastest-growing
+        // table, so a filterless export on a mature fleet would pull 100k+ rows — each
+        // dragging its raw_payload JSON — into memory at once and exhaust the worker.
+        // Use lazyByIdDesc() (keyset on the primary key), NOT lazy(): lazy() pages by
+        // LIMIT/OFFSET, which is O(N^2) at deep offsets and, ordered by non-unique
+        // received_at on a table that ingests live, duplicates or skips rows as the
+        // offset window shifts. Keyset paging is O(N) and stable; id is monotonic with
+        // received_at, so descending id keeps the newest-first CSV order.
         $offers = $this->filtered($request)
             ->with('driver:id,name')
-            ->orderByDesc('received_at')
-            ->lazy();
+            ->lazyByIdDesc();
 
         $filename = 'offers_'.now()->toDateString().'.csv';
 
@@ -65,11 +69,13 @@ class DispatchOfferController extends Controller
 
                 fputcsv($out, [
                     $offer->received_at?->toDateTimeString(),
-                    $offer->rider_first_name,
-                    $offer->driver?->name
-                        ?? (trim(($offer->driver_first_name ?? '').' '.($offer->driver_last_name ?? '')) ?: null),
-                    AddressFormatter::tidy($offer->pickup_address),
-                    AddressFormatter::tidy($offer->dropoff_address),
+                    // Rider name + addresses come from Uber's captured payload (outside
+                    // the operator's control), so neutralize CSV formula injection.
+                    Csv::cell($offer->rider_first_name),
+                    Csv::cell($offer->driver?->name
+                        ?? (trim(($offer->driver_first_name ?? '').' '.($offer->driver_last_name ?? '')) ?: null)),
+                    Csv::cell(AddressFormatter::tidy($offer->pickup_address)),
+                    Csv::cell(AddressFormatter::tidy($offer->dropoff_address)),
                     $fare !== null ? number_format($fare, 2, '.', '') : null,
                     $distanceKm !== null ? number_format($distanceKm, 2, '.', '') : null,
                     $pricePerKm !== null ? number_format($pricePerKm, 2, '.', '') : null,

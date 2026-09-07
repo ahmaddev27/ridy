@@ -66,6 +66,10 @@ class DriverStatusIngestor
 
             $was = $this->level($driver->online_status);
             $now = $this->level($row['status'] ?? '');
+            // Was the driver OFFLINE (not merely idle) before this poll? Distinguishes a
+            // genuine idle→trip start from a reconnect that resumes a trip preserved
+            // across an offline blip. Read from the pre-update status.
+            $wasOffline = ! Driver::statusIsOnline($driver->online_status);
 
             // Uber returns 0,0 for offline/idle drivers, so keep real coordinates
             // only (null otherwise) — that also drops offline drivers off the map.
@@ -107,8 +111,8 @@ class DriverStatusIngestor
             // locks on, so they can deadlock (1213). Retry a couple of times, then
             // report and move on: a lost transition is re-derived on the next poll and
             // must never 500 the batch (which would drop every driver + acceptance).
-            $this->retryOnDeadlock(function () use ($tenantId, $uuid, $was, $now, $onlineNow, &$counts) {
-                $this->applyTransition($tenantId, $uuid, $was, $now, $onlineNow, $counts);
+            $this->retryOnDeadlock(function () use ($tenantId, $uuid, $was, $now, $onlineNow, $wasOffline, &$counts) {
+                $this->applyTransition($tenantId, $uuid, $was, $now, $onlineNow, $wasOffline, $counts);
             });
 
             // Once engaged, Uber's live map carries the trip's real pickup/drop-off
@@ -195,7 +199,7 @@ class DriverStatusIngestor
      *
      * @param  array<string, int>  $counts
      */
-    private function applyTransition(int $tenantId, string $uuid, int $was, int $now, bool $onlineNow, array &$counts): void
+    private function applyTransition(int $tenantId, string $uuid, int $was, int $now, bool $onlineNow, bool $wasOffline, array &$counts): void
     {
         // Diagnostic: every real engagement-level change, with the offer it resolved to.
         // Surfaces in the admin Logs tab so we can see WHY a busy driver's acceptance is
@@ -214,6 +218,19 @@ class DriverStatusIngestor
 
         // idle → engaged: attribute the pending offer and accept it.
         if ($was === 0 && $now >= 1) {
+            $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
+
+            // A STARTED offer surviving here is a driver RESUMING a trip after an
+            // offline blip (the engaged→idle branch preserved it), NOT a new
+            // engagement — but ONLY when they were actually OFFLINE before. Leave it
+            // running: attributing a pending back-to-back offer to this edge would
+            // supersede (force-complete) the live trip below. A plain idle→trip start
+            // with a stale STARTED offer still falls through so supersedeActiveFor
+            // finalizes the stale one (a driver never shows two live trips).
+            if ($wasOffline && $active !== null && $active->status === OfferStatus::Started) {
+                return;
+            }
+
             $pending = $this->lifecycle->pendingOfferFor($tenantId, $uuid);
             if ($pending !== null && $this->lifecycle->accept($pending)) {
                 $counts['accepted']++;
@@ -223,15 +240,11 @@ class DriverStatusIngestor
                 }
                 // A driver holds one active trip — finalize any older stuck offer.
                 $this->lifecycle->supersedeActiveFor($tenantId, $uuid, $pending->id);
-            } elseif ($now === 2) {
-                // No fresh pending offer, but an offer that was ACCEPTED before a brief
-                // OFFLINE blip (which we no longer cancel) may now be starting — the
-                // driver reconnected straight to ON_TRIP. Start that accepted offer so
-                // the recovered trip is tracked instead of stranded.
-                $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
-                if ($active !== null && $active->status === OfferStatus::Accepted && $this->lifecycle->start($active)) {
-                    $counts['started']++;
-                }
+            } elseif ($now === 2 && $active !== null && $active->status === OfferStatus::Accepted && $this->lifecycle->start($active)) {
+                // No fresh pending offer, but an offer ACCEPTED before a brief OFFLINE
+                // blip (which we no longer cancel) may now be starting — the driver
+                // reconnected straight to ON_TRIP. Start it so the trip is tracked.
+                $counts['started']++;
             }
 
             return;
