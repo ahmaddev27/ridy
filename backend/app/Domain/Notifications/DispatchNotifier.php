@@ -281,7 +281,12 @@ class DispatchNotifier
         }
 
         $km = $offer->distance_m / 1000;
-        $parts = [number_format($km, 1, '.', '').' km'];
+        // A street-level (or straight-line 'estimated') geocode gives an APPROXIMATE
+        // distance — the point sits mid-street, not on the exact house — so prefix a
+        // "~" until an exact source (the accept's Uber waypoints) upgrades it. Uber
+        // waypoints set geo_confidence='exact', so a resolved trip drops the "~".
+        $approx = $offer->geo_confidence !== null && $offer->geo_confidence !== 'exact';
+        $parts = [($approx ? '~' : '').number_format($km, 1, '.', '').' km'];
 
         $fare = (float) ($offer->fare_amount ?? 0);
         if ($fare > 0 && $km > 0) {

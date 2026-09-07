@@ -171,15 +171,18 @@ class TripGeocoder
             $pConf = $pickup['confidence'] ?? null;
             $dConf = $dropoff['confidence'] ?? null;
 
-            // Only trust a distance when BOTH ends resolved to a precise house number
-            // ('exact'). An incomplete address — a pickup with no house number lands on
-            // an arbitrary point of the street — produced garbage distances / €-per-km
-            // (a "Hoheleye" pickup geocoded to 877 m one run and 65 m another for the
-            // same trip). Per product decision we do NOT guess: leave the distance blank
-            // until a RELIABLE source fills it — the driver accepts / finishes the trip
-            // (Uber waypoints, via OfferLifecycle → applyFromWaypoints) or a later exact
-            // geocode. €-per-km derives from distance_m, so it stays hidden until then.
-            if ($pConf === 'exact' && $dConf === 'exact') {
+            // Compute a distance when BOTH ends land on the correct STREET — an exact
+            // house number, OR a street+PLZ+city match with only the house number
+            // missing ('street'). A street-level point sits mid-street in the RIGHT
+            // town, so the route is off by at most the street's length — a small error
+            // the push flags approximate (geo_confidence < 'exact', shown with a "~").
+            // An AREA/POSTAL/APPROX end (a town centroid, or an ambiguous no-postcode
+            // hit that can land in the wrong town) is NOT trusted — those produced the
+            // garbage distances the no-guess policy exists for (a "Hoheleye" pickup:
+            // 877 m one run, 65 m another; a Wuppertal→Düsseldorf that came out 55 km).
+            // Those stay blank until a RELIABLE source fills them — the accept's Uber
+            // waypoints (via OfferLifecycle → applyFromWaypoints) or a later exact geocode.
+            if ($this->preciseEnoughForDistance($pConf, $dConf)) {
                 $route = $this->route($pickup, $dropoff);
                 $offer->distance_m = $route['distance_m'] ?? null;
                 $offer->route_geometry = $route['geometry'] ?? null;
@@ -690,6 +693,20 @@ class TripGeocoder
     private function combinedConfidence(?string $pickup, ?string $dropoff, array $route): string
     {
         return ($route['geometry'] ?? null) === null ? 'estimated' : $this->worstConfidence($pickup, $dropoff);
+    }
+
+    /**
+     * Whether both endpoints are precise enough to trust a distance between them:
+     * both on the correct STREET — an exact house number, OR a street+town match
+     * with the house number missing ('street'). An AREA/POSTAL/APPROX end (a town
+     * centroid or an ambiguous no-postcode hit) is NOT — those gave wildly wrong
+     * distances, so we withhold there and wait for the accept's Uber waypoints.
+     */
+    private function preciseEnoughForDistance(?string $pickup, ?string $dropoff): bool
+    {
+        $trusted = ['exact', 'street'];
+
+        return in_array($pickup, $trusted, true) && in_array($dropoff, $trusted, true);
     }
 
     /** The lower (more cautious) of the two endpoints' geocode confidences. */

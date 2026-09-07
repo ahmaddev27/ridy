@@ -70,6 +70,50 @@ class OfferTripTest extends TestCase
         $this->assertSame('Posener Str. 36, 42283 Wuppertal', $fresh->dropoff_address);
     }
 
+    public function test_street_level_drop_without_a_house_number_gets_an_approximate_distance(): void
+    {
+        // A drop-off with a known street + PLZ + city but NO house number resolves to
+        // 'street' confidence. It used to leave the distance blank (no-guess); now the
+        // point is on the RIGHT street in the RIGHT town, so we compute an APPROXIMATE
+        // distance (flagged 'street', shown with "~" in the push) — only AREA/APPROX
+        // ends stay withheld. The accept's Uber waypoints later upgrade it to exact.
+        $this->seed(RolePermissionSeeder::class);
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $user = User::create(['name' => 'M2', 'email' => 'm2@a.de', 'password' => Hash::make('password'), 'tenant_id' => $tenant->id]);
+        $user->assignRole('fleet_manager');
+        app(TenantContext::class)->set($tenant->id);
+
+        $offer = DispatchOffer::create([
+            'tenant_id' => $tenant->id,
+            'driver_uuid' => 'd2',
+            'offer_uuid' => 'o2',
+            'pickup_address' => 'Hammersteiner Allee 22, 42329 Wuppertal', // house number → exact
+            'dropoff_address' => 'Lüntenbecker Weg, 42327 Wuppertal',       // NO house number → street
+            'fare_formatted' => '4,57 €',
+            'received_at' => now(),
+            'raw_payload' => ['offerUUID' => 'o2'],
+        ]);
+
+        Http::fake([
+            'nominatim.openstreetmap.org/*' => Http::sequence()
+                ->push([['lat' => '51.24', 'lon' => '7.10']])
+                ->push([['lat' => '51.23', 'lon' => '7.12']]),
+            'router.project-osrm.org/*' => Http::response([
+                'routes' => [[
+                    'distance' => 3400, // 3.4 km
+                    'geometry' => ['type' => 'LineString', 'coordinates' => [[7.10, 51.24], [7.12, 51.23]]],
+                ]],
+            ]),
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk()
+            ->assertJsonPath('data.trip.distance_km', 3.4)
+            ->assertJsonPath('data.trip.price_per_km', 1.34) // 4.57 / 3.4
+            ->assertJsonPath('data.trip.geo_confidence', 'street');
+    }
+
     public function test_bare_hauptbahnhof_pickup_borrows_the_dropoff_city(): void
     {
         $this->seed(RolePermissionSeeder::class);
