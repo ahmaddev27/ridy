@@ -50,6 +50,11 @@ class DispatchNotifier
             'offer_uuid' => (string) $offer->offer_uuid,
             'pickup' => $this->cleanAddress($offer->pickup_address),
             'dropoff' => $this->cleanAddress($offer->dropoff_address),
+            'pickup_lat' => (string) ($offer->pickup_lat ?? ''),
+            'pickup_lng' => (string) ($offer->pickup_lng ?? ''),
+            'dropoff_lat' => (string) ($offer->dropoff_lat ?? ''),
+            'dropoff_lng' => (string) ($offer->dropoff_lng ?? ''),
+            'geo_source' => (string) ($offer->geo_source ?? ''),
             'fare' => (string) ($offer->fare_formatted ?? ''),
             'fare_amount' => (string) ($offer->fare_amount ?? ''),
             'distance_m' => (string) ($offer->distance_m ?? ''),
@@ -198,6 +203,11 @@ class DispatchNotifier
             'fare_amount' => (string) ($offer->fare_amount ?? ''),
             'pickup' => $this->cleanAddress($offer->pickup_display ?? $offer->pickup_address),
             'dropoff' => $this->cleanAddress($offer->dropoff_display ?? $offer->dropoff_address),
+            'pickup_lat' => (string) ($offer->pickup_lat ?? ''),
+            'pickup_lng' => (string) ($offer->pickup_lng ?? ''),
+            'dropoff_lat' => (string) ($offer->dropoff_lat ?? ''),
+            'dropoff_lng' => (string) ($offer->dropoff_lng ?? ''),
+            'geo_source' => (string) ($offer->geo_source ?? ''),
             // Every stop as JSON so the app's "open in map" routes through them all
             // (Google Maps waypoints) and can render per-stop detail from the push.
             'stops' => $this->stopsPayload($offer),
@@ -228,7 +238,7 @@ class DispatchNotifier
             if ($address === '') {
                 continue;
             }
-            $out[] = ['address' => $address, 'leg_m' => $s['leg_m'] ?? null];
+            $out[] = ['address' => $address, 'lat' => $s['lat'] ?? null, 'lng' => $s['lng'] ?? null, 'leg_m' => $s['leg_m'] ?? null];
         }
 
         return $out === [] ? '' : (string) json_encode($out, JSON_UNESCAPED_UNICODE);

@@ -104,7 +104,14 @@ export default function OfferScreen() {
     if (!offer) return;
     // Opens the maps app with the full pickup → drop-off route, including any
     // intermediate stops of a multi-stop trip as waypoints (falls back to browser).
-    openRouteInMaps(offer.pickup_address, offer.dropoff_address, offer.stops);
+    openRouteInMaps({
+      pickup: offer.pickup_address,
+      dropoff: offer.dropoff_address,
+      pickupPoint: { lat: offer.pickup_lat, lng: offer.pickup_lng },
+      dropoffPoint: { lat: offer.dropoff_lat, lng: offer.dropoff_lng },
+      stops: offer.stops,
+      exact: offer.geo_source === "uber",
+    });
   }
 
   const status = offer?.status ?? "pending";

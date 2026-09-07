@@ -50,6 +50,15 @@ class DispatchOfferResource extends JsonResource
             // Road distance once the trip is geocoded — lets the driver app show
             // the distance and derive €/km (same data the dashboard trip view uses).
             'distance_m' => $this->distance_m,
+            // Resolved coordinates so the app can open the maps route BY COORDINATE
+            // instead of re-geocoding a house-number-less address text (wrong pin).
+            'pickup_lat' => $this->pickup_lat !== null ? (float) $this->pickup_lat : null,
+            'pickup_lng' => $this->pickup_lng !== null ? (float) $this->pickup_lng : null,
+            'dropoff_lat' => $this->dropoff_lat !== null ? (float) $this->dropoff_lat : null,
+            'dropoff_lng' => $this->dropoff_lng !== null ? (float) $this->dropoff_lng : null,
+            // 'uber' = the coordinates are Uber's exact live-map waypoints (post-accept),
+            // so the app pins by coordinate; otherwise it lets the maps app geocode the text.
+            'geo_source' => $this->geo_source,
             // Number of drop-offs once resolved from Uber's live map (>= 2 = multi-
             // stop). Lets the offers list badge a multi-stop trip without the detail.
             'stops_count' => $this->stops_count,

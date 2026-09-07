@@ -127,7 +127,16 @@ export default function HomeScreen() {
             <SectionLabel>{t("home.activeOffer")}</SectionLabel>
             <OfferCard offer={active} onPress={() => router.push(`/offer/${active.id}`)} />
             <Pressable
-              onPress={() => openRouteInMaps(active.pickup_address, active.dropoff_address, active.stops)}
+              onPress={() =>
+                openRouteInMaps({
+                  pickup: active.pickup_address,
+                  dropoff: active.dropoff_address,
+                  pickupPoint: { lat: active.pickup_lat, lng: active.pickup_lng },
+                  dropoffPoint: { lat: active.dropoff_lat, lng: active.dropoff_lng },
+                  stops: active.stops,
+                  exact: active.geo_source === "uber",
+                })
+              }
               style={({ pressed }) => ({
                 flexDirection: row,
                 alignItems: "center",

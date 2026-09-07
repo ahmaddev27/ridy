@@ -38,10 +38,18 @@ export type Offer = {
   fare_formatted: string | null;
   fare_amount: number | null;
   distance_m: number | null;
+  /** Resolved coordinates — used to open the maps route BY COORDINATE (exact pin)
+   *  instead of re-geocoding an imprecise address text. */
+  pickup_lat?: number | null;
+  pickup_lng?: number | null;
+  dropoff_lat?: number | null;
+  dropoff_lng?: number | null;
+  /** 'uber' = coordinates are Uber's exact live-map waypoints (post-accept). */
+  geo_source?: string | null;
   /** Number of drop-offs once resolved from Uber's map (>= 2 = multi-stop). */
   stops_count?: number | null;
   /** Ordered stops (pickup first, then each drop-off) with per-leg road distance. */
-  stops?: { address: string | null; leg_m: number | null; cumulative_m?: number | null }[] | null;
+  stops?: { address: string | null; lat?: number | null; lng?: number | null; leg_m: number | null; cumulative_m?: number | null }[] | null;
   accept_window_seconds: number | null;
   trip_duration_seconds?: number | null;
   received_at: string | null;

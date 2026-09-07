@@ -84,17 +84,27 @@ export default Sentry.wrap(RootLayout);
  * whole multi-stop trip. The payload is attacker-influenced, so any parse or shape
  * failure falls back to `undefined` — a plain pickup → drop-off route.
  */
-function parseStops(raw?: string): { address: string | null }[] | undefined {
+function parseStops(raw?: string): { address: string | null; lat?: number | null; lng?: number | null }[] | undefined {
   if (!raw) return undefined;
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return undefined;
     return parsed
-      .filter((s): s is { address?: unknown } => !!s && typeof s === "object")
-      .map((s) => ({ address: typeof s.address === "string" ? s.address : null }));
+      .filter((s): s is { address?: unknown; lat?: unknown; lng?: unknown } => !!s && typeof s === "object")
+      .map((s) => ({
+        address: typeof s.address === "string" ? s.address : null,
+        lat: typeof s.lat === "number" ? s.lat : null,
+        lng: typeof s.lng === "number" ? s.lng : null,
+      }));
   } catch {
     return undefined;
   }
+}
+
+/** Parse an FCM string data value ("51.24") into a number, or null when absent/NaN. */
+function numOrNull(value?: string): number | null {
+  const n = value != null && value !== "" ? Number(value) : NaN;
+  return Number.isFinite(n) ? n : null;
 }
 
 /** Routes the user between auth screens and the app based on session state, and
@@ -152,13 +162,26 @@ function Gate() {
         offer_id?: string;
         pickup?: string;
         dropoff?: string;
+        pickup_lat?: string;
+        pickup_lng?: string;
+        dropoff_lat?: string;
+        dropoff_lng?: string;
+        geo_source?: string;
         stops?: string;
       };
 
       // "Open in map" action button: open the route without opening the app,
       // routing through every stop of a multi-stop trip (Google Maps waypoints).
+      // Prefer Uber's exact coordinates so a house-number-less address still pins right.
       if (response.actionIdentifier === OPEN_MAP_ACTION) {
-        openRouteInMaps(data?.pickup, data?.dropoff, parseStops(data?.stops));
+        openRouteInMaps({
+          pickup: data?.pickup,
+          dropoff: data?.dropoff,
+          pickupPoint: { lat: numOrNull(data?.pickup_lat), lng: numOrNull(data?.pickup_lng) },
+          dropoffPoint: { lat: numOrNull(data?.dropoff_lat), lng: numOrNull(data?.dropoff_lng) },
+          stops: parseStops(data?.stops),
+          exact: data?.geo_source === "uber",
+        });
         return;
       }
 
