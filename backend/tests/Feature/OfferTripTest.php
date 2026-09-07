@@ -114,6 +114,48 @@ class OfferTripTest extends TestCase
             ->assertJsonPath('data.trip.geo_confidence', 'street');
     }
 
+    public function test_airport_pickup_resolves_to_an_approximate_distance(): void
+    {
+        // Uber sends a bare "Dusseldorf Airport" pickup (no street/PLZ) — a single
+        // unambiguous POI. It used to resolve as low-confidence 'approx' and withhold
+        // the distance; an airport hit is now trusted for an APPROXIMATE distance.
+        $this->seed(RolePermissionSeeder::class);
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $user = User::create(['name' => 'M3', 'email' => 'm3@a.de', 'password' => Hash::make('password'), 'tenant_id' => $tenant->id]);
+        $user->assignRole('fleet_manager');
+        app(TenantContext::class)->set($tenant->id);
+
+        $offer = DispatchOffer::create([
+            'tenant_id' => $tenant->id,
+            'driver_uuid' => 'd3',
+            'offer_uuid' => 'o3',
+            'pickup_address' => 'Dusseldorf Airport',
+            'dropoff_address' => 'Rolf-Schwarz-Schütte-Platz, 40789 Monheim am Rhein',
+            'fare_formatted' => '35,72 €',
+            'received_at' => now(),
+            'raw_payload' => ['offerUUID' => 'o3'],
+        ]);
+
+        // The drop-off (has a PLZ) resolves first, then the pickup — an airport hit.
+        Http::fake([
+            'nominatim.openstreetmap.org/*' => Http::sequence()
+                ->push([['lat' => '51.09', 'lon' => '6.88']]) // dropoff → 'street'
+                ->push([['lat' => '51.28', 'lon' => '6.76', 'class' => 'aeroway', 'type' => 'aerodrome', 'display_name' => 'Düsseldorf Airport, Düsseldorf']]),
+            'router.project-osrm.org/*' => Http::response([
+                'routes' => [[
+                    'distance' => 25400, // 25.4 km
+                    'geometry' => ['type' => 'LineString', 'coordinates' => [[6.76, 51.28], [6.88, 51.09]]],
+                ]],
+            ]),
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk()
+            ->assertJsonPath('data.trip.distance_km', 25.4)
+            ->assertJsonPath('data.trip.geo_confidence', 'street');
+    }
+
     public function test_bare_hauptbahnhof_pickup_borrows_the_dropoff_city(): void
     {
         $this->seed(RolePermissionSeeder::class);

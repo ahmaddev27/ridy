@@ -564,7 +564,12 @@ class TripGeocoder
                 return null;
             }
             if ($r['hit'] !== null) {
-                $coords = $this->fromHit($r['hit'], 'approx');
+                // A resolved airport / major transport POI is a single, unambiguous
+                // point — Uber sends it as a bare name ("Dusseldorf Airport") with no
+                // street or PLZ, so it lands here. Trust it enough for an APPROXIMATE
+                // distance ('street', flagged "~") instead of withholding it as a vague
+                // free-text 'approx'; any other free-text hit stays 'approx'.
+                $coords = $this->fromHit($r['hit'], $this->isAirport($r['hit']) ? 'street' : 'approx');
             }
         }
 
@@ -800,6 +805,28 @@ class TripGeocoder
         $postcode = $hit['address']['postcode'] ?? null;
 
         return is_string($postcode) && $postcode === $plz;
+    }
+
+    /**
+     * True when a Nominatim hit is an airport/aerodrome — a single, unambiguous
+     * point Uber sends as a bare name ("Dusseldorf Airport"), so we trust it for an
+     * approximate distance instead of treating it as a vague free-text match.
+     *
+     * @param  array<string, mixed>|null  $hit
+     */
+    private function isAirport(?array $hit): bool
+    {
+        if ($hit === null) {
+            return false;
+        }
+        $class = strtolower((string) ($hit['class'] ?? ''));
+        $type = strtolower((string) ($hit['type'] ?? ''));
+        $name = strtolower((string) ($hit['display_name'] ?? ''));
+
+        return $class === 'aeroway'
+            || in_array($type, ['aerodrome', 'airport'], true)
+            || str_contains($name, 'airport')
+            || str_contains($name, 'flughafen');
     }
 
     private function isStation(?array $hit): bool
