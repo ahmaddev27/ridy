@@ -27,7 +27,7 @@ class DispatchOfferController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $offers = $this->filtered($request)
-            ->with('driver:id,name')
+            ->with('driver:id,name,online_status')
             ->orderByDesc('received_at')
             ->paginate(min(100, max(5, (int) $request->integer('per_page', 25))))
             ->withQueryString();
@@ -51,7 +51,7 @@ class DispatchOfferController extends Controller
         // offset window shifts. Keyset paging is O(N) and stable; id is monotonic with
         // received_at, so descending id keeps the newest-first CSV order.
         $offers = $this->filtered($request)
-            ->with('driver:id,name')
+            ->with('driver:id,name,online_status')
             ->lazyByIdDesc();
 
         $filename = 'offers_'.now()->toDateString().'.csv';

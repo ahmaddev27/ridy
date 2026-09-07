@@ -60,15 +60,20 @@ class DispatchOffer extends Model
     }
 
     /**
-     * The status to show. A stored PENDING whose accept window has elapsed reads
-     * as REJECTED even before the expiry sweep runs — so the UI is never stuck on
-     * "pending" (e.g. a new offer to an already-on-trip driver that was never taken).
+     * The status to show. A stored PENDING whose accept window has elapsed reads as
+     * REJECTED only once the driver is OFFLINE (they left without taking it). While
+     * the driver is still ONLINE — idle or on a trip — it stays PENDING: our coarse
+     * status poll lags the ~5–10s accept window, and a busy driver may still take it
+     * back-to-back, so showing "rejected" on the window timeout alone is a false
+     * negative. A newer offer that supersedes it (stored Rejected) or the driver
+     * going offline resolves it. Unlinked offers (no driver) keep the timeout read.
      */
     public function displayStatus(): OfferStatus
     {
         if ($this->status === OfferStatus::Pending && $this->received_at !== null) {
             $deadline = $this->received_at->addSeconds((int) ($this->accept_window_seconds ?? 0) + 30);
-            if ($deadline->isBefore(now())) {
+            $driverOffline = $this->driver === null || ! $this->driver->isOnline();
+            if ($driverOffline && $deadline->isBefore(now())) {
                 return OfferStatus::Rejected;
             }
         }

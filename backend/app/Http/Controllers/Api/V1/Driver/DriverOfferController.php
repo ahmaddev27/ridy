@@ -21,7 +21,7 @@ class DriverOfferController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $offers = $this->filtered($request)
-            ->with('driver:id,name')
+            ->with('driver:id,name,online_status')
             ->orderByDesc('received_at')
             ->paginate(min(50, max(5, (int) $request->integer('per_page', 20))))
             ->withQueryString();

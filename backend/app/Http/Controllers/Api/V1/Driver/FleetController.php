@@ -46,7 +46,7 @@ class FleetController extends Controller
             ->values();
 
         $recent = $this->scoped($tenantId)
-            ->with('driver:id,name')
+            ->with('driver:id,name,online_status')
             ->latest('received_at')
             ->limit(8)
             ->get();
@@ -67,7 +67,7 @@ class FleetController extends Controller
     public function offers(Request $request): AnonymousResourceCollection
     {
         $offers = $this->filtered($request)
-            ->with('driver:id,name')
+            ->with('driver:id,name,online_status')
             ->orderByDesc('received_at')
             ->paginate(min(50, max(5, (int) $request->integer('per_page', 20))))
             ->withQueryString();
@@ -83,7 +83,7 @@ class FleetController extends Controller
     public function showOffer(Request $request, string $offer): DispatchOfferResource
     {
         $record = $this->scoped($this->tenantId($request))
-            ->with('driver:id,name')
+            ->with('driver:id,name,online_status')
             ->findOrFail($offer);
 
         return new DispatchOfferResource($record);

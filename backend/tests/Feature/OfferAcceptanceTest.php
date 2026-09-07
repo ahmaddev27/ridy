@@ -376,16 +376,16 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame('MONITORING_SUPPLY_STATUS_OFFLINE', $driver->online_status);
     }
 
-    public function test_late_acceptance_overturns_a_timeout_rejection(): void
+    public function test_an_online_drivers_offer_is_held_past_the_window_then_accepted(): void
     {
-        // The core prod bug: the expiry sweep marks an offer rejected within
-        // seconds of its short accept window, but the driver's acceptance is only
-        // detected a poll or two later — it must still attribute + overturn.
-        $this->driver();
-        $offer = $this->offer(['received_at' => now()->subMinutes(2), 'accept_window_seconds' => 10]);
+        // The status poll lags the ~5–10s accept window, so an ONLINE driver's offer
+        // is NOT rejected on the timeout — it's held pending, then attributed when the
+        // poll finally sees the driver engage.
+        $driver = $this->driver();
+        $offer = $this->offer(['driver_id' => $driver->id, 'received_at' => now()->subMinutes(2), 'accept_window_seconds' => 10]);
 
         app(OfferLifecycle::class)->expirePending();
-        $this->assertSame('rejected', $offer->fresh()->status->value);
+        $this->assertSame('pending', $offer->fresh()->status->value, 'an online driver holds the offer past the window');
 
         // The driver actually took it — seen now as ON_TRIP.
         $this->postJson('/api/v1/drivers/statuses', [
@@ -397,27 +397,34 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame('started', $fresh->status->value);
     }
 
-    public function test_pending_offer_past_window_reads_as_rejected_in_the_list(): void
+    public function test_pending_offer_past_window_reads_rejected_only_when_the_driver_is_offline(): void
     {
-        $this->driver();
-        // A new offer to an already-on-trip driver that's never taken.
-        $offer = $this->offer(['received_at' => now()->subMinutes(5), 'accept_window_seconds' => 30]);
+        $driver = $this->driver();
+        $offer = $this->offer(['driver_id' => $driver->id, 'received_at' => now()->subMinutes(5), 'accept_window_seconds' => 30]);
 
-        $res = $this->getJson('/api/v1/dispatch/offers')->assertOk();
-        $row = collect($res->json('data'))->firstWhere('id', $offer->id);
-
-        // Stored status is still pending (sweep hasn't run), but the UI shows rejected.
+        // Online driver: past the window it still reads PENDING (may be taken back-to-back).
+        $row = collect($this->getJson('/api/v1/dispatch/offers')->assertOk()->json('data'))->firstWhere('id', $offer->id);
         $this->assertSame('pending', $offer->fresh()->status->value);
+        $this->assertSame('pending', $row['status']);
+
+        // Once the driver is offline, the same past-window offer reads REJECTED.
+        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_OFFLINE']);
+        $row = collect($this->getJson('/api/v1/dispatch/offers')->assertOk()->json('data'))->firstWhere('id', $offer->id);
         $this->assertSame('rejected', $row['status']);
     }
 
-    public function test_pending_offer_past_its_window_is_rejected(): void
+    public function test_pending_offer_past_its_window_is_expired_only_when_offline(): void
     {
-        $this->driver();
-        $offer = $this->offer(['received_at' => now()->subMinutes(2), 'accept_window_seconds' => 5]);
+        $driver = $this->driver();
+        $offer = $this->offer(['driver_id' => $driver->id, 'received_at' => now()->subMinutes(2), 'accept_window_seconds' => 5]);
 
+        // Online driver: held past the window (resolved by a newer offer or going offline).
         app(OfferLifecycle::class)->expirePending($this->tenant->id);
+        $this->assertSame(OfferStatus::Pending, $offer->fresh()->status);
 
+        // Offline driver: the same offer is now expired (they left without taking it).
+        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_OFFLINE']);
+        app(OfferLifecycle::class)->expirePending($this->tenant->id);
         $this->assertSame(OfferStatus::Rejected, $offer->fresh()->status);
     }
 

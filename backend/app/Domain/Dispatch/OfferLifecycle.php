@@ -250,13 +250,15 @@ class OfferLifecycle
                 if (! $windowPassed) {
                     return false;
                 }
-                // Hold it while the driver is still on/heading to a trip: they take
-                // it back-to-back once free, so marking it "not taken" now would be
-                // wrong (it just flickers to accepted a poll later). Only expire an
-                // engaged driver's offer past the hard cap.
-                $engaged = $o->driver !== null && $o->driver->engagementStatus() >= 1;
+                // Hold it while the driver is still ONLINE — idle OR on a trip. Our
+                // coarse status poll lags the ~5-10s accept window, so marking an
+                // online driver's offer "not taken" on the window timeout is wrong: it
+                // flickers to accepted a poll later, or is taken back-to-back. Resolve
+                // it instead when a NEWER offer supersedes it (supersedePendingFor) or
+                // the driver goes OFFLINE — and only force-expire past the 2h hard cap.
+                $stillOnline = $o->driver !== null && $o->driver->isOnline();
 
-                return ! $engaged || $o->received_at->isBefore($hardCap);
+                return ! $stillOnline || $o->received_at->isBefore($hardCap);
             })
             ->pluck('id');
 

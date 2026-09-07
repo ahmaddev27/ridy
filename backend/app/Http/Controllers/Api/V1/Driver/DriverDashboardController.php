@@ -23,12 +23,12 @@ class DriverDashboardController extends Controller
         $driver = $request->user();
 
         $active = $this->scoped($driver->id)
-            ->with('driver:id,name')
+            ->with('driver:id,name,online_status')
             ->whereIn('status', [OfferStatus::Accepted, OfferStatus::Started])
             ->latest('received_at')
             ->first();
 
-        $recent = $this->scoped($driver->id)->with('driver:id,name')->latest('received_at')->limit(5)->get();
+        $recent = $this->scoped($driver->id)->with('driver:id,name,online_status')->latest('received_at')->limit(5)->get();
 
         return response()->json(['data' => [
             'driver' => [
