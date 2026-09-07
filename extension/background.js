@@ -657,10 +657,9 @@ async function finishEviction(result) {
   }
 }
 
-/** Honor the opt-in after a genuine dashboard "Connect" completed. */
-async function maybeArmEvictionAfterConnect() {
-  const { evictOtherSessions } = await api.storage.local.get(["evictOtherSessions"]);
-  if (evictOtherSessions === true) await armEviction();
+/** Always evict the operator's other Uber sessions after a genuine Connect. */
+async function armEvictionAfterConnect() {
+  await armEviction();
 }
 
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -696,8 +695,8 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (res?.ok && res.closeTab && tabId != null) {
         setTimeout(() => api.tabs?.remove(tabId).catch(() => {}), 2500);
       }
-      // A genuine dashboard "Connect" just completed — honor the opt-in eviction.
-      if (res?.ok && res.closeTab) maybeArmEvictionAfterConnect();
+      // A genuine dashboard "Connect" just completed — always evict other sessions.
+      if (res?.ok && res.closeTab) armEvictionAfterConnect();
     });
     return true; // async response
   }
