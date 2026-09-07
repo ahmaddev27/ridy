@@ -79,7 +79,12 @@ class AddressFormatter
 
         // clean() removes non-Latin (localised country) segments + Latinizes digits.
         $a = (string) AddressNormalizer::clean($address);
-        // Drop a "Deutschland/Germany" token ANYWHERE — Uber sometimes puts it
+        // Drop a country tail in ANY language. Uber localizes it to the RIDER's app
+        // language, so besides "Deutschland"/"Germany" it can be "Đức" (Vietnamese),
+        // "Allemagne" (French), etc. — Latin-script names clean() leaves in place. A
+        // German address ends at "PLZ City", so strip anything after the PLZ's segment.
+        $a = self::stripCountryTail($a);
+        // Also drop a "Deutschland/Germany" token ANYWHERE — Uber sometimes puts it
         // mid-string ("Solingen, Deutschland 42697"), not only as a trailing tail.
         $a = (string) preg_replace('/\s*,?\s*\b(Deutschland|Germany)\b\s*,?/iu', ' ', $a);
         // Collapse repeated/leading/trailing commas + spaces produced by the strips.
@@ -118,6 +123,40 @@ class AddressFormatter
         $hasNumber = preg_match('/\d/', $streetPart) === 1;
 
         return ($hasStreet ? 2 : 0) + ($hasNumber ? 1 : 0) + ($hasPlz ? 1 : 0) + ($hasCity ? 1 : 0);
+    }
+
+    /**
+     * Strip a trailing country segment (in any language) using the German address
+     * shape: everything ends at "PLZ City". Find the comma-segment carrying the
+     * 5-digit PLZ; if it already includes the city ("45127 Essen"), the country is
+     * the next segment onward, so drop it — otherwise ("…, 45127, Essen, Đức") keep
+     * the one city segment that follows the PLZ, then drop the rest. With no PLZ we
+     * can't safely locate the tail, so the string is returned unchanged.
+     */
+    private static function stripCountryTail(string $a): string
+    {
+        if (! str_contains($a, ',') || preg_match('/\b\d{5}\b/', $a) !== 1) {
+            return $a;
+        }
+
+        $segments = array_map('trim', explode(',', $a));
+        $plzIdx = null;
+        foreach ($segments as $i => $seg) {
+            if (preg_match('/\b\d{5}\b/', $seg) === 1) {
+                $plzIdx = $i;
+                break;
+            }
+        }
+        if ($plzIdx === null) {
+            return $a;
+        }
+
+        // City already in the PLZ segment ("45127 Essen") → keep up to it; else the
+        // next segment is the city → keep one more.
+        $cityInPlzSeg = preg_match('/\d{5}\s*\p{L}/u', $segments[$plzIdx]) === 1;
+        $keepUpTo = $cityInPlzSeg ? $plzIdx : min($plzIdx + 1, count($segments) - 1);
+
+        return implode(', ', array_slice($segments, 0, $keepUpTo + 1));
     }
 
     /** Trim + collapse internal whitespace runs to single spaces. */

@@ -78,6 +78,19 @@ class AddressFormatterTest extends TestCase
     }
 
     #[Test]
+    public function it_strips_a_localized_country_tail_in_any_language(): void
+    {
+        // Uber localizes the country to the RIDER's app language — Latin-script names
+        // clean() leaves in place. A German address ends at "PLZ City", so anything
+        // after the PLZ segment is the country, whatever the language.
+        $this->assertSame('Kornmarkt 23, 45127 Essen', AddressFormatter::tidy('Kornmarkt 23, 45127 Essen, Đức')); // Vietnamese
+        $this->assertSame('Kornmarkt 23, 45127 Essen', AddressFormatter::tidy('Kornmarkt 23, 45127 Essen, Allemagne')); // French
+        $this->assertSame('45127 Essen', AddressFormatter::tidy('45127 Essen, Germania')); // Italian, street-less
+        // A clean address (no country tail) is untouched.
+        $this->assertSame('Döppersberg 51, 42103 Wuppertal', AddressFormatter::tidy('Döppersberg 51, 42103 Wuppertal'));
+    }
+
+    #[Test]
     public function it_assembles_canonical_form_from_parts(): void
     {
         $this->assertSame('Sandstraße 10, 42655 Solingen', AddressFormatter::format('Sandstraße 10', '42655', 'Solingen'));
