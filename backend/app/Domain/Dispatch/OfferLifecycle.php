@@ -3,7 +3,6 @@
 namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
-use App\Domain\Fleet\Models\Driver;
 use App\Events\OfferBroadcast;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -159,30 +158,16 @@ class OfferLifecycle
      * @return int rows expired
      */
     /**
-     * When a newer offer arrives while the driver is IDLE, any still-pending older
-     * offer of theirs is superseded → rejected: a free driver who lets one offer sit
-     * and gets another has passed on the first.
-     *
-     * But NOT while the driver is ENGAGED (en route / on a trip): Uber batches
-     * back-to-back trips, so an older pending offer may still be done next — proven
-     * in the field (a driver finished one trip, then did the offer we'd rejected).
-     * Rejecting it there is premature: it flashes "rejected" then flips to accepted
-     * when they take it. So we hold older offers pending while engaged; expirePending
-     * (past its window once idle, or the 2h hard cap) and the next engagement resolve
-     * them. Returns rows changed (0 while engaged, or driver-uuid missing).
+     * A driver holds AT MOST ONE pending offer: when a newer offer arrives, any
+     * still-pending older offer of theirs is superseded → rejected (idle or engaged
+     * alike), so the list never shows two pending offers for one driver. If the
+     * driver actually takes a superseded offer, the attribution overturns the
+     * rejection (pendingOfferFor matches accepted_at IS NULL). Returns rows changed.
      */
     public function supersedePendingFor(int $tenantId, string $driverUuid, int $keepOfferId): int
     {
         if ($driverUuid === '') {
             return 0;
-        }
-
-        $driver = Driver::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('uber_driver_uuid', $driverUuid)
-            ->first();
-        if ($driver !== null && $driver->engagementStatus() >= 1) {
-            return 0; // engaged — hold older offers for a possible back-to-back trip
         }
 
         return DispatchOffer::withoutGlobalScopes()
@@ -250,15 +235,14 @@ class OfferLifecycle
                 if (! $windowPassed) {
                     return false;
                 }
-                // Hold it while the driver is still ONLINE — idle OR on a trip. Our
-                // coarse status poll lags the ~5-10s accept window, so marking an
-                // online driver's offer "not taken" on the window timeout is wrong: it
-                // flickers to accepted a poll later, or is taken back-to-back. Resolve
-                // it instead when a NEWER offer supersedes it (supersedePendingFor) or
-                // the driver goes OFFLINE — and only force-expire past the 2h hard cap.
-                $stillOnline = $o->driver !== null && $o->driver->isOnline();
+                // Hold it while the driver is ENGAGED (en route / on a trip): they may
+                // take it back-to-back once free, so marking it "not taken" now would be
+                // wrong (it flips to accepted a poll later). An IDLE driver who let the
+                // window pass declined it → expire. A newer offer also supersedes it;
+                // an engaged driver's held offer only force-expires past the 2h hard cap.
+                $engaged = $o->driver !== null && $o->driver->engagementStatus() >= 1;
 
-                return ! $stillOnline || $o->received_at->isBefore($hardCap);
+                return ! $engaged || $o->received_at->isBefore($hardCap);
             })
             ->pluck('id');
 

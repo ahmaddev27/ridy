@@ -376,16 +376,16 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame('MONITORING_SUPPLY_STATUS_OFFLINE', $driver->online_status);
     }
 
-    public function test_an_online_drivers_offer_is_held_past_the_window_then_accepted(): void
+    public function test_late_acceptance_overturns_a_timeout_rejection(): void
     {
-        // The status poll lags the ~5–10s accept window, so an ONLINE driver's offer
-        // is NOT rejected on the timeout — it's held pending, then attributed when the
-        // poll finally sees the driver engage.
-        $driver = $this->driver();
-        $offer = $this->offer(['driver_id' => $driver->id, 'received_at' => now()->subMinutes(2), 'accept_window_seconds' => 10]);
+        // The sweep marks an IDLE driver's offer rejected shortly after its short
+        // accept window, but the acceptance is only detected a poll or two later —
+        // it must still attribute + overturn the rejection.
+        $this->driver();
+        $offer = $this->offer(['received_at' => now()->subMinutes(2), 'accept_window_seconds' => 10]);
 
         app(OfferLifecycle::class)->expirePending();
-        $this->assertSame('pending', $offer->fresh()->status->value, 'an online driver holds the offer past the window');
+        $this->assertSame('rejected', $offer->fresh()->status->value);
 
         // The driver actually took it — seen now as ON_TRIP.
         $this->postJson('/api/v1/drivers/statuses', [
@@ -397,33 +397,34 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame('started', $fresh->status->value);
     }
 
-    public function test_pending_offer_past_window_reads_rejected_only_when_the_driver_is_offline(): void
+    public function test_past_window_reads_rejected_when_idle_but_pending_when_engaged(): void
     {
-        $driver = $this->driver();
+        $driver = $this->driver(); // online-idle
         $offer = $this->offer(['driver_id' => $driver->id, 'received_at' => now()->subMinutes(5), 'accept_window_seconds' => 30]);
 
-        // Online driver: past the window it still reads PENDING (may be taken back-to-back).
-        $row = collect($this->getJson('/api/v1/dispatch/offers')->assertOk()->json('data'))->firstWhere('id', $offer->id);
-        $this->assertSame('pending', $offer->fresh()->status->value);
-        $this->assertSame('pending', $row['status']);
-
-        // Once the driver is offline, the same past-window offer reads REJECTED.
-        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_OFFLINE']);
+        // Idle driver past the window: reads REJECTED (they were free and declined it).
         $row = collect($this->getJson('/api/v1/dispatch/offers')->assertOk()->json('data'))->firstWhere('id', $offer->id);
         $this->assertSame('rejected', $row['status']);
+        $this->assertSame('pending', $offer->fresh()->status->value, 'stored status is still pending until the sweep');
+
+        // On a trip: the SAME past-window offer reads PENDING (may be taken back-to-back).
+        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']);
+        $row = collect($this->getJson('/api/v1/dispatch/offers')->assertOk()->json('data'))->firstWhere('id', $offer->id);
+        $this->assertSame('pending', $row['status']);
     }
 
-    public function test_pending_offer_past_its_window_is_expired_only_when_offline(): void
+    public function test_pending_offer_past_window_expires_when_idle_but_is_held_while_engaged(): void
     {
         $driver = $this->driver();
+        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']);
         $offer = $this->offer(['driver_id' => $driver->id, 'received_at' => now()->subMinutes(2), 'accept_window_seconds' => 5]);
 
-        // Online driver: held past the window (resolved by a newer offer or going offline).
+        // Engaged driver: held past the window (back-to-back).
         app(OfferLifecycle::class)->expirePending($this->tenant->id);
         $this->assertSame(OfferStatus::Pending, $offer->fresh()->status);
 
-        // Offline driver: the same offer is now expired (they left without taking it).
-        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_OFFLINE']);
+        // Idle driver: the same offer expires (they were free and didn't take it).
+        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_ONLINE']);
         app(OfferLifecycle::class)->expirePending($this->tenant->id);
         $this->assertSame(OfferStatus::Rejected, $offer->fresh()->status);
     }
@@ -462,12 +463,11 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame(OfferStatus::Pending, $newer->fresh()->status);
     }
 
-    public function test_a_new_offer_does_not_supersede_an_engaged_drivers_prior_offer(): void
+    public function test_a_new_offer_supersedes_even_an_engaged_drivers_prior_offer(): void
     {
-        // While the driver is ON A TRIP, Uber batches back-to-back trips: an older
-        // pending offer may still be done next, so a newer arrival must NOT reject it
-        // (it would flash rejected then flip to accepted when they take it). Both stay
-        // pending; expirePending / the next engagement resolves them once idle.
+        // A driver holds at most ONE pending offer, on a trip or not — a newer offer
+        // supersedes (rejects) the older so the list never shows two pending for one
+        // driver. If the driver actually takes the older one, attribution overturns it.
         $driver = $this->driver();
         $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']);
         $older = $this->offer(['received_at' => now()->subMinutes(2)]);
@@ -475,7 +475,7 @@ class OfferAcceptanceTest extends TestCase
 
         app(OfferLifecycle::class)->supersedePendingFor($this->tenant->id, self::DRIVER_UUID, $newer->id);
 
-        $this->assertSame(OfferStatus::Pending, $older->fresh()->status, 'engaged driver keeps the older offer for back-to-back');
+        $this->assertSame(OfferStatus::Rejected, $older->fresh()->status);
         $this->assertSame(OfferStatus::Pending, $newer->fresh()->status);
     }
 
