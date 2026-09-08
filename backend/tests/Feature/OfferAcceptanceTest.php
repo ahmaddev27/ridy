@@ -397,6 +397,28 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame('started', $fresh->status->value);
     }
 
+    public function test_a_stale_rejected_offer_is_not_re_attributed_to_a_later_trip(): void
+    {
+        // A rejected offer older than the late-accept grace must NOT be re-accepted
+        // when the driver later engages on an unrelated trip — otherwise it wrongly
+        // flips rejected → accepted → completed. (A recently-rejected offer still
+        // overturns; see test_late_acceptance_overturns_a_timeout_rejection.)
+        $this->driver();
+        $offer = $this->offer([
+            'received_at' => now()->subMinutes(10),
+            'status' => OfferStatus::Rejected,
+            'rejected_at' => now()->subMinutes(9), // long past the 3-min late-accept grace
+        ]);
+
+        $this->postJson('/api/v1/drivers/statuses', [
+            'statuses' => [['driver_uuid' => self::DRIVER_UUID, 'status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']],
+        ])->assertOk();
+
+        $fresh = $offer->fresh();
+        $this->assertSame(OfferStatus::Rejected, $fresh->status, 'a stale rejection is not re-attributed');
+        $this->assertNull($fresh->accepted_at);
+    }
+
     public function test_past_window_reads_rejected_when_idle_but_pending_when_engaged(): void
     {
         $driver = $this->driver(); // online-idle

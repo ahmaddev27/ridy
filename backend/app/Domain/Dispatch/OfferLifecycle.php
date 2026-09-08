@@ -6,6 +6,7 @@ use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Events\OfferBroadcast;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -19,6 +20,15 @@ class OfferLifecycle
 {
     /** A freshly-arrived offer older than this isn't attributed to a new engagement. */
     public const ATTRIBUTION_MINUTES = 15;
+
+    /**
+     * How recently an already-REJECTED offer must have been rejected to still be
+     * re-attributed (a LATE-detected accept: the driver took it just before our sweep
+     * marked it rejected). Past this it was genuinely declined and must NEVER be
+     * re-accepted onto a later, unrelated trip — the cause of a rejected offer
+     * wrongly showing "completed". A still-PENDING offer keeps the full window above.
+     */
+    public const LATE_ACCEPT_GRACE_MINUTES = 3;
 
     /** A STARTED offer still open after this is force-completed (safety net). */
     public const MAX_TRIP_MINUTES = 100;
@@ -91,8 +101,20 @@ class OfferLifecycle
             ->where('driver_uuid', $driverUuid)
             ->whereNull('accepted_at')
             ->where('received_at', '>=', now()->subMinutes(self::ATTRIBUTION_MINUTES))
+            ->where(fn ($q) => $this->takeableGuard($q))
             ->latest('received_at')
             ->first();
+    }
+
+    /**
+     * A not-yet-accepted offer is takeable only if it is still PENDING, or was
+     * REJECTED very recently (a late-detected accept). A long-rejected offer stays
+     * rejected — never re-attributed to an unrelated later trip.
+     */
+    private function takeableGuard(Builder $q): void
+    {
+        $q->where('status', '!=', OfferStatus::Rejected)
+            ->orWhere('rejected_at', '>=', now()->subMinutes(self::LATE_ACCEPT_GRACE_MINUTES));
     }
 
     /**
@@ -108,6 +130,7 @@ class OfferLifecycle
             ->where('driver_uuid', $driverUuid)
             ->whereNull('accepted_at')
             ->where('received_at', '>', $after)
+            ->where(fn ($q) => $this->takeableGuard($q))
             ->latest('received_at')
             ->first();
     }
