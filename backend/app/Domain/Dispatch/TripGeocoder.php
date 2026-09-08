@@ -425,7 +425,39 @@ class TripGeocoder
             return null;
         }
 
-        return PostalCodes::hasCity($candidate) ? $candidate : null;
+        return $this->knownTown($candidate);
+    }
+
+    /**
+     * Validate a free-text town against the postal-code table, recovering the base
+     * city from a "City-Stadtteil" district name. A district like
+     * "Wuppertal-Elberfeld" is not itself a listed town, but its base "Wuppertal"
+     * is — so a street named only by its district ("Heckinghauser Str. 102,
+     * Wuppertal-Heckinghausen") still resolves to street level (Tier 1b), and
+     * completePostcode then fills its PLZ from that result. Falls back ONLY when the
+     * full name is unknown, so a genuinely hyphenated town (Castrop-Rauxel,
+     * Kamp-Lintfort) is never truncated. Returns the known town, or null.
+     */
+    private function knownTown(string $candidate): ?string
+    {
+        if (PostalCodes::hasCity($candidate)) {
+            return $candidate;
+        }
+
+        if (! str_contains($candidate, '-')) {
+            return null;
+        }
+
+        // "City-District" (and deeper "City-Sub-District"): try the base before the
+        // last hyphen, then before the first — each validated, so we never invent a town.
+        foreach ([mb_substr($candidate, 0, (int) mb_strrpos($candidate, '-')), explode('-', $candidate)[0]] as $base) {
+            $base = trim($base);
+            if ($base !== '' && PostalCodes::hasCity($base)) {
+                return $base;
+            }
+        }
+
+        return null;
     }
 
     /** An address that is a street/place but names no town or postcode of its own. */

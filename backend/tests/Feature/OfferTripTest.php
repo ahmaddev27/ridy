@@ -322,6 +322,26 @@ class OfferTripTest extends TestCase
         $this->assertSame('Baz, Solingen', $complete('Baz, Solingen', "Baz, 10115 {$city}"));
     }
 
+    public function test_town_of_recovers_the_base_city_from_a_stadtteil_district_name(): void
+    {
+        $geo = app(TripGeocoder::class);
+        $m = new \ReflectionMethod($geo, 'townOf');
+        $m->setAccessible(true);
+        $town = fn (string $address) => $m->invoke($geo, $address);
+
+        // A postcode-less address named only by its district ("City-Stadtteil")
+        // resolves to its base city — a real listed town — so the street geocodes
+        // (Tier 1b) at offer time instead of falling to the free-text 'approx' tier.
+        $this->assertSame('Wuppertal', $town('Heckinghauser Str. 102, Wuppertal-Heckinghausen'));
+        $this->assertSame('Wuppertal', $town('Am Kiesberg 1, Wuppertal-Elberfeld'));
+
+        // A genuinely hyphenated town is never truncated (its full name is listed).
+        $this->assertSame('Castrop-Rauxel', $town('Some Street 1, Castrop-Rauxel'));
+
+        // A street word is still never mistaken for a town.
+        $this->assertNull($town('Königsberger Straße 66F'));
+    }
+
     public function test_non_latin_display_falls_back_to_the_german_plz_city_and_leaves_latin_untouched(): void
     {
         $geo = app(TripGeocoder::class);
