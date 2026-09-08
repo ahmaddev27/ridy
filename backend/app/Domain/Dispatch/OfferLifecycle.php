@@ -236,45 +236,20 @@ class OfferLifecycle
 
     public function expirePending(?int $tenantId = null): int
     {
+        // A pending offer is NOT rejected on the accept-window timeout — it stays
+        // pending until an EVENT resolves it: a newer offer supersedes it
+        // (supersedePendingFor), the driver engages (the status ingestor accepts it),
+        // or — handled here — the driver goes OFFLINE (they left without taking it).
+        // A 2h hard cap is only a backstop for a dead session / an unlinked offer.
         $now = CarbonImmutable::now();
-        // Even a busy driver's offer can't linger forever (dead session / missed
-        // "idle" edge) — expire past this absolute cap regardless of engagement.
-        $hardCap = $now->subHours(2);
-
-        // The accept window is per-row, so evaluate the deadline in PHP (portable
-        // across sqlite/MySQL). The pending set is small, so this stays cheap.
-        $expired = DispatchOffer::withoutGlobalScopes()
-            ->where('status', OfferStatus::Pending)
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->with('driver:id,online_status')
-            ->get(['id', 'received_at', 'accept_window_seconds', 'driver_id'])
-            ->filter(function (DispatchOffer $o) use ($now, $hardCap) {
-                if ($o->received_at === null) {
-                    return false;
-                }
-                $windowPassed = $o->received_at
-                    ->addSeconds((int) ($o->accept_window_seconds ?? 0) + 30)
-                    ->isBefore($now);
-                if (! $windowPassed) {
-                    return false;
-                }
-                // Hold it while the driver is ENGAGED (en route / on a trip): they may
-                // take it back-to-back once free, so marking it "not taken" now would be
-                // wrong (it flips to accepted a poll later). An IDLE driver who let the
-                // window pass declined it → expire. A newer offer also supersedes it;
-                // an engaged driver's held offer only force-expires past the 2h hard cap.
-                $engaged = $o->driver !== null && $o->driver->engagementStatus() >= 1;
-
-                return ! $engaged || $o->received_at->isBefore($hardCap);
-            })
-            ->pluck('id');
-
-        if ($expired->isEmpty()) {
-            return 0;
-        }
 
         return DispatchOffer::withoutGlobalScopes()
-            ->whereIn('id', $expired)
+            ->where('status', OfferStatus::Pending)
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->where(function ($q) use ($now) {
+                $q->whereHas('driver', fn ($d) => $d->offline())
+                    ->orWhere('received_at', '<', $now->subHours(2));
+            })
             ->update(['status' => OfferStatus::Rejected, 'rejected_at' => $now]);
     }
 

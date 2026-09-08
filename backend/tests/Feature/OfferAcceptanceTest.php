@@ -376,18 +376,22 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame('MONITORING_SUPPLY_STATUS_OFFLINE', $driver->online_status);
     }
 
-    public function test_late_acceptance_overturns_a_timeout_rejection(): void
+    public function test_late_acceptance_overturns_a_recent_rejection(): void
     {
-        // The sweep marks an IDLE driver's offer rejected shortly after its short
-        // accept window, but the acceptance is only detected a poll or two later —
-        // it must still attribute + overturn the rejection.
-        $this->driver();
-        $offer = $this->offer(['received_at' => now()->subMinutes(2), 'accept_window_seconds' => 10]);
+        // A pending offer was rejected moments ago (the driver flickered OFFLINE and
+        // the sweep marked it not-taken), but the acceptance is only detected a poll
+        // or two later — within the late-accept grace it must still attribute +
+        // overturn the rejection. There is no accept-window timeout: the rejection
+        // here comes from the driver going offline, not from the elapsed window.
+        $driver = $this->driver();
+        $offer = $this->offer(['driver_id' => $driver->id, 'received_at' => now()->subMinutes(2)]);
 
+        // The driver flickers offline and the sweep rejects the still-untaken offer.
+        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_OFFLINE']);
         app(OfferLifecycle::class)->expirePending();
         $this->assertSame('rejected', $offer->fresh()->status->value);
 
-        // The driver actually took it — seen now as ON_TRIP.
+        // …but they had actually taken it — seen now as ON_TRIP a poll later.
         $this->postJson('/api/v1/drivers/statuses', [
             'statuses' => [['driver_uuid' => self::DRIVER_UUID, 'status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']],
         ])->assertOk()->assertJsonPath('data.accepted', 1);
@@ -419,34 +423,38 @@ class OfferAcceptanceTest extends TestCase
         $this->assertNull($fresh->accepted_at);
     }
 
-    public function test_past_window_reads_rejected_when_idle_but_pending_when_engaged(): void
+    public function test_a_past_window_pending_offer_still_reads_pending(): void
     {
+        // With no accept-window timeout, an offer stays PENDING in the list until an
+        // event resolves it — the elapsed window alone never flips the display, idle
+        // or engaged. It reads exactly its stored status.
         $driver = $this->driver(); // online-idle
         $offer = $this->offer(['driver_id' => $driver->id, 'received_at' => now()->subMinutes(5), 'accept_window_seconds' => 30]);
 
-        // Idle driver past the window: reads REJECTED (they were free and declined it).
         $row = collect($this->getJson('/api/v1/dispatch/offers')->assertOk()->json('data'))->firstWhere('id', $offer->id);
-        $this->assertSame('rejected', $row['status']);
-        $this->assertSame('pending', $offer->fresh()->status->value, 'stored status is still pending until the sweep');
+        $this->assertSame('pending', $row['status']);
+        $this->assertSame('pending', $offer->fresh()->status->value);
 
-        // On a trip: the SAME past-window offer reads PENDING (may be taken back-to-back).
+        // Still pending on a trip too (a back-to-back offer it may yet take).
         $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']);
         $row = collect($this->getJson('/api/v1/dispatch/offers')->assertOk()->json('data'))->firstWhere('id', $offer->id);
         $this->assertSame('pending', $row['status']);
     }
 
-    public function test_pending_offer_past_window_expires_when_idle_but_is_held_while_engaged(): void
+    public function test_a_pending_offer_is_rejected_only_once_the_driver_goes_offline(): void
     {
-        $driver = $this->driver();
-        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']);
-        $offer = $this->offer(['driver_id' => $driver->id, 'received_at' => now()->subMinutes(2), 'accept_window_seconds' => 5]);
+        // No accept-window timeout: a pending offer is HELD while the driver is online
+        // (idle or engaged) and is rejected only when they go OFFLINE — they left
+        // without taking it. The elapsed accept window never rejects it on its own.
+        $driver = $this->driver(); // online-idle
+        $offer = $this->offer(['driver_id' => $driver->id, 'received_at' => now()->subMinutes(5), 'accept_window_seconds' => 30]);
 
-        // Engaged driver: held past the window (back-to-back).
+        // Online-idle, window long elapsed: still PENDING (the window does not reject).
         app(OfferLifecycle::class)->expirePending($this->tenant->id);
         $this->assertSame(OfferStatus::Pending, $offer->fresh()->status);
 
-        // Idle driver: the same offer expires (they were free and didn't take it).
-        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_ONLINE']);
+        // The driver goes offline → they left without taking it → rejected.
+        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_OFFLINE']);
         app(OfferLifecycle::class)->expirePending($this->tenant->id);
         $this->assertSame(OfferStatus::Rejected, $offer->fresh()->status);
     }

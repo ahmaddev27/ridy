@@ -60,23 +60,14 @@ class DispatchOffer extends Model
     }
 
     /**
-     * The status to show. A stored PENDING whose accept window has elapsed reads as
-     * REJECTED only when the driver is NOT engaged (idle or offline) — a free driver
-     * who let the window pass declined it. While the driver is ON A TRIP / EN ROUTE
-     * it stays PENDING: they may take it back-to-back once free (matching
-     * {@see OfferLifecycle::expirePending()}'s engaged-hold). Unlinked offers (no
-     * driver) keep the plain timeout read.
+     * The status to show. There is NO accept-window timeout: a pending offer stays
+     * PENDING until an EVENT resolves it — a newer offer supersedes it (→ Rejected),
+     * the driver engages (→ Accepted/Started), or the driver goes offline (→ Rejected
+     * by the sweep). So the display is simply the stored status; nothing is inferred
+     * from the elapsed accept window.
      */
     public function displayStatus(): OfferStatus
     {
-        if ($this->status === OfferStatus::Pending && $this->received_at !== null) {
-            $deadline = $this->received_at->addSeconds((int) ($this->accept_window_seconds ?? 0) + 30);
-            $notEngaged = $this->driver === null || $this->driver->engagementStatus() < 1;
-            if ($notEngaged && $deadline->isBefore(now())) {
-                return OfferStatus::Rejected;
-            }
-        }
-
         return $this->status ?? OfferStatus::Pending;
     }
 
