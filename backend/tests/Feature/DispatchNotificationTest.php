@@ -77,6 +77,27 @@ class DispatchNotificationTest extends TestCase
         $this->assertSame('Alexanderplatz, Berlin', $this->sent[0]['data']['pickup']);
     }
 
+    public function test_a_rider_localized_non_latin_address_is_latinized_in_the_push(): void
+    {
+        $driver = Driver::create(['name' => 'Omar', 'uber_driver_uuid' => self::DRIVER_UUID]);
+        DeviceToken::create(['driver_id' => $driver->id, 'token' => 'tokenA', 'platform' => 'android']);
+
+        // Uber localizes the offer text to the RIDER's app language — a Chinese rider
+        // yields a non-Latin dropoff ("德国…邮政编码: 42103"). The driver must never see it:
+        // the push shows the authoritative German "<PLZ> City" from the postcode in it.
+        $offer = $this->offer();
+        $offer['pickupAddress'] = 'Bahnstraße 20';
+        $offer['dropoffAddress'] = '德国伍珀塔尔邮政编码: 42103';
+
+        app(DispatchOfferIngestor::class)->ingest($this->tenant->id, $offer);
+
+        $this->assertCount(1, $this->sent);
+        $body = $this->sent[0]['body'];
+        $this->assertStringContainsString('42103 Wuppertal', $body);
+        $this->assertStringNotContainsString('邮政编码', $body);
+        $this->assertSame('42103 Wuppertal', $this->sent[0]['data']['dropoff']);
+    }
+
     public function test_unlinked_offer_pushes_to_nobody(): void
     {
         app(DispatchOfferIngestor::class)->ingest($this->tenant->id, $this->offer());

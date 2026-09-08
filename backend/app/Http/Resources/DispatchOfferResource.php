@@ -2,9 +2,7 @@
 
 namespace App\Http\Resources;
 
-use App\Domain\Dispatch\AddressFormatter;
-use App\Domain\Dispatch\AddressNormalizer;
-use App\Domain\Geo\PostalCodes;
+use App\Domain\Dispatch\AddressLatinizer;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Arr;
@@ -83,14 +81,7 @@ class DispatchOfferResource extends JsonResource
      */
     private function latinAddress(?string $display, mixed $raw): ?string
     {
-        $value = $display ?? AddressFormatter::tidy(is_string($raw) ? $raw : null);
-        if ($value === null || ! AddressNormalizer::hasNonLatinLetters($value)) {
-            return $value;
-        }
-
-        return preg_match('/\b(\d{5})\b/', $value, $m) === 1 && ($city = PostalCodes::city($m[1])) !== null
-            ? $m[1].' '.$city
-            : null;
+        return AddressLatinizer::toLatin($display, $raw);
     }
 
     /**

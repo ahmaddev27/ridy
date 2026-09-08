@@ -3,6 +3,7 @@
 namespace App\Domain\Notifications;
 
 use App\Domain\Dispatch\AddressFormatter;
+use App\Domain\Dispatch\AddressLatinizer;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Notifications\Contracts\PushSender;
 use App\Domain\Notifications\Models\DeviceToken;
@@ -48,8 +49,8 @@ class DispatchNotifier
             'categoryId' => 'offer',
             'offer_id' => (string) $offer->id,
             'offer_uuid' => (string) $offer->offer_uuid,
-            'pickup' => $this->cleanAddress($offer->pickup_address),
-            'dropoff' => $this->cleanAddress($offer->dropoff_address),
+            'pickup' => $this->latinAddress($offer->pickup_display, $offer->pickup_address),
+            'dropoff' => $this->latinAddress($offer->dropoff_display, $offer->dropoff_address),
             'pickup_lat' => (string) ($offer->pickup_lat ?? ''),
             'pickup_lng' => (string) ($offer->pickup_lng ?? ''),
             'dropoff_lat' => (string) ($offer->dropoff_lat ?? ''),
@@ -201,8 +202,8 @@ class DispatchNotifier
             'stops_count' => (string) $stopsCount,
             'distance_m' => (string) ($offer->distance_m ?? ''),
             'fare_amount' => (string) ($offer->fare_amount ?? ''),
-            'pickup' => $this->cleanAddress($offer->pickup_display ?? $offer->pickup_address),
-            'dropoff' => $this->cleanAddress($offer->dropoff_display ?? $offer->dropoff_address),
+            'pickup' => $this->latinAddress($offer->pickup_display, $offer->pickup_address),
+            'dropoff' => $this->latinAddress($offer->dropoff_display, $offer->dropoff_address),
             'pickup_lat' => (string) ($offer->pickup_lat ?? ''),
             'pickup_lng' => (string) ($offer->pickup_lng ?? ''),
             'dropoff_lat' => (string) ($offer->dropoff_lat ?? ''),
@@ -275,8 +276,8 @@ class DispatchNotifier
     /** "pickup\ndropoff" — the two addresses, country stripped, no separator arrow. */
     private function buildBody(DispatchOffer $offer): string
     {
-        $pickup = $this->cleanAddress($offer->pickup_address);
-        $dropoff = $this->cleanAddress($offer->dropoff_address);
+        $pickup = $this->latinAddress($offer->pickup_display, $offer->pickup_address);
+        $dropoff = $this->latinAddress($offer->dropoff_display, $offer->dropoff_address);
 
         $lines = array_values(array_filter([$pickup, $dropoff], fn ($l) => $l !== ''));
 
@@ -328,5 +329,16 @@ class DispatchNotifier
     private function cleanAddress(?string $address): string
     {
         return AddressFormatter::tidy($address) ?? '';
+    }
+
+    /**
+     * A guaranteed-Latin address for the push — Uber localizes an offer's address
+     * text to the RIDER's app language, so a non-Latin ("德国…: 42103") value must
+     * never reach the driver. Prefers the resolved display, replaces a non-Latin
+     * string with the German "<PLZ> City". Same rule as the API resource.
+     */
+    private function latinAddress(?string $display, ?string $raw): string
+    {
+        return AddressLatinizer::toLatin($display, $raw) ?? '';
     }
 }
