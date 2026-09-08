@@ -19,7 +19,9 @@ use Illuminate\Support\Facades\Cache;
  *
  *   idle → EN_ROUTE      accept the pending offer      (driver → heading to pickup)
  *   → ON_TRIP            start it                       (driver → on trip)
- *   engaged → idle       complete (if started) or cancel (if only accepted)
+ *   ON_TRIP → EN_ROUTE   complete + accept the next    (back-to-back: took a new trip)
+ *   engaged → idle       complete (if started) or cancel (if only accepted);
+ *                        reject any still-pending offer (available again, passed on it)
  *
  * Shared by the manager's extension sync and the daemon's continuous poll.
  */
@@ -44,11 +46,11 @@ class DriverStatusIngestor
 
     /**
      * @param  array<int, array<string, mixed>>  $statuses
-     * @return array{updated: int, accepted: int, started: int, completed: int, canceled: int}
+     * @return array{updated: int, accepted: int, started: int, completed: int, canceled: int, rejected: int}
      */
     public function ingest(int $tenantId, array $statuses): array
     {
-        $counts = ['updated' => 0, 'accepted' => 0, 'started' => 0, 'completed' => 0, 'canceled' => 0, 'multistop' => 0];
+        $counts = ['updated' => 0, 'accepted' => 0, 'started' => 0, 'completed' => 0, 'canceled' => 0, 'rejected' => 0, 'multistop' => 0];
 
         foreach ($statuses as $row) {
             $uuid = $row['driver_uuid'] ?? null;
@@ -282,6 +284,16 @@ class DriverStatusIngestor
 
         // engaged → idle: the offer is done (completed if it started, else canceled).
         if ($was >= 1 && $now === 0) {
+            // A NEW offer that arrived during the trip but was never taken: the driver
+            // is available again and never engaged on it (didn't go EN_ROUTE) → it was
+            // passed on → reject it. Only on a genuine idle-ONLINE return (an OFFLINE
+            // blip is left to the offline sweep). A coarse poll that missed a real
+            // back-to-back engagement is safe — the 3-min late-accept grace overturns
+            // this rejection when the driver then engages on it a poll later.
+            if ($onlineNow) {
+                $counts['rejected'] += $this->lifecycle->rejectPendingFor($tenantId, $uuid);
+            }
+
             $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
             if ($active === null) {
                 return;

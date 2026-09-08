@@ -480,6 +480,33 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame(OfferStatus::Rejected, $offer->fresh()->status);
     }
 
+    public function test_returning_to_idle_completes_the_trip_and_rejects_an_untaken_pending_offer(): void
+    {
+        // On a trip with a back-to-back offer left pending: the driver finishes and
+        // returns idle-ONLINE WITHOUT taking it (never went EN_ROUTE toward it), so
+        // the trip completes and the un-taken new offer is rejected — a status change
+        // resolves the pending offer. Never accepted → never completed.
+        $this->driver();
+
+        // The driver is on a real, multi-minute trip (offer A started).
+        $trip = $this->offer(['received_at' => now()->subMinutes(6)]);
+        $this->postStatus('EN_ROUTE');
+        $this->postStatus('ON_TRIP');
+        $trip->update(['started_at' => now()->subMinutes(4)]);
+        $this->assertSame(OfferStatus::Started, $trip->fresh()->status);
+
+        // A new offer arrives DURING the trip — held pending (a possible back-to-back).
+        $pending = $this->offer(['received_at' => now()]);
+        $this->assertSame(OfferStatus::Pending, $pending->fresh()->status);
+
+        // The driver finishes and goes idle-online without taking the new offer.
+        $this->postStatus('ONLINE');
+
+        $this->assertSame(OfferStatus::Completed, $trip->fresh()->status, 'the trip completes');
+        $this->assertSame(OfferStatus::Rejected, $pending->fresh()->status, 'the untaken new offer is rejected');
+        $this->assertNull($pending->fresh()->accepted_at, 'it was never accepted');
+    }
+
     public function test_a_new_offer_supersedes_the_drivers_prior_pending_offer(): void
     {
         // A driver can't hold two pending offers: a newer one supersedes the older.

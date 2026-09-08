@@ -202,6 +202,28 @@ class OfferLifecycle
     }
 
     /**
+     * The driver became available again (a trip ended → back to idle-online) without
+     * taking a still-pending offer: they were free and never engaged on it, so it was
+     * passed on. Reject every pending offer of theirs. A coarse poll that briefly
+     * reports idle between back-to-back trips is safe — if the driver actually engages
+     * on it a poll later, {@see accept()} overturns this rejection within the
+     * {@see LATE_ACCEPT_GRACE_MINUTES} grace (pendingOfferFor matches accepted_at IS
+     * NULL). Returns rows changed.
+     */
+    public function rejectPendingFor(int $tenantId, string $driverUuid): int
+    {
+        if ($driverUuid === '') {
+            return 0;
+        }
+
+        return DispatchOffer::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('driver_uuid', $driverUuid)
+            ->where('status', OfferStatus::Pending)
+            ->update(['status' => OfferStatus::Rejected, 'rejected_at' => CarbonImmutable::now()]);
+    }
+
+    /**
      * A driver holds exactly ONE active trip. When a newer offer becomes active (or
      * the driver goes idle), any OTHER offer of theirs still ACCEPTED/STARTED is a
      * trip whose close edge we missed — a rapid trip-to-trip jump, or a sub-minute
