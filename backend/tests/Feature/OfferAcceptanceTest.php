@@ -441,20 +441,32 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame('pending', $row['status']);
     }
 
-    public function test_a_pending_offer_is_rejected_only_once_the_driver_goes_offline(): void
+    public function test_an_idle_drivers_pending_offer_expires_once_the_window_passes(): void
     {
-        // No accept-window timeout: a pending offer is HELD while the driver is online
-        // (idle or engaged) and is rejected only when they go OFFLINE — they left
-        // without taking it. The elapsed accept window never rejects it on its own.
+        // An IDLE (online, not engaged) driver holds no back-to-back claim: once the
+        // accept window has elapsed and they did not take it, they were free and passed
+        // on it → reject. Within the window it is still held (they may yet accept). This
+        // is the case a driver sitting idle with an offer "Open" for an hour needs.
         $driver = $this->driver(); // online-idle
-        $offer = $this->offer(['driver_id' => $driver->id, 'received_at' => now()->subMinutes(5), 'accept_window_seconds' => 30]);
 
-        // Online-idle, window long elapsed: still PENDING (the window does not reject).
+        // Fresh, still inside the window → HELD.
+        $fresh = $this->offer(['driver_id' => $driver->id, 'received_at' => now(), 'accept_window_seconds' => 30]);
         app(OfferLifecycle::class)->expirePending($this->tenant->id);
-        $this->assertSame(OfferStatus::Pending, $offer->fresh()->status);
+        $this->assertSame(OfferStatus::Pending, $fresh->fresh()->status);
 
-        // The driver goes offline → they left without taking it → rejected.
+        // Idle and the window (+grace) has passed → REJECTED (was free, didn't take it).
+        $stale = $this->offer(['driver_id' => $driver->id, 'received_at' => now()->subMinutes(5), 'accept_window_seconds' => 30]);
+        app(OfferLifecycle::class)->expirePending($this->tenant->id);
+        $this->assertSame(OfferStatus::Rejected, $stale->fresh()->status);
+    }
+
+    public function test_an_offline_drivers_pending_offer_is_rejected(): void
+    {
+        // Offline → the driver left without taking it → rejected.
+        $driver = $this->driver();
         $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_OFFLINE']);
+        $offer = $this->offer(['driver_id' => $driver->id, 'received_at' => now()->subMinutes(2), 'accept_window_seconds' => 30]);
+
         app(OfferLifecycle::class)->expirePending($this->tenant->id);
         $this->assertSame(OfferStatus::Rejected, $offer->fresh()->status);
     }

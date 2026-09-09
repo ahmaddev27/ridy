@@ -258,20 +258,64 @@ class OfferLifecycle
 
     public function expirePending(?int $tenantId = null): int
     {
-        // A pending offer is NOT rejected on the accept-window timeout — it stays
-        // pending until an EVENT resolves it: a newer offer supersedes it
-        // (supersedePendingFor), the driver engages (the status ingestor accepts it),
-        // or — handled here — the driver goes OFFLINE (they left without taking it).
-        // A 2h hard cap is only a backstop for a dead session / an unlinked offer.
+        // Resolve a pending offer by the driver's availability, NOT by a blanket timer:
+        //   • ENGAGED (en route / on a trip) → HOLD it (bounded only by the 2h cap):
+        //     it may be a back-to-back the driver takes once free, so timing it out now
+        //     would wrongly flip it to "not taken" a poll before they accept it.
+        //   • IDLE (online, not engaged) and the accept window has elapsed → REJECT:
+        //     the driver was free and did not take it, so it was passed on. This is the
+        //     case the pure event model missed — a driver who is ALREADY idle when the
+        //     offer arrives (or whose engaged→idle edge a coarse poll skipped) would
+        //     otherwise sit "pending" forever until a newer offer or the 2h cap.
+        //   • OFFLINE → REJECT: they left without taking it.
+        //   • Past the 2h cap → REJECT regardless (a dead session / unlinked offer).
+        // A late-detected take within LATE_ACCEPT_GRACE_MINUTES still overturns the
+        // rejection (pendingOfferFor matches accepted_at IS NULL), so this never loses a
+        // real acceptance the poll saw a moment late.
         $now = CarbonImmutable::now();
+        $hardCap = $now->subHours(2);
 
-        return DispatchOffer::withoutGlobalScopes()
+        // The accept window is per-row, so evaluate the deadline in PHP (portable
+        // across sqlite/MySQL). The pending set is small, so this stays cheap.
+        $expired = DispatchOffer::withoutGlobalScopes()
             ->where('status', OfferStatus::Pending)
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->where(function ($q) use ($now) {
-                $q->whereHas('driver', fn ($d) => $d->offline())
-                    ->orWhere('received_at', '<', $now->subHours(2));
+            ->with('driver:id,online_status')
+            ->get(['id', 'received_at', 'accept_window_seconds', 'driver_id'])
+            ->filter(function (DispatchOffer $o) use ($now, $hardCap) {
+                if ($o->received_at === null) {
+                    return false;
+                }
+                // Absolute backstop — expire regardless of state (dead session / unlinked).
+                if ($o->received_at->isBefore($hardCap)) {
+                    return true;
+                }
+                // Unlinked offers have no driver to judge availability from — wait for the cap.
+                if ($o->driver === null) {
+                    return false;
+                }
+                // Hold it while the driver is ENGAGED (a possible back-to-back trip).
+                if ($o->driver->engagementStatus() >= 1) {
+                    return false;
+                }
+                // Offline → they left without taking it → reject now.
+                if (! $o->driver->isOnline()) {
+                    return true;
+                }
+
+                // Idle-online → reject once the accept window (+grace) has elapsed.
+                return $o->received_at
+                    ->addSeconds((int) ($o->accept_window_seconds ?? 0) + 30)
+                    ->isBefore($now);
             })
+            ->pluck('id');
+
+        if ($expired->isEmpty()) {
+            return 0;
+        }
+
+        return DispatchOffer::withoutGlobalScopes()
+            ->whereIn('id', $expired)
             ->update(['status' => OfferStatus::Rejected, 'rejected_at' => $now]);
     }
 
