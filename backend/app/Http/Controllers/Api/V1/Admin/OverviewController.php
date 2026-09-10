@@ -79,18 +79,20 @@ class OverviewController extends Controller
         }
 
         // Our own proxy subscriptions expiring within 5 days — renew before the
-        // companies on them lose their exit IP.
-        $expiringProxies = Proxy::query()
-            ->whereNotNull('expires_at')
-            ->whereDate('expires_at', '<=', CarbonImmutable::now()->addDays(5))
-            ->orderBy('expires_at')
-            ->get()
+        // companies on them lose their exit IP. Judged by the REAL expiry (base period
+        // + paid renewals), so a renewed proxy whose first period has passed doesn't
+        // raise a false alert. The pool is small, so filter in PHP off the renewals.
+        $now = CarbonImmutable::now();
+        $expiringProxies = Proxy::query()->with('renewals')->get()
             ->map(fn (Proxy $p) => [
                 'id' => $p->id,
                 'label' => $p->label,
-                'expires_at' => $p->expires_at?->toDateString(),
-                'days_left' => (int) CarbonImmutable::now()->startOfDay()->diffInDays($p->expires_at->startOfDay(), false),
-            ]);
+                'expires_at' => $p->effectiveEndsAt()?->toDateString(),
+                'days_left' => $p->daysLeft($now),
+            ])
+            ->filter(fn (array $r) => $r['days_left'] !== null && $r['days_left'] <= 5)
+            ->sortBy('days_left')
+            ->values();
 
         return response()->json(['data' => [
             'stats' => $stats,

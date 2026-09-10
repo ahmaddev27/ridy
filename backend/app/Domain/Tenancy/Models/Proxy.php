@@ -3,6 +3,7 @@
 namespace App\Domain\Tenancy\Models;
 
 use App\Domain\Fleet\Models\Driver;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
@@ -34,6 +35,33 @@ class Proxy extends Model
     public function effectiveEndsAt(): ?Carbon
     {
         return $this->renewals->pluck('ends_at')->push($this->expires_at)->filter()->max();
+    }
+
+    /**
+     * Whether the proxy is still within its paid period — the REAL expiry, which
+     * includes paid renewals (extensions on the same credentials), not just the base
+     * period. A proxy whose first period has passed but which was renewed is NOT
+     * expired. No end set at all = treated as active (no known expiry).
+     */
+    public function isActive(?CarbonInterface $now = null): bool
+    {
+        $end = $this->effectiveEndsAt();
+
+        return $end === null || $end->copy()->endOfDay()->greaterThanOrEqualTo($now ?? now());
+    }
+
+    /**
+     * Whole days until the real (renewal-aware) expiry — negative once past it, null
+     * when the proxy has no end date set. The single source of truth for the "expires
+     * in N days" the admin overview, health report and expiry notification all show.
+     */
+    public function daysLeft(?CarbonInterface $now = null): ?int
+    {
+        $end = $this->effectiveEndsAt();
+
+        return $end === null
+            ? null
+            : (int) ($now ?? now())->copy()->startOfDay()->diffInDays($end->copy()->startOfDay(), false);
     }
 
     /** Total spend on this proxy: the initial price plus every renewal amount. */

@@ -22,7 +22,7 @@ class SystemHealthService
     {
         $now = now();
 
-        $tenants = Tenant::query()->with('proxy')->get();
+        $tenants = Tenant::query()->with('proxy.renewals')->get();
         // Newest session per tenant — unique() keeps the first of the desc-sorted rows.
         $sessions = UberFleetSession::withoutGlobalScopes()
             ->orderByDesc('updated_at')
@@ -106,12 +106,14 @@ class SystemHealthService
             return ['label' => null, 'expires_at' => null, 'ok' => false];
         }
 
-        $notExpired = $proxy->expires_at === null || $proxy->expires_at->endOfDay()->greaterThanOrEqualTo($now);
+        // The REAL expiry includes paid renewals — a renewed proxy whose base period
+        // has passed is NOT expired. Surface (and judge health by) the effective end.
+        $endsAt = $proxy->effectiveEndsAt();
 
         return [
             'label' => $proxy->label,
-            'expires_at' => $proxy->expires_at?->toDateString(),
-            'ok' => $notExpired,
+            'expires_at' => $endsAt?->toDateString(),
+            'ok' => $proxy->isActive($now),
         ];
     }
 
