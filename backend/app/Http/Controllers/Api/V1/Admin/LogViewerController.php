@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use SplFileObject;
 
 /**
  * Super-admin log viewer for the System Health board: tail and clear the backend
@@ -69,12 +68,16 @@ class LogViewerController extends Controller
             'url' => ['nullable', 'string', 'max:500'],
         ]);
 
+        // Strip control characters from ALL THREE fields. Sanitising only the message
+        // let any signed-in dashboard user put newlines in `url` or `level` and forge
+        // arbitrary extra lines in the admin's frontend log — including lines that
+        // read like backend errors.
         $line = sprintf(
             "[%s] %s %s — %s\n",
             now()->toDateTimeString(),
-            strtoupper($data['level'] ?? 'error'),
-            $data['url'] ?? '-',
-            str_replace(["\n", "\r"], ' ', $data['message']),
+            strtoupper(self::oneLine($data['level'] ?? 'error')),
+            self::oneLine($data['url'] ?? '-'),
+            self::oneLine($data['message']),
         );
 
         $path = storage_path('logs/frontend.log');
@@ -87,23 +90,55 @@ class LogViewerController extends Controller
         return response()->json(['data' => ['logged' => true]]);
     }
 
+    /** Collapse a user-supplied value to a single log-safe line. */
+    private static function oneLine(string $value): string
+    {
+        return trim(preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $value) ?? '');
+    }
+
     /**
-     * The last $lines lines of a file, read from the end. SplFileObject seeks to the
-     * line count first, then reads only the tail — cheap even for a large log.
+     * The last $lines lines of a file, read backwards from the end in fixed blocks.
+     *
+     * The previous implementation seek(PHP_INT_MAX)'d an SplFileObject to find the
+     * last key and then seek()'d back — two full passes over the file per call. On a
+     * laravel.log of a few hundred MB (it is only truncated manually) that ran on
+     * every load of the admin System Health page.
      *
      * @return array<int, string>
      */
     private function tail(string $path, int $lines): array
     {
-        $file = new SplFileObject($path, 'r');
-        $file->seek(PHP_INT_MAX);
-        $lastLine = $file->key();
-        $start = max(0, $lastLine - $lines);
+        $handle = fopen($path, 'rb');
+        if ($handle === false) {
+            return [];
+        }
+
+        $block = 8192;
+        $position = filesize($path) ?: 0;
+        $buffer = '';
+
+        try {
+            // Walk backwards a block at a time until we hold enough newlines (one
+            // more than requested, so the first line in the buffer is known-complete).
+            while ($position > 0 && substr_count($buffer, "\n") <= $lines) {
+                $read = (int) min($block, $position);
+                $position -= $read;
+                fseek($handle, $position);
+                $buffer = (string) fread($handle, $read).$buffer;
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        $parts = preg_split('/\r\n|\n|\r/', $buffer) ?: [];
+        // A log file ends with a newline, so the split leaves one empty tail element;
+        // dropping it keeps "last 200 lines" from silently returning 199.
+        if (end($parts) === '') {
+            array_pop($parts);
+        }
 
         $out = [];
-        $file->seek($start);
-        while (! $file->eof()) {
-            $line = rtrim((string) $file->fgets(), "\r\n");
+        foreach (array_slice($parts, -$lines) as $line) {
             if ($line !== '') {
                 $out[] = $line;
             }

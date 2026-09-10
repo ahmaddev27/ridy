@@ -66,3 +66,7 @@ Schedule::command('stations:sync')->weeklyOn(1, '04:00')->withoutOverlapping();
 
 // Keep the dispatch network log (admin Network tab) to a 48h retention window.
 Schedule::command('network-logs:prune')->hourly()->withoutOverlapping();
+
+// Keep geocode_cache bounded: expired MISSES (so a re-tryable address is asked
+// again) and hits nothing has touched in a year. Nightly, off the busy hours.
+Schedule::command('geocode-cache:prune')->dailyAt('03:40')->withoutOverlapping();

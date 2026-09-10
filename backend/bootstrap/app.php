@@ -70,16 +70,17 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/*'),
         );
 
-        // TEMPORARY diagnostic: every driver-endpoint 401 flows through here.
-        // Log (at error level) exactly WHY the token was rejected so the recurring
-        // "session_invalidated" logout can be pinned. Returns null so the normal
-        // 401 JSON still renders. Remove once the root cause is confirmed.
+        // Diagnostic: every driver-endpoint 401 flows through here, recording WHY the
+        // token was rejected so the recurring "session_invalidated" logout stays
+        // pinnable. Kept at DEBUG level — at `error` it fed Sentry and inflated
+        // laravel.log on what is, for an expired token, entirely normal traffic.
+        // Returns null so the normal 401 JSON still renders.
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             if ($request->is('api/v1/driver/*') && ! $request->is('api/v1/driver/fleet/*')) {
                 $bearer = $request->bearerToken();
                 $pat = $bearer !== null && $bearer !== '' ? PersonalAccessToken::findToken($bearer) : null;
 
-                Log::error('driver_auth_401', [
+                Log::debug('driver_auth_401', [
                     'path' => $request->path(),
                     'token_state' => match (true) {
                         $bearer === null || $bearer === '' => 'no_bearer',

@@ -31,15 +31,8 @@ class DriverAuthController extends Controller
 
     private const MAX_ATTEMPTS = 5;
 
-    /**
-     * App Store review demo account: the app is invite + email-OTP only, so
-     * Apple's reviewer can't receive a code. This single whitelisted email accepts
-     * a fixed code (even in production) so they can sign in. It unlocks ONLY its own
-     * demo driver — no other account is affected. Remove after the app is approved.
-     */
-    private const REVIEW_DEMO_EMAIL = 'aa20589@gmail.com';
-
-    private const REVIEW_DEMO_OTP = '000000';
+    /** The single ability a fleet-owner app token carries (see EnsureDashboardToken). */
+    private const OWNER_APP_ABILITY = 'fleet:read';
 
     public function __construct(private readonly DriverInvitationService $invitations) {}
 
@@ -81,23 +74,8 @@ class DriverAuthController extends Controller
             'otp' => ['required', 'digits:6'],
         ]);
 
-        // App Store reviewer sign-in: the whitelisted demo email + fixed code
-        // bypasses the emailed OTP (they can't receive one), opening only its own
-        // demo driver.
-        if ($this->isReviewDemoLogin($data['email'], $data['otp'])) {
-            $driver = Driver::withoutGlobalScopes()->where('email', self::REVIEW_DEMO_EMAIL)->first();
-            if ($driver !== null) {
-                $this->guardSuspendedTenant($driver->loadMissing('tenant')->tenant);
-                $driver->forceFill([
-                    'activated_at' => $driver->activated_at ?? now(),
-                    'invite_token' => null,
-                    'last_login_at' => now(),
-                ])->save();
-
-                return $this->tokenResponse($driver);
-            }
-        }
-
+        // No account-specific bypass lives here: the only non-emailed code path is
+        // GeneratesOtp::isTestCode(), which hard-refuses in production.
         $reset = $this->validOtpOrFail($data['email'], $data['otp']);
 
         $driver = Driver::withoutGlobalScopes()->where('email', $reset->email)->first();
@@ -272,13 +250,6 @@ class DriverAuthController extends Controller
         return $owner !== null ? (string) $owner->name : null;
     }
 
-    /** The App Store reviewer's whitelisted demo email + fixed code (constant-time). */
-    private function isReviewDemoLogin(string $email, string $otp): bool
-    {
-        return strcasecmp($email, self::REVIEW_DEMO_EMAIL) === 0
-            && hash_equals(self::REVIEW_DEMO_OTP, $otp);
-    }
-
     /** A dashboard owner/manager matched by email alone (passwordless sign-in). */
     private function findOwnerByEmail(string $email): ?User
     {
@@ -325,9 +296,15 @@ class DriverAuthController extends Controller
         ]);
     }
 
+    /**
+     * Fleet-owner mode runs on strictly weaker credentials than the dashboard — an
+     * emailed 6-digit code, no password — so its token is minted read-only and
+     * EnsureDashboardToken confines it to `api/v1/driver/fleet/*`. It must never
+     * carry '*' and reach the manager API (fleet purge, bulk delete, invites).
+     */
     private function ownerTokenResponse(User $owner): JsonResponse
     {
-        $token = $owner->createToken('driver-app')->plainTextToken;
+        $token = $owner->createToken('driver-app-owner', [self::OWNER_APP_ABILITY])->plainTextToken;
 
         return response()->json([
             'data' => ['token' => $token, 'is_owner' => true, 'owner' => $this->ownerProfile($owner)],

@@ -109,6 +109,26 @@ async function reconcile() {
   }
 }
 
+// reconcile() is async and the interval doesn't wait for it: a session poll that
+// runs long (a slow backend) would let a second pass start while the first is still
+// deciding which streams to stop — two passes mutating the same map, each able to
+// stop a stream the other just started. One in-flight pass at a time; a skipped
+// tick simply happens 60s later.
+let reconciling = false;
+
+async function reconcileTick() {
+  if (reconciling) {
+    console.warn("reconcile still in flight — skipping this tick");
+    return;
+  }
+  reconciling = true;
+  try {
+    await reconcile();
+  } finally {
+    reconciling = false;
+  }
+}
+
 async function main() {
   initSentry();
   console.log(`Ridy dispatch daemon starting [shard "${config.shardId}"] -> ${config.apiBaseUrl}`);
@@ -119,8 +139,8 @@ async function main() {
       ? "global fallback proxy configured; per-company proxy_url overrides it"
       : "no global proxy — companies without their own proxy_url connect directly (Uber blocks that)",
   );
-  await reconcile();
-  setInterval(reconcile, config.sessionPollInterval);
+  await reconcileTick();
+  setInterval(reconcileTick, config.sessionPollInterval);
 }
 
 for (const signal of ["SIGINT", "SIGTERM"]) {

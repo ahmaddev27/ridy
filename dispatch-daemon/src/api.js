@@ -15,6 +15,11 @@ async function call(method, path, body) {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    // fetch has no default timeout: without this a backend that accepts the
+    // connection but never answers parks the promise forever — and these calls sit
+    // inside the SSE read loop and the adaptive status chain, which would both
+    // stall silently. A rejection is already handled as retryable by every caller.
+    signal: AbortSignal.timeout(config.apiTimeout),
   });
   if (!res.ok) {
     throw new Error(`${method} ${path} -> ${res.status} ${await res.text().catch(() => "")}`);

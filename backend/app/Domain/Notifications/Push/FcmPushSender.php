@@ -3,7 +3,10 @@
 namespace App\Domain\Notifications\Push;
 
 use App\Domain\Notifications\Contracts\PushSender;
+use App\Domain\Notifications\Contracts\SendsPushInBulk;
 use App\Domain\Notifications\Models\DeviceToken;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -16,7 +19,7 @@ use Throwable;
  * when backgrounded or closed, and lets the app render its own countdown UI
  * rather than a plain notification.
  */
-class FcmPushSender implements PushSender
+class FcmPushSender implements PushSender, SendsPushInBulk
 {
     public function __construct(
         private readonly GoogleServiceAccountToken $auth,
@@ -39,26 +42,94 @@ class FcmPushSender implements PushSender
         }
 
         if (! $response->successful()) {
-            $dead = $this->isDeadToken($response->status(), (string) $response->body());
-
-            // Log a COMPACT single line (FCM's error body is pretty-printed multi-line
-            // JSON that floods the log) — just the status, the one-line message and the
-            // token prefix, plus whether we pruned it.
-            Log::warning('push.fcm_failed', [
-                'status' => $response->status(),
-                'error' => (string) ($response->json('error.message') ?? 'unknown'),
-                'token' => substr($deviceToken, 0, 12).'…',
-                'pruned' => $dead,
-            ]);
-
-            // A permanently-dead token would otherwise fail on every future offer and
-            // linger as a ghost device. Delete it so the noise stops.
-            if ($dead) {
-                DeviceToken::withoutGlobalScopes()->where('token', $deviceToken)->delete();
-            }
+            $this->reportFailure($deviceToken, $response);
         }
 
         return $response->successful();
+    }
+
+    /**
+     * Send the same message to every device AT ONCE. The offer push runs inside
+     * Uber's ~5-second accept window, so N sequential 5 s-timeout calls (a driver's
+     * two devices plus every owner phone) could hold the ingest request open far
+     * longer than the window itself. Pooled, the whole fan-out costs one timeout.
+     *
+     * @param  array<int, string>  $deviceTokens
+     * @param  array<string, mixed>  $data
+     */
+    public function sendMany(array $deviceTokens, string $title, string $body, array $data = []): int
+    {
+        $tokens = array_values(array_unique(array_filter($deviceTokens)));
+        if ($tokens === []) {
+            return 0;
+        }
+        if (count($tokens) === 1) {
+            return $this->send($tokens[0], $title, $body, $data) ? 1 : 0;
+        }
+
+        try {
+            // One OAuth mint for the batch (it is cached ~55 min anyway).
+            $accessToken = $this->auth->accessToken();
+
+            /** @var array<int, Response> $responses */
+            $responses = Http::pool(fn (Pool $pool) => array_map(
+                fn (string $token) => $pool->withToken($accessToken)
+                    ->acceptJson()
+                    ->timeout(5)
+                    ->post($this->endpoint(), ['message' => $this->message($token, $title, $body, $data)]),
+                $tokens,
+            ));
+        } catch (Throwable $e) {
+            Log::warning('push.fcm_error', ['message' => $e->getMessage()]);
+
+            return 0;
+        }
+
+        $sent = 0;
+        foreach ($tokens as $i => $token) {
+            $response = $responses[$i] ?? null;
+            // A pooled entry is a Response OR the exception that request threw.
+            if (! $response instanceof Response) {
+                Log::warning('push.fcm_error', [
+                    'message' => $response instanceof Throwable ? $response->getMessage() : 'no response',
+                    'token' => substr($token, 0, 12).'…',
+                ]);
+
+                continue;
+            }
+
+            if ($response->successful()) {
+                $sent++;
+
+                continue;
+            }
+
+            $this->reportFailure($token, $response);
+        }
+
+        return $sent;
+    }
+
+    /** Log a compact failure line and prune a permanently-dead token. */
+    private function reportFailure(string $deviceToken, Response $response): void
+    {
+        $dead = $this->isDeadToken($response->status(), (string) $response->body());
+
+        // Log a COMPACT single line (FCM's error body is pretty-printed multi-line
+        // JSON that floods the log) — just the status, the one-line message and the
+        // token prefix, plus whether we pruned it.
+        Log::warning('push.fcm_failed', [
+            'status' => $response->status(),
+            'error' => (string) ($response->json('error.message') ?? 'unknown'),
+            'token' => substr($deviceToken, 0, 12).'…',
+            'pruned' => $dead,
+        ]);
+
+        // A permanently-dead token would otherwise fail on every future offer and
+        // linger as a ghost device. Delete it so the noise stops.
+        if ($dead) {
+            DeviceToken::withoutGlobalScopes()->where('token', $deviceToken)->delete();
+        }
     }
 
     /**
@@ -116,7 +187,6 @@ class FcmPushSender implements PushSender
         // the driver's attention, distinct from a routine offer on "offers". The app
         // creates both channels (src/lib/push.ts); an unknown id falls back to the
         // default channel harmlessly. (A custom sound file still needs a native build.)
-        $isMultiStop = isset($data['stops_count']) && (int) $data['stops_count'] >= 2;
         $androidNotification = ['channel_id' => $isMultiStop ? 'multistop' : 'offers', 'sound' => 'default'];
         if ($badge !== null) {
             $androidNotification['notification_count'] = $badge;

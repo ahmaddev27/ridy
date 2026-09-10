@@ -52,16 +52,22 @@ class DriverStatusIngestor
     {
         $counts = ['updated' => 0, 'accepted' => 0, 'started' => 0, 'completed' => 0, 'canceled' => 0, 'rejected' => 0, 'multistop' => 0];
 
+        // One SELECT for the whole batch instead of one per driver: at the engaged
+        // cadence (3 s) a 100-driver fleet was ~33 lookups/s from a single tenant
+        // before any lifecycle work.
+        $drivers = Driver::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('uber_driver_uuid', collect($statuses)->pluck('driver_uuid')->filter()->unique()->all())
+            ->get()
+            ->keyBy('uber_driver_uuid');
+
         foreach ($statuses as $row) {
             $uuid = $row['driver_uuid'] ?? null;
             if (! $uuid) {
                 continue;
             }
 
-            $driver = Driver::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where('uber_driver_uuid', $uuid)
-                ->first();
+            $driver = $drivers->get($uuid);
             if ($driver === null) {
                 continue;
             }
@@ -203,24 +209,31 @@ class DriverStatusIngestor
      */
     private function applyTransition(int $tenantId, string $uuid, int $was, int $now, bool $onlineNow, bool $wasOffline, array &$counts): void
     {
+        // Every branch below needs an engagement-level EDGE, so there is nothing to
+        // infer (and nothing to look up) when the level is unchanged.
+        if ($was === $now) {
+            return;
+        }
+
+        // Resolved ONCE here and reused below: the diagnostic used to fetch both rows
+        // and the branch immediately after re-fetched exactly the same two, so every
+        // real engagement edge paid for two redundant queries purely for a log line.
+        $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
+        $pending = $this->lifecycle->pendingOfferFor($tenantId, $uuid);
+
         // Diagnostic: every real engagement-level change, with the offer it resolved to.
         // Surfaces in the admin Logs tab so we can see WHY a busy driver's acceptance is
         // (not) detected — e.g. an idle→engaged edge the coarse poll missed.
-        if ($was !== $now) {
-            $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
-            $pending = $this->lifecycle->pendingOfferFor($tenantId, $uuid);
-            RidyLog::event('driver_status.transition', [
-                'driver' => substr($uuid, 0, 8),
-                'was' => $was,
-                'now' => $now,
-                'active_offer' => $active?->id,
-                'pending_offer' => $pending?->id,
-            ]);
-        }
+        RidyLog::event('driver_status.transition', [
+            'driver' => substr($uuid, 0, 8),
+            'was' => $was,
+            'now' => $now,
+            'active_offer' => $active?->id,
+            'pending_offer' => $pending?->id,
+        ]);
 
         // idle → engaged: attribute the pending offer and accept it.
         if ($was === 0 && $now >= 1) {
-            $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
 
             // A STARTED offer surviving here is a driver RESUMING a trip after an
             // offline blip (the engaged→idle branch preserved it), NOT a new
@@ -233,7 +246,6 @@ class DriverStatusIngestor
                 return;
             }
 
-            $pending = $this->lifecycle->pendingOfferFor($tenantId, $uuid);
             if ($pending !== null && $this->lifecycle->accept($pending)) {
                 $counts['accepted']++;
                 // Jumped straight to ON_TRIP (skipped EN_ROUTE) — start it too.
@@ -254,7 +266,6 @@ class DriverStatusIngestor
 
         // EN_ROUTE → ON_TRIP: the accepted offer's trip has begun.
         if ($was === 1 && $now === 2) {
-            $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
             if ($active !== null && $this->lifecycle->start($active)) {
                 $counts['started']++;
             }
@@ -267,7 +278,6 @@ class DriverStatusIngestor
         // then accept the next offer that arrived DURING this trip (Uber only sends
         // it once the driver is already on a trip). Not started yet — it's EN_ROUTE.
         if ($was === 2 && $now === 1) {
-            $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
             if ($this->tripLooksReal($active) && $this->lifecycle->complete($active)) {
                 $counts['completed']++;
             }
@@ -294,7 +304,6 @@ class DriverStatusIngestor
                 $counts['rejected'] += $this->lifecycle->rejectPendingFor($tenantId, $uuid);
             }
 
-            $active = $this->lifecycle->activeOfferFor($tenantId, $uuid);
             if ($active === null) {
                 return;
             }

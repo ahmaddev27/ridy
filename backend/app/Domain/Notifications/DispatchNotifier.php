@@ -6,8 +6,11 @@ use App\Domain\Dispatch\AddressFormatter;
 use App\Domain\Dispatch\AddressLatinizer;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Notifications\Contracts\PushSender;
+use App\Domain\Notifications\Contracts\SendsPushInBulk;
+use App\Domain\Notifications\Jobs\NotifyOwnersOfOffer;
 use App\Domain\Notifications\Models\DeviceToken;
 use App\Events\OfferBroadcast;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Turns a routed dispatch offer into a push to every device of its linked driver.
@@ -25,10 +28,18 @@ use App\Events\OfferBroadcast;
  */
 class DispatchNotifier
 {
+    /**
+     * Wall-clock budget for the whole driver-facing push step, mirroring
+     * TripGeocoder::enrichForNotify's deadline guard: the accept window is ~5 s, so
+     * the push must never be the thing that outlives it.
+     */
+    private const PUSH_BUDGET_SECONDS = 4.0;
+
     public function __construct(private PushSender $sender) {}
 
     /**
-     * @return int number of devices the offer was pushed to
+     * @return int number of the DRIVER's devices the offer was pushed to (the fleet
+     *             owners' copy is queued — see {@see NotifyOwnersOfOffer})
      */
     public function notify(DispatchOffer $offer): int
     {
@@ -41,8 +52,26 @@ class DispatchNotifier
         // -effort: a broadcast failure (Reverb down) must never break ingestion.
         rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'new')), report: false);
 
-        $title = $this->buildTitle($offer);
-        $body = $this->buildBody($offer);
+        $sent = $this->pushToDriver($offer, $this->buildTitle($offer), $this->buildBody($offer), $this->offerData($offer));
+
+        // The owners' copy leaves the hot path: only the DRIVER has a 5-second
+        // window, and a company with three managers in owner mode used to add three
+        // more sequential FCM calls to it.
+        NotifyOwnersOfOffer::dispatch((int) $offer->id);
+
+        return $sent;
+    }
+
+    /**
+     * The data payload every offer push carries. Built in ONE place: notify() and
+     * notifyMultiStop() used to assemble near-identical arrays by hand, so a new
+     * field had to be added twice — the duplication behind the non-Latin address bug
+     * fixed on 2026-09-08.
+     *
+     * @return array<string, string>
+     */
+    private function offerData(DispatchOffer $offer, ?int $stopsCount = null): array
+    {
         $data = [
             // Ties the push to the app's "offer" notification category so the
             // "Open in map" action button is rendered (see FcmPushSender::message).
@@ -65,58 +94,98 @@ class DispatchNotifier
             'stops' => $this->stopsPayload($offer),
         ];
 
-        $tokens = DeviceToken::where('driver_id', $offer->driver_id)->get();
+        // Only the multi-stop alert carries the count (it also picks the app's urgent
+        // channel + sound in FcmPushSender::message).
+        if ($stopsCount !== null) {
+            $data['stops_count'] = (string) $stopsCount;
+        }
 
+        return $data;
+    }
+
+    /**
+     * Push to the driver's own devices — in parallel where the transport supports it
+     * — inside a wall-clock budget.
+     *
+     * @param  array<string, string>  $data
+     */
+    private function pushToDriver(DispatchOffer $offer, string $title, string $body, array $data): int
+    {
+        $tokens = DeviceToken::where('driver_id', $offer->driver_id)->pluck('token')->all();
+
+        return $this->push($tokens, $title, $body, $data);
+    }
+
+    /**
+     * @param  array<int, string>  $tokens
+     * @param  array<string, string>  $data
+     */
+    private function push(array $tokens, string $title, string $body, array $data): int
+    {
+        if ($tokens === []) {
+            return 0;
+        }
+
+        if ($this->sender instanceof SendsPushInBulk) {
+            return $this->sender->sendMany($tokens, $title, $body, $data);
+        }
+
+        // Sequential fallback (log transport / tests): stop rather than run past the
+        // window if the transport turns slow, so a stalled device never delays the rest.
+        $deadline = microtime(true) + self::PUSH_BUDGET_SECONDS;
         $sent = 0;
-        foreach ($tokens as $token) {
-            if ($this->sender->send($token->token, $title, $body, $data)) {
+        foreach ($tokens as $i => $token) {
+            if ($i > 0 && microtime(true) >= $deadline) {
+                Log::warning('push.budget_exhausted', ['skipped' => count($tokens) - $i]);
+                break;
+            }
+            if ($this->sender->send($token, $title, $body, $data)) {
                 $sent++;
             }
         }
-
-        $sent += $this->notifyOwners($offer, $title, $body, $data);
 
         return $sent;
     }
 
     /**
-     * Fan the same offer out to the tenant's fleet owners/managers who registered
-     * a device in owner mode. The driver still gets their own push unchanged; the
-     * owner's copy carries the driver name so they know whose offer it is.
+     * Fan an offer out to the tenant's fleet owners/managers who registered a device
+     * in owner mode. The driver's own push is unchanged; the owner's copy carries the
+     * driver name so they know whose offer it is.
      *
-     * @param  array<string, string>  $data
+     * Runs on the QUEUE ({@see NotifyOwnersOfOffer}) — owners have no accept window,
+     * so this must not sit inside the driver's. Also covers the multi-stop follow-up,
+     * which a manager in owner mode previously never received.
+     *
+     * @param  int|null  $stopsCount  set for the multi-stop follow-up
      * @return int number of owner devices notified
      */
-    private function notifyOwners(DispatchOffer $offer, string $title, string $body, array $data): int
+    public function notifyOwners(DispatchOffer $offer, ?int $stopsCount = null): int
     {
         // Scope explicitly by the offer's tenant (bypass the global scope): owner
         // tokens are the tenant's, keyed by user_id, never a driver.
         $tokens = DeviceToken::withoutGlobalScopes()
             ->where('tenant_id', $offer->tenant_id)
             ->whereNotNull('user_id')
-            ->get();
+            ->pluck('token')
+            ->all();
 
-        if ($tokens->isEmpty()) {
+        if ($tokens === []) {
             return 0;
         }
 
         // Fleet-manager layout (4 lines): numbers on the title, then driver · rider,
         // then pickup, then drop-off — so the manager reads whose offer it is at a
         // glance. (The driver's own push keeps the rider on the title line.)
-        $ownerTitle = $this->buildNumbers($offer);
+        $isMultiStop = $stopsCount !== null;
+        $ownerTitle = $isMultiStop ? $this->multiStopTitle($offer) : $this->buildNumbers($offer);
+        $body = $isMultiStop ? $this->multiStopBody($offer, $stopsCount) : $this->buildBody($offer);
+
         $driverName = $this->driverName($offer);
         $rider = trim((string) $offer->rider_first_name);
         $names = trim($driverName.($rider !== '' ? ' · '.$rider : ''));
         $ownerBody = $names !== '' ? trim($names."\n".$body) : $body;
 
-        $sent = 0;
-        foreach ($tokens as $token) {
-            if ($this->sender->send($token->token, $ownerTitle, $ownerBody, $data)) {
-                $sent++;
-            }
-        }
-
-        return $sent;
+        return $this->push($tokens, $ownerTitle, $ownerBody, $this->offerData($offer, $stopsCount));
     }
 
     /** The offer's driver name, from the linked driver or the captured payload. */
@@ -186,42 +255,30 @@ class DispatchNotifier
         // arrived (Uber revealed extra drop-offs). This one notification is
         // intentionally localized (unlike the word-free single-offer push).
         $title = $this->multiStopTitle($offer);
-        // Body: a blue stop marker + the stop count, distance and €/km on the first
-        // line, then EVERY stop on its own bulleted line (pickup, then each drop-off
-        // with its "+km") — so the driver reads all destinations and pricing from the
-        // lock screen. (An OS push carries only an emoji, not our blue-circle stop
-        // icon; the app renders the real marker in its own UI.)
-        $metrics = $this->buildMetrics($offer);
-        $head = trim('🔵 x'.$stopsCount.($metrics !== '' ? ' · '.$metrics : ''));
-        $body = trim($head."\n".$this->buildStopBullets($offer));
+        $body = $this->multiStopBody($offer, $stopsCount);
 
-        $data = [
-            'categoryId' => 'offer',
-            'offer_id' => (string) $offer->id,
-            'offer_uuid' => (string) $offer->offer_uuid,
-            'stops_count' => (string) $stopsCount,
-            'distance_m' => (string) ($offer->distance_m ?? ''),
-            'fare_amount' => (string) ($offer->fare_amount ?? ''),
-            'pickup' => $this->latinAddress($offer->pickup_display, $offer->pickup_address),
-            'dropoff' => $this->latinAddress($offer->dropoff_display, $offer->dropoff_address),
-            'pickup_lat' => (string) ($offer->pickup_lat ?? ''),
-            'pickup_lng' => (string) ($offer->pickup_lng ?? ''),
-            'dropoff_lat' => (string) ($offer->dropoff_lat ?? ''),
-            'dropoff_lng' => (string) ($offer->dropoff_lng ?? ''),
-            'geo_source' => (string) ($offer->geo_source ?? ''),
-            // Every stop as JSON so the app's "open in map" routes through them all
-            // (Google Maps waypoints) and can render per-stop detail from the push.
-            'stops' => $this->stopsPayload($offer),
-        ];
+        $sent = $this->pushToDriver($offer, $title, $body, $this->offerData($offer, $stopsCount));
 
-        $sent = 0;
-        foreach (DeviceToken::where('driver_id', $offer->driver_id)->get() as $token) {
-            if ($this->sender->send($token->token, $title, $body, $data)) {
-                $sent++;
-            }
-        }
+        // The manager in owner mode gets the follow-up too — they used to receive the
+        // first offer push and then never hear about the extra drop-offs.
+        NotifyOwnersOfOffer::dispatch((int) $offer->id, $stopsCount);
 
         return $sent;
+    }
+
+    /**
+     * The multi-stop body: a blue stop marker + the stop count, distance and €/km on
+     * the first line, then EVERY stop on its own bulleted line (pickup, then each
+     * drop-off with its "+km") — so the driver reads all destinations and pricing
+     * from the lock screen. (An OS push carries only an emoji, not our blue-circle
+     * stop icon; the app renders the real marker in its own UI.)
+     */
+    private function multiStopBody(DispatchOffer $offer, int $stopsCount): string
+    {
+        $metrics = $this->buildMetrics($offer);
+        $head = trim('🔵 x'.$stopsCount.($metrics !== '' ? ' · '.$metrics : ''));
+
+        return trim($head."\n".$this->buildStopBullets($offer));
     }
 
     /**

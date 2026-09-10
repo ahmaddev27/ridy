@@ -8,8 +8,8 @@ use App\Domain\Notifications\Push\GoogleServiceAccountToken;
 use App\Domain\Notifications\Push\LogPushSender;
 use App\Domain\Tenancy\TenantContext;
 use App\Support\Settings;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Throwable;
 
@@ -58,10 +58,10 @@ class AppServiceProvider extends ServiceProvider
     private function applyMailSettings(): void
     {
         try {
-            if (! Schema::hasTable('settings')) {
-                return;
-            }
-
+            // No Schema::hasTable() guard here: it queried information_schema on EVERY
+            // request (the offer-ingest path included) while the Settings::all() read
+            // behind it is cached forever. A missing table (a pre-migrate boot — the
+            // only case the guard existed for) simply throws and is swallowed below.
             $from = [
                 'mail.from.address' => Settings::get('mail_from_address', config('mail.from.address')),
                 'mail.from.name' => Settings::get('mail_from_name', config('mail.from.name')),
@@ -94,7 +94,8 @@ class AppServiceProvider extends ServiceProvider
                 'mail.mailers.smtp.encryption' => Settings::get('smtp_encryption', 'tls'),
             ]));
         } catch (Throwable $e) {
-            // never let settings break the app boot
+            // Never let settings break the app boot — a pre-migrate boot lands here.
+            Log::debug('mail settings not applied: '.$e->getMessage());
         }
     }
 }

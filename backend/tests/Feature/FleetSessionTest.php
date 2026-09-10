@@ -31,6 +31,9 @@ class FleetSessionTest extends TestCase
         $this->manager = User::create([
             'name' => 'M', 'email' => 'm@ya.de', 'password' => Hash::make('password'), 'tenant_id' => $this->tenant->id,
         ]);
+        // Every real tenant user is created with a role; the connection routes are
+        // gated on connections.manage.
+        $this->manager->assignRole('fleet_manager');
         app(TenantContext::class)->set($this->tenant->id);
     }
 

@@ -31,6 +31,8 @@ class DriverLinkTest extends TestCase
         $this->manager = User::create([
             'name' => 'M', 'email' => 'm@ya.de', 'password' => Hash::make('password'), 'tenant_id' => $this->tenant->id,
         ]);
+        // Linking a driver to an Uber UUID is gated on drivers.manage.
+        $this->manager->assignRole('fleet_manager');
         app(TenantContext::class)->set($this->tenant->id);
     }
 

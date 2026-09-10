@@ -88,6 +88,27 @@ export const config = {
   // How often to re-read the active session list from the backend (ms).
   sessionPollInterval: Number(process.env.SESSION_POLL_INTERVAL_MS || 60000),
 
+  // Request deadlines (ms). Neither Node's fetch nor undici's has a default
+  // timeout, so without these a hung TCP connection through a residential proxy
+  // parks the promise forever: a stalled status poll freezes the adaptive chain
+  // (statuses stop, every offer reads "Not taken") and a stalled ingest blocks
+  // the SSE read loop. Every caller already treats a rejection as retryable, so
+  // a timeout self-heals on the next cycle.
+  apiTimeout: Number(process.env.API_TIMEOUT_MS || 8000),
+  rosterTimeout: Number(process.env.ROSTER_TIMEOUT_MS || 15000),
+  statusTimeout: Number(process.env.STATUS_TIMEOUT_MS || 10000),
+  // The RAMEN handshake + stream open. Bounds the CONNECT phase only — once the
+  // body is streaming, streamIdleTimeout takes over (a deadline on the body
+  // itself would kill a healthy long-poll).
+  handshakeTimeout: Number(process.env.HANDSHAKE_TIMEOUT_MS || 20000),
+
+  // Idle watchdog for an open stream (ms). A connection that goes quiet WITHOUT
+  // closing — a proxy that drops the path but leaves the socket open, a TCP black
+  // hole — yields no frame, no error and no reconnect: the daemon looks healthy
+  // and delivers nothing. If no frame arrives within this window we abort, which
+  // surfaces as a normal stream error and reopens from this.seq on the fast path.
+  streamIdleTimeout: Number(process.env.STREAM_IDLE_TIMEOUT_MS || 90000),
+
   // Reconnect backoff bounds (ms).
   reconnectMinDelay: Number(process.env.RECONNECT_MIN_MS || 2000),
   reconnectMaxDelay: Number(process.env.RECONNECT_MAX_MS || 60000),

@@ -502,8 +502,21 @@ class TripGeocoder
         $cached = DB::table('geocode_cache')->where('query', $cacheKey)->first();
         if ($cached !== null) {
             if ($cached->lat === null) {
-                return null;
+                // A cached MISS is not permanent. Nominatim's data improves (and a
+                // miss can be a bad parse we have since fixed), and a permanent one
+                // silently defeated `offers:backfill-geo --reset`: the re-queued offer
+                // hit this row, resolved nothing and burned straight back through
+                // MAX_ATTEMPTS. Past the TTL we simply ask again.
+                if ($this->missIsFresh($cached)) {
+                    return null;
+                }
+
+                DB::table('geocode_cache')->where('query', $cacheKey)->delete();
+                $cached = null;
             }
+        }
+
+        if ($cached !== null) {
             $result = ['lat' => (float) $cached->lat, 'lng' => (float) $cached->lng];
             if (! empty($cached->label)) {
                 $result['address'] = $cached->label; // unify to German even from cache
@@ -644,6 +657,20 @@ class TripGeocoder
         );
 
         return $coords;
+    }
+
+    /** How long a definitive geocoding MISS stays cached before it is re-tried. */
+    public const MISS_TTL_DAYS = 30;
+
+    /** Whether a cached miss is still within {@see MISS_TTL_DAYS}. */
+    private function missIsFresh(object $cached): bool
+    {
+        $stamped = $cached->updated_at ?? $cached->created_at ?? null;
+        if ($stamped === null) {
+            return false;
+        }
+
+        return CarbonImmutable::parse($stamped)->isAfter(CarbonImmutable::now()->subDays(self::MISS_TTL_DAYS));
     }
 
     /**

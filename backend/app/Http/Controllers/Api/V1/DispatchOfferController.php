@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\AddressFormatter;
 use App\Domain\Dispatch\DispatchOfferIngestor;
+use App\Domain\Dispatch\Jobs\GeocodeOffer;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\SupplierNetworkRecorder;
-use App\Domain\Dispatch\TripGeocoder;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchOfferResource;
@@ -178,11 +178,19 @@ class DispatchOfferController extends Controller
      * (pickup/dropoff coordinates, road route, distance and price-per-km) —
      * computed once via free services and cached on the row.
      */
-    public function show(Request $request, DispatchOffer $offer, TripGeocoder $geocoder): JsonResponse
+    public function show(Request $request, DispatchOffer $offer): JsonResponse
     {
         $this->authorizeTenant($offer);
 
-        $geocoder->enrich($offer);
+        // Queue the enrich instead of running it inline: enrich() is up to two
+        // Nominatim calls plus an OSRM route (6 s timeout each) plus a save() — HANDOFF
+        // §9 is explicit that per-request geocoding does not belong on a hot path, and
+        // clicking three cold offers otherwise means three slow GETs that also burn the
+        // attempt budget the gentle scheduled backfill was tuned to spend carefully.
+        // The row renders with whatever is already resolved and refreshes on next open.
+        if ($offer->geo_synced_at === null) {
+            GeocodeOffer::dispatch($offer->id);
+        }
 
         return response()->json([
             'data' => array_merge(
@@ -264,11 +272,20 @@ class DispatchOfferController extends Controller
     public function bulkDestroy(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'ids' => ['required', 'array', 'min:1'],
+            // Bounded: one request must not be able to delete an arbitrary number of rows.
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
             'ids.*' => ['integer'],
         ]);
 
-        $deleted = DispatchOffer::whereIn('id', $data['ids'])->delete();
+        // Scope to the caller's tenant EXPLICITLY rather than relying on the global
+        // scope: a super_admin reaches this route with an empty tenant context by
+        // design, and the scope then no-ops — so an unscoped delete would run across
+        // every company. Every other action in this controller authorizeTenant()s for
+        // the same reason (see the AuthorizesTenantResource docblock).
+        $deleted = DispatchOffer::withoutGlobalScopes()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->whereIn('id', $data['ids'])
+            ->delete();
 
         return response()->json(['data' => ['deleted' => $deleted]]);
     }

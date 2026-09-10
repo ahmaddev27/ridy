@@ -12,7 +12,7 @@ const api = globalThis.browser || globalThis["chrome"];
 // session (cookies) to `${apiUrl}/...`, a malicious apiUrl would exfiltrate
 // that session. Lock the destination host to a hardcoded allowlist. reidey.de
 // must be https; localhost/127.0.0.1 may be http for local development.
-const ALLOWED_API_HOSTS = ["reidey.de", "localhost", "127.0.0.1"];
+const ALLOWED_API_HOSTS = ["reidey.de"];
 
 function isAllowedApiUrl(url) {
   let parsed;

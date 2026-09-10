@@ -31,6 +31,8 @@ class ExtensionTokenTest extends TestCase
         $this->manager = User::create([
             'name' => 'M', 'email' => 'm@ya.de', 'password' => Hash::make('password'), 'tenant_id' => $this->tenant->id,
         ]);
+        // Minting the extension token is gated on connections.manage.
+        $this->manager->assignRole('fleet_manager');
     }
 
     public function test_manager_issues_an_extension_token(): void

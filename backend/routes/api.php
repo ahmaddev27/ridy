@@ -176,7 +176,9 @@ Route::prefix('v1')->group(function () {
 
     // Session basics every authenticated user needs — including tenant-less ones
     // (resellers). NOT tenant-scoped, so they never hit the no-tenant guard.
-    Route::middleware(['auth:sanctum', 'user.account'])->group(function () {
+    // `dashboard.only` still applies: a scoped token (extension / fleet-owner app)
+    // has its own logout + profile routes and must not read these either.
+    Route::middleware(['auth:sanctum', 'user.account', 'dashboard.only'])->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
         // Stop impersonating: mid-impersonation the caller is a manager, so this
@@ -190,6 +192,10 @@ Route::prefix('v1')->group(function () {
         Route::post('broadcasting/auth', fn (Request $request) => Broadcast::auth($request));
     });
 
+    // Roles are enforced, not decorative: every mutating or destructive route below
+    // carries the `can:` permission from RolePermissionSeeder, so a `viewer` can read
+    // the fleet but cannot disconnect Uber, purge data, delete offers, edit a driver
+    // or send invites. Reads stay open to every role holding `offers.view`.
     Route::middleware(['auth:sanctum', 'user.account', ResolveTenant::class, 'dashboard.only', 'user.active'])->group(function () {
         // Dashboard
         Route::get('dashboard/summary', [DashboardController::class, 'summary']);
@@ -207,61 +213,61 @@ Route::prefix('v1')->group(function () {
         Route::get('drivers', [DriverController::class, 'index']);
         Route::get('drivers/live', [DriverController::class, 'live']);
         Route::get('drivers/{driver}', [DriverController::class, 'show']);
-        Route::patch('drivers/{driver}', [DriverController::class, 'update']);
+        Route::patch('drivers/{driver}', [DriverController::class, 'update'])->middleware('can:drivers.manage');
         Route::get('drivers/{driver}/stats', [DriverController::class, 'stats']);
         // Browser-fed ingest: only for a company that has connected its own Uber
         // account (a stored session), never an arbitrary account the manager is
         // signed into. Guarded by fleet.connected.
-        Route::post('drivers/sync', [DriverController::class, 'sync'])->middleware('fleet.connected');
-        Route::post('drivers/roster', [DriverController::class, 'ingestRoster'])->middleware('fleet.connected');
-        Route::post('drivers/statuses', [DriverController::class, 'ingestStatuses'])->middleware('fleet.connected');
+        Route::post('drivers/sync', [DriverController::class, 'sync'])->middleware(['fleet.connected', 'can:connections.manage']);
+        Route::post('drivers/roster', [DriverController::class, 'ingestRoster'])->middleware(['fleet.connected', 'can:connections.manage']);
+        Route::post('drivers/statuses', [DriverController::class, 'ingestStatuses'])->middleware(['fleet.connected', 'can:connections.manage']);
 
         // Per-driver Uber performance metrics (earnings/hours/trips)
-        Route::post('drivers/metrics', [DriverMetricController::class, 'store'])->middleware('fleet.connected');
+        Route::post('drivers/metrics', [DriverMetricController::class, 'store'])->middleware(['fleet.connected', 'can:connections.manage']);
         Route::get('drivers/{driver}/metrics', [DriverMetricController::class, 'index']);
 
         // Fleet vehicles (synced from Uber via the extension)
         Route::get('vehicles', [VehicleController::class, 'index']);
-        Route::post('vehicles', [VehicleController::class, 'ingest'])->middleware('fleet.connected');
+        Route::post('vehicles', [VehicleController::class, 'ingest'])->middleware(['fleet.connected', 'can:connections.manage']);
 
         // Generic supplier capture — the extension pulls any Uber Fleet tab
         // (documents/reports/invoices/banking/promotions/inbox/…) and POSTs the raw
         // payload here tagged with a kind, so it lands in the admin Network feed.
-        Route::post('supplier/capture', [SupplierCaptureController::class, 'store'])->middleware('fleet.connected');
+        Route::post('supplier/capture', [SupplierCaptureController::class, 'store'])->middleware(['fleet.connected', 'can:connections.manage']);
 
         // Dispatch offers feed
-        Route::get('dispatch/offers', [DispatchOfferController::class, 'index']);
-        Route::get('dispatch/offers/stats', [DispatchOfferController::class, 'stats']);
-        Route::get('dispatch/offers/export', [DispatchOfferController::class, 'export']);
-        Route::get('dispatch/offers/{offer}', [DispatchOfferController::class, 'show']);
+        Route::get('dispatch/offers', [DispatchOfferController::class, 'index'])->middleware('can:offers.view');
+        Route::get('dispatch/offers/stats', [DispatchOfferController::class, 'stats'])->middleware('can:offers.view');
+        Route::get('dispatch/offers/export', [DispatchOfferController::class, 'export'])->middleware('can:offers.view');
+        Route::get('dispatch/offers/{offer}', [DispatchOfferController::class, 'show'])->middleware('can:offers.view');
         // Extension forwards RAMEN offers captured in the manager's browser.
-        Route::post('dispatch/offers/ingest', [DispatchOfferController::class, 'ingest'])->middleware('fleet.connected');
-        Route::post('dispatch/offers/bulk-delete', [DispatchOfferController::class, 'bulkDestroy']);
-        Route::delete('dispatch/offers/{offer}', [DispatchOfferController::class, 'destroy']);
+        Route::post('dispatch/offers/ingest', [DispatchOfferController::class, 'ingest'])->middleware(['fleet.connected', 'can:connections.manage']);
+        Route::post('dispatch/offers/bulk-delete', [DispatchOfferController::class, 'bulkDestroy'])->middleware('can:offers.manage');
+        Route::delete('dispatch/offers/{offer}', [DispatchOfferController::class, 'destroy'])->middleware('can:offers.manage');
 
         // Interactive Uber sign-in (email/password -> optional MFA code)
-        Route::post('uber-login/start', [UberLoginController::class, 'start']);
-        Route::post('uber-login/mfa', [UberLoginController::class, 'mfa']);
+        Route::post('uber-login/start', [UberLoginController::class, 'start'])->middleware('can:connections.manage');
+        Route::post('uber-login/mfa', [UberLoginController::class, 'mfa'])->middleware('can:connections.manage');
 
         // Browser-extension pairing token (minted from the dashboard session)
-        Route::post('extension/token', [ExtensionController::class, 'issueToken']);
+        Route::post('extension/token', [ExtensionController::class, 'issueToken'])->middleware('can:connections.manage');
 
         // Uber fleet session status + capture (cookie paste OR extension via token)
         Route::get('fleet-session', [FleetSessionController::class, 'show']);
-        Route::post('fleet-session', [FleetSessionController::class, 'capture']);
-        Route::post('fleet-session/reconnect', [FleetSessionController::class, 'reconnect']);
-        Route::post('fleet-session/report-broken', [FleetSessionController::class, 'reportBroken']);
-        Route::delete('fleet-session', [FleetSessionController::class, 'destroy']);
+        Route::post('fleet-session', [FleetSessionController::class, 'capture'])->middleware('can:connections.manage');
+        Route::post('fleet-session/reconnect', [FleetSessionController::class, 'reconnect'])->middleware('can:connections.manage');
+        Route::post('fleet-session/report-broken', [FleetSessionController::class, 'reportBroken'])->middleware('can:connections.manage');
+        Route::delete('fleet-session', [FleetSessionController::class, 'destroy'])->middleware('can:connections.manage');
 
         // Uber driver linking
         Route::get('dispatch/unlinked-drivers', [DispatchLinkController::class, 'unlinkedDrivers']);
-        Route::post('drivers/{driver}/link-uber', [DispatchLinkController::class, 'linkManual']);
-        Route::post('dispatch/auto-link', [DispatchLinkController::class, 'autoLink']);
+        Route::post('drivers/{driver}/link-uber', [DispatchLinkController::class, 'linkManual'])->middleware('can:drivers.manage');
+        Route::post('dispatch/auto-link', [DispatchLinkController::class, 'autoLink'])->middleware('can:drivers.manage');
 
         // Invite a driver to the mobile app (emailed activation link).
-        Route::post('drivers/{driver}/invite', [DriverInviteController::class, 'send']);
+        Route::post('drivers/{driver}/invite', [DriverInviteController::class, 'send'])->middleware('can:drivers.manage');
         // Send a diagnostic test push to the driver's registered devices.
-        Route::post('drivers/{driver}/test-push', [DriverPushController::class, 'test']);
+        Route::post('drivers/{driver}/test-push', [DriverPushController::class, 'test'])->middleware('can:drivers.manage');
 
         // Driver app registers its push device token
         Route::post('devices', [DeviceTokenController::class, 'store']);
@@ -280,7 +286,7 @@ Route::prefix('v1')->group(function () {
         Route::put('notification-prefs', [NotificationPrefsController::class, 'update']);
 
         // Governance
-        Route::get('audit-logs', [AuditLogController::class, 'index']);
+        Route::get('audit-logs', [AuditLogController::class, 'index'])->middleware('can:audit.view');
 
         // The authenticated user edits their own account (managers + super-admin).
         Route::put('profile', [ProfileController::class, 'update']);
@@ -293,14 +299,14 @@ Route::prefix('v1')->group(function () {
     // Gate the WHOLE reseller group on the reseller permission — previously only
     // generate()/codes() checked in-controller, leaving plans()/searchCompanies()
     // open to any authenticated user (cross-tenant company + owner-phone leak).
-    Route::middleware(['auth:sanctum', 'user.account', 'can:codes.generate'])->prefix('reseller')->group(function () {
+    Route::middleware(['auth:sanctum', 'user.account', 'dashboard.only', 'can:codes.generate'])->prefix('reseller')->group(function () {
         Route::get('plans', [ResellerController::class, 'plans']);
         Route::get('companies/search', [ResellerController::class, 'searchCompanies']);
         Route::post('activation', [ResellerController::class, 'generate']);
         Route::get('codes', [ResellerController::class, 'codes']);
     });
 
-    Route::middleware(['auth:sanctum', 'user.account', 'super.admin'])->prefix('admin')->group(function () {
+    Route::middleware(['auth:sanctum', 'user.account', 'dashboard.only', 'super.admin'])->prefix('admin')->group(function () {
         Route::get('overview', OverviewController::class);
         Route::get('system-health', SystemHealthController::class);
         Route::get('system-metrics', SystemMetricsController::class);

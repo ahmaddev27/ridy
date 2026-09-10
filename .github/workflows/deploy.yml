@@ -104,30 +104,50 @@ jobs:
               FCM_CREDENTIALS_PATH="/var/www/storage/app/fcm-credentials.json"
             fi
 
-            cat > .env <<EOF
-            DOMAIN=$DOMAIN
-            SITE_ADDRESS=$DOMAIN
-            APP_KEY=$APP_KEY
-            SESSION_SECURE_COOKIE=true
-            SESSION_SAME_SITE=lax
-            REVERB_APP_ID=$REVERB_APP_ID
-            REVERB_APP_KEY=$REVERB_APP_KEY
-            REVERB_APP_SECRET=$REVERB_APP_SECRET
-            DB_DATABASE=ridy
-            DB_USERNAME=ridy
-            DB_PASSWORD=$DB_PASSWORD
-            DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD
-            DISPATCH_INGEST_SECRET=$DISPATCH_INGEST_SECRET
-            FCM_CREDENTIALS=$FCM_CREDENTIALS_PATH
-            FCM_PROJECT_ID=$FCM_PROJECT_ID
-            ALERT_EMAIL=$ALERT_EMAIL
-            OTP_TEST_CODE=$OTP_TEST_CODE
-            SENTRY_LARAVEL_DSN=$SENTRY_LARAVEL_DSN
-            NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
-            DAEMON_SENTRY_DSN=$DAEMON_SENTRY_DSN
-            NOMINATIM_URL=$NOMINATIM_URL
-            OSRM_URL=$OSRM_URL
-            EOF
+            # Write .env one safely-quoted line at a time. The old unquoted heredoc
+            # (<<EOF, not <<'EOF') had to interpolate $DB_PASSWORD & friends — which also
+            # meant the SHELL expanded any $, backtick or backslash INSIDE a secret value:
+            # a password containing $ was silently truncated, and one containing `…` or
+            # $(…) executed on the server as the deploy user. Values were also written
+            # unquoted, so a secret holding a space or # was misparsed by dotenv. env_line
+            # escapes backslash, " and $ and wraps the value in double quotes — exactly the three
+            # escapes phpdotenv understands — so what the secret holds is what Laravel reads.
+            env_line() {
+              printf '%s="%s"\n' "$1" "$(printf '%s' "$2" | tr -d '\r' | sed -e 's/[\\"$]/\\&/g')" >> .env
+            }
+
+            : > .env
+            env_line DOMAIN "$DOMAIN"
+            env_line SITE_ADDRESS "$DOMAIN"
+            env_line APP_KEY "$APP_KEY"
+            env_line SESSION_SECURE_COOKIE "true"
+            env_line SESSION_SAME_SITE "lax"
+            env_line REVERB_APP_ID "$REVERB_APP_ID"
+            env_line REVERB_APP_KEY "$REVERB_APP_KEY"
+            env_line REVERB_APP_SECRET "$REVERB_APP_SECRET"
+            env_line DB_DATABASE "ridy"
+            env_line DB_USERNAME "ridy"
+            env_line DB_PASSWORD "$DB_PASSWORD"
+            env_line DB_ROOT_PASSWORD "$DB_ROOT_PASSWORD"
+            env_line DISPATCH_INGEST_SECRET "$DISPATCH_INGEST_SECRET"
+            env_line FCM_CREDENTIALS "$FCM_CREDENTIALS_PATH"
+            env_line FCM_PROJECT_ID "$FCM_PROJECT_ID"
+            env_line ALERT_EMAIL "$ALERT_EMAIL"
+            env_line OTP_TEST_CODE "$OTP_TEST_CODE"
+            env_line SENTRY_LARAVEL_DSN "$SENTRY_LARAVEL_DSN"
+            env_line NEXT_PUBLIC_SENTRY_DSN "$NEXT_PUBLIC_SENTRY_DSN"
+            env_line DAEMON_SENTRY_DSN "$DAEMON_SENTRY_DSN"
+            env_line NOMINATIM_URL "$NOMINATIM_URL"
+            env_line OSRM_URL "$OSRM_URL"
+
+            # Every key must be present exactly once: a value that swallowed a newline
+            # would otherwise silently shift the rest of the file into garbage.
+            for key in DOMAIN SITE_ADDRESS APP_KEY SESSION_SECURE_COOKIE SESSION_SAME_SITE REVERB_APP_ID REVERB_APP_KEY REVERB_APP_SECRET DB_DATABASE DB_USERNAME DB_PASSWORD DB_ROOT_PASSWORD DISPATCH_INGEST_SECRET FCM_CREDENTIALS FCM_PROJECT_ID ALERT_EMAIL OTP_TEST_CODE SENTRY_LARAVEL_DSN NEXT_PUBLIC_SENTRY_DSN DAEMON_SENTRY_DSN NOMINATIM_URL OSRM_URL; do
+              count=$(grep -c "^$key=" .env || true)
+              if [ "$count" != "1" ]; then
+                echo "::error::.env is malformed: $key appears $count time(s)"; exit 1
+              fi
+            done
 
             # --- 4. Free the web ports + build + start ------------------------
             # AlmaLinux may ship Apache (httpd) which grabs port 80/443 and blocks
@@ -166,13 +186,29 @@ jobs:
             $COMPOSE exec -T backend sh -c "chown -R www-data:www-data storage bootstrap/cache && chmod -R 775 storage bootstrap/cache" || true
 
             # --- 5. Wait for MySQL, then migrate ------------------------------
+            # Readiness and migration are SEPARATE concerns. The old loop ran
+            # `migrate --force 2>/dev/null` up to 30 times and could not tell "the
+            # database isn't up yet" from "this migration throws": it discarded the
+            # error, and once the attempts ran out the script simply carried on to
+            # config:cache and printed "Deploy complete". A broken migration shipped
+            # green with its failure text thrown away. Now readiness is polled with
+            # mysqladmin (the same probe as the service healthcheck), then migrate
+            # runs exactly ONCE, unredirected, with set -e free to fail the job.
             echo "Waiting for the database..."
+            db_ready=""
             for i in $(seq 1 30); do
-              if $COMPOSE exec -T backend php artisan migrate --force 2>/dev/null; then
+              if $COMPOSE exec -T mysql mysqladmin ping -h localhost -p"$DB_ROOT_PASSWORD" --silent >/dev/null 2>&1; then
+                db_ready=1
                 break
               fi
               sleep 3
             done
+            if [ -z "$db_ready" ]; then
+              echo "::error::database never became reachable (90s) — aborting before migrate."
+              exit 1
+            fi
+
+            $COMPOSE exec -T backend php artisan migrate --force
 
             # Seed the admin user only on the very first deploy.
             if [ ! -f "$APP_DIR/.seeded" ]; then
@@ -197,23 +233,55 @@ jobs:
               echo "composer install failed (attempt $i) — retrying in 20s..."; sleep 20
             done
 
-            $COMPOSE exec -T backend php artisan optimize:clear || true
+            # These steps change RUNTIME behaviour, so they get the same
+            # retry-then-fail treatment composer install now has. A blanket "|| true"
+            # let a failed package:discover or config:cache leave the container running
+            # the PREVIOUS configuration while the deploy still reported success — the
+            # exact silent failure the composer retry was added to stop.
+            artisan_required() {
+              for i in 1 2 3; do
+                if $COMPOSE exec -T backend php artisan "$@"; then return 0; fi
+                echo "artisan $* failed (attempt $i) — retrying in 10s..."
+                sleep 10
+              done
+              echo "::error::artisan $* failed three times — aborting the deploy."
+              return 1
+            }
+
+            artisan_required optimize:clear
             # Link public/storage so uploaded assets (invoice + email logos on the
             # public disk) are actually served at {APP_URL}/storage/... — without
             # this the logo URL 404s and images never render in the PDF or preview.
-            $COMPOSE exec -T backend php artisan storage:link || true
+            # Non-fatal: it legitimately fails when the link already exists.
+            $COMPOSE exec -T backend php artisan storage:link || echo "::warning::storage:link failed (already linked?) — continuing"
             # Rebuild the package-discovery manifest: the image installs deps with
             # --no-scripts (so post-autoload-dump never runs discover), and
             # bootstrap/cache is bind-mounted, so a stale packages.php would keep a
             # newly added provider (e.g. Sentry) from ever registering.
-            $COMPOSE exec -T backend php artisan package:discover || true
-            $COMPOSE exec -T backend php artisan config:cache || true
+            artisan_required package:discover
+            artisan_required config:cache
 
             # Cap the Docker build cache so it can't slowly fill the disk (it grew
             # to 80GB before). Keeps the most recent 5GB for fast rebuilds; drops
             # the rest. Also sweep dangling images left by --build.
             docker builder prune -f --keep-storage 5GB || true
             docker image prune -f || true
+
+            # "Deploy complete" must mean the app actually answers — otherwise a green
+            # run says nothing about whether the site came back up.
+            echo "Checking https://$DOMAIN/api/v1/health ..."
+            for i in 1 2 3 4 5; do
+              if curl -fsS --max-time 15 "https://$DOMAIN/api/v1/health" >/dev/null; then
+                health_ok=1
+                break
+              fi
+              echo "health check not ready (attempt $i) — retrying in 6s..."
+              sleep 6
+            done
+            if [ -z "$health_ok" ]; then
+              echo "::error::health check failed at https://$DOMAIN/api/v1/health"
+              exit 1
+            fi
 
             echo "Deploy complete: https://$DOMAIN"
         env:

@@ -53,6 +53,11 @@ class OfferTripTest extends TestCase
 
         Sanctum::actingAs($user);
 
+        // Opening an offer QUEUES the geocode (GeocodeOffer) instead of running two
+        // Nominatim calls plus an OSRM route inside the GET; the detail renders from
+        // what is stored, so the resolved trip shows on the next read.
+        $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk();
+
         $res = $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk();
         $res->assertJsonPath('data.trip.distance_km', 5.2)
             ->assertJsonPath('data.trip.fare_amount', 6.43)
@@ -108,6 +113,10 @@ class OfferTripTest extends TestCase
 
         Sanctum::actingAs($user);
 
+        // Opening an offer QUEUES the geocode (GeocodeOffer) instead of running two
+        // Nominatim calls plus an OSRM route inside the GET; the detail renders from
+        // what is stored, so the resolved trip shows on the next read.
+        $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk();
         $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk()
             ->assertJsonPath('data.trip.distance_km', 3.4)
             ->assertJsonPath('data.trip.price_per_km', 1.34) // 4.57 / 3.4
@@ -151,6 +160,10 @@ class OfferTripTest extends TestCase
 
         Sanctum::actingAs($user);
 
+        // Opening an offer QUEUES the geocode (GeocodeOffer) instead of running two
+        // Nominatim calls plus an OSRM route inside the GET; the detail renders from
+        // what is stored, so the resolved trip shows on the next read.
+        $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk();
         $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk()
             ->assertJsonPath('data.trip.distance_km', 25.4)
             ->assertJsonPath('data.trip.geo_confidence', 'street');
@@ -393,6 +406,11 @@ class OfferTripTest extends TestCase
         ]);
 
         Sanctum::actingAs($user);
+
+        // Opening an offer QUEUES the geocode (GeocodeOffer) instead of running it
+        // inside the GET; the detail renders from what is stored, so the resolved
+        // trip shows on the next read.
+        $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk();
 
         $res = $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk();
         // Resolved only to the static PLZ centroids (Berlin ~52.5, Munich ~48.1) →

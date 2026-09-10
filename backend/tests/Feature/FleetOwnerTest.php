@@ -223,4 +223,39 @@ class FleetOwnerTest extends TestCase
         Sanctum::actingAs($reseller);
         $this->getJson('/api/v1/driver/fleet/offers')->assertStatus(403);
     }
+
+    /**
+     * The owner app token is obtained with an emailed 6-digit code and no password.
+     * It must therefore stay inside the read-only fleet surface and never reach the
+     * manager API it would otherwise share full power with.
+     */
+    public function test_owner_app_token_is_refused_on_the_manager_api(): void
+    {
+        $this->owner();
+
+        $token = $this->postJson('/api/v1/driver/login', ['email' => 'owner@ya.de', 'password' => 'secret123'])
+            ->assertOk()->json('data.token');
+        $auth = ['Authorization' => 'Bearer '.$token];
+
+        // The destructive manager routes: fleet purge, offer bulk delete, driver reads.
+        $this->deleteJson('/api/v1/fleet-session', [], $auth)->assertStatus(403);
+        $this->postJson('/api/v1/dispatch/offers/bulk-delete', ['ids' => [1]], $auth)->assertStatus(403);
+        $this->getJson('/api/v1/drivers', $auth)->assertStatus(403);
+        // Even the shared session basics stay out of reach — the app has its own.
+        $this->getJson('/api/v1/me', $auth)->assertStatus(403);
+
+        // …while the fleet surface it was minted for still works.
+        $this->getJson('/api/v1/driver/fleet/me', $auth)->assertOk();
+    }
+
+    public function test_owner_app_token_carries_only_the_read_ability(): void
+    {
+        $owner = $this->owner();
+
+        $this->postJson('/api/v1/driver/login', ['email' => 'owner@ya.de', 'password' => 'secret123'])->assertOk();
+
+        $token = $owner->tokens()->latest('id')->first();
+        $this->assertSame('driver-app-owner', $token->name);
+        $this->assertSame(['fleet:read'], $token->abilities);
+    }
 }

@@ -25,6 +25,23 @@
 2. **Load Temporary Add-on** → اختر `extension/manifest.json`
    > مؤقّت — بينمسح عند إغلاق فايرفوكس (للتطوير فقط).
 
+## التطوير محلياً — مضيفات localhost
+
+النسخة المنشورة **لا** تحتوي `localhost` / `127.0.0.1` في `manifest.json` ولا في قوائم السماح
+(`ALLOWED_API_HOSTS` / `ALLOWED_PAIR_ORIGINS`): أي صفحة على منفذ 3000 على جهاز المدير كانت
+تقدر تعيد إقران الإضافة بنقطة نهاية محلية وتستلم جلسة أوبر الملتقَطة التالية.
+
+للتطوير محلياً شغّل السكربت ثم **أرجِعه قبل أي رفع للمتجر**:
+
+```bash
+node dev-hosts.mjs on    # يضيف localhost للتطوير
+node dev-hosts.mjs off   # يرجّع حالة الإصدار (الحالة المحفوظة في git)
+```
+
+> قبل عمل zip للمتجر: `node dev-hosts.mjs off` ثم تأكّد أن `git status` نظيف، وارفع رقم `version`.
+
+---
+
 ## الإعداد (مرة واحدة)
 
 1. لوحة رايدي → **Uber-Verbindung** → **Kopplungs-Token generieren** → انسخ التوكن

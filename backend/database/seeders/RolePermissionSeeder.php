@@ -15,6 +15,9 @@ class RolePermissionSeeder extends Seeder
 
         $permissions = [
             'offers.view',
+            // Deleting offers is destructive and irreversible, so it is NOT part of
+            // offers.view — a viewer reads the feed but cannot purge it.
+            'offers.manage',
             'drivers.manage',
             'connections.manage',
             'audit.view',
@@ -35,8 +38,8 @@ class RolePermissionSeeder extends Seeder
         $roles = [
             // Platform owner — full cross-tenant control.
             'super_admin' => $permissions,
-            'owner' => ['offers.view', 'drivers.manage', 'connections.manage', 'audit.view', 'users.manage'],
-            'fleet_manager' => ['offers.view', 'drivers.manage', 'connections.manage', 'audit.view'],
+            'owner' => ['offers.view', 'offers.manage', 'drivers.manage', 'connections.manage', 'audit.view', 'users.manage'],
+            'fleet_manager' => ['offers.view', 'offers.manage', 'drivers.manage', 'connections.manage', 'audit.view'],
             'driver' => ['offers.view'],
             'viewer' => ['offers.view'],
             // A reseller only generates activation codes — no fleet/admin access.

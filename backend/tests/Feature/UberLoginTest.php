@@ -31,6 +31,8 @@ class UberLoginTest extends TestCase
         $user = User::create([
             'name' => 'M', 'email' => 'm@ya.de', 'password' => Hash::make('password'), 'tenant_id' => $this->tenant->id,
         ]);
+        // Signing the company into Uber is gated on connections.manage.
+        $user->assignRole('fleet_manager');
         Sanctum::actingAs($user);
     }
 

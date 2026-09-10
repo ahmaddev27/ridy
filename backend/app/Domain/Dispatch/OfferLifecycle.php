@@ -7,6 +7,7 @@ use App\Events\OfferBroadcast;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -146,11 +147,14 @@ class OfferLifecycle
     {
         $now = CarbonImmutable::now();
 
-        $completed = DispatchOffer::withoutGlobalScopes()
-            ->where('status', OfferStatus::Started)
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->where('started_at', '<', $now->subMinutes(self::MAX_TRIP_MINUTES))
-            ->update(['status' => OfferStatus::Completed, 'completed_at' => $now]);
+        $completed = $this->finalizeRows(
+            DispatchOffer::withoutGlobalScopes()
+                ->where('status', OfferStatus::Started)
+                ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+                ->where('started_at', '<', $now->subMinutes(self::MAX_TRIP_MINUTES)),
+            OfferStatus::Started,
+            ['status' => OfferStatus::Completed, 'completed_at' => $now],
+        );
 
         // A driver who has been OFFLINE past the grace can't still be on a trip — the
         // close edge was never observed (a sign-off / abrupt disconnect). Complete it
@@ -158,20 +162,52 @@ class OfferLifecycle
         // brief mid-trip blip (offline → back ON_TRIP) doesn't end a live trip early.
         // The grace is measured from went_offline_at (cleared when the driver returns),
         // so a blip that reconnects resets it. Only offers linked to a driver count.
-        $offlineCompleted = DispatchOffer::withoutGlobalScopes()
-            ->where('status', OfferStatus::Started)
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->whereHas('driver', fn ($q) => $q->offline()
-                ->where('went_offline_at', '<', $now->subMinutes(self::OFFLINE_GRACE_MINUTES)))
-            ->update(['status' => OfferStatus::Completed, 'completed_at' => $now]);
+        $offlineCompleted = $this->finalizeRows(
+            DispatchOffer::withoutGlobalScopes()
+                ->where('status', OfferStatus::Started)
+                ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+                ->whereHas('driver', fn ($q) => $q->offline()
+                    ->where('went_offline_at', '<', $now->subMinutes(self::OFFLINE_GRACE_MINUTES))),
+            OfferStatus::Started,
+            ['status' => OfferStatus::Completed, 'completed_at' => $now],
+        );
 
-        $canceled = DispatchOffer::withoutGlobalScopes()
-            ->where('status', OfferStatus::Accepted)
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->where('accepted_at', '<', $now->subMinutes(self::ACCEPTED_STALE_MINUTES))
-            ->update(['status' => OfferStatus::Canceled, 'canceled_at' => $now]);
+        $canceled = $this->finalizeRows(
+            DispatchOffer::withoutGlobalScopes()
+                ->where('status', OfferStatus::Accepted)
+                ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+                ->where('accepted_at', '<', $now->subMinutes(self::ACCEPTED_STALE_MINUTES)),
+            OfferStatus::Accepted,
+            ['status' => OfferStatus::Canceled, 'canceled_at' => $now],
+        );
 
         return $completed + $offlineCompleted + $canceled;
+    }
+
+    /**
+     * Materialise a sweep's target rows, apply the bulk update, then announce each
+     * row (see {@see announce()}). $from re-guards the UPDATE so a row that moved on
+     * between the SELECT and the write is left alone.
+     *
+     * @param  Builder<DispatchOffer>  $query
+     * @param  array<string, mixed>  $stamps
+     * @return int rows changed
+     */
+    private function finalizeRows(Builder $query, OfferStatus $from, array $stamps): int
+    {
+        $rows = $query->get(['id', 'driver_id', 'tenant_id']);
+        if ($rows->isEmpty()) {
+            return 0;
+        }
+
+        $changed = DispatchOffer::withoutGlobalScopes()
+            ->whereIn('id', $rows->pluck('id'))
+            ->where('status', $from)
+            ->update($stamps);
+
+        $this->announce($rows);
+
+        return $changed;
     }
 
     /**
@@ -193,12 +229,14 @@ class OfferLifecycle
             return 0;
         }
 
-        return DispatchOffer::withoutGlobalScopes()
+        $rows = DispatchOffer::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('driver_uuid', $driverUuid)
             ->where('id', '!=', $keepOfferId)
             ->where('status', OfferStatus::Pending)
-            ->update(['status' => OfferStatus::Rejected, 'rejected_at' => CarbonImmutable::now()]);
+            ->get(['id', 'driver_id', 'tenant_id']);
+
+        return $this->rejectRows($rows);
     }
 
     /**
@@ -216,11 +254,13 @@ class OfferLifecycle
             return 0;
         }
 
-        return DispatchOffer::withoutGlobalScopes()
+        $rows = DispatchOffer::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('driver_uuid', $driverUuid)
             ->where('status', OfferStatus::Pending)
-            ->update(['status' => OfferStatus::Rejected, 'rejected_at' => CarbonImmutable::now()]);
+            ->get(['id', 'driver_id', 'tenant_id']);
+
+        return $this->rejectRows($rows);
     }
 
     /**
@@ -281,7 +321,7 @@ class OfferLifecycle
             ->where('status', OfferStatus::Pending)
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->with('driver:id,online_status')
-            ->get(['id', 'received_at', 'accept_window_seconds', 'driver_id'])
+            ->get(['id', 'received_at', 'accept_window_seconds', 'driver_id', 'tenant_id'])
             ->filter(function (DispatchOffer $o) use ($now, $hardCap) {
                 if ($o->received_at === null) {
                     return false;
@@ -308,15 +348,63 @@ class OfferLifecycle
                     ->addSeconds((int) ($o->accept_window_seconds ?? 0) + 30)
                     ->isBefore($now);
             })
-            ->pluck('id');
+            ->values();
 
-        if ($expired->isEmpty()) {
+        return $this->rejectRows($expired);
+    }
+
+    /**
+     * Reject a materialised set of pending offers in one UPDATE, then announce each
+     * one.
+     *
+     * The status guard is kept on the UPDATE so an offer the driver accepted between
+     * the SELECT and here is not flipped back to rejected.
+     *
+     * @param  Collection<int, DispatchOffer>  $rows
+     * @return int rows changed
+     */
+    private function rejectRows($rows): int
+    {
+        if ($rows->isEmpty()) {
             return 0;
         }
 
-        return DispatchOffer::withoutGlobalScopes()
-            ->whereIn('id', $expired)
-            ->update(['status' => OfferStatus::Rejected, 'rejected_at' => $now]);
+        $changed = DispatchOffer::withoutGlobalScopes()
+            ->whereIn('id', $rows->pluck('id'))
+            ->where('status', OfferStatus::Pending)
+            ->update(['status' => OfferStatus::Rejected, 'rejected_at' => CarbonImmutable::now()]);
+
+        $this->announce($rows);
+
+        return $changed;
+    }
+
+    /**
+     * Announce a bulk state change on the live channels.
+     *
+     * {@see transition()} broadcasts per row, but the sweeps issue one bulk UPDATE
+     * and used to bypass it entirely — so the most common rejection paths in the
+     * system (a newer offer superseding an older one, a driver returning to idle, the
+     * per-minute expiry sweep) produced no WebSocket event at all. Nothing was wrong,
+     * because the dashboard and app fall back to polling; but a manager watching the
+     * live feed saw an offer sit "Open" while the database already said Rejected,
+     * which reads exactly like the stuck-pending bug. Best-effort per row: an offer
+     * with no linked driver has no channel, and a broadcast must never break a sweep.
+     *
+     * @param  Collection<int, DispatchOffer>  $rows
+     */
+    private function announce($rows): void
+    {
+        foreach ($rows as $offer) {
+            if ($offer->driver_id === null) {
+                continue;
+            }
+
+            rescue(
+                fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'status')),
+                report: false,
+            );
+        }
     }
 
     /**

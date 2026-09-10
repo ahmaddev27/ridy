@@ -1,8 +1,6 @@
 // Super-admin screens (companies management). Keyed under `screens.companies.*`.
 
-type Dict = Record<string, unknown>;
-
-const en: Dict = {
+const en = {
   ads: { title: "Ads", subtitle: "Platform-wide ads every company sees on its Offers page.", create: "Create ad", empty: "No ads yet", emptyDesc: "Create your first ad to show it to companies.", colTitle: "Title", colStatus: "Status", colWindow: "Window", active: "Active", inactive: "Inactive", always: "Always", from: "From", until: "Until", edit: "Edit", delete: "Delete", deleted: "Ad deleted", deleteTitle: "Delete ad", deleteConfirm: "This ad will be permanently deleted.", createTitle: "Create ad", editTitle: "Edit ad", fieldTitle: "Title", fieldBody: "Body", fieldImage: "Image", uploadImage: "Upload image", changeImage: "Change image", removeImage: "Remove", uploading: "Uploading…", cropTitle: "Adjust image", cropApply: "Apply", cropHint: "Drag to reposition, use the slider to zoom.", fieldImageUrl: "Image URL", fieldLinkUrl: "Link URL", fieldCtaLabel: "Button label", fieldStartsAt: "Starts at", fieldEndsAt: "Ends at", fieldActive: "Active", save: "Save", saved: "Ad saved", cancel: "Cancel", error: "Something went wrong", slotSponsored: "Sponsored", slotDefaultCta: "Learn more", imageHint: "Recommended: 1200×300 px (banner)", deviceImagesHint: "Upload one image per device (all three required). Design your own button into each image — the whole image is clickable.", recommended: "Recommended" },
   inbox: { title: "Inbox", subtitle: "Messages from the landing page contact form.", unread: "unread", empty: "No messages yet", emptyDesc: "Contact-form submissions from the website will appear here.", markRead: "Mark as read", markUnread: "Mark as unread", delete: "Delete", deleteTitle: "Delete message", deleteConfirm: "This message will be permanently deleted.", cancel: "Cancel", deleted: "Message deleted", error: "Something went wrong" },
   shards: {
@@ -252,7 +250,7 @@ const en: Dict = {
   },
 };
 
-const de: Dict = {
+const de: typeof en = {
   ads: { title: "Werbung", subtitle: "Plattformweite Anzeigen, die jede Firma auf ihrer Angebote-Seite sieht.", create: "Anzeige erstellen", empty: "Noch keine Anzeigen", emptyDesc: "Erstelle deine erste Anzeige, um sie den Firmen zu zeigen.", colTitle: "Titel", colStatus: "Status", colWindow: "Zeitraum", active: "Aktiv", inactive: "Inaktiv", always: "Immer", from: "Ab", until: "Bis", edit: "Bearbeiten", delete: "Löschen", deleted: "Anzeige gelöscht", deleteTitle: "Anzeige löschen", deleteConfirm: "Diese Anzeige wird dauerhaft gelöscht.", createTitle: "Anzeige erstellen", editTitle: "Anzeige bearbeiten", fieldTitle: "Titel", fieldBody: "Text", fieldImage: "Bild", uploadImage: "Bild hochladen", changeImage: "Bild ändern", removeImage: "Entfernen", uploading: "Wird hochgeladen…", cropTitle: "Bild anpassen", cropApply: "Übernehmen", cropHint: "Zum Verschieben ziehen, mit dem Regler zoomen.", fieldImageUrl: "Bild-URL", fieldLinkUrl: "Link-URL", fieldCtaLabel: "Button-Text", fieldStartsAt: "Startet am", fieldEndsAt: "Endet am", fieldActive: "Aktiv", save: "Speichern", saved: "Anzeige gespeichert", cancel: "Abbrechen", error: "Etwas ist schiefgelaufen", slotSponsored: "Anzeige", slotDefaultCta: "Mehr erfahren", imageHint: "Empfohlen: 1200×300 px (Banner)", deviceImagesHint: "Lade pro Gerät ein Bild hoch (alle drei erforderlich). Gestalte deinen Button ins Bild — das ganze Bild ist klickbar.", recommended: "Empfohlen" },
   inbox: { title: "Postfach", subtitle: "Nachrichten aus dem Kontaktformular der Landingpage.", unread: "ungelesen", empty: "Noch keine Nachrichten", emptyDesc: "Einsendungen aus dem Kontaktformular der Website erscheinen hier.", markRead: "Als gelesen markieren", markUnread: "Als ungelesen markieren", delete: "Löschen", deleteTitle: "Nachricht löschen", deleteConfirm: "Diese Nachricht wird dauerhaft gelöscht.", cancel: "Abbrechen", deleted: "Nachricht gelöscht", error: "Etwas ist schiefgelaufen" },
   shards: {
@@ -500,7 +498,7 @@ const de: Dict = {
   },
 };
 
-const ar: Dict = {
+const ar: typeof en = {
   ads: { title: "الإعلانات", subtitle: "إعلانات على مستوى المنصة تراها كل شركة في صفحة العروض.", create: "إنشاء إعلان", empty: "لا توجد إعلانات بعد", emptyDesc: "أنشئ أول إعلان لعرضه على الشركات.", colTitle: "العنوان", colStatus: "الحالة", colWindow: "الفترة", active: "نشط", inactive: "غير نشط", always: "دائمًا", from: "من", until: "حتى", edit: "تعديل", delete: "حذف", deleted: "تم حذف الإعلان", deleteTitle: "حذف الإعلان", deleteConfirm: "سيتم حذف هذا الإعلان نهائيًا.", createTitle: "إنشاء إعلان", editTitle: "تعديل الإعلان", fieldTitle: "العنوان", fieldBody: "النص", fieldImage: "الصورة", uploadImage: "رفع صورة", changeImage: "تغيير الصورة", removeImage: "إزالة", uploading: "جارٍ الرفع…", cropTitle: "ضبط الصورة", cropApply: "تطبيق", cropHint: "اسحب لتحريك الصورة واستخدم الشريط للتكبير.", fieldImageUrl: "رابط الصورة", fieldLinkUrl: "رابط الوجهة", fieldCtaLabel: "نص الزر", fieldStartsAt: "يبدأ في", fieldEndsAt: "ينتهي في", fieldActive: "نشط", save: "حفظ", saved: "تم حفظ الإعلان", cancel: "إلغاء", error: "حدث خطأ ما", slotSponsored: "إعلان", slotDefaultCta: "اعرف المزيد", imageHint: "الموصى به: 1200×300 بكسل (بانر)", deviceImagesHint: "ارفع صورة لكل جهاز (الثلاث مطلوبة). صمّم الزر داخل الصورة نفسها — الصورة كلها قابلة للنقر.", recommended: "الموصى به" },
   inbox: { title: "الوارد", subtitle: "الرسائل الواردة من فورم التواصل بصفحة الهبوط.", unread: "غير مقروءة", empty: "لا توجد رسائل بعد", emptyDesc: "الرسائل المرسلة من فورم الموقع بتظهر هنا.", markRead: "تعليم كمقروءة", markUnread: "تعليم كغير مقروءة", delete: "حذف", deleteTitle: "حذف الرسالة", deleteConfirm: "سيتم حذف هذه الرسالة نهائيًا.", cancel: "إلغاء", deleted: "تم حذف الرسالة", error: "حدث خطأ ما" },
   shards: {
@@ -748,4 +746,8 @@ const ar: Dict = {
   },
 };
 
-export const screensAdmin: { en: Dict; de: Dict; ar: Dict } = { en, de, ar };
+/**
+ * de/ar are typed as `typeof en`, so a missing or misspelt key fails `npm run build`
+ * — the three-locale rule is enforced by the compiler, not by review.
+ */
+export const screensAdmin: { en: typeof en; de: typeof en; ar: typeof en } = { en, de, ar };

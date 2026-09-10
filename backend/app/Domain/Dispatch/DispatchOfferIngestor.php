@@ -34,15 +34,20 @@ class DispatchOfferIngestor
      */
     public function ingest(int $tenantId, array $offer, ?int $seq = null): array
     {
+        // Save and RESTORE rather than clear. Clearing is right for a queue worker,
+        // but the extension path calls this from inside an authenticated dashboard
+        // request where ResolveTenant established the context — so after the first
+        // offer of a batch the request's tenant context was gone, leaving the global
+        // scope silently absent for anything running later in that request. Worker
+        // isolation is guaranteed separately by the Queue::looping hook in
+        // AppServiceProvider::boot().
+        $previous = $this->context->get();
         $this->context->set($tenantId);
 
         try {
             return $this->route($tenantId, $offer, $seq);
         } finally {
-            // Reset the request/job-lifetime tenant so a long-lived worker
-            // (queue/Octane) never inherits this tenant's scope into the next
-            // unit of work. Under FPM this is a harmless per-request no-op.
-            $this->context->forget();
+            $this->context->set($previous);
         }
     }
 

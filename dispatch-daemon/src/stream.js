@@ -116,6 +116,8 @@ export class RamenStream {
           method: "POST",
           headers: { ...this.supplierHeaders(), "content-type": "application/json", "x-csrf-token": "x" },
           dispatcher: this.dispatcher,
+          // A hung proxy connection would otherwise park this page forever.
+          signal: AbortSignal.timeout(config.rosterTimeout),
           body: JSON.stringify({
             orgUuid: { uuid: { value: this.session.uber_org_uuid } },
             driversFilters: ROSTER_FILTERS,
@@ -167,6 +169,10 @@ export class RamenStream {
         method: "POST",
         headers: { ...this.supplierHeaders(), "content-type": "application/json", "x-csrf-token": "x" },
         dispatcher: this.dispatcher,
+        // Without a deadline a stalled poll freezes the whole adaptive chain
+        // (scheduleStatusPoll only reschedules after this await resolves), so
+        // driver statuses stop and every offer reads "Not taken".
+        signal: AbortSignal.timeout(config.statusTimeout),
         body: JSON.stringify({
           orgId: { uuid: { value: this.session.uber_org_uuid } },
           driverIds: [],
@@ -288,12 +294,22 @@ export class RamenStream {
     // self-rotation branch — so a rotation never resets the secondary's seq either.
     if (!this.primary) return;
 
-    this.cookieFp = `${jarFingerprint([...this.jar].map(([name, value]) => ({ name, value })))}:${jarFingerprint(this.session.supplier_cookies)}`;
-
+    // Advance the fingerprint ONLY after the backend has stored the new jar. If the
+    // write fails (backend restarting mid-deploy, or a timeout) an already-advanced
+    // fingerprint would be ahead of what the backend serves, so the next reconcile()
+    // would see a mismatch it can't attribute to a self-rotation and tear the stream
+    // down — restarting it on the OLD cookies with seq reset to 0. That is exactly
+    // the offer-loss mechanism this fingerprint was introduced to close. Keeping the
+    // old fingerprint on failure means the next rotation simply retries the write.
     const cookies = [...this.jar].map(([name, value]) => ({ name, value }));
-    await api.refreshCookies(this.session.id, cookies).catch((e) =>
-      console.error(`[${this.tag()}] cookie refresh failed: ${e.message}`),
-    );
+    const nextFp = `${jarFingerprint(cookies)}:${jarFingerprint(this.session.supplier_cookies)}`;
+
+    try {
+      await api.refreshCookies(this.session.id, cookies);
+      this.cookieFp = nextFp;
+    } catch (e) {
+      console.error(`[${this.tag()}] cookie refresh failed: ${e.message}`);
+    }
   }
 
   tag() {
@@ -341,6 +357,24 @@ export class RamenStream {
     }
   }
 
+  /**
+   * Fetch on this stream's controller with a deadline on the CONNECT phase only.
+   * The timer aborts when no response arrives in time and is cleared the moment
+   * one does, so /recv's body may then stream for as long as it stays alive (the
+   * idle watchdog in readSse guards that phase; a deadline on the body itself
+   * would kill a healthy long-poll). Without it, a proxy that accepts the
+   * connection and never answers leaves run() awaiting forever: no error, no
+   * reconnect, no offers.
+   */
+  async fetchOpening(url) {
+    const timer = setTimeout(() => this.controller.abort(), config.handshakeTimeout);
+    try {
+      return await fetch(url, { headers: this.headers(), signal: this.controller.signal, dispatcher: this.dispatcher });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async connectOnce() {
     this.controller = new AbortController();
     // Cleared until the stream truly opens; run() reads it to decide fast-reopen
@@ -348,7 +382,7 @@ export class RamenStream {
     this.streamOpened = false;
 
     // 1. Handshake. Uber's client sends seq=0 here (seq=-1 returns 404).
-    const ack = await fetch(this.url("/ack", 0), { headers: this.headers(), signal: this.controller.signal, dispatcher: this.dispatcher });
+    const ack = await this.fetchOpening(this.url("/ack", 0));
     if (await this.handleAuthFailure(ack.status)) return;
     // Uber returns 404 on RAMEN for non-residential (datacenter) IPs. Without a
     // residential proxy the server can't hold the stream — offers are captured
@@ -379,7 +413,7 @@ export class RamenStream {
     await this.absorbCookies(ack);
 
     // 2. Open the stream, resuming from the last seq we saw.
-    const recv = await fetch(this.url("/recv", this.seq), { headers: this.headers(), signal: this.controller.signal, dispatcher: this.dispatcher });
+    const recv = await this.fetchOpening(this.url("/recv", this.seq));
     if (await this.handleAuthFailure(recv.status)) return;
     if (!recv.ok) throw new Error(`recv -> ${recv.status}`);
     await this.absorbCookies(recv);
@@ -411,24 +445,43 @@ export class RamenStream {
     const decoder = new TextDecoder();
     let buffer = "";
 
-    while (!this.stopped) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    // Idle watchdog. Every recovery path in run() is triggered by this read ENDING
+    // or throwing, so a connection that goes quiet WITHOUT closing (a proxy that drops
+    // the path but leaves the socket open, a TCP black hole) would park here forever —
+    // the daemon healthy-looking and silent, with an unbounded blind window. Aborting
+    // surfaces as a normal stream error while streamOpened is true, so run() reopens
+    // from this.seq on the fast 250 ms path: no seq reset, no lost offers.
+    let lastFrameAt = Date.now();
+    const watchdog = setInterval(() => {
+      const idleMs = Date.now() - lastFrameAt;
+      if (idleMs < config.streamIdleTimeout) return;
+      console.warn(`[${this.tag()}] no frame for ${Math.round(idleMs / 1000)}s — reopening the stream`);
+      this.controller.abort();
+    }, Math.max(1000, Math.round(config.streamIdleTimeout / 3)));
 
-      // Any frame (offer OR keep-alive) means the stream is alive — heartbeat so
-      // an open-but-quiet stream doesn't drift to "stale/idle" in System Health.
-      // Throttled so frequent keep-alives don't spam the backend.
-      await this.maybeHeartbeat();
+    try {
+      while (!this.stopped) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        lastFrameAt = Date.now();
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
+        // Any frame (offer OR keep-alive) means the stream is alive — heartbeat so
+        // an open-but-quiet stream doesn't drift to "stale/idle" in System Health.
+        // Throttled so frequent keep-alives don't spam the backend.
+        await this.maybeHeartbeat();
 
-      for (const line of lines) {
-        if (!line.startsWith("data:")) continue;
-        const data = line.slice(5).trim();
-        if (data) await this.handleData(data);
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+          const data = line.slice(5).trim();
+          if (data) await this.handleData(data);
+        }
       }
+    } finally {
+      clearInterval(watchdog);
     }
   }
 

@@ -145,7 +145,12 @@ class DriverController extends Controller
             'email' => ['nullable', 'email', 'max:255', Rule::unique('drivers', 'email')->ignore($driver->id)],
         ]);
 
-        $driver->forceFill(['email' => $data['email'] ?: null])->save();
+        // PATCH semantics: an ABSENT email leaves the driver untouched, an empty one
+        // clears it. Reading $data['email'] unconditionally 500'd on a body that
+        // simply didn't carry the field.
+        if (array_key_exists('email', $data)) {
+            $driver->forceFill(['email' => $data['email'] ?: null])->save();
+        }
 
         return new DriverResource($driver);
     }

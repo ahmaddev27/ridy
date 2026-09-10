@@ -100,10 +100,16 @@ class DispatchPushTest extends TestCase
             }
         };
 
+        // The owner copy runs on the queue (NotifyOwnersOfOffer), which resolves the
+        // notifier from the container — so the spy has to be the bound transport for
+        // this test to observe it. QUEUE_CONNECTION=sync runs the job inline.
+        $this->app->instance(PushSender::class, $spy);
+
         $sent = (new DispatchNotifier($spy))->notify($offer);
 
-        // Driver + owner = 2 devices; the stranger tenant's device is untouched.
-        $this->assertSame(2, $sent);
+        // notify() reports the DRIVER's devices only; owners are queued off the
+        // 5-second accept window. Both still receive the push here.
+        $this->assertSame(1, $sent);
         $byToken = collect($spy->calls)->keyBy('deviceToken');
         $this->assertTrue($byToken->has('drv'));
         $this->assertTrue($byToken->has('own'));

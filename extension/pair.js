@@ -32,10 +32,10 @@ async function callBackground(message) {
 // Only the real dashboard may pair the extension. Validating event.origin (not
 // just event.source === window) stops any other page on a matched origin — or an
 // XSS on the dashboard hosted elsewhere — from injecting a rogue apiUrl+token.
-const ALLOWED_PAIR_ORIGINS = ["https://reidey.de", "http://localhost:3000", "http://127.0.0.1:3000"];
+const ALLOWED_PAIR_ORIGINS = ["https://reidey.de"];
 
 // Keep in sync with background.js — the paired backend host must be allowlisted.
-const ALLOWED_API_HOSTS = ["reidey.de", "localhost", "127.0.0.1"];
+const ALLOWED_API_HOSTS = ["reidey.de"];
 
 function isAllowedApiUrl(url) {
   let parsed;
