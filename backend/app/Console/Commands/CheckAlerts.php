@@ -23,10 +23,20 @@ class CheckAlerts extends Command
 
     public function handle(AlertService $alerts): int
     {
-        $this->checkSessions($alerts);
-        $this->checkShards($alerts);
+        // Isolate the two checks: one throwing (a bad row, a DB hiccup) must not
+        // skip the other — a session-check failure used to blind shard alerts too.
+        $ok = true;
+        foreach (['checkSessions', 'checkShards'] as $check) {
+            try {
+                $this->{$check}($alerts);
+            } catch (\Throwable $e) {
+                $ok = false;
+                report($e);
+                $this->error("{$check} failed: {$e->getMessage()}");
+            }
+        }
 
-        return self::SUCCESS;
+        return $ok ? self::SUCCESS : self::FAILURE;
     }
 
     /** A company whose Uber session expired or needs relinking gets no offers. */

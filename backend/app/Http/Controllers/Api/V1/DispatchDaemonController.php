@@ -124,13 +124,25 @@ class DispatchDaemonController extends Controller
     }
 
     /** The daemon saw Uber reject the session; flag it for manager re-link. */
-    public function needsRelink(int $session, FleetSessionService $service, SupplierNetworkRecorder $recorder): JsonResponse
+    public function needsRelink(int $session, FleetSessionService $service): JsonResponse
     {
-        $model = $this->find($session);
-        $service->markNeedsRelink($model);
-        $recorder->session((int) $model->tenant_id, 'needs_relink');
+        // markNeedsRelink records the 'needs_relink' event (tagged source=daemon).
+        $service->markNeedsRelink($this->find($session), 'daemon');
 
         return response()->json(['data' => ['status' => UberFleetSession::STATUS_NEEDS_RELINK]]);
+    }
+
+    /**
+     * The daemon's Fleet Hub polls (roster/live-status) are being rejected, but its
+     * RAMEN offer stream is still alive. Prompt the manager to reconnect WITHOUT
+     * flagging the session broken — flagging it would drop the still-working offer
+     * stream. See FleetSessionService::notifySupplierDegraded.
+     */
+    public function supplierDegraded(int $session, FleetSessionService $service): JsonResponse
+    {
+        $service->notifySupplierDegraded($this->find($session), 'daemon');
+
+        return response()->json(['data' => ['status' => 'degraded']]);
     }
 
     /** Liveness heartbeat — records that the stream is still delivering. */

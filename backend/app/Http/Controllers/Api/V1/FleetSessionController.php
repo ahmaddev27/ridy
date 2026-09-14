@@ -14,6 +14,12 @@ use Illuminate\Http\JsonResponse;
 
 class FleetSessionController extends Controller
 {
+    /**
+     * How recently the daemon must have delivered a frame for us to treat its
+     * offer stream as alive (mirrors SystemHealthService's heartbeat TTL).
+     */
+    private const DAEMON_LIVE_MINUTES = 5;
+
     /** Current fleet session status for the manager's tenant (no cookies exposed). */
     public function show(): JsonResponse
     {
@@ -62,8 +68,22 @@ class FleetSessionController extends Controller
     public function reportBroken(FleetSessionService $service): JsonResponse
     {
         $session = UberFleetSession::query()->orderByDesc('updated_at')->first();
+
         if ($session !== null && $session->status === UberFleetSession::STATUS_ACTIVE) {
-            $service->markNeedsRelink($session);
+            // If the server-side daemon is actively streaming this session (a fresh
+            // last_event_at), the RAMEN offer stream is provably alive — the 401/403
+            // the manager's browser hit is only THEIR Fleet Hub session, not ours.
+            // Flagging the session broken here would tear down a working offer stream
+            // (the 2026-09-13 outage: the manager's browser knocked out live offers).
+            // Treat it as supplier-degraded instead: prompt a reconnect, keep streaming.
+            $streaming = $session->last_event_at !== null
+                && $session->last_event_at->greaterThanOrEqualTo(now()->subMinutes(self::DAEMON_LIVE_MINUTES));
+
+            if ($streaming) {
+                $service->notifySupplierDegraded($session, 'extension');
+            } else {
+                $service->markNeedsRelink($session, 'extension');
+            }
         }
 
         return response()->json(['data' => ['status' => $session?->status ?? 'none']]);

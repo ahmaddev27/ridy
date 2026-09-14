@@ -102,6 +102,14 @@ export const config = {
   // itself would kill a healthy long-poll).
   handshakeTimeout: Number(process.env.HANDSHAKE_TIMEOUT_MS || 20000),
 
+  // Fleet Hub (roster/live-status) degradation. A supplier 401/403 does NOT kill
+  // the offer stream (that was a ~4.5h offer outage). Instead the status poll slows
+  // to supplierRetryInterval, and only after supplierFailThreshold consecutive
+  // failures do we prompt the manager — at most once per supplierDegradedCooldown.
+  supplierRetryInterval: Number(process.env.SUPPLIER_RETRY_MS || 60000),
+  supplierFailThreshold: Number(process.env.SUPPLIER_FAIL_THRESHOLD || 3),
+  supplierDegradedCooldown: Number(process.env.SUPPLIER_DEGRADED_COOLDOWN_MS || 600000),
+
   // Idle watchdog for an open stream (ms). A connection that goes quiet WITHOUT
   // closing — a proxy that drops the path but leaves the socket open, a TCP black
   // hole — yields no frame, no error and no reconnect: the daemon looks healthy

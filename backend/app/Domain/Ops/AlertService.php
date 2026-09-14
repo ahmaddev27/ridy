@@ -22,17 +22,22 @@ class AlertService
      */
     public function open(string $key, string $kind, string $title, string $body = ''): void
     {
-        $existing = AlertIncident::where('key', $key)->whereNull('resolved_at')->first();
-        if ($existing !== null) {
-            return; // already alerted; don't re-notify
+        // `key` is UNIQUE, so there is one row per incident forever. A prior
+        // occurrence that already resolved leaves that row present with a
+        // resolved_at — so re-opening the SAME key must UPDATE that row, not insert
+        // a second one (which threw 1062 and crashed the whole alerts:check run,
+        // swallowing the alert AND blinding every check after it).
+        $incident = AlertIncident::firstOrNew(['key' => $key]);
+        if ($incident->exists && $incident->resolved_at === null) {
+            return; // still open; already alerted — don't re-notify
         }
 
-        AlertIncident::create([
-            'key' => $key,
+        $incident->forceFill([
             'kind' => $kind,
             'title' => $title,
             'opened_at' => CarbonImmutable::now(),
-        ]);
+            'resolved_at' => null, // reopen a previously-resolved incident
+        ])->save();
 
         $this->notify("🔴 ALERT: {$title}", $body ?: $title);
         RidyLog::event('alert.opened', ['key' => $key, 'kind' => $kind, 'title' => $title]);

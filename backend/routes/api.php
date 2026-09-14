@@ -169,6 +169,9 @@ Route::prefix('v1')->group(function () {
         Route::get('sessions', [DispatchDaemonController::class, 'sessions']);
         Route::post('sessions/{session}/cookies', [DispatchDaemonController::class, 'refreshCookies']);
         Route::post('sessions/{session}/needs-relink', [DispatchDaemonController::class, 'needsRelink']);
+        // Fleet Hub (roster/status) rejected but the offer stream is still alive:
+        // prompt a reconnect WITHOUT flagging the session broken (keeps offers flowing).
+        Route::post('sessions/{session}/supplier-degraded', [DispatchDaemonController::class, 'supplierDegraded']);
         Route::post('sessions/{session}/heartbeat', [DispatchDaemonController::class, 'heartbeat']);
         Route::post('sessions/{session}/roster', [DispatchDaemonController::class, 'roster']);
         Route::post('sessions/{session}/statuses', [DispatchDaemonController::class, 'statuses']);

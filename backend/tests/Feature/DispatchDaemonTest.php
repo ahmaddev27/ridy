@@ -130,6 +130,23 @@ class DispatchDaemonTest extends TestCase
         $this->assertSame('needs_relink', UberFleetSession::withoutGlobalScopes()->find($session->id)->status);
     }
 
+    public function test_supplier_degraded_keeps_the_session_active(): void
+    {
+        $session = $this->makeSession();
+
+        // Fleet Hub rejected the daemon's roster/status, but the offer stream is
+        // alive — the session must NOT be flagged broken (that dropped live offers).
+        $this->daemon()->postJson("/api/v1/internal/dispatch/sessions/{$session->id}/supplier-degraded")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'degraded');
+
+        $this->assertSame('active', UberFleetSession::withoutGlobalScopes()->find($session->id)->status);
+        $this->assertDatabaseHas('dispatch_network_logs', [
+            'tenant_id' => $session->tenant_id,
+            'kind' => 'session',
+        ]);
+    }
+
     public function test_daemon_endpoints_require_the_secret(): void
     {
         $session = $this->makeSession();

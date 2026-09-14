@@ -172,6 +172,51 @@ class FleetSessionTest extends TestCase
         $this->assertSame(UberFleetSession::STATUS_NEEDS_RELINK, $session->fresh()->status);
     }
 
+    public function test_report_broken_from_the_browser_does_not_kill_a_live_daemon_stream(): void
+    {
+        // The daemon delivered a frame seconds ago, so its RAMEN offer stream is
+        // provably alive — a 401/403 the manager's browser hit is only THEIR Fleet
+        // Hub session. The session must STAY active (offers keep flowing); we only
+        // record a supplier-degraded event to prompt a reconnect.
+        $session = UberFleetSession::withoutGlobalScopes()->create([
+            'tenant_id' => $this->tenant->id, 'uber_org_uuid' => self::ORG,
+            'cookies' => [['name' => 'sid', 'value' => 'v']],
+            'status' => UberFleetSession::STATUS_ACTIVE,
+            'last_event_at' => now()->subMinute(),
+        ]);
+
+        Sanctum::actingAs($this->manager);
+        $this->postJson('/api/v1/fleet-session/report-broken')
+            ->assertOk()
+            ->assertJsonPath('data.status', UberFleetSession::STATUS_ACTIVE);
+
+        $this->assertSame(UberFleetSession::STATUS_ACTIVE, $session->fresh()->status);
+        $this->assertDatabaseHas('dispatch_network_logs', [
+            'tenant_id' => $this->tenant->id,
+            'kind' => 'session',
+        ]);
+    }
+
+    public function test_report_broken_flags_relink_when_the_daemon_is_not_streaming(): void
+    {
+        // No fresh last_event_at → the daemon is NOT holding the stream (datacenter-IP
+        // deploy, or the daemon is down), so the browser's 401/403 is the only signal:
+        // flag needs_relink as before.
+        $session = UberFleetSession::withoutGlobalScopes()->create([
+            'tenant_id' => $this->tenant->id, 'uber_org_uuid' => self::ORG,
+            'cookies' => [['name' => 'sid', 'value' => 'v']],
+            'status' => UberFleetSession::STATUS_ACTIVE,
+            'last_event_at' => now()->subHour(),
+        ]);
+
+        Sanctum::actingAs($this->manager);
+        $this->postJson('/api/v1/fleet-session/report-broken')
+            ->assertOk()
+            ->assertJsonPath('data.status', UberFleetSession::STATUS_NEEDS_RELINK);
+
+        $this->assertSame(UberFleetSession::STATUS_NEEDS_RELINK, $session->fresh()->status);
+    }
+
     public function test_report_broken_leaves_an_already_broken_session_untouched(): void
     {
         $session = UberFleetSession::withoutGlobalScopes()->create([

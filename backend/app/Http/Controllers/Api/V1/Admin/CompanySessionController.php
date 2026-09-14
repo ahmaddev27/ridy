@@ -31,7 +31,7 @@ class CompanySessionController extends Controller
         $session = $this->sessionFor($tenant);
         abort_if($session === null, 404, 'No session.');
 
-        $service->markNeedsRelink($session);
+        $service->markNeedsRelink($session, 'admin');
 
         return response()->json(['data' => ['status' => UberFleetSession::STATUS_NEEDS_RELINK]]);
     }

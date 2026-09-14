@@ -94,12 +94,24 @@ export class RamenStream {
   }
 
   stop() {
+    // Idempotent: a stream commonly gets stopped twice — handleStreamAuthFailure
+    // stops it, then reconcile() sees it "no longer active" 60s later and stops it
+    // again. The second dispatcher.close() on an already-destroyed ProxyAgent
+    // rejected with ClientDestroyedError (an unhandledRejection in Sentry), so
+    // return early once stopped.
+    if (this.stopped) return;
     this.stopped = true;
     this.controller?.abort();
     if (this.rosterTimer) clearInterval(this.rosterTimer);
     if (this.statusTimer) clearTimeout(this.statusTimer); // adaptive loop uses setTimeout
     this.statusPolling = false;
-    this.dispatcher?.close?.();
+    // close() returns a promise that rejects if the agent is already destroyed;
+    // swallow it so a teardown race never becomes an unhandledRejection.
+    try {
+      this.dispatcher?.close?.()?.catch?.(() => {});
+    } catch {
+      /* a synchronous throw from an already-closed agent — nothing to do */
+    }
   }
 
   /**
@@ -129,13 +141,13 @@ export class RamenStream {
           }),
         });
         if (!res.ok) {
-          // A supplier 401/403 means the cookies were rejected — the exact
-          // "company changed their Uber password" case. Report it so the session
-          // is flagged needs_relink and the manager is alerted.
-          if (await this.handleAuthFailure(res.status)) return;
+          // A supplier 401/403 degrades roster/status but NOT the offer stream —
+          // handle it without tearing the stream down.
+          if (await this.handleSupplierAuthFailure(res.status)) return;
           console.warn(`[${this.tag()}] roster fetch -> ${res.status}`);
           return;
         }
+        this.supplierRecovered();
         const result = await res.json();
         if (result.status !== "success") {
           console.warn(`[${this.tag()}] roster fetch: ${result.message || "not success"}`);
@@ -182,12 +194,14 @@ export class RamenStream {
           responseSelector: { includeStats: true },
         }),
       });
-      // A supplier 401/403 here is the clearest "session broken" signal (the
-      // status poll runs continuously), so flag needs_relink and alert the manager.
+      // A supplier 401/403 here degrades live status but NOT the offer stream —
+      // keep streaming offers; just slow the poll and (once persistent) prompt a
+      // reconnect. supplierAuthFails throttles the poll cadence in scheduleStatusPoll.
       if (!res.ok) {
-        await this.handleAuthFailure(res.status);
+        await this.handleSupplierAuthFailure(res.status);
         return;
       }
+      this.supplierRecovered();
       const body = await res.json();
       if (body.status !== "success") return;
 
@@ -241,7 +255,14 @@ export class RamenStream {
       } catch {
         /* syncStatuses logs its own errors */
       }
-      this.scheduleStatusPoll(engaged ? config.statusIntervalActive : config.statusInterval);
+      // While Fleet Hub is rejecting us, poll slowly (supplierRetryInterval) instead
+      // of hammering it every 3-6s — fewer failing calls, less chance of a wider block.
+      const next = this.supplierAuthFails
+        ? config.supplierRetryInterval
+        : engaged
+          ? config.statusIntervalActive
+          : config.statusInterval;
+      this.scheduleStatusPoll(next);
     }, delay);
   }
 
@@ -317,15 +338,51 @@ export class RamenStream {
     return `session ${this.session.id}/${this.session.uber_org_uuid.slice(0, 8)} ${channel}`;
   }
 
-  /** True if Uber rejected the session (auth lapsed) — the manager must re-link. */
-  async handleAuthFailure(status) {
+  /**
+   * The RAMEN OFFER stream itself (ack/recv) was rejected — the offer cookies are
+   * dead, so the session truly needs relinking: flag it and stop. Returns true when
+   * it handled a rejection.
+   */
+  async handleStreamAuthFailure(status) {
     if (status === 401 || status === 403) {
-      console.warn(`[${this.tag()}] auth rejected (${status}) -> needs relink`);
+      console.warn(`[${this.tag()}] stream auth rejected (${status}) -> needs relink`);
       await api.needsRelink(this.session.id).catch(() => {});
       this.stop();
       return true;
     }
     return false;
+  }
+
+  /**
+   * A FLEET HUB call (roster / live-status) was rejected. Its cookies are separate
+   * from the RAMEN stream's, and the offer stream is still delivering — so DO NOT
+   * stop it (that was the ~4.5h offer outage on 2026-09-12/13). Count consecutive
+   * failures; once they persist, prompt the manager to reconnect WITHOUT flagging
+   * the session broken, at most once per cooldown. Returns true on a rejection.
+   */
+  async handleSupplierAuthFailure(status) {
+    if (status !== 401 && status !== 403) return false;
+
+    this.supplierAuthFails = (this.supplierAuthFails ?? 0) + 1;
+    console.warn(`[${this.tag()}] Fleet Hub auth rejected (${status}) x${this.supplierAuthFails} — offer stream kept alive`);
+
+    const now = Date.now();
+    const persistent = this.supplierAuthFails >= config.supplierFailThreshold;
+    const cooledDown = !this.supplierDegradedAt || now - this.supplierDegradedAt > config.supplierDegradedCooldown;
+    if (persistent && cooledDown) {
+      this.supplierDegradedAt = now;
+      await api.supplierDegraded(this.session.id).catch(() => {});
+    }
+    return true;
+  }
+
+  /** A Fleet Hub call succeeded again — clear the degraded state. */
+  supplierRecovered() {
+    if (this.supplierAuthFails) {
+      console.log(`[${this.tag()}] Fleet Hub recovered after ${this.supplierAuthFails} failure(s)`);
+    }
+    this.supplierAuthFails = 0;
+    this.supplierDegradedAt = null;
   }
 
   async run() {
@@ -383,7 +440,7 @@ export class RamenStream {
 
     // 1. Handshake. Uber's client sends seq=0 here (seq=-1 returns 404).
     const ack = await this.fetchOpening(this.url("/ack", 0));
-    if (await this.handleAuthFailure(ack.status)) return;
+    if (await this.handleStreamAuthFailure(ack.status)) return;
     // Uber returns 404 on RAMEN for non-residential (datacenter) IPs. Without a
     // residential proxy the server can't hold the stream — offers are captured
     // via the browser extension instead. Warn once, then retry slowly so the
@@ -414,7 +471,7 @@ export class RamenStream {
 
     // 2. Open the stream, resuming from the last seq we saw.
     const recv = await this.fetchOpening(this.url("/recv", this.seq));
-    if (await this.handleAuthFailure(recv.status)) return;
+    if (await this.handleStreamAuthFailure(recv.status)) return;
     if (!recv.ok) throw new Error(`recv -> ${recv.status}`);
     await this.absorbCookies(recv);
 
@@ -424,11 +481,17 @@ export class RamenStream {
     this.reconnectDelay = config.reconnectMinDelay; // reset backoff on success
     this.lastHeartbeatAt = 0; // force an immediate heartbeat on the first frame
 
-    // Pull the driver roster once the session is proven good, then periodically.
-    // Only the primary channel does this — secondary channels just ingest offers.
+    // Only the primary channel pulls roster/status — secondary channels just ingest.
     if (this.primary) {
-      this.syncRoster();
-      this.rosterTimer ??= setInterval(() => this.syncRoster(), config.rosterInterval);
+      // Pull the roster ONCE on the first successful open, then every rosterInterval
+      // (30 min). Do NOT re-pull on every reopen: the RAMEN long-poll cycle reopens
+      // every few minutes, so calling syncRoster() here each time hammered Fleet Hub
+      // ~20x/hour — needless load that raises the odds of a 403. The timer covers
+      // the rest; a genuine re-link builds a fresh stream that pulls once again.
+      if (!this.rosterTimer) {
+        this.syncRoster();
+        this.rosterTimer = setInterval(() => this.syncRoster(), config.rosterInterval);
+      }
       // Adaptive status polling — start the self-rescheduling loop once (a reconnect
       // must not stack a second chain). First poll fires immediately.
       if (!this.statusPolling) {

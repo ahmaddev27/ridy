@@ -49,6 +49,12 @@ export const api = {
     return call("POST", `/sessions/${sessionId}/needs-relink`);
   },
 
+  /** Fleet Hub polls are failing but the offer stream is alive: prompt a reconnect
+   *  WITHOUT flagging the session broken (so the offer stream keeps running). */
+  async supplierDegraded(sessionId) {
+    return call("POST", `/sessions/${sessionId}/supplier-degraded`);
+  },
+
   /** Forward the driver roster pulled from supplier /api/getDrivers. */
   async roster(sessionId, drivers) {
     return call("POST", `/sessions/${sessionId}/roster`, { drivers });

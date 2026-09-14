@@ -208,16 +208,19 @@
     }
   }
 
-  // A control that signs out ALL / all OTHER sessions: a sign-out verb AND a
-  // scope word. Requiring the scope word is the safety guard against clicking a
-  // plain single-session logout, which would evict the current session.
+  // A control that signs out the OTHER sessions — never the current one. Requires a
+  // sign-out verb AND an explicit "other" word. We deliberately do NOT accept a bare
+  // "all devices" / "alle Geräte": a button labelled only "sign out of all devices"
+  // would evict THIS browser and the daemon's replayed session too (the suspected
+  // cause of the 2026-09-13 offer outage). Uber's real control says "other" ("sign
+  // out of all other sessions" / "von allen anderen Geräten abmelden"), so requiring
+  // it keeps the current session — and the daemon's — alive.
   function isSignOutAllText(text) {
     const t = (text || "").toLowerCase().trim();
     if (!t || t.length > 80) return false;
     const verb = /(sign out|log out|logout|abmelden|abgemeldet)/.test(t);
-    const scope =
-      /(all|other|every|alle|allen|andere|anderen|ger[äa]te|geraete|devices|sessions|sitzungen|[üu]berall|ueberall)/.test(t);
-    return verb && scope;
+    const other = /(other|others|andere|anderen|autres)/.test(t);
+    return verb && other;
   }
 
   function findSignOutAllButton() {
