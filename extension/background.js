@@ -646,6 +646,39 @@ async function armEviction() {
   }
 }
 
+// ── Remove a competitor's Linux/server passkey after Connect ────────────────
+// A rival that linked the operator's Uber account can register a passkey to log
+// back in even after we sign out its sessions. Open the passkeys page and let the
+// content script delete ONLY headless/Linux/server passkeys (never the operator's
+// own phone/PC). Same "click Uber's own UI" approach as the session eviction — no
+// forged requests. Deletes nothing when no such passkey exists.
+const PASSKEYS_URL = "https://account.uber.com/passkeys";
+
+async function armPasskeyCleanup() {
+  try {
+    const tab = await api.tabs.create({ url: PASSKEYS_URL, active: false });
+    await api.storage.local.set({ passkeyCleanupArmed: { at: Date.now() }, passkeyTabId: tab?.id ?? null });
+    console.log("[Reidey bg] passkey cleanup armed — opened passkeys tab", tab?.id);
+    // Fallback close in case the content script never reports (list never rendered).
+    if (tab?.id != null) setTimeout(() => api.tabs?.remove(tab.id).catch(() => {}), 30000);
+    return { ok: true };
+  } catch (e) {
+    console.warn("[Reidey bg] armPasskeyCleanup failed:", e.message);
+    return { ok: false, reason: e.message };
+  }
+}
+
+/** Close the passkeys tab once the content script reports what it removed. */
+async function finishPasskeyCleanup(result) {
+  const { passkeyTabId } = await api.storage.local.get(["passkeyTabId"]);
+  await api.storage.local.remove(["passkeyCleanupArmed", "passkeyTabId"]);
+  const deleted = result?.deleted || [];
+  console.log("[Reidey bg] passkey cleanup:", deleted.length ? `removed ${deleted.join(", ")}` : "nothing to remove");
+  if (passkeyTabId != null) {
+    setTimeout(() => api.tabs?.remove(passkeyTabId).catch(() => {}), 2000);
+  }
+}
+
 /** Close the devices tab once the content script reports it clicked (or gave up). */
 async function finishEviction(result) {
   const { evictTabId } = await api.storage.local.get(["evictTabId"]);
@@ -746,6 +779,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       // dispatch page themselves.
       if (res?.ok && res.closeTab) {
         armEvictionAfterConnect();
+        armPasskeyCleanup();
         warmUpDispatchStream();
         syncFleetDataAfterConnect();
       }
@@ -759,6 +793,10 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg?.type === "evictResult") {
     finishEviction(msg).then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (msg?.type === "passkeyResult") {
+    finishPasskeyCleanup(msg).then(() => sendResponse({ ok: true }));
     return true;
   }
   if (msg?.type === "connectIntent") {

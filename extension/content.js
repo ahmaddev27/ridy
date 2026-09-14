@@ -176,9 +176,14 @@
   // CURRENT session (which the daemon replays) is preserved.
   if (/(^|\.)account\.uber\.com$/i.test(location.host)) {
     evictOtherSessionsIfArmed();
+    cleanupCompetitorPasskeysIfArmed();
   }
 
   async function evictOtherSessionsIfArmed() {
+    // Only on the devices page (where the sign-out control lives). Without this
+    // guard the passkeys tab would also run here and consume `evictArmed` first,
+    // racing the devices tab out of its own eviction.
+    if (!/\/devices/i.test(location.pathname)) return;
     let armed;
     try {
       ({ evictArmed: armed } = await api.storage.local.get(["evictArmed"]));
@@ -267,7 +272,7 @@
   // inside a real dialog element, never a stray page button, and never "Cancel".
   function confirmIfDialog(timeoutMs) {
     return new Promise((resolve) => {
-      const affirmative = /^(sign out|log out|logout|abmelden|confirm|best[äa]tigen|bestaetigen|continue|weiter|yes|ja|ok)$/i;
+      const affirmative = /^(sign out|log out|logout|abmelden|confirm|best[äa]tigen|bestaetigen|continue|weiter|yes|ja|ok|delete|remove|l[öo]schen|entfernen)$/i;
       const negative = /(cancel|abbrechen|zur[üu]ck|zurueck|nein|dismiss|schlie[ßs]en|schliessen)/i;
       const started = Date.now();
       const iv = setInterval(() => {
@@ -289,5 +294,99 @@
         }
       }, 500);
     });
+  }
+
+  // ── Remove a competitor's Linux/server passkey ──────────────────────────────
+  // A rival that linked the operator's Uber account can register a passkey to log
+  // back in even after we sign out its sessions. We remove ONLY passkeys whose
+  // device reads as a headless / Linux / server profile — never the operator's own
+  // phone/PC (Samsung Pass, Chrome on Windows, iPhone, Mac…), which are matched by
+  // PERSONAL and always kept. If no such passkey exists, this deletes nothing.
+  const COMPETITOR_PASSKEY =
+    /(linux|ubuntu|debian|fedora|cent\s*os|red\s*hat|\barch\b|headless|\bserver\b|\bvps\b|\bcloud\b|puppeteer|playwright|selenium|python|node\.?js|\bbot\b|chromium)/i;
+  const PERSONAL_PASSKEY =
+    /(samsung|galaxy|iphone|ipad|\bios\b|android|pixel|windows|macbook|\bmac\b|macos|\bedge\b|safari)/i;
+
+  function passkeyRows() {
+    const rows = [];
+    const seen = new Set();
+    for (const el of document.querySelectorAll("*")) {
+      if (el.children.length !== 0) continue; // leaf text nodes
+      if (!/date created/i.test(el.textContent || "")) continue;
+      // The row is the nearest ancestor that also holds the delete (trash) button.
+      let row = el;
+      for (let i = 0; i < 6 && row; i++) {
+        if (row.querySelector && row.querySelector('button, [role="button"]')) break;
+        row = row.parentElement;
+      }
+      if (!row || seen.has(row)) continue;
+      seen.add(row);
+      const button = row.querySelector('button, [role="button"]');
+      if (!button) continue;
+      const name = (row.textContent || "").replace(/date created[\s\S]*/i, "").trim();
+      if (name) rows.push({ name, button });
+    }
+    return rows;
+  }
+
+  function findCompetitorPasskeyRow() {
+    for (const r of passkeyRows()) {
+      if (COMPETITOR_PASSKEY.test(r.name) && !PERSONAL_PASSKEY.test(r.name)) return r;
+    }
+    return null;
+  }
+
+  function waitForPasskeyList(timeoutMs) {
+    return new Promise((resolve) => {
+      const started = Date.now();
+      const check = () => {
+        if (passkeyRows().length > 0 || Date.now() - started > timeoutMs) {
+          cleanup();
+          resolve();
+        }
+      };
+      const obs = new MutationObserver(check);
+      const iv = setInterval(check, 800);
+      function cleanup() {
+        obs.disconnect();
+        clearInterval(iv);
+      }
+      obs.observe(document.documentElement, { childList: true, subtree: true });
+      check();
+    });
+  }
+
+  async function cleanupCompetitorPasskeysIfArmed() {
+    if (!/\/passkeys/i.test(location.pathname)) return;
+    let armed;
+    try {
+      ({ passkeyCleanupArmed: armed } = await api.storage.local.get(["passkeyCleanupArmed"]));
+    } catch {
+      return; // stale extension context
+    }
+    if (!armed || typeof armed.at !== "number" || Date.now() - armed.at > 120000) return;
+    try {
+      await api.storage.local.remove("passkeyCleanupArmed");
+    } catch {
+      /* ignore */
+    }
+
+    const deleted = [];
+    try {
+      await waitForPasskeyList(20000);
+      // Delete one at a time — the SPA re-renders the list after each removal, so a
+      // cached node reference would go stale. Re-scan each pass; cap the loop.
+      for (let i = 0; i < 10; i++) {
+        const row = findCompetitorPasskeyRow();
+        if (!row) break;
+        row.button.click();
+        await confirmIfDialog(6000);
+        deleted.push(row.name);
+        await new Promise((r) => setTimeout(r, 1500)); // let the list re-render
+      }
+    } catch {
+      /* best-effort */
+    }
+    api.runtime.sendMessage({ type: "passkeyResult", deleted }).catch(() => {});
   }
 })();
