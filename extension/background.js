@@ -639,6 +639,10 @@ async function armEviction() {
     const tab = await api.tabs.create({ url: EVICT_DEVICES_URL, active: false });
     await api.storage.local.set({ evictArmed: { at: Date.now() }, evictTabId: tab?.id ?? null });
     console.log("[Reidey bg] eviction armed — opened devices tab", tab?.id);
+    // Guaranteed fallback close: finishEviction closes it 2s after the content
+    // script reports, but if that report never comes (page didn't load, the arm
+    // went stale, no sign-out button) the tab would linger — so always close it.
+    if (tab?.id != null) setTimeout(() => api.tabs?.remove(tab.id).catch(() => {}), 30000);
     return { ok: true };
   } catch (e) {
     console.warn("[Reidey bg] armEviction failed:", e.message);
