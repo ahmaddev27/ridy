@@ -688,6 +688,24 @@ async function warmUpDispatchStream() {
   }
 }
 
+// Pull the rest of the fleet's data right after Connect — ALL HEADLESS, no Uber
+// tab. Vehicles + roster fetch straight from the supplier API with the captured
+// cookies (so the dashboard is populated immediately instead of waiting up to a
+// minute for the daemon's first poll). Earnings is different: it REPLAYS the
+// graphql template that inject.js captured while the fleethub Connect page was
+// loading, so from now on it refreshes every time WITHOUT reopening Uber.
+async function syncFleetDataAfterConnect() {
+  const results = await Promise.allSettled([fetchVehicles(), fetchRoster()]);
+  console.log("[Reidey bg] post-connect sync (vehicles, roster):", results.map((r) => r.status));
+
+  // The fleethub page fires the earnings query a moment AFTER load, so give the
+  // template a beat to land, then replay it best-effort. A miss self-heals: the
+  // dashboard's normal refresh replays it again once the template is stored.
+  setTimeout(() => {
+    fetchFleetEarnings().then((r) => console.log("[Reidey bg] earnings sync:", r?.ok ? "ok" : r?.reason));
+  }, 6000);
+}
+
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "store_graphql_template" && msg.operationName) {
     api.storage.local
@@ -729,6 +747,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (res?.ok && res.closeTab) {
         armEvictionAfterConnect();
         warmUpDispatchStream();
+        syncFleetDataAfterConnect();
       }
     });
     return true; // async response
