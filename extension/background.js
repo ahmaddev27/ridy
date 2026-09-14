@@ -662,6 +662,32 @@ async function armEvictionAfterConnect() {
   await armEviction();
 }
 
+// ── Warm up the offer stream right after Connect ────────────────────────────
+// The Connect flow lands the manager on fleethub.uber.com, which captures the
+// session but does NOT tee offers — the RAMEN offer tap only runs on
+// vsdispatch.uber.com (see content.js / inject.js). So on a brand-new company
+// the manager saw no offers until they opened the dispatch page THEMSELVES.
+// After a genuine Connect we open vsdispatch in a BACKGROUND tab: its content
+// script (a) re-captures with fresh vsdispatch-scoped RAMEN cookies (so the
+// server-side daemon streams reliably from the first moment), and (b) tees
+// offers immediately, covering the ≤60s gap before the daemon picks up the new
+// session. We close the tab after that warm-up window — the daemon carries the
+// stream from then on, so we don't leave a tab the manager didn't open.
+const DISPATCH_WARMUP_URL = "https://vsdispatch.uber.com/";
+const DISPATCH_WARMUP_MS = 90000;
+
+async function warmUpDispatchStream() {
+  try {
+    const tab = await api.tabs.create({ url: DISPATCH_WARMUP_URL, active: false });
+    console.log("[Reidey bg] dispatch warm-up tab opened", tab?.id);
+    if (tab?.id != null) {
+      setTimeout(() => api.tabs?.remove(tab.id).catch(() => {}), DISPATCH_WARMUP_MS);
+    }
+  } catch (e) {
+    console.warn("[Reidey bg] warmUpDispatchStream failed:", e.message);
+  }
+}
+
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "store_graphql_template" && msg.operationName) {
     api.storage.local
@@ -695,8 +721,15 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (res?.ok && res.closeTab && tabId != null) {
         setTimeout(() => api.tabs?.remove(tabId).catch(() => {}), 2500);
       }
-      // A genuine dashboard "Connect" just completed — always evict other sessions.
-      if (res?.ok && res.closeTab) armEvictionAfterConnect();
+      // A genuine dashboard "Connect" just completed (closeTab is one-shot via
+      // consumeConnectIntent, so the warm-up tab's own capture won't re-trigger
+      // these): evict the operator's other sessions, and warm up the offer stream
+      // so offers flow immediately instead of only after the manager opens the
+      // dispatch page themselves.
+      if (res?.ok && res.closeTab) {
+        armEvictionAfterConnect();
+        warmUpDispatchStream();
+      }
     });
     return true; // async response
   }
