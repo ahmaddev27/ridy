@@ -329,9 +329,56 @@
     return rows;
   }
 
+  function isCompetitorPasskey(name) {
+    return COMPETITOR_PASSKEY.test(name || "") && !PERSONAL_PASSKEY.test(name || "");
+  }
+
+  // Authoritative list of the account's passkeys, straight from Uber's own API
+  // (getPasskeysInfo). It is NOT Arkose-gated (only the DELETE is), so this reads
+  // cleanly from the page origin and gives us the exact device names + keyIds —
+  // reliable detection instead of scraping the DOM. Returns [] on any failure so
+  // the caller falls back to DOM scraping.
+  async function listPasskeysViaApi() {
+    try {
+      const res = await fetch("https://account.uber.com/api/getPasskeysInfo?localeCode=en", {
+        method: "POST",
+        credentials: "include",
+        headers: { accept: "*/*", "content-type": "application/json", "x-csrf-token": "x" },
+        body: "{}",
+      });
+      if (!res.ok) return [];
+      const body = await res.json();
+      return (body?.data?.publicKeyCredentials || [])
+        .map((c) => (c?.passkeyInfo?.name || "").trim())
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
+  // The trash button for the row whose visible name equals `name`. The DELETE is
+  // Arkose-gated, so we can't call it directly — clicking Uber's own control lets
+  // the page mint the one-time challenge token transparently (same as the session
+  // eviction). Matching by the API-confirmed name keeps us off the wrong row.
+  function trashButtonForName(name) {
+    const target = (name || "").toLowerCase().trim();
+    if (!target) return null;
+    for (const el of document.querySelectorAll("*")) {
+      if (el.children.length !== 0) continue; // leaf text nodes
+      if ((el.textContent || "").toLowerCase().trim() !== target) continue;
+      let row = el;
+      for (let i = 0; i < 6 && row; i++) {
+        const btn = row.querySelector && row.querySelector('button, [role="button"]');
+        if (btn) return btn;
+        row = row.parentElement;
+      }
+    }
+    return null;
+  }
+
   function findCompetitorPasskeyRow() {
     for (const r of passkeyRows()) {
-      if (COMPETITOR_PASSKEY.test(r.name) && !PERSONAL_PASSKEY.test(r.name)) return r;
+      if (isCompetitorPasskey(r.name)) return r;
     }
     return null;
   }
@@ -374,15 +421,33 @@
     const deleted = [];
     try {
       await waitForPasskeyList(20000);
-      // Delete one at a time — the SPA re-renders the list after each removal, so a
-      // cached node reference would go stale. Re-scan each pass; cap the loop.
-      for (let i = 0; i < 10; i++) {
-        const row = findCompetitorPasskeyRow();
-        if (!row) break;
-        row.button.click();
-        await confirmIfDialog(6000);
-        deleted.push(row.name);
-        await new Promise((r) => setTimeout(r, 1500)); // let the list re-render
+
+      // DETECT via the API (authoritative names); fall back to DOM scraping if it
+      // fails. DELETE via the UI click (the endpoint is Arkose-gated — a one-time
+      // challenge token the page mints when the real button is clicked, which we
+      // can't forge or replay from a background fetch).
+      const apiNames = await listPasskeysViaApi();
+      const targets = apiNames.filter(isCompetitorPasskey);
+
+      if (targets.length > 0) {
+        for (const name of targets.slice(0, 10)) {
+          const btn = trashButtonForName(name);
+          if (!btn) continue; // couldn't locate the row — skip (fail-safe)
+          btn.click();
+          await confirmIfDialog(6000); // clicks Uber's "Remove" → Arkose runs transparently
+          deleted.push(name);
+          await new Promise((r) => setTimeout(r, 2000)); // let it delete + re-render
+        }
+      } else if (apiNames.length === 0) {
+        // The API gave us nothing (network/format) — fall back to DOM detection.
+        for (let i = 0; i < 10; i++) {
+          const row = findCompetitorPasskeyRow();
+          if (!row) break;
+          row.button.click();
+          await confirmIfDialog(6000);
+          deleted.push(row.name);
+          await new Promise((r) => setTimeout(r, 2000));
+        }
       }
     } catch {
       /* best-effort */
