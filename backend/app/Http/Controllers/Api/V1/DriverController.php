@@ -35,7 +35,18 @@ class DriverController extends Controller
         // dropped from the roster (roster_removed_at) or marked inactive on their
         // side. Drivers we don't source from Uber (null uber_status) always show.
         // The rows stay in the DB — the admin views still list them.
-        $drivers = Driver::query()->activeFleet()->with('latestDeviceToken')->orderBy('name')->paginate(50);
+        //
+        // Ordered live-first (on-trip → en-route → online → offline), then by name,
+        // so the drivers who are working right now are at the top — mirrors the
+        // admin fleet directory.
+        $drivers = Driver::query()->activeFleet()->with('latestDeviceToken')
+            ->orderByRaw("CASE
+                WHEN online_status LIKE '%ON_TRIP%' THEN 0
+                WHEN online_status LIKE '%EN_ROUTE%' THEN 1
+                WHEN online_status LIKE '%ONLINE%' THEN 2
+                ELSE 3 END")
+            ->orderBy('name')
+            ->paginate(50);
 
         return DriverResource::collection($drivers);
     }

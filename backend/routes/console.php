@@ -54,6 +54,11 @@ Schedule::command('alerts:check')->everyFiveMinutes()->withoutOverlapping();
 // supplier.uber.com → fleethub.uber.com). Logs it to the admin Logs tab.
 Schedule::command('fleet:check-sync')->everyFiveMinutes()->withoutOverlapping();
 
+// Force a lapsed company's drivers offline: once its subscription ends the daemon
+// stops streaming it and the extension is blocked, so no new status arrives — the
+// last-known "online" would otherwise stay frozen in the admin list, stats and map.
+Schedule::command('fleet:offline-lapsed')->everyFiveMinutes()->withoutOverlapping();
+
 // Nightly gzipped database backup (kept 7 days in storage/app/backups).
 Schedule::command('db:backup')->dailyAt('03:00')->withoutOverlapping();
 
