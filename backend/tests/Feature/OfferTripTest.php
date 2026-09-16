@@ -414,11 +414,44 @@ class OfferTripTest extends TestCase
 
         $res = $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk();
         // Resolved only to the static PLZ centroids (Berlin ~52.5, Munich ~48.1) →
-        // 'postal', not 'exact'. Per the "no guessing" rule the coarse centroids are
-        // too rough to trust a distance/€-per-km, so distance stays BLANK until a
-        // reliable source fills it (the driver accepts → Uber waypoints).
+        // 'postal', not 'exact'. On a LONG trip (500 km) the centroid's ≈1 km offset
+        // is negligible, so we now show an APPROXIMATE distance (flagged 'postal',
+        // rendered with a "~") instead of withholding it until acceptance.
         $res->assertJsonPath('data.trip.geo_confidence', 'postal');
         $this->assertNotNull($res->json('data.trip.pickup.lat'));
-        $this->assertNull($res->json('data.trip.distance_km'), 'centroid-only → no guessed distance');
+        $this->assertEquals(500, $res->json('data.trip.distance_km'), 'long centroid trip → approximate distance');
+    }
+
+    public function test_a_short_centroid_only_trip_still_withholds_the_distance(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $user = User::create(['name' => 'M', 'email' => 'm@a.de', 'password' => Hash::make('password'), 'tenant_id' => $tenant->id]);
+        $user->assignRole('fleet_manager');
+        app(TenantContext::class)->set($tenant->id);
+
+        $offer = DispatchOffer::create([
+            'tenant_id' => $tenant->id, 'driver_uuid' => 'd1', 'offer_uuid' => 'o3',
+            'pickup_address' => 'Nirgendwostraße 999, 10115 Berlin',
+            'dropoff_address' => 'Irgendwo 1, 10117 Berlin',
+            'fare_formatted' => '8,00 €', 'received_at' => now(), 'raw_payload' => ['offerUUID' => 'o3'],
+        ]);
+
+        // Both ends fall back to nearby PLZ centroids; OSRM routes them ~900 m apart.
+        Http::fake([
+            'nominatim.openstreetmap.org/*' => Http::response([]),
+            'router.project-osrm.org/*' => Http::response([
+                'routes' => [['distance' => 900, 'geometry' => ['type' => 'LineString', 'coordinates' => [[13.38, 52.52], [13.39, 52.53]]]]],
+            ]),
+        ]);
+
+        Sanctum::actingAs($user);
+        $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk();
+        $res = $this->getJson("/api/v1/dispatch/offers/{$offer->id}")->assertOk();
+
+        // Below MIN_COARSE_DISTANCE_M the centroid error dominates, so a short
+        // centroid-only trip still shows no distance until Uber's exact waypoints.
+        $res->assertJsonPath('data.trip.geo_confidence', 'postal');
+        $this->assertNull($res->json('data.trip.distance_km'), 'short centroid trip → still no guessed distance');
     }
 }

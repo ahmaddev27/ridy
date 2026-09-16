@@ -67,6 +67,16 @@ class TripGeocoder
     private const MIN_APPROX_DISTANCE_M = 1500;
 
     /**
+     * A COARSE endpoint — a PLZ centroid ('postal') or a town centroid ('area') —
+     * is trusted for an approximate distance only on a longer trip, where the
+     * centroid's ≈1–1.5 km offset is a small fraction of the route. Below this the
+     * error dominates, so the distance stays blank until Uber's exact waypoints.
+     * An 'approx' end (ambiguous, no postcode — it can land in the WRONG town, the
+     * source of the 55 km garbage) is NEVER trusted, at any length.
+     */
+    private const MIN_COARSE_DISTANCE_M = 4000;
+
+    /**
      * Geocode + route an offer once it succeeds, caching on the row. Safe to call
      * repeatedly: a transient failure (rate-limited free services) leaves
      * geo_synced_at null so a later call — or the backfill command — retries,
@@ -191,16 +201,17 @@ class TripGeocoder
             // 877 m one run, 65 m another; a Wuppertal→Düsseldorf that came out 55 km).
             // Those stay blank until a RELIABLE source fills them — the accept's Uber
             // waypoints (via OfferLifecycle → applyFromWaypoints) or a later exact geocode.
+            // The shortest trip we'll trust a computed distance for, scaled to how
+            // precise the COARSER endpoint is (null = never trust — an ambiguous
+            // 'approx' end that can land in the wrong town). A longer minimum for a
+            // coarser point keeps its positional error a small fraction of the route.
             $route = null;
             $distance = null;
-            if ($this->preciseEnoughForDistance($pConf, $dConf)) {
+            $minTrusted = $this->minTrustedDistance($pConf, $dConf);
+            if ($minTrusted !== null) {
                 $route = $this->route($pickup, $dropoff);
                 $distance = $route['distance_m'] ?? null;
-                // A street-level (approximate) end is trusted only for a long-enough
-                // trip, where its mid-street error is a small fraction; a short trip is
-                // dominated by it, so drop the distance there. Both-exact trusts any length.
-                $bothExact = $pConf === 'exact' && $dConf === 'exact';
-                if ($distance !== null && ! $bothExact && $distance < self::MIN_APPROX_DISTANCE_M) {
+                if ($distance !== null && $distance < $minTrusted) {
                     $route = null;
                     $distance = null;
                 }
@@ -788,17 +799,26 @@ class TripGeocoder
     }
 
     /**
-     * Whether both endpoints are precise enough to trust a distance between them:
-     * both on the correct STREET — an exact house number, OR a street+town match
-     * with the house number missing ('street'). An AREA/POSTAL/APPROX end (a town
-     * centroid or an ambiguous no-postcode hit) is NOT — those gave wildly wrong
-     * distances, so we withhold there and wait for the accept's Uber waypoints.
+     * The shortest trip length (metres) at which a computed distance is trusted for
+     * these two endpoint confidences, or null to withhold it entirely. The coarser
+     * the weaker endpoint, the longer the trip must be so its positional error stays
+     * a small fraction of the route:
+     *   both exact           → 0      (any length)
+     *   both ≥ street         → 1.5 km (mid-street error is small)
+     *   postal / area         → 4 km   (a PLZ/town-centroid offset is a small fraction)
+     *   approx / unknown end  → null   (ambiguous, wrong-town risk — never trust)
      */
-    private function preciseEnoughForDistance(?string $pickup, ?string $dropoff): bool
+    private function minTrustedDistance(?string $pConf, ?string $dConf): ?int
     {
-        $trusted = ['exact', 'street'];
+        $rank = ['exact' => 5, 'street' => 4, 'area' => 3, 'postal' => 2, 'approx' => 1];
+        $worst = min($rank[$pConf] ?? 0, $rank[$dConf] ?? 0);
 
-        return in_array($pickup, $trusted, true) && in_array($dropoff, $trusted, true);
+        return match (true) {
+            $worst <= 1 => null,                       // an 'approx'/unknown end
+            $worst >= 5 => 0,                          // both exact
+            $worst >= 4 => self::MIN_APPROX_DISTANCE_M, // both ≥ street
+            default => self::MIN_COARSE_DISTANCE_M,     // postal / area
+        };
     }
 
     /** The lower (more cautious) of the two endpoints' geocode confidences. */
