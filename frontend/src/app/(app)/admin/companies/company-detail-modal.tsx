@@ -505,6 +505,7 @@ export function CompanyDetail({
                             <th>{c("subHistPeriod")}</th>
                             <th>{c("days")}</th>
                             <th>{c("amount")}</th>
+                            <th>{t("screens.codes.colRef")}</th>
                             <th>{t("screens.codes.method")}</th>
                             <th>{c("subHistStatus")}</th>
                           </tr>
@@ -517,6 +518,7 @@ export function CompanyDetail({
                               </td>
                               <td className="tabular-nums text-ink-muted">{inv.days}</td>
                               <td className="font-semibold tabular-nums text-ink">{inv.amount != null ? `€${inv.amount.toFixed(2)}` : "—"}</td>
+                              <td className="font-mono text-xs text-ink-muted" dir="ltr">{inv.code?.payment_ref ?? "—"}</td>
                               <td className="text-ink-muted">{paymentMethodLabel(inv.code?.payment_method, t)}</td>
                               <td>
                                 <span className={"rounded-full px-2 py-0.5 text-xs font-semibold " + (inv.paid ? "bg-success-bg text-success-fg" : "bg-warning-bg text-warning-fg")}>

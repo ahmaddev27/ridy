@@ -237,6 +237,7 @@ export default function ReportsPage() {
                   <th className="px-4 py-3 font-semibold">{c("colCompany")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colPlan")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colCode")}</th>
+                  <th className="px-4 py-3 font-semibold">{t("screens.codes.colRef")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colDays")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colAmount")}</th>
                   <th className="px-4 py-3 font-semibold">{t("screens.codes.method")}</th>
@@ -263,6 +264,7 @@ export default function ReportsPage() {
                         <span className="text-ink-subtle">—</span>
                       )}
                     </td>
+                    <td className="px-4 py-3 font-mono text-xs text-ink-muted" dir="ltr">{inv.code?.payment_ref ?? "—"}</td>
                     <td className="px-4 py-3 tabular-nums text-ink-muted">{inv.days}</td>
                     <td className="px-4 py-3 font-semibold tabular-nums text-ink">{inv.amount !== null ? money(inv.amount) : "—"}</td>
                     <td className="px-4 py-3 text-ink-muted">{paymentMethodLabel(inv.code?.payment_method, t)}</td>
