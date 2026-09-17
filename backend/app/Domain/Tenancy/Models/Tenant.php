@@ -2,6 +2,7 @@
 
 namespace App\Domain\Tenancy\Models;
 
+use App\Domain\Billing\CompanyReferenceGenerator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Tenant extends Model
 {
     protected $fillable = [
-        'name', 'status', 'country', 'settings', 'uber_org_uuid', 'proxy_url', 'proxy_id',
+        'name', 'payment_reference', 'status', 'country', 'settings', 'uber_org_uuid', 'proxy_url', 'proxy_id',
         'activated_at', 'subscription_ends_at', 'banned_at',
     ];
 
@@ -28,9 +29,26 @@ class Tenant extends Model
     // Contains proxy credentials + the activation code — never expose in responses.
     protected $hidden = ['proxy_url', 'activation_code'];
 
+    protected static function booted(): void
+    {
+        // Every company gets its stable payment reference at creation, so it is
+        // present in the admin list/detail and ready to quote before first login.
+        static::created(fn (Tenant $tenant) => $tenant->ensurePaymentReference());
+    }
+
     public function proxy(): BelongsTo
     {
         return $this->belongsTo(Proxy::class);
+    }
+
+    /**
+     * The company's stable, customer-facing payment reference (REIDEY-JAB-4821),
+     * generated + persisted on first access. Quoted by the company on a bank
+     * transfer and to support so a real transfer can be matched to the company.
+     */
+    public function ensurePaymentReference(): string
+    {
+        return app(CompanyReferenceGenerator::class)->assign($this);
     }
 
     /**

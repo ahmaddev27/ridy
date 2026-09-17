@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Billing\PaymentClaimService;
 use App\Domain\Billing\SubscriptionActivator;
 use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Http\Controllers\Controller;
@@ -99,5 +100,37 @@ class CompanyActivationController extends Controller
         }
 
         return response()->json(['data' => ['activated' => true]]);
+    }
+
+    /**
+     * "I've paid" — a company (identified by its login) tells the admin it made
+     * the bank transfer, so the admin can verify it by the payment reference and
+     * issue a code. Idempotent: a second submit while one is pending returns the
+     * existing claim instead of opening another (so the admin list isn't spammed).
+     */
+    public function claim(Request $request, PaymentClaimService $claims): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string'],
+        ]);
+
+        $user = User::where('email', $data['email'])->first();
+        if (! $user || ! Hash::check($data['password'], $user->password)) {
+            throw ValidationException::withMessages(['email' => [__('auth.failed')]]);
+        }
+
+        $tenant = $user->tenant;
+        if ($tenant === null) {
+            throw ValidationException::withMessages(['email' => 'activation_no_company']);
+        }
+
+        $result = $claims->open($tenant);
+
+        return response()->json(['data' => [
+            'pending' => true,
+            'created' => $result['created'],
+            'reference' => $result['claim']->reference,
+        ]]);
     }
 }

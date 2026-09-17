@@ -90,6 +90,8 @@ class CompanyController extends Controller
 
     public function show(Tenant $tenant): JsonResponse
     {
+        $tenant->ensurePaymentReference(); // backfill for any company created before the feature
+
         return response()->json(['data' => $this->detail($tenant)]);
     }
 

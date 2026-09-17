@@ -1,0 +1,87 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\Admin;
+
+use App\Domain\Billing\ActivationCodeIssuer;
+use App\Domain\Billing\Models\PaymentClaim;
+use App\Domain\Billing\Models\Plan;
+use App\Domain\Billing\Models\SubscriptionCode;
+use App\Domain\Billing\PaymentClaimService;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+/**
+ * Super-admin review of company "I've paid" claims: a pending list to reconcile
+ * each incoming bank transfer by its payment reference, then confirm (verified)
+ * or reject (with a reason) — the company is emailed either way.
+ */
+class PaymentClaimController extends Controller
+{
+    /** Pending claims, oldest first (FIFO for the admin to work through). */
+    public function index(): JsonResponse
+    {
+        $claims = PaymentClaim::with('tenant:id,name,payment_reference')
+            ->where('status', PaymentClaimService::PENDING)
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn (PaymentClaim $c) => [
+                'id' => $c->id,
+                'tenant_id' => $c->tenant_id,
+                'company' => $c->tenant?->name,
+                'reference' => $c->reference,
+                'created_at' => $c->created_at?->toIso8601String(),
+            ]);
+
+        return response()->json(['data' => $claims]);
+    }
+
+    /**
+     * Confirm or reject a pending claim. On CONFIRM the admin picks a plan and an
+     * activation code is issued (same flow as a manual code) and emailed with the
+     * acceptance message. A REJECT requires a reason and emails it. Either way the
+     * company is notified.
+     */
+    public function resolve(Request $request, PaymentClaim $claim, PaymentClaimService $service, ActivationCodeIssuer $issuer): JsonResponse
+    {
+        $confirmed = $request->input('status') === PaymentClaimService::CONFIRMED;
+
+        $data = $request->validate([
+            'status' => ['required', Rule::in([PaymentClaimService::CONFIRMED, PaymentClaimService::REJECTED])],
+            'reason' => ['nullable', 'string', 'max:500', Rule::requiredIf(! $confirmed)],
+            'plan_id' => [Rule::requiredIf($confirmed), 'integer'],
+            'paid' => ['boolean'],
+            'payment_method' => ['nullable', Rule::in(SubscriptionCode::PAYMENT_METHODS)],
+        ]);
+
+        if ($claim->status !== PaymentClaimService::PENDING) {
+            return response()->json(['message' => 'claim_already_resolved'], 422);
+        }
+
+        $tenant = $claim->tenant;
+        if ($tenant === null) {
+            return response()->json(['message' => 'claim_company_missing'], 422);
+        }
+
+        $activationCode = null;
+        if ($confirmed) {
+            $plan = Plan::where('active', true)->find($data['plan_id']);
+            if ($plan === null) {
+                throw ValidationException::withMessages(['plan_id' => 'plan_unavailable']);
+            }
+
+            // Same code-issuing flow as a manual admin code; the acceptance email
+            // carries the code so the company can activate right away.
+            $issued = $issuer->issue(
+                $tenant, $plan, (bool) ($data['paid'] ?? true), $data['payment_method'] ?? 'bank', null, $request->user()->id,
+            );
+            $activationCode = $issued['code'];
+        }
+
+        $service->resolve($claim, $confirmed, $data['reason'] ?? null, $request->user(), $activationCode);
+
+        return response()->json(['data' => ['resolved' => true, 'status' => $claim->status]]);
+    }
+}

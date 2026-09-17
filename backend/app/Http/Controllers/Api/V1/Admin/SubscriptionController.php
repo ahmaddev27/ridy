@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Billing\ActivationCodeIssuer;
 use App\Domain\Billing\Models\Plan;
 use App\Domain\Billing\Models\SubscriptionCode;
 use App\Domain\Billing\Models\SubscriptionPeriod;
-use App\Domain\Billing\PaymentReferenceGenerator;
 use App\Domain\Notifications\Notifier;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\ProxyPool;
-use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -25,10 +24,6 @@ use Illuminate\Validation\ValidationException;
  */
 class SubscriptionController extends Controller
 {
-    use GeneratesOtp;
-
-    private const CODE_TTL_MINUTES = 10;
-
     /**
      * Generate a plan-based activation code the owner enters. Price + duration
      * come from the plan; "paid" is optional (admin may comp a subscription).
@@ -47,44 +42,19 @@ class SubscriptionController extends Controller
         }
 
         $paid = (bool) ($data['paid'] ?? false);
-        $code = $this->newOtp();
-        $expiresAt = CarbonImmutable::now()->addMinutes(self::CODE_TTL_MINUTES);
-
-        $tenant->forceFill([
-            'activation_code' => $code,
-            'activation_code_expires_at' => $expiresAt,
-            'activation_days' => $plan->duration_days,
-            'activation_amount' => $plan->price,
-            'activation_paid' => $paid,
-            'activation_collector_id' => null, // admin-issued, no reseller
-            'activation_attempts' => 0,
-        ])->save();
-
-        $ledger = SubscriptionCode::create([
-            'code' => $code,
-            'plan_id' => $plan->id,
-            'tenant_id' => $tenant->id,
-            'collector_id' => null,
-            'amount' => $plan->price,
-            'paid' => $paid,
-            'payment_method' => $data['payment_method'] ?? null,
-            'expires_at' => $expiresAt,
-            'created_by' => $request->user()->id,
-        ]);
-
-        // Human-readable reference (e.g. DIN-2026-0042) the admin uses to reconcile
-        // the bank transfer this code was issued for.
-        $paymentRef = app(PaymentReferenceGenerator::class)->assign($ledger, $tenant, (int) CarbonImmutable::now()->format('Y'));
+        $issued = app(ActivationCodeIssuer::class)->issue(
+            $tenant, $plan, $paid, $data['payment_method'] ?? null, null, $request->user()->id,
+        );
 
         return response()->json(['data' => [
-            'code' => $code,
-            'payment_ref' => $paymentRef,
-            'payment_method' => $ledger->payment_method,
+            'code' => $issued['code'],
+            'payment_ref' => $issued['payment_ref'],
+            'payment_method' => $data['payment_method'] ?? null,
             'plan' => $plan->name,
             'days' => $plan->duration_days,
             'price' => (float) $plan->price,
             'paid' => $paid,
-            'expires_at' => $expiresAt->toIso8601String(),
+            'expires_at' => $issued['expires_at']->toIso8601String(),
         ]]);
     }
 

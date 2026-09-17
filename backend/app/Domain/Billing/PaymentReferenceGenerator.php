@@ -5,7 +5,6 @@ namespace App\Domain\Billing;
 use App\Domain\Billing\Models\SubscriptionCode;
 use App\Domain\Tenancy\Models\Tenant;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Assigns a human-readable payment reference to an issued activation code, e.g.
@@ -22,7 +21,7 @@ class PaymentReferenceGenerator
     /** Assign, persist, and return the next reference for this company + year. */
     public function assign(SubscriptionCode $code, Tenant $tenant, int $year): string
     {
-        $prefix = $this->prefix($tenant->name);
+        $prefix = PaymentPrefix::from($tenant->name);
 
         return DB::transaction(function () use ($code, $prefix, $year) {
             $pattern = $prefix.'-'.$year.'-%';
@@ -43,19 +42,5 @@ class PaymentReferenceGenerator
 
             return $ref;
         });
-    }
-
-    /** The first 3 A–Z letters of the company name, transliterated + uppercased. */
-    private function prefix(?string $name): string
-    {
-        $ascii = Str::ascii((string) $name);
-        $letters = strtoupper((string) preg_replace('/[^A-Za-z]/', '', $ascii));
-        $prefix = substr($letters, 0, 3);
-
-        if ($prefix === '') {
-            return 'CMP'; // a name with no Latin letters (e.g. all-Arabic) → generic
-        }
-
-        return str_pad($prefix, 3, 'X'); // "A1 Co" → "ACO"; "Q" → "QXX"
     }
 }

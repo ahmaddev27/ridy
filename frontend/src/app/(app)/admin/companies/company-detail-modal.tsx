@@ -312,6 +312,15 @@ export function CompanyDetail({
           <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
         </Link>
         <h1 className="text-xl font-bold text-ink">{company?.name ?? c("company")}</h1>
+        {company?.payment_reference && (
+          <span
+            className="rounded-md bg-surface-2 px-2 py-0.5 font-mono text-xs text-ink-muted"
+            dir="ltr"
+            title={t("screens.codes.yourReference")}
+          >
+            {company.payment_reference}
+          </span>
+        )}
         {company?.state !== undefined && company?.state !== null && (
           <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs font-semibold text-warning-fg">
             {c(`sub_${company.state}`)}

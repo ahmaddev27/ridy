@@ -91,6 +91,8 @@ export default function LoginPage() {
           password,
           supportEmail: err.data.support_email as string | null,
           supportWhatsapp: err.data.support_whatsapp as string | null,
+          paymentReference: (err.data.payment_reference as string | null) ?? null,
+          paymentClaimPending: !!err.data.payment_claim_pending,
         });
         setSubmitting(false);
         return;

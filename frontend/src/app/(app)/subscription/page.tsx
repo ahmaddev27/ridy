@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
 import { ReceiptText, KeyRound } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -10,7 +11,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RedeemCodeModal } from "@/components/subscription/redeem-code-modal";
 import { PaymentMethods } from "@/components/subscription/payment-methods";
-import { paymentMethodLabel } from "@/lib/api/payments";
+import { paymentMethodLabel, getPaymentReference, submitPaymentClaim } from "@/lib/api/payments";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getCompanySubscriptions, type CompanySubscriptionRow } from "@/lib/api/company-subscription";
@@ -28,6 +29,31 @@ export default function CompanySubscriptionPage() {
   const rows = data ?? [];
 
   const [open, setOpen] = useState(false);
+  const [reference, setReference] = useState<string | null>(null);
+  const [claimPending, setClaimPending] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    getPaymentReference()
+      .then((r) => {
+        setReference(r.reference);
+        setClaimPending(r.claim_pending);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function confirmPayment() {
+    setConfirming(true);
+    try {
+      await submitPaymentClaim();
+      setClaimPending(true);
+      toast.success(c("claimSent"));
+    } catch {
+      toast.error(c("claimFailed"));
+    } finally {
+      setConfirming(false);
+    }
+  }
 
   const money = (n: number | null) =>
     n === null ? "—" : new Intl.NumberFormat(latnLocale(locale), { style: "currency", currency: "EUR" }).format(n);
@@ -47,7 +73,12 @@ export default function CompanySubscriptionPage() {
 
       <RedeemCodeModal open={open} onClose={() => setOpen(false)} onSuccess={refetch} />
 
-      <PaymentMethods />
+      <PaymentMethods
+        reference={reference}
+        claimPending={claimPending}
+        onConfirm={confirmPayment}
+        confirming={confirming}
+      />
 
       <Card className="overflow-hidden">
         {loading ? (

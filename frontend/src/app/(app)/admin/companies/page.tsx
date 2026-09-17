@@ -175,7 +175,12 @@ export default function CompaniesPage() {
                   >
                     <td className="px-4 py-3">
                       <div className="font-medium text-ink">{co.name}</div>
-                      <div className="text-xs text-ink-subtle">{co.country ?? "—"}</div>
+                      <div className="flex items-center gap-2 text-xs text-ink-subtle">
+                        <span>{co.country ?? "—"}</span>
+                        {co.payment_reference && (
+                          <span className="font-mono" dir="ltr">· {co.payment_reference}</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col items-start gap-1">

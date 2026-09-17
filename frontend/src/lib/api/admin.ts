@@ -4,6 +4,7 @@ import { codesQueryString, type CodeFilters, type CodesPage } from "./reseller";
 export type Company = {
   id: number;
   name: string;
+  payment_reference: string | null;
   country: string | null;
   status: string;
   uber_org_uuid: string | null;
@@ -760,6 +761,34 @@ export async function listSubscriptionInvoices(
 export async function exportSubscriptionInvoices(tenantId?: number): Promise<Blob> {
   const qs = tenantId ? `?tenant_id=${tenantId}` : "";
   return apiDownload(`/api/v1/admin/subscription-invoices/export${qs}`);
+}
+
+// ── Payment claims ("I've paid" requests awaiting verification) ───────────────
+export type PaymentClaim = {
+  id: number;
+  tenant_id: number;
+  company: string | null;
+  reference: string;
+  created_at: string | null;
+};
+
+export async function listPaymentClaims(): Promise<PaymentClaim[]> {
+  const res = await apiFetch<{ data: PaymentClaim[] }>("/api/v1/admin/payment-claims");
+  return res.data;
+}
+
+/** Confirm (with a plan → issues + emails a code) or reject (with a reason) a claim. */
+export async function resolvePaymentClaim(
+  id: number,
+  input:
+    | { status: "confirmed"; plan_id: number; paid?: boolean; payment_method?: string | null }
+    | { status: "rejected"; reason: string },
+): Promise<{ resolved: boolean; status: string }> {
+  const res = await apiFetch<{ data: { resolved: boolean; status: string } }>(
+    `/api/v1/admin/payment-claims/${id}/resolve`,
+    { method: "POST", body: input, withCsrf: true },
+  );
+  return res.data;
 }
 
 export async function settleInvoice(invoiceId: number, collectorPaymentId: number): Promise<SubscriptionInvoice> {

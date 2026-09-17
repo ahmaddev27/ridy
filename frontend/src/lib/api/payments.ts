@@ -42,3 +42,32 @@ export function paymentMethodLabel(method: string | null | undefined, t: (k: str
   if (method === "cash") return t("screens.codes.method_cash");
   return "—";
 }
+
+/** The authenticated company's stable payment reference + whether a claim is pending. */
+export async function getPaymentReference(): Promise<{ reference: string | null; claim_pending: boolean }> {
+  const res = await apiFetch<{ data: { reference: string | null; claim_pending: boolean } }>(
+    "/api/v1/subscription/payment-reference",
+  );
+  return res.data;
+}
+
+/** "I've paid" from inside the dashboard (idempotent — one pending claim/company). */
+export async function submitPaymentClaim(): Promise<{ pending: boolean; created: boolean; reference: string }> {
+  const res = await apiFetch<{ data: { pending: boolean; created: boolean; reference: string } }>(
+    "/api/v1/subscription/payment-claim",
+    { method: "POST", withCsrf: true },
+  );
+  return res.data;
+}
+
+/** "I've paid" from the pre-login suspended screen (credential-checked). */
+export async function submitPaymentClaimWithCredentials(
+  email: string,
+  password: string,
+): Promise<{ pending: boolean; created: boolean; reference: string }> {
+  const res = await apiFetch<{ data: { pending: boolean; created: boolean; reference: string } }>(
+    "/api/v1/company/payment-claim",
+    { method: "POST", body: { email, password }, withCsrf: true },
+  );
+  return res.data;
+}

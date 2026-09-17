@@ -32,6 +32,7 @@ class CompanyResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'payment_reference' => $this->payment_reference,
             'country' => $this->country,
             'status' => $this->status,
             'uber_org_uuid' => $this->uber_org_uuid,

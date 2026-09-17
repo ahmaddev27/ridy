@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Billing\PaymentClaimService;
 use App\Http\Controllers\Api\V1\Admin\ImpersonationController;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\LoginRequest;
@@ -32,11 +33,16 @@ class AuthController extends Controller
         $user->load('tenant');
         $reason = $user->tenant?->stateReason();
         if ($reason !== null) {
+            // Safe to surface the company's payment reference here: this branch is
+            // reached only after the password check above, so the caller owns the
+            // account. Lets the "how to pay" screen show the reference pre-login.
             return response()->json([
                 'message' => 'account_suspended',
                 'reason' => $reason,
                 'support_email' => Settings::get('support_email'),
                 'support_whatsapp' => Settings::get('support_whatsapp'),
+                'payment_reference' => $user->tenant->ensurePaymentReference(),
+                'payment_claim_pending' => app(PaymentClaimService::class)->hasPending($user->tenant),
             ], 403);
         }
 

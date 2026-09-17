@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Billing\Models\SubscriptionPeriod;
+use App\Domain\Billing\PaymentClaimService;
 use App\Domain\Billing\SubscriptionActivator;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -62,6 +63,37 @@ class CompanySubscriptionController extends Controller
             'activated' => true,
             'days' => $period->days,
             'ends_at' => $period->ends_at->toIso8601String(),
+        ]]);
+    }
+
+    /** The company's stable payment reference (REIDEY-JAB-4821) + claim state. */
+    public function paymentReference(Request $request, PaymentClaimService $claims): JsonResponse
+    {
+        $tenant = $request->user()->tenant;
+        if ($tenant === null) {
+            return response()->json(['data' => ['reference' => null, 'claim_pending' => false]]);
+        }
+
+        return response()->json(['data' => [
+            'reference' => $tenant->ensurePaymentReference(),
+            'claim_pending' => $claims->hasPending($tenant),
+        ]]);
+    }
+
+    /** "I've paid" — open (or return the existing) pending payment claim. */
+    public function claim(Request $request, PaymentClaimService $claims): JsonResponse
+    {
+        $tenant = $request->user()->tenant;
+        if ($tenant === null) {
+            throw ValidationException::withMessages(['tenant' => 'activation_no_company']);
+        }
+
+        $result = $claims->open($tenant);
+
+        return response()->json(['data' => [
+            'pending' => true,
+            'created' => $result['created'],
+            'reference' => $result['claim']->reference,
         ]]);
     }
 

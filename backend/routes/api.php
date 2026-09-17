@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\Admin\LogViewerController;
 use App\Http\Controllers\Api\V1\Admin\NetworkLogController;
 use App\Http\Controllers\Api\V1\Admin\OrphanDriverController;
 use App\Http\Controllers\Api\V1\Admin\OverviewController;
+use App\Http\Controllers\Api\V1\Admin\PaymentClaimController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\ProxyController;
 use App\Http\Controllers\Api\V1\Admin\QueueAdminController;
@@ -108,6 +109,8 @@ Route::prefix('v1')->group(function () {
 
     // Company owner enters the admin-generated activation code (3 tries -> ban).
     Route::post('company/activate', [CompanyActivationController::class, 'activate'])->middleware('throttle:10,1');
+    // "I've paid" from the pre-login suspended screen (credential-checked, idempotent).
+    Route::post('company/payment-claim', [CompanyActivationController::class, 'claim'])->middleware('throttle:10,1');
 
     // Mobile driver app. Public onboarding + Sanctum-guarded session. No tenant
     // middleware: a driver's tenant is derived from the driver, not the request.
@@ -214,6 +217,10 @@ Route::prefix('v1')->group(function () {
 
         // The company's own subscription history (codes/plans/collector/status).
         Route::get('subscription/history', [CompanySubscriptionController::class, 'index']);
+        // The company's stable payment reference (quoted on a bank transfer / to support).
+        Route::get('subscription/payment-reference', [CompanySubscriptionController::class, 'paymentReference']);
+        // "I've paid" from inside the dashboard (idempotent — one pending claim/company).
+        Route::post('subscription/payment-claim', [CompanySubscriptionController::class, 'claim'])->middleware('throttle:10,1');
         // Redeem a subscription code from inside the dashboard (stacks after current).
         Route::post('subscription/redeem', [CompanySubscriptionController::class, 'redeem'])->middleware('throttle:10,1');
 
@@ -375,6 +382,10 @@ Route::prefix('v1')->group(function () {
         Route::get('companies/{tenant}/users', [CompanyUserController::class, 'index']);
         Route::post('companies/{tenant}/users', [CompanyUserController::class, 'store']);
         Route::post('companies/{tenant}/users/{user}/reset-password', [CompanyUserController::class, 'resetPassword']);
+
+        // Company "I've paid" claims: pending list + confirm/reject (emails the company).
+        Route::get('payment-claims', [PaymentClaimController::class, 'index']);
+        Route::post('payment-claims/{claim}/resolve', [PaymentClaimController::class, 'resolve']);
 
         // Subscriptions: generate an activation code, review + lift bans.
         Route::get('banned-companies', [SubscriptionController::class, 'banned']);
