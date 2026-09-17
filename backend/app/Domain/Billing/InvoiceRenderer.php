@@ -68,6 +68,7 @@ class InvoiceRenderer
             'customer_address' => "Elberfelder Straße 12\n42103 Wuppertal\nDeutschland",
             'customer_no' => 'KD-0071',
             'activation_code' => 'REIDEY-7F3K-92MX',
+            'payment_ref' => 'ASF-'.date('Y').'-0042',
 
             'item_title' => 'Reidey Flotten-Abo',
             'item_desc' => 'Live-Dispatch, Fahrer-Push & Auswertung · Laufzeit 30 Tage',
@@ -127,6 +128,7 @@ class InvoiceRenderer
             'customer_address' => $this->customerAddress($tenant),
             'customer_no' => $tenant !== null ? sprintf('KD-%04d', $tenant->id) : null,
             'activation_code' => $code?->code,
+            'payment_ref' => $code?->payment_ref,
 
             'item_title' => $planName !== null ? 'Reidey '.$planName : 'Reidey Flotten-Abo',
             'item_desc' => 'Live-Dispatch, Fahrer-Push & Auswertung · Laufzeit '.$period->days.' Tage',

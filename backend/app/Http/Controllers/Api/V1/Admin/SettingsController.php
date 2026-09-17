@@ -33,6 +33,18 @@ class SettingsController extends Controller
             'support_email' => Settings::get('support_email'),
             'support_whatsapp' => Settings::get('support_whatsapp'),
 
+            // Subscription payment methods shown to a company on its subscription /
+            // suspended screen. Each method is independently on/off.
+            'pay_bank_enabled' => Settings::get('pay_bank_enabled') === '1',
+            'pay_bank_holder' => Settings::get('pay_bank_holder'),
+            'pay_bank_name' => Settings::get('pay_bank_name'),
+            'pay_bank_iban' => Settings::get('pay_bank_iban'),
+            'pay_bank_bic' => Settings::get('pay_bank_bic'),
+            'pay_bank_note' => Settings::get('pay_bank_note'),
+            'pay_cash_enabled' => Settings::get('pay_cash_enabled') === '1',
+            'pay_cash_whatsapp' => Settings::get('pay_cash_whatsapp'),
+            'pay_cash_note' => Settings::get('pay_cash_note'),
+
             // Mobile driver-app force-update gate (min supported version + store links).
             'app_min_android' => Settings::get('app_min_android'),
             'app_min_ios' => Settings::get('app_min_ios'),
@@ -55,6 +67,15 @@ class SettingsController extends Controller
             'resend_api_key' => ['nullable', 'string', 'max:255'], // only when changing
             'support_email' => ['nullable', 'email'],
             'support_whatsapp' => ['nullable', 'string', 'max:32'],
+            'pay_bank_enabled' => ['nullable', 'boolean'],
+            'pay_bank_holder' => ['nullable', 'string', 'max:255'],
+            'pay_bank_name' => ['nullable', 'string', 'max:255'],
+            'pay_bank_iban' => ['nullable', 'string', 'max:64'],
+            'pay_bank_bic' => ['nullable', 'string', 'max:32'],
+            'pay_bank_note' => ['nullable', 'string', 'max:500'],
+            'pay_cash_enabled' => ['nullable', 'boolean'],
+            'pay_cash_whatsapp' => ['nullable', 'string', 'max:32'],
+            'pay_cash_note' => ['nullable', 'string', 'max:500'],
             'app_min_android' => ['nullable', 'string', 'max:20'],
             'app_min_ios' => ['nullable', 'string', 'max:20'],
             'app_android_store_url' => ['nullable', 'url', 'max:255'],
@@ -64,12 +85,20 @@ class SettingsController extends Controller
         $map = [
             'smtp_host', 'smtp_port', 'smtp_username', 'smtp_encryption',
             'mail_from_address', 'mail_from_name', 'mail_provider', 'support_email', 'support_whatsapp',
+            'pay_bank_holder', 'pay_bank_name', 'pay_bank_iban', 'pay_bank_bic', 'pay_bank_note',
+            'pay_cash_whatsapp', 'pay_cash_note',
             'app_min_android', 'app_min_ios', 'app_android_store_url', 'app_ios_store_url',
         ];
         $values = [];
         foreach ($map as $key) {
             if (array_key_exists($key, $data)) {
                 $values[$key] = $data[$key] !== null ? (string) $data[$key] : null;
+            }
+        }
+        // Boolean toggles are stored as "1"/"" strings (the KV store is string-only).
+        foreach (['pay_bank_enabled', 'pay_cash_enabled'] as $flag) {
+            if ($request->has($flag)) {
+                $values[$flag] = $request->boolean($flag) ? '1' : '';
             }
         }
         // Secrets are only overwritten when a non-empty value is submitted; an

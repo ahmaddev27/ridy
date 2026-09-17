@@ -106,6 +106,11 @@ export default function ResellerPage() {
           <p className="mt-3 text-sm text-ink-muted">
             {money(code.price)} · {c("daysN").replace("{n}", String(code.days))} · {c("validHint")}
           </p>
+          {code.payment_ref && (
+            <p className="mt-2 text-sm text-ink-muted">
+              {c("paymentRef")} <span className="font-mono font-semibold text-ink" dir="ltr">{code.payment_ref}</span>
+            </p>
+          )}
           <Button className="mt-5" onClick={reset}>{c("newCode")}</Button>
         </Card>
       ) : (

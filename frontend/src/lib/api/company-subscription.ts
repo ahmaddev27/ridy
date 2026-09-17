@@ -4,6 +4,7 @@ export type CompanySubscriptionRow = {
   id: number;
   plan: string | null;
   code: string | null;
+  payment_ref: string | null;
   code_status: "pending" | "activated" | "expired" | null;
   period_status: "active" | "scheduled" | "ended";
   collector: string | null;

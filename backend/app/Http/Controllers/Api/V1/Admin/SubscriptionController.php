@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Domain\Billing\Models\Plan;
 use App\Domain\Billing\Models\SubscriptionCode;
 use App\Domain\Billing\Models\SubscriptionPeriod;
+use App\Domain\Billing\PaymentReferenceGenerator;
 use App\Domain\Notifications\Notifier;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\ProxyPool;
@@ -57,7 +58,7 @@ class SubscriptionController extends Controller
             'activation_attempts' => 0,
         ])->save();
 
-        SubscriptionCode::create([
+        $ledger = SubscriptionCode::create([
             'code' => $code,
             'plan_id' => $plan->id,
             'tenant_id' => $tenant->id,
@@ -68,8 +69,13 @@ class SubscriptionController extends Controller
             'created_by' => $request->user()->id,
         ]);
 
+        // Human-readable reference (e.g. DIN-2026-0042) the admin uses to reconcile
+        // the bank transfer this code was issued for.
+        $paymentRef = app(PaymentReferenceGenerator::class)->assign($ledger, $tenant, (int) CarbonImmutable::now()->format('Y'));
+
         return response()->json(['data' => [
             'code' => $code,
+            'payment_ref' => $paymentRef,
             'plan' => $plan->name,
             'days' => $plan->duration_days,
             'price' => (float) $plan->price,

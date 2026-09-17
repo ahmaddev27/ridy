@@ -87,6 +87,7 @@ export function CompanyDetail({
     listPlans().then(setPlans).catch(() => setPlans([]));
   }, [tab, id]);
   const [genCode, setGenCode] = useState<string | null>(null);
+  const [genRef, setGenRef] = useState<string | null>(null);
 
   // Password reset (in-app modal, not a native prompt).
   const [resetFor, setResetFor] = useState<number | null>(null);
@@ -171,6 +172,7 @@ export function CompanyDetail({
     try {
       const res = await generateActivationCode(id, Number(planId), paid);
       setGenCode(res.code);
+      setGenRef(res.payment_ref);
       toast.success(c("codeGenerated"));
       await load();
     } catch (e) {
@@ -417,6 +419,11 @@ export function CompanyDetail({
                     {c("codeIs")}{" "}
                     <span className="font-mono text-lg font-bold tracking-widest" dir="ltr">{genCode}</span>
                     <span className="ms-2 text-xs text-success-fg">{c("codeValid")}</span>
+                    {genRef && (
+                      <div className="mt-1 text-xs text-emerald-800">
+                        {c("codeRef")} <span className="font-mono font-semibold" dir="ltr">{genRef}</span>
+                      </div>
+                    )}
                   </div>
                 )}
 

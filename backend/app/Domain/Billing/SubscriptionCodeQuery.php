@@ -38,6 +38,7 @@ class SubscriptionCodeQuery
         return [
             'id' => $c->id,
             'code' => $c->code,
+            'payment_ref' => $c->payment_ref,
             'plan' => $c->plan?->name,
             'plan_id' => $c->plan_id,
             'tenant_id' => $c->tenant_id,

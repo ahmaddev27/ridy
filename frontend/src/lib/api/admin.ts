@@ -99,6 +99,15 @@ export type PlatformSettings = {
   has_resend_key: boolean;
   support_email: string | null;
   support_whatsapp: string | null;
+  pay_bank_enabled: boolean;
+  pay_bank_holder: string | null;
+  pay_bank_name: string | null;
+  pay_bank_iban: string | null;
+  pay_bank_bic: string | null;
+  pay_bank_note: string | null;
+  pay_cash_enabled: boolean;
+  pay_cash_whatsapp: string | null;
+  pay_cash_note: string | null;
   app_min_android: string | null;
   app_min_ios: string | null;
   app_android_store_url: string | null;
@@ -117,6 +126,15 @@ export type UpdateSettingsInput = Partial<{
   resend_api_key: string; // only when changing
   support_email: string;
   support_whatsapp: string;
+  pay_bank_enabled: boolean;
+  pay_bank_holder: string;
+  pay_bank_name: string;
+  pay_bank_iban: string;
+  pay_bank_bic: string;
+  pay_bank_note: string;
+  pay_cash_enabled: boolean;
+  pay_cash_whatsapp: string;
+  pay_cash_note: string;
   app_min_android: string | null;
   app_min_ios: string | null;
   app_android_store_url: string | null;
@@ -348,8 +366,8 @@ export async function generateActivationCode(
   id: number,
   planId: number,
   paid?: boolean,
-): Promise<{ code: string; plan: string; days: number; price: number; paid: boolean; expires_at: string }> {
-  const res = await apiFetch<{ data: { code: string; plan: string; days: number; price: number; paid: boolean; expires_at: string } }>(
+): Promise<{ code: string; payment_ref: string; plan: string; days: number; price: number; paid: boolean; expires_at: string }> {
+  const res = await apiFetch<{ data: { code: string; payment_ref: string; plan: string; days: number; price: number; paid: boolean; expires_at: string } }>(
     `${base}/${id}/activation`,
     { method: "POST", body: { plan_id: planId, paid }, withCsrf: true },
   );

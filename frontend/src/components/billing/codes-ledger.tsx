@@ -145,6 +145,7 @@ export function CodesLedger({ fetchCodes, exportCodes, showCollector = false, on
           <thead>
             <tr className="border-b border-line text-start text-xs uppercase text-ink-subtle">
               <th className="px-2 py-2 text-start font-medium">{c("colCode")}</th>
+              <th className="px-2 py-2 text-start font-medium">{c("colRef")}</th>
               <th className="px-2 py-2 text-start font-medium">{c("colPlan")}</th>
               <th className="px-2 py-2 text-start font-medium">{c("colCompany")}</th>
               {showCollector && <th className="px-2 py-2 text-start font-medium">{c("colCollector")}</th>}
@@ -159,6 +160,7 @@ export function CodesLedger({ fetchCodes, exportCodes, showCollector = false, on
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-line last:border-0">
                 <td className="px-2 py-2 font-mono font-semibold tracking-wider text-ink" dir="ltr">{r.code}</td>
+                <td className="px-2 py-2 font-mono text-xs text-ink-muted" dir="ltr">{r.payment_ref ?? c("none")}</td>
                 <td className="px-2 py-2 text-ink-muted">{r.plan ?? c("none")}</td>
                 <td className="px-2 py-2 text-ink-muted">{r.company ?? c("none")}</td>
                 {showCollector && <td className="px-2 py-2 text-ink-muted">{r.collector ?? c("none")}</td>}
@@ -187,7 +189,7 @@ export function CodesLedger({ fetchCodes, exportCodes, showCollector = false, on
               </tr>
             ))}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={(showCollector ? 8 : 7) + (onRegenerate ? 1 : 0)} className="px-2 py-8 text-center text-ink-subtle">{c("empty")}</td></tr>
+              <tr><td colSpan={(showCollector ? 9 : 8) + (onRegenerate ? 1 : 0)} className="px-2 py-8 text-center text-ink-subtle">{c("empty")}</td></tr>
             )}
           </tbody>
         </table>

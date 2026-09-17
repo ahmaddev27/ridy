@@ -59,6 +59,7 @@ use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\NotificationPrefsController;
 use App\Http\Controllers\Api\V1\PasswordResetController;
 use App\Http\Controllers\Api\V1\ProfileController;
+use App\Http\Controllers\Api\V1\PublicPaymentController;
 use App\Http\Controllers\Api\V1\PublicPlanController;
 use App\Http\Controllers\Api\V1\PublicSupportController;
 use App\Http\Controllers\Api\V1\RegistrationController;
@@ -90,6 +91,10 @@ Route::prefix('v1')->group(function () {
 
     // Public support-contact (WhatsApp) for the auth pages' "contact support" button.
     Route::get('support-contact', [PublicSupportController::class, 'show'])->middleware('throttle:60,1');
+
+    // Public subscription payment methods (bank transfer / cash) for the suspended
+    // screen + subscription page — only the admin-enabled methods are returned.
+    Route::get('payment-methods', [PublicPaymentController::class, 'show'])->middleware('throttle:60,1');
 
     // Public company self-registration (email OTP).
     Route::post('register', [RegistrationController::class, 'start'])->middleware('throttle:6,1');

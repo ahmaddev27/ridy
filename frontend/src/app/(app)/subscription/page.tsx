@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RedeemCodeModal } from "@/components/subscription/redeem-code-modal";
+import { PaymentMethods } from "@/components/subscription/payment-methods";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getCompanySubscriptions, type CompanySubscriptionRow } from "@/lib/api/company-subscription";
@@ -45,6 +46,8 @@ export default function CompanySubscriptionPage() {
 
       <RedeemCodeModal open={open} onClose={() => setOpen(false)} onSuccess={refetch} />
 
+      <PaymentMethods />
+
       <Card className="overflow-hidden">
         {loading ? (
           <div className="space-y-2 p-4">
@@ -59,6 +62,7 @@ export default function CompanySubscriptionPage() {
                 <tr>
                   <th className="px-4 py-3 font-semibold">{c("colPlan")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colCode")}</th>
+                  <th className="px-4 py-3 font-semibold">{c("colRef")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colCollector")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colAmount")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colStatus")}</th>
@@ -72,6 +76,13 @@ export default function CompanySubscriptionPage() {
                     <td className="px-4 py-3">
                       {r.code ? (
                         <span className="font-mono tracking-wider text-ink-muted" dir="ltr">{r.code}</span>
+                      ) : (
+                        <span className="text-ink-subtle">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {r.payment_ref ? (
+                        <span className="font-mono text-xs text-ink-muted" dir="ltr">{r.payment_ref}</span>
                       ) : (
                         <span className="text-ink-subtle">—</span>
                       )}

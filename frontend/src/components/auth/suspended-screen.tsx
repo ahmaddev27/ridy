@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2, MessageCircle, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OtpInput } from "@/components/ui/otp-input";
+import { PaymentMethods } from "@/components/subscription/payment-methods";
 import { useI18n } from "@/lib/i18n/context";
 import { apiErrorMessage } from "@/lib/api/error-message";
 import { activateCompany } from "@/lib/api/activation";
@@ -79,6 +80,8 @@ export function SuspendedScreen({
           </a>
         )}
       </div>
+
+      {canActivate && <PaymentMethods className="mt-4" />}
 
       {canActivate && (
         <form onSubmit={activate} className="mt-6 space-y-3 border-t border-line pt-5">

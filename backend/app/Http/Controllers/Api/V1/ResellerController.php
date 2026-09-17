@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Billing\Models\Plan;
 use App\Domain\Billing\Models\SubscriptionCode;
+use App\Domain\Billing\PaymentReferenceGenerator;
 use App\Domain\Billing\SubscriptionCodeQuery;
 use App\Domain\Collections\Models\Collector;
 use App\Domain\Tenancy\Models\Tenant;
@@ -129,7 +130,7 @@ class ResellerController extends Controller
             'activation_attempts' => 0,
         ])->save();
 
-        SubscriptionCode::create([
+        $ledger = SubscriptionCode::create([
             'code' => $code,
             'plan_id' => $plan->id,
             'tenant_id' => $tenant->id,
@@ -140,8 +141,13 @@ class ResellerController extends Controller
             'created_by' => $request->user()->id,
         ]);
 
+        // Human-readable reference (e.g. DIN-2026-0042) the reseller/admin uses to
+        // reconcile the bank transfer this code was issued for.
+        $paymentRef = app(PaymentReferenceGenerator::class)->assign($ledger, $tenant, (int) CarbonImmutable::now()->format('Y'));
+
         return response()->json(['data' => [
             'code' => $code,
+            'payment_ref' => $paymentRef,
             'company' => $tenant->name,
             'plan' => $plan->name,
             'days' => $plan->duration_days,

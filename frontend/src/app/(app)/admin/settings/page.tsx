@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Save, Mail, LifeBuoy, Smartphone } from "lucide-react";
+import { Loader2, Save, Mail, LifeBuoy, Smartphone, Landmark, Banknote } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -30,6 +30,17 @@ export default function SettingsPage() {
   const [supportEmail, setSupportEmail] = useState("");
   const [supportWhatsapp, setSupportWhatsapp] = useState("");
   const [provider, setProvider] = useState<"smtp" | "resend">("smtp");
+
+  // Subscription payment methods (bank transfer + cash), each independently on/off.
+  const [bankEnabled, setBankEnabled] = useState(false);
+  const [bankHolder, setBankHolder] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [bankIban, setBankIban] = useState("");
+  const [bankBic, setBankBic] = useState("");
+  const [bankNote, setBankNote] = useState("");
+  const [cashEnabled, setCashEnabled] = useState(false);
+  const [cashWhatsapp, setCashWhatsapp] = useState("");
+  const [cashNote, setCashNote] = useState("");
   const [resendKey, setResendKey] = useState("");
   const [testOpen, setTestOpen] = useState(false);
   const [testTo, setTestTo] = useState("");
@@ -51,6 +62,15 @@ export default function SettingsPage() {
     setFromName(s.mail_from_name ?? "");
     setSupportEmail(s.support_email ?? "");
     setSupportWhatsapp(s.support_whatsapp ?? "");
+    setBankEnabled(s.pay_bank_enabled);
+    setBankHolder(s.pay_bank_holder ?? "");
+    setBankName(s.pay_bank_name ?? "");
+    setBankIban(s.pay_bank_iban ?? "");
+    setBankBic(s.pay_bank_bic ?? "");
+    setBankNote(s.pay_bank_note ?? "");
+    setCashEnabled(s.pay_cash_enabled);
+    setCashWhatsapp(s.pay_cash_whatsapp ?? "");
+    setCashNote(s.pay_cash_note ?? "");
     setProvider(s.mail_provider ?? "smtp");
     setAppMinAndroid(s.app_min_android ?? "");
     setAppMinIos(s.app_min_ios ?? "");
@@ -110,6 +130,29 @@ export default function SettingsPage() {
     setBusy(true);
     try {
       await updateSettings({ support_email: supportEmail, support_whatsapp: supportWhatsapp });
+      toast.success(c("saved"));
+      await load();
+    } catch (e) {
+      toast.error(c("saveFailed"), { description: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function savePayments() {
+    setBusy(true);
+    try {
+      await updateSettings({
+        pay_bank_enabled: bankEnabled,
+        pay_bank_holder: bankHolder.trim(),
+        pay_bank_name: bankName.trim(),
+        pay_bank_iban: bankIban.trim(),
+        pay_bank_bic: bankBic.trim(),
+        pay_bank_note: bankNote.trim(),
+        pay_cash_enabled: cashEnabled,
+        pay_cash_whatsapp: cashWhatsapp.trim(),
+        pay_cash_note: cashNote.trim(),
+      });
       toast.success(c("saved"));
       await load();
     } catch (e) {
@@ -241,6 +284,61 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      {/* Subscription payment methods — shown to companies on the subscription/suspended screens */}
+      <Card className="w-full p-5">
+        <div className="mb-1 flex items-center gap-2">
+          <Banknote className="h-4 w-4 text-ink" />
+          <h3 className="font-semibold text-ink">{c("payment")}</h3>
+        </div>
+        <p className="mb-4 text-sm text-ink-muted">{c("paymentHint")}</p>
+
+        {/* Bank transfer */}
+        <div className="rounded-xl border border-line p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Landmark className="h-4 w-4 text-ink" />
+              <span className="font-medium text-ink">{c("payBank")}</span>
+            </div>
+            <Toggle checked={bankEnabled} onChange={() => setBankEnabled((v) => !v)} label={c("payBank")} />
+          </div>
+          {bankEnabled && (
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <Field label={c("payBankHolder")} value={bankHolder} onChange={setBankHolder} />
+              <Field label={c("payBankName")} value={bankName} onChange={setBankName} />
+              <Field label={c("payBankIban")} value={bankIban} onChange={setBankIban} mono dir="ltr" />
+              <Field label={c("payBankBic")} value={bankBic} onChange={setBankBic} mono dir="ltr" />
+              <div className="md:col-span-2">
+                <Field label={c("payBankNote")} value={bankNote} onChange={setBankNote} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Cash / phone contact */}
+        <div className="mt-3 rounded-xl border border-line p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Banknote className="h-4 w-4 text-ink" />
+              <span className="font-medium text-ink">{c("payCash")}</span>
+            </div>
+            <Toggle checked={cashEnabled} onChange={() => setCashEnabled((v) => !v)} label={c("payCash")} />
+          </div>
+          {cashEnabled && (
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <Field label={c("payCashWhatsapp")} value={cashWhatsapp} onChange={setCashWhatsapp} placeholder="+491700000000" dir="ltr" />
+              <Field label={c("payCashNote")} value={cashNote} onChange={setCashNote} />
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <Button onClick={savePayments} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {c("save")}
+          </Button>
+        </div>
+      </Card>
+
       {/* Mobile driver-app force-update */}
       <Card className="w-full p-5">
         <div className="mb-1 flex items-center gap-2">
@@ -299,6 +397,7 @@ function Field({
   type = "text",
   mono = false,
   placeholder,
+  dir,
 }: {
   label: string;
   value: string;
@@ -306,6 +405,7 @@ function Field({
   type?: string;
   mono?: boolean;
   placeholder?: string;
+  dir?: "ltr" | "rtl";
 }) {
   return (
     <div>
@@ -323,11 +423,44 @@ function Field({
           type={type}
           value={value}
           placeholder={placeholder}
+          dir={dir}
           onChange={(e) => onChange(e.target.value)}
           autoComplete="off"
           className={`w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ${mono ? "font-mono text-xs" : ""}`}
         />
       )}
     </div>
+  );
+}
+
+function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange?: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      title={label}
+      onClick={onChange}
+      className={
+        "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-line " +
+        (checked ? "bg-primary" : "bg-line-strong")
+      }
+    >
+      <span
+        className={
+          "inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ltr:ml-1 rtl:mr-1 " +
+          (checked ? "ltr:translate-x-5 rtl:-translate-x-5" : "translate-x-0")
+        }
+      />
+    </button>
   );
 }

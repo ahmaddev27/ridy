@@ -37,7 +37,8 @@ class ResellerTest extends TestCase
 
         Sanctum::actingAs($user);
         $code = $this->postJson('/api/v1/reseller/activation', ['tenant_id' => $tenant->id, 'plan_id' => $plan->id])
-            ->assertOk()->assertJsonPath('data.price', 200)->assertJsonPath('data.days', 365)->json('data.code');
+            ->assertOk()->assertJsonPath('data.price', 200)->assertJsonPath('data.days', 365)
+            ->assertJsonPath('data.payment_ref', 'ACM-2026-0001')->json('data.code');
 
         // The company owner consumes the code → invoice created with plan price + reseller tag.
         $this->postJson('/api/v1/company/activate', ['email' => 'o@acme.de', 'password' => 'password', 'code' => $code])->assertOk();

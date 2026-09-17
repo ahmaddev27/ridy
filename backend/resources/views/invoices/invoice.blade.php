@@ -92,6 +92,12 @@
                     <span class="eyebrow">{{ $settings->label('invoice_no') }}</span><br>
                     <span class="val">{{ $invoice_no }}</span>
                 </div>
+                @if (!empty($payment_ref))
+                    <div style="padding-top: 6px;">
+                        <span class="eyebrow">{{ $settings->label('payment_ref') }}</span><br>
+                        <span class="val">{{ $payment_ref }}</span>
+                    </div>
+                @endif
             </td>
         </tr>
     </table>

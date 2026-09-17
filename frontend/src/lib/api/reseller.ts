@@ -4,6 +4,7 @@ export type ResellerPlan = { id: number; name: string; price: number; duration_d
 export type ResellerCompany = { id: number; name: string; phone: string | null };
 export type GeneratedCode = {
   code: string;
+  payment_ref: string;
   company: string;
   plan: string;
   days: number;
@@ -36,6 +37,7 @@ export type CodeStatus = "pending" | "activated" | "expired";
 export type CodeRow = {
   id: number;
   code: string;
+  payment_ref: string | null;
   plan: string | null;
   plan_id: number | null;
   tenant_id: number;

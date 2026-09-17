@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class SubscriptionCode extends Model
 {
     protected $fillable = [
-        'code', 'plan_id', 'tenant_id', 'collector_id', 'amount', 'paid',
+        'code', 'payment_ref', 'plan_id', 'tenant_id', 'collector_id', 'amount', 'paid',
         'expires_at', 'activated_at', 'subscription_period_id', 'created_by',
     ];
 

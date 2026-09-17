@@ -48,6 +48,7 @@ class InvoiceSettings extends Model
         'invoice_date' => 'Rechnungsdatum',
         'period' => 'Leistungszeitraum',
         'activation_code' => 'Aktivierungscode',
+        'payment_ref' => 'Zahlungsreferenz',
         'customer_no' => 'Kunden-Nr.',
         'invoice_no' => 'Rechnungs-Nr.',
         'description' => 'Beschreibung',
