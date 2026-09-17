@@ -89,6 +89,7 @@ class CompanySubscriptionController extends Controller
                     'plan' => $code?->plan?->name,
                     'code' => $code?->code,
                     'payment_ref' => $code?->payment_ref,
+                    'payment_method' => $code?->payment_method,
                     'code_status' => $code?->status(),
                     'period_status' => $periodStatus,
                     'collector' => $code?->collector?->name,

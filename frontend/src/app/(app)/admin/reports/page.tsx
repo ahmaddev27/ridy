@@ -13,6 +13,7 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Select } from "@/components/ui/select";
 import { Badge, type Status } from "@/components/ui/badge";
 import { CodeDetailModal } from "@/components/billing/code-detail-modal";
+import { paymentMethodLabel } from "@/lib/api/payments";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import {
@@ -238,6 +239,7 @@ export default function ReportsPage() {
                   <th className="px-4 py-3 font-semibold">{c("colCode")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colDays")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colAmount")}</th>
+                  <th className="px-4 py-3 font-semibold">{t("screens.codes.method")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colStatus")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colStarts")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colEnds")}</th>
@@ -263,6 +265,7 @@ export default function ReportsPage() {
                     </td>
                     <td className="px-4 py-3 tabular-nums text-ink-muted">{inv.days}</td>
                     <td className="px-4 py-3 font-semibold tabular-nums text-ink">{inv.amount !== null ? money(inv.amount) : "—"}</td>
+                    <td className="px-4 py-3 text-ink-muted">{paymentMethodLabel(inv.code?.payment_method, t)}</td>
                     <td className="px-4 py-3">
                       <span
                         className={

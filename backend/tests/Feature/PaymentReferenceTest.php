@@ -87,4 +87,33 @@ class PaymentReferenceTest extends TestCase
 
         $this->assertSame($ref, SubscriptionCode::first()->payment_ref);
     }
+
+    public function test_admin_generate_records_the_selected_payment_method(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $admin = User::create(['name' => 'Admin', 'email' => 'admin@reidey.app', 'password' => Hash::make('password'), 'tenant_id' => null]);
+        $admin->assignRole('super_admin');
+        $tenant = Tenant::create(['name' => 'Dinari', 'country' => 'DE']);
+        $plan = Plan::create(['name' => 'Monthly', 'price' => 50, 'duration_days' => 30, 'active' => true]);
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/v1/admin/companies/{$tenant->id}/activation", ['plan_id' => $plan->id, 'payment_method' => 'bank'])
+            ->assertOk()
+            ->assertJsonPath('data.payment_method', 'bank');
+
+        $this->assertSame('bank', SubscriptionCode::first()->payment_method);
+    }
+
+    public function test_admin_generate_rejects_an_unknown_payment_method(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $admin = User::create(['name' => 'Admin', 'email' => 'admin@reidey.app', 'password' => Hash::make('password'), 'tenant_id' => null]);
+        $admin->assignRole('super_admin');
+        $tenant = Tenant::create(['name' => 'Dinari', 'country' => 'DE']);
+        $plan = Plan::create(['name' => 'Monthly', 'price' => 50, 'duration_days' => 30, 'active' => true]);
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/v1/admin/companies/{$tenant->id}/activation", ['plan_id' => $plan->id, 'payment_method' => 'crypto'])
+            ->assertStatus(422);
+    }
 }

@@ -5,6 +5,7 @@ export type ResellerCompany = { id: number; name: string; phone: string | null }
 export type GeneratedCode = {
   code: string;
   payment_ref: string;
+  payment_method: string | null;
   company: string;
   plan: string;
   days: number;
@@ -38,6 +39,7 @@ export type CodeRow = {
   id: number;
   code: string;
   payment_ref: string | null;
+  payment_method: string | null;
   plan: string | null;
   plan_id: number | null;
   tenant_id: number;

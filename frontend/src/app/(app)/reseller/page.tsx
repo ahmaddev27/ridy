@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale } from "@/lib/utils";
+import { paymentMethodLabel } from "@/lib/api/payments";
 import { CodesLedger } from "@/components/billing/codes-ledger";
 import {
   getResellerPlans,
@@ -109,6 +110,11 @@ export default function ResellerPage() {
           {code.payment_ref && (
             <p className="mt-2 text-sm text-ink-muted">
               {c("paymentRef")} <span className="font-mono font-semibold text-ink" dir="ltr">{code.payment_ref}</span>
+            </p>
+          )}
+          {code.payment_method && (
+            <p className="mt-1 text-sm text-ink-muted">
+              {t("screens.codes.method")}: <span className="font-semibold text-ink">{paymentMethodLabel(code.payment_method, t)}</span>
             </p>
           )}
           <Button className="mt-5" onClick={reset}>{c("newCode")}</Button>

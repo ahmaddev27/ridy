@@ -137,6 +137,9 @@ class ResellerController extends Controller
             'collector_id' => $collector->id,
             'amount' => $plan->price,
             'paid' => true,
+            // A reseller collects the fee from the fleet in person, up front — so a
+            // reseller-issued code is always a cash payment.
+            'payment_method' => 'cash',
             'expires_at' => $expiresAt,
             'created_by' => $request->user()->id,
         ]);
@@ -148,6 +151,7 @@ class ResellerController extends Controller
         return response()->json(['data' => [
             'code' => $code,
             'payment_ref' => $paymentRef,
+            'payment_method' => $ledger->payment_method,
             'company' => $tenant->name,
             'plan' => $plan->name,
             'days' => $plan->duration_days,

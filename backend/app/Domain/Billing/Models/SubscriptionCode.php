@@ -14,8 +14,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class SubscriptionCode extends Model
 {
+    /**
+     * Recorded ways a subscription can be paid, mirroring the methods the admin
+     * enables in settings. Add a new method here (plus its settings keys + i18n)
+     * — the `payment_method` column is a free string, so no migration is needed.
+     */
+    public const PAYMENT_METHODS = ['bank', 'cash'];
+
     protected $fillable = [
-        'code', 'payment_ref', 'plan_id', 'tenant_id', 'collector_id', 'amount', 'paid',
+        'code', 'payment_ref', 'payment_method', 'plan_id', 'tenant_id', 'collector_id', 'amount', 'paid',
         'expires_at', 'activated_at', 'subscription_period_id', 'created_by',
     ];
 

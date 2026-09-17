@@ -44,6 +44,7 @@ import {
   type SubscriptionInvoice,
   type Plan,
 } from "@/lib/api/admin";
+import { getPaymentMethods, PAYMENT_METHOD_KEYS, paymentMethodLabel } from "@/lib/api/payments";
 
 /** Super-admin company detail as a full page: edit, proxy, users, session,
  *  subscription controls, plus drivers/offers/vehicles tabs. */
@@ -80,14 +81,31 @@ export function CompanyDetail({
   const [freeDays, setFreeDays] = useState("30");
   const [invoices, setInvoices] = useState<SubscriptionInvoice[]>([]);
 
+  // Payment method recorded on the issued code — all known methods are selectable,
+  // the ones enabled in settings are highlighted and one of them is pre-selected.
+  const [payMethod, setPayMethod] = useState<string>(PAYMENT_METHOD_KEYS[0]);
+  const [enabledMethods, setEnabledMethods] = useState<Set<string>>(new Set());
+
   // The company's subscription history + the plans to choose from, for the tab.
   useEffect(() => {
     if (tab !== "subscription") return;
     listSubscriptionInvoices(id).then((r) => setInvoices(r.data)).catch(() => setInvoices([]));
     listPlans().then(setPlans).catch(() => setPlans([]));
+    getPaymentMethods()
+      .then((m) => {
+        const on = new Set<string>();
+        if (m.bank) on.add("bank");
+        if (m.cash) on.add("cash");
+        setEnabledMethods(on);
+        // Pre-select the first enabled method (falls back to the first known one).
+        const first = PAYMENT_METHOD_KEYS.find((k) => on.has(k)) ?? PAYMENT_METHOD_KEYS[0];
+        setPayMethod(first);
+      })
+      .catch(() => {});
   }, [tab, id]);
   const [genCode, setGenCode] = useState<string | null>(null);
   const [genRef, setGenRef] = useState<string | null>(null);
+  const [genMethod, setGenMethod] = useState<string | null>(null);
 
   // Password reset (in-app modal, not a native prompt).
   const [resetFor, setResetFor] = useState<number | null>(null);
@@ -170,9 +188,10 @@ export function CompanyDetail({
   async function genActivation() {
     setBusy(true);
     try {
-      const res = await generateActivationCode(id, Number(planId), paid);
+      const res = await generateActivationCode(id, Number(planId), paid, payMethod || null);
       setGenCode(res.code);
       setGenRef(res.payment_ref);
+      setGenMethod(res.payment_method);
       toast.success(c("codeGenerated"));
       await load();
     } catch (e) {
@@ -381,9 +400,6 @@ export function CompanyDetail({
                     <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} className="h-4 w-4" />
                     {c("markPaid")}
                   </label>
-                  <Button variant="secondary" onClick={genActivation} disabled={busy || !planId}>
-                    <Ticket className="h-4 w-4" /> {c("generateCode")}
-                  </Button>
                   {company.banned && (
                     <Button onClick={doReactivate} disabled={busy}>
                       <ShieldCheck className="h-4 w-4" /> {c("reactivate")}
@@ -394,6 +410,36 @@ export function CompanyDetail({
                       {c("endSubscription")}
                     </Button>
                   )}
+                </div>
+
+                {/* How the company paid — all methods selectable; enabled ones marked. */}
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="flex-1">
+                    <label className="mb-1 block text-xs font-medium text-ink-muted">{t("screens.codes.method")}</label>
+                    <div className="flex flex-wrap gap-2">
+                      {PAYMENT_METHOD_KEYS.map((m) => {
+                        const on = enabledMethods.has(m);
+                        const selected = payMethod === m;
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setPayMethod(m)}
+                            className={
+                              "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors " +
+                              (selected ? "border-ink bg-primary text-primary-ink" : "border-line text-ink-muted hover:bg-surface-2")
+                            }
+                          >
+                            {paymentMethodLabel(m, t)}
+                            {on && <span className={"text-xs " + (selected ? "text-primary-ink/80" : "text-success-fg")}>✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <Button variant="secondary" onClick={genActivation} disabled={busy || !planId}>
+                    <Ticket className="h-4 w-4" /> {c("generateCode")}
+                  </Button>
                 </div>
 
                 {/* Free subscription — activates the company with no code/invoice. */}
@@ -424,6 +470,11 @@ export function CompanyDetail({
                         {c("codeRef")} <span className="font-mono font-semibold" dir="ltr">{genRef}</span>
                       </div>
                     )}
+                    {genMethod && (
+                      <div className="mt-1 text-xs text-emerald-800">
+                        {t("screens.codes.method")}: <span className="font-semibold">{paymentMethodLabel(genMethod, t)}</span>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -440,6 +491,7 @@ export function CompanyDetail({
                             <th>{c("subHistPeriod")}</th>
                             <th>{c("days")}</th>
                             <th>{c("amount")}</th>
+                            <th>{t("screens.codes.method")}</th>
                             <th>{c("subHistStatus")}</th>
                           </tr>
                         </thead>
@@ -451,6 +503,7 @@ export function CompanyDetail({
                               </td>
                               <td className="tabular-nums text-ink-muted">{inv.days}</td>
                               <td className="font-semibold tabular-nums text-ink">{inv.amount != null ? `€${inv.amount.toFixed(2)}` : "—"}</td>
+                              <td className="text-ink-muted">{paymentMethodLabel(inv.code?.payment_method, t)}</td>
                               <td>
                                 <span className={"rounded-full px-2 py-0.5 text-xs font-semibold " + (inv.paid ? "bg-success-bg text-success-fg" : "bg-warning-bg text-warning-fg")}>
                                   {inv.paid ? c("subPaid") : c("subUnpaid")}

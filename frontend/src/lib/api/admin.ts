@@ -366,10 +366,11 @@ export async function generateActivationCode(
   id: number,
   planId: number,
   paid?: boolean,
-): Promise<{ code: string; payment_ref: string; plan: string; days: number; price: number; paid: boolean; expires_at: string }> {
-  const res = await apiFetch<{ data: { code: string; payment_ref: string; plan: string; days: number; price: number; paid: boolean; expires_at: string } }>(
+  paymentMethod?: string | null,
+): Promise<{ code: string; payment_ref: string; payment_method: string | null; plan: string; days: number; price: number; paid: boolean; expires_at: string }> {
+  const res = await apiFetch<{ data: { code: string; payment_ref: string; payment_method: string | null; plan: string; days: number; price: number; paid: boolean; expires_at: string } }>(
     `${base}/${id}/activation`,
-    { method: "POST", body: { plan_id: planId, paid }, withCsrf: true },
+    { method: "POST", body: { plan_id: planId, paid, payment_method: paymentMethod ?? null }, withCsrf: true },
   );
   return res.data;
 }
@@ -732,6 +733,8 @@ export type SubscriptionInvoice = {
 export type InvoiceCode = {
   id: number;
   code: string;
+  payment_ref: string | null;
+  payment_method: string | null;
   plan: string | null;
   collector: string | null;
   amount: number | null;

@@ -126,10 +126,12 @@ class BillingReportController extends Controller
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM for Excel
-            fputcsv($out, ['Code', 'Plan', 'Company', 'Collector', 'Amount', 'Paid', 'Status', 'Created', 'Activated', 'Expires']);
+            fputcsv($out, ['Code', 'Reference', 'Method', 'Plan', 'Company', 'Collector', 'Amount', 'Paid', 'Status', 'Created', 'Activated', 'Expires']);
             foreach ($rows as $c) {
                 fputcsv($out, [
                     $c->code,
+                    Csv::cell($c->payment_ref),
+                    Csv::cell($c->payment_method),
                     Csv::cell($c->plan?->name),
                     Csv::cell($c->tenant?->name),
                     Csv::cell($c->collector?->name),
@@ -199,6 +201,8 @@ class BillingReportController extends Controller
             'code' => $code ? [
                 'id' => $code->id,
                 'code' => $code->code,
+                'payment_ref' => $code->payment_ref,
+                'payment_method' => $code->payment_method,
                 'plan' => $code->plan?->name,
                 'collector' => $code->collector?->name,
                 'amount' => $code->amount !== null ? (float) $code->amount : null,

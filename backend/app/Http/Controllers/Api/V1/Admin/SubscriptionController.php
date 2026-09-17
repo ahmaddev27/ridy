@@ -15,6 +15,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -37,6 +38,7 @@ class SubscriptionController extends Controller
         $data = $request->validate([
             'plan_id' => ['required', 'integer'],
             'paid' => ['boolean'],
+            'payment_method' => ['nullable', Rule::in(SubscriptionCode::PAYMENT_METHODS)],
         ]);
 
         $plan = Plan::where('active', true)->find($data['plan_id']);
@@ -65,6 +67,7 @@ class SubscriptionController extends Controller
             'collector_id' => null,
             'amount' => $plan->price,
             'paid' => $paid,
+            'payment_method' => $data['payment_method'] ?? null,
             'expires_at' => $expiresAt,
             'created_by' => $request->user()->id,
         ]);
@@ -76,6 +79,7 @@ class SubscriptionController extends Controller
         return response()->json(['data' => [
             'code' => $code,
             'payment_ref' => $paymentRef,
+            'payment_method' => $ledger->payment_method,
             'plan' => $plan->name,
             'days' => $plan->duration_days,
             'price' => (float) $plan->price,

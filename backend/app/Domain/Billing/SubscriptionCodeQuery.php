@@ -39,6 +39,7 @@ class SubscriptionCodeQuery
             'id' => $c->id,
             'code' => $c->code,
             'payment_ref' => $c->payment_ref,
+            'payment_method' => $c->payment_method,
             'plan' => $c->plan?->name,
             'plan_id' => $c->plan_id,
             'tenant_id' => $c->tenant_id,

@@ -84,7 +84,7 @@ class InvoiceRenderer
 
             'paid' => true,
             'paid_at' => '04.09.2026',
-            'payment_method' => 'Aktivierungscode',
+            'payment_method' => $this->paymentMethodLabel('bank'),
             'sold_by' => 'Reidey Vertrieb',
         ];
     }
@@ -144,7 +144,7 @@ class InvoiceRenderer
 
             'paid' => $period->isPaid(),
             'paid_at' => $period->paid_at !== null ? $this->date($period->paid_at) : null,
-            'payment_method' => 'Aktivierungscode',
+            'payment_method' => $this->paymentMethodLabel($code?->payment_method),
             'sold_by' => $soldBy ?? 'Reidey Vertrieb',
         ];
     }
@@ -177,6 +177,20 @@ class InvoiceRenderer
     private function date(\DateTimeInterface $date): string
     {
         return $date->format('d.m.Y');
+    }
+
+    /**
+     * German label for how the invoice was paid. Falls back to "Aktivierungscode"
+     * (the generic settlement label used before a method was recorded) when the
+     * code carries no specific method.
+     */
+    private function paymentMethodLabel(?string $method): string
+    {
+        return match ($method) {
+            'bank' => 'Banküberweisung',
+            'cash' => 'Bar',
+            default => 'Aktivierungscode',
+        };
     }
 
     /** The customer address block (only the country is stored today). */

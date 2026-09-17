@@ -4,6 +4,7 @@ import { Modal } from "@/components/ui/modal";
 import { Badge, type Status } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
+import { paymentMethodLabel } from "@/lib/api/payments";
 import type { InvoiceCode } from "@/lib/api/admin";
 
 const STATUS_TONE: Record<InvoiceCode["status"], Status> = {
@@ -38,6 +39,8 @@ export function CodeDetailModal({
     [c("codeCompany"), company ?? "—"],
     [c("codeCollector"), code.collector ?? "—"],
     [c("codeAmount"), <span key="a" className="tabular-nums">{money(code.amount)} · {code.paid ? c("paid") : c("unpaid")}</span>],
+    [t("screens.codes.colRef"), code.payment_ref ? <span key="r" className="font-mono" dir="ltr">{code.payment_ref}</span> : "—"],
+    [t("screens.codes.method"), paymentMethodLabel(code.payment_method, t)],
     [c("codeCreated"), dateTime(code.created_at)],
     [c("codeActivated"), date(code.activated_at)],
     [c("codeExpires"), dateTime(code.expires_at)],

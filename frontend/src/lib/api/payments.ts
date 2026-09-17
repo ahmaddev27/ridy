@@ -27,3 +27,18 @@ export async function getPaymentMethods(): Promise<PaymentMethods> {
   const res = await apiFetch<{ data: PaymentMethods }>("/api/v1/payment-methods");
   return res.data;
 }
+
+/**
+ * The recorded ways a subscription can be paid, kept in sync with the backend's
+ * SubscriptionCode::PAYMENT_METHODS. Adding a method here + its settings/i18n
+ * keys makes it selectable and displayable — no schema change needed.
+ */
+export const PAYMENT_METHOD_KEYS = ["bank", "cash"] as const;
+export type PaymentMethodKey = (typeof PAYMENT_METHOD_KEYS)[number];
+
+/** Localized label for a stored payment method, or "—" when none is recorded. */
+export function paymentMethodLabel(method: string | null | undefined, t: (k: string) => string): string {
+  if (method === "bank") return t("screens.codes.method_bank");
+  if (method === "cash") return t("screens.codes.method_cash");
+  return "—";
+}
