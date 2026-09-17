@@ -764,16 +764,23 @@ export async function exportSubscriptionInvoices(tenantId?: number): Promise<Blo
 }
 
 // ── Payment claims ("I've paid" requests awaiting verification) ───────────────
+export type PaymentClaimStatus = "pending" | "confirmed" | "rejected";
 export type PaymentClaim = {
   id: number;
   tenant_id: number;
   company: string | null;
   reference: string;
+  status: PaymentClaimStatus;
+  reason: string | null;
+  resolved_by: string | null;
+  resolved_at: string | null;
   created_at: string | null;
 };
 
-export async function listPaymentClaims(): Promise<PaymentClaim[]> {
-  const res = await apiFetch<{ data: PaymentClaim[] }>("/api/v1/admin/payment-claims");
+/** Pending by default; pass "all" for the archive or a specific status to filter. */
+export async function listPaymentClaims(status?: PaymentClaimStatus | "all"): Promise<PaymentClaim[]> {
+  const qs = status ? `?status=${status}` : "";
+  const res = await apiFetch<{ data: PaymentClaim[] }>(`/api/v1/admin/payment-claims${qs}`);
   return res.data;
 }
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Loader2, MessageCircle, Mail, KeyRound, Banknote, ChevronDown } from "lucide-react";
+import { Loader2, MessageCircle, Mail, KeyRound, Banknote, ChevronDown, Check, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OtpInput } from "@/components/ui/otp-input";
 import { PaymentMethods } from "@/components/subscription/payment-methods";
@@ -80,15 +80,25 @@ export function SuspendedScreen({
 
       {canActivate ? (
         <>
-          <Section title={t("screens.codes.payTitle")} icon={Banknote} defaultOpen>
-            <PaymentMethods
-              headless
-              reference={info.paymentReference}
-              claimPending={claimPending}
-              onConfirm={confirmPayment}
-              confirming={confirming}
-            />
+          <Section title={t("screens.codes.payTitle")} icon={Banknote} defaultOpen={false}>
+            <PaymentMethods headless reference={info.paymentReference} />
           </Section>
+
+          {/* "I've paid" stays OUTSIDE the collapse so it's always visible. */}
+          {claimPending ? (
+            <div className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2.5 text-sm text-ink-muted">
+              <Clock className="h-4 w-4 text-ink-subtle" />
+              {t("screens.codes.claimPendingLabel")}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-line bg-surface p-4">
+              <Button onClick={confirmPayment} disabled={confirming} className="w-full">
+                {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {t("screens.codes.confirmPayment")}
+              </Button>
+              <p className="mt-2 text-xs text-ink-subtle">{t("screens.codes.confirmPaymentHint")}</p>
+            </div>
+          )}
 
           <Section title={s("activateTitle")} icon={KeyRound} defaultOpen={false}>
             <p className="text-xs text-ink-subtle">{s("activateHint")}</p>

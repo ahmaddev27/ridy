@@ -46,6 +46,7 @@ class PaymentClaimTest extends TestCase
 
     public function test_credential_claim_is_idempotent_while_pending(): void
     {
+        $this->seed(RolePermissionSeeder::class); // opening a claim notifies super-admins
         $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE', 'status' => 'active', 'subscription_ends_at' => CarbonImmutable::now()->subDay()]);
         $this->owner($tenant);
 

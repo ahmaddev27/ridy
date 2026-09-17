@@ -20,18 +20,30 @@ use Illuminate\Validation\ValidationException;
  */
 class PaymentClaimController extends Controller
 {
-    /** Pending claims, oldest first (FIFO for the admin to work through). */
-    public function index(): JsonResponse
+    /**
+     * Claims for the admin list. Defaults to PENDING (the review queue, oldest
+     * first); `?status=all` returns the full archive and `?status=confirmed|
+     * rejected|pending` filters, newest first for history.
+     */
+    public function index(Request $request): JsonResponse
     {
-        $claims = PaymentClaim::with('tenant:id,name,payment_reference')
-            ->where('status', PaymentClaimService::PENDING)
-            ->orderBy('created_at')
+        $status = $request->query('status', PaymentClaimService::PENDING);
+        $onlyPending = $status === PaymentClaimService::PENDING;
+
+        $claims = PaymentClaim::with(['tenant:id,name,payment_reference', 'resolver:id,name'])
+            ->when(in_array($status, [PaymentClaimService::PENDING, PaymentClaimService::CONFIRMED, PaymentClaimService::REJECTED], true),
+                fn ($q) => $q->where('status', $status))
+            ->orderBy('created_at', $onlyPending ? 'asc' : 'desc')
             ->get()
             ->map(fn (PaymentClaim $c) => [
                 'id' => $c->id,
                 'tenant_id' => $c->tenant_id,
                 'company' => $c->tenant?->name,
                 'reference' => $c->reference,
+                'status' => $c->status,
+                'reason' => $c->reason,
+                'resolved_by' => $c->resolver?->name,
+                'resolved_at' => $c->resolved_at?->toIso8601String(),
                 'created_at' => $c->created_at?->toIso8601String(),
             ]);
 

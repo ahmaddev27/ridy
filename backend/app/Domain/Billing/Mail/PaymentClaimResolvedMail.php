@@ -42,7 +42,7 @@ class PaymentClaimResolvedMail extends Mailable
         if ($this->confirmed) {
             $codeBlock = $this->activationCode !== null && $this->activationCode !== ''
                 ? '<p>Ihr Aktivierungscode: <strong style="font-size:18px;letter-spacing:2px">'
-                    .e($this->activationCode).'</strong></p>'
+                    .e($this->activationCode).'</strong> (1 Stunde gültig)</p>'
                     .'<p>Geben Sie ihn auf der Abo-Seite ein, um Ihr Abonnement zu aktivieren.</p>'
                 : '<p>Ihr Aktivierungscode wird Ihnen in Kürze bereitgestellt.</p>';
             $body = '<p>wir haben Ihre Zahlung erhalten und bestätigt.</p>'.$codeBlock;

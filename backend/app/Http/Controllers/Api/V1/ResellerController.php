@@ -25,7 +25,7 @@ class ResellerController extends Controller
 {
     use GeneratesOtp;
 
-    private const CODE_TTL_MINUTES = 10;
+    private const CODE_TTL_MINUTES = 60;
 
     /** The reseller's own issued codes (with lifecycle status), filtered + paged. */
     public function codes(Request $request, SubscriptionCodeQuery $query): JsonResponse

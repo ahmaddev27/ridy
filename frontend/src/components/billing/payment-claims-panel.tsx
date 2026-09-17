@@ -2,34 +2,53 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Check, X, Inbox } from "lucide-react";
+import { Loader2, Check, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Inbox } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale } from "@/lib/utils";
 import { PAYMENT_METHOD_KEYS, paymentMethodLabel } from "@/lib/api/payments";
-import { listPaymentClaims, resolvePaymentClaim, listPlans, type PaymentClaim, type Plan } from "@/lib/api/admin";
+import {
+  listPaymentClaims,
+  resolvePaymentClaim,
+  listPlans,
+  type PaymentClaim,
+  type PaymentClaimStatus,
+  type Plan,
+} from "@/lib/api/admin";
+
+type Filter = "pending" | "confirmed" | "rejected" | "all";
+
+const STATUS_CHIP: Record<PaymentClaimStatus, string> = {
+  pending: "bg-warning-bg text-warning-fg",
+  confirmed: "bg-success-bg text-success-fg",
+  rejected: "bg-danger-bg text-danger-fg",
+};
 
 /**
- * Admin panel of pending "I've paid" claims. The admin reconciles each incoming
- * bank transfer by its reference, then ACCEPTS (picks a plan → issues + emails an
- * activation code) or REJECTS (with a reason → emails it). Shows only when there
- * are pending claims.
+ * Admin list of company "I've paid" claims with their lifecycle status — the
+ * review queue (pending, with accept/reject) plus the archive (confirmed/rejected
+ * keep their status + reason). Accepting picks a plan → issues + emails a code;
+ * rejecting requires a reason → emails it.
  */
-export function PaymentClaimsPanel() {
+export function PaymentClaimsList() {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.claims.${k}`);
+  const [filter, setFilter] = useState<Filter>("pending");
   const [claims, setClaims] = useState<PaymentClaim[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function load() {
+    setLoading(true);
     try {
-      const [cl, pl] = await Promise.all([listPaymentClaims(), listPlans()]);
+      const [cl, pl] = await Promise.all([listPaymentClaims(filter), listPlans()]);
       setClaims(cl);
       setPlans(pl.filter((p) => p.active));
     } catch {
-      /* ignore — panel just stays empty */
+      setClaims([]);
     } finally {
       setLoading(false);
     }
@@ -37,24 +56,42 @@ export function PaymentClaimsPanel() {
 
   useEffect(() => {
     load();
-  }, []);
-
-  if (loading || claims.length === 0) return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
 
   const date = (iso: string | null) => (iso ? new Date(iso).toLocaleString(latnLocale(locale)) : "—");
 
   return (
     <Card className="p-5">
-      <div className="mb-3 flex items-center gap-2">
-        <Inbox className="h-4 w-4 text-ink" />
-        <h3 className="font-semibold text-ink">{c("title")}</h3>
-        <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs font-semibold text-warning-fg">{claims.length}</span>
-      </div>
-      <div className="space-y-2">
-        {claims.map((claim) => (
-          <ClaimRow key={claim.id} claim={claim} plans={plans} onResolved={load} whenText={date(claim.created_at)} />
+      <div className="mb-4 inline-flex rounded-lg border border-line bg-surface-2 p-1">
+        {(["pending", "confirmed", "rejected", "all"] as const).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setFilter(f)}
+            className={
+              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors " +
+              (filter === f ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink")
+            }
+          >
+            {c(`filter_${f}`)}
+          </button>
         ))}
       </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {[0, 1].map((i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-surface-2" />)}
+        </div>
+      ) : claims.length === 0 ? (
+        <EmptyState icon={Inbox} title={c("empty")} />
+      ) : (
+        <div className="space-y-2">
+          {claims.map((claim) => (
+            <ClaimRow key={claim.id} claim={claim} plans={plans} onResolved={load} whenText={date(claim.created_at)} resolvedText={date(claim.resolved_at)} />
+          ))}
+        </div>
+      )}
     </Card>
   );
 }
@@ -64,11 +101,13 @@ function ClaimRow({
   plans,
   onResolved,
   whenText,
+  resolvedText,
 }: {
   claim: PaymentClaim;
   plans: Plan[];
   onResolved: () => void;
   whenText: string;
+  resolvedText: string;
 }) {
   const { t } = useI18n();
   const c = (k: string) => t(`screens.claims.${k}`);
@@ -77,6 +116,8 @@ function ClaimRow({
   const [planId, setPlanId] = useState("");
   const [method, setMethod] = useState<string>("bank");
   const [reason, setReason] = useState("");
+
+  const pending = claim.status === "pending";
 
   async function accept() {
     setBusy(true);
@@ -108,13 +149,20 @@ function ClaimRow({
     <div className="rounded-lg border border-line p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="font-medium text-ink">{claim.company ?? "—"}</div>
-          <div className="flex items-center gap-2 text-xs text-ink-subtle">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-ink">{claim.company ?? "—"}</span>
+            <span className={"rounded-full px-2 py-0.5 text-[11px] font-semibold " + STATUS_CHIP[claim.status]}>
+              {c(`st_${claim.status}`)}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-ink-subtle">
             <span className="font-mono" dir="ltr">{claim.reference}</span>
             <span dir="ltr">· {whenText}</span>
+            {!pending && claim.resolved_by && <span>· {c("resolvedBy")} {claim.resolved_by} ({resolvedText})</span>}
           </div>
+          {!pending && claim.reason && <p className="mt-1 text-xs text-ink-muted">{claim.reason}</p>}
         </div>
-        {mode === null && (
+        {pending && mode === null && (
           <div className="flex items-center gap-2">
             <Button variant="secondary" onClick={() => setMode("reject")} disabled={busy} className="text-sm">
               <X className="h-4 w-4" /> {c("reject")}
@@ -126,7 +174,7 @@ function ClaimRow({
         )}
       </div>
 
-      {mode === "accept" && (
+      {pending && mode === "accept" && (
         <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-line pt-3">
           <div className="min-w-[180px] flex-1">
             <label className="mb-1 block text-xs font-medium text-ink-muted">{c("plan")}</label>
@@ -160,7 +208,7 @@ function ClaimRow({
         </div>
       )}
 
-      {mode === "reject" && (
+      {pending && mode === "reject" && (
         <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-line pt-3">
           <div className="min-w-[220px] flex-1">
             <label className="mb-1 block text-xs font-medium text-ink-muted">{c("reason")}</label>

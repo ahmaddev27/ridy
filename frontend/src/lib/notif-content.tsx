@@ -1,4 +1,4 @@
-import { Plug, Building2, Ban, CheckCircle2, Gift, Clock, AlertTriangle, Ticket, Bell, Megaphone, type LucideIcon } from "lucide-react";
+import { Plug, Building2, Ban, CheckCircle2, Gift, Clock, AlertTriangle, Ticket, Bell, Megaphone, Banknote, type LucideIcon } from "lucide-react";
 import type { AppNotification } from "@/lib/api/notifications";
 
 type Tone = "success" | "danger" | "warning" | "info" | "default";
@@ -15,6 +15,7 @@ const MAP: Record<string, { icon: LucideIcon; tone: Tone }> = {
   subscription_expired: { icon: AlertTriangle, tone: "danger" },
   proxy_expiring: { icon: Plug, tone: "warning" },
   code_activated: { icon: Ticket, tone: "success" },
+  payment_claim: { icon: Banknote, tone: "warning" },
   admin_broadcast: { icon: Megaphone, tone: "info" },
 };
 

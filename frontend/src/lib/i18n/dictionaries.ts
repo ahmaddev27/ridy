@@ -37,6 +37,7 @@ const en = {
     settings: "Settings",
     emailTemplates: "Email Templates",
     invoiceTemplate: "Invoice Template",
+    paymentRequests: "Payment requests",
     profile: "Profile",
   },
   pages: {
@@ -63,6 +64,7 @@ const en = {
     systemHealth: { title: "System Health", subtitle: "Live status of every company's critical subsystems." },
     collectors: { title: "Collectors", subtitle: "Cash collectors and the fleet-payment ledger." },
     subscriptions: { title: "Subscriptions", subtitle: "Subscription revenue, expiring plans and invoices." },
+    paymentRequests: { title: "Payment requests", subtitle: "Company “I’ve paid” requests — verify each transfer by its reference, then accept or reject." },
     codes: { title: "Activation codes", subtitle: "Every issued code and its lifecycle — reseller and admin." },
     users: { title: "Users", subtitle: "Everyone with an account — managers, resellers and admins." },
     reseller: { title: "Generate code", subtitle: "Pick a plan and a company to issue an activation code." },
@@ -124,6 +126,7 @@ const en = {
     subscription_expired: { title: "Subscription expired", body: "Your subscription has expired — renew to continue." },
     proxy_expiring: { title: "Proxy expiring", body: "Proxy {label} is about to expire." },
     code_activated: { title: "Code activated", body: "{company} activated a code you issued." },
+    payment_claim: { title: "Payment reported", body: "{company} reported a payment (ref. {reference}) — verify it." },
   },
   onboarding: {
     badge: "Getting started", skip: "Skip", next: "Next", back: "Back", finish: "Get started", tapToReveal: "Tap to reveal",
@@ -196,6 +199,7 @@ const de: typeof en = {
     settings: "Einstellungen",
     emailTemplates: "E-Mail-Vorlagen",
     invoiceTemplate: "Rechnungsvorlage",
+    paymentRequests: "Zahlungsanfragen",
     profile: "Profil",
   },
   pages: {
@@ -222,6 +226,7 @@ const de: typeof en = {
     systemHealth: { title: "Systemstatus", subtitle: "Live-Status der kritischen Subsysteme jeder Firma." },
     collectors: { title: "Inkasso", subtitle: "Bargeld-Inkassostellen und das Zahlungsbuch der Flotten." },
     subscriptions: { title: "Abonnements", subtitle: "Abo-Umsatz, auslaufende Pläne und Rechnungen." },
+    paymentRequests: { title: "Zahlungsanfragen", subtitle: "„Ich habe bezahlt“-Anfragen — jede Überweisung anhand der Referenz prüfen, dann annehmen oder ablehnen." },
     codes: { title: "Aktivierungscodes", subtitle: "Jeder ausgegebene Code und sein Lebenszyklus — Reseller und Admin." },
     users: { title: "Benutzer", subtitle: "Alle mit Konto — Manager, Vertriebler und Admins." },
     reseller: { title: "Code erstellen", subtitle: "Wähle ein Paket und eine Firma, um einen Aktivierungscode auszustellen." },
@@ -283,6 +288,7 @@ const de: typeof en = {
     subscription_expired: { title: "Abo abgelaufen", body: "Dein Abo ist abgelaufen — verlängere, um fortzufahren." },
     proxy_expiring: { title: "Proxy läuft ab", body: "Proxy {label} läuft bald ab." },
     code_activated: { title: "Code aktiviert", body: "{company} hat einen von dir ausgestellten Code aktiviert." },
+    payment_claim: { title: "Zahlung gemeldet", body: "{company} meldet eine Zahlung (Ref. {reference}) — bitte prüfen." },
   },
   onboarding: {
     badge: "Erste Schritte", skip: "Überspringen", next: "Weiter", back: "Zurück", finish: "Los geht's", tapToReveal: "Zum Anzeigen tippen",
@@ -356,6 +362,7 @@ const ar: typeof en = {
     settings: "الإعدادات",
     emailTemplates: "قوالب الإيميل",
     invoiceTemplate: "قالب الفاتورة",
+    paymentRequests: "طلبات الدفع",
     profile: "الملف الشخصي",
   },
   pages: {
@@ -382,6 +389,7 @@ const ar: typeof en = {
     systemHealth: { title: "حالة النظام", subtitle: "الحالة الحيّة للأنظمة الحرجة لكل شركة." },
     collectors: { title: "المحصّلون", subtitle: "محصّلو الكاش وسجلّ دفعات الشركات." },
     subscriptions: { title: "الاشتراكات", subtitle: "إيرادات الاشتراكات، الاشتراكات القاربة على الانتهاء، والفواتير." },
+    paymentRequests: { title: "طلبات الدفع", subtitle: "طلبات «دفعت» من الشركات — تحقّق من كل حوالة بالرقم المرجعي، وبعدها اقبل أو ارفض." },
     codes: { title: "أكواد التفعيل", subtitle: "كل كود تم توليده ودورة حياته — من الريسيلر والأدمن." },
     users: { title: "المستخدمون", subtitle: "كل من عنده حساب — مدراء، موزّعون، وأدمن." },
     reseller: { title: "توليد كود", subtitle: "اختر باقة وشركة لإصدار كود تفعيل." },
@@ -443,6 +451,7 @@ const ar: typeof en = {
     subscription_expired: { title: "انتهى الاشتراك", body: "انتهى اشتراكك — جدّد للمتابعة." },
     proxy_expiring: { title: "بروكسي قارب على الانتهاء", body: "البروكسي {label} قارب على الانتهاء." },
     code_activated: { title: "تم تفعيل كود", body: "{company} فعّلت كوداً أصدرته." },
+    payment_claim: { title: "بلاغ دفع", body: "أبلغت {company} عن دفعة (مرجع {reference}) — تحقّق منها." },
   },
   onboarding: {
     badge: "لنبدأ", skip: "تخطّي", next: "التالي", back: "السابق", finish: "لنبدأ", tapToReveal: "انقر للعرض",

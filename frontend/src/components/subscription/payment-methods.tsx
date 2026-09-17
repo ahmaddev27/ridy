@@ -97,28 +97,32 @@ export function PaymentMethods({
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className="mt-4 space-y-3">
         {methods.bank && (
           <div className="rounded-xl border border-line p-4">
             <div className="mb-3 flex items-center gap-2">
               <Landmark className="h-4 w-4 text-ink" />
               <span className="font-medium text-ink">{c("payBank")}</span>
             </div>
-            <dl className="space-y-2 text-sm">
-              <Row label={c("payBankHolder")} value={methods.bank.holder} />
-              <Row label={c("payBankName")} value={methods.bank.bank} />
-              <Row label={c("payBankIban")} value={methods.bank.iban} mono />
-              <Row label={c("payBankBic")} value={methods.bank.bic} mono />
-            </dl>
-            {methods.bank.note && <p className="mt-3 text-xs text-ink-subtle">{methods.bank.note}</p>}
-            {epc && (
-              <div className="mt-4 flex flex-col items-center gap-2 border-t border-line pt-4">
-                <div className="rounded-lg bg-white p-2 shadow-sm ring-1 ring-line">
-                  <QRCodeSVG value={epc} size={148} marginSize={0} />
-                </div>
-                <span className="text-xs text-ink-subtle">{c("scanToPay")}</span>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <dl className="space-y-2 text-sm">
+                  <Row label={c("payBankHolder")} value={methods.bank.holder} />
+                  <Row label={c("payBankName")} value={methods.bank.bank} />
+                  <Row label={c("payBankIban")} value={methods.bank.iban} mono />
+                  <Row label={c("payBankBic")} value={methods.bank.bic} mono />
+                </dl>
+                {methods.bank.note && <p className="mt-3 text-xs text-ink-subtle">{methods.bank.note}</p>}
               </div>
-            )}
+              {epc && (
+                <div className="flex shrink-0 flex-col items-center gap-2 self-center border-t border-line pt-4 sm:self-start sm:border-s sm:border-t-0 sm:pt-0 sm:ps-4">
+                  <div className="rounded-lg bg-white p-2 shadow-sm ring-1 ring-line">
+                    <QRCodeSVG value={epc} size={132} marginSize={0} />
+                  </div>
+                  <span className="text-xs text-ink-subtle">{c("scanToPay")}</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

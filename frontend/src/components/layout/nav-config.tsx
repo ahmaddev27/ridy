@@ -91,6 +91,7 @@ export const navGroups: NavGroup[] = [
     requiresRole: "super_admin",
     items: [
       { href: "/admin/reports", label: "nav.subscriptions", icon: FileBarChart },
+      { href: "/admin/payment-requests", label: "nav.paymentRequests", icon: ReceiptText },
       { href: "/admin/invoice-template", label: "nav.invoiceTemplate", icon: FileText },
     ],
   },

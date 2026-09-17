@@ -18,7 +18,7 @@ class ActivationCodeIssuer
 {
     use GeneratesOtp;
 
-    private const CODE_TTL_MINUTES = 10;
+    private const CODE_TTL_MINUTES = 60;
 
     public function __construct(private readonly PaymentReferenceGenerator $paymentRefs) {}
 

@@ -4,6 +4,7 @@ namespace App\Domain\Billing;
 
 use App\Domain\Billing\Mail\PaymentClaimResolvedMail;
 use App\Domain\Billing\Models\PaymentClaim;
+use App\Domain\Notifications\Notifier;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -24,15 +25,18 @@ class PaymentClaimService
 
     public const REJECTED = 'rejected';
 
+    public function __construct(private readonly Notifier $notifier) {}
+
     /**
      * Open a pending claim for the company, or return the one already pending
-     * (idempotent). Race-safe: two concurrent submits yield a single claim.
+     * (idempotent). Race-safe: two concurrent submits yield a single claim. A
+     * newly opened claim notifies the super-admins so they can verify it.
      *
      * @return array{claim: PaymentClaim, created: bool}
      */
     public function open(Tenant $tenant): array
     {
-        return DB::transaction(function () use ($tenant) {
+        $result = DB::transaction(function () use ($tenant) {
             $existing = PaymentClaim::where('tenant_id', $tenant->id)
                 ->where('status', self::PENDING)
                 ->lockForUpdate()
@@ -50,6 +54,17 @@ class PaymentClaimService
 
             return ['claim' => $claim, 'created' => true];
         });
+
+        // Notify admins only for a genuinely new claim (after the row is committed).
+        if ($result['created']) {
+            $this->notifier->toAdmins(
+                'payment_claim',
+                ['company' => $tenant->name, 'reference' => $result['claim']->reference],
+                '/admin/payment-requests',
+            );
+        }
+
+        return $result;
     }
 
     /** Whether the company currently has a pending claim (drives the button state). */

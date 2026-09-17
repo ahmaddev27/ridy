@@ -61,6 +61,11 @@ class NotificationPushText
             'en' => ['Code redeemed', '{company} redeemed code {code}.'],
             'ar' => ['تم تفعيل كود', 'فعّلت {company} الكود {code}.'],
         ],
+        'payment_claim' => [
+            'de' => ['Zahlung gemeldet', '{company} meldet eine Zahlung (Ref. {reference}) — bitte prüfen.'],
+            'en' => ['Payment reported', '{company} reported a payment (ref. {reference}) — please verify.'],
+            'ar' => ['بلاغ دفع', 'أبلغت {company} عن دفعة (مرجع {reference}) — يرجى التحقق.'],
+        ],
     ];
 
     /**

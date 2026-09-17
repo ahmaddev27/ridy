@@ -13,7 +13,6 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Select } from "@/components/ui/select";
 import { Badge, type Status } from "@/components/ui/badge";
 import { CodeDetailModal } from "@/components/billing/code-detail-modal";
-import { PaymentClaimsPanel } from "@/components/billing/payment-claims-panel";
 import { paymentMethodLabel } from "@/lib/api/payments";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
@@ -116,9 +115,6 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       <PageHeader tkey="subscriptions" />
-
-      {/* Pending "I've paid" claims to verify — only shows when there are any. */}
-      <PaymentClaimsPanel />
 
       {/* Headline totals */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

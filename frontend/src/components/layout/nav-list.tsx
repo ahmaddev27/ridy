@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/context";
 import { useAuth } from "@/components/auth/auth-provider";
 import { listContactMessages } from "@/lib/api/contact-messages";
+import { listPaymentClaims } from "@/lib/api/admin";
 
 /**
  * The navigation list — role-filtered groups + links. Shared by the desktop
@@ -21,13 +22,18 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
   // Unread contact-form messages, shown as a badge on the admin Inbox link.
   const isAdmin = user?.roles.includes("super_admin") ?? false;
   const [unread, setUnread] = useState(0);
+  const [pendingClaims, setPendingClaims] = useState(0);
   useEffect(() => {
     if (!isAdmin) return;
     let alive = true;
-    const load = () =>
+    const load = () => {
       listContactMessages()
         .then((r) => alive && setUnread(r.unread))
         .catch(() => {});
+      listPaymentClaims("pending")
+        .then((r) => alive && setPendingClaims(r.length))
+        .catch(() => {});
+    };
     load();
     const id = setInterval(load, 30000); // refresh a couple of times a minute
     return () => {
@@ -62,8 +68,13 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
             const active =
               pathname === item.href || (!isIndex && pathname.startsWith(item.href + "/"));
             const Icon = item.icon;
-            // Live unread count on the Inbox link; other links keep any static badge.
-            const inboxUnread = item.href === "/admin/inbox" && unread > 0 ? unread : null;
+            // Live counts on the Inbox + Payment-requests links; others keep any static badge.
+            const liveCount =
+              item.href === "/admin/inbox" && unread > 0
+                ? unread
+                : item.href === "/admin/payment-requests" && pendingClaims > 0
+                  ? pendingClaims
+                  : null;
             return (
               <Link
                 key={item.href}
@@ -80,9 +91,9 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
                   <Icon className="h-4 w-4" />
                   {t(item.label)}
                 </span>
-                {inboxUnread ? (
+                {liveCount ? (
                   <span className="min-w-5 rounded-full bg-primary px-1.5 py-0.5 text-center text-[10px] font-bold text-primary-ink">
-                    {inboxUnread}
+                    {liveCount}
                   </span>
                 ) : item.badge ? (
                   <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-semibold text-ink">
