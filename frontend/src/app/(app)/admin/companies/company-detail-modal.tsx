@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { latnLocale } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn, Globe, Network, Copy, Files } from "lucide-react";
+import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn, Globe, Network, Copy, Files, Check, Lock } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -188,7 +188,9 @@ export function CompanyDetail({
   async function genActivation() {
     setBusy(true);
     try {
-      const res = await generateActivationCode(id, Number(planId), paid, payMethod || null);
+      // Only record a method that is actually enabled in settings.
+      const method = enabledMethods.has(payMethod) ? payMethod : null;
+      const res = await generateActivationCode(id, Number(planId), paid, method);
       setGenCode(res.code);
       setGenRef(res.payment_ref);
       setGenMethod(res.payment_method);
@@ -412,30 +414,42 @@ export function CompanyDetail({
                   )}
                 </div>
 
-                {/* How the company paid — all methods selectable; enabled ones marked. */}
-                <div className="flex flex-wrap items-end gap-2">
-                  <div className="flex-1">
+                {/* How the company paid — only methods enabled in settings are
+                    selectable; a disabled one is shown locked so the admin knows it
+                    exists but must be turned on in settings first. */}
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
                     <label className="mb-1 block text-xs font-medium text-ink-muted">{t("screens.codes.method")}</label>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="inline-flex rounded-lg border border-line bg-surface-2 p-1">
                       {PAYMENT_METHOD_KEYS.map((m) => {
                         const on = enabledMethods.has(m);
-                        const selected = payMethod === m;
+                        const selected = on && payMethod === m;
                         return (
                           <button
                             key={m}
                             type="button"
-                            onClick={() => setPayMethod(m)}
+                            disabled={!on}
+                            onClick={() => on && setPayMethod(m)}
+                            title={on ? undefined : t("screens.codes.methodOff")}
                             className={
-                              "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors " +
-                              (selected ? "border-ink bg-primary text-primary-ink" : "border-line text-ink-muted hover:bg-surface-2")
+                              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors " +
+                              (selected
+                                ? "bg-surface text-ink shadow-sm"
+                                : on
+                                  ? "text-ink-muted hover:text-ink"
+                                  : "cursor-not-allowed text-ink-subtle/60")
                             }
                           >
+                            {selected && <Check className="h-3.5 w-3.5 text-success-fg" />}
+                            {!on && <Lock className="h-3 w-3" />}
                             {paymentMethodLabel(m, t)}
-                            {on && <span className={"text-xs " + (selected ? "text-primary-ink/80" : "text-success-fg")}>✓</span>}
                           </button>
                         );
                       })}
                     </div>
+                    {enabledMethods.size === 0 && (
+                      <p className="mt-1 text-xs text-ink-subtle">{t("screens.codes.methodNoneHint")}</p>
+                    )}
                   </div>
                   <Button variant="secondary" onClick={genActivation} disabled={busy || !planId}>
                     <Ticket className="h-4 w-4" /> {c("generateCode")}

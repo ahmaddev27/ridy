@@ -18,6 +18,7 @@ export default function SettingsPage() {
   const c = (k: string) => t(`screens.settings.${k}`);
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<"email" | "support" | "payment" | "mobile">("email");
 
   // SMTP form.
   const [host, setHost] = useState("");
@@ -185,7 +186,37 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <PageHeader tkey="settings" />
 
+      <div className="flex w-full flex-col gap-4 md:flex-row">
+        {/* Side tabs */}
+        <nav className="flex gap-1 overflow-x-auto rounded-xl border border-line/70 bg-surface-2 p-1.5 md:h-fit md:w-52 md:flex-col md:gap-1">
+          {([
+            { k: "email", icon: Mail },
+            { k: "support", icon: LifeBuoy },
+            { k: "payment", icon: Banknote },
+            { k: "mobile", icon: Smartphone },
+          ] as const).map(({ k, icon: Icon }) => {
+            const active = tab === k;
+            return (
+              <button
+                key={k}
+                onClick={() => setTab(k)}
+                className={
+                  "group flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-start text-sm font-medium transition-all " +
+                  (active
+                    ? "bg-primary text-primary-ink shadow-sm"
+                    : "text-ink-muted hover:bg-surface-2 hover:text-ink")
+                }
+              >
+                <Icon className={"h-4 w-4 shrink-0 " + (active ? "text-primary-ink" : "text-ink-subtle group-hover:text-ink-muted")} />
+                {c(`tab_${k}`)}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="min-w-0 flex-1 space-y-6">
       {/* Email delivery */}
+      {tab === "email" && (
       <Card className="w-full p-5">
         <div className="mb-4 flex items-center gap-2">
           <Mail className="h-4 w-4 text-ink" />
@@ -264,8 +295,10 @@ export default function SettingsPage() {
           </Button>
         </div>
       </Card>
+      )}
 
       {/* Support contacts — shown to suspended companies */}
+      {tab === "support" && (
       <Card className="w-full p-5">
         <div className="mb-1 flex items-center gap-2">
           <LifeBuoy className="h-4 w-4 text-ink" />
@@ -283,8 +316,10 @@ export default function SettingsPage() {
           </Button>
         </div>
       </Card>
+      )}
 
       {/* Subscription payment methods — shown to companies on the subscription/suspended screens */}
+      {tab === "payment" && (
       <Card className="w-full p-5">
         <div className="mb-1 flex items-center gap-2">
           <Banknote className="h-4 w-4 text-ink" />
@@ -338,8 +373,10 @@ export default function SettingsPage() {
           </Button>
         </div>
       </Card>
+      )}
 
       {/* Mobile driver-app force-update */}
+      {tab === "mobile" && (
       <Card className="w-full p-5">
         <div className="mb-1 flex items-center gap-2">
           <Smartphone className="h-4 w-4 text-ink" />
@@ -359,6 +396,9 @@ export default function SettingsPage() {
           </Button>
         </div>
       </Card>
+      )}
+        </div>
+      </div>
 
       <Modal
         open={testOpen}
