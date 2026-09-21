@@ -357,6 +357,45 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame(OfferStatus::Canceled, $offer->fresh()->status);
     }
 
+    public function test_a_still_en_route_driver_on_a_long_pickup_is_not_canceled(): void
+    {
+        // Prod bug: a driver accepted an offer with a FAR pickup and was still driving
+        // to the rider 20+ minutes later (status held EN_ROUTE the whole time). The
+        // trip hadn't started yet, but they never dropped it — the sweep must NOT
+        // cancel it just because ACCEPTED_STALE_MINUTES elapsed while they're engaged.
+        $driver = $this->driver();
+        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_EN_ROUTE']);
+        $offer = $this->offer([
+            'driver_id' => $driver->id,
+            'status' => OfferStatus::Accepted,
+            'accepted_at' => now()->subMinutes(OfferLifecycle::ACCEPTED_STALE_MINUTES + 5),
+        ]);
+
+        app(OfferLifecycle::class)->finalizeStale();
+        $this->assertSame(OfferStatus::Accepted, $offer->fresh()->status, 'a live en-route driver on a long pickup is held, not canceled');
+
+        // …and it starts normally once the rider is finally picked up.
+        $this->postStatus('ON_TRIP');
+        $this->assertSame(OfferStatus::Started, $offer->fresh()->status);
+    }
+
+    public function test_a_permanently_stuck_accepted_offer_is_canceled_by_the_backstop(): void
+    {
+        // If the status sync dies and the driver is frozen EN_ROUTE, the ON_TRIP/idle
+        // edges are never seen and the offer would hold forever — the absolute backstop
+        // cancels it once past ACCEPTED_STUCK_MINUTES so it can't linger as "accepted".
+        $driver = $this->driver();
+        $driver->update(['online_status' => 'MONITORING_SUPPLY_STATUS_EN_ROUTE']);
+        $offer = $this->offer([
+            'driver_id' => $driver->id,
+            'status' => OfferStatus::Accepted,
+            'accepted_at' => now()->subMinutes(OfferLifecycle::ACCEPTED_STUCK_MINUTES + 1),
+        ]);
+
+        app(OfferLifecycle::class)->finalizeStale();
+        $this->assertSame(OfferStatus::Canceled, $offer->fresh()->status);
+    }
+
     public function test_garbage_location_timestamp_does_not_break_the_batch(): void
     {
         // An offline driver carried a bad ms timestamp that parses to year 0001,

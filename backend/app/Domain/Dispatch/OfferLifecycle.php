@@ -34,8 +34,22 @@ class OfferLifecycle
     /** A STARTED offer still open after this is force-completed (safety net). */
     public const MAX_TRIP_MINUTES = 100;
 
-    /** An ACCEPTED-but-never-started offer older than this is force-canceled. */
+    /**
+     * A stale ACCEPTED-but-never-started offer is force-canceled once this old —
+     * but ONLY when the driver is no longer engaged (they accepted then went
+     * idle/offline). A driver STILL en-route to a far pickup can legitimately be
+     * accepted for longer than this, so they are held, not canceled (see
+     * {@see finalizeStale()} and {@see ACCEPTED_STUCK_MINUTES}).
+     */
     public const ACCEPTED_STALE_MINUTES = 20;
+
+    /**
+     * Absolute backstop: an ACCEPTED offer still open this long is canceled
+     * regardless of driver status, so one permanently stuck by a dead status sync
+     * (the ON_TRIP/idle edge never observed, the driver frozen en-route) can't
+     * linger as "accepted" forever. Set well above any real pickup drive.
+     */
+    public const ACCEPTED_STUCK_MINUTES = 120;
 
     /**
      * How long a driver must have been continuously OFFLINE before their STARTED
@@ -172,11 +186,29 @@ class OfferLifecycle
             ['status' => OfferStatus::Completed, 'completed_at' => $now],
         );
 
+        // Cancel a never-started ACCEPTED offer once stale, but ONLY when its driver
+        // is no longer engaged — they accepted (went en-route) then went idle/offline
+        // and dropped it. A driver STILL EN_ROUTE/ON_TRIP has a pickup ahead (a far
+        // rider is a long drive, well over 20 min) and must NOT be canceled mid-run —
+        // that wrongly showed a live trip as "canceled". Judged by driver_uuid so a
+        // not-yet-linked offer (null driver_id) is still handled. The absolute backstop
+        // still closes an offer permanently stuck ACCEPTED by a dead status sync.
+        $engagedDriverExists = fn ($sub) => $sub->selectRaw('1')->from('drivers')
+            ->whereColumn('drivers.uber_driver_uuid', 'dispatch_offers.driver_uuid')
+            ->whereColumn('drivers.tenant_id', 'dispatch_offers.tenant_id')
+            ->where(fn ($d) => $d
+                ->where('online_status', 'like', '%EN_ROUTE%')
+                ->orWhere('online_status', 'like', '%ON_TRIP%'));
+
         $canceled = $this->finalizeRows(
             DispatchOffer::withoutGlobalScopes()
                 ->where('status', OfferStatus::Accepted)
                 ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-                ->where('accepted_at', '<', $now->subMinutes(self::ACCEPTED_STALE_MINUTES)),
+                ->where(fn ($q) => $q
+                    ->where(fn ($q) => $q
+                        ->where('accepted_at', '<', $now->subMinutes(self::ACCEPTED_STALE_MINUTES))
+                        ->whereNotExists($engagedDriverExists))
+                    ->orWhere('accepted_at', '<', $now->subMinutes(self::ACCEPTED_STUCK_MINUTES))),
             OfferStatus::Accepted,
             ['status' => OfferStatus::Canceled, 'canceled_at' => $now],
         );
