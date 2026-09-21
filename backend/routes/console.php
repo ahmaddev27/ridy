@@ -54,6 +54,11 @@ Schedule::command('alerts:check')->everyFiveMinutes()->withoutOverlapping();
 // supplier.uber.com → fleethub.uber.com). Logs it to the admin Logs tab.
 Schedule::command('fleet:check-sync')->everyFiveMinutes()->withoutOverlapping();
 
+// Detect a silently-stalled offer stream: sync is live and idle drivers are online,
+// yet no offers have arrived for a while (a RAMEN stream that stopped delivering
+// while the session still looks healthy). Observability only — logs to the admin tab.
+Schedule::command('fleet:check-offer-flow')->everyFiveMinutes()->withoutOverlapping();
+
 // Force a lapsed company's drivers offline: once its subscription ends the daemon
 // stops streaming it and the extension is blocked, so no new status arrives — the
 // last-known "online" would otherwise stay frozen in the admin list, stats and map.
