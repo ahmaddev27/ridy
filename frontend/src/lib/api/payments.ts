@@ -5,6 +5,7 @@ export type BankPaymentMethod = {
   bank: string | null;
   iban: string | null;
   bic: string | null;
+  amount: string | null; // EUR amount prefilled into the QR, e.g. "300"
   note: string | null;
 };
 

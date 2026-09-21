@@ -63,13 +63,15 @@ export function PaymentMethods({
     }
   };
 
+  const bankAmount = methods.bank?.amount ? Number(methods.bank.amount) : null;
   const epc =
     methods.bank && canBuildEpc({ name: methods.bank.holder, iban: methods.bank.iban })
       ? buildEpcPayload({
           name: methods.bank.holder ?? "",
           iban: methods.bank.iban ?? "",
           bic: methods.bank.bic,
-          reference,
+          amountEur: bankAmount, // prefills the amount in the scanned bank transfer
+          reference, // the company's unique reference lands in the transfer's note
         })
       : null;
 
@@ -111,6 +113,7 @@ export function PaymentMethods({
                   <Row label={c("payBankName")} value={methods.bank.bank} />
                   <Row label={c("payBankIban")} value={methods.bank.iban} mono />
                   <Row label={c("payBankBic")} value={methods.bank.bic} mono />
+                  {bankAmount ? <Row label={c("payBankAmount")} value={`€${bankAmount.toFixed(2)}`} /> : null}
                 </dl>
                 {methods.bank.note && <p className="mt-3 text-xs text-ink-subtle">{methods.bank.note}</p>}
               </div>
@@ -119,7 +122,8 @@ export function PaymentMethods({
                   <div className="rounded-lg bg-white p-2 shadow-sm ring-1 ring-line">
                     <QRCodeSVG value={epc} size={132} marginSize={0} />
                   </div>
-                  <span className="text-xs text-ink-subtle">{c("scanToPay")}</span>
+                  <span className="text-center text-xs font-medium text-ink-muted">{c("scanToPay")}</span>
+                  <span className="text-center text-[11px] text-ink-subtle">{c("scanToPayHint")}</span>
                 </div>
               )}
             </div>

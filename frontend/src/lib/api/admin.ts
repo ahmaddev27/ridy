@@ -105,6 +105,7 @@ export type PlatformSettings = {
   pay_bank_name: string | null;
   pay_bank_iban: string | null;
   pay_bank_bic: string | null;
+  pay_bank_amount: string | null;
   pay_bank_note: string | null;
   pay_cash_enabled: boolean;
   pay_cash_whatsapp: string | null;
@@ -132,6 +133,7 @@ export type UpdateSettingsInput = Partial<{
   pay_bank_name: string;
   pay_bank_iban: string;
   pay_bank_bic: string;
+  pay_bank_amount: string;
   pay_bank_note: string;
   pay_cash_enabled: boolean;
   pay_cash_whatsapp: string;

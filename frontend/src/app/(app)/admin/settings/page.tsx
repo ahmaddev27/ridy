@@ -38,6 +38,7 @@ export default function SettingsPage() {
   const [bankName, setBankName] = useState("");
   const [bankIban, setBankIban] = useState("");
   const [bankBic, setBankBic] = useState("");
+  const [bankAmount, setBankAmount] = useState("");
   const [bankNote, setBankNote] = useState("");
   const [cashEnabled, setCashEnabled] = useState(false);
   const [cashWhatsapp, setCashWhatsapp] = useState("");
@@ -68,6 +69,7 @@ export default function SettingsPage() {
     setBankName(s.pay_bank_name ?? "");
     setBankIban(s.pay_bank_iban ?? "");
     setBankBic(s.pay_bank_bic ?? "");
+    setBankAmount(s.pay_bank_amount ?? "");
     setBankNote(s.pay_bank_note ?? "");
     setCashEnabled(s.pay_cash_enabled);
     setCashWhatsapp(s.pay_cash_whatsapp ?? "");
@@ -149,6 +151,7 @@ export default function SettingsPage() {
         pay_bank_name: bankName.trim(),
         pay_bank_iban: bankIban.trim(),
         pay_bank_bic: bankBic.trim(),
+        pay_bank_amount: bankAmount.trim(),
         pay_bank_note: bankNote.trim(),
         pay_cash_enabled: cashEnabled,
         pay_cash_whatsapp: cashWhatsapp.trim(),
@@ -342,6 +345,7 @@ export default function SettingsPage() {
               <Field label={c("payBankName")} value={bankName} onChange={setBankName} />
               <Field label={c("payBankIban")} value={bankIban} onChange={setBankIban} mono dir="ltr" />
               <Field label={c("payBankBic")} value={bankBic} onChange={setBankBic} mono dir="ltr" />
+              <Field label={c("payBankAmount")} value={bankAmount} onChange={setBankAmount} placeholder="300" dir="ltr" />
               <div className="md:col-span-2">
                 <Field label={c("payBankNote")} value={bankNote} onChange={setBankNote} />
               </div>

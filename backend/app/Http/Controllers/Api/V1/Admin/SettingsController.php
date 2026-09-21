@@ -40,6 +40,7 @@ class SettingsController extends Controller
             'pay_bank_name' => Settings::get('pay_bank_name'),
             'pay_bank_iban' => Settings::get('pay_bank_iban'),
             'pay_bank_bic' => Settings::get('pay_bank_bic'),
+            'pay_bank_amount' => Settings::get('pay_bank_amount'),
             'pay_bank_note' => Settings::get('pay_bank_note'),
             'pay_cash_enabled' => Settings::get('pay_cash_enabled') === '1',
             'pay_cash_whatsapp' => Settings::get('pay_cash_whatsapp'),
@@ -72,6 +73,7 @@ class SettingsController extends Controller
             'pay_bank_name' => ['nullable', 'string', 'max:255'],
             'pay_bank_iban' => ['nullable', 'string', 'max:64'],
             'pay_bank_bic' => ['nullable', 'string', 'max:32'],
+            'pay_bank_amount' => ['nullable', 'numeric', 'min:0', 'max:99999'],
             'pay_bank_note' => ['nullable', 'string', 'max:500'],
             'pay_cash_enabled' => ['nullable', 'boolean'],
             'pay_cash_whatsapp' => ['nullable', 'string', 'max:32'],
@@ -85,7 +87,7 @@ class SettingsController extends Controller
         $map = [
             'smtp_host', 'smtp_port', 'smtp_username', 'smtp_encryption',
             'mail_from_address', 'mail_from_name', 'mail_provider', 'support_email', 'support_whatsapp',
-            'pay_bank_holder', 'pay_bank_name', 'pay_bank_iban', 'pay_bank_bic', 'pay_bank_note',
+            'pay_bank_holder', 'pay_bank_name', 'pay_bank_iban', 'pay_bank_bic', 'pay_bank_amount', 'pay_bank_note',
             'pay_cash_whatsapp', 'pay_cash_note',
             'app_min_android', 'app_min_ios', 'app_android_store_url', 'app_ios_store_url',
         ];

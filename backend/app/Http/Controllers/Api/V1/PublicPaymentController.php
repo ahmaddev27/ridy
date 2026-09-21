@@ -23,6 +23,9 @@ class PublicPaymentController extends Controller
                 'bank' => Settings::get('pay_bank_name'),
                 'iban' => Settings::get('pay_bank_iban'),
                 'bic' => Settings::get('pay_bank_bic'),
+                // Prefilled into the GiroCode/EPC QR so a scan opens the bank app
+                // with the amount already set (e.g. 300). Empty = open amount.
+                'amount' => Settings::get('pay_bank_amount'),
                 'note' => Settings::get('pay_bank_note'),
             ] : null,
             'cash' => Settings::get('pay_cash_enabled') === '1' ? [
