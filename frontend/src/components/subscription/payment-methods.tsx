@@ -99,6 +99,27 @@ export function PaymentMethods({
         </div>
       )}
 
+      {/* "I've paid" — files a claim the admin verifies by the reference. Kept high,
+          right under the reference, so it's the obvious next step after paying. */}
+      {onConfirm && (
+        <div className="mt-4">
+          {claimPending ? (
+            <div className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2.5 text-sm text-ink-muted">
+              <Clock className="h-4 w-4 text-ink-subtle" />
+              {c("claimPendingLabel")}
+            </div>
+          ) : (
+            <>
+              <Button onClick={onConfirm} disabled={confirming} className="w-full sm:w-auto">
+                {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {c("confirmPayment")}
+              </Button>
+              <p className="mt-2 text-xs text-ink-subtle">{c("confirmPaymentHint")}</p>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="mt-4 space-y-3">
         {methods.bank && (
           <div className="rounded-xl border border-line p-4">
@@ -106,27 +127,23 @@ export function PaymentMethods({
               <Landmark className="h-4 w-4 text-ink" />
               <span className="font-medium text-ink">{c("payBank")}</span>
             </div>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0 flex-1">
-                <dl className="space-y-2 text-sm">
-                  <Row label={c("payBankHolder")} value={methods.bank.holder} />
-                  <Row label={c("payBankName")} value={methods.bank.bank} />
-                  <Row label={c("payBankIban")} value={methods.bank.iban} mono />
-                  <Row label={c("payBankBic")} value={methods.bank.bic} mono />
-                  {bankAmount ? <Row label={c("payBankAmount")} value={`€${bankAmount.toFixed(2)}`} /> : null}
-                </dl>
-                {methods.bank.note && <p className="mt-3 text-xs text-ink-subtle">{methods.bank.note}</p>}
-              </div>
-              {epc && (
-                <div className="flex shrink-0 flex-col items-center gap-2 self-center border-t border-line pt-4 sm:self-start sm:border-s sm:border-t-0 sm:pt-0 sm:ps-4">
-                  <div className="rounded-lg bg-white p-2 shadow-sm ring-1 ring-line">
-                    <QRCodeSVG value={epc} size={132} marginSize={0} />
-                  </div>
-                  <span className="text-center text-xs font-medium text-ink-muted">{c("scanToPay")}</span>
-                  <span className="text-center text-[11px] text-ink-subtle">{c("scanToPayHint")}</span>
+            <dl className="space-y-2 text-sm">
+              <Row label={c("payBankHolder")} value={methods.bank.holder} />
+              <Row label={c("payBankName")} value={methods.bank.bank} />
+              <Row label={c("payBankIban")} value={methods.bank.iban} mono />
+              <Row label={c("payBankBic")} value={methods.bank.bic} mono />
+              {bankAmount ? <Row label={c("payBankAmount")} value={`€${bankAmount.toFixed(2)}`} /> : null}
+            </dl>
+            {methods.bank.note && <p className="mt-3 text-xs text-ink-subtle">{methods.bank.note}</p>}
+            {epc && (
+              <div className="mt-4 flex flex-col items-center gap-1.5 border-t border-line pt-4">
+                <div className="rounded-lg bg-white p-2 shadow-sm ring-1 ring-line">
+                  <QRCodeSVG value={epc} size={140} marginSize={0} />
                 </div>
-              )}
-            </div>
+                <span className="mt-1 text-center text-xs font-medium text-ink-muted">{c("scanToPay")}</span>
+                <span className="text-center text-[11px] leading-snug text-ink-subtle">{c("scanToPayHint")}</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -151,26 +168,6 @@ export function PaymentMethods({
           </div>
         )}
       </div>
-
-      {/* "I've paid" — files a claim the admin verifies by the reference. */}
-      {onConfirm && (
-        <div className="mt-4 border-t border-line pt-4">
-          {claimPending ? (
-            <div className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2.5 text-sm text-ink-muted">
-              <Clock className="h-4 w-4 text-ink-subtle" />
-              {c("claimPendingLabel")}
-            </div>
-          ) : (
-            <>
-              <Button onClick={onConfirm} disabled={confirming} className="w-full sm:w-auto">
-                {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                {c("confirmPayment")}
-              </Button>
-              <p className="mt-2 text-xs text-ink-subtle">{c("confirmPaymentHint")}</p>
-            </>
-          )}
-        </div>
-      )}
     </>
   );
 
