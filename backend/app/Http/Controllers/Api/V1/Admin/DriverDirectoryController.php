@@ -35,8 +35,19 @@ class DriverDirectoryController extends Controller
             'rate' => $total > 0 ? (int) round($online / $total * 100) : 0,
         ];
 
+        // On-trip → en-route → online → offline, then alphabetical. This CASE sort
+        // (plus the OR-of-LIKE search) can never use an index, so it always filesorts.
+        $liveFirst = "CASE
+                WHEN online_status LIKE '%ON_TRIP%' THEN 0
+                WHEN online_status LIKE '%EN_ROUTE%' THEN 1
+                WHEN online_status LIKE '%ONLINE%' THEN 2
+                ELSE 3 END";
+
+        // Deferred join: sort/paginate on id + the sort columns only, so the driver
+        // JSON columns (trip_waypoints/external_ids) never hit the sort buffer (1038
+        // out-of-sort-memory), then fetch the page's full rows (with tenant) by id.
         $drivers = $fleet()
-            ->with('tenant:id,name')
+            ->select('id', 'name', 'online_status')
             ->when($request->filled('status'), fn ($q) => $this->applyStatus($q, (string) $request->input('status')))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%'.$request->string('search').'%';
@@ -47,15 +58,17 @@ class DriverDirectoryController extends Controller
                     ->orWhere('uber_email', 'like', $term)
                     ->orWhereHas('tenant', fn ($t) => $t->where('name', 'like', $term)));
             })
-            // On-trip → en-route → online → offline, then alphabetical.
-            ->orderByRaw("CASE
-                WHEN online_status LIKE '%ON_TRIP%' THEN 0
-                WHEN online_status LIKE '%EN_ROUTE%' THEN 1
-                WHEN online_status LIKE '%ONLINE%' THEN 2
-                ELSE 3 END")
-            ->orderBy('name')
+            ->orderByRaw($liveFirst)->orderBy('name')->orderBy('id')
             ->paginate(min(100, max(10, (int) $request->integer('per_page', 25))))
             ->withQueryString();
+
+        $drivers->setCollection(
+            Driver::withoutGlobalScopes()
+                ->whereIn('id', $drivers->pluck('id'))
+                ->with('tenant:id,name')
+                ->orderByRaw($liveFirst)->orderBy('name')->orderBy('id')
+                ->get()
+        );
 
         // The in-flight offer for each listed driver (accepted/started), resolved in
         // ONE query to avoid an N+1 over the page — newest first so keyBy keeps it.

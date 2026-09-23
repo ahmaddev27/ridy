@@ -20,13 +20,26 @@ class DriverOfferController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        $offers = $this->filtered($request)
-            ->with('driver:id,name,online_status')
-            ->orderByDesc('received_at')
-            ->paginate(min(50, max(5, (int) $request->integer('per_page', 20))))
+        $perPage = min(50, max(5, (int) $request->integer('per_page', 20)));
+
+        // Deferred join: sort/paginate on id + received_at only, so the search's
+        // OR-of-LIKE filesort never packs the large raw_payload JSON into MySQL's
+        // sort buffer (SQLSTATE[HY001] 1038). Full rows are fetched by id after.
+        $page = $this->filtered($request)
+            ->select('id', 'received_at')
+            ->orderByDesc('received_at')->orderByDesc('id')
+            ->paginate($perPage)
             ->withQueryString();
 
-        return DispatchOfferResource::collection($offers);
+        $offers = DispatchOffer::withoutGlobalScopes()
+            ->whereIn('id', $page->pluck('id'))
+            ->with('driver:id,name,online_status')
+            ->orderByDesc('received_at')->orderByDesc('id')
+            ->get();
+
+        $page->setCollection($offers);
+
+        return DispatchOfferResource::collection($page);
     }
 
     /**

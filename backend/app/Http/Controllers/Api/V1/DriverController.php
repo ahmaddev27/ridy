@@ -39,16 +39,29 @@ class DriverController extends Controller
         // Ordered live-first (on-trip → en-route → online → offline), then by name,
         // so the drivers who are working right now are at the top — mirrors the
         // admin fleet directory.
-        $drivers = Driver::query()->activeFleet()->with('latestDeviceToken')
-            ->orderByRaw("CASE
+        $liveFirst = "CASE
                 WHEN online_status LIKE '%ON_TRIP%' THEN 0
                 WHEN online_status LIKE '%EN_ROUTE%' THEN 1
                 WHEN online_status LIKE '%ONLINE%' THEN 2
-                ELSE 3 END")
-            ->orderBy('name')
+                ELSE 3 END";
+
+        // The live-first ORDER BY is a CASE expression that can never use an index,
+        // so it always filesorts. Deferred join: sort/paginate on id + the sort
+        // columns only (never the driver JSON columns trip_waypoints/external_ids),
+        // so the sort buffer stays small (avoids 1038 out-of-sort-memory on a large
+        // fleet), then fetch the page's full rows by id.
+        $page = Driver::query()->activeFleet()
+            ->select('id', 'name', 'online_status')
+            ->orderByRaw($liveFirst)->orderBy('name')->orderBy('id')
             ->paginate(50);
 
-        return DriverResource::collection($drivers);
+        $drivers = Driver::query()->whereIn('id', $page->pluck('id'))->with('latestDeviceToken')
+            ->orderByRaw($liveFirst)->orderBy('name')->orderBy('id')
+            ->get();
+
+        $page->setCollection($drivers);
+
+        return DriverResource::collection($page);
     }
 
     /**

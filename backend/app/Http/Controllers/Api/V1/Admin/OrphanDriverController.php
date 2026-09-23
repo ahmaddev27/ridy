@@ -18,7 +18,12 @@ class OrphanDriverController extends Controller
 {
     public function __invoke(Request $request): JsonResponse
     {
+        // App-registered drivers first (activated), then most-recently dropped — both
+        // are computed/unindexed sort keys, so this always filesorts. Deferred join:
+        // sort/paginate on id + the sort columns only (never the driver JSON columns),
+        // so the sort buffer stays small (avoids 1038), then fetch full rows by id.
         $drivers = Driver::withoutGlobalScopes()
+            ->select('id', 'activated_at', 'roster_removed_at')
             ->whereNotNull('roster_removed_at')
             // Drop anyone who has since been placed with another fleet: the same Uber
             // driver (uber_driver_uuid) now has an ACTIVE roster record elsewhere. Their
@@ -29,7 +34,6 @@ class OrphanDriverController extends Controller
                     ->whereNotNull('active_d.uber_driver_uuid')
                     ->whereNull('active_d.roster_removed_at');
             })
-            ->with('tenant:id,name')
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%'.$request->string('search').'%';
                 $q->where(fn ($sub) => $sub
@@ -38,11 +42,17 @@ class OrphanDriverController extends Controller
                     ->orWhere('email', 'like', $term)
                     ->orWhere('uber_email', 'like', $term));
             })
-            // App-registered drivers first (activated), then by most-recently dropped.
-            ->orderByRaw('activated_at IS NULL')
-            ->orderByDesc('roster_removed_at')
+            ->orderByRaw('activated_at IS NULL')->orderByDesc('roster_removed_at')->orderByDesc('id')
             ->paginate(min(100, max(10, (int) $request->integer('per_page', 25))))
             ->withQueryString();
+
+        $drivers->setCollection(
+            Driver::withoutGlobalScopes()
+                ->whereIn('id', $drivers->pluck('id'))
+                ->with('tenant:id,name')
+                ->orderByRaw('activated_at IS NULL')->orderByDesc('roster_removed_at')->orderByDesc('id')
+                ->get()
+        );
 
         $drivers->getCollection()->transform(fn (Driver $d) => [
             'id' => $d->id,
