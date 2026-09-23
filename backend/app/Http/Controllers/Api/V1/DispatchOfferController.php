@@ -26,13 +26,29 @@ class DispatchOfferController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $offers = $this->filtered($request)
-            ->with('driver:id,name,online_status')
-            ->orderByDesc('received_at')
-            ->paginate(min(100, max(5, (int) $request->integer('per_page', 25))))
+        $perPage = min(100, max(5, (int) $request->integer('per_page', 25)));
+
+        // Deferred join: paginate on id + received_at ONLY, so the ORDER BY sort
+        // never packs the large raw_payload/trip_waypoints JSON into MySQL's sort
+        // buffer. A filter that forces a filesort (e.g. the search's OR of LIKEs)
+        // otherwise sorted full rows and blew the buffer — SQLSTATE[HY001] 1038
+        // "Out of sort memory". The page's full rows (with raw_payload for the
+        // address fallback) are then fetched by id.
+        $page = $this->filtered($request)
+            ->select('id', 'received_at')
+            ->orderByDesc('received_at')->orderByDesc('id')
+            ->paginate($perPage)
             ->withQueryString();
 
-        return DispatchOfferResource::collection($offers);
+        $offers = DispatchOffer::query()
+            ->whereIn('id', $page->pluck('id'))
+            ->with('driver:id,name,online_status')
+            ->orderByDesc('received_at')->orderByDesc('id')
+            ->get();
+
+        $page->setCollection($offers);
+
+        return DispatchOfferResource::collection($page);
     }
 
     /**
