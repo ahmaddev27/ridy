@@ -13,6 +13,7 @@ use App\Http\Requests\Api\V1\Admin\StoreCompanyRequest;
 use App\Http\Requests\Api\V1\Admin\UpdateCompanyRequest;
 use App\Http\Resources\Admin\CompanyResource;
 use App\Models\User;
+use App\Support\PlatformCounters;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
@@ -25,15 +26,17 @@ use Illuminate\Support\Facades\Hash;
  */
 class CompanyController extends Controller
 {
+    public function __construct(private PlatformCounters $counters) {}
+
     public function index(): AnonymousResourceCollection
     {
         $tenants = Tenant::query()->orderBy('name')->get();
 
-        // Per-tenant counts in 3 grouped queries (no N+1).
-        $driverCounts = Driver::withoutGlobalScopes()
-            ->selectRaw('tenant_id, count(*) c')->groupBy('tenant_id')->pluck('c', 'tenant_id');
-        $offerCounts = DispatchOffer::withoutGlobalScopes()
-            ->selectRaw('tenant_id, count(*) c')->groupBy('tenant_id')->pluck('c', 'tenant_id');
+        // Per-tenant driver/offer counts come from the shared platform-count cache
+        // (a per-request full-table scan each would otherwise be); the session query
+        // below stays live.
+        $driverCounts = $this->counters->driversByTenant();
+        $offerCounts = $this->counters->offersByTenant();
         // Newest session per tenant (unique() keeps the first of the desc-sorted rows,
         // so keyBy can't fall back to the oldest for a tenant with several sessions).
         $sessions = UberFleetSession::withoutGlobalScopes()

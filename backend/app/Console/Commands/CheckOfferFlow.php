@@ -54,8 +54,7 @@ class CheckOfferFlow extends Command
                 ->whereNotNull('uber_driver_uuid')
                 ->where('status_synced_at', '>=', $statusCutoff)
                 ->online()
-                ->where('online_status', 'not like', '%EN_ROUTE%')
-                ->where('online_status', 'not like', '%ON_TRIP%')
+                ->idle() // engagement 0: online and not EN_ROUTE/ON_TRIP, now index-served
                 ->count();
             if ($available === 0) {
                 continue; // all busy/offline, or sync not fresh — nothing to expect

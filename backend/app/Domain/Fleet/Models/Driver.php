@@ -25,6 +25,9 @@ class Driver extends Authenticatable
      * dispatch. Uber returns a redacted/variable enum, and offline drivers often
      * have no status at all — so "online" is defined as "has a status that is not
      * one of these", which reflects reality without hard-coding online strings.
+     *
+     * Canonical: the drivers migration's `is_online` generated-column CASE is a SQL
+     * transcription of this list — keep them in lockstep (DriverOnlineParityTest guards it).
      */
     private const OFFLINE_TOKENS = ['OFFLINE', 'UNAVAILABLE', 'DISCONNECTED', 'OFF_DUTY', 'LOGGED_OUT'];
 
@@ -52,6 +55,8 @@ class Driver extends Authenticatable
         'longitude' => 'decimal:7',
         'heading' => 'decimal:2',
         'trip_waypoints' => 'array',
+        'is_online' => 'boolean',
+        'engagement' => 'integer',
         'password' => 'hashed',
         'invited_at' => 'datetime',
         'activated_at' => 'datetime',
@@ -95,6 +100,9 @@ class Driver extends Authenticatable
      * Engagement level for the app: 0 = available (online, no trip), 1 = heading
      * to pickup (EN_ROUTE), 2 = on trip (ON_TRIP). Derived from the raw status;
      * the offer lifecycle only advances an offer when a real one is attributed.
+     *
+     * Canonical: the drivers migration's `engagement` generated-column CASE mirrors
+     * this — keep them in lockstep (DriverOnlineParityTest guards it).
      */
     public function engagementStatus(): int
     {
@@ -131,28 +139,22 @@ class Driver extends Authenticatable
         return true;
     }
 
-    /** Drivers Uber currently reports as online — mirrors {@see isOnline()} in SQL. */
+    /** Drivers Uber currently reports as online — reads the indexed `is_online` generated column that mirrors {@see isOnline()}. */
     public function scopeOnline(Builder $query): Builder
     {
-        return $query
-            ->whereNotNull('online_status')
-            ->where('online_status', '!=', '')
-            ->where(function (Builder $q) {
-                foreach (self::OFFLINE_TOKENS as $token) {
-                    $q->where('online_status', 'not like', "%{$token}%");
-                }
-            });
+        return $query->where('is_online', 1);
     }
 
-    /** The complement of {@see scopeOnline()}: no status, empty, or an offline token. */
+    /** The complement of {@see scopeOnline()} — the indexed `is_online` generated column that mirrors {@see isOnline()}. */
     public function scopeOffline(Builder $query): Builder
     {
-        return $query->where(function (Builder $q) {
-            $q->whereNull('online_status')->orWhere('online_status', '');
-            foreach (self::OFFLINE_TOKENS as $token) {
-                $q->orWhere('online_status', 'like', "%{$token}%");
-            }
-        });
+        return $query->where('is_online', 0);
+    }
+
+    /** Online but not on a job — the indexed `engagement` generated column at level 0. */
+    public function scopeIdle(Builder $query): Builder
+    {
+        return $query->where('engagement', 0);
     }
 
     /**

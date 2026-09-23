@@ -8,6 +8,7 @@ use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Proxy;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
+use App\Support\PlatformCounters;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,8 @@ use Illuminate\Support\Facades\DB;
  */
 class OverviewController extends Controller
 {
+    public function __construct(private PlatformCounters $counters) {}
+
     public function __invoke(): JsonResponse
     {
         $tenants = Tenant::query()->get();
@@ -54,7 +57,7 @@ class OverviewController extends Controller
             'drivers' => Driver::withoutGlobalScopes()->count(),
             'drivers_total' => $driversTotal,
             'drivers_online' => $driversOnline,
-            'offers' => DispatchOffer::withoutGlobalScopes()->count(),
+            'offers' => $this->counters->totalOffers(),
             'sessions_active' => $breakdown['active'],
             'sessions_need_attention' => $breakdown['expired'] + $breakdown['needs_relink'],
         ];
@@ -127,10 +130,8 @@ class OverviewController extends Controller
     /** Top 5 companies by captured offers (with their driver counts). */
     private function topCompanies($tenants): array
     {
-        $offers = DispatchOffer::withoutGlobalScopes()
-            ->selectRaw('tenant_id, count(*) c')->groupBy('tenant_id')->pluck('c', 'tenant_id');
-        $drivers = Driver::withoutGlobalScopes()
-            ->selectRaw('tenant_id, count(*) c')->groupBy('tenant_id')->pluck('c', 'tenant_id');
+        $offers = $this->counters->offersByTenant();
+        $drivers = $this->counters->driversByTenant();
 
         return $tenants
             ->map(fn ($t) => [

@@ -9,6 +9,7 @@ use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -32,6 +33,28 @@ class RosterSyncService
         $synced = 0;
         $seen = [];
 
+        // Preload every rostered driver in one grouped query (keyed by UUID) so
+        // the loop resolves each canonical driver from memory instead of firing
+        // one SELECT per row — the N+1 this sync used to pay on every pull.
+        $uuids = [];
+        foreach ($drivers as $row) {
+            $uuid = $this->extractUuid($row);
+            if ($uuid !== null) {
+                $uuids[] = $uuid;
+            }
+        }
+        $uuids = array_values(array_unique($uuids));
+
+        // Skip the query on an empty roster so no `WHERE ... IN ()` is emitted.
+        $existing = $uuids === []
+            ? new Collection
+            : Driver::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->whereIn('uber_driver_uuid', $uuids)
+                ->orderBy('id')
+                ->get()
+                ->groupBy('uber_driver_uuid');
+
         foreach ($drivers as $row) {
             $uuid = $this->extractUuid($row);
             if ($uuid === null) {
@@ -39,7 +62,7 @@ class RosterSyncService
             }
             $seen[] = $uuid;
 
-            $driver = $this->canonicalDriver($tenantId, $uuid);
+            $driver = $this->canonicalDriver($tenantId, $existing->get($uuid));
             $wasNew = $driver === null;
 
             $attributes = [
@@ -63,6 +86,9 @@ class RosterSyncService
                 $attributes['uber_link_method'] = 'auto';
                 $driver = Driver::create($attributes);
                 $created++;
+                // Register the fresh row so a duplicate of this UUID later in the
+                // same roster resolves to it rather than creating a second driver.
+                $existing->put($uuid, ($existing->get($uuid) ?? new Collection)->push($driver));
             } else {
                 // Don't clobber a manual link method; only fill profile fields.
                 unset($attributes['tenant_id']);
@@ -104,16 +130,13 @@ class RosterSyncService
      * roster never lists a driver twice. A pending invite/login on any extra is
      * carried onto the canonical so a merge never invalidates an active invite.
      */
-    private function canonicalDriver(int $tenantId, string $uuid): ?Driver
+    private function canonicalDriver(int $tenantId, ?Collection $group): ?Driver
     {
-        // Explicit tenant_id (not just the global scope) — this method DELETES
-        // rows, so it must never reach across tenants even if the tenant context
-        // were ever unset (the scope is a no-op then).
-        $rows = Driver::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('uber_driver_uuid', $uuid)
-            ->orderBy('id')
-            ->get();
+        // Rows arrive preloaded from the one grouped query above. Re-assert the
+        // tenant_id in memory (no extra query) — this method DELETES rows, so it
+        // must never reach across tenants even though the preload was already
+        // tenant-scoped.
+        $rows = ($group ?? new Collection)->where('tenant_id', $tenantId)->values();
         if ($rows->isEmpty()) {
             return null;
         }

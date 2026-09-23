@@ -16,8 +16,17 @@ class NetworkLogController extends Controller
 {
     public function clear(): JsonResponse
     {
-        $deleted = DispatchNetworkLog::query()->delete();
+        // Delete in bounded batches rather than one unbounded DELETE: this is the
+        // highest-volume table, so a single statement would hold a long MySQL
+        // transaction, blow up the undo log, and risk locking/stalling ingestion.
+        $total = 0;
 
-        return response()->json(['data' => ['deleted' => $deleted]]);
+        do {
+            $ids = DispatchNetworkLog::query()->limit(5000)->pluck('id');
+            $deleted = $ids->isEmpty() ? 0 : DispatchNetworkLog::whereIn('id', $ids)->delete();
+            $total += $deleted;
+        } while ($deleted > 0);
+
+        return response()->json(['data' => ['deleted' => $total]]);
     }
 }
