@@ -124,4 +124,22 @@ class DispatchNotificationTest extends TestCase
 
         $this->assertDatabaseHas('device_tokens', ['token' => 'fcm-token-xyz', 'driver_id' => $driver->id]);
     }
+
+    public function test_viewer_cannot_attach_a_push_token_to_a_driver(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        Driver::create(['name' => 'Mhmoud', 'uber_driver_uuid' => self::DRIVER_UUID]);
+        $viewer = User::create([
+            'name' => 'V', 'email' => 'v@ya.de', 'password' => Hash::make('password'), 'tenant_id' => $this->tenant->id,
+        ]);
+        $viewer->assignRole('viewer');
+        Sanctum::actingAs($viewer);
+
+        $this->postJson('/api/v1/devices', [
+            'uber_driver_uuid' => self::DRIVER_UUID,
+            'token' => 'spy-token',
+        ])->assertForbidden();
+
+        $this->assertDatabaseMissing('device_tokens', ['token' => 'spy-token']);
+    }
 }

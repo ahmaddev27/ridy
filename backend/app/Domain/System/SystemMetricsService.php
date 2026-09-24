@@ -102,7 +102,13 @@ class SystemMetricsService
      */
     private function netBytes(): array
     {
-        $dev = @file_get_contents($this->proc().'/net/dev');
+        // <proc>/net/dev resolves to the READER's network namespace (the backend
+        // container's eth0), not the VPS uplink. PID 1's view of the bind-mounted
+        // host /proc is the host namespace; fall back for local dev.
+        $dev = @file_get_contents($this->proc().'/1/net/dev');
+        if ($dev === false) {
+            $dev = @file_get_contents($this->proc().'/net/dev');
+        }
         if ($dev === false) {
             return [0, 0];
         }
@@ -115,7 +121,8 @@ class SystemMetricsService
             }
             [$iface, $rest] = explode(':', $line, 2);
             $iface = trim($iface);
-            if ($iface === 'lo' || str_starts_with($iface, 'veth') || str_starts_with($iface, 'docker') || str_starts_with($iface, 'br-')) {
+            // Virtual/bridge/VPN links would double-count the physical NIC's traffic.
+            if ($iface === 'lo' || preg_match('/^(veth|docker|br-|tun|wg|tailscale)/', $iface)) {
                 continue;
             }
             $cols = preg_split('/\s+/', trim($rest));

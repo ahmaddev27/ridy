@@ -30,7 +30,7 @@ class EmailTemplateController extends Controller
         return response()->json(['data' => $this->present($template)]);
     }
 
-    public function update(Request $request, string $key): JsonResponse
+    public function update(Request $request, string $key, EmailTemplateRenderer $renderer): JsonResponse
     {
         $template = EmailTemplate::findOrFail($key);
 
@@ -41,6 +41,10 @@ class EmailTemplateController extends Controller
             'accent_color' => ['nullable', 'string', 'max:9'],
             'footer_text' => ['nullable', 'string', 'max:255'],
         ]);
+
+        // Store only clean HTML: the dashboard editor loads body_html back into the
+        // page, so an unsanitized stored body would run on the dashboard origin.
+        $data['body_html'] = $renderer->sanitize($data['body_html']);
 
         $template->update($data);
 

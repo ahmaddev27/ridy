@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Audit\AuditLogger;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 
@@ -49,30 +51,72 @@ class QueueAdminController extends Controller
         ]]);
     }
 
-    /** Retry every failed job (pushes them back onto the queue). */
-    public function retry(): JsonResponse
+    /**
+     * Retry failed jobs (pushes them back onto the queue): every one by default
+     * (the existing dashboard button), or only the given `ids` (uuids) or job
+     * class `name` (e.g. "GeocodeOffer").
+     */
+    public function retry(Request $request, AuditLogger $audit): JsonResponse
     {
-        $count = DB::table('failed_jobs')->count();
-        Artisan::call('queue:retry', ['id' => ['all']]);
+        $data = $request->validate([
+            'ids' => ['sometimes', 'array', 'max:500'],
+            'ids.*' => ['string', 'max:64'],
+            'name' => ['sometimes', 'string', 'max:120'],
+        ]);
 
-        return response()->json(['data' => ['retried' => $count]]);
+        $uuids = $this->selectFailedUuids($data['ids'] ?? null, $data['name'] ?? null);
+        if ($uuids !== []) {
+            Artisan::call('queue:retry', ['id' => $uuids]);
+        }
+
+        $audit->logPlatform('queue.retry', null, [
+            'count' => count($uuids),
+            'filter' => array_filter(['name' => $data['name'] ?? null, 'ids' => isset($data['ids']) ? count($data['ids']) : null]),
+        ]);
+
+        return response()->json(['data' => ['retried' => count($uuids)]]);
     }
 
     /** Delete every failed job (they are gone for good). */
-    public function flush(): JsonResponse
+    public function flush(AuditLogger $audit): JsonResponse
     {
         $count = DB::table('failed_jobs')->count();
         Artisan::call('queue:flush');
+        $audit->logPlatform('queue.flush', null, ['count' => $count]);
 
         return response()->json(['data' => ['cleared' => $count]]);
     }
 
     /** Delete the PENDING backlog (jobs waiting to run) — a hard reset. */
-    public function clearPending(): JsonResponse
+    public function clearPending(AuditLogger $audit): JsonResponse
     {
         $count = DB::table('jobs')->count();
         DB::table('jobs')->delete();
+        $audit->logPlatform('queue.clear_pending', null, ['count' => $count]);
 
         return response()->json(['data' => ['cleared' => $count]]);
+    }
+
+    /**
+     * @param  array<int, string>|null  $ids
+     * @return array<int, string> failed-job uuids to retry
+     */
+    private function selectFailedUuids(?array $ids, ?string $name): array
+    {
+        $query = DB::table('failed_jobs');
+        if ($ids !== null) {
+            $query->whereIn('uuid', $ids);
+        }
+
+        $rows = $query->get(['uuid', 'payload']);
+        if ($name !== null) {
+            $rows = $rows->filter(function ($row) use ($name) {
+                $payload = json_decode((string) $row->payload, true) ?: [];
+
+                return class_basename((string) ($payload['displayName'] ?? '')) === $name;
+            });
+        }
+
+        return $rows->pluck('uuid')->filter()->values()->all();
     }
 }

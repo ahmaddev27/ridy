@@ -24,8 +24,12 @@ class SyncRailwayStations extends Command
 
     protected $description = 'Import DB InfraGO OpenStation railway-station addresses (local, indexed).';
 
+    /** A run importing less than this share of the known stations is treated as broken. */
+    private const MIN_IMPORT_RATIO = 0.5;
+
     public function handle(): int
     {
+        $downloaded = ! $this->option('file');
         $path = $this->option('file') ?: $this->download((string) $this->option('url'));
         if ($path === null) {
             $this->error('Download failed — existing station data left untouched.');
@@ -33,8 +37,24 @@ class SyncRailwayStations extends Command
             return self::FAILURE;
         }
 
+        try {
+            return $this->import($path);
+        } finally {
+            if ($downloaded) {
+                @unlink($path); // the ~18 MB bundle is not kept in storage/app
+            }
+        }
+    }
+
+    private function import(string $path): int
+    {
+        $before = RailwayStation::query()->count();
+        $previousLibxml = libxml_use_internal_errors(true);
+        libxml_clear_errors();
+
         $reader = new XMLReader;
         if (! @$reader->open('compress.zlib://'.$path)) {
+            libxml_use_internal_errors($previousLibxml);
             $this->error("Could not open NeTEx stream at {$path}.");
 
             return self::FAILURE;
@@ -67,9 +87,27 @@ class SyncRailwayStations extends Command
         }
         $reader->close();
 
+        $parseErrors = count(libxml_get_errors());
+        libxml_clear_errors();
+        libxml_use_internal_errors($previousLibxml);
+
         $pctCoords = $imported > 0 ? round($withCoords / $imported * 100) : 0;
         $pctHouse = $imported > 0 ? round($withHouseNo / $imported * 100) : 0;
         $this->info("Imported {$imported} stations — {$pctCoords}% with coordinates, {$pctHouse}% with a house number.");
+
+        // A truncated gzip, an HTML error page served with 200 or an upstream schema
+        // change all end the stream early or match nothing — fail visibly instead of
+        // reporting success while the weekly refresh silently stops working.
+        if ($parseErrors > 0) {
+            $this->error("NeTEx stream had {$parseErrors} parse error(s) — the download is likely truncated.");
+
+            return self::FAILURE;
+        }
+        if ($imported === 0 || ($before > 0 && $imported < self::MIN_IMPORT_RATIO * $before)) {
+            $this->error("Only {$imported} station(s) parsed (had {$before}) — treating the source as broken.");
+
+            return self::FAILURE;
+        }
 
         return self::SUCCESS;
     }

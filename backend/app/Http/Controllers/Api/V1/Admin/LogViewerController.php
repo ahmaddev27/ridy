@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Super-admin log viewer for the System Health board: tail and clear the backend
@@ -15,6 +16,8 @@ use Illuminate\Http\Request;
 class LogViewerController extends Controller
 {
     private const MAX_FRONTEND_BYTES = 2_000_000;
+
+    private const DAILY_LINES_PER_USER = 500;
 
     /** Absolute path of a known log source, or null for an unknown source. */
     private function path(string $source): ?string
@@ -81,22 +84,36 @@ class LogViewerController extends Controller
             'url' => ['nullable', 'string', 'max:500'],
         ]);
 
-        // Strip control characters from ALL THREE fields. Sanitising only the message
-        // let any signed-in dashboard user put newlines in `url` or `level` and forge
+        // Per-user daily budget on top of the route throttle: one account can no
+        // longer flood the file to push older evidence out.
+        $user = $request->user();
+        $budgetKey = 'client-log:'.($user?->getAuthIdentifier() ?? $request->ip());
+        if (RateLimiter::tooManyAttempts($budgetKey, self::DAILY_LINES_PER_USER)) {
+            return response()->json(['data' => ['logged' => false]]);
+        }
+        RateLimiter::hit($budgetKey, 86400);
+
+        // Strip control characters from ALL fields. Sanitising only the message let
+        // any signed-in dashboard user put newlines in `url` or `level` and forge
         // arbitrary extra lines in the admin's frontend log — including lines that
-        // read like backend errors.
+        // read like backend errors. Each line is attributed to its account.
+        $impersonating = $request->hasSession() && $request->session()->has('impersonator_id');
         $line = sprintf(
-            "[%s] %s %s — %s\n",
+            "[%s] %s u:%s c:%s%s %s — %s\n",
             now()->toDateTimeString(),
             strtoupper(self::oneLine($data['level'] ?? 'error')),
+            $user?->getAuthIdentifier() ?? '-',
+            $user?->tenant_id ?? '-',
+            $impersonating ? ' (impersonated)' : '',
             self::oneLine($data['url'] ?? '-'),
-            self::oneLine($data['message']),
+            mb_substr(self::oneLine($data['message']), 0, 1000),
         );
 
         $path = storage_path('logs/frontend.log');
-        // Reset the file if it has grown past the cap, so it can never run away.
+        // Rotate (keep one previous file) instead of truncating, so a flood can
+        // never silently erase what was there before.
         if (is_file($path) && filesize($path) > self::MAX_FRONTEND_BYTES) {
-            file_put_contents($path, '');
+            @rename($path, $path.'.1');
         }
         @file_put_contents($path, $line, FILE_APPEND | LOCK_EX);
 

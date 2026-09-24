@@ -71,13 +71,16 @@ class DriverDirectoryController extends Controller
         );
 
         // The in-flight offer for each listed driver (accepted/started), resolved in
-        // ONE query to avoid an N+1 over the page — newest first so keyBy keeps it.
+        // ONE query to avoid an N+1 over the page — newest first, and unique() keeps
+        // that first row per driver (keyBy alone keeps the LAST, i.e. the oldest).
         $ids = $drivers->getCollection()->pluck('id')->all();
         $activeOffers = DispatchOffer::withoutGlobalScopes()
             ->whereIn('driver_id', $ids)
             ->whereIn('status', [OfferStatus::Accepted, OfferStatus::Started])
             ->orderByDesc('received_at')
+            ->orderByDesc('id')
             ->get(['id', 'driver_id', 'pickup_display', 'pickup_address', 'dropoff_display', 'dropoff_address', 'fare_formatted', 'stops_count'])
+            ->unique('driver_id')
             ->keyBy('driver_id');
 
         $drivers->getCollection()->transform(function (Driver $d) use ($activeOffers) {

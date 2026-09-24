@@ -10,81 +10,92 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Drain queued jobs (GeocodeOffer, SyncTripFromWaypoints, …) every minute via the
+// Every withoutOverlapping() below carries an explicit lock expiry (minutes) that
+// fits its cadence. The default is 24 h: a deploy SIGKILLs the scheduler mid-run,
+// the event's lock row stays in cache_locks, and the new scheduler skipped that
+// event for up to a day (the per-minute queue backstop, backups, notifications).
+
+// Scheduler heartbeat FIRST: events in one schedule:run execute in order, so a slow
+// event ahead of it delayed the stamp the admin System Health board reads (a stale/
+// missing stamp means nothing scheduled — queue drain, backfill, expiry — is running).
+Schedule::call(fn () => Cache::put(InfrastructureHealthService::HEARTBEAT_KEY, now()->toIso8601String(), 3600))
+    ->everyMinute()
+    ->name('scheduler-heartbeat')
+    ->withoutOverlapping(2);
+
+// Drain queued jobs (GeocodeOffer, SyncTripFromWaypoints, mail, …) every minute via the
 // scheduler, so they actually run even without a dedicated `queue:work` daemon. A
 // missing worker was leaving the database queue's jobs unprocessed — offers never
 // geocoded (distance/€-per-km blank until a manager opened the detail) and accepted
 // trips never got their Uber-waypoint address/stop correction. --stop-when-empty
 // exits the moment the queue is drained; --max-time keeps each run under the minute;
-// withoutOverlapping stops two runs stacking. Harmless if a real worker also runs.
+// withoutOverlapping stops two runs stacking. In the BACKGROUND so its up-to-50 s
+// never delays the sweeps below. Harmless if a real worker also runs.
 Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3 --sleep=1')
     ->everyMinute()
-    ->withoutOverlapping();
-
-// Scheduler heartbeat: stamp a shared (database-cache) timestamp every minute so the
-// admin System Health board can tell whether the scheduler container is actually
-// ticking — a stale/missing stamp means nothing scheduled (queue drain, backfill,
-// expiry) is running.
-Schedule::call(fn () => Cache::put(InfrastructureHealthService::HEARTBEAT_KEY, now()->toIso8601String(), 3600))
-    ->everyMinute()
-    ->name('scheduler-heartbeat')
-    ->withoutOverlapping();
+    ->withoutOverlapping(2)
+    ->runInBackground();
 
 // Expire pending offers whose accept window elapsed (safety net for idle tenants).
-Schedule::command('offers:expire-pending')->everyMinute()->withoutOverlapping();
+Schedule::command('offers:expire-pending')->everyMinute()->withoutOverlapping(2);
 
 // Force-finalize stale offers (over-long trips / abandoned accepts) the poll missed.
-Schedule::command('offers:finalize-stale')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('offers:finalize-stale')->everyFiveMinutes()->withoutOverlapping(10);
 
 // Backfill for offers whose lazy/ingest-time enrich never resolved (hard street-
 // only addresses, transient 429s), so their distance/€-per-km shows in the mobile
 // "recent" list without anyone opening the detail on the dashboard. Kept GENTLE —
 // a tiny batch every 10 min at ~1 req/sec (see the 700ms throttle) — because a
 // large fast sweep once 429'd the self-hosted Nominatim and starved live offers.
-Schedule::command('offers:backfill-geo --limit=12')->everyTenMinutes()->withoutOverlapping();
+Schedule::command('offers:backfill-geo --limit=12')->everyTenMinutes()->withoutOverlapping(10)->runInBackground();
 
 // Daily heads-up notifications: subscriptions/proxies expiring or expired.
-Schedule::command('notifications:scan')->dailyAt('08:00')->withoutOverlapping();
+Schedule::command('notifications:scan')->dailyAt('08:00')->withoutOverlapping(60);
 
 // Ops alerting: broken Uber sessions / down daemon shards (emailed once each).
-Schedule::command('alerts:check')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('alerts:check')->everyFiveMinutes()->withoutOverlapping(10);
 
 // Detect a silently-broken Uber connection: an active company whose live driver-status
 // sync has gone stale (extension down, session rotated, or a portal migration like
 // supplier.uber.com → fleethub.uber.com). Logs it to the admin Logs tab.
-Schedule::command('fleet:check-sync')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('fleet:check-sync')->everyFiveMinutes()->withoutOverlapping(10);
 
 // Detect a silently-stalled offer stream: sync is live and idle drivers are online,
 // yet no offers have arrived for a while (a RAMEN stream that stopped delivering
 // while the session still looks healthy). Observability only — logs to the admin tab.
-Schedule::command('fleet:check-offer-flow')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('fleet:check-offer-flow')->everyFiveMinutes()->withoutOverlapping(10);
 
 // Force a lapsed company's drivers offline: once its subscription ends the daemon
 // stops streaming it and the extension is blocked, so no new status arrives — the
 // last-known "online" would otherwise stay frozen in the admin list, stats and map.
-Schedule::command('fleet:offline-lapsed')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('fleet:offline-lapsed')->everyFiveMinutes()->withoutOverlapping(10);
 
 // Location only during live trips: clear positions/waypoints once a driver's
 // status stops syncing (DSGVO "detect, don't surveil").
 Schedule::command('fleet:purge-stale-locations')->everyFiveMinutes()->withoutOverlapping();
 
 // Nightly gzipped database backup (kept 7 days in storage/app/backups).
-Schedule::command('db:backup')->dailyAt('03:00')->withoutOverlapping();
+Schedule::command('db:backup')->dailyAt('03:00')->withoutOverlapping(60)->runInBackground();
+
+// Data retention (DSGVO): anonymize/delete personal data past the periods set in the
+// platform settings. Every period is OFF by default — until the owner sets one, this
+// changes nothing. After the backup, before the geocode-cache prune.
+Schedule::command('data:retention')->dailyAt('03:20')->withoutOverlapping(60);
 
 // Flip expired ads to inactive (scopeLive already hides them; this syncs the flag).
-Schedule::command('ads:expire')->hourly()->withoutOverlapping();
+Schedule::command('ads:expire')->hourly()->withoutOverlapping(60);
 
 // Refresh the local railway-station table from DB InfraGO OpenStation (weekly —
 // the dataset changes slowly; a failed run leaves the current data intact).
-Schedule::command('stations:sync')->weeklyOn(1, '04:00')->withoutOverlapping();
+Schedule::command('stations:sync')->weeklyOn(1, '04:00')->withoutOverlapping(120);
 
 // Keep the dispatch network log (admin Network tab) to a 48h retention window.
-Schedule::command('network-logs:prune')->hourly()->withoutOverlapping();
+Schedule::command('network-logs:prune')->hourly()->withoutOverlapping(60);
 
 // Keep geocode_cache bounded: expired MISSES (so a re-tryable address is asked
-// again) and hits nothing has touched in a year. Nightly, off the busy hours.
-Schedule::command('geocode-cache:prune')->dailyAt('03:40')->withoutOverlapping();
+// again) and hits stored more than a year ago. Nightly, off the busy hours.
+Schedule::command('geocode-cache:prune')->dailyAt('03:40')->withoutOverlapping(60);
 
 // The database cache store only drops an expired row when that key is read again,
 // so never-re-read keys (throttle counters, one-off lookups) piled up forever.
-Schedule::command('cache:prune-expired')->dailyAt('03:50')->withoutOverlapping();
+Schedule::command('cache:prune-expired')->dailyAt('03:50')->withoutOverlapping(60);
