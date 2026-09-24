@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, FlatList, Pressable, RefreshControl, ActivityIndicator, ScrollView } from "react-native";
+import {
+  View,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  ActivityIndicator,
+  ScrollView,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Notifications from "expo-notifications";
 import { Text, TextInput } from "@/components/typography";
@@ -25,6 +34,8 @@ import { alertOffer } from "@/lib/offer-alert";
 import { LoadErrorBanner, PushHealthBanner } from "@/components/status-banner";
 
 const PER_PAGE = 20;
+/** Within this many px of the top the feed counts as "at the top" for live reloads. */
+const NEAR_TOP_PX = 200;
 
 
 /** €/km for a sort comparison (missing metrics sink to the bottom). */
@@ -123,16 +134,20 @@ export default function OffersScreen() {
     api.fleetDrivers().then((r) => setDrivers(r.data)).catch(() => { /* keep empty */ });
   }, [isOwner]);
 
-  // Only auto-refresh while the driver is at the top of the feed (page 1); a
-  // silent reset to page 1 mustn't yank away pages they scrolled into.
-  const atTopRef = useRef(true);
-  useEffect(() => { atTopRef.current = page <= 1 && !loadingMore; }, [page, loadingMore]);
+  // Only auto-refresh while the driver is near the top of the feed: a silent
+  // reset to page 1 mustn't yank away rows they scrolled down to. Tracked by
+  // scroll position (not page number), so live updates resume after they
+  // scroll back up from page 2+.
+  const nearTopRef = useRef(true);
+  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    nearTopRef.current = e.nativeEvent.contentOffset.y < NEAR_TOP_PX;
+  }, []);
 
   // Live feed: focus load, adaptive poll (5s without socket, 30s with), and a
   // reload on every socket event / push / resume — one request at a time.
   useLiveReload(
     async () => {
-      if (!atTopRef.current) return;
+      if (!nearTopRef.current || loadingMoreRef.current) return;
       try {
         await fetchPage(1);
       } catch {
@@ -205,6 +220,8 @@ export default function OffersScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={c.ink} />}
         onEndReachedThreshold={0.4}
         onEndReached={loadMore}
+        onScroll={onScroll}
+        scrollEventThrottle={100}
         ListHeaderComponent={
           <View style={{ gap: 14, marginBottom: 2 }}>
             <Text style={{ color: c.ink, fontSize: 26, fontWeight: "700", letterSpacing: -0.5, textAlign: align }}>{t("offers.title")}</Text>

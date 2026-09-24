@@ -4,7 +4,7 @@ import { Clock, Route } from "@/components/icons";
 import { Text } from "@/components/typography";
 import { Badge, StatusBadge } from "@/components/ui";
 import { useColors, radius, cardStyle, isDarkPalette } from "@/lib/theme";
-import { isRTL, t } from "@/lib/i18n";
+import { isRTL, t, useLocale } from "@/lib/i18n";
 import type { Offer } from "@/lib/api";
 import { fareLabel, perKmValue, distanceLabel, cleanAddress, clockLabel, dayLabel } from "@/lib/format";
 
@@ -27,6 +27,9 @@ type OfferCardProps = {
 };
 
 function OfferCardImpl({ offer, onOpen, showDriver }: OfferCardProps) {
+  // Subscribed to the locale so a language switch re-renders the memoized card
+  // even when the comparator sees identical offer fields.
+  useLocale();
   const c = useColors();
   const status = offer.status ?? "pending";
   const dim = status === "rejected" || status === "canceled";
