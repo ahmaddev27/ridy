@@ -6,6 +6,7 @@ use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\OfferLifecycle;
 use App\Domain\Dispatch\OfferStatus;
+use App\Domain\Fleet\DriverStatusIngestor;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
@@ -654,5 +655,22 @@ class OfferAcceptanceTest extends TestCase
         $second = $this->offer();
         $this->postStatus('EN_ROUTE');
         $this->assertSame(OfferStatus::Accepted, $second->fresh()->status);
+    }
+
+    public function test_extension_statuses_stand_down_while_the_daemon_feeds_the_company(): void
+    {
+        $this->driver();
+        $offer = $this->offer();
+
+        // The daemon just applied a fresh batch for this company…
+        DriverStatusIngestor::markDaemonFeeding($this->tenant->id);
+
+        // …so the extension's (older) snapshot must not drive the lifecycle.
+        $this->postJson('/api/v1/drivers/statuses', [
+            'statuses' => [['driver_uuid' => self::DRIVER_UUID, 'status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']],
+        ])->assertOk()->assertJsonPath('data.skipped', 'daemon_active');
+
+        $this->assertNull($offer->fresh()->accepted_at);
+        $this->assertSame('MONITORING_SUPPLY_STATUS_ONLINE', Driver::withoutGlobalScopes()->first()->online_status);
     }
 }

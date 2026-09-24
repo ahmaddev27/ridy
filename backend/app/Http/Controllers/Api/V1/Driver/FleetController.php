@@ -7,6 +7,7 @@ use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\FleetDayRange;
 use App\Http\Resources\DispatchOfferResource;
 use App\Models\User;
 use App\Support\FleetDay;
@@ -106,13 +107,9 @@ class FleetController extends Controller
     public function stats(Request $request): JsonResponse
     {
         $tenantId = $this->tenantId($request);
-        // Fleet-day windows (04:00 boundary), $to exclusive.
-        $from = $request->filled('from')
-            ? FleetDay::startOfDate($request->string('from'))
-            : FleetDay::startDaysAgo(30);
-        $to = $request->filled('to')
-            ? FleetDay::endOfDate($request->string('to'))
-            : FleetDay::todayStart()->addDay();
+        // Fleet-day windows (04:00 boundary), $to exclusive; validated + span-capped
+        // (the daily zero-fill loops once per day in the range).
+        [$from, $to] = FleetDayRange::window($request, 30);
 
         return response()->json(['data' => $this->summary($tenantId, $from, $to)]);
     }
@@ -183,11 +180,13 @@ class FleetController extends Controller
     /** The tenant's offers with the list's filters (search / status / date range) applied. */
     private function filtered(Request $request): Builder
     {
+        [$from, $to] = FleetDayRange::filters($request);
+
         return $this->scoped($this->tenantId($request))
             ->when($request->filled('driver_id'), fn ($q) => $q->where('driver_id', $request->integer('driver_id')))
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
-            ->when($request->filled('from'), fn ($q) => $q->where('received_at', '>=', FleetDay::startOfDate($request->string('from'))))
-            ->when($request->filled('to'), fn ($q) => $q->where('received_at', '<', FleetDay::endOfDate($request->string('to'))))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', (string) $request->string('status')))
+            ->when($from !== null, fn ($q) => $q->where('received_at', '>=', $from))
+            ->when($to !== null, fn ($q) => $q->where('received_at', '<', $to))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%'.$request->string('search').'%';
                 $q->where(fn ($sub) => $sub
@@ -238,6 +237,8 @@ class FleetController extends Controller
             ->pluck('income', 'fleet_date');
 
         $daily = [];
+        // Defense in depth: never zero-fill more than the allowed span.
+        $to = $to->min($from->addDays(FleetDayRange::MAX_DAYS + 1));
         for ($cursor = $from; $cursor < $to; $cursor = $cursor->addDay()) {
             $date = $cursor->toDateString();
             $daily[] = ['date' => $date, 'income' => round((float) ($incomeByDate[$date] ?? 0), 2)];

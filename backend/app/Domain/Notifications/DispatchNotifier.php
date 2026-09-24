@@ -47,17 +47,24 @@ class DispatchNotifier
             return 0; // unlinked offers have no one to notify
         }
 
-        // Real-time nudge to the driver's open app (WebSocket) so a fresh offer
-        // appears instantly, alongside the push that wakes a closed app. Best
-        // -effort: a broadcast failure (Reverb down) must never break ingestion.
-        rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'new')), report: false);
-
+        // The FCM push goes FIRST: it is what wakes the driver's phone inside the
+        // ~5-second accept window. The Reverb broadcast is a synchronous HTTP call
+        // (up to its client timeout when Reverb is slow), so running it before the
+        // push could eat the window.
         $sent = $this->pushToDriver($offer, $this->buildTitle($offer), $this->buildBody($offer), $this->offerData($offer));
+
+        // Real-time nudge to the driver's open app (WebSocket) so a fresh offer
+        // appears instantly. Best-effort: a broadcast failure (Reverb down) must
+        // never break ingestion.
+        rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'new')), report: false);
 
         // The owners' copy leaves the hot path: only the DRIVER has a 5-second
         // window, and a company with three managers in owner mode used to add three
-        // more sequential FCM calls to it.
-        NotifyOwnersOfOffer::dispatch((int) $offer->id);
+        // more sequential FCM calls to it. A queue write failure must not turn the
+        // driver's delivered push into a reported failure.
+        rescue(function () use ($offer): void {
+            NotifyOwnersOfOffer::dispatch((int) $offer->id);
+        });
 
         return $sent;
     }
@@ -248,16 +255,17 @@ class DispatchNotifier
             return 0;
         }
 
-        // Live nudge to the open app so it re-fetches the offer with the new stops.
-        rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'multistop')), report: false);
-
         // A worded, localized title so the driver instantly reads WHY a second push
         // arrived (Uber revealed extra drop-offs). This one notification is
         // intentionally localized (unlike the word-free single-offer push).
         $title = $this->multiStopTitle($offer);
         $body = $this->multiStopBody($offer, $stopsCount);
 
+        // Push first, then the (synchronous, best-effort) broadcast — see notify().
         $sent = $this->pushToDriver($offer, $title, $body, $this->offerData($offer, $stopsCount));
+
+        // Live nudge to the open app so it re-fetches the offer with the new stops.
+        rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'multistop')), report: false);
 
         // The manager in owner mode gets the follow-up too — they used to receive the
         // first offer push and then never hear about the extra drop-offs.

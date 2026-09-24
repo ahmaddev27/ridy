@@ -4,6 +4,7 @@ namespace App\Domain\Dispatch\Jobs;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\TripGeocoder;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -14,7 +15,7 @@ use Illuminate\Foundation\Queue\Queueable;
  * the daemon's ingest request open on a slow external geocode. The 5-minute
  * backfill sweep is the safety net if the job fails or the queue is down.
  */
-class GeocodeOffer implements ShouldQueue
+class GeocodeOffer implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
@@ -23,7 +24,22 @@ class GeocodeOffer implements ShouldQueue
 
     public int $backoff = 15;
 
+    /** Hard stop below the worker's 60 s timeout (a few 6 s Nominatim/OSRM calls). */
+    public int $timeout = 45;
+
+    /**
+     * One in-flight geocode per offer: every manager tab that opens a cold offer
+     * used to queue its own copy, re-hitting Nominatim and burning the offer's
+     * attempt budget.
+     */
+    public int $uniqueFor = 300;
+
     public function __construct(private readonly int $offerId) {}
+
+    public function uniqueId(): string
+    {
+        return (string) $this->offerId;
+    }
 
     public function handle(TripGeocoder $geocoder): void
     {

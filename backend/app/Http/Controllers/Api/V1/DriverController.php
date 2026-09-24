@@ -3,31 +3,35 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\Jobs\BackfillWaypointLabels;
-use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Domain\Dispatch\TripGeocoder;
-use App\Domain\Dispatch\UberSupplierClient;
+use App\Domain\Fleet\DriverEraser;
+use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Fleet\DriverStatsService;
 use App\Domain\Fleet\DriverStatusIngestor;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Geo\PostalCodes;
+use App\Domain\Notifications\Models\DeviceToken;
 use App\Events\DriversBroadcast;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\IngestDriverStatusesRequest;
+use App\Http\Requests\FleetDayRange;
 use App\Http\Resources\DriverResource;
-use App\Support\FleetDay;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class DriverController extends Controller
 {
     use AuthorizesTenantResource;
 
-    /** A driver whose status hasn't synced within this many minutes is stale. */
-    private const LIVE_STALE_MINUTES = 10;
+    /** How long a cold waypoint label, once queued, isn't queued again. */
+    private const LABEL_BACKFILL_COOLDOWN_SECONDS = 120;
 
     public function index(): AnonymousResourceCollection
     {
@@ -38,25 +42,19 @@ class DriverController extends Controller
         //
         // Ordered live-first (on-trip → en-route → online → offline), then by name,
         // so the drivers who are working right now are at the top — mirrors the
-        // admin fleet directory.
-        $liveFirst = "CASE
-                WHEN online_status LIKE '%ON_TRIP%' THEN 0
-                WHEN online_status LIKE '%EN_ROUTE%' THEN 1
-                WHEN online_status LIKE '%ONLINE%' THEN 2
-                ELSE 3 END";
-
-        // The live-first ORDER BY is a CASE expression that can never use an index,
-        // so it always filesorts. Deferred join: sort/paginate on id + the sort
-        // columns only (never the driver JSON columns trip_waypoints/external_ids),
-        // so the sort buffer stays small (avoids 1038 out-of-sort-memory on a large
-        // fleet), then fetch the page's full rows by id.
+        // admin fleet directory. See Driver::scopeLiveFirst.
+        //
+        // The multi-column order still filesorts. Deferred join: sort/paginate on id
+        // + the sort columns only (never the driver JSON columns trip_waypoints/
+        // external_ids), so the sort buffer stays small (avoids 1038 out-of-sort-
+        // memory on a large fleet), then fetch the page's full rows by id.
         $page = Driver::query()->activeFleet()
-            ->select('id', 'name', 'online_status')
-            ->orderByRaw($liveFirst)->orderBy('name')->orderBy('id')
+            ->select('id', 'name', 'engagement', 'is_online')
+            ->liveFirst()
             ->paginate(50);
 
         $drivers = Driver::query()->whereIn('id', $page->pluck('id'))->with('latestDeviceToken')
-            ->orderByRaw($liveFirst)->orderBy('name')->orderBy('id')
+            ->liveFirst()
             ->get();
 
         $page->setCollection($drivers);
@@ -75,7 +73,7 @@ class DriverController extends Controller
         // Only show genuinely-live positions: a driver whose status hasn't been
         // synced within this window (dead session / closed extension) must drop
         // off the map instead of freezing in place and looking live.
-        $freshSince = now()->subMinutes(self::LIVE_STALE_MINUTES);
+        $freshSince = now()->subMinutes(Driver::LIVE_STALE_MINUTES);
 
         $liveDrivers = Driver::query()
             ->whereNotNull('latitude')
@@ -102,10 +100,19 @@ class DriverController extends Controller
         $cachedLabels = $geo->cachedReverseLabels($allPoints);
 
         $misses = [];
-        $drivers = $liveDrivers->map(function (Driver $d) use ($geo, $cachedLabels, &$misses) {
+        // Nearest-town lookups memoised per request: drivers and their waypoints
+        // often share a point (same pickup, same station), so each is computed once.
+        $towns = [];
+        $nearest = function (float $lat, float $lng) use (&$towns): ?array {
+            $key = round($lat, 3).','.round($lng, 3);
+
+            return $towns[$key] ??= PostalCodes::nearest($lat, $lng);
+        };
+
+        $drivers = $liveDrivers->map(function (Driver $d) use ($geo, $cachedLabels, &$misses, $nearest) {
             // Reverse the live GPS to the nearest town so the fleet map can show
             // where each driver currently is (updates every poll).
-            $near = PostalCodes::nearest((float) $d->latitude, (float) $d->longitude);
+            $near = $nearest((float) $d->latitude, (float) $d->longitude);
 
             return [
                 'id' => $d->id,
@@ -120,10 +127,10 @@ class DriverController extends Controller
                 'heading' => $d->heading !== null ? (float) $d->heading : null,
                 // Label each pickup/dropoff from the batched cache; the nearest town
                 // is the always-available fallback while a cold point is backfilled.
-                'waypoints' => collect($d->trip_waypoints ?? [])->map(function ($w) use ($geo, $cachedLabels, &$misses) {
+                'waypoints' => collect($d->trip_waypoints ?? [])->map(function ($w) use ($geo, $cachedLabels, &$misses, $nearest) {
                     $lat = (float) ($w['lat'] ?? 0);
                     $lng = (float) ($w['lng'] ?? 0);
-                    $near = PostalCodes::nearest($lat, $lng);
+                    $near = $nearest($lat, $lng);
                     $key = $geo->reverseCacheKey($lat, $lng);
                     $address = $key !== null ? ($cachedLabels[$key] ?? null) : null;
                     if ($key !== null && $address === null) {
@@ -141,8 +148,15 @@ class DriverController extends Controller
         });
 
         // Fill cold labels off the request path so the next poll serves them warm.
-        if ($misses !== []) {
-            BackfillWaypointLabels::dispatch(array_values($misses));
+        // Each cold point is queued ONCE per couple of minutes, not by every open
+        // dashboard on every 12 s poll (a Nominatim outage used to flood the queue).
+        $fresh = array_values(array_filter(
+            $misses,
+            fn ($key) => Cache::add('revgeo:inflight:'.$key, 1, self::LABEL_BACKFILL_COOLDOWN_SECONDS),
+            ARRAY_FILTER_USE_KEY,
+        ));
+        foreach (array_chunk($fresh, BackfillWaypointLabels::MAX_POINTS) as $chunk) {
+            BackfillWaypointLabels::dispatch($chunk);
         }
 
         return response()->json(['data' => $drivers]);
@@ -161,7 +175,7 @@ class DriverController extends Controller
      * and invited without an Uber email). Route-model binding keeps it within the
      * manager's own tenant; the email stays globally unique across drivers.
      */
-    public function update(Request $request, Driver $driver): DriverResource
+    public function update(Request $request, Driver $driver, DriverInvitationService $invitations): DriverResource
     {
         $this->authorizeTenant($driver);
 
@@ -172,11 +186,42 @@ class DriverController extends Controller
         // PATCH semantics: an ABSENT email leaves the driver untouched, an empty one
         // clears it. Reading $data['email'] unconditionally 500'd on a body that
         // simply didn't carry the field.
-        if (array_key_exists('email', $data)) {
-            $driver->forceFill(['email' => $data['email'] ?: null])->save();
+        if (! array_key_exists('email', $data)) {
+            return new DriverResource($driver);
         }
 
+        $email = $data['email'] ?: null;
+        if ($email !== null) {
+            $invitations->assertEmailAvailable($driver, $email);
+        }
+
+        if ($email === $driver->email) {
+            return new DriverResource($driver);
+        }
+
+        // A NEW login address means a new person may hold the account (the phone
+        // changed hands, a test login was re-pointed). Sign the previous holder out
+        // everywhere and stop pushing offers to their devices; the new address
+        // signs in with its own one-time code.
+        DB::transaction(function () use ($driver, $email) {
+            $driver->tokens()->delete();
+            DeviceToken::withoutGlobalScopes()->where('driver_id', $driver->id)->delete();
+            $driver->forceFill(['email' => $email, 'invite_token' => null])->save();
+        });
+
         return new DriverResource($driver);
+    }
+
+    /**
+     * Erase one driver (DSGVO Art. 17 request routed through the fleet): row,
+     * logins, devices and metrics deleted, offer history anonymized. Refused
+     * while Uber still lists the driver on the fleet (a sync would recreate them).
+     */
+    public function destroy(Driver $driver, DriverEraser $eraser): JsonResponse
+    {
+        $this->authorizeTenant($driver);
+
+        return response()->json(['data' => $eraser->erase($driver)]);
     }
 
     /** Work stats for one driver, computed from our own offers/acceptance data. */
@@ -184,13 +229,8 @@ class DriverController extends Controller
     {
         $this->authorizeTenant($driver);
 
-        // Fleet-day windows (04:00 boundary), $to exclusive.
-        $from = $request->filled('from')
-            ? FleetDay::startOfDate($request->string('from'))
-            : FleetDay::startDaysAgo(30);
-        $to = $request->filled('to')
-            ? FleetDay::endOfDate($request->string('to'))
-            : FleetDay::todayStart()->addDay();
+        // Fleet-day windows (04:00 boundary), $to exclusive; validated + span-capped.
+        [$from, $to] = FleetDayRange::window($request, 30);
 
         return response()->json(['data' => $stats->forDriver($driver, $from, $to)]);
     }
@@ -203,8 +243,9 @@ class DriverController extends Controller
     public function ingestRoster(Request $request, RosterSyncService $roster, SupplierNetworkRecorder $recorder): JsonResponse
     {
         $data = $request->validate([
-            'drivers' => ['required', 'array'],
-            'uber_org_uuid' => ['nullable', 'string'],
+            'drivers' => ['required', 'array', 'max:'.RosterSyncService::MAX_DRIVERS],
+            'drivers.*' => ['array'],
+            'uber_org_uuid' => ['nullable', 'string', 'max:64'],
         ]);
 
         $tenant = $request->user()->tenant;
@@ -227,20 +268,20 @@ class DriverController extends Controller
      * Live online/offline presence, posted by the extension after querying
      * Uber's GetDriverLiveLocation. Matched to drivers by Uber UUID.
      */
-    public function ingestStatuses(Request $request, DriverStatusIngestor $ingestor, SupplierNetworkRecorder $recorder): JsonResponse
+    public function ingestStatuses(IngestDriverStatusesRequest $request, DriverStatusIngestor $ingestor, SupplierNetworkRecorder $recorder): JsonResponse
     {
-        $data = $request->validate([
-            'statuses' => ['required', 'array'],
-            'statuses.*.driver_uuid' => ['required', 'string'],
-            'statuses.*.status' => ['nullable', 'string'],
-            'statuses.*.location_updated_at' => ['nullable', 'numeric'], // ms epoch
-            'statuses.*.latitude' => ['nullable', 'numeric'],
-            'statuses.*.longitude' => ['nullable', 'numeric'],
-            'statuses.*.heading' => ['nullable', 'numeric'],
-            'statuses.*.waypoints' => ['nullable', 'array'],
-        ]);
-
+        $data = $request->validated();
         $tenantId = (int) $request->user()->tenant_id;
+
+        // The daemon polls the same statuses every few seconds; this extension batch
+        // (once a minute, with fetch/post latency) is often OLDER than what the
+        // daemon already applied. Two unordered writers fabricate engagement edges
+        // (a fake ON_TRIP → EN_ROUTE completes a trip and accepts the wrong offer),
+        // so while the daemon is feeding this company the extension only observes.
+        if (DriverStatusIngestor::daemonIsFeeding($tenantId)) {
+            return response()->json(['data' => ['updated' => 0, 'skipped' => 'daemon_active']]);
+        }
+
         $recorder->statuses($tenantId, $data['statuses']);
         $result = $ingestor->ingest($tenantId, $data['statuses']);
 
@@ -252,28 +293,15 @@ class DriverController extends Controller
     }
 
     /**
-     * Server-side on-demand pull (fallback). Often blocked by Uber's datacenter
-     * check — the extension path (ingestRoster) is the reliable one.
+     * The dashboard's "Sync" fallback when no extension answered. The backend
+     * never calls Uber itself: replaying the company's live session from the
+     * datacenter IP (bypassing its residential proxy) is what gets an Uber account
+     * flagged, and it never worked anyway (blocked IP, wrong cookie jar). The
+     * roster arrives through the extension (ingestRoster) and the daemon's
+     * proxied 30-minute pull.
      */
-    public function sync(UberSupplierClient $client, RosterSyncService $roster): JsonResponse
+    public function sync(): JsonResponse
     {
-        $session = UberFleetSession::query()
-            ->where('status', UberFleetSession::STATUS_ACTIVE)
-            ->orderByDesc('updated_at')
-            ->first();
-
-        if ($session === null) {
-            return response()->json(['data' => ['synced' => 0, 'reason' => 'no_active_session']]);
-        }
-
-        $drivers = $client->getDrivers($session);
-
-        if ($drivers === []) {
-            return response()->json(['data' => ['synced' => 0, 'reason' => 'uber_unreachable']]);
-        }
-
-        $result = $roster->sync((int) $session->tenant_id, $drivers);
-
-        return response()->json(['data' => $result]);
+        return response()->json(['data' => ['synced' => 0, 'reason' => 'extension_required']]);
     }
 }
