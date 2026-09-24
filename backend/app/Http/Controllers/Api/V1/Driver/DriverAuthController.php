@@ -174,17 +174,20 @@ class DriverAuthController extends Controller
         return response()->json(['data' => $this->profile($request->user())]);
     }
 
-    /** The driver edits their own name, app language, and (optionally) password. */
+    /**
+     * The driver edits their own name and app language. The app is passwordless,
+     * so a bearer token can no longer set a password (a stolen token must not be
+     * able to plant a lasting credential); a sent `password` is ignored.
+     */
     public function update(Request $request): JsonResponse
     {
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:120'],
             'locale' => ['sometimes', 'in:de,en,ar'],
-            'password' => ['sometimes', 'string', 'min:8'],
         ]);
 
         $driver = $request->user();
-        $driver->fill(array_intersect_key($data, array_flip(['name', 'locale', 'password'])));
+        $driver->fill($data);
         $driver->save();
 
         return response()->json(['data' => $this->profile($driver)]);

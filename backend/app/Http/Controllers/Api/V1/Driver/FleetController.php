@@ -128,19 +128,22 @@ class FleetController extends Controller
         return response()->json(['data' => $drivers]);
     }
 
-    /** Owner profile, mirroring the driver `me` shape so the app can restore a session. */
-    /** Update the fleet owner's own profile (User token) — the owner counterpart
-     *  of the driver's PATCH /driver/me, so saving a profile never 401s them. */
+    /**
+     * Update the fleet owner's own name / app language (User token) — the owner
+     * counterpart of the driver's PATCH /driver/me. Never the password: the app
+     * token is a read-only credential minted from an emailed code, and letting it
+     * set the DASHBOARD password escalated it to full manager access. Password
+     * changes belong to the dashboard's profile page; a sent `password` is ignored.
+     */
     public function update(Request $request): JsonResponse
     {
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:120'],
             'locale' => ['sometimes', 'in:de,en,ar'],
-            'password' => ['sometimes', 'string', 'min:8'],
         ]);
 
         $owner = $request->user();
-        $owner->fill(array_intersect_key($data, array_flip(['name', 'locale', 'password'])));
+        $owner->fill($data);
         $owner->save();
 
         return $this->me($request);
@@ -155,6 +158,7 @@ class FleetController extends Controller
         return response()->json(['message' => 'ok']);
     }
 
+    /** Owner profile, mirroring the driver `me` shape so the app can restore a session. */
     public function me(Request $request): JsonResponse
     {
         $owner = $request->user();

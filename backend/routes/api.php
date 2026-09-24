@@ -129,7 +129,9 @@ Route::prefix('v1')->group(function () {
         Route::post('password/verify', [DriverPasswordResetController::class, 'verify'])->middleware('throttle:12,1');
         Route::post('password/reset', [DriverPasswordResetController::class, 'reset'])->middleware('throttle:12,1');
 
-        Route::middleware('auth:driver')->group(function () {
+        // `driver.account` re-asserts the caller is a Driver: every route below
+        // filters on driver_id = user()->id, so a dashboard User must never pass.
+        Route::middleware(['auth:driver', 'driver.account'])->group(function () {
             // Logout must work even when suspended (so the app can clear its token).
             Route::post('logout', [DriverAuthController::class, 'logout']);
 
@@ -153,9 +155,11 @@ Route::prefix('v1')->group(function () {
 
         // Fleet-owner mode: a dashboard manager/owner signs into the SAME app and
         // monitors ALL their drivers read-only. Their token resolves on the `User`
-        // (auth:sanctum, not auth:driver); `driver.active` still blocks a suspended
-        // tenant, and FleetController rejects non-tenant callers.
-        Route::middleware(['auth:sanctum', 'driver.active'])->prefix('fleet')->group(function () {
+        // (auth:sanctum, not auth:driver). `user.account` rejects Driver tokens,
+        // `dashboard.only` confines scoped tokens (the extension token gets 403;
+        // the owner app's fleet:read token is allowed here), `fleet.owner` requires
+        // a tenant-bound owner/manager, and `driver.active` blocks a suspended tenant.
+        Route::middleware(['auth:sanctum', 'user.account', 'dashboard.only', 'fleet.owner', 'driver.active'])->prefix('fleet')->group(function () {
             Route::get('me', [FleetController::class, 'me']);
             Route::patch('me', [FleetController::class, 'update']);
             Route::post('logout', [FleetController::class, 'logout']);
