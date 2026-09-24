@@ -4,6 +4,7 @@ namespace App\Domain\Tenancy;
 
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Tenancy\Models\Tenant;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
 /**
@@ -20,15 +21,13 @@ class SystemHealthService
     /** @return array<int, array<string, mixed>> */
     public function report(): array
     {
-        $now = now();
+        // Immutable: isFresh() derives a cutoff from it for every row, and a mutable
+        // now() was shifted back 10 minutes per company — so companies further down
+        // the list were judged against an ever-older clock (false greens).
+        $now = CarbonImmutable::now();
 
         $tenants = Tenant::query()->with('proxy.renewals')->get();
-        // Newest session per tenant — unique() keeps the first of the desc-sorted rows.
-        $sessions = UberFleetSession::withoutGlobalScopes()
-            ->orderByDesc('updated_at')
-            ->get()
-            ->unique('tenant_id')
-            ->keyBy('tenant_id');
+        $sessions = LatestFleetSessions::perTenant();
 
         return $tenants
             ->map(fn (Tenant $tenant) => $this->row($tenant, $sessions->get($tenant->id), $now))
@@ -123,7 +122,7 @@ class SystemHealthService
             return false;
         }
 
-        return $timestamp->greaterThanOrEqualTo($now->subMinutes(self::HEARTBEAT_TTL_MINUTES));
+        return $timestamp->greaterThanOrEqualTo($now->copy()->subMinutes(self::HEARTBEAT_TTL_MINUTES));
     }
 
     /**
