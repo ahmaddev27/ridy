@@ -7,7 +7,7 @@ import { createHash, randomUUID } from "node:crypto";
 // effect when we call undici's own fetch.
 import { ProxyAgent, fetch } from "undici";
 import { config } from "./config.js";
-import { api } from "./api.js";
+import { api, isStaleJar } from "./api.js";
 import { captureThrottled } from "./sentry.js";
 import {
   describeProxy,
@@ -54,12 +54,49 @@ function track(promise) {
 // deploy, a 5xx, a timeout) used to drop the offer for good — seq had already moved
 // past it, so a reconnect never replays it. Retrying is safe: the backend ingest is
 // idempotent on offer_uuid (unique (tenant_id, offer_uuid)).
+//
+// But an offer is only worth delivering while the driver can still accept it: the
+// backend pushes every ingested offer, so a retry that lands after Uber's accept
+// window rings the driver for a dead ride. A job is therefore retried only until
+// its offers expire (offerGeneratedAtMs + acceptWindowInSeconds + grace), bounded
+// to [INGEST_FRESH_MIN_MS, INGEST_FRESH_MAX_MS] after receipt so a skewed Uber
+// clock can neither drop a live offer nor keep a dead one alive. A driver's
+// newer offer supersedes an older one still waiting to (re)try.
 const INGEST_MAX_CONCURRENCY = 4; // per stream, across different drivers
 const INGEST_BACKLOG_MAX = 500; // queued batches per stream before the oldest is dropped
-const INGEST_MAX_AGE_MS = 10 * 60 * 1000; // give up on a batch after 10 min
-const INGEST_RETRY_MIN_MS = 1000;
-const INGEST_RETRY_MAX_MS = 30000;
-const INGEST_ALERT_AFTER_MS = 60000; // a deploy blip must not page anyone
+const INGEST_ACCEPT_WINDOW_DEFAULT_S = 15;
+const INGEST_EXPIRY_GRACE_MS = 5000;
+const INGEST_FRESH_MIN_MS = 10000;
+const INGEST_FRESH_MAX_MS = 25000;
+const INGEST_RETRY_MIN_MS = 500;
+const INGEST_RETRY_MAX_MS = 4000;
+
+/** Epoch ms after which a job's offers can no longer be accepted (see policy above). */
+export function ingestExpiresAt(offers, receivedAt) {
+  let expiry = 0;
+  for (const offer of offers) {
+    const generated = Number(offer?.offerGeneratedAtMs);
+    const windowS = Number(offer?.acceptWindowInSeconds);
+    if (!Number.isFinite(generated) || generated <= 0) continue;
+    const seconds = Number.isFinite(windowS) && windowS > 0 ? windowS : INGEST_ACCEPT_WINDOW_DEFAULT_S;
+    expiry = Math.max(expiry, generated + seconds * 1000 + INGEST_EXPIRY_GRACE_MS);
+  }
+  if (expiry === 0) expiry = receivedAt + INGEST_FRESH_MAX_MS;
+  return Math.min(Math.max(expiry, receivedAt + INGEST_FRESH_MIN_MS), receivedAt + INGEST_FRESH_MAX_MS);
+}
+
+/** Network errors, timeouts, 408, 429 and 5xx may succeed on a retry; other 4xx never will. */
+function isRetryableIngestError(error) {
+  const status = error?.status;
+  return status === undefined || status === 408 || status === 429 || status >= 500;
+}
+
+// The backend treats the daemon as a company's live-status source only while its
+// status POSTs keep arriving (DriverStatusIngestor::DAEMON_SOURCE_TTL_SECONDS = 20 s);
+// after that the manager's extension writes statuses too. Delta forwarding may send
+// nothing for a long time on an idle fleet, so POST at least this often. Must stay
+// well inside that TTL (one missed poll still leaves headroom).
+const STATUS_KEEPALIVE_MS = 8000;
 
 // A never-terminated SSE line would otherwise grow the buffer without bound.
 const SSE_BUFFER_MAX = 1_000_000;
@@ -111,8 +148,11 @@ export class RamenStream {
    * @param options.primary When true this stream also owns roster sync and
    *   cookie rotation; secondary channels only ingest offers (avoids duplicate
    *   roster pulls and racing cookie writes across a session's channels).
+   * @param options.onStaleJar Called when the backend says a reconnect replaced
+   *   this stream's cookie jar (409 stale_jar), so the supervisor can restart on
+   *   the fresh jar without waiting for its next poll.
    */
-  constructor(session, ramenPath = config.ramenPaths[0], { primary = true } = {}) {
+  constructor(session, ramenPath = config.ramenPaths[0], { primary = true, onStaleJar = null } = {}) {
     this.session = session; // { id, tenant_id, uber_org_uuid, cookies: [{name,value}] }
     this.ramenPath = ramenPath;
     this.primary = primary;
@@ -129,6 +169,13 @@ export class RamenStream {
     // COUNT (the old count-only fingerprint missed a value rotation and stuck the
     // stream on dead cookies with a RAMEN 404 until a manual restart).
     this.cookieFp = `${jarFingerprint(session.cookies)}:${jarFingerprint(session.supplier_cookies)}`;
+    // The backend's jar generation this stream was built from. Echoed on cookie /
+    // relink / degraded reports so a stream a reconnect replaced can't clobber the
+    // fresh capture. Adopting our own rotation never changes it (the backend only
+    // bumps it on a browser capture). Null from a backend that predates it.
+    this.jarVersion = Number.isInteger(session.jar_version) ? session.jar_version : null;
+    this.jarStale = false;
+    this.onStaleJar = onStaleJar;
     this.seq = 0;
     this.stopped = false;
     this.reconnectDelay = config.reconnectMinDelay;
@@ -142,10 +189,12 @@ export class RamenStream {
     this.ingestActive = 0;
     this.ingestWaiters = [];
     this.ingestDropped = 0;
+    this.ingestLatest = new Map(); // driver key -> newest job (a newer offer supersedes older waiting work)
 
     // Status-poll delta state (see syncStatuses).
     this.lastSentStatus = new Map(); // driver_uuid -> statusSignature of the last row the backend accepted
     this.lastFullStatusAt = 0;
+    this.lastStatusPostAt = 0;
     this.supplierBackoffMs = 0;
 
     // Route this company's Uber traffic through its own residential IP. Only
@@ -342,15 +391,21 @@ export class RamenStream {
    * (every poll used to UPDATE every driver row + write a full-payload network log),
    * with a periodic full batch as the freshness/sweep backstop. The "last sent"
    * memory only advances on success, so a failed POST is re-sent next poll.
+   * With nothing changed, one unchanged row is still sent every STATUS_KEEPALIVE_MS
+   * so the backend keeps the daemon as the status source (see that constant).
    */
   async forwardStatuses(statuses) {
     const now = Date.now();
     const full = !config.statusFullSyncInterval || now - this.lastFullStatusAt >= config.statusFullSyncInterval;
-    const batch = full ? statuses : statuses.filter((s) => this.lastSentStatus.get(s.driver_uuid) !== statusSignature(s));
+    let batch = full ? statuses : statuses.filter((s) => this.lastSentStatus.get(s.driver_uuid) !== statusSignature(s));
+    if (batch.length === 0 && statuses.length > 0 && now - this.lastStatusPostAt >= STATUS_KEEPALIVE_MS) {
+      batch = statuses.slice(0, 1);
+    }
     if (batch.length === 0) return;
 
     try {
       const outcome = await api.statuses(this.session.id, batch);
+      this.lastStatusPostAt = now;
       for (const s of batch) this.lastSentStatus.set(s.driver_uuid, statusSignature(s));
       if (full) this.lastFullStatusAt = now;
       if (outcome?.data?.accepted) {
@@ -502,20 +557,41 @@ export class RamenStream {
     try {
       do {
         this.persistDirty = false;
-        // A torn-down stream must not overwrite a newer re-link with its old jar.
-        if (this.stopped) return;
+        // A torn-down stream (or one a reconnect superseded) must not overwrite a
+        // newer re-link with its old jar.
+        if (this.stopped || this.jarStale) return;
         const { cookies, fp } = this.liveJarFingerprint();
         if (fp === this.cookieFp || cookies.length === 0) continue;
         try {
-          await track(api.refreshCookies(this.session.id, cookies));
+          await track(api.refreshCookies(this.session.id, cookies, undefined, this.jarVersion));
           this.cookieFp = fp;
         } catch (e) {
+          // Our jar was replaced by a reconnect: never retry the write or advance
+          // the fingerprint. Keep streaming (the old cookies may still deliver
+          // offers) until the supervisor restarts us on the fresh jar.
+          if (isStaleJar(e)) {
+            this.markJarStale("cookie refresh");
+            return;
+          }
           console.error(`[${this.tag()}] cookie refresh failed: ${e.message}`);
           captureThrottled(`cookies:${this.session.id}`, e, { where: "cookie_refresh", sessionId: this.session.id });
         }
       } while (this.persistDirty);
     } finally {
       this.persisting = false;
+    }
+  }
+
+  /** The backend holds a newer cookie jar for this session: stop writing, ask for a restart. */
+  markJarStale(where) {
+    if (!this.jarStale) {
+      console.warn(`[${this.tag()}] ${where} refused: a reconnect replaced jar v${this.jarVersion} — restarting on the fresh jar`);
+    }
+    this.jarStale = true;
+    try {
+      this.onStaleJar?.();
+    } catch {
+      /* the supervisor's next poll restarts us anyway */
     }
   }
 
@@ -532,7 +608,11 @@ export class RamenStream {
   async handleStreamAuthFailure(status) {
     if (status === 401 || status === 403) {
       console.warn(`[${this.tag()}] stream auth rejected (${status}) -> needs relink`);
-      await api.needsRelink(this.session.id).catch(() => {});
+      // A 401 on a jar a reconnect already replaced says nothing about the fresh
+      // one: the backend refuses it (stale_jar) and we just make way for it.
+      await api.needsRelink(this.session.id, this.jarVersion).catch((e) => {
+        if (isStaleJar(e)) this.markJarStale("needs-relink");
+      });
       this.stop();
       return true;
     }
@@ -557,7 +637,9 @@ export class RamenStream {
     const cooledDown = !this.supplierDegradedAt || now - this.supplierDegradedAt > config.supplierDegradedCooldown;
     if (persistent && cooledDown) {
       this.supplierDegradedAt = now;
-      await api.supplierDegraded(this.session.id).catch(() => {});
+      await api.supplierDegraded(this.session.id, this.jarVersion).catch((e) => {
+        if (isStaleJar(e)) this.markJarStale("supplier-degraded");
+      });
     }
     return true;
   }
@@ -829,6 +911,8 @@ export class RamenStream {
    * stay strictly ordered (the backend supersedes a driver's earlier pending offer
    * with a newer one), while different drivers are ingested concurrently (up to
    * INGEST_MAX_CONCURRENCY), so one slow geocode doesn't delay another driver's push.
+   * A driver's newer offer supersedes an older job that is still waiting or in
+   * retry backoff, so stale work never holds up the driver's live offer.
    */
   enqueueIngest(offers, seq) {
     const groups = new Map();
@@ -839,9 +923,23 @@ export class RamenStream {
     }
 
     for (const [key, group] of groups) {
-      const job = { offers: group, seq, enqueuedAt: Date.now(), dropped: false };
+      const now = Date.now();
+      const job = { offers: group, seq, enqueuedAt: now, expiresAt: ingestExpiresAt(group, now), attempts: 0, dropped: false, inFlight: false, superseded: false, wake: null };
       this.ingestBacklog.push(job);
       if (this.ingestBacklog.length > INGEST_BACKLOG_MAX) this.dropJob(this.ingestBacklog.shift(), "backlog full");
+
+      // An older job for this driver that already FAILED (sleeping in backoff or
+      // waiting for a retry slot) is dropped so this one goes out right away. One
+      // not yet sent or mid-request keeps its single first attempt (order and the
+      // offer's row are preserved) but is never retried ahead of this one.
+      // "_unknown" offers belong to no driver and never supersede each other.
+      const older = key === "_unknown" ? null : this.ingestLatest.get(key);
+      if (older && older.attempts > 0 && !older.inFlight) {
+        this.dropJob(older, "superseded by a newer offer for the same driver", { quiet: true });
+      } else if (older) {
+        older.superseded = true;
+      }
+      this.ingestLatest.set(key, job);
 
       const previous = this.ingestChains.get(key) ?? Promise.resolve();
       const deliver = () => this.deliverIngest(job);
@@ -851,45 +949,57 @@ export class RamenStream {
       this.ingestChains.set(key, tail);
       const forget = () => {
         if (this.ingestChains.get(key) === tail) this.ingestChains.delete(key);
+        if (this.ingestLatest.get(key) === job) this.ingestLatest.delete(key);
       };
       tail.then(forget, forget);
     }
   }
 
-  /** Deliver one job, retrying with exponential backoff until it lands or expires. */
+  /**
+   * Deliver one job, retrying transient failures with backoff while its offers
+   * can still be accepted. Never sends it after job.expiresAt (logged + dropped).
+   */
   async deliverIngest(job) {
     let delay = INGEST_RETRY_MIN_MS;
-    let attempts = 0;
     try {
       while (!job.dropped) {
-        attempts++;
         await this.acquireIngestSlot();
         let error = null;
         try {
+          // Re-checked after waiting for a slot: superseded or expired meanwhile.
+          if (job.dropped) return;
+          if (Date.now() >= job.expiresAt) {
+            const age = Math.round((Date.now() - job.enqueuedAt) / 1000);
+            this.dropJob(job, `accept window over (${age}s after receipt, ${job.attempts} attempt(s))`, { quiet: true });
+            return;
+          }
+          job.attempts++;
+          job.inFlight = true;
           const result = await api.ingest(job.offers, job.seq);
-          console.log(`[${this.tag()}] ingested ${job.offers.length} offer(s)${attempts > 1 ? ` (attempt ${attempts})` : ""}:`, result);
+          console.log(`[${this.tag()}] ingested ${job.offers.length} offer(s)${job.attempts > 1 ? ` (attempt ${job.attempts})` : ""}:`, result);
           return;
         } catch (e) {
           error = e;
         } finally {
+          job.inFlight = false;
           this.releaseIngestSlot();
         }
 
-        const age = Date.now() - job.enqueuedAt;
-        console.error(`[${this.tag()}] ingest failed (attempt ${attempts}, seq ${job.seq}): ${error.message}`);
-        if (age >= INGEST_MAX_AGE_MS) {
-          this.dropJob(job, `still failing after ${Math.round(age / 1000)}s: ${error.message}`);
+        console.error(`[${this.tag()}] ingest failed (attempt ${job.attempts}, seq ${job.seq}): ${error.message}`);
+        if (!isRetryableIngestError(error)) {
+          this.dropJob(job, `rejected: ${error.message}`);
           return;
         }
-        if (age >= INGEST_ALERT_AFTER_MS) {
-          captureThrottled(`ingest:${this.session.id}`, error, {
-            where: "ingest_retry",
-            sessionId: this.session.id,
-            attempts,
-            ageMs: age,
-          });
+        if (job.superseded) {
+          this.dropJob(job, `superseded by a newer offer for the same driver: ${error.message}`, { quiet: true });
+          return;
         }
-        await this.sleep(jitter(delay));
+        const remaining = job.expiresAt - Date.now();
+        if (remaining <= 0) {
+          this.dropJob(job, `accept window over after ${job.attempts} attempt(s): ${error.message}`, { quiet: true });
+          return;
+        }
+        await this.ingestBackoff(job, Math.min(jitter(delay), remaining));
         delay = Math.min(delay * 2, INGEST_RETRY_MAX_MS);
       }
     } finally {
@@ -898,11 +1008,28 @@ export class RamenStream {
     }
   }
 
-  dropJob(job, reason) {
+  /** Retry backoff that dropJob() (a newer offer superseding this one) cuts short. */
+  async ingestBackoff(job, ms) {
+    if (job.dropped) return;
+    await Promise.race([this.sleep(ms), new Promise((resolve) => (job.wake = resolve))]);
+    job.wake = null;
+  }
+
+  /**
+   * Give up on a job. `quiet` drops (accept window over / superseded) are the
+   * expected outcome of a backend blip, so they are only logged; the rest also go
+   * to Sentry (throttled).
+   */
+  dropJob(job, reason, { quiet = false } = {}) {
     if (!job || job.dropped) return;
     job.dropped = true;
+    job.wake?.();
     this.ingestDropped++;
     const message = `dropped ${job.offers.length} offer(s) at seq ${job.seq}: ${reason} (total dropped ${this.ingestDropped})`;
+    if (quiet) {
+      console.warn(`[${this.tag()}] ${message}`);
+      return;
+    }
     console.error(`[${this.tag()}] ${message}`);
     captureThrottled(`ingest-drop:${this.session.id}`, new Error(`offer ingest ${message}`), {
       where: "ingest_drop",

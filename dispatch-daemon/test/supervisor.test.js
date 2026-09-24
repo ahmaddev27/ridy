@@ -53,3 +53,24 @@ test("a failing session poll or reconcile error never rejects", async () => {
   // null session list = nothing active: every stream is stopped, nothing throws.
   assert.equal(streams.size, 0);
 });
+
+test("a new jar_version restarts the streams even when the cookies match the primary's rotation", async () => {
+  const row = { ...good(5), jar_version: 1 };
+  api.sessions = async () => ({ sessions: [row], globalProxyUrl: "" });
+  await reconcileTick();
+  const before = [...streams.entries()].filter(([k]) => k.startsWith("5:"));
+  assert.ok(before.length > 0);
+
+  // Same version, same cookies: nothing restarts.
+  await reconcileTick();
+  for (const [key, stream] of before) assert.equal(streams.get(key), stream);
+
+  // A reconnect bumped the version (cookie values happen to fingerprint the same).
+  api.sessions = async () => ({ sessions: [{ ...row, jar_version: 2 }], globalProxyUrl: "" });
+  await reconcileTick();
+  for (const [key, stream] of before) {
+    assert.equal(stream.stopped, true);
+    assert.notEqual(streams.get(key), stream);
+    assert.equal(streams.get(key).jarVersion, 2);
+  }
+});

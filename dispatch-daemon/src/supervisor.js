@@ -95,6 +95,11 @@ async function reconcile() {
     sessions.map((s) => [s.id, `${jarFingerprint(s.cookies)}:${jarFingerprint(s.supplier_cookies)}`]),
   );
 
+  // The backend bumps jar_version on every browser capture with new cookie values.
+  // A different version than the stream runs on is always a reconnect — restart
+  // even when the fingerprint would pass for the primary's own rotation.
+  const jarVersions = new Map(sessions.map((s) => [s.id, Number.isInteger(s.jar_version) ? s.jar_version : null]));
+
   // Stop streams whose session is gone, no longer active, OR whose proxy/cookies
   // changed (dropped here and immediately re-created below with the new values —
   // so re-linking or setting a proxy in the panel takes effect with no manual restart).
@@ -106,14 +111,16 @@ async function reconcile() {
 
     const proxyChanged = effectiveProxy.has(sessionId) && effectiveProxy.get(sessionId) !== stream.proxyUrl;
     const fpNow = effectiveFp.get(sessionId);
-    const cookiesChanged = fpNow !== undefined && fpNow !== stream.cookieFp;
+    const versionNow = jarVersions.get(sessionId);
+    const versionChanged = versionNow != null && stream.jarVersion != null && versionNow !== stream.jarVersion;
+    const cookiesChanged = (fpNow !== undefined && fpNow !== stream.cookieFp) || versionChanged;
 
     // A cookie change that MATCHES the primary channel's live fingerprint is the
     // daemon's OWN rolling refresh (the primary absorbed + persisted Uber's rotated
     // session cookie). Adopt it into this (secondary) stream WITHOUT a teardown, so a
     // self-rotation never resets its seq and drops offers in the gap. Only a change the
     // primary's live jar can't match — a fresh browser re-link — restarts the streams.
-    if (cookiesChanged && wantedKeys.has(key) && !proxyChanged) {
+    if (cookiesChanged && !versionChanged && wantedKeys.has(key) && !proxyChanged) {
       const primaryFp = streams.get(streamKey(sessionId, config.ramenPaths[0]))?.cookieFp;
       if (primaryFp !== undefined && fpNow === primaryFp) {
         stream.cookieFp = fpNow; // adopt the primary's rotation; keep the live stream + its seq
@@ -148,7 +155,7 @@ function startSessionStreams(session) {
       const key = streamKey(session.id, path);
       if (streams.has(key)) return;
       console.log(`starting stream ${key} (${session.uber_org_uuid})`);
-      const stream = new RamenStream(session, path, { primary: index === 0 });
+      const stream = new RamenStream(session, path, { primary: index === 0, onStaleJar: reconcileSoon });
       // Registered synchronously so the next reconcile pass never starts it twice.
       streams.set(key, stream);
       created.push([key, stream]);
@@ -183,6 +190,19 @@ function runStream(key, stream, delay) {
 // stop a stream the other just started. One in-flight pass at a time; a skipped
 // tick simply happens 60s later.
 let reconciling = false;
+
+// A stream learned (409 stale_jar) that a reconnect replaced its jar: reconcile
+// right away instead of streaming the old jar for up to a full poll interval.
+// Coalesced, so every channel of the session reporting it costs one pass.
+let reconcileSoonTimer = null;
+function reconcileSoon() {
+  if (reconcileSoonTimer) return;
+  reconcileSoonTimer = setTimeout(() => {
+    reconcileSoonTimer = null;
+    reconcileTick();
+  }, 1000);
+  reconcileSoonTimer.unref?.();
+}
 
 export async function reconcileTick() {
   if (reconciling) {

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 process.env.DISPATCH_INGEST_SECRET ??= "test-dispatch-secret";
 
-const { RamenStream, inflight } = await import("../src/stream.js");
+const { RamenStream, inflight, ingestExpiresAt } = await import("../src/stream.js");
 const { api } = await import("../src/api.js");
 const { config } = await import("../src/config.js");
 
@@ -251,5 +251,227 @@ test("Fleet Hub 429 backs the status poll off (honouring Retry-After) without th
   assert.equal(stream.supplierBackoffMs, 40000);
   stream.supplierRecovered();
   assert.equal(stream.supplierBackoffMs, 0);
+  stream.stop();
+});
+
+// ── Ingest freshness + per-driver superseding ───────────────────────────────
+
+const offerData = (seq, driver, uuid, extra = {}) =>
+  JSON.stringify({
+    msg: [
+      {
+        seq,
+        type: "push_fleet_unified_offer",
+        msg: JSON.stringify({ offers: [{ offerUUID: uuid, driverInfo: { driverUUID: driver }, ...extra }] }),
+      },
+    ],
+  });
+
+/** Run fn with Date.now driven by a fake clock that the stream's sleep advances. */
+async function withFakeClock(stream, fn) {
+  const realNow = Date.now;
+  let now = realNow();
+  Date.now = () => now;
+  stream.sleep = async (ms) => {
+    now += ms;
+  };
+  try {
+    return await fn({ advance: (ms) => (now += ms), now: () => now });
+  } finally {
+    Date.now = realNow;
+  }
+}
+
+test("ingest expiry follows the offer's accept window, bounded to 10-25 s after receipt", () => {
+  const t = 1_000_000;
+  assert.equal(ingestExpiresAt([{}], t), t + 25000); // unknown: 25 s from receipt
+  assert.equal(ingestExpiresAt([{ offerGeneratedAtMs: t, acceptWindowInSeconds: 12 }], t), t + 17000);
+  assert.equal(ingestExpiresAt([{ offerGeneratedAtMs: t - 300000 }], t), t + 10000); // skewed/old clock: floor
+  assert.equal(ingestExpiresAt([{ offerGeneratedAtMs: t + 600000 }], t), t + 25000); // clock ahead: cap
+});
+
+test("a failing ingest is never sent after the offer's accept window", async () => {
+  const stream = newStream();
+  const sentAt = [];
+  await withFakeClock(stream, async ({ now }) => {
+    const received = now();
+    api.ingest = async () => {
+      sentAt.push(Date.now());
+      const e = new Error("POST /ingest -> 503");
+      e.status = 503;
+      throw e;
+    };
+    stream.handleData(offerData(1, "A", "a1", { offerGeneratedAtMs: received, acceptWindowInSeconds: 15 }));
+    await settle();
+    const expiresAt = received + 20000;
+    assert.ok(sentAt.length >= 2, "retried while fresh");
+    assert.ok(sentAt.every((t) => t < expiresAt), "no attempt after the accept window");
+    assert.equal(stream.ingestDropped, 1);
+    assert.equal(stream.ingestBacklog.length, 0);
+  });
+  stream.stop();
+});
+
+test("a permanent 4xx ingest error is not retried", async () => {
+  const stream = newStream();
+  let calls = 0;
+  api.ingest = async () => {
+    calls++;
+    const e = new Error("POST /ingest -> 422");
+    e.status = 422;
+    throw e;
+  };
+  stream.handleData(offerData(1, "A", "a1"));
+  await settle();
+  assert.equal(calls, 1);
+  assert.equal(stream.ingestDropped, 1);
+  stream.stop();
+});
+
+test("a driver's new offer is not held behind an older offer sleeping in retry backoff", async () => {
+  const stream = newStream();
+  stream.sleep = () => new Promise(() => {}); // a backoff that would never end on its own
+  const sent = [];
+  let healthy = false;
+  api.ingest = async (offers) => {
+    sent.push(offers[0].offerUUID);
+    if (!healthy) throw Object.assign(new Error("POST /ingest -> 502"), { status: 502 });
+    return {};
+  };
+  stream.handleData(offerData(1, "A", "a1"));
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(sent, ["a1"]); // failed, now sleeping in backoff
+
+  healthy = true;
+  const started = Date.now();
+  stream.handleData(offerData(2, "A", "a2"));
+  await settle();
+  assert.deepEqual(sent, ["a1", "a2"], "the stale a1 is never re-sent after a2");
+  assert.ok(Date.now() - started < 100, "a2 went out immediately");
+  assert.equal(stream.ingestDropped, 1);
+  assert.equal(stream.ingestBacklog.length, 0);
+  stream.stop();
+});
+
+test("an older offer mid-request is not retried once a newer one for the driver is queued", async () => {
+  const stream = newStream();
+  const sent = [];
+  let failA1;
+  api.ingest = async (offers) => {
+    const id = offers[0].offerUUID;
+    sent.push(id);
+    if (id === "a1") await new Promise((_, reject) => (failA1 = reject));
+    return {};
+  };
+  stream.handleData(offerData(1, "A", "a1"));
+  await new Promise((r) => setImmediate(r));
+  stream.handleData(offerData(2, "A", "a2"));
+  failA1(Object.assign(new Error("timeout"), { status: undefined }));
+  await settle();
+  assert.deepEqual(sent, ["a1", "a2"]);
+  assert.equal(stream.ingestDropped, 1);
+  stream.stop();
+});
+
+// ── jar_version echo + stale_jar ────────────────────────────────────────────
+
+test("reports echo the stream's jar_version", async () => {
+  const stream = new RamenStream({ ...session(), jar_version: 7 }, "/ramendca/events");
+  stream.sleep = async () => {};
+  const seen = {};
+  api.refreshCookies = async (_id, _cookies, _expires, version) => {
+    seen.cookies = version;
+    return {};
+  };
+  api.needsRelink = async (_id, version) => {
+    seen.relink = version;
+    return {};
+  };
+  api.supplierDegraded = async (_id, version) => {
+    seen.degraded = version;
+    return {};
+  };
+  stream.absorbCookies(response({ setCookies: ["sid=v2"] }));
+  await settle();
+  stream.supplierAuthFails = config.supplierFailThreshold;
+  await stream.handleSupplierAuthFailure(401);
+  await stream.handleStreamAuthFailure(401);
+  assert.deepEqual(seen, { cookies: 7, relink: 7, degraded: 7 });
+});
+
+test("the api client puts jar_version in the report bodies", async () => {
+  const realFetch = globalThis.fetch;
+  const bodies = [];
+  globalThis.fetch = async (url, init) => {
+    bodies.push([url.split("/dispatch")[1], JSON.parse(init.body ?? "null")]);
+    return { ok: true, json: async () => ({ data: {} }) };
+  };
+  try {
+    await originalApi.refreshCookies(3, [{ name: "sid", value: "x" }], undefined, 4);
+    await originalApi.needsRelink(3, 4);
+    await originalApi.supplierDegraded(3, 4);
+    await originalApi.needsRelink(3, null);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.deepEqual(bodies, [
+    ["/sessions/3/cookies", { cookies: [{ name: "sid", value: "x" }], jar_version: 4 }],
+    ["/sessions/3/needs-relink", { jar_version: 4 }],
+    ["/sessions/3/supplier-degraded", { jar_version: 4 }],
+    ["/sessions/3/needs-relink", {}],
+  ]);
+});
+
+test("a 409 stale_jar stops cookie writes without advancing the fingerprint", async () => {
+  let staleCalls = 0;
+  const stream = new RamenStream({ ...session(), jar_version: 1 }, "/ramendca/events", { onStaleJar: () => staleCalls++ });
+  const before = stream.cookieFp;
+  let writes = 0;
+  api.refreshCookies = async () => {
+    writes++;
+    throw Object.assign(new Error("POST /cookies -> 409"), { status: 409, apiMessage: "stale_jar" });
+  };
+  stream.absorbCookies(response({ setCookies: ["sid=v2"] }));
+  await settle();
+  stream.absorbCookies(response({ setCookies: ["sid=v3"] }));
+  await settle();
+  assert.equal(writes, 1, "no further writes from a replaced jar");
+  assert.equal(stream.cookieFp, before);
+  assert.equal(stream.jarStale, true);
+  assert.equal(staleCalls, 1);
+  assert.equal(stream.stopped, false, "keeps streaming until the supervisor swaps it");
+  stream.stop();
+});
+
+test("a 401 whose needs-relink is refused as stale_jar stops the stream and asks for a restart", async () => {
+  let staleCalls = 0;
+  const stream = new RamenStream({ ...session(), jar_version: 1 }, "/ramendca/events", { onStaleJar: () => staleCalls++ });
+  api.needsRelink = async () => {
+    throw Object.assign(new Error("409"), { status: 409, apiMessage: "stale_jar" });
+  };
+  assert.equal(await stream.handleStreamAuthFailure(401), true);
+  assert.equal(stream.stopped, true);
+  assert.equal(staleCalls, 1);
+});
+
+// ── Status keepalive for the backend's daemon-is-feeding gate ───────────────
+
+test("an idle fleet still posts a keepalive status row well inside the backend's 20 s gate", async () => {
+  const stream = newStream();
+  const sent = [];
+  api.statuses = async (_id, rows) => {
+    sent.push(rows.map((r) => r.driver_uuid));
+    return { data: {} };
+  };
+  const rows = [
+    { driver_uuid: "a", status: "ONLINE", latitude: 0, longitude: 0, heading: null, waypoints: null },
+    { driver_uuid: "b", status: "OFFLINE", latitude: 0, longitude: 0, heading: null, waypoints: null },
+  ];
+  await stream.forwardStatuses(rows); // full batch
+  await stream.forwardStatuses(rows); // unchanged, just posted -> nothing
+  assert.equal(sent.length, 1);
+  stream.lastStatusPostAt = Date.now() - 8000; // 8 s of no change
+  await stream.forwardStatuses(rows);
+  assert.deepEqual(sent.at(-1), ["a"], "one unchanged row keeps the gate open");
   stream.stop();
 });
