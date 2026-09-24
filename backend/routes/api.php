@@ -42,6 +42,7 @@ use App\Http\Controllers\Api\V1\DispatchDaemonController;
 use App\Http\Controllers\Api\V1\DispatchIngestController;
 use App\Http\Controllers\Api\V1\DispatchLinkController;
 use App\Http\Controllers\Api\V1\DispatchOfferController;
+use App\Http\Controllers\Api\V1\Driver\AccountDeletionController;
 use App\Http\Controllers\Api\V1\Driver\DriverAuthController;
 use App\Http\Controllers\Api\V1\Driver\DriverDashboardController;
 use App\Http\Controllers\Api\V1\Driver\DriverDeviceController;
@@ -132,6 +133,8 @@ Route::prefix('v1')->group(function () {
         Route::middleware('auth:driver')->group(function () {
             // Logout must work even when suspended (so the app can clear its token).
             Route::post('logout', [DriverAuthController::class, 'logout']);
+            // In-app account deletion request — also allowed while suspended.
+            Route::post('account/deletion-request', [AccountDeletionController::class, 'driver'])->middleware('throttle:3,1');
 
             // Everything else requires the driver's company to still be active.
             Route::middleware('driver.active')->group(function () {
@@ -155,6 +158,10 @@ Route::prefix('v1')->group(function () {
         // monitors ALL their drivers read-only. Their token resolves on the `User`
         // (auth:sanctum, not auth:driver); `driver.active` still blocks a suspended
         // tenant, and FleetController rejects non-tenant callers.
+        // Owner-mode account deletion request (outside driver.active, like logout should be).
+        Route::post('fleet/account/deletion-request', [AccountDeletionController::class, 'owner'])
+            ->middleware(['auth:sanctum', 'throttle:3,1']);
+
         Route::middleware(['auth:sanctum', 'driver.active'])->prefix('fleet')->group(function () {
             Route::get('me', [FleetController::class, 'me']);
             Route::patch('me', [FleetController::class, 'update']);
