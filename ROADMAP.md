@@ -456,7 +456,7 @@ docker compose -f docker-compose.prod.yml up -d --build frontend backend   # ل�
 docker compose -f docker-compose.prod.yml exec backend php artisan migrate --force
 docker compose -f docker-compose.prod.yml exec backend php artisan db:seed --class=RolePermissionSeeder --force   # دور reseller + codes.generate
 ```
-- **`OTP_TEST_CODE=111111`** لازم يكون بملف **`/root/ridy/.env`** (مستوى الـcompose، مش `backend/.env`).
+- ~~`OTP_TEST_CODE=111111` بملف `/root/ridy/.env`~~ — **لا تضعه على البرودكشن** (2026-09-24): التطبيق يتجاهله بالبرودكشن الآن، وامسح الـsecret من GitHub.
 
 ### إعدادات خارجية
 - **SMTP** لإرسال الإيميلات الحقيقية (المزوّد + `MAIL_*` أو من إعدادات الأدمن). حالياً log/غير مضبوط.
