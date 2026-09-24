@@ -9,6 +9,7 @@ use App\Domain\Fleet\Models\DriverMetric;
 use App\Domain\Notifications\Models\DeviceToken;
 use App\Models\PasswordReset;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Erases ONE driver (DSGVO Art. 17), without touching the rest of the fleet.
@@ -20,8 +21,11 @@ use Illuminate\Support\Facades\DB;
  * uuid, captured names and the raw payload are cleared, as are the addresses and
  * coordinates of their trips).
  *
+ * Used by the fleet dashboard (DELETE /drivers/{driver}), `drivers:erase` and the
+ * retention job — one eraser, so every Art. 17 path removes the same data.
+ *
  * Note: a driver still on the fleet's Uber roster is re-created by the next
- * roster sync — remove them in Uber first.
+ * roster sync — remove them in Uber first ({@see assertErasable()}).
  */
 class DriverEraser
 {
@@ -32,6 +36,21 @@ class DriverEraser
         private readonly OfferAnonymizer $offers,
         private readonly AuditLogger $audit,
     ) {}
+
+    /**
+     * Refuse a driver Uber still lists on the fleet's roster: the next roster sync
+     * would simply recreate them. The fleet removes them in Uber first.
+     *
+     * @throws ValidationException
+     */
+    public function assertErasable(Driver $driver): void
+    {
+        if ($driver->uber_driver_uuid !== null && $driver->roster_removed_at === null) {
+            throw ValidationException::withMessages([
+                'driver' => [__('Remove this driver from the fleet in Uber first — otherwise the next roster sync recreates them.')],
+            ]);
+        }
+    }
 
     /** @return array<string, int> rows affected per entity */
     public function erase(Driver $driver): array

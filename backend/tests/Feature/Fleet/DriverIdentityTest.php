@@ -5,6 +5,7 @@ namespace Tests\Feature\Fleet;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\Models\DeviceToken;
+use App\Domain\Privacy\DriverEraser;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use App\Models\User;
@@ -87,21 +88,36 @@ class DriverIdentityTest extends TestCase
         $driver = $this->driver(['uber_driver_uuid' => 'uuid-1', 'roster_removed_at' => now()]);
         $driver->createToken('driver-app');
         DeviceToken::create(['driver_id' => $driver->id, 'token' => 'phone', 'tenant_id' => $this->tenant->id]);
+        DB::table('notifications')->insert([
+            'id' => 'n-1', 'type' => 'x', 'notifiable_type' => $driver->getMorphClass(), 'notifiable_id' => $driver->id,
+            'data' => '{}', 'created_at' => now(), 'updated_at' => now(),
+        ]);
         $offer = DispatchOffer::create([
             'tenant_id' => $this->tenant->id, 'driver_id' => $driver->id, 'driver_uuid' => 'uuid-1', 'offer_uuid' => 'o1',
-            'driver_first_name' => 'Omar', 'received_at' => now(), 'raw_payload' => ['driverInfo' => ['firstName' => 'Omar'], 'fare' => 5],
+            'driver_first_name' => 'Omar', 'rider_first_name' => 'Lena', 'pickup_address' => 'Hauptstr. 1, Berlin',
+            'pickup_lat' => 52.5, 'pickup_lng' => 13.4, 'fare_amount' => 12.5, 'received_at' => now(),
+            'raw_payload' => ['driverInfo' => ['firstName' => 'Omar'], 'fare' => 5],
         ]);
 
-        $this->deleteJson("/api/v1/drivers/{$driver->id}")->assertOk()->assertJsonPath('data.offers_anonymized', 1);
+        // The dashboard uses the same eraser as `drivers:erase`: a complete Art. 17 wipe.
+        $this->deleteJson("/api/v1/drivers/{$driver->id}")->assertOk()
+            ->assertJsonPath('data.offers_anonymized', 1)
+            ->assertJsonPath('data.notifications', 1);
 
         $this->assertNull(Driver::withoutGlobalScopes()->find($driver->id));
         $this->assertSame(0, DB::table('personal_access_tokens')->count());
         $this->assertSame(0, DeviceToken::withoutGlobalScopes()->count());
+        $this->assertSame(0, DB::table('notifications')->where('notifiable_id', $driver->id)->count());
         $fresh = DispatchOffer::withoutGlobalScopes()->find($offer->id);
         $this->assertNull($fresh->driver_id);
+        $this->assertSame(DriverEraser::ERASED_UUID, $fresh->driver_uuid);
         $this->assertNull($fresh->driver_first_name);
-        $this->assertArrayNotHasKey('driverInfo', $fresh->raw_payload);
-        $this->assertSame(5, $fresh->raw_payload['fare']);
+        $this->assertNull($fresh->rider_first_name);
+        $this->assertNull($fresh->pickup_address);
+        $this->assertNull($fresh->pickup_lat);
+        $this->assertNotNull($fresh->anonymized_at);
+        $this->assertSame('{}', DB::table('dispatch_offers')->where('id', $offer->id)->value('raw_payload'));
+        $this->assertEquals(12.5, (float) $fresh->fare_amount); // the fleet keeps its figures
     }
 
     public function test_a_driver_still_on_the_uber_roster_cannot_be_erased(): void
