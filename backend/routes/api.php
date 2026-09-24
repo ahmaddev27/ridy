@@ -66,7 +66,6 @@ use App\Http\Controllers\Api\V1\PublicSupportController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\ResellerController;
 use App\Http\Controllers\Api\V1\SupplierCaptureController;
-use App\Http\Controllers\Api\V1\UberLoginController;
 use App\Http\Controllers\Api\V1\VehicleController;
 use App\Http\Middleware\LogDriverAuthContext;
 use App\Http\Middleware\ResolveTenant;
@@ -259,10 +258,6 @@ Route::prefix('v1')->group(function () {
         Route::post('dispatch/offers/ingest', [DispatchOfferController::class, 'ingest'])->middleware(['fleet.connected', 'can:connections.manage']);
         Route::post('dispatch/offers/bulk-delete', [DispatchOfferController::class, 'bulkDestroy'])->middleware('can:offers.manage');
         Route::delete('dispatch/offers/{offer}', [DispatchOfferController::class, 'destroy'])->middleware('can:offers.manage');
-
-        // Interactive Uber sign-in (email/password -> optional MFA code)
-        Route::post('uber-login/start', [UberLoginController::class, 'start'])->middleware('can:connections.manage');
-        Route::post('uber-login/mfa', [UberLoginController::class, 'mfa'])->middleware('can:connections.manage');
 
         // Browser-extension pairing token (minted from the dashboard session)
         Route::post('extension/token', [ExtensionController::class, 'issueToken'])->middleware('can:connections.manage');

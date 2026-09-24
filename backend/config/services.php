@@ -54,13 +54,6 @@ return [
     // real production deployment so codes are random.
     'otp_test_code' => env('OTP_TEST_CODE'),
 
-    'uber_auth' => [
-        // Node uber-auth service that drives the interactive Uber sign-in browser.
-        'url' => env('UBER_AUTH_URL', 'http://localhost:8791'),
-        'secret' => env('UBER_AUTH_SECRET'),
-        'timeout' => (int) env('UBER_AUTH_TIMEOUT', 60),
-    ],
-
     'fcm' => [
         // Path to the Google service-account JSON. When unset (or the file is
         // missing) pushes are logged instead of sent — see AppServiceProvider.
