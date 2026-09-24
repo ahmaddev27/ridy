@@ -1,11 +1,11 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View, ScrollView, RefreshControl, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useRouter } from "expo-router";
 import { Map as MapIcon, Route } from "@/components/icons";
 import { api, type HomeData, type FleetHomeData, type Offer } from "@/lib/api";
-import { alertOffer, isFreshOffer } from "@/lib/offer-alert";
+import { alertOffer, freshUntil, isFreshOffer } from "@/lib/offer-alert";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, useLocale } from "@/lib/i18n";
 import { openRouteInMaps } from "@/lib/maps";
@@ -16,11 +16,19 @@ import { Logo, SectionLabel, StatusBadge } from "@/components/ui";
 import { OfferCard } from "@/components/offer-card";
 import { LoadErrorBanner, PushHealthBanner } from "@/components/status-banner";
 
-/** The newest still-open offer: the backend's `pending_offer` when it sends one
- *  (newer backends), else the freshest pending row in `recent`. */
-function pendingOfferOf(home: HomeData): Offer | null {
+/** The newest pending offer: the backend's `pending_offer` when it sends one
+ *  (newer backends), else the newest pending row in `recent`. It may be HELD
+ *  (the driver is on a trip) and long past its accept window. */
+function latestPendingOf(home: HomeData): Offer | null {
   if (home.pending_offer !== undefined) return home.pending_offer ?? null;
-  return home.recent.find((o) => o.status === "pending" && isFreshOffer(o)) ?? null;
+  return home.recent.find((o) => o.status === "pending") ?? null;
+}
+
+/** The pending offer only while it is still inside its accept window — a held,
+ *  stale offer is never shown as "New offer". */
+function freshPendingOf(home: HomeData, now: number): Offer | null {
+  const p = latestPendingOf(home);
+  return p && p.status === "pending" && isFreshOffer(p, now) ? p : null;
 }
 
 /** Replace state only when the payload actually changed (no re-render per poll). */
@@ -50,7 +58,8 @@ export default function HomeScreen() {
         setData((prev) => (sameJson(prev, home) ? prev : home));
         // Fallback chime for a new offer that surfaced without its push (the
         // push itself already rang through the foreground handler).
-        alertOffer(pendingOfferOf(home));
+        // alertOffer judges freshness itself.
+        alertOffer(latestPendingOf(home));
       }
       setLoadError(false);
     } catch {
@@ -74,10 +83,22 @@ export default function HomeScreen() {
 
   const openOffer = useCallback((id: number) => router.push(`/offer/${id}`), [router]);
 
+  // Identical polls don't re-render (sameJson), so re-render once when the shown
+  // pending offer's accept window closes — the "New offer" card then disappears.
+  const [, setExpiryTick] = useState(0);
+  const latest = !isOwner && data ? latestPendingOf(data) : null;
+  const latestExpiry = latest ? freshUntil(latest) : NaN;
+  useEffect(() => {
+    const ms = latestExpiry - Date.now();
+    if (!Number.isFinite(ms) || ms < 0) return;
+    const timer = setTimeout(() => setExpiryTick((n) => n + 1), ms + 50);
+    return () => clearTimeout(timer);
+  }, [latestExpiry]);
+
   const greeting = new Date().getHours() >= 17 ? t("home.greetingEvening") : t("home.greetingDay");
   const today = isOwner ? fleet?.today : data?.today;
   const active = data?.active_offer ?? null;
-  const pending = !isOwner && data ? pendingOfferOf(data) : null;
+  const pending = !isOwner && data ? freshPendingOf(data, Date.now()) : null;
   const noData = isOwner ? !fleet : !data;
   const headline = isOwner ? (fleet?.owner.company_name ?? driver?.company_name ?? "…") : (data?.driver.name ?? "…");
   const sub = isOwner ? t("home.fleetTitle") : (driver?.company_name ?? "");

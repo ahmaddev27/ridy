@@ -2,6 +2,7 @@ import * as Notifications from "expo-notifications";
 import { AppState, Vibration } from "react-native";
 import { cleanAddress, fareLabel } from "./format";
 import { MULTISTOP_CHANNEL, OFFERS_CHANNEL, isMultiStop } from "./notification-channels";
+import { freshUntil, isFreshOffer } from "./offer-freshness";
 import { loadPrefs } from "./prefs";
 import type { Offer } from "./api";
 
@@ -18,14 +19,14 @@ import type { Offer } from "./api";
  * window, not by when the app started — a stale pending offer never chimes.
  */
 
-/** Accept window assumed when the offer carries none (seconds). */
-const DEFAULT_WINDOW_S = 15;
-/** Slack for clock skew between the phone and the server (seconds). */
-const CLOCK_SKEW_S = 10;
 /** How long the FCM push gets to arrive before the local fallback fires. */
 const PUSH_GRACE_MS = 2_000;
 
+/** Offers that actually rang (push presented or fallback shown). */
 const alerted = new Set<string>();
+/** Offers the socket/poll judged stale — never fallback-chimed, but NOT treated as
+ *  alerted, so their real FCM push (e.g. with phone-clock skew) still presents. */
+const skipped = new Set<string>();
 const pendingFallback = new Map<string, ReturnType<typeof setTimeout>>();
 
 function keyFor(offerId: number | string, multi: boolean): string {
@@ -51,13 +52,7 @@ export function wasAlerted(offerId: number | string | null | undefined, multi = 
   return alerted.has(keyFor(offerId, multi));
 }
 
-/** True while the offer is still inside its accept window (plus clock slack). */
-export function isFreshOffer(offer: Pick<Offer, "received_at" | "accept_window_seconds">, now = Date.now()): boolean {
-  const received = offer.received_at ? Date.parse(offer.received_at) : NaN;
-  if (!Number.isFinite(received)) return false;
-  const windowS = (offer.accept_window_seconds ?? DEFAULT_WINDOW_S) + CLOCK_SKEW_S;
-  return now - received <= windowS * 1000;
-}
+export { freshUntil, isFreshOffer };
 
 /**
  * Schedule the fallback alert for a genuinely new pending offer. No-op for a
@@ -67,9 +62,9 @@ export function alertOffer(offer: Offer | null | undefined): void {
   if (!offer || offer.status !== "pending") return;
   const multi = isMultiStop(offer.stops_count);
   const key = keyFor(offer.id, multi);
-  if (alerted.has(key) || pendingFallback.has(key)) return;
+  if (alerted.has(key) || skipped.has(key) || pendingFallback.has(key)) return;
   if (!isFreshOffer(offer)) {
-    alerted.add(key); // stale: never alert it later either
+    skipped.add(key); // stale: no fallback chime, but its push may still present
     return;
   }
   const timer = setTimeout(() => {

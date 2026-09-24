@@ -43,3 +43,24 @@ test("Arabic-Indic and Persian digits become ASCII", () => {
   assert.equal(toAsciiDigits("۰۹۸"), "098");
   assert.equal(toAsciiDigits("Code: 12 34"), "Code: 12 34");
 });
+
+const { isFreshOffer, freshUntil } = await import("../src/lib/offer-freshness.ts");
+
+test("an offer is fresh inside its accept window plus clock slack", () => {
+  const offer = { received_at: "2026-09-24T10:00:00Z", accept_window_seconds: 15 };
+  const received = Date.parse(offer.received_at);
+  assert.equal(freshUntil(offer), received + 25_000);
+  assert.equal(isFreshOffer(offer, received + 24_000), true);
+  assert.equal(isFreshOffer(offer, received + 26_000), false);
+});
+
+test("a held pending offer (minutes old) is never fresh — Home must not show it as new", () => {
+  const offer = { received_at: "2026-09-24T10:00:00Z", accept_window_seconds: 15 };
+  assert.equal(isFreshOffer(offer, Date.parse(offer.received_at) + 10 * 60_000), false);
+});
+
+test("missing window falls back to 15s; missing receive time is never fresh", () => {
+  const offer = { received_at: "2026-09-24T10:00:00Z", accept_window_seconds: null };
+  assert.equal(freshUntil(offer), Date.parse(offer.received_at) + 25_000);
+  assert.equal(isFreshOffer({ received_at: null, accept_window_seconds: 15 }), false);
+});

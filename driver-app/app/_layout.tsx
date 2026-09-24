@@ -9,6 +9,8 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { ToastProvider } from "@/components/toast";
 import { registerOfferCategory, startPushRegistration, OPEN_MAP_ACTION } from "@/lib/push";
+import { markAlerted } from "@/lib/offer-alert";
+import { isMultiStop } from "@/lib/notification-channels";
 import { startLive, stopLive } from "@/lib/live";
 import { openRouteInMaps } from "@/lib/maps";
 import { useColors, isDarkPalette, setThemeMode, type ThemeMode } from "@/lib/theme";
@@ -133,6 +135,9 @@ type OfferPushData = {
   dropoff_lng?: string;
   geo_source?: string;
   stops?: string;
+  stops_count?: string;
+  /** "1" on the in-app fallback notification (never on an FCM push). */
+  local?: string;
 };
 
 /** Notification taps already acted on in this process (survives re-renders). */
@@ -210,6 +215,12 @@ function Gate() {
     }
 
     const data = (response.notification.request.content.data ?? {}) as OfferPushData;
+    // A push tapped from the tray (background / cold start) never passed through
+    // the foreground handler: record it so the resume reload's in-app fallback
+    // doesn't ring the same offer a second time.
+    if (data.offer_id != null && data.local !== "1") {
+      markAlerted(data.offer_id, isMultiStop(data.stops_count));
+    }
     // "Open in map" action button: route through every stop of a multi-stop trip
     // (Google Maps waypoints). Prefer Uber's exact coordinates so a
     // house-number-less address still pins right.

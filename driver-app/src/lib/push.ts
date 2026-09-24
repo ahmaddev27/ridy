@@ -89,6 +89,22 @@ Notifications.addNotificationReceivedListener((notification) => {
   emitLive({ reason: "push", offerId: Number.isFinite(id) ? id : undefined });
 });
 
+// Opening the app from its icon while an offer push still sits in the tray: that
+// push already rang in the background, so record it before the resume reload's
+// in-app fallback (2 s grace) could ring it again.
+AppState.addEventListener("change", (state) => {
+  if (state !== "active") return;
+  Notifications.getPresentedNotificationsAsync()
+    .then((list) => {
+      for (const n of list) {
+        const data = (n.request.content.data ?? {}) as Record<string, unknown>;
+        if (data.offer_id == null || data.local === "1") continue;
+        markAlerted(data.offer_id as string | number, isMultiStop(data.stops_count));
+      }
+    })
+    .catch(() => { /* unsupported: the fallback grace still dedupes most cases */ });
+});
+
 // ---------------------------------------------------------------------------
 // Category ("Open in map" action) + channels — re-labelled on language change
 // ---------------------------------------------------------------------------
@@ -163,10 +179,14 @@ export type PushHealth = {
 export async function getPushHealth(): Promise<PushHealth> {
   const perm = await Notifications.getPermissionsAsync();
   let channelOk = true;
-  if (Platform.OS === "android") {
+  // Android < 8 (API 26) has no notification channels — expo returns null there,
+  // so only the app-level permission decides whether offers can ring.
+  if (Platform.OS === "android" && Number(Platform.Version) >= 26) {
     await ensureChannels().catch(() => {});
     const channel = await Notifications.getNotificationChannelAsync(OFFERS_CHANNEL).catch(() => null);
     channelOk = !!channel && channel.importance >= Notifications.AndroidImportance.HIGH;
+  } else if (Platform.OS === "android") {
+    channelOk = true;
   } else if (perm.granted && perm.ios) {
     channelOk = perm.ios.allowsAlert !== false;
   }
