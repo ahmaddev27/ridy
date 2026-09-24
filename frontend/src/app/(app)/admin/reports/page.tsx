@@ -33,6 +33,7 @@ import {
   type Plan,
 } from "@/lib/api/admin";
 import { downloadInvoicePdf } from "@/lib/api/invoice-template";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 export default function ReportsPage() {
   const { t, locale } = useI18n();
@@ -99,7 +100,7 @@ export default function ReportsPage() {
       toast.success(c("planDeleted"));
       await refetchPlans();
     } catch (e) {
-      toast.error(c("failed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("failed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setPlanBusy(false);
       setDeletingPlan(null);
@@ -110,7 +111,7 @@ export default function ReportsPage() {
     try {
       await downloadInvoicePdf(invoiceId);
     } catch (e) {
-      toast.error(c("pdfFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("pdfFailed"), { description: apiErrorMessage(e, t, locale) });
     }
   }
 
@@ -124,7 +125,7 @@ export default function ReportsPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      toast.error(c("exportFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("exportFailed"), { description: apiErrorMessage(e, t, locale) });
     }
   }
 
@@ -393,7 +394,7 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | null; onClose: () 
       onSaved();
       onClose();
     } catch (e) {
-      toast.error(c("failed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("failed"), { description: apiErrorMessage(e, t) });
     } finally {
       setBusy(false);
     }
@@ -471,7 +472,7 @@ function SettleModal({
       await onSettled();
       onClose();
     } catch (e) {
-      toast.error(c("settleFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("settleFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }

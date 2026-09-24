@@ -13,6 +13,7 @@ import { useAsync } from "@/hooks/use-async";
 import { listUsers, deleteUser, type PlatformUser } from "@/lib/api/admin";
 import { BroadcastModal } from "./broadcast-modal";
 import { Pager } from "@/components/ui/pager";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 const PAGE_SIZE = 50;
 
@@ -110,7 +111,7 @@ export default function UsersPage() {
       toast.success(c("deleted"));
       await refetch();
     } catch (e) {
-      toast.error(c("deleteFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("deleteFailed"), { description: apiErrorMessage(e, t) });
     } finally {
       setBusy(false);
       setConfirmDel(null);

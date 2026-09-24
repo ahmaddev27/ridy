@@ -46,6 +46,7 @@ import {
   type Plan,
 } from "@/lib/api/admin";
 import { getPaymentMethods, PAYMENT_METHOD_KEYS, paymentMethodLabel } from "@/lib/api/payments";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 /** Super-admin company detail as a full page: edit, proxy, users, session,
  *  subscription controls, plus drivers/offers/vehicles tabs. */
@@ -152,7 +153,7 @@ export function CompanyDetail({
       await load();
       onChanged();
     } catch (e) {
-      toast.error(c("saveFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("saveFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
@@ -186,7 +187,7 @@ export function CompanyDetail({
       setResetFor(null);
       setResetPwd("");
     } catch (e) {
-      toast.error(c("resetFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("resetFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
@@ -204,7 +205,7 @@ export function CompanyDetail({
       toast.success(c("codeGenerated"));
       await load();
     } catch (e) {
-      toast.error(c("codeFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("codeFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
@@ -217,7 +218,7 @@ export function CompanyDetail({
       toast.success(c("freeGranted"));
       await load();
     } catch (e) {
-      toast.error(c("codeFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("codeFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
@@ -233,7 +234,7 @@ export function CompanyDetail({
       await load();
       onChanged();
     } catch (e) {
-      toast.error(c("actionFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("actionFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
@@ -247,7 +248,7 @@ export function CompanyDetail({
       await load();
       onChanged();
     } catch (e) {
-      toast.error(c("actionFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("actionFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
@@ -262,7 +263,7 @@ export function CompanyDetail({
       // refetch as the manager. Client-side navigation would keep stale data.
       window.location.assign("/");
     } catch (e) {
-      toast.error(c("impersonateFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("impersonateFailed"), { description: apiErrorMessage(e, t, locale) });
       setBusy(false);
     }
   }
@@ -282,7 +283,7 @@ export function CompanyDetail({
       await load();
       onChanged();
     } catch (e) {
-      toast.error(c("actionFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("actionFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
       setConfirm(null);
@@ -304,7 +305,7 @@ export function CompanyDetail({
       await load();
       onChanged();
     } catch (e) {
-      toast.error(c("purgeFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("purgeFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
       setConfirm(null);

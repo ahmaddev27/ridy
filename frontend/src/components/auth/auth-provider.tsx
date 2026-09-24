@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { AuthUser, fetchMe, logout as apiLogout } from "@/lib/api/auth";
 import { ApiError, AUTH_EVENT, authEvents, type AuthEventDetail } from "@/lib/api/client";
+import { stopImpersonation } from "@/lib/api/admin";
 import { disableWebPush } from "@/lib/push/web-push";
 import { disconnectRealtime } from "@/lib/realtime";
 
@@ -19,6 +20,9 @@ type AuthState = {
   /** True while a super-admin is acting as a company manager (impersonation). */
   impersonating: boolean;
   loading: boolean;
+  /** True while the provider is ending the session and navigating to /login
+   *  itself — the guard must not redirect too (it would drop `?reason=`). */
+  endingSession: boolean;
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -28,6 +32,17 @@ const AuthContext = createContext<AuthState | null>(null);
 // Logout must not hang on the push-token cleanup (a slow Firebase call).
 const PUSH_CLEANUP_TIMEOUT_MS = 3000;
 const ME_RETRY_MAX_MS = 30_000;
+
+/** Ask the Reidey extension (if installed) to drop its pairing token, so a
+ *  shared browser never keeps a working token after the manager leaves.
+ *  Fire-and-forget: extensions before the unpair listener simply ignore it. */
+function unpairExtension(): void {
+  try {
+    window.postMessage({ source: "ridy-unpair" }, window.location.origin);
+  } catch {
+    /* no window / cross-origin — nothing to unpair */
+  }
+}
 
 /** Only a real "not signed in / not allowed" answer ends the session — a
  *  network blip or a 5xx on /me must not log the user out. */
@@ -39,12 +54,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [impersonating, setImpersonating] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [endingSessionState, setEndingSessionState] = useState(false);
   const router = useRouter();
   const userRef = useRef<AuthUser | null>(null);
   userRef.current = user;
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryDelay = useRef(1000);
   const endingSession = useRef(false);
+  const impersonatingRef = useRef(false);
+  useEffect(() => {
+    impersonatingRef.current = impersonating;
+  }, [impersonating]);
 
   const refresh = useCallback(async () => {
     if (retryTimer.current) {
@@ -57,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setImpersonating(me.impersonating);
       retryDelay.current = 1000;
       endingSession.current = false;
+      setEndingSessionState(false);
       setLoading(false);
     } catch (err) {
       if (isAuthRejection(err)) {
@@ -90,13 +111,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!detail || !userRef.current || endingSession.current) return;
       endingSession.current = true;
       disconnectRealtime();
+      if (detail.kind === "suspended" && impersonatingRef.current) {
+        // A super-admin acting as a disabled/banned company: never log the
+        // admin out — revert to their own identity and go back to the admin area.
+        void stopImpersonation()
+          .catch(() => {})
+          .finally(() => window.location.assign("/admin/companies"));
+        return;
+      }
+      // Set together with the user so the guard sees both in one render and
+      // leaves the navigation (with its ?reason) to us.
+      setEndingSessionState(true);
       setUser(null);
       setImpersonating(false);
       if (detail.kind === "suspended") {
-        // The session is still valid server-side; end it so the login screen
-        // can show the suspended/activation flow on the next sign-in.
-        void apiLogout().catch(() => {});
-        router.replace("/login?reason=suspended");
+        // The session is still valid server-side; end it (before the login page
+        // probes /me) so the login screen can show the suspended/activation flow.
+        void apiLogout()
+          .catch(() => {})
+          .finally(() => router.replace("/login?reason=suspended"));
       } else {
         router.replace("/login?reason=expired");
       }
@@ -107,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     endingSession.current = true;
+    unpairExtension();
     try {
       // Unregister this browser's push token while the session still exists.
       await Promise.race([
@@ -118,6 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       /* signed out locally regardless */
     } finally {
       disconnectRealtime();
+      setEndingSessionState(true);
       setUser(null);
       setImpersonating(false);
       router.push("/login");
@@ -125,7 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   return (
-    <AuthContext.Provider value={{ user, impersonating, loading, refresh, signOut }}>
+    <AuthContext.Provider value={{ user, impersonating, loading, endingSession: endingSessionState, refresh, signOut }}>
       {children}
     </AuthContext.Provider>
   );

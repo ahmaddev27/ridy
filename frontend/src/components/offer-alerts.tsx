@@ -7,18 +7,17 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale } from "@/lib/utils";
 import { listOffers, getOffer, fareLabel, type DispatchOffer, type DispatchOfferDetail } from "@/lib/api/offers";
-import { useCompanyRealtime, useRealtimeConnected, type OfferChangedPayload } from "@/lib/realtime";
+import { useCompanyRealtime, type OfferChangedPayload } from "@/lib/realtime";
 import { usePolling } from "@/hooks/use-polling";
 
 /** Window event the offers page listens for to open an offer's detail in place. */
 export const OPEN_OFFER_EVENT = "reidey:open-offer";
 
-// Fallback poll cadence. With the Reverb socket up, alerts arrive over the
-// WebSocket and the poll is only a slow safety net; without it the poll is the
-// alert path. Hidden tabs keep polling (slower) so alerts still sound.
-const POLL_LIVE_MS = 60_000;
-const POLL_FALLBACK_MS = 10_000;
-const POLL_FALLBACK_HIDDEN_MS = 20_000;
+// Poll cadence — the same whether or not the Reverb socket is up: the backend
+// only broadcasts "new" for offers of a LINKED driver, so the poll is the only
+// alert path for an unlinked driver's offer and must stay near real time.
+// Hidden tabs keep polling so alerts still sound in a background tab.
+const POLL_MS = 5_000;
 
 const CLAIM_PREFIX = "offerAlert:";
 const CLAIM_TTL_MS = 60 * 60 * 1000;
@@ -78,7 +77,6 @@ export function OfferAlerts() {
   pathnameRef.current = pathname;
   const seen = useRef<Set<number>>(new Set());
   const primed = useRef(false);
-  const connected = useRealtimeConnected();
 
   const tenantId = user?.tenant?.id ?? null;
   const isManager = tenantId != null;
@@ -178,9 +176,7 @@ export function OfferAlerts() {
     void poll().catch(() => {});
   }, [isManager, poll]);
 
-  usePolling(poll, isManager ? (connected ? POLL_LIVE_MS : POLL_FALLBACK_MS) : null, {
-    whenHidden: connected ? POLL_LIVE_MS : POLL_FALLBACK_HIDDEN_MS,
-  });
+  usePolling(poll, isManager ? POLL_MS : null, { whenHidden: POLL_MS });
 
   return null;
 }

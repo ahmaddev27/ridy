@@ -308,7 +308,7 @@ Route::prefix('v1')->group(function () {
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::post('notifications/read', [NotificationController::class, 'markRead']);
         Route::delete('notifications/clear', [NotificationController::class, 'clear']);
-        Route::delete('notifications/{id}', [NotificationController::class, 'destroy']);
+        Route::delete('notifications/{id}', [NotificationController::class, 'destroy'])->whereUuid('id');
         // Browser FCM token for dashboard web push.
         Route::post('notifications/device', [NotificationController::class, 'registerDevice']);
         Route::delete('notifications/device', [NotificationController::class, 'unregisterDevice']);

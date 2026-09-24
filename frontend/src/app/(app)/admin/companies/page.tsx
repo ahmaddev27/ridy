@@ -15,6 +15,7 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { listCompanies, deleteCompany, setCompanyActive, type Company } from "@/lib/api/admin";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 type Filter = "all" | "linked" | "expired" | "banned";
 
@@ -87,7 +88,7 @@ export default function CompaniesPage() {
       toast.success(next ? c("enabledToast") : c("disabledToast"));
       await refetch();
     } catch (e) {
-      toast.error(c("updateFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("updateFailed"), { description: apiErrorMessage(e, t, locale) });
     }
   }
 
@@ -99,7 +100,7 @@ export default function CompaniesPage() {
       toast.success(c("deletedToast"));
       await refetch();
     } catch (e) {
-      toast.error(c("deleteFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("deleteFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
       setConfirmDel(null);
