@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { Text } from "@/components/typography";
 import { Logo } from "@/components/ui";
@@ -25,6 +25,7 @@ const AUTO_ADVANCE_MS = 650;
  */
 export default function SplashScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
 
   // First launch (no stored language) → onboarding → language picker; afterwards
   // apply the saved language and hand off to the app (the auth Gate takes over).
@@ -34,6 +35,9 @@ export default function SplashScreen() {
     if (navigated.current) return;
     navigated.current = true;
     const stored = await SecureStore.getItemAsync("locale").catch(() => null);
+    // Something else (e.g. a notification-opened offer) is already on top: a
+    // replace() here would wipe it out.
+    if (!navigation.isFocused()) return;
     if (stored) {
       setLocale(stored);
       router.replace("/");
