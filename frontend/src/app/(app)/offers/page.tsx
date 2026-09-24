@@ -23,7 +23,7 @@ import { listDrivers, type Driver } from "@/lib/api/drivers";
 import { OfferDetailModal } from "./offer-detail-modal";
 import { AdBanner } from "@/components/ads/ad-banner";
 import { useAuth } from "@/components/auth/auth-provider";
-import { useCompanyRealtime, useRealtimeConnected } from "@/lib/realtime";
+import { useCompanyRealtime } from "@/lib/realtime";
 
 export default function OffersPage() {
   const { user } = useAuth();
@@ -155,10 +155,10 @@ export default function OffersPage() {
   const loadStatsRef = useRef(loadStats);
   loadStatsRef.current = loadStats;
 
-  // Background refresh (paused in hidden tabs, backs off on errors): fast while
-  // the WebSocket is down, a slow safety net while live events flow.
-  const realtimeConnected = useRealtimeConnected();
-  usePolling(() => loadList(true), realtimeConnected ? 30_000 : 5_000);
+  // Background refresh (paused in hidden tabs, backs off on errors). Kept fast
+  // even with the WebSocket up: offers of an unlinked driver get no "new"
+  // broadcast, so only this poll surfaces them.
+  usePolling(() => loadList(true), 5_000);
   usePolling(loadStats, 60_000);
 
   // Live: offer changes on the company channel refresh the list — coalesced so a
