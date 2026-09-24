@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronDown, Calendar } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale } from "@/lib/utils";
+import { fleetYmd, shiftYmd } from "@/lib/fleet-day";
 
 /** A quick-range preset. Bounds are inclusive local calendar days. */
 type Preset = "today" | "yesterday" | "week" | "month";
@@ -14,6 +15,9 @@ interface Props {
   to: string;
   /** Notified with the new inclusive-day bounds ("" , "" clears the filter). */
   onChange: (from: string, to: string) => void;
+  /** Presets follow the 04:00 Europe/Berlin fleet-day (offer data) instead of
+   *  the browser's calendar day — so "Today" isn't empty between 00:00 and 04:00. */
+  fleetDays?: boolean;
   className?: string;
 }
 
@@ -34,7 +38,7 @@ const parse = (s: string) => {
  * length. Purely controlled — it owns no range state, so it drops into any
  * page's filter row and stays in sync with that page's query.
  */
-export function DateRangeFilter({ from, to, onChange, className = "" }: Props) {
+export function DateRangeFilter({ from, to, onChange, fleetDays = false, className = "" }: Props) {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`common.${k}`);
   const loc = latnLocale(locale);
@@ -58,7 +62,7 @@ export function DateRangeFilter({ from, to, onChange, className = "" }: Props) {
   }, [open]);
 
   const hasRange = Boolean(from && to);
-  const activePreset = useMemo(() => matchPreset(from, to), [from, to]);
+  const activePreset = useMemo(() => matchPreset(from, to, fleetDays), [from, to, fleetDays]);
 
   // Pill label: "24. Aug. – 31. Aug." (or a single day, or "All dates").
   const label = useMemo(() => {
@@ -81,7 +85,7 @@ export function DateRangeFilter({ from, to, onChange, className = "" }: Props) {
   };
 
   const applyPreset = (p: Preset) => {
-    const [f, e] = presetBounds(p);
+    const [f, e] = presetBounds(p, fleetDays);
     onChange(f, e);
     setOpen(false);
   };
@@ -92,10 +96,10 @@ export function DateRangeFilter({ from, to, onChange, className = "" }: Props) {
         type="button"
         onClick={() => step(-1)}
         disabled={!hasRange}
-        aria-label={c("dateFrom")}
+        aria-label={c("previousPeriod")}
         className="rounded-full p-1.5 text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
       </button>
 
       <button
@@ -112,10 +116,10 @@ export function DateRangeFilter({ from, to, onChange, className = "" }: Props) {
         type="button"
         onClick={() => step(1)}
         disabled={!hasRange}
-        aria-label={c("dateTo")}
+        aria-label={c("nextPeriod")}
         className="rounded-full p-1.5 text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-4 w-4 rtl:rotate-180" />
       </button>
 
       {open && (
@@ -178,8 +182,20 @@ export function DateRangeFilter({ from, to, onChange, className = "" }: Props) {
   );
 }
 
-/** Inclusive [from, to] local-day bounds for a preset. */
-function presetBounds(p: Preset): [string, string] {
+const PRESET_SPAN: Record<Preset, { days: number; offset: number }> = {
+  today: { days: 1, offset: 0 },
+  yesterday: { days: 1, offset: 1 },
+  week: { days: 7, offset: 0 },
+  month: { days: 30, offset: 0 },
+};
+
+/** Inclusive [from, to] day bounds for a preset (fleet-days or local calendar days). */
+function presetBounds(p: Preset, fleetDays: boolean): [string, string] {
+  if (fleetDays) {
+    const { days, offset } = PRESET_SPAN[p];
+    const end = shiftYmd(fleetYmd(), -offset);
+    return [shiftYmd(end, -(days - 1)), end];
+  }
   const now = new Date();
   const start = new Date(now);
   const end = new Date(now);
@@ -195,10 +211,10 @@ function presetBounds(p: Preset): [string, string] {
 }
 
 /** Which preset (if any) the given bounds correspond to, for chip highlighting. */
-function matchPreset(from: string, to: string): Preset | null {
+function matchPreset(from: string, to: string, fleetDays: boolean): Preset | null {
   if (!from || !to) return null;
   for (const p of ["today", "yesterday", "week", "month"] as const) {
-    const [f, e] = presetBounds(p);
+    const [f, e] = presetBounds(p, fleetDays);
     if (f === from && e === to) return p;
   }
   return null;

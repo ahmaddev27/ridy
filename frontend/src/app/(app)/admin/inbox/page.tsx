@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { ApiError } from "@/lib/api/client";
+import { ADMIN_BADGES_REFRESH_EVENT } from "@/components/layout/app-feeds";
 import {
   listContactMessages,
   setContactMessageRead,
@@ -32,6 +33,7 @@ export default function AdminInboxPage() {
     try {
       await setContactMessageRead(m.id, !m.read);
       refetch();
+      window.dispatchEvent(new Event(ADMIN_BADGES_REFRESH_EVENT));
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : c("error"));
     }
@@ -45,6 +47,7 @@ export default function AdminInboxPage() {
       toast.success(c("deleted"));
       setDeleting(null);
       refetch();
+      window.dispatchEvent(new Event(ADMIN_BADGES_REFRESH_EVENT));
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : c("error"));
     } finally {

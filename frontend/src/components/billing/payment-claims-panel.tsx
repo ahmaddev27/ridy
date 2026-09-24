@@ -10,6 +10,7 @@ import { Inbox } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale } from "@/lib/utils";
 import { PAYMENT_METHOD_KEYS, paymentMethodLabel } from "@/lib/api/payments";
+import { ADMIN_BADGES_REFRESH_EVENT } from "@/components/layout/app-feeds";
 import {
   listPaymentClaims,
   resolvePaymentClaim,
@@ -88,7 +89,7 @@ export function PaymentClaimsList() {
       ) : (
         <div className="space-y-2">
           {claims.map((claim) => (
-            <ClaimRow key={claim.id} claim={claim} plans={plans} onResolved={load} whenText={date(claim.created_at)} resolvedText={date(claim.resolved_at)} />
+            <ClaimRow key={claim.id} claim={claim} plans={plans} onResolved={() => { load(); window.dispatchEvent(new Event(ADMIN_BADGES_REFRESH_EVENT)); }} whenText={date(claim.created_at)} resolvedText={date(claim.resolved_at)} />
           ))}
         </div>
       )}

@@ -1,73 +1,118 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale } from "@/lib/utils";
-import { listOffers, getOffer, fareLabel, type DispatchOffer } from "@/lib/api/offers";
+import { listOffers, getOffer, fareLabel, type DispatchOffer, type DispatchOfferDetail } from "@/lib/api/offers";
+import { useCompanyRealtime, useRealtimeConnected, type OfferChangedPayload } from "@/lib/realtime";
+import { usePolling } from "@/hooks/use-polling";
+
+/** Window event the offers page listens for to open an offer's detail in place. */
+export const OPEN_OFFER_EVENT = "reidey:open-offer";
+
+// Fallback poll cadence. With the Reverb socket up, alerts arrive over the
+// WebSocket and the poll is only a slow safety net; without it the poll is the
+// alert path. Hidden tabs keep polling (slower) so alerts still sound.
+const POLL_LIVE_MS = 60_000;
+const POLL_FALLBACK_MS = 10_000;
+const POLL_FALLBACK_HIDDEN_MS = 20_000;
+
+const CLAIM_PREFIX = "offerAlert:";
+const CLAIM_TTL_MS = 60 * 60 * 1000;
 
 /**
- * App-wide new-offer watcher. Polls the offers feed every few seconds and, for
- * any offer not seen before, fires a toast + a short beep — so a manager is
- * alerted on ANY page. A near-real-time popup with zero extra infrastructure;
- * upgradeable to a WebSocket push later. Runs only for company managers
- * (the super-admin has no tenant / offers).
+ * Only one open tab may beep/toast for a given offer. The claim is a
+ * localStorage mark taken under a Web Lock (atomic across tabs where supported).
+ */
+async function claimAlert(offerId: number): Promise<boolean> {
+  const key = `${CLAIM_PREFIX}${offerId}`;
+  const tryClaim = (): boolean => {
+    try {
+      if (localStorage.getItem(key)) return false;
+      localStorage.setItem(key, String(Date.now()));
+      return true;
+    } catch {
+      return true; // storage blocked: this tab alerts on its own
+    }
+  };
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  if (locks?.request) {
+    try {
+      return await locks.request("reidey-offer-alerts", () => tryClaim());
+    } catch {
+      /* fall through */
+    }
+  }
+  return tryClaim();
+}
+
+function pruneClaims(): void {
+  try {
+    const cutoff = Date.now() - CLAIM_TTL_MS;
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(CLAIM_PREFIX) && Number(localStorage.getItem(key)) < cutoff) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * App-wide new-offer watcher: a toast + a short beep for every new offer, on ANY
+ * page. Driven by the company's Reverb channel (`.offer.changed`, reason "new");
+ * a slow list poll remains as the safety net when the socket is down. Runs only
+ * for company managers (the super-admin has no tenant / offers).
  */
 export function OfferAlerts() {
   const { user } = useAuth();
   const { t, locale } = useI18n();
   const router = useRouter();
+  const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
   const seen = useRef<Set<number>>(new Set());
   const primed = useRef(false);
+  const connected = useRealtimeConnected();
 
-  const isManager = Boolean(user?.tenant);
+  const tenantId = user?.tenant?.id ?? null;
+  const isManager = tenantId != null;
 
   useEffect(() => {
-    if (!isManager) return;
-    let stopped = false;
+    if (isManager) pruneClaims();
+  }, [isManager]);
 
-    async function poll() {
-      try {
-        const offers = await listOffers();
-        // First pass just records the current state — never toast the backlog.
-        if (!primed.current) {
-          offers.forEach((o) => seen.current.add(o.id));
-          primed.current = true;
-          return;
-        }
-        // Feed comes newest-first; announce oldest-to-newest.
-        offers
-          .filter((o) => !seen.current.has(o.id))
-          .reverse()
-          .forEach((o) => {
-            seen.current.add(o.id);
-            announce(o);
-          });
-      } catch {
-        /* transient — try again next tick */
+  const openOffer = useCallback(
+    (id: number) => {
+      // Already on /offers: open the detail in place (a push to the same route
+      // with a new ?offer= would not re-run the page's deep-link handling).
+      if (pathnameRef.current === "/offers") {
+        window.dispatchEvent(new CustomEvent<number>(OPEN_OFFER_EVENT, { detail: id }));
+      } else {
+        router.push(`/offers?offer=${id}`);
       }
-    }
+    },
+    [router],
+  );
 
-    async function announce(o: DispatchOffer) {
+  const announce = useCallback(
+    (o: DispatchOffer, detail: DispatchOfferDetail | null) => {
       beep();
-      // Enrich with the geocoded trip (distance + price/km) — best-effort so a
-      // slow/failed geocode never blocks the alert.
-      let distanceKm: number | null = null;
-      let pricePerKm: number | null = null;
-      try {
-        const detail = await getOffer(o.id);
-        distanceKm = detail.trip?.distance_km ?? null;
-        pricePerKm = detail.trip?.price_per_km ?? null;
-      } catch {
-        /* show what we have */
-      }
+      const distanceKm = detail?.trip?.distance_km ?? null;
+      const pricePerKm = detail?.trip?.price_per_km ?? null;
+      const numberLocale = latnLocale(locale);
 
       const line1 = [
-        fareLabel(o, latnLocale(locale)),
-        distanceKm != null ? `${distanceKm} km` : null,
-        pricePerKm != null ? `${pricePerKm.toFixed(2)} €/km` : null,
+        fareLabel(o, numberLocale),
+        distanceKm != null ? `${distanceKm.toLocaleString(numberLocale)} km` : null,
+        pricePerKm != null
+          ? `${pricePerKm.toLocaleString(numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/km`
+          : null,
       ].filter(Boolean).join(" · ");
       const line2 = [o.driver_name, o.rider_first_name].filter(Boolean).join(" · ");
       const line3 = [o.pickup_address, o.dropoff_address].filter(Boolean).join(" · ");
@@ -80,18 +125,62 @@ export function OfferAlerts() {
             {line3 && <div className="line-clamp-2 break-words text-xs text-ink-subtle">{line3}</div>}
           </div>
         ),
-        action: { label: t("common.view"), onClick: () => router.push(`/offers?offer=${o.id}`) },
+        action: { label: t("common.view"), onClick: () => openOffer(o.id) },
         duration: 9000,
       });
-    }
+    },
+    [locale, t, openOffer],
+  );
 
-    poll();
-    const id = setInterval(() => !stopped && poll(), 5000);
-    return () => {
-      stopped = true;
-      clearInterval(id);
-    };
-  }, [isManager, t, router]);
+  /** Record + (if this tab wins the claim) announce one new offer. */
+  const handleNew = useCallback(
+    async (id: number, known?: DispatchOffer) => {
+      if (seen.current.has(id)) return;
+      seen.current.add(id);
+      if (!(await claimAlert(id))) return;
+      // Enrich with the geocoded trip (distance + price/km) — best-effort so a
+      // slow/failed geocode never blocks the alert.
+      let detail: DispatchOfferDetail | null = null;
+      try {
+        detail = await getOffer(id);
+      } catch {
+        /* show what we have */
+      }
+      const offer = detail ?? known;
+      if (offer) announce(offer, detail);
+    },
+    [announce],
+  );
+
+  useCompanyRealtime(tenantId, (payload) => {
+    const { offer_id: offerId, reason } = (payload ?? {}) as OfferChangedPayload;
+    if (reason !== "new" || typeof offerId !== "number") return;
+    void handleNew(offerId);
+  });
+
+  const poll = useCallback(async () => {
+    const offers = await listOffers();
+    // First pass just records the current state — never toast the backlog.
+    if (!primed.current) {
+      offers.forEach((o) => seen.current.add(o.id));
+      primed.current = true;
+      return;
+    }
+    // Feed comes newest-first; announce oldest-to-newest.
+    for (const o of offers.filter((x) => !seen.current.has(x.id)).reverse()) {
+      await handleNew(o.id, o);
+    }
+  }, [handleNew]);
+
+  // Prime immediately so realtime/poll alerts only cover offers from now on.
+  useEffect(() => {
+    if (!isManager) return;
+    void poll().catch(() => {});
+  }, [isManager, poll]);
+
+  usePolling(poll, isManager ? (connected ? POLL_LIVE_MS : POLL_FALLBACK_MS) : null, {
+    whenHidden: connected ? POLL_LIVE_MS : POLL_FALLBACK_HIDDEN_MS,
+  });
 
   return null;
 }

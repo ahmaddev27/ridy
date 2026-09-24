@@ -6,23 +6,14 @@ import { latnLocale, toLatinDigits } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { X, MapPin, User, CircleDollarSign, Clock, Loader2, Route, Gauge, Wallet } from "lucide-react";
 import { StatCard } from "@/components/ui/card";
-import { Badge, type Status } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
+import { OFFER_TONE } from "@/lib/offer-status";
 import { StopMarker } from "@/components/ui/stop-marker";
 import { useI18n } from "@/lib/i18n/context";
-import { getOffer, fareLabel, offerBadgeStatus, type DispatchOfferDetail, type OfferStatus } from "@/lib/api/offers";
+import { getOffer, fareLabel, offerBadgeStatus, type DispatchOfferDetail } from "@/lib/api/offers";
 
 /** One row in the modal's stop list: an address with its per-leg + cumulative km. */
 type StopRow = { address: string; legKm: number | null; cumulativeKm: number | null };
-
-/** Offer lifecycle status → badge tone (mirrors the offers list). */
-const OFFER_TONE: Record<OfferStatus, Status> = {
-  pending: "expiring",
-  accepted: "info",
-  started: "private",
-  completed: "connected",
-  rejected: "neutral",
-  canceled: "personal",
-};
 
 // MapLibre GL touches `window`, so load the map client-side only.
 const TripMap = dynamic(() => import("./trip-map").then((m) => m.TripMap), {

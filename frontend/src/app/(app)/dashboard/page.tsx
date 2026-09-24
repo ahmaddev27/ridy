@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { latnLocale } from "@/lib/utils";
+import { useEffect, useRef, useState } from "react";
+import { formatMoney, latnLocale } from "@/lib/utils";
 import { Users, Wifi, Car, Radio, KeyRound, Wallet, Banknote, CreditCard } from "lucide-react";
 import { Card, StatCard } from "@/components/ui/card";
 import { RedeemCodeModal } from "@/components/subscription/redeem-code-modal";
@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getDashboardSummary } from "@/lib/api/dashboard";
 import { LiveMap } from "@/components/dashboard/live-map";
+import { WidgetBoundary } from "@/components/widget-boundary";
 import { AdBanner } from "@/components/ads/ad-banner";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useCompanyRealtime } from "@/lib/realtime";
@@ -20,8 +21,16 @@ export default function DashboardPage() {
   const { data, loading, error, refetch } = useAsync(getDashboardSummary, { refetchInterval: 10000 });
   const [redeemOpen, setRedeemOpen] = useState(false);
 
-  // Live: refresh the summary the moment an offer changes (poll stays as fallback).
-  useCompanyRealtime(user?.tenant?.id, refetch);
+  // Live: refresh the summary (silently) when offers change — coalesced so a
+  // burst of events causes one request. The poll stays as the fallback.
+  const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useCompanyRealtime(user?.tenant?.id, () => {
+    if (realtimeTimer.current) clearTimeout(realtimeTimer.current);
+    realtimeTimer.current = setTimeout(() => void refetch({ silent: true }), 500);
+  });
+  useEffect(() => () => {
+    if (realtimeTimer.current) clearTimeout(realtimeTimer.current);
+  }, []);
 
   const k = (key: string) => t(`screens.dashboard.${key}`);
 
@@ -34,7 +43,7 @@ export default function DashboardPage() {
   useEffect(() => {
     function onDone(e: MessageEvent) {
       if (e.source === window && (e.data as { source?: string })?.source === "ridy-fleet-earnings-done") {
-        setTimeout(() => refetch(), 400);
+        setTimeout(() => void refetch({ silent: true }), 400);
       }
     }
     const requestEarnings = () => window.postMessage({ source: "ridy-fetch-fleet-earnings" }, "*");
@@ -134,7 +143,9 @@ export default function DashboardPage() {
             so its bottom edge lines up with the subscription + stat cards column. */}
         <div className="lg:col-span-2">
           <h3 className="mb-3 font-semibold text-ink">{t("pages.map.title")}</h3>
-          <LiveMap heightClass="h-[352px]" />
+          <WidgetBoundary>
+            <LiveMap heightClass="h-[352px]" />
+          </WidgetBoundary>
         </div>
       </div>
 
@@ -153,9 +164,9 @@ export default function DashboardPage() {
         </div>
         {data?.fleet_metric ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <FleetTile icon={Wallet} label={k("fleetEarnings")} value={fleetMoney(data.fleet_metric.earnings, data.fleet_metric.currency)} />
-            <FleetTile icon={Banknote} label={k("fleetCash")} value={fleetMoney(data.fleet_metric.cash_collected, data.fleet_metric.currency)} tone="amber" />
-            <FleetTile icon={CreditCard} label={k("fleetNet")} value={fleetMoney(data.fleet_metric.net_outstanding, data.fleet_metric.currency)} tone="emerald" />
+            <FleetTile icon={Wallet} label={k("fleetEarnings")} value={formatMoney(data.fleet_metric.earnings, locale, data.fleet_metric.currency ?? "EUR")} />
+            <FleetTile icon={Banknote} label={k("fleetCash")} value={formatMoney(data.fleet_metric.cash_collected, locale, data.fleet_metric.currency ?? "EUR")} tone="amber" />
+            <FleetTile icon={CreditCard} label={k("fleetNet")} value={formatMoney(data.fleet_metric.net_outstanding, locale, data.fleet_metric.currency ?? "EUR")} tone="emerald" />
           </div>
         ) : (
           <p className="text-sm text-ink-subtle">{k("fleetEarningsEmpty")}</p>
@@ -167,14 +178,6 @@ export default function DashboardPage() {
   );
 }
 
-/** Currency (decimal string/number → "€1.234,56"), or "—". */
-function fleetMoney(amount: string | number | null | undefined, currency: string | null): string {
-  if (amount == null) return "—";
-  const n = typeof amount === "number" ? amount : Number(amount);
-  if (Number.isNaN(n)) return "—";
-  const symbol = currency === "EUR" ? "€" : currency ? `${currency} ` : "";
-  return `${symbol}${n.toFixed(2)}`;
-}
 
 function FleetTile({
   icon: Icon,
