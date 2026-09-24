@@ -29,25 +29,47 @@ on:
         type: boolean
         default: false
 
+# Release hygiene: read-only token, one store release at a time, main only, and
+# the store-release environment (add required reviewers + move EXPO_TOKEN and the
+# ASC key into it in Settings -> Environments so other branches cannot read them).
+permissions:
+  contents: read
+
+concurrency:
+  group: store-${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   ios:
     name: iOS ${{ github.event.inputs.profile }}${{ github.event.inputs.submit == 'true' && ' + submit' || '' }}
     runs-on: ubuntu-latest
+    environment: store-release
+    if: github.ref == 'refs/heads/main'
     defaults:
       run:
         working-directory: driver-app
     steps:
-      - uses: actions/checkout@v4
+      # eas.json has no submit.preview profile: fail in seconds, not after a
+      # full cloud build.
+      - name: Validate inputs
+        if: ${{ github.event.inputs.submit == 'true' && github.event.inputs.profile != 'production' }}
+        working-directory: .
+        run: |
+          echo "::error::submit is only supported with the production profile"
+          exit 1
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: driver-app/package-lock.json
 
+      # Pinned: this CLI runs with EXPO_TOKEN and the ASC key on disk.
       - name: Install eas-cli
-        run: npm install -g eas-cli
+        run: npm install -g eas-cli@22.3.0
 
       - name: Install dependencies
         run: npm ci
