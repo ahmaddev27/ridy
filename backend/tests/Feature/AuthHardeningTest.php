@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -78,34 +79,146 @@ class AuthHardeningTest extends TestCase
 
     // ── OTP ──────────────────────────────────────────────────────────────────
 
-    public function test_a_reissued_code_does_not_reset_the_per_email_failure_budget(): void
+    public function test_a_reissued_code_does_not_reset_the_per_client_failure_budget(): void
     {
         $this->driver();
 
-        for ($i = 0; $i < OtpGuard::MAX_FAILURES_PER_EMAIL; $i++) {
+        for ($i = 0; $i < OtpGuard::MAX_FAILURES_PER_CLIENT; $i++) {
             $this->pendingCode('omar@ya.de'); // a fresh code each round (attempts back to 0)
-            $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.'.($i + 1)])
+            $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])
                 ->postJson('/api/v1/driver/login/verify', ['email' => 'omar@ya.de', 'otp' => '000000'])
                 ->assertStatus(422)->assertJsonPath('errors.otp.0', 'otp_incorrect');
         }
 
-        // Even the CORRECT code of a brand-new issue is refused until the window passes.
+        // Even the CORRECT code of a brand-new issue is refused for that client…
         $this->pendingCode('omar@ya.de');
-        $this->withServerVariables(['REMOTE_ADDR' => '10.0.1.1'])
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])
             ->postJson('/api/v1/driver/login/verify', ['email' => 'omar@ya.de', 'otp' => '123456'])
             ->assertStatus(422)->assertJsonPath('errors.otp.0', 'otp_too_many');
 
+        // …until the window passes.
         $this->travel(OtpGuard::FAILURE_WINDOW_SECONDS + 1)->seconds();
+        $this->pendingCode('omar@ya.de');
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])
+            ->postJson('/api/v1/driver/login/verify', ['email' => 'omar@ya.de', 'otp' => '123456'])
+            ->assertOk()->assertJsonStructure(['data' => ['token']]);
+    }
+
+    public function test_a_stranger_guessing_from_elsewhere_does_not_lock_the_owner_out(): void
+    {
+        $this->driver();
+
+        for ($i = 0; $i < OtpGuard::MAX_FAILURES_PER_CLIENT; $i++) {
+            $this->pendingCode('omar@ya.de');
+            $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])
+                ->postJson('/api/v1/driver/login/verify', ['email' => 'omar@ya.de', 'otp' => '000000'])
+                ->assertStatus(422);
+        }
+
+        $this->pendingCode('omar@ya.de');
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.20'])
+            ->postJson('/api/v1/driver/login/verify', ['email' => 'omar@ya.de', 'otp' => '123456'])
+            ->assertOk()->assertJsonStructure(['data' => ['token']]);
+    }
+
+    public function test_verifying_without_a_pending_code_never_counts_against_the_account(): void
+    {
+        $this->driver();
+
+        for ($i = 0; $i < OtpGuard::MAX_FAILURES_PER_CLIENT * 3; $i++) {
+            $this->travel(10)->seconds(); // stay under the per-IP 12/min cap
+            $this->postJson('/api/v1/driver/login/verify', ['email' => 'omar@ya.de', 'otp' => '000000'])
+                ->assertStatus(422)->assertJsonPath('errors.otp.0', 'otp_incorrect');
+        }
+
         $this->pendingCode('omar@ya.de');
         $this->postJson('/api/v1/driver/login/verify', ['email' => 'omar@ya.de', 'otp' => '123456'])
             ->assertOk()->assertJsonStructure(['data' => ['token']]);
     }
 
-    public function test_the_per_email_budget_also_covers_the_manager_password_reset(): void
+    public function test_requesting_a_new_code_unlocks_the_requesting_client(): void
+    {
+        $this->driver();
+
+        for ($i = 0; $i < OtpGuard::MAX_FAILURES_PER_CLIENT; $i++) {
+            $this->pendingCode('omar@ya.de');
+            $this->postJson('/api/v1/driver/login/verify', ['email' => 'omar@ya.de', 'otp' => '000000'])
+                ->assertStatus(422);
+        }
+        $this->pendingCode('omar@ya.de');
+        $this->postJson('/api/v1/driver/login/verify', ['email' => 'omar@ya.de', 'otp' => '123456'])
+            ->assertStatus(422)->assertJsonPath('errors.otp.0', 'otp_too_many');
+
+        // App 1.0.4's "resend code" is the only way out it knows: it must work.
+        $this->postJson('/api/v1/driver/login/request', ['email' => 'omar@ya.de'])->assertOk();
+        $code = PasswordReset::where('email', 'omar@ya.de')->value('otp');
+
+        $this->postJson('/api/v1/driver/login/verify', ['email' => 'omar@ya.de', 'otp' => $code])
+            ->assertOk()->assertJsonStructure(['data' => ['token']]);
+    }
+
+    public function test_the_account_wide_ceiling_stops_a_rotating_ip_pool(): void
+    {
+        $this->driver();
+
+        for ($i = 0; $i < OtpGuard::MAX_FAILURES_PER_EMAIL; $i++) {
+            $this->pendingCode('omar@ya.de');
+            $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.'.($i + 1)])
+                ->postJson('/api/v1/driver/login/verify', ['email' => 'omar@ya.de', 'otp' => '000000'])
+                ->assertStatus(422)->assertJsonPath('errors.otp.0', 'otp_incorrect');
+        }
+
+        // Past the ceiling only the first guess on a freshly issued code gets
+        // through (the owner's way back in); further guesses on it are refused.
+        $this->pendingCode('omar@ya.de');
+        $this->withServerVariables(['REMOTE_ADDR' => '10.0.1.1'])
+            ->postJson('/api/v1/driver/login/verify', ['email' => 'omar@ya.de', 'otp' => '000000'])
+            ->assertStatus(422)->assertJsonPath('errors.otp.0', 'otp_incorrect');
+        $this->withServerVariables(['REMOTE_ADDR' => '10.0.1.2'])
+            ->postJson('/api/v1/driver/login/verify', ['email' => 'omar@ya.de', 'otp' => '123456'])
+            ->assertStatus(422)->assertJsonPath('errors.otp.0', 'otp_too_many');
+
+        $this->pendingCode('omar@ya.de');
+        $this->withServerVariables(['REMOTE_ADDR' => '10.0.1.3'])
+            ->postJson('/api/v1/driver/login/verify', ['email' => 'omar@ya.de', 'otp' => '123456'])
+            ->assertOk()->assertJsonStructure(['data' => ['token']]);
+    }
+
+    public function test_a_look_alike_address_never_verifies_against_the_real_code(): void
+    {
+        // SQLite compares exactly, so hand the guard the row MySQL's accent-
+        // insensitive collation would return for "gmäil.com".
+        $this->pendingCode('driver@gmail.com');
+        $row = PasswordReset::where('email', 'driver@gmail.com')->first();
+
+        try {
+            app(OtpGuard::class)->verify($row, 'driver@gmäil.com', '123456');
+            $this->fail('A look-alike address must not verify.');
+        } catch (ValidationException $e) {
+            $this->assertSame('otp_incorrect', $e->errors()['otp'][0]);
+        }
+
+        // Nothing was counted, and case differences are still the same address.
+        $this->assertSame(0, (int) $row->fresh()->attempts);
+        $this->assertSame($row->id, app(OtpGuard::class)->verify($row->fresh(), 'Driver@Gmail.com', '123456')->id);
+    }
+
+    public function test_parallel_guesses_cannot_exceed_the_per_code_cap(): void
+    {
+        $this->pendingCode('omar@ya.de');
+        PasswordReset::where('email', 'omar@ya.de')->update(['attempts' => OtpGuard::MAX_ATTEMPTS]);
+        // A stale copy read before the other guesses landed still can't guess.
+        $stale = PasswordReset::where('email', 'omar@ya.de')->first()->forceFill(['attempts' => 0]);
+
+        $this->expectException(ValidationException::class);
+        app(OtpGuard::class)->verify($stale, 'omar@ya.de', '123456');
+    }
+
+    public function test_the_per_client_budget_also_covers_the_manager_password_reset(): void
     {
         $this->manager();
 
-        for ($i = 0; $i < OtpGuard::MAX_FAILURES_PER_EMAIL; $i++) {
+        for ($i = 0; $i < OtpGuard::MAX_FAILURES_PER_CLIENT; $i++) {
             $this->pendingCode('m@ya.de');
             $this->postJson('/api/v1/password/verify', ['email' => 'm@ya.de', 'otp' => '000000'])->assertStatus(422);
         }
@@ -114,6 +227,20 @@ class AuthHardeningTest extends TestCase
         $this->postJson('/api/v1/password/reset', [
             'email' => 'm@ya.de', 'otp' => '123456', 'password' => 'newsecret123', 'password_confirmation' => 'newsecret123',
         ])->assertStatus(422)->assertJsonPath('errors.otp.0', 'otp_too_many');
+    }
+
+    public function test_the_reset_flow_can_verify_then_reset_after_earlier_typos(): void
+    {
+        $this->manager();
+        $this->pendingCode('m@ya.de');
+
+        for ($i = 0; $i < OtpGuard::MAX_ATTEMPTS - 1; $i++) {
+            $this->postJson('/api/v1/password/verify', ['email' => 'm@ya.de', 'otp' => '000000'])->assertStatus(422);
+        }
+        $this->postJson('/api/v1/password/verify', ['email' => 'm@ya.de', 'otp' => '123456'])->assertOk();
+        $this->postJson('/api/v1/password/reset', [
+            'email' => 'm@ya.de', 'otp' => '123456', 'password' => 'newsecret123', 'password_confirmation' => 'newsecret123',
+        ])->assertOk();
     }
 
     public function test_verify_does_not_reveal_whether_an_account_exists(): void
@@ -158,6 +285,21 @@ class AuthHardeningTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.is_owner', true)
             ->assertJsonPath('data.owner.id', $owner->id);
+    }
+
+    public function test_a_driver_who_later_became_another_companys_manager_still_signs_in_as_the_driver(): void
+    {
+        $other = $this->makeTenant('Other');
+        $driver = Driver::withoutGlobalScopes()->create([
+            'tenant_id' => $other->id, 'name' => 'Dual', 'email' => 'dual@ya.de', 'activated_at' => now()->subMonth(),
+        ]);
+        $this->manager('dual@ya.de'); // their own company, created after they started driving
+        $this->pendingCode('dual@ya.de');
+
+        $this->postJson('/api/v1/driver/login/verify', ['email' => 'dual@ya.de', 'otp' => '123456'])
+            ->assertOk()
+            ->assertJsonPath('data.is_owner', false)
+            ->assertJsonPath('data.driver.id', $driver->id);
     }
 
     // ── Sign-up hijack ───────────────────────────────────────────────────────
@@ -212,7 +354,8 @@ class AuthHardeningTest extends TestCase
     {
         $this->manager();
 
-        for ($i = 1; $i <= 20; $i++) {
+        // A rotating pool (few guesses per IP) still hits the account-wide ceiling.
+        for ($i = 1; $i <= 50; $i++) {
             $this->withServerVariables(['REMOTE_ADDR' => '10.1.0.'.$i])
                 ->postJson('/api/v1/login', ['email' => 'm@ya.de', 'password' => 'wrong-'.$i])
                 ->assertStatus(422);
@@ -225,6 +368,26 @@ class AuthHardeningTest extends TestCase
         $this->manager('other@ya.de');
         $this->withServerVariables(['REMOTE_ADDR' => '10.1.1.1'])
             ->postJson('/api/v1/login', ['email' => 'other@ya.de', 'password' => 'secret123'])
+            ->assertOk();
+    }
+
+    public function test_one_client_guessing_passwords_does_not_lock_the_owner_out(): void
+    {
+        $this->manager();
+
+        for ($i = 1; $i <= 20; $i++) {
+            $this->travel(7)->seconds(); // stay under the per-IP 10/min cap
+            $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])
+                ->postJson('/api/v1/login', ['email' => 'm@ya.de', 'password' => 'wrong-'.$i])
+                ->assertStatus(422);
+        }
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])
+            ->postJson('/api/v1/login', ['email' => 'm@ya.de', 'password' => 'secret123'])
+            ->assertStatus(429);
+
+        // The real owner, signing in from their own network, is not affected.
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.20'])
+            ->postJson('/api/v1/login', ['email' => 'm@ya.de', 'password' => 'secret123'])
             ->assertOk();
     }
 

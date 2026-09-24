@@ -21,23 +21,31 @@ class AuthRateLimits
     public static function register(): void
     {
         // Password checks (dashboard login, company activate / payment-claim, the
-        // app's legacy password login) share ONE per-email budget.
+        // app's legacy password login). The tight per-account budget is keyed on
+        // account + client network, so a stranger guessing from elsewhere can't
+        // lock the real user out; the account-wide ceiling is the looser backstop
+        // against a rotating IP pool.
         RateLimiter::for('credentials', fn (Request $request) => [
             Limit::perMinute(10)->by('ip:'.self::clientKey($request)),
-            ...self::perEmail($request, Limit::perMinutes(15, 20)),
+            ...self::perEmailAndClient($request, Limit::perMinutes(15, 20)),
+            ...self::perEmail($request, Limit::perMinutes(15, 50)),
         ]);
 
         // Anything that emails a one-time code: sign-in, password reset, sign-up.
+        // Same split, so someone else spamming requests can't use up the owner's
+        // ability to ask for a fresh code.
         RateLimiter::for('otp-send', fn (Request $request) => [
             Limit::perMinute(6)->by('ip:'.self::clientKey($request)),
-            ...self::perEmail($request, Limit::perHour(8)),
+            ...self::perEmailAndClient($request, Limit::perHour(8)),
+            ...self::perEmail($request, Limit::perHour(20)),
         ]);
 
-        // Code verification. Wrong guesses are also capped per email by OtpGuard,
-        // across every re-issued code.
+        // Code verification. Deliberately NO account-wide request cap here: it
+        // would lock the owner out without a single real guess. Wrong guesses
+        // against a live code are capped per account by OtpGuard instead.
         RateLimiter::for('otp-verify', fn (Request $request) => [
             Limit::perMinute(12)->by('ip:'.self::clientKey($request)),
-            ...self::perEmail($request, Limit::perHour(60)),
+            ...self::perEmailAndClient($request, Limit::perHour(60)),
         ]);
 
         // Browser-extension ingest (roster / statuses / metrics / vehicles /
@@ -84,6 +92,14 @@ class AuthRateLimits
         $email = self::email($request);
 
         return $email === null ? [] : [$limit->by('email:'.sha1($email))];
+    }
+
+    /** @return array<int, Limit> */
+    private static function perEmailAndClient(Request $request, Limit $limit): array
+    {
+        $email = self::email($request);
+
+        return $email === null ? [] : [$limit->by('email-client:'.sha1($email.'|'.self::clientKey($request)))];
     }
 
     /** Per token (or user / client) key for the authenticated ingest limits. */

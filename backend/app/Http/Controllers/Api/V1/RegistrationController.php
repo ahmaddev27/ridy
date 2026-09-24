@@ -60,6 +60,7 @@ class RegistrationController extends Controller
         );
 
         $this->sendOtp($registration);
+        $this->otp->unlockClient($registration->email);
         $this->bindToBrowser($request, $registration);
 
         return response()->json(['data' => ['email' => $registration->email]]);
@@ -125,6 +126,7 @@ class RegistrationController extends Controller
                 'attempts' => 0,
             ]);
             $this->sendOtp($registration);
+            $this->otp->unlockClient($registration->email);
         }
 
         return response()->json(['data' => ['email' => $data['email']]]);
