@@ -11,6 +11,7 @@ use App\Models\EmailTemplate;
 use App\Models\User;
 use App\Support\Settings;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
@@ -44,6 +45,17 @@ class MailAndSettingsHardeningTest extends TestCase
         Queue::assertPushed(SendRenderedMail::class, fn (SendRenderedMail $job) => $job->to === 'a@b.de'
             && $job->subject === 'Code 123456'
             && str_contains($job->body, '123456'));
+        // OTP mail must not wait behind slow geocode/trip jobs on `default`.
+        Queue::assertPushedOn('mail', SendRenderedMail::class);
+    }
+
+    public function test_the_scheduler_drain_serves_every_dispatch_queue(): void
+    {
+        $event = collect(app(Schedule::class)->events())
+            ->first(fn ($e) => str_contains((string) $e->command, 'queue:work'));
+
+        $this->assertNotNull($event);
+        $this->assertStringContainsString('--queue=push,mail,default', (string) $event->command);
     }
 
     public function test_ops_alert_is_logged_and_queued(): void

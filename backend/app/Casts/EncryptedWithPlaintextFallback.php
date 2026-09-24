@@ -12,9 +12,10 @@ use Illuminate\Support\Facades\Crypt;
  * returned as-is instead of throwing.
  *
  * Used to turn on encryption for a column that already holds plaintext on a live
- * system: new code can be running before the migration that encrypts existing
- * rows has finished (deploy order), and a hard DecryptException there would take
- * down the daemon's /sessions feed. Every write is encrypted.
+ * system: existing rows are only encrypted by `tenants:encrypt-proxy-urls`, run
+ * after a deploy is confirmed (so a rolled-back release never reads ciphertext),
+ * and a hard DecryptException before then would take down the daemon's /sessions
+ * feed. Every write is encrypted.
  *
  * @implements CastsAttributes<string|null, string|null>
  */

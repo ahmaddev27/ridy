@@ -12,6 +12,9 @@ use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Broadcasting\BroadcastException;
+use Illuminate\Broadcasting\PendingBroadcast;
+use Illuminate\Contracts\Broadcasting\Factory as BroadcastFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
@@ -586,6 +589,50 @@ class OfferAcceptanceTest extends TestCase
 
         $this->assertSame(OfferStatus::Rejected, $older->fresh()->status);
         $this->assertSame(OfferStatus::Pending, $newer->fresh()->status);
+    }
+
+    public function test_a_late_supersede_from_an_older_offer_never_rejects_the_newer_one(): void
+    {
+        // Offer A (one RAMEN channel) is still pushing when offer B (another channel)
+        // arrives and supersedes it; A's supersede, seconds later, must not reject B.
+        $this->driver();
+        $older = $this->offer(['received_at' => now()->subSeconds(5)]);
+        $newer = $this->offer(['received_at' => now()]);
+
+        app(OfferLifecycle::class)->supersedePendingFor($this->tenant->id, self::DRIVER_UUID, $newer->id);
+        app(OfferLifecycle::class)->supersedePendingFor($this->tenant->id, self::DRIVER_UUID, $older->id);
+
+        $this->assertSame(OfferStatus::Rejected, $older->fresh()->status);
+        $this->assertSame(OfferStatus::Pending, $newer->fresh()->status);
+    }
+
+    public function test_a_failing_broadcast_never_breaks_a_transition(): void
+    {
+        // PendingBroadcast sends in its destructor: a Reverb timeout there used to
+        // escape rescue() and 500 the daemon's status batch mid-way.
+        $offer = $this->offer(['driver_id' => $this->driver()->id]); // linked → broadcasts
+        $this->app->instance(BroadcastFactory::class, new class implements BroadcastFactory
+        {
+            public function connection($name = null)
+            {
+                throw new BroadcastException('reverb timed out');
+            }
+
+            public function event($event = null)
+            {
+                // As in the real PendingBroadcast, the send (and its failure) happens on destruct.
+                return new class(app('events'), $event) extends PendingBroadcast
+                {
+                    public function __destruct()
+                    {
+                        throw new BroadcastException('reverb timed out');
+                    }
+                };
+            }
+        });
+
+        $this->assertTrue(app(OfferLifecycle::class)->accept($offer));
+        $this->assertSame(OfferStatus::Accepted, $offer->fresh()->status);
     }
 
     public function test_invalid_transition_is_a_noop(): void

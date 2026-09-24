@@ -6,13 +6,14 @@ use App\Domain\Dispatch\Jobs\BackfillWaypointLabels;
 use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Domain\Dispatch\TripGeocoder;
-use App\Domain\Fleet\DriverEraser;
 use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Fleet\DriverStatsService;
 use App\Domain\Fleet\DriverStatusIngestor;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Geo\PostalCodes;
 use App\Domain\Notifications\Models\DeviceToken;
+use App\Domain\Notifications\SafeBroadcast;
+use App\Domain\Privacy\DriverEraser;
 use App\Events\DriversBroadcast;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
@@ -213,13 +214,15 @@ class DriverController extends Controller
     }
 
     /**
-     * Erase one driver (DSGVO Art. 17 request routed through the fleet): row,
-     * logins, devices and metrics deleted, offer history anonymized. Refused
+     * Erase one driver (DSGVO Art. 17 request routed through the fleet) with the
+     * same eraser as `drivers:erase`: row, logins, devices, metrics, notifications
+     * and OTP rows deleted, offer history anonymized. Refused
      * while Uber still lists the driver on the fleet (a sync would recreate them).
      */
     public function destroy(Driver $driver, DriverEraser $eraser): JsonResponse
     {
         $this->authorizeTenant($driver);
+        $eraser->assertErasable($driver);
 
         return response()->json(['data' => $eraser->erase($driver)]);
     }
@@ -287,7 +290,7 @@ class DriverController extends Controller
 
         // Live dashboard map: nudge the company's channel so it refetches driver
         // positions instantly instead of waiting for its poll. Best-effort.
-        rescue(fn () => broadcast(new DriversBroadcast($tenantId)), report: false);
+        SafeBroadcast::send(new DriversBroadcast($tenantId), ['tenant_id' => $tenantId]);
 
         return response()->json(['data' => $result]);
     }

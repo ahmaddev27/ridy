@@ -236,6 +236,8 @@ services:
   # --- Queue worker — processes ShouldQueue jobs (admin broadcast fan-out) ---
   # Without this, database-queued jobs are enqueued and never run. --tries=3 with
   # a short backoff; --max-time recycles the worker so a leaked handle can't grow.
+  # --queue order is priority: owner offer pushes, then OTP/transactional mail,
+  # then the slow geocode/trip jobs. Keep in sync with routes/console.php's drain.
   queue:
     build:
       context: .
@@ -244,7 +246,7 @@ services:
     logging: *default-logging
     user: www-data
     security_opt: ["no-new-privileges:true"]
-    command: php artisan queue:work --queue=default --tries=3 --backoff=10 --max-time=3600 --sleep=2
+    command: php artisan queue:work --queue=push,mail,default --tries=3 --backoff=10 --max-time=3600 --sleep=2
     depends_on:
       mysql:
         condition: service_healthy

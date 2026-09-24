@@ -151,5 +151,18 @@ class DispatchNotifierHardeningTest extends TestCase
 
         (new NotifyOwnersOfOffer((int) $offer->id, 2))->handle($notifier);
         $this->assertCount(1, $spy->calls);
+
+        // The multi-stop follow-up describes a running trip: it outlives the 60 s cutoff.
+        $lateFollowUp = new NotifyOwnersOfOffer((int) $offer->id, 2);
+        $lateFollowUp->queuedAt = time() - NotifyOwnersOfOffer::MAX_AGE_SECONDS - 30;
+        $lateFollowUp->handle($notifier);
+        $this->assertCount(2, $spy->calls);
+    }
+
+    public function test_owner_pushes_run_on_their_own_queue_ahead_of_slow_jobs(): void
+    {
+        // The worker/scheduler serve `push,mail,default`: geocode backlogs can't age these out.
+        $this->assertSame(NotifyOwnersOfOffer::QUEUE, (new NotifyOwnersOfOffer(1))->queue);
+        $this->assertSame('push', NotifyOwnersOfOffer::QUEUE);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Closure;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -33,6 +34,24 @@ final class OnlineDdl
         self::alter($table, "ADD INDEX `{$name}` ({$cols})");
     }
 
+    /**
+     * Append a column as a metadata-only change (ALGORITHM=INSTANT on MySQL 8), with
+     * the same bounded lock wait. `$definition` is the MySQL column definition, e.g.
+     * "`anonymized_at` TIMESTAMP NULL"; `$blueprint` builds it for SQLite.
+     *
+     * @param  Closure(Blueprint): void  $blueprint
+     */
+    public static function addColumn(string $table, string $definition, Closure $blueprint): void
+    {
+        if (! self::isMysql()) {
+            Schema::table($table, $blueprint);
+
+            return;
+        }
+
+        self::alter($table, "ADD COLUMN {$definition}", 'ALGORITHM=INSTANT');
+    }
+
     public static function dropIndex(string $table, string $name): void
     {
         if (! self::isMysql()) {
@@ -44,13 +63,13 @@ final class OnlineDdl
         self::alter($table, "DROP INDEX `{$name}`");
     }
 
-    private static function alter(string $table, string $clause): void
+    private static function alter(string $table, string $clause, string $algorithm = 'ALGORITHM=INPLACE, LOCK=NONE'): void
     {
         $previous = (int) (DB::selectOne('SELECT @@SESSION.lock_wait_timeout AS t')->t ?? 31536000);
         DB::statement('SET SESSION lock_wait_timeout = '.self::LOCK_WAIT_SECONDS);
 
         try {
-            DB::statement("ALTER TABLE `{$table}` {$clause}, ALGORITHM=INPLACE, LOCK=NONE");
+            DB::statement("ALTER TABLE `{$table}` {$clause}, {$algorithm}");
         } finally {
             // Later migrations in the same run keep the server's own setting.
             DB::statement('SET SESSION lock_wait_timeout = '.$previous);

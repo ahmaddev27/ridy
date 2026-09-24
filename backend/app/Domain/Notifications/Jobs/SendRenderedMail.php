@@ -15,6 +15,9 @@ use Throwable;
  * daemon's internal calls and FPM workers, and the SMTP round-trip made "unknown
  * email" and "known email" answers of the OTP endpoints distinguishable by timing.
  * The message is rendered BEFORE queueing so the job carries plain strings only.
+ *
+ * Runs on its own queue ({@see QUEUE}), which the worker serves before `default`:
+ * a login/OTP code must not wait behind 45 s geocode or trip-sync jobs.
  */
 class SendRenderedMail implements ShouldQueue
 {
@@ -27,6 +30,8 @@ class SendRenderedMail implements ShouldQueue
 
     public int $timeout = 60;
 
+    public const QUEUE = 'mail';
+
     /**
      * @param  string|array<int, string>  $to
      */
@@ -35,7 +40,9 @@ class SendRenderedMail implements ShouldQueue
         public readonly string $subject,
         public readonly string $body,
         public readonly bool $html = true,
-    ) {}
+    ) {
+        $this->onQueue(self::QUEUE);
+    }
 
     public function handle(): void
     {
