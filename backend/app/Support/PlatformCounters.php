@@ -20,23 +20,43 @@ class PlatformCounters
 {
     private const TTL_SECONDS = 60;
 
+    /**
+     * Only plain arrays/scalars go into the cache: config/cache.php sets
+     * serializable_classes=false, so a cached Collection comes back from the
+     * DB store as __PHP_Incomplete_Class. The ".v2" keys skip entries that the
+     * first (Collection-caching) version already wrote.
+     */
+    private const OFFERS_BY_TENANT_KEY = 'platform.offers_by_tenant.v2';
+
+    private const OFFERS_TOTAL_KEY = 'platform.offers_total.v2';
+
+    private const DRIVERS_BY_TENANT_KEY = 'platform.drivers_by_tenant.v2';
+
     /** Offer count per tenant, keyed by tenant_id. */
     public function offersByTenant(): Collection
     {
-        return Cache::remember('platform.offers_by_tenant', self::TTL_SECONDS, fn () => DispatchOffer::withoutGlobalScopes()
-            ->selectRaw('tenant_id, count(*) c')->groupBy('tenant_id')->pluck('c', 'tenant_id'));
+        return collect(Cache::remember(self::OFFERS_BY_TENANT_KEY, self::TTL_SECONDS, fn () => DispatchOffer::withoutGlobalScopes()
+            ->selectRaw('tenant_id, count(*) c')->groupBy('tenant_id')->pluck('c', 'tenant_id')->all()));
     }
 
     /** Total offers captured across the whole platform. */
     public function totalOffers(): int
     {
-        return (int) Cache::remember('platform.offers_total', self::TTL_SECONDS, fn () => DispatchOffer::withoutGlobalScopes()->count());
+        return (int) Cache::remember(self::OFFERS_TOTAL_KEY, self::TTL_SECONDS, fn () => DispatchOffer::withoutGlobalScopes()->count());
+    }
+
+    /** Drop the cached counts so a structural change (e.g. a deleted company) shows at once. */
+    public function forget(): void
+    {
+        Cache::forget(self::OFFERS_BY_TENANT_KEY);
+        Cache::forget(self::OFFERS_TOTAL_KEY);
+        Cache::forget(self::DRIVERS_BY_TENANT_KEY);
     }
 
     /** Driver count per tenant, keyed by tenant_id. */
     public function driversByTenant(): Collection
     {
-        return Cache::remember('platform.drivers_by_tenant', self::TTL_SECONDS, fn () => Driver::withoutGlobalScopes()
-            ->selectRaw('tenant_id, count(*) c')->groupBy('tenant_id')->pluck('c', 'tenant_id'));
+        return collect(Cache::remember(self::DRIVERS_BY_TENANT_KEY, self::TTL_SECONDS, fn () => Driver::withoutGlobalScopes()
+            ->selectRaw('tenant_id, count(*) c')->groupBy('tenant_id')->pluck('c', 'tenant_id')->all()));
     }
 }

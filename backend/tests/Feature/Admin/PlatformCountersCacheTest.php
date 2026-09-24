@@ -47,6 +47,28 @@ class PlatformCountersCacheTest extends TestCase
         $this->assertSame(6, $counters->totalOffers()); // now reflects the new row
     }
 
+    /**
+     * Prod regression: the DB cache store serializes values and
+     * config('cache.serializable_classes') is false, so a cached Collection was
+     * read back as __PHP_Incomplete_Class (TypeError on /admin/overview and
+     * /admin/companies). The array store used elsewhere in tests never
+     * serializes, which is why it slipped through — this runs a real round trip.
+     */
+    public function test_counts_survive_a_real_serializing_cache_round_trip(): void
+    {
+        config(['cache.default' => 'database', 'cache.serializable_classes' => false]);
+        Cache::flush();
+        [$acme] = $this->seedTwoTenants();
+
+        app(PlatformCounters::class)->offersByTenant();   // write
+        app(PlatformCounters::class)->driversByTenant();
+
+        $counters = app(PlatformCounters::class);          // read back from the DB store
+        $this->assertSame(3, (int) $counters->offersByTenant()[$acme->id]);
+        $this->assertSame(2, (int) $counters->driversByTenant()[$acme->id]);
+        $this->assertSame(5, $counters->totalOffers());
+    }
+
     /** @return array{0: Tenant, 1: Tenant} */
     private function seedTwoTenants(): array
     {

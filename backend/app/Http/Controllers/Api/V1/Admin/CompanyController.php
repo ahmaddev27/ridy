@@ -151,6 +151,8 @@ class CompanyController extends Controller
             $tenant->delete();
         });
 
+        $this->counters->forget();
+
         return response()->json(['data' => ['deleted' => true]]);
     }
 
