@@ -6,13 +6,15 @@ use App\Domain\Dispatch\AddressFormatter;
 use App\Domain\Dispatch\DispatchOfferIngestor;
 use App\Domain\Dispatch\Jobs\GeocodeOffer;
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Dispatch\SupplierNetworkRecorder;
+use App\Domain\Fleet\DriverStatsService;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\IngestOffersRequest;
+use App\Http\Requests\FleetDayRange;
 use App\Http\Resources\DispatchOfferResource;
 use App\Support\Csv;
-use App\Support\FleetDay;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -81,7 +83,7 @@ class DispatchOfferController extends Controller
 
             foreach ($offers as $offer) {
                 $distanceKm = $offer->distance_m !== null ? round($offer->distance_m / 1000, 2) : null;
-                $fare = $this->fareAmount($offer->fare_formatted);
+                $fare = $this->resolveFare($offer);
                 $pricePerKm = ($fare !== null && $distanceKm) ? round($fare / $distanceKm, 2) : null;
 
                 fputcsv($out, [
@@ -106,13 +108,25 @@ class DispatchOfferController extends Controller
     /** Lightweight aggregates for the current filter set — powers the stat cards. */
     public function stats(Request $request): JsonResponse
     {
-        $total = $this->filtered($request)->count();
         // "Taken" = ever accepted, even if later canceled. Pending offers fold into
         // "not taken" (declined) per the product decision. Earnings count COMPLETED
-        // trips only, summed from the numeric fare column.
-        $accepted = $this->filtered($request)->taken()->count();
-        $completed = $this->filtered($request)->completed()->count();
-        $earnings = (float) $this->filtered($request)->completed()->sum('fare_amount');
+        // trips only, summed from the numeric fare column. ONE conditional-aggregate
+        // pass instead of four scans — the offers page polls this every few seconds.
+        $completedStatus = OfferStatus::Completed->value;
+        $row = $this->filtered($request)->toBase()
+            ->selectRaw(
+                'COUNT(*) as total, '
+                .'SUM(CASE WHEN accepted_at IS NOT NULL THEN 1 ELSE 0 END) as accepted, '
+                .'SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as completed, '
+                .'COALESCE(SUM(CASE WHEN status = ? THEN fare_amount END), 0) as earnings',
+                [$completedStatus, $completedStatus],
+            )
+            ->first();
+
+        $total = (int) ($row->total ?? 0);
+        $accepted = (int) ($row->accepted ?? 0);
+        $completed = (int) ($row->completed ?? 0);
+        $earnings = (float) ($row->earnings ?? 0);
 
         return response()->json(['data' => [
             'total' => $total,
@@ -127,8 +141,16 @@ class DispatchOfferController extends Controller
     /** The offer query with the list's filters applied (search/driver/date). */
     private function filtered(Request $request): Builder
     {
+        [$from, $to] = FleetDayRange::filters($request);
+        $request->validate([
+            'driver_uuid' => ['nullable', 'string', 'max:64'],
+            'driver_uuids' => ['nullable', 'array', 'max:500'],
+            'driver_uuids.*' => ['string', 'max:64'],
+            'search' => ['nullable', 'string', 'max:100'],
+        ]);
+
         return DispatchOffer::query()
-            ->when($request->filled('driver_uuid'), fn ($q) => $q->where('driver_uuid', $request->string('driver_uuid')))
+            ->when($request->filled('driver_uuid'), fn ($q) => $q->where('driver_uuid', (string) $request->string('driver_uuid')))
             ->when($request->filled('driver_uuids'), fn ($q) => $q->whereIn('driver_uuid', (array) $request->input('driver_uuids')))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%'.$request->string('search').'%';
@@ -140,8 +162,8 @@ class DispatchOfferController extends Controller
                         ->orWhere('dropoff_address', 'like', $term);
                 });
             })
-            ->when($request->filled('from'), fn ($q) => $q->where('received_at', '>=', FleetDay::startOfDate($request->string('from'))))
-            ->when($request->filled('to'), fn ($q) => $q->where('received_at', '<', FleetDay::endOfDate($request->string('to'))));
+            ->when($from !== null, fn ($q) => $q->where('received_at', '>=', $from))
+            ->when($to !== null, fn ($q) => $q->where('received_at', '<', $to));
     }
 
     /**
@@ -225,13 +247,7 @@ class DispatchOfferController extends Controller
     private function trip(DispatchOffer $offer): array
     {
         $distanceKm = $offer->distance_m !== null ? round($offer->distance_m / 1000, 2) : null;
-        // Prefer the authoritative numeric fare column (the same one earnings sum
-        // over); only fall back to parsing the formatted string when it is unset.
-        // Otherwise a completed offer whose fare_formatted is blank shows "—" for
-        // price/km even though its fare is known.
-        $fare = $offer->fare_amount !== null
-            ? (float) $offer->fare_amount
-            : $this->fareAmount($offer->fare_formatted);
+        $fare = $this->resolveFare($offer);
         $pricePerKm = ($fare !== null && $distanceKm) ? round($fare / $distanceKm, 2) : null;
 
         return [
@@ -259,21 +275,24 @@ class DispatchOfferController extends Controller
         ];
     }
 
-    /** Parse "6,43 €" / "$6.43" into a float (handles German comma decimals). */
-    private function fareAmount(?string $formatted): ?float
+    /**
+     * The offer's fare for the detail view AND the CSV export (one rule, so they
+     * never disagree): the authoritative numeric column the earnings sum over, else
+     * the formatted string parsed with the same parser the ingestor uses. A blank
+     * fare_formatted must not hide a known fare.
+     */
+    private function resolveFare(DispatchOffer $offer): ?float
     {
-        if (! $formatted) {
+        if ($offer->fare_amount !== null) {
+            return (float) $offer->fare_amount;
+        }
+
+        $formatted = trim((string) $offer->fare_formatted);
+        if (preg_match('/\d/', $formatted) !== 1) {
             return null;
         }
-        $n = preg_replace('/[^0-9,.]/', '', $formatted);
-        // If both separators exist, the last one is the decimal separator.
-        if (str_contains($n, ',') && str_contains($n, '.')) {
-            $n = strrpos($n, ',') > strrpos($n, '.')
-                ? str_replace('.', '', $n) : $n;
-        }
-        $n = str_replace(',', '.', $n);
 
-        return is_numeric($n) ? (float) $n : null;
+        return DriverStatsService::parseFare($formatted);
     }
 
     /** Delete a single offer. */

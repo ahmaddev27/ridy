@@ -3,11 +3,9 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\Jobs\BackfillWaypointLabels;
-use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Domain\Dispatch\TripGeocoder;
-use App\Domain\Dispatch\UberSupplierClient;
 use App\Domain\Fleet\DriverStatsService;
 use App\Domain\Fleet\DriverStatusIngestor;
 use App\Domain\Fleet\Models\Driver;
@@ -16,8 +14,8 @@ use App\Events\DriversBroadcast;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\IngestDriverStatusesRequest;
+use App\Http\Requests\FleetDayRange;
 use App\Http\Resources\DriverResource;
-use App\Support\FleetDay;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -179,13 +177,8 @@ class DriverController extends Controller
     {
         $this->authorizeTenant($driver);
 
-        // Fleet-day windows (04:00 boundary), $to exclusive.
-        $from = $request->filled('from')
-            ? FleetDay::startOfDate($request->string('from'))
-            : FleetDay::startDaysAgo(30);
-        $to = $request->filled('to')
-            ? FleetDay::endOfDate($request->string('to'))
-            : FleetDay::todayStart()->addDay();
+        // Fleet-day windows (04:00 boundary), $to exclusive; validated + span-capped.
+        [$from, $to] = FleetDayRange::window($request, 30);
 
         return response()->json(['data' => $stats->forDriver($driver, $from, $to)]);
     }
@@ -247,28 +240,15 @@ class DriverController extends Controller
     }
 
     /**
-     * Server-side on-demand pull (fallback). Often blocked by Uber's datacenter
-     * check — the extension path (ingestRoster) is the reliable one.
+     * The dashboard's "Sync" fallback when no extension answered. The backend
+     * never calls Uber itself: replaying the company's live session from the
+     * datacenter IP (bypassing its residential proxy) is what gets an Uber account
+     * flagged, and it never worked anyway (blocked IP, wrong cookie jar). The
+     * roster arrives through the extension (ingestRoster) and the daemon's
+     * proxied 30-minute pull.
      */
-    public function sync(UberSupplierClient $client, RosterSyncService $roster): JsonResponse
+    public function sync(): JsonResponse
     {
-        $session = UberFleetSession::query()
-            ->where('status', UberFleetSession::STATUS_ACTIVE)
-            ->orderByDesc('updated_at')
-            ->first();
-
-        if ($session === null) {
-            return response()->json(['data' => ['synced' => 0, 'reason' => 'no_active_session']]);
-        }
-
-        $drivers = $client->getDrivers($session);
-
-        if ($drivers === []) {
-            return response()->json(['data' => ['synced' => 0, 'reason' => 'uber_unreachable']]);
-        }
-
-        $result = $roster->sync((int) $session->tenant_id, $drivers);
-
-        return response()->json(['data' => $result]);
+        return response()->json(['data' => ['synced' => 0, 'reason' => 'extension_required']]);
     }
 }

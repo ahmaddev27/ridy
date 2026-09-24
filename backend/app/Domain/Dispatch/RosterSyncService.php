@@ -10,6 +10,7 @@ use App\Domain\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -19,6 +20,11 @@ use Illuminate\Support\Facades\DB;
  */
 class RosterSyncService
 {
+    /** Roster sync lock lifetime / how long a concurrent sync waits for it. */
+    private const LOCK_SECONDS = 30;
+
+    private const LOCK_WAIT_SECONDS = 10;
+
     public function __construct(private TenantContext $context) {}
 
     /**
@@ -27,8 +33,28 @@ class RosterSyncService
      */
     public function sync(int $tenantId, array $drivers): array
     {
+        // Save and RESTORE the request-wide tenant context (as the offer ingestor
+        // does), so a caller doing cross-tenant work afterwards isn't silently
+        // scoped to the last synced tenant.
+        $previous = $this->context->get();
         $this->context->set($tenantId);
 
+        try {
+            // The daemon push, the extension post and a manual sync can overlap;
+            // serialized per company so two runs can't both create a new driver.
+            return Cache::lock("roster-sync:{$tenantId}", self::LOCK_SECONDS)
+                ->block(self::LOCK_WAIT_SECONDS, fn () => $this->syncLocked($tenantId, $drivers));
+        } finally {
+            $this->context->set($previous);
+        }
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $drivers
+     * @return array{synced: int, created: int, removed: int}
+     */
+    private function syncLocked(int $tenantId, array $drivers): array
+    {
         $created = 0;
         $synced = 0;
         $seen = [];
@@ -55,7 +81,13 @@ class RosterSyncService
                 ->get()
                 ->groupBy('uber_driver_uuid');
 
+        // uuid => driver id of every rostered driver, for the orphan-offer backfill.
+        $driverIdByUuid = [];
+
         foreach ($drivers as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
             $uuid = $this->extractUuid($row);
             if ($uuid === null) {
                 continue;
@@ -70,11 +102,13 @@ class RosterSyncService
                 'name' => $this->fullName($row),
                 'phone' => $this->phone($row),
                 'uber_driver_uuid' => $uuid,
-                'uber_email' => Arr::get($row, 'email'),
-                'uber_picture_url' => Arr::get($row, 'pictureUrl'),
-                'uber_rating' => Arr::get($row, 'recognitionRating'),
-                'uber_total_trips' => Arr::get($row, 'tripsInfo.totalCompletedTrips'),
-                'uber_status' => Arr::get($row, 'onboardingInfo.status'),
+                // Uber's payload is outside our control: a non-scalar or oversized
+                // field is dropped instead of 500ing the whole sync.
+                'uber_email' => $this->text($row, 'email', 255),
+                'uber_picture_url' => $this->httpsUrl($this->text($row, 'pictureUrl', 2048)),
+                'uber_rating' => $this->number($row, 'recognitionRating'),
+                'uber_total_trips' => $this->number($row, 'tripsInfo.totalCompletedTrips'),
+                'uber_status' => $this->text($row, 'onboardingInfo.status', 64),
                 'roster_synced_at' => CarbonImmutable::now(),
                 // Present in this roster → clear any earlier "removed" mark (a
                 // driver Uber had dropped and then re-added is active again).
@@ -95,13 +129,11 @@ class RosterSyncService
                 $driver->fill($attributes)->save();
             }
 
-            // Route any offers that arrived for this UUID before the driver existed.
-            DispatchOffer::where('driver_uuid', $uuid)
-                ->whereNull('driver_id')
-                ->update(['driver_id' => $driver->id]);
-
+            $driverIdByUuid[$uuid] = $driver->id;
             $synced++;
         }
+
+        $this->linkOrphanOffers($tenantId, $driverIdByUuid);
 
         // Reconcile removals: a driver Uber no longer lists is marked removed from
         // the fleet — NEVER deleted. The row and its offer history stay with the
@@ -118,6 +150,35 @@ class RosterSyncService
         }
 
         return ['synced' => $synced, 'created' => $created, 'removed' => $removed];
+    }
+
+    /**
+     * Route offers that arrived for a rostered UUID before its driver existed (or
+     * while unlinked). One index-served query finds the UUIDs that actually HAVE
+     * orphan offers, and only those get a targeted UPDATE — on a normal sync that
+     * is zero statements, instead of one UPDATE per driver that walked (and
+     * next-key-locked) each driver's whole offer history against live ingest.
+     *
+     * @param  array<string, int>  $driverIdByUuid
+     */
+    private function linkOrphanOffers(int $tenantId, array $driverIdByUuid): void
+    {
+        foreach (array_chunk(array_keys($driverIdByUuid), 500) as $chunk) {
+            $orphanUuids = DispatchOffer::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->whereNull('driver_id')
+                ->whereIn('driver_uuid', $chunk)
+                ->distinct()
+                ->pluck('driver_uuid');
+
+            foreach ($orphanUuids as $uuid) {
+                DispatchOffer::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('driver_uuid', $uuid)
+                    ->whereNull('driver_id')
+                    ->update(['driver_id' => $driverIdByUuid[$uuid]]);
+            }
+        }
     }
 
     /**
@@ -154,17 +215,22 @@ class RosterSyncService
             ?? $rows->first();
 
         $extraIds = $rows->where('id', '!=', $canonical->id)->pluck('id');
-        DispatchOffer::whereIn('driver_id', $extraIds)->update(['driver_id' => $canonical->id]);
-        DeviceToken::whereIn('driver_id', $extraIds)->update(['driver_id' => $canonical->id]);
-        // Carry the driver's app session (Sanctum tokens) onto the canonical row
-        // BEFORE deleting the extras — otherwise a merge orphans the token to a
-        // now-gone driver id and the driver's very next request 401s them out.
-        DB::table('personal_access_tokens')
-            ->where('tokenable_type', $canonical->getMorphClass())
-            ->whereIn('tokenable_id', $extraIds)
-            ->update(['tokenable_id' => $canonical->id]);
-        DriverMetric::whereIn('driver_id', $extraIds)->delete();
-        Driver::whereIn('id', $extraIds)->delete();
+
+        // All-or-nothing: a half-done merge would leave offers or a login token
+        // pointing at a deleted driver id.
+        DB::transaction(function () use ($extraIds, $canonical) {
+            DispatchOffer::whereIn('driver_id', $extraIds)->update(['driver_id' => $canonical->id]);
+            DeviceToken::whereIn('driver_id', $extraIds)->update(['driver_id' => $canonical->id]);
+            // Carry the driver's app session (Sanctum tokens) onto the canonical row
+            // BEFORE deleting the extras — otherwise a merge orphans the token to a
+            // now-gone driver id and the driver's very next request 401s them out.
+            DB::table('personal_access_tokens')
+                ->where('tokenable_type', $canonical->getMorphClass())
+                ->whereIn('tokenable_id', $extraIds)
+                ->update(['tokenable_id' => $canonical->id]);
+            DriverMetric::whereIn('driver_id', $extraIds)->delete();
+            Driver::whereIn('id', $extraIds)->delete();
+        });
 
         return $canonical;
     }
@@ -198,20 +264,50 @@ class RosterSyncService
 
     private function fullName(array $row): string
     {
-        $name = trim(Arr::get($row, 'name.firstName', '').' '.Arr::get($row, 'name.lastName', ''));
+        $name = trim(($this->text($row, 'name.firstName', 120) ?? '').' '.($this->text($row, 'name.lastName', 120) ?? ''));
 
         return $name !== '' ? $name : 'Unbekannter Fahrer';
     }
 
     private function phone(array $row): ?string
     {
-        $code = Arr::get($row, 'phoneNumber.countryCode');
-        $number = Arr::get($row, 'phoneNumber.number');
+        $code = $this->text($row, 'phoneNumber.countryCode', 8);
+        $number = $this->text($row, 'phoneNumber.number', 32);
 
         if (! $number) {
             return null;
         }
 
         return trim(($code ?? '').' '.$number);
+    }
+
+    /** A scalar roster field as a trimmed string capped at $max chars, else null. */
+    private function text(array $row, string $key, int $max): ?string
+    {
+        $value = Arr::get($row, $key);
+        if (! is_scalar($value)) {
+            return null;
+        }
+        $value = trim((string) $value);
+
+        return $value === '' ? null : mb_substr($value, 0, $max);
+    }
+
+    private function number(array $row, string $key): int|float|null
+    {
+        $value = Arr::get($row, $key);
+
+        return is_numeric($value) ? $value + 0 : null;
+    }
+
+    /**
+     * Only an https URL is kept for the driver picture: it is rendered as an
+     * <img src> in manager and admin browsers, so anything else is dropped.
+     */
+    private function httpsUrl(?string $url): ?string
+    {
+        return $url !== null && str_starts_with(strtolower($url), 'https://') && filter_var($url, FILTER_VALIDATE_URL) !== false
+            ? $url
+            : null;
     }
 }
