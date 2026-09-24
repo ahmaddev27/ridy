@@ -82,7 +82,8 @@ return [
     ],
 
     // Ops alerting: where operational alerts (broken session / down shard) are
-    // emailed. Empty = alerts are only logged (RidyLog), never mailed.
+    // emailed (queued). Every alert is also logged as 'ops.alert' on the default
+    // channel, so with this empty the log line is the record.
     'alerts' => [
         'email' => env('ALERT_EMAIL'),
     ],

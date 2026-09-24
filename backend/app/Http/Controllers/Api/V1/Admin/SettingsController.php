@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
 
@@ -112,6 +113,10 @@ class SettingsController extends Controller
         }
 
         Settings::setMany($values);
+
+        // Mail now leaves on the queue, and a worker applies the mail settings once at
+        // boot — signal the workers to restart so new SMTP/Resend credentials are used.
+        rescue(fn () => Artisan::call('queue:restart'), report: false);
 
         return $this->show();
     }
