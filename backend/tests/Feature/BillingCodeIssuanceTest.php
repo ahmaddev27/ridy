@@ -6,6 +6,7 @@ use App\Domain\Billing\Models\PaymentClaim;
 use App\Domain\Billing\Models\Plan;
 use App\Domain\Billing\Models\SubscriptionCode;
 use App\Domain\Billing\PaymentClaimService;
+use App\Domain\Billing\PaymentReferenceGenerator;
 use App\Domain\Collections\Models\Collector;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Models\User;
@@ -116,6 +117,18 @@ class BillingCodeIssuanceTest extends TestCase
         $this->assertFalse($issued);
         $this->assertSame($firstCode, $tenant->fresh()->activation_code);
         $this->assertSame(1, SubscriptionCode::count());
+    }
+
+    public function test_payment_references_count_past_9999(): void
+    {
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $code = fn () => SubscriptionCode::create(['code' => '123456', 'tenant_id' => $tenant->id, 'paid' => false, 'expires_at' => now()->addHour()]);
+        $code()->forceFill(['payment_ref' => 'ACM-2026-9999'])->save();
+
+        $refs = app(PaymentReferenceGenerator::class);
+
+        $this->assertSame('ACM-2026-10000', $refs->assign($code(), $tenant, 2026));
+        $this->assertSame('ACM-2026-10001', $refs->assign($code(), $tenant, 2026));
     }
 
     public function test_opening_a_claim_twice_returns_the_same_pending_claim(): void
