@@ -147,7 +147,9 @@ class BillingIntegrityTest extends TestCase
 
         $this->postJson('/api/v1/company/activate', [
             'email' => $owner->email, 'password' => 'password', 'code' => '654321',
-        ])->assertStatus(422)->assertJsonPath('errors.code.0', 'account_disabled');
+        ])->assertForbidden()
+            ->assertJsonPath('message', 'account_suspended')
+            ->assertJsonPath('reason', 'disabled');
 
         $this->assertSame('disabled', $tenant->fresh()->status);
         $this->assertSame(0, SubscriptionPeriod::count());
