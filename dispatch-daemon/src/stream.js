@@ -2,6 +2,22 @@
 // and persist rolling cookies so an actively-used session outlives its idle TTL.
 
 import { createHash, randomUUID } from "node:crypto";
+// Import fetch from undici (not the global fetch): Node's global fetch ignores
+// the per-request `dispatcher` option, so a per-stream ProxyAgent only takes
+// effect when we call undici's own fetch.
+import { ProxyAgent, fetch } from "undici";
+import { config } from "./config.js";
+import { api } from "./api.js";
+import { captureThrottled } from "./sentry.js";
+import {
+  describeProxy,
+  jitter,
+  nextThrottleDelay,
+  parseRetryAfter,
+  parseSetCookie,
+  statusSignature,
+  toCookieList,
+} from "./util.js";
 
 /**
  * A fingerprint of a cookie jar's VALUES (not just its count), so the supervisor
@@ -11,19 +27,46 @@ import { createHash, randomUUID } from "node:crypto";
  * Stable between reconnects (stored cookies don't change), so it doesn't churn.
  */
 export function jarFingerprint(cookies) {
-  if (!cookies?.length) return "0";
-  const joined = cookies
+  const list = toCookieList(cookies);
+  if (list.length === 0) return "0";
+  const joined = list
     .map((c) => `${c.name}=${c.value}`)
     .sort()
     .join("|");
   return createHash("sha1").update(joined).digest("hex").slice(0, 16);
 }
-// Import fetch from undici (not the global fetch): Node's global fetch ignores
-// the per-request `dispatcher` option, so a per-stream ProxyAgent only takes
-// effect when we call undici's own fetch.
-import { ProxyAgent, fetch } from "undici";
-import { config } from "./config.js";
-import { api } from "./api.js";
+
+/**
+ * Backend writes that must not be cut off by a restart (offer ingests, rotated
+ * cookie persists). The SIGTERM handler waits for these, briefly, before exiting.
+ */
+export const inflight = new Set();
+function track(promise) {
+  inflight.add(promise);
+  promise.then(
+    () => inflight.delete(promise),
+    () => inflight.delete(promise),
+  );
+  return promise;
+}
+
+// Offer-ingest retry policy. A failed ingest (backend/Caddy restarting during a
+// deploy, a 5xx, a timeout) used to drop the offer for good — seq had already moved
+// past it, so a reconnect never replays it. Retrying is safe: the backend ingest is
+// idempotent on offer_uuid (unique (tenant_id, offer_uuid)).
+const INGEST_MAX_CONCURRENCY = 4; // per stream, across different drivers
+const INGEST_BACKLOG_MAX = 500; // queued batches per stream before the oldest is dropped
+const INGEST_MAX_AGE_MS = 10 * 60 * 1000; // give up on a batch after 10 min
+const INGEST_RETRY_MIN_MS = 1000;
+const INGEST_RETRY_MAX_MS = 30000;
+const INGEST_ALERT_AFTER_MS = 60000; // a deploy blip must not page anyone
+
+// A never-terminated SSE line would otherwise grow the buffer without bound.
+const SSE_BUFFER_MAX = 1_000_000;
+
+// Drop-storm detection (see dropStorm()).
+const STORM_MIN_LIFETIME_MS = 1500;
+const STORM_THRESHOLD = 6;
 
 // Filters the supplier getDrivers UI itself sends (all empty = "everyone").
 // NOTE: `complianceStatusFitler` is misspelled in Uber's OWN API contract — it
@@ -52,6 +95,15 @@ const ROSTER_FILTERS = {
   gigTypeDocumentStatusFilter: [],
 };
 
+/** Release a response body we won't read, so its connection is freed right away. */
+function discardBody(response) {
+  try {
+    response?.body?.cancel?.()?.catch?.(() => {});
+  } catch {
+    /* already consumed/cancelled */
+  }
+}
+
 export class RamenStream {
   /**
    * @param session One fleet session { id, tenant_id, uber_org_uuid, cookies }.
@@ -64,12 +116,14 @@ export class RamenStream {
     this.session = session; // { id, tenant_id, uber_org_uuid, cookies: [{name,value}] }
     this.ramenPath = ramenPath;
     this.primary = primary;
-    this.jar = new Map(session.cookies.map((c) => [c.name, c.value]));
+    // Defensive: the supervisor already normalizes rows, but a jar that arrives as
+    // an object must never throw here and take the whole reconcile pass down.
+    const cookies = toCookieList(session.cookies);
+    const supplierCookies = toCookieList(session.supplier_cookies);
+    this.jar = new Map(cookies.map((c) => [c.name, c.value]));
     // supplier.uber.com needs its own host-scoped cookies for roster/status. Fall
     // back to the RAMEN jar for sessions captured before supplier cookies existed.
-    this.supplierJar = new Map(
-      (session.supplier_cookies?.length ? session.supplier_cookies : session.cookies).map((c) => [c.name, c.value]),
-    );
+    this.supplierJar = new Map((supplierCookies.length ? supplierCookies : cookies).map((c) => [c.name, c.value]));
     // Jar fingerprint over cookie VALUES so the supervisor restarts this stream
     // whenever the manager reconnects — even when the new token has the same cookie
     // COUNT (the old count-only fingerprint missed a value rotation and stuck the
@@ -78,8 +132,21 @@ export class RamenStream {
     this.seq = 0;
     this.stopped = false;
     this.reconnectDelay = config.reconnectMinDelay;
+    this.rapidDrops = 0;
     // A stable device id per stream, mirroring the browser client's headers.
     this.deviceId = `vs_dispatch-${randomUUID()}`;
+
+    // Offer-ingest pipeline state (see enqueueIngest).
+    this.ingestChains = new Map(); // driver key -> tail promise (keeps one driver's offers ordered)
+    this.ingestBacklog = []; // jobs not yet delivered, oldest first
+    this.ingestActive = 0;
+    this.ingestWaiters = [];
+    this.ingestDropped = 0;
+
+    // Status-poll delta state (see syncStatuses).
+    this.lastSentStatus = new Map(); // driver_uuid -> statusSignature of the last row the backend accepted
+    this.lastFullStatusAt = 0;
+    this.supplierBackoffMs = 0;
 
     // Route this company's Uber traffic through its own residential IP. Only
     // Uber requests use this dispatcher — calls back to our API stay direct.
@@ -88,8 +155,7 @@ export class RamenStream {
     this.proxyUrl = proxyUrl || ""; // remembered so the supervisor can detect changes
     this.dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
     if (this.primary) {
-      const safe = proxyUrl ? proxyUrl.replace(/\/\/[^@]*@/, "//***@") : "direct (no proxy)";
-      console.log(`[${this.tag()}] exit: ${safe}`);
+      console.log(`[${this.tag()}] exit: ${describeProxy(proxyUrl)}`);
     }
   }
 
@@ -102,9 +168,12 @@ export class RamenStream {
     if (this.stopped) return;
     this.stopped = true;
     this.controller?.abort();
+    if (this.rosterKickoff) clearTimeout(this.rosterKickoff);
     if (this.rosterTimer) clearInterval(this.rosterTimer);
     if (this.statusTimer) clearTimeout(this.statusTimer); // adaptive loop uses setTimeout
     this.statusPolling = false;
+    // Queued offer ingests are NOT cancelled: they go to our own backend (not
+    // through the dispatcher) and must still land after a cookie/proxy restart.
     // close() returns a promise that rejects if the agent is already destroyed;
     // swallow it so a teardown race never becomes an unhandledRejection.
     try {
@@ -120,6 +189,7 @@ export class RamenStream {
    * with nested fields; routed through the same residential proxy as the stream.
    */
   async syncRoster() {
+    if (this.stopped) return;
     try {
       const rows = [];
       let pageToken = "";
@@ -140,10 +210,16 @@ export class RamenStream {
             },
           }),
         });
+        if (this.stopped) {
+          discardBody(res);
+          return; // torn down mid-pull: never post a roster for a dead stream
+        }
         if (!res.ok) {
+          discardBody(res);
           // A supplier 401/403 degrades roster/status but NOT the offer stream —
           // handle it without tearing the stream down.
           if (await this.handleSupplierAuthFailure(res.status)) return;
+          this.noteSupplierThrottle(res);
           console.warn(`[${this.tag()}] roster fetch -> ${res.status}`);
           return;
         }
@@ -160,7 +236,7 @@ export class RamenStream {
         pageToken = next;
       }
 
-      if (rows.length === 0) return;
+      if (rows.length === 0 || this.stopped) return;
 
       const outcome = await api.roster(this.session.id, rows);
       console.log(`[${this.tag()}] roster synced: ${rows.length} drivers`, outcome);
@@ -173,11 +249,18 @@ export class RamenStream {
    * Poll supplier GetDriverLiveLocation for the whole org and forward the driver
    * statuses. Fast + continuous so an ON_TRIP transition (offer acceptance) is
    * caught within seconds, regardless of whether a manager has a page open.
-   * Uber returns coordinates as 0,0 (redacted), so we only forward the status.
+   *
+   * Forwards the status plus the live coordinates, course and trip waypoints Uber
+   * returns for engaged drivers (idle/offline drivers come back as 0,0, which the
+   * backend discards). Only rows that changed since the last accepted send are
+   * posted, plus a full batch every statusFullSyncInterval (see config).
+   *
+   * @returns {Promise<boolean>} whether any driver is engaged (drives the cadence)
    */
   async syncStatuses() {
+    let res;
     try {
-      const res = await fetch(`${config.uberSupplierBase}/api/GetDriverLiveLocation?localeCode=de-DE`, {
+      res = await fetch(`${config.uberSupplierBase}/api/GetDriverLiveLocation?localeCode=de-DE`, {
         method: "POST",
         headers: { ...this.supplierHeaders(), "content-type": "application/json", "x-csrf-token": "x" },
         dispatcher: this.dispatcher,
@@ -194,49 +277,87 @@ export class RamenStream {
           responseSelector: { includeStats: true },
         }),
       });
-      // A supplier 401/403 here degrades live status but NOT the offer stream —
-      // keep streaming offers; just slow the poll and (once persistent) prompt a
-      // reconnect. supplierAuthFails throttles the poll cadence in scheduleStatusPoll.
-      if (!res.ok) {
-        await this.handleSupplierAuthFailure(res.status);
-        return;
-      }
-      this.supplierRecovered();
+    } catch (e) {
+      if (this.stopped) return false;
+      console.error(`[${this.tag()}] status poll failed: ${e.message}`);
+      this.noteSupplierThrottle(null);
+      return false;
+    }
+    if (this.stopped) {
+      discardBody(res);
+      return false;
+    }
+
+    // A supplier 401/403 here degrades live status but NOT the offer stream —
+    // keep streaming offers; just slow the poll and (once persistent) prompt a
+    // reconnect. supplierAuthFails throttles the poll cadence in scheduleStatusPoll.
+    if (!res.ok) {
+      discardBody(res);
+      if (!(await this.handleSupplierAuthFailure(res.status))) this.noteSupplierThrottle(res);
+      return false;
+    }
+    this.supplierRecovered();
+
+    let statuses;
+    try {
       const body = await res.json();
-      if (body.status !== "success") return;
+      if (body.status !== "success") return false;
+      statuses = this.mapStatuses(body.data?.driverLocations);
+    } catch (e) {
+      console.error(`[${this.tag()}] status poll parse failed: ${e.message}`);
+      return false;
+    }
+    if (statuses.length === 0) return false;
 
-      const statuses = (body.data?.driverLocations ?? [])
-        .map((l) => ({
-          driver_uuid: l.driverId?.value,
-          status: l.driverStatus ?? null,
-          location_updated_at: l.locationUpdatedTime?.value ? Number(l.locationUpdatedTime.value) : null,
-          latitude: typeof l.latitude === "number" ? l.latitude : null,
-          longitude: typeof l.longitude === "number" ? l.longitude : null,
-          heading: typeof l.course === "number" ? l.course : null,
-          waypoints: Array.isArray(l.waypointsLocation)
-            ? l.waypointsLocation.map((w) => ({ lat: w.latitude, lng: w.longitude, type: w.checkpointType }))
-            : null,
-        }))
-        .filter((s) => s.driver_uuid);
+    // Any engaged driver (just accepted / on a trip) → the caller polls faster so
+    // this trip's live-map waypoints are captured within seconds of acceptance.
+    const engaged = statuses.some((s) => {
+      const u = String(s.status || "").toUpperCase();
+      return u.includes("EN_ROUTE") || u.includes("ON_TRIP");
+    });
 
-      if (statuses.length === 0) return false;
+    await this.forwardStatuses(statuses);
+    return engaged;
+  }
 
-      // Any engaged driver (just accepted / on a trip) → the caller polls faster so
-      // this trip's live-map waypoints are captured within seconds of acceptance.
-      const engaged = statuses.some((s) => {
-        const u = String(s.status || "").toUpperCase();
-        return u.includes("EN_ROUTE") || u.includes("ON_TRIP");
-      });
+  mapStatuses(driverLocations) {
+    return (Array.isArray(driverLocations) ? driverLocations : [])
+      .filter((l) => l && typeof l === "object")
+      .map((l) => ({
+        driver_uuid: l.driverId?.value,
+        status: l.driverStatus ?? null,
+        location_updated_at: l.locationUpdatedTime?.value ? Number(l.locationUpdatedTime.value) : null,
+        latitude: typeof l.latitude === "number" ? l.latitude : null,
+        longitude: typeof l.longitude === "number" ? l.longitude : null,
+        heading: typeof l.course === "number" ? l.course : null,
+        waypoints: Array.isArray(l.waypointsLocation)
+          ? l.waypointsLocation.map((w) => ({ lat: w?.latitude, lng: w?.longitude, type: w?.checkpointType }))
+          : null,
+      }))
+      .filter((s) => s.driver_uuid);
+  }
 
-      const outcome = await api.statuses(this.session.id, statuses);
+  /**
+   * POST only what changed since the backend last accepted a row for that driver
+   * (every poll used to UPDATE every driver row + write a full-payload network log),
+   * with a periodic full batch as the freshness/sweep backstop. The "last sent"
+   * memory only advances on success, so a failed POST is re-sent next poll.
+   */
+  async forwardStatuses(statuses) {
+    const now = Date.now();
+    const full = !config.statusFullSyncInterval || now - this.lastFullStatusAt >= config.statusFullSyncInterval;
+    const batch = full ? statuses : statuses.filter((s) => this.lastSentStatus.get(s.driver_uuid) !== statusSignature(s));
+    if (batch.length === 0) return;
+
+    try {
+      const outcome = await api.statuses(this.session.id, batch);
+      for (const s of batch) this.lastSentStatus.set(s.driver_uuid, statusSignature(s));
+      if (full) this.lastFullStatusAt = now;
       if (outcome?.data?.accepted) {
         console.log(`[${this.tag()}] statuses: ${outcome.data.accepted} offer(s) marked accepted`);
       }
-
-      return engaged;
     } catch (e) {
-      console.error(`[${this.tag()}] status sync failed: ${e.message}`);
-      return false;
+      console.error(`[${this.tag()}] status forward failed: ${e.message}`);
     }
   }
 
@@ -255,15 +376,43 @@ export class RamenStream {
       } catch {
         /* syncStatuses logs its own errors */
       }
-      // While Fleet Hub is rejecting us, poll slowly (supplierRetryInterval) instead
-      // of hammering it every 3-6s — fewer failing calls, less chance of a wider block.
-      const next = this.supplierAuthFails
-        ? config.supplierRetryInterval
+      this.scheduleStatusPoll(this.nextStatusDelay(engaged));
+    }, delay);
+  }
+
+  nextStatusDelay(engaged) {
+    // While Fleet Hub is rejecting us, poll slowly (supplierRetryInterval) instead
+    // of hammering it every 3-6s — fewer failing calls, less chance of a wider block.
+    // A 429/5xx/timeout backs off on its own schedule (honouring Retry-After).
+    const base = this.supplierAuthFails
+      ? config.supplierRetryInterval
+      : this.supplierBackoffMs
+        ? this.supplierBackoffMs
         : engaged
           ? config.statusIntervalActive
           : config.statusInterval;
-      this.scheduleStatusPoll(next);
-    }, delay);
+    // ±10% so companies' poll chains drift apart instead of hitting Uber and the
+    // backend in phase-aligned bursts.
+    return Math.round(base * (0.9 + Math.random() * 0.2));
+  }
+
+  /**
+   * Fleet Hub answered 429 / 5xx (or the poll timed out): back the status poll off
+   * exponentially, honouring Retry-After. Deliberately separate from the 401/403
+   * auth path — throttling is NOT a reason to prompt the manager to reconnect.
+   */
+  noteSupplierThrottle(res) {
+    if (res && res.status !== 429 && res.status < 500) return;
+    const retryAfter = res ? parseRetryAfter(res.headers?.get?.("retry-after")) : 0;
+    this.supplierBackoffMs = nextThrottleDelay(
+      this.supplierBackoffMs,
+      retryAfter,
+      config.statusInterval,
+      config.supplierRetryInterval,
+    );
+    console.warn(
+      `[${this.tag()}] Fleet Hub ${res ? `-> ${res.status}` : "unreachable"}; next status poll in ~${this.supplierBackoffMs}ms`,
+    );
   }
 
   headers() {
@@ -293,17 +442,25 @@ export class RamenStream {
     return `${config.uberDispatchBase}${this.ramenPath}${path}?seq=${seq}`;
   }
 
-  /** Merge any Set-Cookie from a response into the jar, then persist to backend. */
-  async absorbCookies(response) {
+  /**
+   * Merge any Set-Cookie from a response into the jar and (primary only) persist
+   * the rotated jar in the BACKGROUND. The persist used to be awaited between /ack
+   * and /recv — a backend round-trip (up to apiTimeout) inside the blind window the
+   * 250ms fast reopen exists to minimise.
+   */
+  absorbCookies(response) {
     const setCookies = response.headers.getSetCookie?.() ?? [];
     if (setCookies.length === 0) return;
 
     // Merge Uber's rotated cookies into THIS channel's jar (both channels, so a
-    // secondary's jar never goes stale against a rotated session token).
+    // secondary's jar never goes stale against a rotated session token). A deletion
+    // (Max-Age<=0 / past Expires / empty value) removes the cookie: persisting it as
+    // an empty value was rejected by the backend (422) and blocked every later write.
     for (const raw of setCookies) {
-      const [pair] = raw.split(";");
-      const eq = pair.indexOf("=");
-      if (eq > 0) this.jar.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
+      const cookie = parseSetCookie(raw);
+      if (!cookie) continue;
+      if (cookie.deleted) this.jar.delete(cookie.name);
+      else this.jar.set(cookie.name, cookie.value);
     }
 
     // Only the PRIMARY channel persists the rotated jar AND advances its own
@@ -313,29 +470,58 @@ export class RamenStream {
     // never persists (so channels don't race the backend write); reconcile() adopts
     // the primary's rotation into the secondary without a teardown — see its
     // self-rotation branch — so a rotation never resets the secondary's seq either.
-    if (!this.primary) return;
+    if (!this.primary || this.stopped) return;
+    this.persistJar().catch(() => {});
+  }
 
-    // Advance the fingerprint ONLY after the backend has stored the new jar. If the
-    // write fails (backend restarting mid-deploy, or a timeout) an already-advanced
-    // fingerprint would be ahead of what the backend serves, so the next reconcile()
-    // would see a mismatch it can't attribute to a self-rotation and tear the stream
-    // down — restarting it on the OLD cookies with seq reset to 0. That is exactly
-    // the offer-loss mechanism this fingerprint was introduced to close. Keeping the
-    // old fingerprint on failure means the next rotation simply retries the write.
+  /** The fingerprint the backend would hold if it stored the current jar. */
+  liveJarFingerprint() {
     const cookies = [...this.jar].map(([name, value]) => ({ name, value }));
-    const nextFp = `${jarFingerprint(cookies)}:${jarFingerprint(this.session.supplier_cookies)}`;
+    return { cookies, fp: `${jarFingerprint(cookies)}:${jarFingerprint(this.session.supplier_cookies)}` };
+  }
 
+  /**
+   * Single-flight persist of the live jar. A rotation that arrives while a write is
+   * in flight marks the jar dirty and is written (latest jar only) once that write
+   * settles. An unchanged jar is never written (every Set-Cookie used to cost a DB
+   * update + a network-log row).
+   *
+   * cookieFp advances ONLY after the backend has stored that exact jar. If the write
+   * fails (backend restarting mid-deploy, or a timeout) an already-advanced
+   * fingerprint would be ahead of what the backend serves, so the next reconcile()
+   * would see a mismatch it can't attribute to a self-rotation and tear the stream
+   * down — restarting it on the OLD cookies with seq reset to 0. Keeping the old
+   * fingerprint on failure means the next rotation simply retries the write.
+   */
+  async persistJar() {
+    if (this.persisting) {
+      this.persistDirty = true;
+      return;
+    }
+    this.persisting = true;
     try {
-      await api.refreshCookies(this.session.id, cookies);
-      this.cookieFp = nextFp;
-    } catch (e) {
-      console.error(`[${this.tag()}] cookie refresh failed: ${e.message}`);
+      do {
+        this.persistDirty = false;
+        // A torn-down stream must not overwrite a newer re-link with its old jar.
+        if (this.stopped) return;
+        const { cookies, fp } = this.liveJarFingerprint();
+        if (fp === this.cookieFp || cookies.length === 0) continue;
+        try {
+          await track(api.refreshCookies(this.session.id, cookies));
+          this.cookieFp = fp;
+        } catch (e) {
+          console.error(`[${this.tag()}] cookie refresh failed: ${e.message}`);
+          captureThrottled(`cookies:${this.session.id}`, e, { where: "cookie_refresh", sessionId: this.session.id });
+        }
+      } while (this.persistDirty);
+    } finally {
+      this.persisting = false;
     }
   }
 
   tag() {
     const channel = this.ramenPath.split("/").filter(Boolean)[0] ?? "ramen";
-    return `session ${this.session.id}/${this.session.uber_org_uuid.slice(0, 8)} ${channel}`;
+    return `session ${this.session.id}/${String(this.session.uber_org_uuid).slice(0, 8)} ${channel}`;
   }
 
   /**
@@ -376,13 +562,14 @@ export class RamenStream {
     return true;
   }
 
-  /** A Fleet Hub call succeeded again — clear the degraded state. */
+  /** A Fleet Hub call succeeded again — clear the degraded/throttled state. */
   supplierRecovered() {
     if (this.supplierAuthFails) {
       console.log(`[${this.tag()}] Fleet Hub recovered after ${this.supplierAuthFails} failure(s)`);
     }
     this.supplierAuthFails = 0;
     this.supplierDegradedAt = null;
+    this.supplierBackoffMs = 0;
   }
 
   async run() {
@@ -397,20 +584,31 @@ export class RamenStream {
         }
       }
       if (this.stopped) break;
+      await this.afterCycle();
+    }
+  }
 
-      // A stream that ACTUALLY OPENED and then ended/dropped is the normal RAMEN
-      // long-poll cycle (or a proxy connection reset) — NOT a failure. Reopen
-      // almost immediately, resuming from this.seq, so the blind window between
-      // streams is ~250ms instead of the 2s error-backoff (offers Uber dispatches
-      // in that gap would otherwise be missed). Exponential backoff is reserved
-      // for a failure BEFORE the stream opened (handshake/HTTP/404/connect) or a
-      // storm of instant drops (a hard-down proxy) — so we never hammer Uber.
-      if (this.streamOpened && !this.dropStorm()) {
-        this.reconnectDelay = config.reconnectMinDelay; // keep error-backoff reset
-        await this.sleep(config.streamCycleDelay);
-      } else {
-        await this.backoff();
-      }
+  /**
+   * Decide how long to wait before the next connect.
+   *
+   * A stream that ACTUALLY OPENED and then ended/dropped is the normal RAMEN
+   * long-poll cycle (or a proxy connection reset) — NOT a failure. Reopen almost
+   * immediately, resuming from this.seq, so the blind window between streams is
+   * ~250ms instead of the 2s error-backoff (offers Uber dispatches in that gap
+   * would otherwise be missed). Exponential backoff is reserved for a failure
+   * BEFORE the stream opened (handshake/HTTP/404/connect) or a storm of instant
+   * drops (a hard-down proxy) — so we never hammer Uber.
+   *
+   * The backoff is reset ONLY here, on the healthy path. It used to reset on every
+   * successful open, so a storm of open-then-drop cycles never grew past 2s.
+   */
+  async afterCycle() {
+    const storming = this.streamOpened ? this.dropStorm() : false;
+    if (this.streamOpened && !storming) {
+      this.reconnectDelay = config.reconnectMinDelay;
+      await this.sleep(config.streamCycleDelay);
+    } else {
+      await this.backoff();
     }
   }
 
@@ -440,6 +638,8 @@ export class RamenStream {
 
     // 1. Handshake. Uber's client sends seq=0 here (seq=-1 returns 404).
     const ack = await this.fetchOpening(this.url("/ack", 0));
+    // The ack body carries nothing we use; release it so the connection is freed.
+    discardBody(ack);
     if (await this.handleStreamAuthFailure(ack.status)) return;
     // Uber returns 404 on RAMEN for non-residential (datacenter) IPs. Without a
     // residential proxy the server can't hold the stream — offers are captured
@@ -467,40 +667,61 @@ export class RamenStream {
       throw new Error("ramen_blocked_404");
     }
     if (!ack.ok) throw new Error(`ack -> ${ack.status}`);
-    await this.absorbCookies(ack);
+    this.absorbCookies(ack);
+    if (this.stopped) return;
 
     // 2. Open the stream, resuming from the last seq we saw.
     const recv = await this.fetchOpening(this.url("/recv", this.seq));
-    if (await this.handleStreamAuthFailure(recv.status)) return;
-    if (!recv.ok) throw new Error(`recv -> ${recv.status}`);
-    await this.absorbCookies(recv);
+    if (await this.handleStreamAuthFailure(recv.status)) {
+      discardBody(recv);
+      return;
+    }
+    if (!recv.ok) {
+      discardBody(recv);
+      throw new Error(`recv -> ${recv.status}`);
+    }
+    this.absorbCookies(recv);
+    // Stopped while the handshake was in flight (a reconcile restart): don't open,
+    // and above all don't start roster/status timers that stop() already ran past.
+    if (this.stopped) {
+      discardBody(recv);
+      return;
+    }
 
     console.log(`[${this.tag()}] stream open (seq ${this.seq})`);
     this.streamOpened = true; // from here a drop is a mid-stream cycle, not a failure
     this.openedAt = Date.now();
-    this.reconnectDelay = config.reconnectMinDelay; // reset backoff on success
-    this.lastHeartbeatAt = 0; // force an immediate heartbeat on the first frame
+    // Heartbeat right away (fire-and-forget — never ahead of the first frame, which
+    // is the one most likely to carry the backlog resumed from seq).
+    this.lastHeartbeatAt = 0;
+    this.maybeHeartbeat();
 
     // Only the primary channel pulls roster/status — secondary channels just ingest.
-    if (this.primary) {
-      // Pull the roster ONCE on the first successful open, then every rosterInterval
-      // (30 min). Do NOT re-pull on every reopen: the RAMEN long-poll cycle reopens
-      // every few minutes, so calling syncRoster() here each time hammered Fleet Hub
-      // ~20x/hour — needless load that raises the odds of a 403. The timer covers
-      // the rest; a genuine re-link builds a fresh stream that pulls once again.
-      if (!this.rosterTimer) {
-        this.syncRoster();
-        this.rosterTimer = setInterval(() => this.syncRoster(), config.rosterInterval);
-      }
-      // Adaptive status polling — start the self-rescheduling loop once (a reconnect
-      // must not stack a second chain). First poll fires immediately.
-      if (!this.statusPolling) {
-        this.statusPolling = true;
-        this.scheduleStatusPoll(0);
-      }
-    }
+    if (this.primary) this.startSupplierPolls();
 
     await this.readSse(recv.body);
+  }
+
+  /**
+   * Roster: ONCE on the first successful open, then every rosterInterval (30 min).
+   * Do NOT re-pull on every reopen: the RAMEN long-poll cycle reopens every few
+   * minutes, so calling syncRoster() each time hammered Fleet Hub ~20x/hour —
+   * needless load that raises the odds of a 403. A genuine re-link builds a fresh
+   * stream that pulls once again. The first pull and the first status poll are
+   * jittered so a daemon restart doesn't fire every company's pulls in one second.
+   */
+  startSupplierPolls() {
+    if (this.stopped) return;
+    if (!this.rosterTimer) {
+      this.rosterKickoff = setTimeout(() => this.syncRoster(), Math.floor(Math.random() * 30000));
+      this.rosterTimer = setInterval(() => this.syncRoster(), config.rosterInterval);
+    }
+    // Adaptive status polling — start the self-rescheduling loop once (a reconnect
+    // must not stack a second chain).
+    if (!this.statusPolling) {
+      this.statusPolling = true;
+      this.scheduleStatusPoll(Math.floor(Math.random() * config.statusInterval));
+    }
   }
 
   async readSse(body) {
@@ -528,46 +749,64 @@ export class RamenStream {
         if (done) break;
         lastFrameAt = Date.now();
 
-        // Any frame (offer OR keep-alive) means the stream is alive — heartbeat so
-        // an open-but-quiet stream doesn't drift to "stale/idle" in System Health.
-        // Throttled so frequent keep-alives don't spam the backend.
-        await this.maybeHeartbeat();
-
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
+        if (buffer.length > SSE_BUFFER_MAX) {
+          console.warn(`[${this.tag()}] unterminated SSE line over ${SSE_BUFFER_MAX} chars — reopening from seq ${this.seq}`);
+          this.controller.abort();
+          break;
+        }
 
         for (const line of lines) {
           if (!line.startsWith("data:")) continue;
           const data = line.slice(5).trim();
-          if (data) await this.handleData(data);
+          if (!data) continue;
+          // One malformed frame is skipped; it must not tear down a healthy stream.
+          try {
+            this.handleData(data);
+          } catch (e) {
+            console.error(`[${this.tag()}] bad frame skipped: ${e.message}`);
+          }
         }
+
+        // Any frame (offer OR keep-alive) means the stream is alive — heartbeat so
+        // an open-but-quiet stream doesn't drift to "stale/idle" in System Health.
+        // Throttled, and never awaited: a backend round-trip must not delay reading.
+        this.maybeHeartbeat();
       }
     } finally {
       clearInterval(watchdog);
+      reader.cancel().catch(() => {});
     }
   }
 
   /** Heartbeat on stream activity, at most once per interval, so a live-but-quiet
-   *  stream keeps its "last seen" fresh without spamming the backend. */
-  async maybeHeartbeat() {
+   *  stream keeps its "last seen" fresh without spamming the backend. Never throws. */
+  maybeHeartbeat() {
     const now = Date.now();
     if (this.lastHeartbeatAt && now - this.lastHeartbeatAt < 45000) return;
     this.lastHeartbeatAt = now;
-    await api.heartbeat(this.session.id).catch(() => {});
+    api.heartbeat(this.session.id).catch(() => {});
   }
 
-  async handleData(data) {
+  /**
+   * Parse one SSE data frame: advance seq synchronously, hand offers to the ingest
+   * pipeline without awaiting it (a backend round-trip — geocode + FCM, up to
+   * seconds — must never hold up reading the next offer inside Uber's ~5s window).
+   */
+  handleData(data) {
     let payload;
     try {
       payload = JSON.parse(data);
     } catch {
+      if (data.startsWith("{")) console.warn(`[${this.tag()}] unparseable JSON frame dropped (${data.length} chars)`);
       return; // non-JSON keep-alive frame
     }
+    if (!payload || typeof payload !== "object" || !Array.isArray(payload.msg)) return;
 
-    await this.maybeHeartbeat();
-
-    for (const message of payload.msg ?? []) {
+    for (const message of payload.msg) {
+      if (!message || typeof message !== "object") continue;
       if (typeof message.seq === "number") this.seq = Math.max(this.seq, message.seq);
       if (message.type !== "push_fleet_unified_offer") continue;
 
@@ -578,22 +817,119 @@ export class RamenStream {
         continue;
       }
 
-      const offers = inner?.offers ?? [];
+      const offers = Array.isArray(inner?.offers) ? inner.offers.filter((o) => o && typeof o === "object") : [];
       if (offers.length === 0) continue;
 
-      try {
-        const result = await api.ingest(offers, message.seq);
-        console.log(`[${this.tag()}] ingested ${offers.length} offer(s):`, result);
-      } catch (e) {
-        console.error(`[${this.tag()}] ingest failed: ${e.message}`);
-      }
+      this.enqueueIngest(offers, message.seq);
     }
   }
 
+  /**
+   * Queue offers for ingestion. Offers are split per driver: one driver's offers
+   * stay strictly ordered (the backend supersedes a driver's earlier pending offer
+   * with a newer one), while different drivers are ingested concurrently (up to
+   * INGEST_MAX_CONCURRENCY), so one slow geocode doesn't delay another driver's push.
+   */
+  enqueueIngest(offers, seq) {
+    const groups = new Map();
+    for (const offer of offers) {
+      const key = offer.driverInfo?.driverUUID || "_unknown";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(offer);
+    }
+
+    for (const [key, group] of groups) {
+      const job = { offers: group, seq, enqueuedAt: Date.now(), dropped: false };
+      this.ingestBacklog.push(job);
+      if (this.ingestBacklog.length > INGEST_BACKLOG_MAX) this.dropJob(this.ingestBacklog.shift(), "backlog full");
+
+      const previous = this.ingestChains.get(key) ?? Promise.resolve();
+      const deliver = () => this.deliverIngest(job);
+      // Run after the previous job whether it resolved or not — one failure must
+      // never wedge the driver's chain.
+      const tail = track(previous.then(deliver, deliver));
+      this.ingestChains.set(key, tail);
+      const forget = () => {
+        if (this.ingestChains.get(key) === tail) this.ingestChains.delete(key);
+      };
+      tail.then(forget, forget);
+    }
+  }
+
+  /** Deliver one job, retrying with exponential backoff until it lands or expires. */
+  async deliverIngest(job) {
+    let delay = INGEST_RETRY_MIN_MS;
+    let attempts = 0;
+    try {
+      while (!job.dropped) {
+        attempts++;
+        await this.acquireIngestSlot();
+        let error = null;
+        try {
+          const result = await api.ingest(job.offers, job.seq);
+          console.log(`[${this.tag()}] ingested ${job.offers.length} offer(s)${attempts > 1 ? ` (attempt ${attempts})` : ""}:`, result);
+          return;
+        } catch (e) {
+          error = e;
+        } finally {
+          this.releaseIngestSlot();
+        }
+
+        const age = Date.now() - job.enqueuedAt;
+        console.error(`[${this.tag()}] ingest failed (attempt ${attempts}, seq ${job.seq}): ${error.message}`);
+        if (age >= INGEST_MAX_AGE_MS) {
+          this.dropJob(job, `still failing after ${Math.round(age / 1000)}s: ${error.message}`);
+          return;
+        }
+        if (age >= INGEST_ALERT_AFTER_MS) {
+          captureThrottled(`ingest:${this.session.id}`, error, {
+            where: "ingest_retry",
+            sessionId: this.session.id,
+            attempts,
+            ageMs: age,
+          });
+        }
+        await this.sleep(jitter(delay));
+        delay = Math.min(delay * 2, INGEST_RETRY_MAX_MS);
+      }
+    } finally {
+      const index = this.ingestBacklog.indexOf(job);
+      if (index !== -1) this.ingestBacklog.splice(index, 1);
+    }
+  }
+
+  dropJob(job, reason) {
+    if (!job || job.dropped) return;
+    job.dropped = true;
+    this.ingestDropped++;
+    const message = `dropped ${job.offers.length} offer(s) at seq ${job.seq}: ${reason} (total dropped ${this.ingestDropped})`;
+    console.error(`[${this.tag()}] ${message}`);
+    captureThrottled(`ingest-drop:${this.session.id}`, new Error(`offer ingest ${message}`), {
+      where: "ingest_drop",
+      sessionId: this.session.id,
+    }, 5 * 60 * 1000);
+  }
+
+  acquireIngestSlot() {
+    if (this.ingestActive < INGEST_MAX_CONCURRENCY) {
+      this.ingestActive++;
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => this.ingestWaiters.push(resolve));
+  }
+
+  releaseIngestSlot() {
+    const next = this.ingestWaiters.shift();
+    if (next) next(); // hand the slot straight to the next waiter
+    else this.ingestActive--;
+  }
+
   async backoff() {
-    const delay = this.reconnectDelay;
+    // Jittered so every stream behind one failing proxy/backend doesn't retry in
+    // lockstep. (The 250ms fast reopen above is deliberately NOT jittered.)
+    const delay = jitter(this.reconnectDelay);
     console.log(`[${this.tag()}] reconnecting in ${delay}ms`);
-    await new Promise((r) => setTimeout(r, delay));
+    await this.sleep(delay);
     this.reconnectDelay = Math.min(this.reconnectDelay * 2, config.reconnectMaxDelay);
   }
 
@@ -606,13 +942,15 @@ export class RamenStream {
    * rejected session, not a healthy long-poll cycle. Counts consecutive opens
    * that lived < STORM_MIN_LIFETIME_MS; once STORM_THRESHOLD in a row, run()
    * switches from fast-reopen to exponential backoff so we don't hammer Uber. A
-   * stream that lived long enough resets the counter.
+   * stream that lived long enough resets the counter. Call once per cycle.
    */
   dropStorm() {
-    const STORM_MIN_LIFETIME_MS = 1500;
-    const STORM_THRESHOLD = 6;
     const lifetime = Date.now() - (this.openedAt ?? 0);
-    this.rapidDrops = lifetime < STORM_MIN_LIFETIME_MS ? (this.rapidDrops ?? 0) + 1 : 0;
-    return this.rapidDrops >= STORM_THRESHOLD;
+    const wasStorming = this.rapidDrops >= STORM_THRESHOLD;
+    this.rapidDrops = lifetime < STORM_MIN_LIFETIME_MS ? this.rapidDrops + 1 : 0;
+    const storming = this.rapidDrops >= STORM_THRESHOLD;
+    if (storming && !wasStorming) console.warn(`[${this.tag()}] drop storm — backing off exponentially`);
+    if (!storming && wasStorming) console.log(`[${this.tag()}] drop storm over`);
+    return storming;
   }
 }
