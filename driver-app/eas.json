@@ -19,14 +19,6 @@
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal",
-      "channel": "development",
-      "android": {
-        "buildType": "apk"
-      }
-    },
     "production": {
       "autoIncrement": true,
       "channel": "production",

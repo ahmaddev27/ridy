@@ -6,3 +6,27 @@ frontend/
 extension/
 dispatch-daemon/
 docs/
+
+# .easignore REPLACES .gitignore for EAS uploads, so repeat everything that must
+# never leave this machine: store/signing credentials and env files.
+**/*.p8
+**/*.p12
+**/*.pem
+**/*.jks
+**/*.keystore
+**/*.mobileprovision
+**/credentials.json
+**/*service-account*.json
+**/.env
+**/.env.*
+driver-app/ios-asc-key.p8
+driver-app/play-service-account.json
+
+# Build output, caches and agent worktrees — never needed by the mobile build.
+**/node_modules/
+driver-app/.expo/
+driver-app/dist/
+driver-app/android/
+driver-app/ios/
+.claude/
+.github/
