@@ -9,6 +9,7 @@ use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureUserAccount;
 use App\Http\Middleware\EnsureUserTenantActive;
 use App\Http\Middleware\ResolveTenant;
+use App\Http\Middleware\TrustCloudflareClientIp;
 use App\Http\Middleware\VerifyDispatchSecret;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -47,6 +48,11 @@ return Application::configure(basePath: dirname(__DIR__))
             | Request::HEADER_X_FORWARDED_HOST
             | Request::HEADER_X_FORWARDED_PORT
             | Request::HEADER_X_FORWARDED_PROTO);
+
+        // Cloudflare sits in front of Caddy: when the peer is a Cloudflare edge,
+        // take the real visitor IP from CF-Connecting-IP (appended = runs after
+        // TrustProxies, before any throttle), so per-IP limits aren't shared.
+        $middleware->append(TrustCloudflareClientIp::class);
 
         $middleware->alias([
             'dispatch.secret' => VerifyDispatchSecret::class,

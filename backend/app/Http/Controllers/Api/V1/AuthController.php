@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Auth\PasswordCheck;
 use App\Domain\Billing\PaymentClaimService;
 use App\Http\Controllers\Api\V1\Admin\ImpersonationController;
 use App\Http\Controllers\Controller;
@@ -13,7 +14,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -22,7 +22,8 @@ class AuthController extends Controller
     {
         $user = User::where('email', $request->string('email'))->first();
 
-        if (! $user || ! Hash::check((string) $request->string('password'), $user->password)) {
+        // Constant-work check: an unknown email costs the same bcrypt as a real one.
+        if (! PasswordCheck::matches($user?->password, (string) $request->string('password'))) {
             throw ValidationException::withMessages([
                 'email' => [__('auth.failed')],
             ]);

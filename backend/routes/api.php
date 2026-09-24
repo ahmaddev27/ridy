@@ -68,7 +68,6 @@ use App\Http\Controllers\Api\V1\ResellerController;
 use App\Http\Controllers\Api\V1\SupplierCaptureController;
 use App\Http\Controllers\Api\V1\UberLoginController;
 use App\Http\Controllers\Api\V1\VehicleController;
-use App\Http\Middleware\LogDriverAuthContext;
 use App\Http\Middleware\ResolveTenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
@@ -77,57 +76,63 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     Route::get('health', HealthController::class);
 
-    // Throttle the dashboard credential endpoint (super-admin/manager/reseller)
-    // to blunt brute-force — every other auth endpoint is already throttled.
-    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+    // Rate limits: plain `throttle:N,1` shares ONE counter per client across every
+    // route, so each family below gets its own key (3rd arg) and the credential /
+    // one-time-code routes use named limiters (App\Domain\Auth\AuthRateLimits)
+    // that also cap attempts per target EMAIL, not just per IP.
+
+    // Dashboard credential endpoint (super-admin/manager/reseller).
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:credentials');
 
     // Public force-update gate for the mobile driver app (checked on launch).
-    Route::get('app/version', [AppVersionController::class, 'check'])->middleware('throttle:60,1');
+    Route::get('app/version', [AppVersionController::class, 'check'])->middleware('throttle:60,1,public-read');
 
     // Public plan catalogue for the marketing site's pricing section.
-    Route::get('plans', [PublicPlanController::class, 'index'])->middleware('throttle:60,1');
+    Route::get('plans', [PublicPlanController::class, 'index'])->middleware('throttle:60,1,public-read');
 
     // Public contact form on the landing page (throttled against spam/abuse).
-    Route::post('contact', [ContactController::class, 'store'])->middleware('throttle:5,1');
+    Route::post('contact', [ContactController::class, 'store'])->middleware('throttle:5,1,contact');
 
     // Public support-contact (WhatsApp) for the auth pages' "contact support" button.
-    Route::get('support-contact', [PublicSupportController::class, 'show'])->middleware('throttle:60,1');
+    Route::get('support-contact', [PublicSupportController::class, 'show'])->middleware('throttle:60,1,public-read');
 
     // Public subscription payment methods (bank transfer / cash) for the suspended
     // screen + subscription page — only the admin-enabled methods are returned.
-    Route::get('payment-methods', [PublicPaymentController::class, 'show'])->middleware('throttle:60,1');
+    Route::get('payment-methods', [PublicPaymentController::class, 'show'])->middleware('throttle:60,1,public-read');
 
     // Public company self-registration (email OTP).
-    Route::post('register', [RegistrationController::class, 'start'])->middleware('throttle:6,1');
-    Route::post('register/verify', [RegistrationController::class, 'verify'])->middleware('throttle:12,1');
-    Route::post('register/resend', [RegistrationController::class, 'resend'])->middleware('throttle:3,1');
+    Route::post('register', [RegistrationController::class, 'start'])->middleware('throttle:otp-send');
+    Route::post('register/verify', [RegistrationController::class, 'verify'])->middleware('throttle:otp-verify');
+    Route::post('register/resend', [RegistrationController::class, 'resend'])->middleware('throttle:otp-send');
 
     // Public password reset via email OTP.
-    Route::post('password/forgot', [PasswordResetController::class, 'start'])->middleware('throttle:6,1');
-    Route::post('password/verify', [PasswordResetController::class, 'verify'])->middleware('throttle:12,1');
-    Route::post('password/reset', [PasswordResetController::class, 'reset'])->middleware('throttle:12,1');
+    Route::post('password/forgot', [PasswordResetController::class, 'start'])->middleware('throttle:otp-send');
+    Route::post('password/verify', [PasswordResetController::class, 'verify'])->middleware('throttle:otp-verify');
+    Route::post('password/reset', [PasswordResetController::class, 'reset'])->middleware('throttle:otp-verify');
 
     // Company owner enters the admin-generated activation code (3 tries -> ban).
-    Route::post('company/activate', [CompanyActivationController::class, 'activate'])->middleware('throttle:10,1');
+    Route::post('company/activate', [CompanyActivationController::class, 'activate'])->middleware('throttle:credentials');
     // "I've paid" from the pre-login suspended screen (credential-checked, idempotent).
-    Route::post('company/payment-claim', [CompanyActivationController::class, 'claim'])->middleware('throttle:10,1');
+    Route::post('company/payment-claim', [CompanyActivationController::class, 'claim'])->middleware('throttle:credentials');
 
     // Mobile driver app. Public onboarding + Sanctum-guarded session. No tenant
     // middleware: a driver's tenant is derived from the driver, not the request.
-    Route::prefix('driver')->middleware(LogDriverAuthContext::class)->group(function () {
-        Route::get('invite/{token}', [DriverAuthController::class, 'invite'])->middleware('throttle:20,1');
-        Route::post('activate', [DriverAuthController::class, 'activate'])->middleware('throttle:10,1');
-        Route::post('login', [DriverAuthController::class, 'login'])->middleware('throttle:10,1');
+    Route::prefix('driver')->group(function () {
+        Route::get('invite/{token}', [DriverAuthController::class, 'invite'])->middleware('throttle:20,1,driver-invite');
+        Route::post('activate', [DriverAuthController::class, 'activate'])->middleware('throttle:10,1,driver-activate');
+        // Legacy password sign-in (pre-passwordless builds): shares the per-email
+        // credential budget with the dashboard login, so it's no side door.
+        Route::post('login', [DriverAuthController::class, 'login'])->middleware('throttle:credentials');
 
         // Passwordless sign-in: email a one-time code, then exchange it for a token.
         // Serves both drivers and fleet owners/managers; no password ever set.
-        Route::post('login/request', [DriverAuthController::class, 'loginRequest'])->middleware('throttle:6,1');
-        Route::post('login/verify', [DriverAuthController::class, 'loginVerify'])->middleware('throttle:12,1');
+        Route::post('login/request', [DriverAuthController::class, 'loginRequest'])->middleware('throttle:otp-send');
+        Route::post('login/verify', [DriverAuthController::class, 'loginVerify'])->middleware('throttle:otp-verify');
 
         // In-app "forgot password" via an email OTP (mirrors the manager flow).
-        Route::post('password/forgot', [DriverPasswordResetController::class, 'start'])->middleware('throttle:6,1');
-        Route::post('password/verify', [DriverPasswordResetController::class, 'verify'])->middleware('throttle:12,1');
-        Route::post('password/reset', [DriverPasswordResetController::class, 'reset'])->middleware('throttle:12,1');
+        Route::post('password/forgot', [DriverPasswordResetController::class, 'start'])->middleware('throttle:otp-send');
+        Route::post('password/verify', [DriverPasswordResetController::class, 'verify'])->middleware('throttle:otp-verify');
+        Route::post('password/reset', [DriverPasswordResetController::class, 'reset'])->middleware('throttle:otp-verify');
 
         // `driver.account` re-asserts the caller is a Driver: every route below
         // filters on driver_id = user()->id, so a dashboard User must never pass.
@@ -175,8 +180,9 @@ Route::prefix('v1')->group(function () {
     });
 
     // Internal — the dispatch daemon. Authenticated by a shared secret
-    // (VerifyDispatchSecret), not a user session.
-    Route::middleware('dispatch.secret')->prefix('internal/dispatch')->group(function () {
+    // (VerifyDispatchSecret, optionally IP-allowlisted), not a user session. The
+    // throttle is only a generous ceiling against a leaked secret.
+    Route::middleware(['throttle:dispatch-internal', 'dispatch.secret'])->prefix('internal/dispatch')->group(function () {
         Route::post('ingest', [DispatchIngestController::class, 'ingest']);
         Route::get('sessions', [DispatchDaemonController::class, 'sessions']);
         Route::post('sessions/{session}/cookies', [DispatchDaemonController::class, 'refreshCookies']);
@@ -201,7 +207,7 @@ Route::prefix('v1')->group(function () {
         Route::post('impersonate/stop', [ImpersonationController::class, 'stop']);
         // Dashboard client-side error reporter → the admin's frontend log. Any signed-in
         // dashboard user, throttled + size-capped in the controller.
-        Route::post('client-log', [LogViewerController::class, 'recordFrontend'])->middleware('throttle:30,1');
+        Route::post('client-log', [LogViewerController::class, 'recordFrontend'])->middleware('throttle:30,1,client-log');
         // Reverb broadcasting auth for the dashboard — authorises private channels
         // (e.g. company.{tenantId}) for the signed-in user via routes/channels.php.
         Route::post('broadcasting/auth', fn (Request $request) => Broadcast::auth($request));
@@ -224,9 +230,9 @@ Route::prefix('v1')->group(function () {
         // The company's stable payment reference (quoted on a bank transfer / to support).
         Route::get('subscription/payment-reference', [CompanySubscriptionController::class, 'paymentReference']);
         // "I've paid" from inside the dashboard (idempotent — one pending claim/company).
-        Route::post('subscription/payment-claim', [CompanySubscriptionController::class, 'claim'])->middleware('throttle:10,1');
+        Route::post('subscription/payment-claim', [CompanySubscriptionController::class, 'claim'])->middleware('throttle:10,1,sub-claim');
         // Redeem a subscription code from inside the dashboard (stacks after current).
-        Route::post('subscription/redeem', [CompanySubscriptionController::class, 'redeem'])->middleware('throttle:10,1');
+        Route::post('subscription/redeem', [CompanySubscriptionController::class, 'redeem'])->middleware('throttle:10,1,sub-redeem');
 
         // Fleet drivers
         Route::get('drivers', [DriverController::class, 'index']);
@@ -237,22 +243,22 @@ Route::prefix('v1')->group(function () {
         // Browser-fed ingest: only for a company that has connected its own Uber
         // account (a stored session), never an arbitrary account the manager is
         // signed into. Guarded by fleet.connected.
-        Route::post('drivers/sync', [DriverController::class, 'sync'])->middleware(['fleet.connected', 'can:connections.manage']);
-        Route::post('drivers/roster', [DriverController::class, 'ingestRoster'])->middleware(['fleet.connected', 'can:connections.manage']);
-        Route::post('drivers/statuses', [DriverController::class, 'ingestStatuses'])->middleware(['fleet.connected', 'can:connections.manage']);
+        Route::post('drivers/sync', [DriverController::class, 'sync'])->middleware(['throttle:ext-ingest', 'fleet.connected', 'can:connections.manage']);
+        Route::post('drivers/roster', [DriverController::class, 'ingestRoster'])->middleware(['throttle:ext-ingest', 'fleet.connected', 'can:connections.manage']);
+        Route::post('drivers/statuses', [DriverController::class, 'ingestStatuses'])->middleware(['throttle:ext-ingest', 'fleet.connected', 'can:connections.manage']);
 
         // Per-driver Uber performance metrics (earnings/hours/trips)
-        Route::post('drivers/metrics', [DriverMetricController::class, 'store'])->middleware(['fleet.connected', 'can:connections.manage']);
+        Route::post('drivers/metrics', [DriverMetricController::class, 'store'])->middleware(['throttle:ext-ingest', 'fleet.connected', 'can:connections.manage']);
         Route::get('drivers/{driver}/metrics', [DriverMetricController::class, 'index']);
 
         // Fleet vehicles (synced from Uber via the extension)
         Route::get('vehicles', [VehicleController::class, 'index']);
-        Route::post('vehicles', [VehicleController::class, 'ingest'])->middleware(['fleet.connected', 'can:connections.manage']);
+        Route::post('vehicles', [VehicleController::class, 'ingest'])->middleware(['throttle:ext-ingest', 'fleet.connected', 'can:connections.manage']);
 
         // Generic supplier capture — the extension pulls any Uber Fleet tab
         // (documents/reports/invoices/banking/promotions/inbox/…) and POSTs the raw
         // payload here tagged with a kind, so it lands in the admin Network feed.
-        Route::post('supplier/capture', [SupplierCaptureController::class, 'store'])->middleware(['fleet.connected', 'can:connections.manage']);
+        Route::post('supplier/capture', [SupplierCaptureController::class, 'store'])->middleware(['throttle:ext-ingest', 'fleet.connected', 'can:connections.manage']);
 
         // Dispatch offers feed
         Route::get('dispatch/offers', [DispatchOfferController::class, 'index'])->middleware('can:offers.view');
@@ -260,7 +266,7 @@ Route::prefix('v1')->group(function () {
         Route::get('dispatch/offers/export', [DispatchOfferController::class, 'export'])->middleware('can:offers.view');
         Route::get('dispatch/offers/{offer}', [DispatchOfferController::class, 'show'])->middleware('can:offers.view');
         // Extension forwards RAMEN offers captured in the manager's browser.
-        Route::post('dispatch/offers/ingest', [DispatchOfferController::class, 'ingest'])->middleware(['fleet.connected', 'can:connections.manage']);
+        Route::post('dispatch/offers/ingest', [DispatchOfferController::class, 'ingest'])->middleware(['throttle:ext-offers', 'fleet.connected', 'can:connections.manage']);
         Route::post('dispatch/offers/bulk-delete', [DispatchOfferController::class, 'bulkDestroy'])->middleware('can:offers.manage');
         Route::delete('dispatch/offers/{offer}', [DispatchOfferController::class, 'destroy'])->middleware('can:offers.manage');
 
@@ -288,8 +294,10 @@ Route::prefix('v1')->group(function () {
         // Send a diagnostic test push to the driver's registered devices.
         Route::post('drivers/{driver}/test-push', [DriverPushController::class, 'test'])->middleware('can:drivers.manage');
 
-        // Driver app registers its push device token
-        Route::post('devices', [DeviceTokenController::class, 'store']);
+        // Legacy dashboard device-token route (no client uses it; the driver app
+        // registers via /driver/devices). Gated so a viewer can't re-point a push
+        // token at any driver of the tenant.
+        Route::post('devices', [DeviceTokenController::class, 'store'])->middleware('can:drivers.manage');
 
         // Notifications
         Route::get('notifications', [NotificationController::class, 'index']);
@@ -308,7 +316,7 @@ Route::prefix('v1')->group(function () {
         Route::get('audit-logs', [AuditLogController::class, 'index'])->middleware('can:audit.view');
 
         // The authenticated user edits their own account (managers + super-admin).
-        Route::put('profile', [ProfileController::class, 'update']);
+        Route::put('profile', [ProfileController::class, 'update'])->middleware('throttle:10,1,profile');
     });
 
     // Platform owner (super-admin). Deliberately WITHOUT ResolveTenant so the
