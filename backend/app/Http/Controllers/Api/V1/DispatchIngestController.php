@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\DispatchOfferIngestor;
+use App\Domain\Dispatch\LockRetry;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Http\Controllers\Controller;
@@ -28,6 +29,7 @@ class DispatchIngestController extends Controller
         // ONE pre-push geocode budget for the whole batch: a second offer in the
         // same message must never wait out a fresh budget behind the first.
         $deadline = DispatchOfferIngestor::batchDeadline();
+        $retryable = false;
 
         foreach ($data['offers'] as $offer) {
             // Route by the ACTIVE session for this Uber org, not the tenant's
@@ -60,15 +62,24 @@ class DispatchIngestController extends Controller
                 $outcome = $ingestor->ingest($tenantId, $offer, $seq, $deadline);
                 $results[$outcome['status']] = ($results[$outcome['status']] ?? 0) + 1;
             } catch (Throwable $e) {
-                // One failing offer must never 500 the batch: the daemon doesn't
-                // retry, so every later offer in this message would be lost.
+                // One failing offer never stops the rest of the batch.
                 $results['error']++;
+                $retryable = $retryable || LockRetry::isTransient($e);
                 report($e);
                 Log::error('dispatch_offer.ingest_error', [
                     'offer_uuid' => is_scalar($offer['offerUUID'] ?? null) ? $offer['offerUUID'] : null,
                     'error' => $e->getMessage(),
                 ]);
             }
+        }
+
+        // A transient DB failure (lost connection, deadlock) is worth the daemon's
+        // retry of the whole message: ingest is idempotent on offer_uuid, so offers
+        // this attempt already stored come back as `duplicate` with no second push.
+        // A deterministic failure (bad payload) stays a 200, or the daemon would
+        // retry it for minutes and hold up that driver's later offers.
+        if ($retryable) {
+            return response()->json(['data' => $results], 503, ['Retry-After' => '1']);
         }
 
         return response()->json(['data' => $results]);

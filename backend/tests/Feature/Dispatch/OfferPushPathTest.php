@@ -122,6 +122,50 @@ class OfferPushPathTest extends TestCase
         $this->assertSame(['phone'], $this->spy->tokens);
     }
 
+    public function test_a_transient_db_failure_asks_the_daemon_to_retry_without_double_pushing(): void
+    {
+        $pdo = new \PDOException('SQLSTATE[HY000]: General error: 2006 MySQL server has gone away');
+        $pdo->errorInfo = ['HY000', 2006, 'MySQL server has gone away'];
+        $goneAway = new QueryException('mysql', 'insert into dispatch_offers ...', [], $pdo);
+
+        $ingestor = new class($goneAway, app(TenantContext::class), app(DispatchNotifier::class), app(OfferLifecycle::class), app(TripGeocoder::class)) extends DispatchOfferIngestor
+        {
+            public bool $failOnce = true;
+
+            public function __construct(private QueryException $failure, ...$deps)
+            {
+                parent::__construct(...$deps);
+            }
+
+            public function ingest(int $tenantId, array $offer, ?int $seq = null, ?float $geocodeDeadline = null): array
+            {
+                if ($offer['offerUUID'] === 'flaky' && $this->failOnce) {
+                    $this->failOnce = false;
+                    throw $this->failure;
+                }
+
+                return parent::ingest($tenantId, $offer, $seq, $geocodeDeadline);
+            }
+        };
+        $this->app->instance(DispatchOfferIngestor::class, $ingestor);
+
+        // The batch still processes the healthy offer, but answers 503 so the daemon retries.
+        $this->ingest([$this->offer('ok'), $this->offer('flaky')])
+            ->assertStatus(503)
+            ->assertHeader('Retry-After', '1')
+            ->assertJsonPath('data.routed', 1)
+            ->assertJsonPath('data.error', 1);
+
+        // The retry of the same message: the stored offer is a duplicate (no second push).
+        $this->ingest([$this->offer('ok'), $this->offer('flaky')])
+            ->assertOk()
+            ->assertJsonPath('data.duplicate', 1)
+            ->assertJsonPath('data.routed', 1);
+
+        $this->assertSame(1, DispatchOffer::withoutGlobalScopes()->where('offer_uuid', 'ok')->count());
+        $this->assertSame(['phone', 'phone'], $this->spy->tokens, 'each offer pushed exactly once');
+    }
+
     public function test_non_scalar_offer_fields_are_ignored_instead_of_failing(): void
     {
         $offer = $this->offer('o-arr');
