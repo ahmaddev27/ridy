@@ -16,13 +16,16 @@ async function call(method, path, body) {
     headers,
     body: body ? JSON.stringify(body) : undefined,
     // fetch has no default timeout: without this a backend that accepts the
-    // connection but never answers parks the promise forever — and these calls sit
-    // inside the SSE read loop and the adaptive status chain, which would both
-    // stall silently. A rejection is already handled as retryable by every caller.
+    // connection but never answers parks the promise forever (a stalled status
+    // chain, a never-settling ingest). Callers decide what a rejection means:
+    // ingests are retried by the stream's queue, polls/heartbeats retry next cycle.
     signal: AbortSignal.timeout(config.apiTimeout),
   });
   if (!res.ok) {
-    throw new Error(`${method} ${path} -> ${res.status} ${await res.text().catch(() => "")}`);
+    // Bounded: an HTML error page (Caddy 503 during a deploy) would otherwise
+    // flood the logs and Sentry with kilobytes per failure.
+    const text = await res.text().catch(() => "");
+    throw new Error(`${method} ${path} -> ${res.status} ${text.slice(0, 300)}`);
   }
   return res.json();
 }
