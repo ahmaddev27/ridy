@@ -7,12 +7,14 @@ import { useAuth } from "./auth-provider";
 
 /** Gates the app shell: redirects to /login when there is no authenticated user. */
 export function AppGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, endingSession } = useAuth();
   const router = useRouter();
 
+  // While the provider ends the session it navigates itself (keeping ?reason=
+  // for the login screen); a second replace here would win and drop it.
   useEffect(() => {
-    if (!loading && !user) router.replace("/login");
-  }, [loading, user, router]);
+    if (!loading && !user && !endingSession) router.replace("/login");
+  }, [loading, user, endingSession, router]);
 
   if (loading) {
     return (
