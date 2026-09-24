@@ -2,20 +2,19 @@
 
 namespace App\Http\Controllers\Api\V1\Driver;
 
+use App\Domain\Auth\OtpGuard;
+use App\Domain\Auth\PasswordCheck;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\SendTemplatedMail;
 use App\Domain\Tenancy\Models\Tenant;
-use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Http\Controllers\Controller;
-use App\Models\PasswordReset;
+use App\Http\Middleware\EnsureFleetOwner;
 use App\Models\User;
 use App\Support\Settings;
-use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -25,16 +24,15 @@ use Illuminate\Validation\ValidationException;
  */
 class DriverAuthController extends Controller
 {
-    use GeneratesOtp;
-
     private const OTP_TTL_MINUTES = 10;
-
-    private const MAX_ATTEMPTS = 5;
 
     /** The single ability a fleet-owner app token carries (see EnsureDashboardToken). */
     private const OWNER_APP_ABILITY = 'fleet:read';
 
-    public function __construct(private readonly DriverInvitationService $invitations) {}
+    public function __construct(
+        private readonly DriverInvitationService $invitations,
+        private readonly OtpGuard $otp,
+    ) {}
 
     /**
      * Passwordless sign-in step 1: email a 6-digit code. Works for a driver
@@ -47,14 +45,7 @@ class DriverAuthController extends Controller
 
         $name = $this->accountName($data['email']);
         if ($name !== null) {
-            $reset = PasswordReset::updateOrCreate(
-                ['email' => $data['email']],
-                [
-                    'otp' => $this->newOtp(),
-                    'otp_expires_at' => CarbonImmutable::now()->addMinutes(self::OTP_TTL_MINUTES),
-                    'attempts' => 0,
-                ],
-            );
+            $reset = $this->otp->issueReset($data['email'], self::OTP_TTL_MINUTES);
 
             SendTemplatedMail::to($data['email'], 'driver_login_otp', ['name' => $name, 'otp' => $reset->otp]);
         }
@@ -76,31 +67,49 @@ class DriverAuthController extends Controller
 
         // No account-specific bypass lives here: the only non-emailed code path is
         // GeneratesOtp::isTestCode(), which hard-refuses in production.
-        $reset = $this->validOtpOrFail($data['email'], $data['otp']);
+        $reset = $this->otp->verifyReset($data['email'], $data['otp']);
 
-        $driver = Driver::withoutGlobalScopes()->where('email', $reset->email)->first();
-        if ($driver !== null) {
-            $this->guardSuspendedTenant($driver->loadMissing('tenant')->tenant);
-            $driver->forceFill([
-                'activated_at' => $driver->activated_at ?? now(),
-                'invite_token' => null,
-                'last_login_at' => now(),
-            ])->save();
-            $reset->delete();
-
-            return $this->tokenResponse($driver);
+        $account = $this->resolveAppAccount($reset->email);
+        if ($account === null) {
+            $this->otp->consume($reset);
+            // Same answer as a wrong code: verify must not reveal account existence.
+            throw ValidationException::withMessages(['otp' => 'otp_incorrect']);
         }
 
-        $owner = $this->findOwnerByEmail($reset->email);
-        if ($owner !== null) {
-            $this->guardSuspendedTenant($owner->loadMissing('tenant')->tenant);
-            $reset->delete();
+        $this->guardSuspendedTenant($account->loadMissing('tenant')->tenant);
+        // Spend the code exactly once before minting — a concurrent second correct
+        // submit gets otp_incorrect instead of a second token.
+        $this->otp->consume($reset);
 
-            return $this->ownerTokenResponse($owner);
+        if ($account instanceof User) {
+            return $this->ownerTokenResponse($account);
         }
 
-        $reset->delete();
-        throw ValidationException::withMessages(['otp' => 'otp_none']);
+        $account->forceFill([
+            'activated_at' => $account->activated_at ?? now(),
+            'invite_token' => null,
+            'last_login_at' => now(),
+        ])->save();
+
+        return $this->tokenResponse($account);
+    }
+
+    /**
+     * Which app identity an email signs into. A driver row normally wins, EXCEPT
+     * when the email is also an owner/manager of a DIFFERENT company: a driver's
+     * email is set by that company's manager, so another tenant could otherwise
+     * "claim" an owner's address and capture their app sign-in.
+     */
+    private function resolveAppAccount(string $email): Driver|User|null
+    {
+        $driver = Driver::withoutGlobalScopes()->where('email', $email)->first();
+        $owner = $this->findOwnerByEmail($email);
+
+        if ($driver !== null && ($owner === null || $owner->tenant_id === $driver->tenant_id)) {
+            return $driver;
+        }
+
+        return $owner;
     }
 
     /** Preview an invitation so the activation screen can greet the driver. */
@@ -152,7 +161,7 @@ class DriverAuthController extends Controller
         ]);
 
         $driver = Driver::withoutGlobalScopes()->where('email', $data['email'])->first();
-        if ($driver !== null && $driver->activated_at !== null && Hash::check($data['password'], (string) $driver->password)) {
+        if ($driver !== null && $driver->activated_at !== null && PasswordCheck::matches($driver->password, $data['password'])) {
             $this->guardSuspendedTenant($driver->loadMissing('tenant')->tenant);
             $driver->forceFill(['last_login_at' => now()])->save();
 
@@ -174,17 +183,20 @@ class DriverAuthController extends Controller
         return response()->json(['data' => $this->profile($request->user())]);
     }
 
-    /** The driver edits their own name, app language, and (optionally) password. */
+    /**
+     * The driver edits their own name and app language. The app is passwordless,
+     * so a bearer token can no longer set a password (a stolen token must not be
+     * able to plant a lasting credential); a sent `password` is ignored.
+     */
     public function update(Request $request): JsonResponse
     {
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:120'],
             'locale' => ['sometimes', 'in:de,en,ar'],
-            'password' => ['sometimes', 'string', 'min:8'],
         ]);
 
         $driver = $request->user();
-        $driver->fill(array_intersect_key($data, array_flip(['name', 'locale', 'password'])));
+        $driver->fill($data);
         $driver->save();
 
         return response()->json(['data' => $this->profile($driver)]);
@@ -224,10 +236,11 @@ class DriverAuthController extends Controller
     private function findOwner(string $email, string $password): ?User
     {
         $user = User::where('email', $email)->first();
-        if ($user === null
+        // The hash check always runs (against a dummy for an unknown email), so the
+        // response time doesn't reveal whether the account exists.
+        if (! PasswordCheck::matches($user?->password, $password)
             || $user->tenant_id === null
-            || ! $user->hasAnyRole(['fleet_manager', 'owner'])
-            || ! Hash::check($password, (string) $user->password)) {
+            || ! $user->hasAnyRole(EnsureFleetOwner::ROLES)) {
             return null;
         }
 
@@ -256,35 +269,11 @@ class DriverAuthController extends Controller
         $user = User::where('email', $email)->first();
         if ($user === null
             || $user->tenant_id === null
-            || ! $user->hasAnyRole(['fleet_manager', 'owner'])) {
+            || ! $user->hasAnyRole(EnsureFleetOwner::ROLES)) {
             return null;
         }
 
         return $user;
-    }
-
-    /**
-     * Resolve a pending OTP whose code matches, or throw a coded validation error
-     * (the app localizes the code). A wrong code counts an attempt.
-     */
-    private function validOtpOrFail(string $email, string $otp): PasswordReset
-    {
-        $reset = PasswordReset::where('email', $email)->first();
-        if ($reset === null) {
-            throw ValidationException::withMessages(['otp' => 'otp_none']);
-        }
-        if ($reset->otp_expires_at->isPast()) {
-            throw ValidationException::withMessages(['otp' => 'otp_expired']);
-        }
-        if ($reset->attempts >= self::MAX_ATTEMPTS) {
-            throw ValidationException::withMessages(['otp' => 'otp_too_many']);
-        }
-        if (! hash_equals($reset->otp, $otp) && ! $this->isTestCode($otp)) {
-            $reset->increment('attempts');
-            throw ValidationException::withMessages(['otp' => 'otp_incorrect']);
-        }
-
-        return $reset;
     }
 
     private function tokenResponse(Driver $driver): JsonResponse

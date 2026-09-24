@@ -44,11 +44,19 @@ return [
             'provider' => 'users',
         ],
 
-        // Mobile driver app — Sanctum bearer tokens issued to Driver models.
+        // Mobile driver app — Sanctum bearer tokens issued to Driver models ONLY.
+        // `sanctum-bearer` (App\Domain\Auth\BearerTokenGuard) never falls back to
+        // the dashboard's web session, and the `drivers` provider rejects any
+        // User (manager / owner-app / extension) token. Two guards — don't cross them.
         'driver' => [
-            'driver' => 'sanctum',
+            'driver' => 'sanctum-bearer',
             'provider' => 'drivers',
         ],
+
+        // NOTE: no explicit `sanctum` guard with a `users` provider — spatie/permission
+        // would then resolve role checks against a `sanctum` guard with no seeded
+        // permissions. Driver tokens on `auth:sanctum` routes are rejected by the
+        // `user.account` middleware instead.
     ],
 
     /*

@@ -112,6 +112,8 @@ class DispatchNotificationTest extends TestCase
         $user = User::create([
             'name' => 'M', 'email' => 'm@ya.de', 'password' => Hash::make('password'), 'tenant_id' => $this->tenant->id,
         ]);
+        // The legacy dashboard device route is gated on drivers.manage.
+        $user->assignRole('fleet_manager');
         Sanctum::actingAs($user);
 
         $this->postJson('/api/v1/devices', [

@@ -29,26 +29,33 @@ class EnsureDashboardToken
     private const FLEET_OWNER_ABILITY = 'fleet:read';
 
     /**
-     * Ability => the only route URIs (Str::is patterns) a token holding it may
-     * reach. A token holding none of these abilities is not confined here.
+     * Ability => the only "METHOD uri" pairs (Str::is patterns) a token holding it
+     * may reach. Method-aware on purpose: the URI alone let the extension token
+     * DELETE /fleet-session (a full company purge) and GET /vehicles. A token
+     * holding none of these abilities is not confined here. HEAD counts as GET.
      */
     private const CONFINED_ABILITIES = [
         // Live session capture/status plus the browser-fed ingest endpoints.
         self::EXTENSION_ABILITY => [
-            'api/v1/fleet-session',
-            'api/v1/fleet-session/reconnect',
-            'api/v1/fleet-session/report-broken',
-            'api/v1/drivers/sync',
-            'api/v1/drivers/roster',
-            'api/v1/drivers/statuses',
-            'api/v1/drivers/metrics',
-            'api/v1/vehicles',
-            'api/v1/dispatch/offers/ingest',
-            'api/v1/supplier/capture',
+            'GET api/v1/fleet-session',
+            'POST api/v1/fleet-session',
+            'POST api/v1/fleet-session/report-broken',
+            'POST api/v1/drivers/sync',
+            'POST api/v1/drivers/roster',
+            'POST api/v1/drivers/statuses',
+            'POST api/v1/drivers/metrics',
+            'POST api/v1/vehicles',
+            'POST api/v1/dispatch/offers/ingest',
+            'POST api/v1/supplier/capture',
         ],
-        // The whole fleet-owner group of the driver app — read-only by design.
+        // The fleet-owner group of the driver app — read-only by design, plus the
+        // owner's own profile, logout and push device.
         self::FLEET_OWNER_ABILITY => [
-            'api/v1/driver/fleet/*',
+            'GET api/v1/driver/fleet/*',
+            'PATCH api/v1/driver/fleet/me',
+            'POST api/v1/driver/fleet/logout',
+            'POST api/v1/driver/fleet/devices',
+            'DELETE api/v1/driver/fleet/devices',
         ],
     ];
 
@@ -62,14 +69,15 @@ class EnsureDashboardToken
             return $next($request);
         }
 
-        $uri = $request->route()?->uri();
+        $method = $request->isMethod('HEAD') ? 'GET' : $request->getMethod();
+        $target = $method.' '.$request->route()?->uri();
 
         foreach (self::CONFINED_ABILITIES as $ability => $allowed) {
             if (! $token->can($ability)) {
                 continue;
             }
 
-            abort_unless(Str::is($allowed, (string) $uri), 403, match ($ability) {
+            abort_unless(Str::is($allowed, $target), 403, match ($ability) {
                 self::EXTENSION_ABILITY => 'This token is limited to fleet-session ingest.',
                 self::FLEET_OWNER_ABILITY => 'This token is limited to the fleet-owner app.',
                 default => 'This token is limited to a narrower scope.',

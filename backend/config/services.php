@@ -22,6 +22,9 @@ return [
         // Shared secret the Node dispatch daemon uses to authenticate to the
         // internal ingest endpoint. Must be set for that endpoint to accept calls.
         'ingest_secret' => env('DISPATCH_INGEST_SECRET'),
+        // Optional source-IP allowlist (comma-separated IPs/CIDRs) for the
+        // internal dispatch API. Empty = any IP (secret only).
+        'allowed_ips' => array_filter(array_map('trim', explode(',', (string) env('DISPATCH_ALLOWED_IPS', '')))),
     ],
 
     'resend' => [
