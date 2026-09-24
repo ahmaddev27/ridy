@@ -8,6 +8,7 @@ use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
+use App\Http\Requests\FleetDayRange;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -61,11 +62,26 @@ class DateRangeAndStatsTest extends TestCase
 
         $this->getJson('/api/v1/driver/stats?from=abc')->assertStatus(422);
         $this->getJson('/api/v1/driver/stats?from=0001-01-01&to=9999-12-31')->assertStatus(422);
-        $this->getJson('/api/v1/driver/stats?from=2026-09-10&to=2026-09-01')->assertStatus(422);
 
         $res = $this->getJson('/api/v1/driver/stats?from=2026-09-01&to=2026-09-07')->assertOk();
         $this->assertCount(7, $res->json('data.daily'));
         $this->getJson('/api/v1/driver/offers?from=nope')->assertStatus(422);
+    }
+
+    public function test_reversed_and_over_long_ranges_are_clamped_not_refused(): void
+    {
+        $driver = Driver::create(['tenant_id' => $this->tenant->id, 'name' => 'Omar', 'email' => 'o@ya.de']);
+        Sanctum::actingAs($driver, guard: 'driver');
+
+        // A custom range picked backwards reads as the same range forwards.
+        $res = $this->getJson('/api/v1/driver/stats?from=2026-09-07&to=2026-09-01')->assertOk();
+        $this->assertCount(7, $res->json('data.daily'));
+        $this->getJson('/api/v1/driver/offers?from=2026-09-07&to=2026-09-01')->assertOk();
+
+        // Longer than a year: the latest MAX_DAYS fleet-days, still bounded.
+        $res = $this->getJson('/api/v1/driver/stats?from=2020-01-01&to=2026-09-07')->assertOk();
+        $this->assertCount(FleetDayRange::MAX_DAYS, $res->json('data.daily'));
+        $this->assertSame('2026-09-07', collect($res->json('data.daily'))->last()['date'] ?? null);
     }
 
     public function test_driver_home_exposes_the_live_pending_offer(): void

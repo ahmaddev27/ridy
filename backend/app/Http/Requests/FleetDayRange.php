@@ -25,9 +25,13 @@ final class FleetDayRange
      * A bounded stats window [from 04:00, to+1 04:00) — `to` exclusive — defaulting
      * to the last $defaultDays fleet-days through today.
      *
+     * A span longer than $maxDays is CLAMPED to its latest $maxDays fleet-days
+     * rather than refused: the dashboard's custom range sends such spans (a `from`
+     * picked more than a year back) and used to get data, not an error.
+     *
      * @return array{0: CarbonImmutable, 1: CarbonImmutable}
      *
-     * @throws ValidationException 422 on a malformed, reversed or over-long range
+     * @throws ValidationException 422 on a malformed date
      */
     public static function window(Request $request, int $defaultDays, int $maxDays = self::MAX_DAYS): array
     {
@@ -36,35 +40,36 @@ final class FleetDayRange
         $from ??= FleetDay::startDaysAgo($defaultDays);
         $to ??= FleetDay::todayStart()->addDay();
 
-        if ($from->diffInDays($to) > $maxDays + 1) {
-            throw ValidationException::withMessages(['to' => ["The date range may span at most {$maxDays} days."]]);
-        }
-
-        return [$from, $to];
+        return [$from->max($to->subDays($maxDays)), $to];
     }
 
     /**
      * The optional list filters as fleet-day bounds (null when absent). Validates
      * the format only — list queries don't zero-fill, so no span cap is needed.
+     * A reversed pair (from after to, e.g. a dashboard custom range picked
+     * backwards) is swapped instead of refused.
      *
      * @return array{0: CarbonImmutable|null, 1: CarbonImmutable|null}
      *
-     * @throws ValidationException 422 on a malformed or reversed range
+     * @throws ValidationException 422 on a malformed date
      */
     public static function filters(Request $request): array
     {
-        $rules = [
-            'from' => ['nullable', 'date_format:Y-m-d'],
-            'to' => ['nullable', 'date_format:Y-m-d'],
-        ];
-        if ($request->filled('from') && $request->filled('to')) {
-            $rules['to'][] = 'after_or_equal:from';
+        // Plausible years only: 9999-12-31 + 1 day is not a valid MySQL datetime.
+        $date = ['nullable', 'date_format:Y-m-d', 'after_or_equal:2000-01-01', 'before_or_equal:2099-12-31'];
+        $request->validate(['from' => $date, 'to' => $date]);
+
+        $fromDate = $request->filled('from') ? (string) $request->string('from') : null;
+        $toDate = $request->filled('to') ? (string) $request->string('to') : null;
+
+        // Y-m-d labels order correctly as strings.
+        if ($fromDate !== null && $toDate !== null && $fromDate > $toDate) {
+            [$fromDate, $toDate] = [$toDate, $fromDate];
         }
-        $request->validate($rules);
 
         return [
-            $request->filled('from') ? FleetDay::startOfDate((string) $request->string('from')) : null,
-            $request->filled('to') ? FleetDay::endOfDate((string) $request->string('to')) : null,
+            $fromDate !== null ? FleetDay::startOfDate($fromDate) : null,
+            $toDate !== null ? FleetDay::endOfDate($toDate) : null,
         ];
     }
 }
