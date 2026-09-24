@@ -123,4 +123,17 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Platform super-admin bootstrap password
+    |--------------------------------------------------------------------------
+    |
+    | Read only by DatabaseSeeder when it creates the first super_admin on a
+    | fresh box. In production the seeder refuses a missing or weak value, so a
+    | new server can never come up with a guessable platform account.
+    |
+    */
+
+    'superadmin_password' => env('SUPERADMIN_PASSWORD'),
+
 ];

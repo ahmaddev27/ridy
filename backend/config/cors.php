@@ -21,10 +21,14 @@ return [
     /*
      * The Ridy browser extension posts the captured Uber session from its own
      * chrome-extension:// (or moz-extension://) origin using a Bearer token. When
-     * EXTENSION_ORIGIN is set we rely on the exact origin above; otherwise (dev,
-     * or before the id is known) fall back to the anchored scheme patterns.
+     * EXTENSION_ORIGIN is set we rely on the exact origin above. The broad
+     * "any extension" patterns are a dev convenience only: production never
+     * uses them, so an unset EXTENSION_ORIGIN fails closed instead of letting
+     * every installed extension make credentialed calls. (The published
+     * extension is unaffected either way: it calls the API from its service
+     * worker under host_permissions, which CORS does not gate.)
      */
-    'allowed_origins_patterns' => env('EXTENSION_ORIGIN') ? [] : [
+    'allowed_origins_patterns' => (env('EXTENSION_ORIGIN') || env('APP_ENV') === 'production') ? [] : [
         '#^chrome-extension://[a-p]{32}$#',
         '#^moz-extension://[0-9a-f-]{36}$#',
     ],
