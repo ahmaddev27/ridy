@@ -191,8 +191,9 @@ class DriverController extends Controller
     public function ingestRoster(Request $request, RosterSyncService $roster, SupplierNetworkRecorder $recorder): JsonResponse
     {
         $data = $request->validate([
-            'drivers' => ['required', 'array'],
-            'uber_org_uuid' => ['nullable', 'string'],
+            'drivers' => ['required', 'array', 'max:'.RosterSyncService::MAX_DRIVERS],
+            'drivers.*' => ['array'],
+            'uber_org_uuid' => ['nullable', 'string', 'max:64'],
         ]);
 
         $tenant = $request->user()->tenant;

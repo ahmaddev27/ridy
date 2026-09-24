@@ -20,6 +20,9 @@ use Illuminate\Support\Facades\DB;
  */
 class RosterSyncService
 {
+    /** Largest roster accepted per sync request (far above any real fleet). */
+    public const MAX_DRIVERS = 5000;
+
     /** Roster sync lock lifetime / how long a concurrent sync waits for it. */
     private const LOCK_SECONDS = 30;
 
