@@ -9,6 +9,7 @@ use App\Domain\Dispatch\ShardService;
 use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Domain\Fleet\DriverStatusIngestor;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\IngestDriverStatusesRequest;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -103,20 +104,14 @@ class DispatchDaemonController extends Controller
      * the statuses here. Same effect as the manager's extension sync (updates
      * presence + marks offers accepted on an ON_TRIP transition) but runs 24/7.
      */
-    public function statuses(Request $request, int $session, DriverStatusIngestor $ingestor, SupplierNetworkRecorder $recorder): JsonResponse
+    public function statuses(IngestDriverStatusesRequest $request, int $session, DriverStatusIngestor $ingestor, SupplierNetworkRecorder $recorder): JsonResponse
     {
-        $data = $request->validate([
-            'statuses' => ['required', 'array'],
-            'statuses.*.driver_uuid' => ['required', 'string'],
-            'statuses.*.status' => ['nullable', 'string'],
-            'statuses.*.location_updated_at' => ['nullable', 'numeric'],
-            'statuses.*.latitude' => ['nullable', 'numeric'],
-            'statuses.*.longitude' => ['nullable', 'numeric'],
-            'statuses.*.heading' => ['nullable', 'numeric'],
-            'statuses.*.waypoints' => ['nullable', 'array'],
-        ]);
+        $data = $request->validated();
 
         $tenantId = (int) $this->find($session)->tenant_id;
+        // Mark the daemon as this company's status source first, so a concurrent
+        // (older) extension batch stands down — see DriverController::ingestStatuses.
+        DriverStatusIngestor::markDaemonFeeding($tenantId);
         $recorder->statuses($tenantId, $data['statuses']);
         $result = $ingestor->ingest($tenantId, $data['statuses']);
 

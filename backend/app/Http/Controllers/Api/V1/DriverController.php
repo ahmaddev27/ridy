@@ -15,6 +15,7 @@ use App\Domain\Geo\PostalCodes;
 use App\Events\DriversBroadcast;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\IngestDriverStatusesRequest;
 use App\Http\Resources\DriverResource;
 use App\Support\FleetDay;
 use Illuminate\Http\JsonResponse;
@@ -38,25 +39,19 @@ class DriverController extends Controller
         //
         // Ordered live-first (on-trip → en-route → online → offline), then by name,
         // so the drivers who are working right now are at the top — mirrors the
-        // admin fleet directory.
-        $liveFirst = "CASE
-                WHEN online_status LIKE '%ON_TRIP%' THEN 0
-                WHEN online_status LIKE '%EN_ROUTE%' THEN 1
-                WHEN online_status LIKE '%ONLINE%' THEN 2
-                ELSE 3 END";
-
-        // The live-first ORDER BY is a CASE expression that can never use an index,
-        // so it always filesorts. Deferred join: sort/paginate on id + the sort
-        // columns only (never the driver JSON columns trip_waypoints/external_ids),
-        // so the sort buffer stays small (avoids 1038 out-of-sort-memory on a large
-        // fleet), then fetch the page's full rows by id.
+        // admin fleet directory. See Driver::scopeLiveFirst.
+        //
+        // The multi-column order still filesorts. Deferred join: sort/paginate on id
+        // + the sort columns only (never the driver JSON columns trip_waypoints/
+        // external_ids), so the sort buffer stays small (avoids 1038 out-of-sort-
+        // memory on a large fleet), then fetch the page's full rows by id.
         $page = Driver::query()->activeFleet()
-            ->select('id', 'name', 'online_status')
-            ->orderByRaw($liveFirst)->orderBy('name')->orderBy('id')
+            ->select('id', 'name', 'engagement', 'is_online')
+            ->liveFirst()
             ->paginate(50);
 
         $drivers = Driver::query()->whereIn('id', $page->pluck('id'))->with('latestDeviceToken')
-            ->orderByRaw($liveFirst)->orderBy('name')->orderBy('id')
+            ->liveFirst()
             ->get();
 
         $page->setCollection($drivers);
@@ -227,20 +222,20 @@ class DriverController extends Controller
      * Live online/offline presence, posted by the extension after querying
      * Uber's GetDriverLiveLocation. Matched to drivers by Uber UUID.
      */
-    public function ingestStatuses(Request $request, DriverStatusIngestor $ingestor, SupplierNetworkRecorder $recorder): JsonResponse
+    public function ingestStatuses(IngestDriverStatusesRequest $request, DriverStatusIngestor $ingestor, SupplierNetworkRecorder $recorder): JsonResponse
     {
-        $data = $request->validate([
-            'statuses' => ['required', 'array'],
-            'statuses.*.driver_uuid' => ['required', 'string'],
-            'statuses.*.status' => ['nullable', 'string'],
-            'statuses.*.location_updated_at' => ['nullable', 'numeric'], // ms epoch
-            'statuses.*.latitude' => ['nullable', 'numeric'],
-            'statuses.*.longitude' => ['nullable', 'numeric'],
-            'statuses.*.heading' => ['nullable', 'numeric'],
-            'statuses.*.waypoints' => ['nullable', 'array'],
-        ]);
-
+        $data = $request->validated();
         $tenantId = (int) $request->user()->tenant_id;
+
+        // The daemon polls the same statuses every few seconds; this extension batch
+        // (once a minute, with fetch/post latency) is often OLDER than what the
+        // daemon already applied. Two unordered writers fabricate engagement edges
+        // (a fake ON_TRIP → EN_ROUTE completes a trip and accepts the wrong offer),
+        // so while the daemon is feeding this company the extension only observes.
+        if (DriverStatusIngestor::daemonIsFeeding($tenantId)) {
+            return response()->json(['data' => ['updated' => 0, 'skipped' => 'daemon_active']]);
+        }
+
         $recorder->statuses($tenantId, $data['statuses']);
         $result = $ingestor->ingest($tenantId, $data['statuses']);
 

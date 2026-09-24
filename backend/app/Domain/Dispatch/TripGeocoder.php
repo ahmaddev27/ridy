@@ -76,6 +76,12 @@ class TripGeocoder
      */
     private const MIN_COARSE_DISTANCE_M = 4000;
 
+    /** Waypoints used per trip resolve (OSRM URL length + one reverse per stop). */
+    private const MAX_WAYPOINTS = 12;
+
+    /** Intermediate stops that get a reverse-geocoded label per resolve. */
+    private const MAX_LABELLED_INTERMEDIATE_STOPS = 5;
+
     /**
      * Geocode + route an offer once it succeeds, caching on the row. Safe to call
      * repeatedly: a transient failure (rate-limited free services) leaves
@@ -253,9 +259,44 @@ class TripGeocoder
             }
         }
 
-        $offer->save();
+        $this->saveUnlessUberResolved($offer);
 
         return $offer;
+    }
+
+    /**
+     * Persist a text-geocode result — unless the row was meanwhile resolved from
+     * Uber's exact waypoints (or otherwise finished). A cold enrich can run for tens
+     * of seconds on the queue while the driver accepts and SyncTripFromWaypoints
+     * stores Uber's authoritative trip; a blind save() of this stale model would
+     * overwrite it with the text geocode (or null the distance) and, geo_source
+     * staying 'uber', nothing would ever repair it. On a lost race the model is
+     * reloaded so the caller (e.g. the pre-push enrich) sees the stored values.
+     */
+    private function saveUnlessUberResolved(DispatchOffer $offer): void
+    {
+        if (! $offer->exists) {
+            $offer->save();
+
+            return;
+        }
+
+        $dirty = $offer->getDirty();
+        if ($dirty === []) {
+            return;
+        }
+
+        $written = DispatchOffer::withoutGlobalScopes()
+            ->whereKey($offer->getKey())
+            ->whereNull('geo_synced_at')
+            ->where(fn ($q) => $q->whereNull('geo_source')->orWhere('geo_source', '!=', 'uber'))
+            ->update($dirty);
+
+        if ($written === 1) {
+            $offer->syncOriginal();
+        } else {
+            $offer->refresh();
+        }
     }
 
     /** True when the address carries a 5-digit German postcode. */
@@ -1133,7 +1174,23 @@ class TripGeocoder
         // estimate until OSRM is reachable.
         $offer->geo_confidence = $route['geometry'] !== null ? 'exact' : 'estimated';
         $offer->geo_synced_at = CarbonImmutable::now();
-        $offer->save();
+
+        // Claim the update atomically: only the run that actually moves the row
+        // (not yet from Uber, or a smaller itinerary) returns a stop count, so two
+        // overlapping resolves can never both send the multi-stop push.
+        $claimed = DispatchOffer::withoutGlobalScopes()
+            ->whereKey($offer->getKey())
+            ->where(fn ($q) => $q->whereNull('geo_source')
+                ->orWhere('geo_source', '!=', 'uber')
+                ->orWhereNull('stops_count')
+                ->orWhere('stops_count', '<', $stopsCount))
+            ->update($offer->getDirty());
+        if ($claimed !== 1) {
+            $offer->refresh();
+
+            return null;
+        }
+        $offer->syncOriginal();
 
         return $stopsCount;
     }
@@ -1149,7 +1206,7 @@ class TripGeocoder
     {
         $out = [];
         foreach ($waypoints as $w) {
-            if (! isset($w['lat'], $w['lng'])) {
+            if (! is_array($w) || ! isset($w['lat'], $w['lng']) || ! is_numeric($w['lat']) || ! is_numeric($w['lng'])) {
                 continue;
             }
             $lat = (float) $w['lat'];
@@ -1157,7 +1214,10 @@ class TripGeocoder
             if (abs($lat) < 0.0001 && abs($lng) < 0.0001) {
                 continue; // redacted point
             }
-            $out[] = ['lat' => $lat, 'lng' => $lng, 'type' => isset($w['type']) ? (string) $w['type'] : null];
+            $out[] = ['lat' => $lat, 'lng' => $lng, 'type' => isset($w['type']) && is_scalar($w['type']) ? (string) $w['type'] : null];
+            if (count($out) >= self::MAX_WAYPOINTS) {
+                break; // a pickup + a handful of drop-offs is the real-world max
+            }
         }
 
         return $out;
@@ -1205,10 +1265,13 @@ class TripGeocoder
 
         $out = [];
         foreach ($points as $i => $p) {
-            $address = match ($i) {
-                0 => $pickupLabel,
-                $last => $dropoffLabel,
-                default => $this->reverse($p['lat'], $p['lng']),
+            // Intermediate stops reverse-geocode one by one (up to 5 s each), so only
+            // the first few are labelled; any beyond keep a null address.
+            $address = match (true) {
+                $i === 0 => $pickupLabel,
+                $i === $last => $dropoffLabel,
+                $i <= self::MAX_LABELLED_INTERMEDIATE_STOPS => $this->reverse($p['lat'], $p['lng']),
+                default => null,
             };
 
             // Leg INTO this stop (from the previous one); the pickup has none.
