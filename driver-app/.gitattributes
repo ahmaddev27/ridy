@@ -1,0 +1,20 @@
+# The runtimeVersion "fingerprint" policy hashes config plugins, native config
+# (google-services.json, GoogleService-Info.plist) and other sources by CONTENT.
+# CI builds on Linux (LF); a Windows checkout with core.autocrlf=true would hash
+# CRLF files, compute a different runtime, and an `eas update` from it would
+# never reach the installed binaries. Force LF everywhere in the app.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.wav binary
+*.mp3 binary
+*.ttf binary
+*.otf binary
+*.p8 binary
+*.jks binary
+*.keystore binary

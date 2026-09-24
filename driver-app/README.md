@@ -47,6 +47,22 @@ npx expo run:android      # or run:ios — push needs a dev build, not Expo Go
   dependency, a config plugin, notification sounds/icons) produces a new runtime,
   so an `eas update` can never reach a binary it doesn't match. A JS-only change
   keeps the runtime and ships OTA. Bump `expo.version` for every store build.
+- The fingerprint hashes files by **content**, so line endings matter. Store
+  builds run on Linux CI (LF); `driver-app/.gitattributes` forces LF so a Windows
+  checkout hashes the same bytes. After pulling that file into an existing
+  Windows checkout, re-checkout once so the working tree is LF:
+  `git rm -r --cached -q driver-app && git reset --hard` (clean tree only).
+- **Before every `eas update`**, confirm the local runtime matches the store
+  build: `npx expo-updates fingerprint:generate --platform android` (and `ios`)
+  must print the same hash as the build's runtime version on expo.dev
+  (or run `eas fingerprint:compare`). Prefer publishing OTAs from Linux/CI,
+  the same OS the builds come from. A mismatch publishes to a runtime no
+  installed app has — drivers silently get nothing.
+- iOS: `ios.entitlements` enables **Time Sensitive Notifications** (the backend
+  sends offer pushes with `interruption-level: time-sensitive` so they break
+  through Focus/Driving). EAS capability sync enables it on the App ID; with
+  `EAS_NO_CAPABILITY_SYNC` set, enable it manually in the Apple Developer portal
+  before the build.
 - Running apps pick up an OTA update on resume and apply it the next time the
   app goes to the background (`src/lib/ota.ts`).
 - Force-update gate: the backend `app_min` setting (checked on launch/resume).
