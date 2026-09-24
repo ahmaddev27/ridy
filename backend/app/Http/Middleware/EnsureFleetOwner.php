@@ -4,7 +4,9 @@ namespace App\Http\Middleware;
 
 use App\Models\User;
 use Closure;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
+use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -22,12 +24,28 @@ class EnsureFleetOwner
     {
         $user = $request->user();
 
-        abort_unless(
-            $user instanceof User && $user->tenant_id !== null && $user->hasAnyRole(self::ROLES),
-            403,
-            'fleet_owner_only',
-        );
+        abort_unless($user instanceof User && $user->tenant_id !== null, 403, 'fleet_owner_only');
+
+        if (! $user->hasAnyRole(self::ROLES)) {
+            $this->signOutDemoted($user);
+        }
 
         return $next($request);
+    }
+
+    /**
+     * An owner demoted after signing in: their app session is over. Answer 401
+     * (and drop the bearer token) — every app build treats 401 as "signed out"
+     * and shows the login screen, whereas a 403 left app 1.0.4 stuck on its
+     * offline screen.
+     */
+    private function signOutDemoted(User $user): never
+    {
+        $token = $user->currentAccessToken();
+        if ($token instanceof PersonalAccessToken) {
+            $token->delete();
+        }
+
+        throw new AuthenticationException('fleet_owner_only');
     }
 }

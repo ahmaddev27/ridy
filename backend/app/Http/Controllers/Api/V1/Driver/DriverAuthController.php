@@ -43,11 +43,14 @@ class DriverAuthController extends Controller
     {
         $data = $request->validate(['email' => ['required', 'email']]);
 
-        $name = $this->accountName($data['email']);
-        if ($name !== null) {
-            $reset = $this->otp->issueReset($data['email'], self::OTP_TTL_MINUTES);
+        // The code only ever goes to the address STORED on the account. MySQL's
+        // accent-insensitive collation also matches look-alikes ("gmäil.com"),
+        // which an attacker can register and read.
+        $account = $this->resolveAppAccount($data['email']);
+        if ($account !== null && OtpGuard::sameEmail((string) $account->email, $data['email'])) {
+            $reset = $this->otp->issueReset((string) $account->email, self::OTP_TTL_MINUTES);
 
-            SendTemplatedMail::to($data['email'], 'driver_login_otp', ['name' => $name, 'otp' => $reset->otp]);
+            SendTemplatedMail::to((string) $account->email, 'driver_login_otp', ['name' => (string) $account->name, 'otp' => $reset->otp]);
         }
 
         return response()->json(['data' => ['sent' => true]]);
@@ -70,7 +73,7 @@ class DriverAuthController extends Controller
         $reset = $this->otp->verifyReset($data['email'], $data['otp']);
 
         $account = $this->resolveAppAccount($reset->email);
-        if ($account === null) {
+        if ($account === null || ! OtpGuard::sameEmail((string) $account->email, $data['email'])) {
             $this->otp->consume($reset);
             // Same answer as a wrong code: verify must not reveal account existence.
             throw ValidationException::withMessages(['otp' => 'otp_incorrect']);
@@ -105,11 +108,24 @@ class DriverAuthController extends Controller
         $driver = Driver::withoutGlobalScopes()->where('email', $email)->first();
         $owner = $this->findOwnerByEmail($email);
 
-        if ($driver !== null && ($owner === null || $owner->tenant_id === $driver->tenant_id)) {
+        if ($driver !== null && ($owner === null || $owner->tenant_id === $driver->tenant_id || $this->claimedBefore($driver, $owner))) {
             return $driver;
         }
 
         return $owner;
+    }
+
+    /**
+     * A real dual-role person (drives for one fleet, owns/manages another) keeps
+     * signing in as the driver when they had already activated that driver
+     * account before the owner account existed — no other tenant can have
+     * squatted an owner address that did not exist yet.
+     */
+    private function claimedBefore(Driver $driver, User $owner): bool
+    {
+        return $driver->activated_at !== null
+            && $owner->created_at !== null
+            && $driver->activated_at->lt($owner->created_at);
     }
 
     /** Preview an invitation so the activation screen can greet the driver. */
@@ -245,22 +261,6 @@ class DriverAuthController extends Controller
         }
 
         return $user;
-    }
-
-    /**
-     * A display name for the OTP email, or null when no app account owns this
-     * email (driver — invited or activated — or an app-relevant owner/manager).
-     */
-    private function accountName(string $email): ?string
-    {
-        $driver = Driver::withoutGlobalScopes()->where('email', $email)->first();
-        if ($driver !== null) {
-            return (string) $driver->name;
-        }
-
-        $owner = $this->findOwnerByEmail($email);
-
-        return $owner !== null ? (string) $owner->name : null;
     }
 
     /** A dashboard owner/manager matched by email alone (passwordless sign-in). */
