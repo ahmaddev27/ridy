@@ -195,6 +195,8 @@ class InvoiceTemplateTest extends TestCase
             'code' => 'ABC123', 'plan_id' => $plan->id, 'tenant_id' => $tenant->id,
             'amount' => 149, 'paid' => true, 'expires_at' => CarbonImmutable::now()->addDay(),
         ]);
+        // A used code must still be the tenant's pending code (checked under lock).
+        $tenant->forceFill(['activation_code' => 'ABC123', 'activation_code_expires_at' => CarbonImmutable::now()->addDay()])->save();
 
         $activator = app(SubscriptionActivator::class);
         $first = $activator->apply($tenant, 30, '149.00', true, null, 'ABC123');

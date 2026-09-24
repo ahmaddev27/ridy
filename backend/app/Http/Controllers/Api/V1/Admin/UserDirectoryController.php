@@ -65,6 +65,12 @@ class UserDirectoryController extends Controller
             return response()->json(['message' => 'cannot_delete_admin'], 422);
         }
 
+        // A reseller whose collector received cash payments is kept (ledger rows are
+        // accounting records; the DB FK also restricts the delete).
+        if (Collector::where('user_id', $user->id)->whereHas('payments')->exists()) {
+            return response()->json(['message' => 'collector_has_payments'], 422);
+        }
+
         // A reseller login and its collector are one entity — remove both, so the
         // collector never lingers after its user is deleted. Issued codes survive
         // (their collector_id is nulled by the FK).

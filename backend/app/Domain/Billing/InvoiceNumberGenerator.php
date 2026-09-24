@@ -7,8 +7,12 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Assigns the next per-year sequential invoice number to a period, e.g.
- * "RE-2026-0042". The sequence is computed under a row lock inside a
- * transaction so two concurrent activations can never claim the same number.
+ * "RE-2026-0042". The sequence lives in `invoice_sequences` (one row per prefix +
+ * year) and is incremented under a lock on that single existing row, so:
+ *  - two concurrent activations never claim the same number (and the first
+ *    invoice of a year no longer races on an empty-range gap lock);
+ *  - a number is never reused, even if a period row is later removed;
+ *  - it keeps counting past 9999 (the old lexicographic MAX stalled there).
  */
 class InvoiceNumberGenerator
 {
@@ -18,26 +22,44 @@ class InvoiceNumberGenerator
     public function assign(SubscriptionPeriod $period, string $prefix, int $year): string
     {
         return DB::transaction(function () use ($period, $prefix, $year) {
-            $pattern = $prefix.'-'.$year.'-%';
+            // Seed the counter on first use from any numbers already issued under
+            // this prefix/year (invoices issued before the counter table existed).
+            $counter = DB::table('invoice_sequences')->where('prefix', $prefix)->where('year', $year);
+            if (! $counter->clone()->exists()) {
+                DB::table('invoice_sequences')->insertOrIgnore([
+                    'prefix' => $prefix,
+                    'year' => $year,
+                    'last_no' => $this->highestIssued($prefix, $year),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
 
-            // Lock the year's rows so a parallel activation waits for our sequence.
-            $last = SubscriptionPeriod::query()
-                ->where('invoice_no', 'like', $pattern)
-                ->lockForUpdate()
-                ->orderByDesc('invoice_no')
-                ->value('invoice_no');
+            $next = (int) $counter->clone()->lockForUpdate()->value('last_no') + 1;
+            $counter->clone()->update(['last_no' => $next, 'updated_at' => now()]);
 
-            $next = $last === null ? 1 : ((int) substr((string) $last, -self::SEQUENCE_PAD)) + 1;
             $number = sprintf('%s-%d-%0'.self::SEQUENCE_PAD.'d', $prefix, $year, $next);
 
-            // Persist INSIDE the transaction so the winning number is written while
-            // the row lock is still held. Writing it after commit (as before) left a
-            // gap where two activations computed the same number — the loser then hit
-            // the UNIQUE(invoice_no) constraint and 500'd. Most acute for the first
-            // invoice of a year, when lockForUpdate matches zero rows and locks nothing.
+            // Persist inside the transaction, while the counter row is locked.
             $period->forceFill(['invoice_no' => $number])->save();
 
             return $number;
         });
+    }
+
+    /** The highest numeric sequence already issued for this prefix/year (0 if none). */
+    private function highestIssued(string $prefix, int $year): int
+    {
+        $head = $prefix.'-'.$year.'-';
+
+        return SubscriptionPeriod::query()
+            ->where('invoice_no', 'like', $head.'%')
+            ->pluck('invoice_no')
+            // LIKE treats `_`/`%` in a custom prefix as wildcards — re-check exactly.
+            ->filter(fn (string $no) => str_starts_with($no, $head))
+            ->map(fn (string $no) => substr($no, strlen($head)))
+            ->filter(fn (string $seq) => ctype_digit($seq))
+            ->map(fn (string $seq) => (int) $seq)
+            ->max() ?? 0;
     }
 }

@@ -4,15 +4,18 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Billing\Models\SubscriptionCode;
 use App\Domain\Billing\Models\SubscriptionPeriod;
+use App\Domain\Billing\Money;
 use App\Domain\Billing\SubscriptionCodeQuery;
 use App\Domain\Collections\Models\CollectorPayment;
 use App\Domain\Tenancy\Models\Tenant;
+use App\Http\Controllers\Concerns\ResolvesPerPage;
 use App\Http\Controllers\Controller;
 use App\Support\Csv;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -22,6 +25,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class BillingReportController extends Controller
 {
+    use ResolvesPerPage;
+
     /** Revenue over time + subscriptions expiring soon + headline totals. */
     public function summary(Request $request): JsonResponse
     {
@@ -29,15 +34,22 @@ class BillingReportController extends Controller
 
         // Revenue = paid invoices, grouped by the month they were paid. Grouping
         // happens in PHP so the SQL stays portable across sqlite (local) and
-        // MySQL (prod).
+        // MySQL (prod). Summed in integer cents so totals never float-drift.
         $byMonth = SubscriptionPeriod::query()
             ->whereNotNull('paid_at')
             ->get(['paid_at', 'amount'])
             ->groupBy(fn (SubscriptionPeriod $p) => $p->paid_at->format('Y-m'))
-            ->map(fn ($group) => (float) $group->sum('amount'))
+            ->map(fn ($group) => $group->sum(fn (SubscriptionPeriod $p) => Money::cents($p->amount)))
             ->sortKeys();
 
-        $revenue = $byMonth->map(fn (float $total, string $month) => ['month' => $month, 'total' => $total])->values();
+        $revenue = $byMonth->map(fn (int $cents, string $month) => ['month' => $month, 'total' => Money::toFloat($cents)])->values();
+
+        // A canceled, never-paid invoice is no longer collectible.
+        $outstanding = SubscriptionPeriod::query()
+            ->whereNull('paid_at')
+            ->whereNull('canceled_at')
+            ->pluck('amount')
+            ->sum(fn ($amount) => Money::cents($amount));
 
         $expiring = Tenant::query()
             ->usable()
@@ -57,8 +69,8 @@ class BillingReportController extends Controller
                 'revenue_by_month' => $revenue,
                 'expiring' => $expiring,
                 'totals' => [
-                    'total_revenue' => (float) SubscriptionPeriod::whereNotNull('paid_at')->sum('amount'),
-                    'outstanding' => (float) SubscriptionPeriod::whereNull('paid_at')->sum('amount'),
+                    'total_revenue' => Money::toFloat((int) $byMonth->sum()),
+                    'outstanding' => Money::toFloat((int) $outstanding),
                     'active_subscriptions' => Tenant::query()->usable()->count(),
                     'expiring_soon' => $expiring->count(),
                 ],
@@ -69,7 +81,7 @@ class BillingReportController extends Controller
     /** The auto-generated subscription invoices, newest first, optionally by company. */
     public function invoices(Request $request): JsonResponse
     {
-        $invoices = $this->invoiceQuery($request)->paginate(min($request->integer('per_page', 25), 100));
+        $invoices = $this->invoiceQuery($request)->paginate($this->perPage($request));
 
         return response()->json([
             'data' => collect($invoices->items())->map(fn (SubscriptionPeriod $p) => $this->present($p)),
@@ -88,16 +100,18 @@ class BillingReportController extends Controller
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM for Excel
-            fputcsv($out, ['Invoice', 'Company', 'Days', 'Amount', 'Status', 'Starts', 'Ends']);
+            // "Invoice" is the legal number (RE-YYYY-NNNN); the internal id trails.
+            fputcsv($out, ['Invoice', 'Company', 'Days', 'Amount', 'Status', 'Starts', 'Ends', 'ID']);
             foreach ($rows as $p) {
                 fputcsv($out, [
-                    $p->id,
+                    Csv::cell($p->invoiceNumber()),
                     Csv::cell($p->tenant?->name),
                     $p->days,
                     $p->amount !== null ? number_format((float) $p->amount, 2, '.', '') : '',
-                    $p->isPaid() ? 'paid' : 'unpaid',
+                    $p->isCanceled() ? 'canceled' : ($p->isPaid() ? 'paid' : 'unpaid'),
                     $p->starts_at->toDateString(),
                     $p->ends_at->toDateString(),
+                    $p->id,
                 ]);
             }
             fclose($out);
@@ -107,7 +121,7 @@ class BillingReportController extends Controller
     /** Every issued activation code with its lifecycle status, filtered + paged. */
     public function codes(Request $request, SubscriptionCodeQuery $query): JsonResponse
     {
-        $codes = $query->forRequest($request)->paginate(min($request->integer('per_page', 25), 100));
+        $codes = $query->forRequest($request)->paginate($this->perPage($request));
 
         return response()->json([
             'data' => collect($codes->items())->map(fn (SubscriptionCode $c) => $query->present($c)),
@@ -159,24 +173,50 @@ class BillingReportController extends Controller
             ->orderByDesc('id');
     }
 
-    /** Settle an open invoice by linking the collector payment that covers it. */
+    /**
+     * Settle an open invoice by linking the collector payment that covers it. One
+     * payment can cover several invoices only up to its amount, and an invoice
+     * that is already paid is only re-linked on an explicit `resettle`.
+     */
     public function settle(Request $request, SubscriptionPeriod $invoice): JsonResponse
     {
         $data = $request->validate([
             'collector_payment_id' => ['required', 'integer', 'exists:collector_payments,id'],
+            'resettle' => ['sometimes', 'boolean'],
         ]);
 
-        $payment = CollectorPayment::findOrFail($data['collector_payment_id']);
-        if ((int) $payment->tenant_id !== (int) $invoice->tenant_id) {
-            return response()->json(['message' => 'payment_company_mismatch'], 422);
-        }
+        return DB::transaction(function () use ($data, $invoice) {
+            $invoice = SubscriptionPeriod::query()->lockForUpdate()->findOrFail($invoice->id);
+            $payment = CollectorPayment::query()->lockForUpdate()->findOrFail($data['collector_payment_id']);
 
-        $invoice->forceFill([
-            'collector_payment_id' => $payment->id,
-            'paid_at' => $payment->paid_on,
-        ])->save();
+            if ((int) $payment->tenant_id !== (int) $invoice->tenant_id) {
+                return response()->json(['message' => 'payment_company_mismatch'], 422);
+            }
+            if ($invoice->isPaid() && ! ($data['resettle'] ?? false)) {
+                return response()->json(['message' => 'invoice_already_paid'], 409);
+            }
 
-        return response()->json(['data' => $this->present($invoice->fresh())]);
+            $allocated = SubscriptionPeriod::query()
+                ->where('collector_payment_id', $payment->id)
+                ->whereKeyNot($invoice->id)
+                ->pluck('amount')
+                ->sum(fn ($amount) => Money::cents($amount));
+            $remaining = Money::cents($payment->amount) - $allocated;
+            if (Money::cents($invoice->amount) > $remaining) {
+                return response()->json([
+                    'message' => 'payment_insufficient',
+                    'remaining' => $remaining / 100,
+                ], 422);
+            }
+
+            // paid_at only — the printed issue date never moves on settlement.
+            $invoice->forceFill([
+                'collector_payment_id' => $payment->id,
+                'paid_at' => $payment->paid_on,
+            ])->save();
+
+            return response()->json(['data' => $this->present($invoice->fresh())]);
+        });
     }
 
     /** @return array<string, mixed> */
@@ -186,6 +226,8 @@ class BillingReportController extends Controller
 
         return [
             'id' => $p->id,
+            'invoice_no' => $p->invoiceNumber(),
+            'canceled' => $p->isCanceled(),
             'tenant_id' => $p->tenant_id,
             'company_name' => $p->tenant?->name,
             'days' => $p->days,
