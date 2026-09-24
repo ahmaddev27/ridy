@@ -154,6 +154,22 @@ test("a 401 from the backend clears the token so the dashboard re-pairs", async 
   assert.equal(local.data.apiUrl, PAIRED.apiUrl, "apiUrl kept for an instant re-pair");
 });
 
+test("a late 401 on the old token never deletes a token paired meanwhile", async () => {
+  let release;
+  const held = new Promise((resolve) => (release = resolve));
+  const { ctx, local } = load({
+    storage: { ...PAIRED, orgUuid: ORG_A },
+    fetchImpl: () => held,
+  });
+  const pending = ctx.postRoster([{ id: 1 }]); // in flight on the OLD token
+  await new Promise((r) => setImmediate(r));
+  await local.set({ token: "2|fresh" }); // the dashboard re-paired meanwhile
+  release(jsonResponse(401, { message: "Unauthenticated." }));
+  const res = await pending;
+  assert.equal(res.reason, "unpaired");
+  assert.equal(local.data.token, "2|fresh", "the fresh token survives the stale 401");
+});
+
 test("a 403/409 pauses the poll; a 429 honours Retry-After", async () => {
   for (const [status, message] of [[403, "company_inactive"], [409, "not_connected"]]) {
     const { ctx, local } = load({

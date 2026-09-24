@@ -107,13 +107,18 @@ function retryAfterMs(res) {
 
 /**
  * React to a backend rejection. Returns the normalized reason for the caller.
- * `orgUuid` is the org the rejected request was about (when known).
+ * `orgUuid` is the org the rejected request was about (when known); `usedToken`
+ * is the token the rejected request was sent with.
  */
-async function handleBackendRejection(res, body, orgUuid) {
+async function handleBackendRejection(res, body, orgUuid, usedToken) {
   const message = typeof body?.message === "string" ? body.message : "";
   if (res.status === 401) {
+    // Only unpair when the REJECTED token is still the stored one: a request that
+    // was in flight on the old token while the dashboard re-paired must not delete
+    // the fresh token (the Connect capture would then fail with not_paired).
+    const { token: current } = await api.storage.local.get(["token"]);
     // Keep apiUrl so the dashboard's silent re-pair works right away.
-    await api.storage.local.remove(["token", "lastSync"]);
+    if (current === usedToken) await api.storage.local.remove(["token", "lastSync"]);
     return "unpaired";
   }
   if (res.status === 409 && message === "org_mismatch") {
@@ -156,7 +161,7 @@ async function backendFetch(pairing, path, payload, { orgUuid = null, method = "
   }
   const body = await res.json().catch(() => ({}));
   if (res.ok) return { ok: true, status: res.status, body, data: body?.data };
-  const reason = await handleBackendRejection(res, body, orgUuid);
+  const reason = await handleBackendRejection(res, body, orgUuid, pairing.token);
   console.warn("[Reidey bg] backend", path, "->", res.status, reason);
   return { ok: false, status: res.status, reason, body };
 }
