@@ -19,4 +19,3 @@ export async function getFleetSession(): Promise<FleetSession> {
 export async function prepareReconnect(): Promise<void> {
   await apiFetch("/api/v1/fleet-session/reconnect", { method: "POST" });
 }
-
