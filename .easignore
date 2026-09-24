@@ -26,9 +26,25 @@ mockup/
 desing/
 uber-auth/
 .claude/
+.github/
 
-# --- Mirror of driver-app/.gitignore (this file replaces it) ------------------------
-node_modules/
+# .easignore REPLACES .gitignore for EAS uploads, so repeat everything that must
+# never leave this machine: store/signing credentials and env files.
+**/*.p8
+**/*.p12
+**/*.pem
+**/*.jks
+**/*.keystore
+**/*.mobileprovision
+**/credentials.json
+**/*service-account*.json
+**/.env
+**/.env.*
+driver-app/ios-asc-key.p8
+driver-app/play-service-account.json
+
+# --- Mirror of driver-app/.gitignore (build output, caches) -------------------------
+**/node_modules/
 driver-app/.expo/
 driver-app/dist/
 driver-app/web-build/

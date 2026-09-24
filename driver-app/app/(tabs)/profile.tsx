@@ -8,22 +8,24 @@ import {
   SlidersHorizontal,
   LifeBuoy,
   LogOut,
+  FileText,
   ChevronLeft,
   ChevronRight,
   type LucideIcon,
-} from "lucide-react-native";
+} from "@/components/icons";
 import { Text } from "@/components/typography";
 import { useAuth } from "@/lib/auth";
-import { t, isRTL } from "@/lib/i18n";
+import { t, isRTL, useLocale } from "@/lib/i18n";
+import { PRIVACY_URL, SUPPORT_EMAIL } from "@/lib/links";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
 
 const APP_VERSION = Constants.expoConfig?.version ?? "1.1.0";
-const SUPPORT_EMAIL = "support@reidey.de";
 
 export default function ProfileScreen() {
   const c = useColors();
   const router = useRouter();
   const { driver, logout } = useAuth();
+  useLocale(); // re-render on a language switch
   const align = isRTL() ? "right" : "left";
   const row = isRTL() ? "row-reverse" : "row";
 
@@ -45,7 +47,7 @@ export default function ProfileScreen() {
   if (driver?.company_name) facts.push({ label: t("profile.company"), value: driver.company_name });
   if (driver?.email) facts.push({ label: t("profile.email"), value: driver.email });
 
-  const openSupport = () => Linking.openURL(`mailto:${SUPPORT_EMAIL}`);
+  const openSupport = () => Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {});
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: c.canvas }}>
@@ -58,6 +60,8 @@ export default function ProfileScreen() {
           <Pressable
             onPress={() => router.push("/settings")}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t("settings.title")}
             style={{
               width: 40,
               height: 40,
@@ -167,13 +171,21 @@ export default function ProfileScreen() {
             icon={LifeBuoy}
             label={t("settings.contactSupport")}
             onPress={openSupport}
+          />
+          <Separator c={c} />
+          <MenuRow
+            c={c}
+            icon={FileText}
+            label={t("settings.privacy")}
+            onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}
             last
           />
         </View>
 
         {/* Log out */}
         <Pressable
-          onPress={logout}
+          onPress={() => logout()}
+          accessibilityRole="button"
           style={{
             ...cardStyle(c),
             flexDirection: row,
@@ -215,6 +227,8 @@ function MenuRow({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={{ flexDirection: row, alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 15 }}
     >
       <Icon size={18} color={c.inkMuted} strokeWidth={1.6} />

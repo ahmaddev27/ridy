@@ -2,77 +2,83 @@ import { useCallback, useState } from "react";
 import { View, ScrollView, RefreshControl, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
-import { useFocusEffect, useRouter } from "expo-router";
-import * as Notifications from "expo-notifications";
-import { UserCircle, Map as MapIcon, Route } from "lucide-react-native";
+import { useRouter } from "expo-router";
+import { Map as MapIcon, Route } from "@/components/icons";
 import { api, type HomeData, type FleetHomeData, type Offer } from "@/lib/api";
-import { connectDriverRealtime } from "@/lib/realtime";
-import { alertOffer, markAlerted } from "@/lib/offer-alert";
+import { alertOffer, isFreshOffer } from "@/lib/offer-alert";
 import { useAuth } from "@/lib/auth";
-import { t, isRTL } from "@/lib/i18n";
+import { t, isRTL, useLocale } from "@/lib/i18n";
 import { openRouteInMaps } from "@/lib/maps";
 import { useColors, cardStyle, radius } from "@/lib/theme";
 import { fareLabel, perKmValue, distanceLabel, cleanAddress } from "@/lib/format";
+import { useLiveReload } from "@/lib/use-live-reload";
 import { Logo, SectionLabel, StatusBadge } from "@/components/ui";
 import { OfferCard } from "@/components/offer-card";
+import { LoadErrorBanner, PushHealthBanner } from "@/components/status-banner";
+
+/** The newest still-open offer: the backend's `pending_offer` when it sends one
+ *  (newer backends), else the freshest pending row in `recent`. */
+function pendingOfferOf(home: HomeData): Offer | null {
+  if (home.pending_offer !== undefined) return home.pending_offer ?? null;
+  return home.recent.find((o) => o.status === "pending" && isFreshOffer(o)) ?? null;
+}
+
+/** Replace state only when the payload actually changed (no re-render per poll). */
+function sameJson<T>(a: T | null, b: T): boolean {
+  return a !== null && JSON.stringify(a) === JSON.stringify(b);
+}
 
 export default function HomeScreen() {
   const c = useColors();
   const router = useRouter();
   const { driver, isOwner } = useAuth();
+  useLocale(); // re-render on a language switch
   const [data, setData] = useState<HomeData | null>(null);
   const [fleet, setFleet] = useState<FleetHomeData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const row = isRTL() ? "row-reverse" : "row";
   const align = isRTL() ? "right" : "left";
 
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setRefreshing(true);
+  async function load() {
     try {
       if (isOwner) {
-        setFleet((await api.fleetHome()).data);
+        const next = (await api.fleetHome()).data;
+        setFleet((prev) => (sameJson(prev, next) ? prev : next));
       } else {
         const home = (await api.home()).data;
-        setData(home);
-        // Chime/vibrate when a NEW offer arrives while the app is open (the OS push
-        // stays silent in the foreground). alertOffer only fires for an offer that
-        // arrived after launch, so pre-existing offers stay quiet.
-        void alertOffer(home.active_offer);
+        setData((prev) => (sameJson(prev, home) ? prev : home));
+        // Fallback chime for a new offer that surfaced without its push (the
+        // push itself already rang through the foreground handler).
+        alertOffer(pendingOfferOf(home));
       }
+      setLoadError(false);
     } catch {
-      /* keep last */
-    } finally {
-      if (!silent) setRefreshing(false);
+      setLoadError(true); // keep the last good data, but say it may be stale
     }
-  }, [isOwner]);
+  }
 
-  // Live home: load on focus, then silently re-poll every few seconds while the
-  // screen is open so a new offer or a status change appears without a manual
-  // pull. The interval is cleared on blur so it never runs off-screen.
-  useFocusEffect(
-    useCallback(() => {
-      load();
-      const iv = setInterval(() => load(true), 4000);
-      // Refresh the instant a dispatch push lands, so a new offer / status change
-      // shows immediately rather than waiting for the next poll tick.
-      // A foreground OS push already chimes on its own — record its offer so the
-      // poll/realtime reload that follows doesn't double-chime it.
-      const sub = Notifications.addNotificationReceivedListener((n) => {
-        markAlerted(Number(n.request.content.data?.offer_id));
-        load(true);
-      });
-      // Real-time (WebSocket): a driver's channel pushes offer changes instantly;
-      // the 4s poll stays as the safety net. Owners use the User token, not a
-      // driver channel, so they rely on the poll.
-      const rt =
-        !isOwner && driver?.id ? connectDriverRealtime(driver.id, api.getToken() ?? "", () => load(true)) : null;
-      return () => { clearInterval(iv); sub.remove(); rt?.disconnect(); };
-    }, [load, isOwner, driver?.id]),
-  );
+  // Live home: load on focus; poll every 4s while the socket is down and every
+  // 30s while it's up (then it's only a safety net); reload on every socket
+  // event / push / resume. Owners have no socket, so they poll every 8s.
+  const run = useLiveReload(load, { fastMs: isOwner ? 8_000 : 4_000, slowMs: 30_000 });
+
+  async function pullToRefresh() {
+    setRefreshing(true);
+    try {
+      await run();
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  const openOffer = useCallback((id: number) => router.push(`/offer/${id}`), [router]);
 
   const greeting = new Date().getHours() >= 17 ? t("home.greetingEvening") : t("home.greetingDay");
   const today = isOwner ? fleet?.today : data?.today;
   const active = data?.active_offer ?? null;
+  const pending = !isOwner && data ? pendingOfferOf(data) : null;
+  const noData = isOwner ? !fleet : !data;
   const headline = isOwner ? (fleet?.owner.company_name ?? driver?.company_name ?? "…") : (data?.driver.name ?? "…");
   const sub = isOwner ? t("home.fleetTitle") : (driver?.company_name ?? "");
   const recent = isOwner ? fleet?.recent ?? [] : data?.recent ?? [];
@@ -86,8 +92,12 @@ export default function HomeScreen() {
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: c.canvas }}>
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 18 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load()} tintColor={c.ink} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={pullToRefresh} tintColor={c.ink} />}
       >
+        {/* Offers can't ring (permission / channel off) — the core promise. */}
+        <PushHealthBanner />
+        {loadError && <LoadErrorBanner onRetry={() => void pullToRefresh()} />}
+
         {/* Brand + greeting + status — one combined card */}
         <View style={{ ...cardStyle(c), padding: 16, gap: 13 }}>
           <View style={{ flexDirection: row, alignItems: "center", gap: 12 }}>
@@ -120,12 +130,21 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* A NEW offer still inside its accept window — the €/km card the driver
+            judges in seconds, above everything else. */}
+        {pending && pending.id !== active?.id && (
+          <View style={{ gap: 10 }}>
+            <SectionLabel>{t("home.newOffer")}</SectionLabel>
+            <OfferCard offer={pending} onOpen={openOffer} />
+          </View>
+        )}
+
         {/* Live / active offer — the driver's current offer as the full €/km card,
             with a quick "open in map" shortcut for its pickup → drop-off route. */}
         {!isOwner && active && (
           <View style={{ gap: 10 }}>
             <SectionLabel>{t("home.activeOffer")}</SectionLabel>
-            <OfferCard offer={active} onPress={() => router.push(`/offer/${active.id}`)} />
+            <OfferCard offer={active} onOpen={openOffer} />
             <Pressable
               onPress={() =>
                 openRouteInMaps({
@@ -175,17 +194,21 @@ export default function HomeScreen() {
               <Text style={{ color: c.inkMuted, fontSize: 13.5, fontWeight: "600" }}>{t("profile.stats")}</Text>
             </Pressable>
           </View>
+          {/* Never pass a failed load off as real zeros ("0,00 €"): show a dash. */}
           <View style={cardStyle(c)}>
             <View style={{ flexDirection: row }}>
-              <GridCell label={t("home.incomeToday")} value={fareLabel(null, today?.earnings ?? 0)} c={c} border />
-              <GridCell label={t("home.avgKm")} value={fareLabel(null, avgKm)} c={c} />
+              <GridCell label={t("home.incomeToday")} value={today ? fareLabel(null, today.earnings) : "—"} c={c} border />
+              <GridCell label={t("home.avgKm")} value={today ? fareLabel(null, avgKm) : "—"} c={c} />
             </View>
             <View style={{ height: 1, backgroundColor: c.line }} />
             <View style={{ flexDirection: row }}>
-              <GridCell label={t("home.st.offers")} value={String(today?.total ?? 0)} c={c} border />
-              <GridCell label={t("home.st.accept")} value={`${today?.accepted ?? 0}/${today?.total ?? 0}`} c={c} />
+              <GridCell label={t("home.st.offers")} value={today ? String(today.total) : "—"} c={c} border />
+              <GridCell label={t("home.st.accept")} value={today ? `${today.accepted}/${today.total}` : "—"} c={c} />
             </View>
           </View>
+          {noData && loadError && (
+            <Text style={{ color: c.inkSubtle, fontSize: 12.5, textAlign: align }}>{t("load.noData")}</Text>
+          )}
         </View>
 
         {/* Recent — compact rows, full list on the Offers tab */}
@@ -260,16 +283,5 @@ function RecentRow({ offer, onPress, last, showDriver, c }: { offer: Offer; onPr
       </View>
       <StatusBadge status={status} label={t(`status.${status}`)} />
     </Pressable>
-  );
-}
-
-/** A small driver-name label used only in fleet-owner mode to attribute a row. */
-export function DriverTag({ name }: { name: string }) {
-  const c = useColors();
-  return (
-    <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 5, marginBottom: 3, alignSelf: isRTL() ? "flex-end" : "flex-start" }}>
-      <UserCircle size={14} color={c.inkSubtle} />
-      <Text numberOfLines={1} style={{ color: c.inkSubtle, fontSize: 12, fontWeight: "500", textAlign: isRTL() ? "right" : "left" }}>{name}</Text>
-    </View>
   );
 }

@@ -42,6 +42,7 @@ use App\Http\Controllers\Api\V1\DispatchDaemonController;
 use App\Http\Controllers\Api\V1\DispatchIngestController;
 use App\Http\Controllers\Api\V1\DispatchLinkController;
 use App\Http\Controllers\Api\V1\DispatchOfferController;
+use App\Http\Controllers\Api\V1\Driver\AccountDeletionController;
 use App\Http\Controllers\Api\V1\Driver\DriverAuthController;
 use App\Http\Controllers\Api\V1\Driver\DriverDashboardController;
 use App\Http\Controllers\Api\V1\Driver\DriverDeviceController;
@@ -138,6 +139,8 @@ Route::prefix('v1')->group(function () {
         Route::middleware(['auth:driver', 'driver.account'])->group(function () {
             // Logout must work even when suspended (so the app can clear its token).
             Route::post('logout', [DriverAuthController::class, 'logout']);
+            // In-app account deletion request — also allowed while suspended.
+            Route::post('account/deletion-request', [AccountDeletionController::class, 'driver'])->middleware('throttle:3,1,account-deletion');
 
             // Everything else requires the driver's company to still be active.
             Route::middleware('driver.active')->group(function () {
@@ -163,6 +166,11 @@ Route::prefix('v1')->group(function () {
         // `dashboard.only` confines scoped tokens (the extension token gets 403;
         // the owner app's fleet:read token is allowed here), `fleet.owner` requires
         // a tenant-bound owner/manager, and `driver.active` blocks a suspended tenant.
+        // Owner-mode account deletion request: same guards, but outside driver.active
+        // so a suspended owner can still ask for erasure.
+        Route::post('fleet/account/deletion-request', [AccountDeletionController::class, 'owner'])
+            ->middleware(['auth:sanctum', 'user.account', 'dashboard.only', 'fleet.owner', 'throttle:3,1,account-deletion']);
+
         Route::middleware(['auth:sanctum', 'user.account', 'dashboard.only', 'fleet.owner', 'driver.active'])->prefix('fleet')->group(function () {
             Route::get('me', [FleetController::class, 'me']);
             Route::patch('me', [FleetController::class, 'update']);

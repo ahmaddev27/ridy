@@ -35,7 +35,9 @@ function waypointsParam(stops: RouteStop[] | null | undefined, preferCoords: boo
     .slice(1, -1)
     .map((s) => locationToken(s.address, s, preferCoords))
     .filter((token): token is string => token !== null);
-  return middle.length ? `&waypoints=${middle.join("|")}` : "";
+  // Pre-encoded "|" (%7C): a raw "|" is not a valid URL character, and iOS < 17
+  // then double-encodes the WHOLE URL, garbling every multi-stop address.
+  return middle.length ? `&waypoints=${middle.join("%7C")}` : "";
 }
 
 /**

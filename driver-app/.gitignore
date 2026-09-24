@@ -16,3 +16,19 @@ play-service-account.json
 
 # iOS App Store Connect key (written from a CI secret; never commit)
 ios-asc-key.p8
+
+# Any other signing / store credential, whatever its name. (google-services.json
+# and GoogleService-Info.plist are client config and stay committed.)
+*.p8
+*.p12
+*.pem
+*.jks
+*.keystore
+*.mobileprovision
+credentials.json
+*service-account*.json
+.env
+.env.*
+
+# NOTE: EAS uses the repo-root .easignore INSTEAD of .gitignore when it exists —
+# every secret pattern above must be repeated there.

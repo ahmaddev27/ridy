@@ -56,6 +56,7 @@ class EnsureDashboardToken
             'POST api/v1/driver/fleet/logout',
             'POST api/v1/driver/fleet/devices',
             'DELETE api/v1/driver/fleet/devices',
+            'POST api/v1/driver/fleet/account/deletion-request',
         ],
     ];
 

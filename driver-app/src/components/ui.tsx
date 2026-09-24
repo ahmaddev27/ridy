@@ -10,12 +10,13 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, type LucideIcon } from "lucide-react-native";
+import { Eye, EyeOff, type LucideIcon } from "@/components/icons";
 import Svg, { Path } from "react-native-svg";
 import { Text, TextInput } from "@/components/typography";
 import { StopMarker } from "@/components/stop-marker";
 import { useColors, radius, statusColors, cardStyle, isDarkPalette, type Palette } from "@/lib/theme";
 import { isRTL } from "@/lib/i18n";
+import { toAsciiDigits } from "@/lib/format";
 
 const align = () => (isRTL() ? "right" : "left") as "right" | "left";
 
@@ -60,8 +61,11 @@ export function PrimaryButton({
   const Icon = icon;
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => onPress()}
       disabled={off}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!off, busy: !!loading }}
       style={[
         {
           flexDirection: isRTL() ? "row-reverse" : "row",
@@ -184,7 +188,8 @@ export function OtpInput({
   const c = useColors();
   const ref = useRef<RNTextInput>(null);
   const handle = (raw: string) => {
-    const clean = raw.replace(/\D/g, "").slice(0, length);
+    // Arabic keyboards type ٠-٩ — convert before stripping, or they'd vanish.
+    const clean = toAsciiDigits(raw).replace(/\D/g, "").slice(0, length);
     onChangeText(clean);
     if (clean.length === length) onComplete?.(clean);
   };
@@ -221,7 +226,6 @@ export function OtpInput({
         inputMode="numeric"
         textContentType="oneTimeCode"
         autoComplete={Platform.OS === "android" ? "sms-otp" : "one-time-code"}
-        maxLength={length}
         autoFocus={autoFocus}
         caretHidden
         style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: 0 }}
@@ -287,11 +291,6 @@ export function StatusBadge({ status, label }: { status: string; label: string }
   );
 }
 
-/** € / €€ / €€€ quality mark — green when good, muted otherwise. */
-export function QualityMark({ mark, good, size = 14 }: { mark: string; good: boolean; size?: number }) {
-  const c = useColors();
-  return <Text style={{ color: good ? c.accent : c.inkSubtle, fontSize: size, fontWeight: "700" }}>{mark}</Text>;
-}
 
 /** Uppercase muted section label. */
 export function SectionLabel({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
@@ -305,11 +304,6 @@ export function SectionLabel({ children, style }: { children: React.ReactNode; s
   );
 }
 
-/** Borderless soft-shadowed card — the single card look shared across the app. */
-export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
-  const c = useColors();
-  return <View style={[cardStyle(c), style]}>{children}</View>;
-}
 
 /** Compact secondary action — outlined pill/rounded button with an optional leading icon. */
 export function SecondaryButton({
@@ -330,7 +324,9 @@ export function SecondaryButton({
   const d = isDarkPalette(c);
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => onPress()}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={[
         {
           flexDirection: isRTL() ? "row-reverse" : "row",
@@ -353,19 +349,6 @@ export function SecondaryButton({
   );
 }
 
-/** A labelled metric (uppercase label + big value), used in the 2×2 grids. */
-export function Metric({ label, value, unit }: { label: string; value: string; unit?: string }) {
-  const c = useColors();
-  return (
-    <View style={{ gap: 4 }}>
-      <SectionLabel>{label}</SectionLabel>
-      <Text style={{ color: c.ink, fontSize: 23, fontWeight: "700", textAlign: align() }}>
-        {value}
-        {unit ? <Text style={{ fontSize: 14, fontWeight: "700", color: c.inkMuted }}> {unit}</Text> : null}
-      </Text>
-    </View>
-  );
-}
 
 /** Route block: hollow-circle pickup → dotted line → green-square dropoff. */
 /** One stop in a multi-stop route: its address and the road km from the previous stop. */
