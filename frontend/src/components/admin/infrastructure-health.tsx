@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
+import { formatDateTime, formatNumber } from "@/lib/utils";
 import { useAsync } from "@/hooks/use-async";
 import { getInfrastructureHealth, getFailedJobs, retryFailedJobs, clearFailedJobs, clearPendingJobs, type InfraStatus, type QueueFailures } from "@/lib/api/admin";
 
@@ -41,7 +42,7 @@ function ageLabel(seconds: number | null | undefined): string {
  * from the dashboard.
  */
 export function InfrastructureHealth() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.systemHealth.${k}`);
   const { data, loading, error, refetch } = useAsync(getInfrastructureHealth, { refetchInterval: 30000 });
   const [failures, setFailures] = useState<QueueFailures | null>(null);
@@ -71,7 +72,7 @@ export function InfrastructureHealth() {
     setBusy(true);
     try {
       const n = await fn();
-      toast.success(c(doneKey).replace("{n}", n.toLocaleString()));
+      toast.success(c(doneKey).replace("{n}", formatNumber(n, locale)));
       await Promise.all([refetch(), loadFailures()]);
     } catch {
       toast.error(c("actionFailed"));
@@ -107,7 +108,11 @@ export function InfrastructureHealth() {
         </button>
       </div>
 
-      {data === null ? (
+      {data === null && loading && !error ? (
+        <div className="flex justify-center py-8 text-ink-subtle">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+      ) : data === null ? (
         <div className="rounded-lg border border-dashed border-line py-8 text-center text-sm text-ink-subtle">
           {error ?? c("resourcesEmpty")}
         </div>
@@ -141,8 +146,8 @@ export function InfrastructureHealth() {
                 <span className="text-xs font-semibold uppercase tracking-wide">{c("svc_queue")}</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
-                <Stat label={c("queuePending")} value={pendingCount.toLocaleString()} />
-                <Stat label={c("queueFailed")} value={failedCount.toLocaleString()} danger={failedCount > 0} />
+                <Stat label={c("queuePending")} value={formatNumber(pendingCount, locale)} />
+                <Stat label={c("queueFailed")} value={formatNumber(failedCount, locale)} danger={failedCount > 0} />
                 <Stat label={c("queueOldest")} value={ageLabel(data.queue.oldest_pending_seconds)} />
               </div>
             </div>
@@ -162,7 +167,7 @@ export function InfrastructureHealth() {
             <span className="me-1 text-xs font-semibold uppercase tracking-wide text-ink-subtle">{c("queueActions")}</span>
             <ActionButton
               icon={RotateCcw}
-              label={`${c("retryFailed")}${failedCount > 0 ? ` (${failedCount.toLocaleString()})` : ""}`}
+              label={`${c("retryFailed")}${failedCount > 0 ? ` (${formatNumber(failedCount, locale)})` : ""}`}
               onClick={() => act(retryFailedJobs, "retryDone")}
               disabled={busy || failedCount === 0}
             />
@@ -201,7 +206,7 @@ export function InfrastructureHealth() {
                   <div key={j.id} className="text-xs">
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-semibold text-ink">{j.name}</span>
-                      <span className="shrink-0 text-ink-subtle" dir="ltr">{new Date(j.failed_at).toLocaleString()}</span>
+                      <span className="shrink-0 text-ink-subtle" dir="ltr">{formatDateTime(j.failed_at, locale)}</span>
                     </div>
                     <p className="mt-0.5 break-words text-danger-fg" dir="ltr">{j.exception}</p>
                   </div>

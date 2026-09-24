@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Inbox } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
-import { latnLocale } from "@/lib/utils";
+import { formatMoney, latnLocale } from "@/lib/utils";
 import { PAYMENT_METHOD_KEYS, paymentMethodLabel } from "@/lib/api/payments";
+import { ADMIN_BADGES_REFRESH_EVENT } from "@/components/layout/app-feeds";
 import {
   listPaymentClaims,
   resolvePaymentClaim,
@@ -88,7 +89,7 @@ export function PaymentClaimsList() {
       ) : (
         <div className="space-y-2">
           {claims.map((claim) => (
-            <ClaimRow key={claim.id} claim={claim} plans={plans} onResolved={load} whenText={date(claim.created_at)} resolvedText={date(claim.resolved_at)} />
+            <ClaimRow key={claim.id} claim={claim} plans={plans} onResolved={() => { load(); window.dispatchEvent(new Event(ADMIN_BADGES_REFRESH_EVENT)); }} whenText={date(claim.created_at)} resolvedText={date(claim.resolved_at)} />
           ))}
         </div>
       )}
@@ -109,7 +110,7 @@ function ClaimRow({
   whenText: string;
   resolvedText: string;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.claims.${k}`);
   const [mode, setMode] = useState<null | "accept" | "reject">(null);
   const [busy, setBusy] = useState(false);
@@ -185,7 +186,7 @@ function ClaimRow({
             >
               <option value="">{c("selectPlan")}</option>
               {plans.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} · €{p.price.toFixed(2)}</option>
+                <option key={p.id} value={p.id}>{p.name} · {formatMoney(p.price, locale)}</option>
               ))}
             </select>
           </div>

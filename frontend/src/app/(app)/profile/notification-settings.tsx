@@ -29,17 +29,26 @@ export function NotificationSettings() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setLoadFailed(false);
     getNotificationPrefs()
       .then((p) => active && setPrefs(p))
-      .catch(() => active && toast.error(c("loadError")))
+      .catch(() => {
+        if (!active) return;
+        setLoadFailed(true);
+        toast.error(c("loadError"));
+      })
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [attempt]);
 
   function toggle(channel: NotificationChannel, category: NotificationCategory) {
     setPrefs((prev) =>
@@ -61,6 +70,22 @@ export function NotificationSettings() {
     } finally {
       setBusy(false);
     }
+  }
+
+  // A failed load offers a retry instead of spinning forever.
+  if (!loading && !prefs && loadFailed) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-10 text-sm text-ink-muted">
+        <p>{c("loadError")}</p>
+        <button
+          type="button"
+          onClick={() => setAttempt((n) => n + 1)}
+          className="rounded-lg border border-line px-3 py-1.5 font-medium text-ink hover:bg-surface-2"
+        >
+          {t("common.retry")}
+        </button>
+      </div>
+    );
   }
 
   if (loading || !prefs) {

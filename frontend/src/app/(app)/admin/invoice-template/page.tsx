@@ -410,7 +410,7 @@ export default function InvoiceTemplatePage() {
         {/* Live preview */}
         <Card className="p-5 lg:sticky lg:top-6 lg:self-start">
           <h3 className="mb-3 text-sm font-semibold text-ink-muted">{c("preview")}</h3>
-          <iframe title="invoice-preview" className="h-[720px] w-full rounded-lg border border-line bg-white" srcDoc={preview} />
+          <iframe title="invoice-preview" sandbox="" className="h-[720px] w-full rounded-lg border border-line bg-white" srcDoc={preview} />
         </Card>
       </div>
 

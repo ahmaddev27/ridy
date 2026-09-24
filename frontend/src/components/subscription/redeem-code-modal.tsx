@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/context";
+import { digitsOnly } from "@/lib/utils";
 import { redeemSubscriptionCode } from "@/lib/api/company-subscription";
 
 /**
@@ -50,7 +51,7 @@ export function RedeemCodeModal({
           <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-ink-subtle">{c("codeLabel")}</label>
           <input
             value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            onChange={(e) => setCode(digitsOnly(e.target.value).slice(0, 6))}
             onKeyDown={(e) => e.key === "Enter" && redeem()}
             inputMode="numeric"
             placeholder="123456"

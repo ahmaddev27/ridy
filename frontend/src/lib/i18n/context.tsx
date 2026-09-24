@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import { dictionaries, RTL_LOCALES, type Locale } from "./dictionaries";
@@ -23,11 +24,19 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 
 /** Merge the chrome dictionary with the per-screen dictionaries (separate files
  *  so screen-group agents can extend translations without touching shared state). */
+const merged = new Map<Locale, Record<string, unknown>>();
+
+// Built once per locale — t() used to rebuild this merged tree on every call.
 function dictionaryFor(locale: Locale): Record<string, unknown> {
-  return {
-    ...dictionaries[locale],
-    screens: { ...screensA[locale], ...screensB[locale], ...screensRidy[locale], ...screensAdmin[locale] },
-  };
+  let dict = merged.get(locale);
+  if (!dict) {
+    dict = {
+      ...dictionaries[locale],
+      screens: { ...screensA[locale], ...screensB[locale], ...screensRidy[locale], ...screensAdmin[locale] },
+    };
+    merged.set(locale, dict);
+  }
+  return dict;
 }
 
 function lookup(tree: unknown, path: string): string {
@@ -64,9 +73,11 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const t = useCallback((key: string) => lookup(dictionaryFor(locale), key), [locale]);
+  // Stable value so consumers only re-render when the locale actually changes.
+  const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
 
   return (
-    <I18nContext.Provider value={{ locale, setLocale, t }}>
+    <I18nContext.Provider value={value}>
       {children}
     </I18nContext.Provider>
   );

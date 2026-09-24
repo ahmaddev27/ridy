@@ -1,6 +1,6 @@
 export const metadata = {
   title: "Impressum · Reidey",
-  description: "Impressum von Reidey gemäß § 5 TMG.",
+  description: "Impressum von Reidey gemäß § 5 DDG.",
 };
 
 export default function ImpressumPage() {
@@ -10,7 +10,7 @@ export default function ImpressumPage() {
 
       <div className="mt-10 space-y-10 text-[15px] leading-relaxed text-ink-muted">
         <section>
-          <h2 className="text-xl font-semibold text-ink">Angaben gemäß § 5 TMG</h2>
+          <h2 className="text-xl font-semibold text-ink">Angaben gemäß § 5 DDG</h2>
           <p className="mt-3">
             Reidey
             <br />
