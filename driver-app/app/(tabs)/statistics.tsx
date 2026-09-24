@@ -63,9 +63,9 @@ export default function StatisticsScreen() {
 
   const seq = useRef(0);
   const load = useCallback(
-    async (win: { from: string; to: string }, mon: Date, key: string) => {
+    async (win: { from: string; to: string }, mon: Date, key: string, silent = false) => {
       const mine = ++seq.current;
-      setRefreshing(true);
+      if (!silent) setRefreshing(true); // focus reloads stay quiet; pull-to-refresh spins
       try {
         const wk = { from: ymd(mon), to: ymd(addDays(mon, 6)) };
         const fetchStats = (from: string, to: string) => (isOwner ? api.fleetStats(from, to) : api.stats(from, to));
@@ -89,7 +89,7 @@ export default function StatisticsScreen() {
     [isOwner, range],
   );
 
-  useFocusEffect(useCallback(() => { void load(window, weekMon, windowKey); }, [load, window, weekMon, windowKey]));
+  useFocusEffect(useCallback(() => { void load(window, weekMon, windowKey, true); }, [load, window, weekMon, windowKey]));
   const current = loadedKey === windowKey ? stats : null;
 
   const avgPerKm = current && current.km > 0 ? current.earnings / current.km : 0;
