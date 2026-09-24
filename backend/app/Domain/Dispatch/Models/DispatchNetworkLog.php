@@ -17,6 +17,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class DispatchNetworkLog extends Model
 {
+    /** Largest payload stored as-is (bytes of JSON). */
+    public const MAX_PAYLOAD_BYTES = 262144;
+
     public const UPDATED_AT = null; // append-only — created_at only
 
     protected $guarded = [];
@@ -32,6 +35,13 @@ class DispatchNetworkLog extends Model
      */
     public static function record(?int $tenantId, string $kind, mixed $payload, ?string $summary = null, ?int $count = null, ?string $offerUuid = null): void
     {
+        // A debug feed, not an archive: an oversized capture is replaced by a
+        // marker instead of bloating the table and the admin Network responses.
+        $bytes = strlen((string) json_encode($payload));
+        if ($bytes > self::MAX_PAYLOAD_BYTES) {
+            $payload = ['truncated' => true, 'bytes' => $bytes];
+        }
+
         self::create([
             'tenant_id' => $tenantId,
             'kind' => $kind,
