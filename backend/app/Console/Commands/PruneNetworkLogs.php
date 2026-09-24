@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Domain\Dispatch\Models\DispatchNetworkLog;
+use App\Support\BatchDelete;
 use Illuminate\Console\Command;
 
 /**
@@ -19,7 +20,14 @@ class PruneNetworkLogs extends Command
     {
         $cutoff = now()->subHours((int) $this->option('hours'));
 
-        $deleted = DispatchNetworkLog::where('created_at', '<', $cutoff)->delete();
+        // Id-bounded batches: after a scheduler outage or a retention change this
+        // could be days of the busiest table, and one DELETE would lock it against
+        // the live status ingest for the whole run.
+        $deleted = BatchDelete::run(
+            fn () => DispatchNetworkLog::query()->where('created_at', '<', $cutoff),
+            batchSize: 5000,
+            pauseMicros: 100_000,
+        );
 
         $this->info("Pruned {$deleted} network-log entr(ies) older than {$this->option('hours')}h.");
 

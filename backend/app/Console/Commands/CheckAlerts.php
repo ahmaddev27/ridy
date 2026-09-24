@@ -5,6 +5,8 @@ namespace App\Console\Commands;
 use App\Domain\Dispatch\Models\DaemonShard;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Ops\AlertService;
+use App\Domain\Ops\Models\AlertIncident;
+use App\Domain\Tenancy\Models\Tenant;
 use Illuminate\Console\Command;
 
 /**
@@ -42,9 +44,13 @@ class CheckAlerts extends Command
     /** A company whose Uber session expired or needs relinking gets no offers. */
     private function checkSessions(AlertService $alerts): void
     {
+        // Only companies we actually serve: a disabled/banned/expired company's broken
+        // session is moot and must not page ops (its open incident resolves below).
         $sessions = UberFleetSession::withoutGlobalScopes()
+            ->select(['id', 'tenant_id', 'status'])
             ->with('tenant:id,name')
             ->whereIn('status', [UberFleetSession::STATUS_EXPIRED, UberFleetSession::STATUS_NEEDS_RELINK])
+            ->whereIn('tenant_id', Tenant::query()->usable()->select('id'))
             ->get();
 
         $broken = [];
@@ -59,13 +65,14 @@ class CheckAlerts extends Command
             );
         }
 
-        // Resolve any previously-broken session that is active again.
-        $active = UberFleetSession::withoutGlobalScopes()
-            ->where('status', UberFleetSession::STATUS_ACTIVE)
-            ->pluck('id');
-        foreach ($active as $id) {
+        // Resolve every OPEN incident whose session is no longer broken — recovered,
+        // deleted, replaced by a new org's row, or its company lapsed. Walks open
+        // incidents (few) instead of every active session (one query each).
+        $open = AlertIncident::where('kind', 'session_relink')->whereNull('resolved_at')->pluck('key');
+        foreach ($open as $key) {
+            $id = (int) substr((string) $key, strlen('session_relink:'));
             if (! isset($broken[$id])) {
-                $alerts->resolve("session_relink:{$id}");
+                $alerts->resolve((string) $key);
             }
         }
     }
