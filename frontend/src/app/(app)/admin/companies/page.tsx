@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { latnLocale } from "@/lib/utils";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Building2, Trash2, ChevronLeft, ChevronRight, Power, PowerOff } from "lucide-react";
@@ -174,7 +175,13 @@ export default function CompaniesPage() {
                     className="cursor-pointer hover:bg-surface-2"
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium text-ink">{co.name}</div>
+                      <Link
+                        href={`/admin/companies/${co.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-medium text-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
+                      >
+                        {co.name}
+                      </Link>
                       <div className="flex items-center gap-2 text-xs text-ink-subtle">
                         <span>{co.country ?? "—"}</span>
                         {co.payment_reference && (

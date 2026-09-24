@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { useDialogFocus } from "@/components/ui/modal";
 import { useRouter } from "next/navigation";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
 import dynamic from "next/dynamic";
@@ -49,11 +50,9 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
       .catch((e) => setError(e instanceof Error ? e.message : "error"));
   }, [id]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  // Escape to close, focus moved in / trapped / restored to the opener.
+  const dialogRef = useDialogFocus(true, onClose);
+  const dialogTitleId = useId();
 
   // The stop list shown in the modal. Prefer the trip's corrected pickup/drop-off
   // (they carry the completed postcode / the address reverse-geocoded from Uber's
@@ -101,13 +100,18 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
       onClick={onClose}
     >
       <div
-        className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-surface text-start shadow-xl"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={dialogTitleId}
+        tabIndex={-1}
+        className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-surface text-start shadow-xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-4 border-b border-line p-5">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-ink">
+            <h2 id={dialogTitleId} className="text-lg font-semibold text-ink">
               {offer?.rider_first_name || c("colRider") || "—"}
             </h2>
             {offer?.driver_id != null ? (

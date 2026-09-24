@@ -5,6 +5,7 @@ import { Cpu, MemoryStick, HardDrive, Network, RefreshCw, Loader2 } from "lucide
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n/context";
+import { latnLocale } from "@/lib/utils";
 import { getSystemMetrics, type SystemMetrics } from "@/lib/api/admin";
 
 /** Human-readable bytes (binary units). */
@@ -30,7 +31,7 @@ function tone(pct: number | null): string {
  * two-sample rate reads on the server run only when explicitly requested.
  */
 export function ServerResources() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.systemHealth.${k}`);
   const [data, setData] = useState<SystemMetrics | null>(null);
   const [loading, setLoading] = useState(false);
@@ -52,7 +53,7 @@ export function ServerResources() {
         <div>
           <h3 className="text-sm font-semibold text-ink">{c("resourcesTitle")}</h3>
           <p className="mt-0.5 text-xs text-ink-subtle">
-            {data ? c("sampledAt").replace("{time}", new Date(data.sampled_at).toLocaleTimeString()) : c("resourcesHint")}
+            {data ? c("sampledAt").replace("{time}", new Date(data.sampled_at).toLocaleTimeString(latnLocale(locale))) : c("resourcesHint")}
           </p>
         </div>
         <button
