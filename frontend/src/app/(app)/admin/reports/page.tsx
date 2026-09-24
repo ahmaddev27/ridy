@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { latnLocale } from "@/lib/utils";
 import { toast } from "sonner";
 import { Wallet, Clock, Download, ReceiptText, CheckCircle2, Loader2, AlertCircle, Package, Plus, Pencil, Trash2, FileText } from "lucide-react";
@@ -8,6 +8,7 @@ import { Card, StatCard } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pager } from "@/components/ui/pager";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Select } from "@/components/ui/select";
@@ -58,19 +59,34 @@ export default function ReportsPage() {
     expired: "error",
   };
 
+  // Paged: older (incl. unpaid, still-to-settle) invoices stay reachable.
+  const [invoicePage, setInvoicePage] = useState(1);
+  const [invoiceMeta, setInvoiceMeta] = useState<{ last_page: number; total: number } | null>(null);
+  const [invoicesLoaded, setInvoicesLoaded] = useState(false);
+  const invoiceSeq = useRef(0);
+
   async function loadInvoices() {
+    const my = ++invoiceSeq.current;
     try {
-      const r = await listSubscriptionInvoices(tenantId);
+      const r = await listSubscriptionInvoices({ tenantId, page: invoicePage, perPage: 50 });
+      if (my !== invoiceSeq.current) return;
       setInvoices(r.data);
+      setInvoiceMeta({ last_page: r.meta.last_page, total: r.meta.total });
     } catch {
-      setInvoices([]);
+      if (my === invoiceSeq.current) setInvoices([]);
+    } finally {
+      if (my === invoiceSeq.current) setInvoicesLoaded(true);
     }
   }
 
   useEffect(() => {
+    setInvoicePage(1);
+  }, [tenantId]);
+
+  useEffect(() => {
     loadInvoices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId]);
+  }, [tenantId, invoicePage]);
 
   const money = (n: number) => new Intl.NumberFormat(latnLocale(locale), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
   const maxRevenue = Math.max(1, ...(summary?.revenue_by_month.map((r) => r.total) ?? [0]));
@@ -226,7 +242,13 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {invoices.length === 0 ? (
+        {!invoicesLoaded ? (
+          <div className="space-y-2 p-4">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-10 animate-pulse rounded bg-surface-2" />
+            ))}
+          </div>
+        ) : invoices.length === 0 ? (
           <EmptyState icon={ReceiptText} title={c("invoicesEmpty")} />
         ) : (
           <div className="overflow-x-auto">
@@ -304,6 +326,15 @@ export default function ReportsPage() {
               </tbody>
             </table>
           </div>
+        )}
+        {invoiceMeta && (
+          <Pager
+            className="border-t border-line p-3"
+            page={invoicePage}
+            lastPage={invoiceMeta.last_page}
+            total={invoiceMeta.total}
+            onPage={setInvoicePage}
+          />
         )}
       </Card>
 

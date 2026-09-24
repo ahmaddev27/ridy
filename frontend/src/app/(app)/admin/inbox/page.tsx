@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/context";
+import { formatDateTime } from "@/lib/utils";
 import { useAsync } from "@/hooks/use-async";
 import { ApiError } from "@/lib/api/client";
 import { ADMIN_BADGES_REFRESH_EVENT } from "@/components/layout/app-feeds";
@@ -22,7 +23,7 @@ import {
 export default function AdminInboxPage() {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.inbox.${k}`);
-  const { data, refetch } = useAsync(listContactMessages);
+  const { data, loading, refetch } = useAsync(listContactMessages);
   const messages = data?.messages ?? [];
   const unread = data?.unread ?? 0;
 
@@ -56,7 +57,7 @@ export default function AdminInboxPage() {
   }
 
   const fmt = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : "";
+    iso ? formatDateTime(iso, locale, { dateStyle: "medium", timeStyle: "short" }) : "";
 
   return (
     <div className="space-y-6">
@@ -66,7 +67,9 @@ export default function AdminInboxPage() {
         action={unread > 0 ? <Badge status="connected" dot>{unread} {c("unread")}</Badge> : undefined}
       />
 
-      {messages.length === 0 ? (
+      {loading && !data ? (
+        <Card className="space-y-2 p-4">{[0, 1].map((k) => <div key={k} className="h-12 animate-pulse rounded bg-surface-2" />)}</Card>
+      ) : messages.length === 0 ? (
         <Card className="overflow-hidden">
           <EmptyState icon={Inbox} title={c("empty")} description={c("emptyDesc")} />
         </Card>

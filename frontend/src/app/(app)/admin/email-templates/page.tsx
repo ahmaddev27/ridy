@@ -26,6 +26,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { useI18n } from "@/lib/i18n/context";
+import { isSafeUrl, sanitizeTemplateHtml } from "@/lib/sanitize-html";
 import {
   listTemplates,
   updateTemplate,
@@ -55,7 +56,8 @@ export default function EmailTemplatesPage() {
     setSubject(tpl.subject);
     setAccent(tpl.accent_color ?? "#4f46e5");
     setFooter(tpl.footer_text ?? "");
-    if (editorRef.current) editorRef.current.innerHTML = tpl.body_html;
+    // Stored HTML is sanitized before it touches the live DOM (onerror etc.).
+    if (editorRef.current) editorRef.current.innerHTML = sanitizeTemplateHtml(tpl.body_html);
   }, []);
 
   useEffect(() => {
@@ -109,8 +111,8 @@ export default function EmailTemplatesPage() {
   }
 
   function addLink() {
-    const url = window.prompt("URL", "https://");
-    if (url) exec("createLink", url);
+    const url = window.prompt(c("linkPrompt"), "https://");
+    if (url && isSafeUrl(url)) exec("createLink", url);
   }
 
   async function onImage(e: React.ChangeEvent<HTMLInputElement>) {
@@ -167,10 +169,10 @@ export default function EmailTemplatesPage() {
             <label className="mb-1 block text-sm font-medium text-ink">{c("body")}</label>
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 border-line-strong bg-surface-2 p-1.5">
-              <ToolBtn onClick={() => exec("bold")} title="Bold"><Bold className="h-4 w-4" /></ToolBtn>
-              <ToolBtn onClick={() => exec("italic")} title="Italic"><Italic className="h-4 w-4" /></ToolBtn>
-              <ToolBtn onClick={() => exec("underline")} title="Underline"><Underline className="h-4 w-4" /></ToolBtn>
-              <ToolBtn onClick={() => exec("strikeThrough")} title="Strikethrough"><Strikethrough className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("bold")} title={c("tool_bold")}><Bold className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("italic")} title={c("tool_italic")}><Italic className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("underline")} title={c("tool_underline")}><Underline className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("strikeThrough")} title={c("tool_strike")}><Strikethrough className="h-4 w-4" /></ToolBtn>
               <span className="mx-1 h-5 w-px bg-line-strong" />
               <select
                 onChange={(e) => {
@@ -191,22 +193,22 @@ export default function EmailTemplatesPage() {
                 <option value="6">XL</option>
                 <option value="7">XXL</option>
               </select>
-              <ToolBtn onClick={() => exec("formatBlock", "H1")} title="Heading 1"><Heading className="h-4 w-4" /></ToolBtn>
-              <ToolBtn onClick={() => exec("formatBlock", "H2")} title="Heading 2"><Heading2 className="h-4 w-4" /></ToolBtn>
-              <ToolBtn onClick={() => exec("insertUnorderedList")} title="Bulleted list"><List className="h-4 w-4" /></ToolBtn>
-              <ToolBtn onClick={() => exec("insertOrderedList")} title="Numbered list"><ListOrdered className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("formatBlock", "H1")} title={c("tool_h1")}><Heading className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("formatBlock", "H2")} title={c("tool_h2")}><Heading2 className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("insertUnorderedList")} title={c("tool_ul")}><List className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("insertOrderedList")} title={c("tool_ol")}><ListOrdered className="h-4 w-4" /></ToolBtn>
               <span className="mx-1 h-5 w-px bg-line-strong" />
-              <ToolBtn onClick={() => exec("justifyLeft")} title="Align left"><AlignLeft className="h-4 w-4" /></ToolBtn>
-              <ToolBtn onClick={() => exec("justifyCenter")} title="Align center"><AlignCenter className="h-4 w-4" /></ToolBtn>
-              <ToolBtn onClick={() => exec("justifyRight")} title="Align right"><AlignRight className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("justifyLeft")} title={c("tool_alignLeft")}><AlignLeft className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("justifyCenter")} title={c("tool_alignCenter")}><AlignCenter className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("justifyRight")} title={c("tool_alignRight")}><AlignRight className="h-4 w-4" /></ToolBtn>
               <span className="mx-1 h-5 w-px bg-line-strong" />
-              <ToolBtn onClick={addLink} title="Link"><Link2 className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={addLink} title={c("tool_link")}><Link2 className="h-4 w-4" /></ToolBtn>
               <label className="cursor-pointer rounded p-1.5 text-ink-muted hover:bg-surface-2" title={c("insertImage")}>
                 <ImageIcon className="h-4 w-4" />
                 <input type="file" accept="image/*" className="hidden" onChange={onImage} />
               </label>
-              <ToolBtn onClick={() => exec("undo")} title="Undo"><Undo2 className="h-4 w-4" /></ToolBtn>
-              <ToolBtn onClick={() => exec("redo")} title="Redo"><Redo2 className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("undo")} title={c("tool_undo")}><Undo2 className="h-4 w-4" /></ToolBtn>
+              <ToolBtn onClick={() => exec("redo")} title={c("tool_redo")}><Redo2 className="h-4 w-4" /></ToolBtn>
               <span className="mx-1 h-5 w-px bg-line-strong" />
               <span className="px-1 text-xs font-medium text-ink-subtle">{c("variablesLabel")}</span>
               {(active?.variables ?? []).map((v) => (
@@ -256,7 +258,8 @@ export default function EmailTemplatesPage() {
         {/* Live preview */}
         <Card className="p-5">
           <h3 className="mb-3 text-sm font-semibold text-ink-muted">{c("preview")}</h3>
-          <iframe title="preview" className="h-[520px] w-full rounded-lg border border-line" srcDoc={preview} />
+          {/* sandbox: the preview renders with an opaque origin and no scripts. */}
+          <iframe title="preview" sandbox="" className="h-[520px] w-full rounded-lg border border-line" srcDoc={preview} />
         </Card>
       </div>
     </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Save, Mail, LifeBuoy, Smartphone, Landmark, Banknote } from "lucide-react";
+import { Loader2, Save, Mail, LifeBuoy, Smartphone, Landmark, Banknote, RotateCcw } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -81,11 +81,22 @@ export default function SettingsPage() {
     setAppIosStoreUrl(s.app_ios_store_url ?? "");
   }
 
+  const [loadFailed, setLoadFailed] = useState(false);
+  function retryLoad() {
+    setLoadFailed(false);
+    load().catch((e) => {
+      setLoadFailed(true);
+      toast.error(t("common.loadFailed"), { description: e instanceof Error ? e.message : undefined });
+    });
+  }
+
   useEffect(() => {
-    load().catch(() => {});
+    retryLoad();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function saveSmtp() {
+    if (!settings) return;
     setBusy(true);
     try {
       await updateSettings({
@@ -130,6 +141,7 @@ export default function SettingsPage() {
   }
 
   async function saveSupport() {
+    if (!settings) return;
     setBusy(true);
     try {
       await updateSettings({ support_email: supportEmail, support_whatsapp: supportWhatsapp });
@@ -143,6 +155,7 @@ export default function SettingsPage() {
   }
 
   async function savePayments() {
+    if (!settings) return;
     setBusy(true);
     try {
       await updateSettings({
@@ -168,6 +181,7 @@ export default function SettingsPage() {
 
 
   async function saveMobileApp() {
+    if (!settings) return;
     setBusy(true);
     try {
       await updateSettings({
@@ -219,7 +233,24 @@ export default function SettingsPage() {
 
         <div className="min-w-0 flex-1 space-y-6">
       {/* Email delivery */}
-      {tab === "email" && (
+      {/* Never show (or let anyone save) the empty default form: a failed
+          load would otherwise overwrite SMTP / payment / support settings. */}
+      {!settings && (
+        <Card className="flex flex-col items-center gap-3 p-8 text-center text-sm text-ink-muted">
+          {loadFailed ? (
+            <>
+              <p>{t("common.loadFailed")}</p>
+              <Button variant="secondary" onClick={retryLoad}>
+                <RotateCcw className="h-4 w-4" />
+                {t("common.retry")}
+              </Button>
+            </>
+          ) : (
+            <Loader2 className="h-5 w-5 animate-spin text-ink-subtle" />
+          )}
+        </Card>
+      )}
+      {settings && tab === "email" && (
       <Card className="w-full p-5">
         <div className="mb-4 flex items-center gap-2">
           <Mail className="h-4 w-4 text-ink" />
@@ -281,7 +312,7 @@ export default function SettingsPage() {
                 value={resendKey}
                 onChange={setResendKey}
                 mono
-                placeholder={settings?.has_resend_key ? "••••••••  (leave blank to keep)" : "re_..."}
+                placeholder={settings?.has_resend_key ? c("keepBlankPlaceholder") : "re_..."}
               />
             </div>
           )}
@@ -289,10 +320,10 @@ export default function SettingsPage() {
           <Field label={c("fromAddress")} type="email" value={fromAddress} onChange={setFromAddress} />
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => { setTestTo(""); setTestOpen(true); }} disabled={busy}>
+          <Button variant="secondary" onClick={() => { setTestTo(""); setTestOpen(true); }} disabled={busy || !settings}>
             {c("sendTest")}
           </Button>
-          <Button onClick={saveSmtp} disabled={busy}>
+          <Button onClick={saveSmtp} disabled={busy || !settings}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {c("save")}
           </Button>
@@ -301,7 +332,7 @@ export default function SettingsPage() {
       )}
 
       {/* Support contacts — shown to suspended companies */}
-      {tab === "support" && (
+      {settings && tab === "support" && (
       <Card className="w-full p-5">
         <div className="mb-1 flex items-center gap-2">
           <LifeBuoy className="h-4 w-4 text-ink" />
@@ -313,7 +344,7 @@ export default function SettingsPage() {
           <Field label={c("supportWhatsapp")} value={supportWhatsapp} onChange={setSupportWhatsapp} placeholder="+491700000000" />
         </div>
         <div className="mt-4 flex justify-end">
-          <Button onClick={saveSupport} disabled={busy}>
+          <Button onClick={saveSupport} disabled={busy || !settings}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {c("save")}
           </Button>
@@ -322,7 +353,7 @@ export default function SettingsPage() {
       )}
 
       {/* Subscription payment methods — shown to companies on the subscription/suspended screens */}
-      {tab === "payment" && (
+      {settings && tab === "payment" && (
       <Card className="w-full p-5">
         <div className="mb-1 flex items-center gap-2">
           <Banknote className="h-4 w-4 text-ink" />
@@ -371,7 +402,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="mt-4 flex justify-end">
-          <Button onClick={savePayments} disabled={busy}>
+          <Button onClick={savePayments} disabled={busy || !settings}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {c("save")}
           </Button>
@@ -380,7 +411,7 @@ export default function SettingsPage() {
       )}
 
       {/* Mobile driver-app force-update */}
-      {tab === "mobile" && (
+      {settings && tab === "mobile" && (
       <Card className="w-full p-5">
         <div className="mb-1 flex items-center gap-2">
           <Smartphone className="h-4 w-4 text-ink" />
@@ -394,7 +425,7 @@ export default function SettingsPage() {
           <Field label={c("appIosStoreUrl")} type="url" value={appIosStoreUrl} onChange={setAppIosStoreUrl} placeholder="https://apps.apple.com/app/id…" />
         </div>
         <div className="mt-4 flex justify-end">
-          <Button onClick={saveMobileApp} disabled={busy}>
+          <Button onClick={saveMobileApp} disabled={busy || !settings}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {c("save")}
           </Button>
@@ -410,8 +441,8 @@ export default function SettingsPage() {
         title={c("sendTest")}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setTestOpen(false)} disabled={busy}>{c("cancel")}</Button>
-            <Button onClick={testEmail} disabled={busy}>
+            <Button variant="secondary" onClick={() => setTestOpen(false)} disabled={busy || !settings}>{c("cancel")}</Button>
+            <Button onClick={testEmail} disabled={busy || !settings}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{c("sendTest")}
             </Button>
           </div>

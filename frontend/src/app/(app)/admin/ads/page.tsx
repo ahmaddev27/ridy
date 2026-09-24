@@ -11,6 +11,7 @@ import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/context";
+import { formatDate } from "@/lib/utils";
 import { useAsync } from "@/hooks/use-async";
 import { listAds, createAd, updateAd, deleteAd, uploadAdImage, type Ad, type AdInput } from "@/lib/api/ads";
 import { ImageCropper } from "@/components/ads/image-cropper";
@@ -32,7 +33,7 @@ function fromLocalInput(v: string): string | null {
 export default function AdminAdsPage() {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.ads.${k}`);
-  const { data, refetch } = useAsync(listAds);
+  const { data, loading, refetch } = useAsync(listAds);
   const ads = data ?? [];
 
   const [editing, setEditing] = useState<Ad | "new" | null>(null);
@@ -55,7 +56,7 @@ export default function AdminAdsPage() {
   }
 
   function windowLabel(ad: Ad): string {
-    const fmt = (iso: string) => new Date(iso).toLocaleDateString(locale);
+    const fmt = (iso: string) => formatDate(iso, locale);
     if (ad.starts_at && ad.ends_at) return `${fmt(ad.starts_at)} – ${fmt(ad.ends_at)}`;
     if (ad.starts_at) return `${c("from")} ${fmt(ad.starts_at)}`;
     if (ad.ends_at) return `${c("until")} ${fmt(ad.ends_at)}`;
@@ -76,7 +77,9 @@ export default function AdminAdsPage() {
       />
 
       <Card className="overflow-hidden">
-        {ads.length === 0 ? (
+        {loading && !data ? (
+          <div className="space-y-2 p-4">{[0, 1].map((k) => <div key={k} className="h-12 animate-pulse rounded bg-surface-2" />)}</div>
+        ) : ads.length === 0 ? (
           <EmptyState icon={Megaphone} title={c("empty")} description={c("emptyDesc")} />
         ) : (
           <div className="overflow-x-auto">
@@ -167,9 +170,9 @@ export default function AdminAdsPage() {
 
 /** The three device images an ad needs, with their crop aspect + recommended size. */
 const AD_IMAGES = [
-  { key: "image_desktop", label: "Desktop", aspect: 4 / 1, rec: "1280 × 320" },
-  { key: "image_tablet", label: "Tablet", aspect: 5 / 2, rec: "800 × 320" },
-  { key: "image_mobile", label: "Mobile", aspect: 16 / 10, rec: "640 × 400" },
+  { key: "image_desktop", labelKey: "device_desktop", aspect: 4 / 1, rec: "1280 × 320" },
+  { key: "image_tablet", labelKey: "device_tablet", aspect: 5 / 2, rec: "800 × 320" },
+  { key: "image_mobile", labelKey: "device_mobile", aspect: 16 / 10, rec: "640 × 400" },
 ] as const;
 
 type ImageKey = (typeof AD_IMAGES)[number]["key"];
@@ -280,7 +283,7 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
             return (
               <div key={img.key} className="rounded-lg border border-line p-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-ink">{img.label}</span>
+                  <span className="text-xs font-semibold text-ink">{c(img.labelKey)}</span>
                   <span className="text-[11px] text-ink-subtle">{c("recommended")}: {img.rec} px</span>
                 </div>
                 {preview && (

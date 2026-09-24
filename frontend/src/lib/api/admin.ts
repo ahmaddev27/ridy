@@ -754,10 +754,14 @@ export async function getBillingSummary(): Promise<BillingSummary> {
 }
 
 export async function listSubscriptionInvoices(
-  tenantId?: number,
+  params: { tenantId?: number; page?: number; perPage?: number } = {},
 ): Promise<{ data: SubscriptionInvoice[]; meta: { current_page: number; last_page: number; total: number } }> {
-  const qs = tenantId ? `?tenant_id=${tenantId}` : "";
-  return apiFetch(`/api/v1/admin/subscription-invoices${qs}`);
+  const q = new URLSearchParams();
+  if (params.tenantId) q.set("tenant_id", String(params.tenantId));
+  if (params.page) q.set("page", String(params.page));
+  if (params.perPage) q.set("per_page", String(params.perPage));
+  const qs = q.toString();
+  return apiFetch(`/api/v1/admin/subscription-invoices${qs ? `?${qs}` : ""}`);
 }
 
 export async function exportSubscriptionInvoices(tenantId?: number): Promise<Blob> {
