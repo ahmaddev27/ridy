@@ -99,15 +99,37 @@ class DispatchIngestTest extends TestCase
     public function test_geocoding_is_enqueued_off_the_ingest_hot_path(): void
     {
         Queue::fake();
+        // The geo services are down: the bounded pre-push geocode can't finish.
+        Http::fake(['*' => Http::response('', 503)]);
+        $this->tenantWithOrg();
+        app(TenantContext::class)->set(Tenant::first()->id);
+        Driver::create(['name' => 'Mhmoud Zedya', 'uber_driver_uuid' => self::DRIVER_UUID]);
+
+        // Postcode-less ends: nothing the local PLZ table can place offline.
+        $this->ingestOffers([$this->offer(['pickupAddress' => 'Irgendwostraße 1', 'dropoffAddress' => 'Nirgendwoweg 2'])])
+            ->assertOk()->assertJsonPath('data.routed', 1);
+        $this->assertNull(DispatchOffer::withoutGlobalScopes()->first()->geo_synced_at);
+
+        // An unfinished geocode is handed to GeocodeOffer so a cold-cache address
+        // never blocks the batch (or the time-sensitive push).
+        Queue::assertPushed(GeocodeOffer::class);
+    }
+
+    public function test_no_geocode_job_is_queued_when_the_pre_push_geocode_finished(): void
+    {
+        Queue::fake();
         $this->tenantWithOrg();
         app(TenantContext::class)->set(Tenant::first()->id);
         Driver::create(['name' => 'Mhmoud Zedya', 'uber_driver_uuid' => self::DRIVER_UUID]);
 
         $this->ingestOffers([$this->offer()])->assertOk()->assertJsonPath('data.routed', 1);
 
-        // The ingest path must not geocode inline — it enqueues GeocodeOffer so a
-        // cold-cache address never blocks the batch (or the time-sensitive push).
-        Queue::assertPushed(GeocodeOffer::class);
+        $offer = DispatchOffer::withoutGlobalScopes()->first();
+        if ($offer->geo_synced_at !== null) {
+            Queue::assertNotPushed(GeocodeOffer::class);
+        } else {
+            Queue::assertPushed(GeocodeOffer::class);
+        }
     }
 
     public function test_offer_for_unlinked_driver_is_stored_without_driver_id(): void

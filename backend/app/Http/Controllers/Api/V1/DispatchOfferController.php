@@ -9,15 +9,16 @@ use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\IngestOffersRequest;
 use App\Http\Resources\DispatchOfferResource;
 use App\Support\Csv;
 use App\Support\FleetDay;
-use App\Support\RidyLog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DispatchOfferController extends Controller
@@ -149,27 +150,26 @@ class DispatchOfferController extends Controller
      * offers it sees here. Ingestion is idempotent on offer_uuid, so the same
      * offer arriving from the stream more than once is de-duplicated.
      */
-    public function ingest(Request $request, DispatchOfferIngestor $ingestor, SupplierNetworkRecorder $recorder): JsonResponse
+    public function ingest(IngestOffersRequest $request, DispatchOfferIngestor $ingestor, SupplierNetworkRecorder $recorder): JsonResponse
     {
-        $data = $request->validate([
-            'offers' => ['required', 'array'],
-            'offers.*' => ['array'],
-            'seq' => ['nullable', 'integer'],
-        ]);
+        $data = $request->validated();
 
         $tenant = $request->user()->tenant;
         $tenantId = (int) $tenant->id;
         $results = ['routed' => 0, 'unlinked_driver' => 0, 'duplicate' => 0, 'skipped_no_uuid' => 0, 'org_mismatch' => 0, 'error' => 0];
+        // One pre-push geocode budget shared by the whole batch (see the daemon path).
+        $deadline = DispatchOfferIngestor::batchDeadline();
 
         foreach ($data['offers'] as $offer) {
             // Capture EVERY inbound offer for the admin Network feed first — before
             // the org filter or ingestion — so it reflects real supplier traffic
             // even when an offer is later skipped (org mismatch) or fails to ingest.
-            $recorder->offer($tenantId, $offer);
+            rescue(fn () => $recorder->offer($tenantId, $offer));
 
             // Only accept offers from THIS company's own Uber org — never a
             // different account the manager happens to have open in another tab.
-            $partnerUuid = (string) Arr::get($offer, 'partnerUUID', '');
+            $partnerUuid = Arr::get($offer, 'partnerUUID');
+            $partnerUuid = is_scalar($partnerUuid) ? (string) $partnerUuid : '';
             if ($tenant->uber_org_uuid !== null && $partnerUuid !== '' && $partnerUuid !== $tenant->uber_org_uuid) {
                 $results['org_mismatch']++;
 
@@ -177,12 +177,14 @@ class DispatchOfferController extends Controller
             }
 
             try {
-                $outcome = $ingestor->ingest($tenantId, $offer, $data['seq'] ?? null);
+                $outcome = $ingestor->ingest($tenantId, $offer, $data['seq'] ?? null, $deadline);
                 $results[$outcome['status']] = ($results[$outcome['status']] ?? 0) + 1;
             } catch (\Throwable $e) {
                 // One malformed/failed offer must never drop the rest of the batch.
+                // Logged for real (RidyLog is a no-op in production).
                 $results['error']++;
-                RidyLog::event('dispatch_offer.ingest_error', ['error' => $e->getMessage()]);
+                report($e);
+                Log::warning('dispatch_offer.ingest_error', ['tenant_id' => $tenantId, 'error' => $e->getMessage()]);
             }
         }
 

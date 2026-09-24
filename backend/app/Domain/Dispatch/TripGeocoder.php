@@ -25,7 +25,7 @@ class TripGeocoder
     private const UA = 'Reidey/1.0 (fleet dispatch; contact: ops@reidey.de)';
 
     /** Per-call HTTP timeout (seconds); tightened for the bounded pre-notify run. */
-    private int $httpTimeout = 6;
+    private float $httpTimeout = 6;
 
     /** Wall-clock deadline for a bounded run (microtime), or null when unbounded. */
     private ?float $deadline = null;
@@ -89,10 +89,12 @@ class TripGeocoder
      * a cold address that would eat the ~5-second accept window trips the deadline and
      * is left to the async GeocodeOffer job to fill in a moment later. Never throws.
      */
-    public function enrichForNotify(DispatchOffer $offer): DispatchOffer
+    public function enrichForNotify(DispatchOffer $offer, ?float $deadline = null): DispatchOffer
     {
+        // A caller ingesting a whole batch passes ONE shared deadline, so a second
+        // offer in the same message never waits for a fresh 2.5 s of its own.
         $this->httpTimeout = 2;
-        $this->deadline = microtime(true) + 2.5;
+        $this->deadline = $deadline ?? microtime(true) + 2.5;
         try {
             return $this->enrich($offer);
         } finally {
@@ -105,6 +107,19 @@ class TripGeocoder
     private function pastDeadline(): bool
     {
         return $this->deadline !== null && microtime(true) >= $this->deadline;
+    }
+
+    /**
+     * The HTTP timeout for the next call: the per-call cap, further clipped to what
+     * is left of a bounded run's budget so a single slow call can't overrun it.
+     */
+    private function callTimeout(): float
+    {
+        if ($this->deadline === null) {
+            return $this->httpTimeout;
+        }
+
+        return max(0.2, min($this->httpTimeout, $this->deadline - microtime(true)));
     }
 
     public function enrich(DispatchOffer $offer): DispatchOffer
@@ -850,7 +865,7 @@ class TripGeocoder
         try {
             $res = Http::withOptions(self::NO_PROXY)
                 ->withHeaders(['User-Agent' => self::UA])
-                ->timeout($this->httpTimeout)
+                ->timeout($this->callTimeout())
                 ->get($this->nominatimUrl(), $params);
         } catch (\Throwable $e) {
             return ['transient' => true, 'hit' => null];
@@ -1022,7 +1037,7 @@ class TripGeocoder
 
         try {
             $path = "{$from['lng']},{$from['lat']};{$to['lng']},{$to['lat']}";
-            $res = Http::withOptions(self::NO_PROXY)->timeout($this->httpTimeout)->get($this->osrmUrl().'/'.$path, [
+            $res = Http::withOptions(self::NO_PROXY)->timeout($this->callTimeout())->get($this->osrmUrl().'/'.$path, [
                 'overview' => 'full',
                 'geometries' => 'geojson',
             ]);
