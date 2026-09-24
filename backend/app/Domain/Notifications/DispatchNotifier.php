@@ -10,9 +10,7 @@ use App\Domain\Notifications\Contracts\SendsPushInBulk;
 use App\Domain\Notifications\Jobs\NotifyOwnersOfOffer;
 use App\Domain\Notifications\Models\DeviceToken;
 use App\Events\OfferBroadcast;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Throwable;
 
 /**
  * Turns a routed dispatch offer into a push to every device of its linked driver.
@@ -201,20 +199,7 @@ class DispatchNotifier
      */
     private function broadcastSafely(OfferBroadcast $event): void
     {
-        try {
-            // PendingBroadcast sends in its destructor — unset it INSIDE the try so
-            // a transport error is caught here rather than escaping later.
-            $pending = broadcast($event);
-            unset($pending);
-        } catch (Throwable $e) {
-            try {
-                if (Cache::add('dispatch_notifier.broadcast_failed', 1, 60)) {
-                    Log::warning('broadcast.failed', ['offer_id' => $event->offerId, 'error' => $e->getMessage()]);
-                }
-            } catch (Throwable) {
-                // The cache is down too — never let logging break the push path.
-            }
-        }
+        SafeBroadcast::send($event, ['offer_id' => $event->offerId]);
     }
 
     /**

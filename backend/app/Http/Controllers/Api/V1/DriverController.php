@@ -12,6 +12,7 @@ use App\Domain\Fleet\DriverStatusIngestor;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Geo\PostalCodes;
 use App\Domain\Notifications\Models\DeviceToken;
+use App\Domain\Notifications\SafeBroadcast;
 use App\Domain\Privacy\DriverEraser;
 use App\Events\DriversBroadcast;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
@@ -289,7 +290,7 @@ class DriverController extends Controller
 
         // Live dashboard map: nudge the company's channel so it refetches driver
         // positions instantly instead of waiting for its poll. Best-effort.
-        rescue(fn () => broadcast(new DriversBroadcast($tenantId)), report: false);
+        SafeBroadcast::send(new DriversBroadcast($tenantId), ['tenant_id' => $tenantId]);
 
         return response()->json(['data' => $result]);
     }

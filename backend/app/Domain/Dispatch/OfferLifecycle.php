@@ -3,6 +3,7 @@
 namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Notifications\SafeBroadcast;
 use App\Events\OfferBroadcast;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -258,7 +259,10 @@ class OfferLifecycle
         $rows = DispatchOffer::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('driver_uuid', $driverUuid)
-            ->where('id', '!=', $keepOfferId)
+            // OLDER offers only (ids are assigned at insert, and ingest inserts before it
+            // supersedes): the supersede runs after the push, seconds later, so a slow
+            // ingest on another RAMEN channel must not reject the driver's NEWER offer.
+            ->where('id', '<', $keepOfferId)
             ->where('status', OfferStatus::Pending)
             ->get(['id', 'driver_id', 'tenant_id']);
 
@@ -442,10 +446,7 @@ class OfferLifecycle
         }
 
         foreach ($latestByDriver as $driverId => $offer) {
-            rescue(
-                fn () => broadcast(new OfferBroadcast($driverId, (int) $offer->tenant_id, (int) $offer->id, 'status')),
-                report: false,
-            );
+            SafeBroadcast::send(new OfferBroadcast($driverId, (int) $offer->tenant_id, (int) $offer->id, 'status'), ['offer_id' => (int) $offer->id]);
         }
     }
 
@@ -473,7 +474,7 @@ class OfferLifecycle
         // Real-time nudge so the driver's open app reflects the new status (taken /
         // on-trip / completed) instantly. Best-effort — never breaks the transition.
         if ($changed && $offer->driver_id !== null) {
-            rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'status')), report: false);
+            SafeBroadcast::send(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'status'), ['offer_id' => (int) $offer->id]);
         }
 
         return $changed;
