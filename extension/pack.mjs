@@ -4,10 +4,10 @@
 //   2. refuses unless extension/ has no uncommitted changes,
 //   3. zips the COMMITTED extension/ tree (git archive), without dev tooling.
 //
-//   node extension/pack.mjs      → reidey-extension-<version>.zip in the repo root
+//   node extension/pack.mjs      → extension/dist/reidey-extension-<version>.zip
 
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,9 +24,12 @@ if (dirty) {
 
 const { version } = JSON.parse(readFileSync(join(here, "manifest.json"), "utf8"));
 const root = git("rev-parse", "--show-toplevel");
-const out = join(root, `reidey-extension-${version}.zip`);
+mkdirSync(join(here, "dist"), { recursive: true }); // git-ignored (extension/.gitignore)
+const out = join(here, "dist", `reidey-extension-${version}.zip`);
 
 // Dev-only files never ship in the store package.
-const exclude = ["tests", "dev-hosts.mjs", "check-release.mjs", "pack.mjs", "README.md"].map((p) => `:(exclude)${p}`);
-git("archive", "--format=zip", "-o", out, "HEAD:extension", "--", ".", ...exclude);
+const exclude = ["tests", "dev-hosts.mjs", "check-release.mjs", "pack.mjs", "README.md", ".gitignore"].map((p) => `:(exclude)${p}`);
+// Run from the repo root: archive pathspecs are relative to the cwd, and the
+// archived tree (HEAD:extension) has extension/ as its root.
+execFileSync("git", ["archive", "--format=zip", "-o", out, "HEAD:extension", "--", ".", ...exclude], { cwd: root, stdio: "inherit" });
 console.log(`packed ${out}`);

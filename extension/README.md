@@ -43,7 +43,7 @@ node dev-hosts.mjs off   # يرجّع حالة الإصدار (الحالة ال
 ## بناء zip للمتجر (الطريقة الوحيدة المدعومة)
 
 ```bash
-node extension/pack.mjs            # → reidey-extension-<version>.zip بجذر الريبو
+node extension/pack.mjs            # → extension/dist/reidey-extension-<version>.zip
 node extension/check-release.mjs   # يفحص إنه ما في localhost (بيشغّله CI و pack)
 node --test extension/tests/*.test.mjs
 ```
