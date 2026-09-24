@@ -4,15 +4,23 @@ namespace App\Domain\Billing;
 
 use App\Domain\Billing\Models\InvoiceSettings;
 use App\Domain\Billing\Models\SubscriptionPeriod;
+use App\Domain\Tenancy\Models\Tenant;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as DomPdf;
 use Illuminate\Contracts\View\Factory as ViewFactory;
+use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 /**
  * Turns a {@see SubscriptionPeriod} into a normalized, presentation-ready view
  * model and renders it as either HTML (live preview) or a dompdf PDF (download
  * / email attachment). All money is computed in integer cents to avoid float
  * drift, then formatted de-DE ("149,00 €").
+ *
+ * An issued invoice is immutable (GoBD): {@see snapshot()} freezes the issuer/VAT
+ * settings and the customer block on the period when its number is assigned, and
+ * every later render reads that snapshot instead of the live settings/tenant.
+ * Only legacy periods (issued before snapshots existed) render from live data.
  */
 class InvoiceRenderer
 {
@@ -92,9 +100,71 @@ class InvoiceRenderer
     /** @param array<string, mixed> $data */
     private function pdfFromData(array $data): DomPdf
     {
+        // Remote fetching stays OFF: the logo is inlined from local storage, so a
+        // stored logo_url can never make the backend fetch an arbitrary URL (SSRF)
+        // or hairpin through the public site on every render.
+        $data['logo_url'] = $this->inlineLogo($data['logo_url'] ?? null);
+
         return Pdf::loadView(self::VIEW, $data)
             ->setPaper('a4')
-            ->setOption('isRemoteEnabled', true);
+            ->setOption('isRemoteEnabled', false);
+    }
+
+    /**
+     * Freeze what this invoice prints — the issuer/VAT/bank settings and the
+     * customer + plan block — together with its issue date. Called once, when the
+     * invoice number is assigned; later settings or tenant renames never change it.
+     */
+    public function snapshot(SubscriptionPeriod $period, InvoiceSettings $settings, ?Tenant $tenant, \DateTimeInterface $issuedAt): void
+    {
+        $period->loadMissing(['code.plan', 'code.collector']);
+        $code = $period->code;
+
+        $period->forceFill([
+            'issued_at' => $issuedAt,
+            'invoice_snapshot' => [
+                'settings' => $settings->only($settings->getFillable()),
+                'customer_name' => $tenant?->name,
+                'customer_address' => $this->customerAddress($tenant),
+                'customer_no' => $tenant !== null ? sprintf('KD-%04d', $tenant->id) : null,
+                'plan_name' => $code?->plan?->name,
+                'sold_by' => $code?->collector?->name,
+                'payment_method' => $code?->payment_method,
+                'activation_code' => $code?->code,
+                'payment_ref' => $code?->payment_ref,
+            ],
+        ])->save();
+    }
+
+    /**
+     * The logo as an inline data URI when it is one of our uploaded invoice images
+     * (public disk, `invoice-images/`), else null — never a remote URL.
+     */
+    private function inlineLogo(?string $logoUrl): ?string
+    {
+        if ($logoUrl === null || $logoUrl === '' || str_starts_with($logoUrl, 'data:image/')) {
+            return $logoUrl ?: null;
+        }
+
+        $path = (string) parse_url($logoUrl, PHP_URL_PATH);
+        if (! preg_match('#/(invoice-images/[A-Za-z0-9._-]+)$#', $path, $m)) {
+            return null;
+        }
+
+        try {
+            $disk = Storage::disk('public');
+            if (! $disk->exists($m[1])) {
+                return null;
+            }
+            $mime = (string) $disk->mimeType($m[1]);
+            if (! str_starts_with($mime, 'image/')) {
+                return null;
+            }
+
+            return 'data:'.$mime.';base64,'.base64_encode((string) $disk->get($m[1]));
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -105,13 +175,20 @@ class InvoiceRenderer
      */
     private function viewData(SubscriptionPeriod $period, InvoiceSettings $settings): array
     {
+        $snap = is_array($period->invoice_snapshot) ? $period->invoice_snapshot : null;
+        if ($snap !== null && is_array($snap['settings'] ?? null)) {
+            $settings = (new InvoiceSettings)->forceFill($snap['settings']);
+        }
+
         $tenant = $period->tenant;
         $code = $period->code;
         $money = $this->splitMoney($period->amount, (float) $settings->vat_rate, (bool) $settings->kleinunternehmer);
         $symbol = self::SYMBOLS[$settings->currency] ?? $settings->currency;
 
-        $planName = $code?->plan?->name;
-        $soldBy = $code?->collector?->name;
+        // Snapshot values win; live values are the fallback for legacy invoices.
+        $pick = fn (string $key, mixed $live) => $snap !== null && array_key_exists($key, $snap) ? $snap[$key] : $live;
+        $planName = $pick('plan_name', $code?->plan?->name);
+        $soldBy = $pick('sold_by', $code?->collector?->name);
 
         return [
             'settings' => $settings,
@@ -120,15 +197,16 @@ class InvoiceRenderer
             'title' => $settings->invoice_title ?: 'Rechnung',
 
             'invoice_no' => $period->invoiceNumber(),
-            'issue_date' => $this->date($period->paid_at ?? $period->created_at ?? $period->starts_at),
+            // The fixed issue date — settling an invoice later only sets paid_at.
+            'issue_date' => $this->date($period->issued_at ?? $period->created_at ?? $period->starts_at),
             'period_start' => $this->date($period->starts_at),
             'period_end' => $this->date($period->ends_at),
 
-            'customer_name' => $tenant?->name ?? '—',
-            'customer_address' => $this->customerAddress($tenant),
-            'customer_no' => $tenant !== null ? sprintf('KD-%04d', $tenant->id) : null,
-            'activation_code' => $code?->code,
-            'payment_ref' => $code?->payment_ref,
+            'customer_name' => $pick('customer_name', $tenant?->name) ?? '—',
+            'customer_address' => $pick('customer_address', $this->customerAddress($tenant)),
+            'customer_no' => $pick('customer_no', $tenant !== null ? sprintf('KD-%04d', $tenant->id) : null),
+            'activation_code' => $pick('activation_code', $code?->code),
+            'payment_ref' => $pick('payment_ref', $code?->payment_ref),
 
             'item_title' => $planName !== null ? 'Reidey '.$planName : 'Reidey Flotten-Abo',
             'item_desc' => 'Live-Dispatch, Fahrer-Push & Auswertung · Laufzeit '.$period->days.' Tage',
@@ -144,7 +222,7 @@ class InvoiceRenderer
 
             'paid' => $period->isPaid(),
             'paid_at' => $period->paid_at !== null ? $this->date($period->paid_at) : null,
-            'payment_method' => $this->paymentMethodLabel($code?->payment_method),
+            'payment_method' => $this->paymentMethodLabel($pick('payment_method', $code?->payment_method)),
             'sold_by' => $soldBy ?? 'Reidey Vertrieb',
         ];
     }

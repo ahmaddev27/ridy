@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  */
 class SubscriptionPeriod extends Model
 {
-    protected $fillable = ['invoice_no', 'tenant_id', 'days', 'amount', 'paid_at', 'collector_payment_id', 'sold_by_collector_id', 'starts_at', 'ends_at'];
+    protected $fillable = ['invoice_no', 'tenant_id', 'days', 'amount', 'paid_at', 'collector_payment_id', 'sold_by_collector_id', 'starts_at', 'ends_at', 'issued_at', 'invoice_snapshot', 'canceled_at'];
 
     protected $casts = [
         'days' => 'integer',
@@ -23,11 +23,20 @@ class SubscriptionPeriod extends Model
         'paid_at' => 'datetime',
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
+        'issued_at' => 'datetime',
+        'invoice_snapshot' => 'array',
+        'canceled_at' => 'datetime',
     ];
 
     public function isPaid(): bool
     {
         return $this->paid_at !== null;
+    }
+
+    /** Canceled by an admin "end subscription" — kept (never deleted) for the books. */
+    public function isCanceled(): bool
+    {
+        return $this->canceled_at !== null;
     }
 
     /**
