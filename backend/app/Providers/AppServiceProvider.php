@@ -7,7 +7,9 @@ use App\Domain\Notifications\Push\FcmPushSender;
 use App\Domain\Notifications\Push\GoogleServiceAccountToken;
 use App\Domain\Notifications\Push\LogPushSender;
 use App\Domain\Tenancy\TenantContext;
+use App\Http\Middleware\AuditPrivilegedMutations;
 use App\Support\Settings;
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
@@ -41,6 +43,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->applyMailSettings();
+
+        // Audit trail for super-admin and act-as-company mutations (see the
+        // middleware). Appended here so routes/api.php needs no per-group wiring.
+        $this->app->make(HttpKernel::class)->appendMiddlewareToGroup('api', AuditPrivilegedMutations::class);
 
         // Clear any lingering tenant context before each queued job runs, so a
         // long-lived worker never inherits the previous job's tenant scope. Each
