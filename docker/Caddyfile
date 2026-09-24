@@ -11,26 +11,59 @@ reidey.de {
 	encode zstd gzip
 
 	# Security headers (applied to every response). HSTS forces HTTPS for a year;
-	# nosniff/frame-ancestors/XFO block MIME-sniffing and clickjacking; the CSP is
-	# permissive enough for Next.js (inline/eval), Google Fonts, MapLibre's https
-	# raster tiles and Sentry (https/wss), while still pinning frame-ancestors,
-	# base-uri and form-action to self. -Server drops the software banner.
+	# nosniff/frame-ancestors/XFO block MIME-sniffing and clickjacking. -Server
+	# drops the software banner.
+	#
+	# CSP, per directive:
+	#   script-src  'unsafe-inline' stays: Next.js streams inline RSC/bootstrap
+	#               scripts and the app has no per-request nonce yet. 'unsafe-eval'
+	#               is gone: Next only needs it in dev (Next 16 CSP guide).
+	#               www.gstatic.com/firebasejs/ is the Firebase compat SDK that
+	#               public/firebase-messaging-sw.js importScripts() for web push
+	#               (a service worker is governed by its own response's CSP).
+	#   connect-src an explicit allowlist instead of "any https/wss host", so an
+	#               injected script cannot exfiltrate to an arbitrary server:
+	#               same origin + Reverb (wss), MapLibre's OSM raster tiles,
+	#               Firebase web push (*.googleapis.com) and Sentry (EU ingest).
+	#   img-src     stays https: (admin ads reference arbitrary image URLs).
+	#   object-src  'none' (no plugins anywhere).
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "SAMEORIGIN"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "geolocation=(self), microphone=(), camera=(), payment=()"
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com/firebasejs/; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' wss://reidey.de https://tile.openstreetmap.org https://*.googleapis.com https://*.sentry.io; worker-src 'self' blob:; object-src 'none'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
 		-Server
 	}
 
-	# Reverb WebSocket (Pusher protocol): the app connects to wss://reidey.de/app/…
-	# and the backend posts events to /apps/…; both proxy to the reverb service.
+	# Cap request bodies at the edge. The largest legitimate upload is an admin ad
+	# image (validated <= 4 MB); PHP accepts up to 10 MB (docker/php/conf.d).
+	request_body {
+		max_size 12MB
+	}
+
+	# Reverb WebSocket (Pusher protocol): clients connect to wss://reidey.de/app/…
+	# Only /app/* is public. The backend publishes events straight to reverb:8080
+	# over the internal Docker network (REVERB_HOST=reverb), so Reverb's signed
+	# HTTP API (/apps/…: publish, channel + presence info) is not exposed here.
 	# Caddy upgrades the connection to WebSocket automatically.
-	@reverb path /app/* /apps/*
+	@reverb path /app/*
 	handle @reverb {
 		reverse_proxy reverb:8080
+	}
+	handle /apps/* {
+		respond 404
+	}
+
+	# Daemon offer/status ingest gets its own PHP-FPM pool ([dispatch] on :9001,
+	# docker/php/php-fpm.d/zz-pools.conf), so dashboard and driver-app polling on
+	# the main pool can never queue an offer behind them inside Uber's ~5 s accept
+	# window. Same Laravel app, routes and auth (dispatch.secret); only the worker
+	# pool differs. A single-path matcher sorts ahead of the named @laravel one.
+	handle /api/v1/internal/dispatch/* {
+		root * /var/www/public
+		php_fastcgi backend:9001
 	}
 
 	# Laravel API + Sanctum. The backend app is mounted so its public/ is the root.

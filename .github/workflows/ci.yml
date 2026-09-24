@@ -1,13 +1,21 @@
 name: CI
 
-# Lint + test both packages of the monorepo on every push and pull request.
+# Lint + test every package of the monorepo on every push and pull request.
+# Deploy (deploy.yml) runs only after this whole workflow succeeds on main, so
+# every blocking job here is a production gate.
+#
+# Third-party actions are pinned to full commit SHAs (tag in the comment): a
+# moved or compromised tag must not change what runs with repository access.
 on:
   push:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  # --- Backend: Laravel (PHP 8.3) --------------------------------------------
+  # --- Backend: Laravel (PHP 8.4) --------------------------------------------
   backend:
     name: Backend (Laravel)
     runs-on: ubuntu-latest
@@ -15,17 +23,17 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: "8.4"
           extensions: pdo_sqlite, bcmath, intl, zip
           coverage: none
 
       - name: Cache Composer packages
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: backend/vendor
           key: composer-${{ hashFiles('backend/composer.lock') }}
@@ -53,6 +61,101 @@ jobs:
           DB_DATABASE: database/database.sqlite
         run: php artisan test
 
+  # --- Backend on MySQL 8 (the production engine) -----------------------------
+  # The suite above runs on SQLite, so MySQL-only DDL (generated columns,
+  # index/collation rules, FleetDay's MySQL branch) was first executed by
+  # `migrate --force` on the live database. Running every migration on a real
+  # mysql:8.0 here catches a migration MySQL rejects before it can deploy.
+  backend-mysql:
+    name: Backend migrations (MySQL 8)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: testing
+          MYSQL_ROOT_PASSWORD: ci-root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: testing
+      DB_USERNAME: root
+      DB_PASSWORD: ci-root
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: "8.4"
+          extensions: pdo_mysql, pdo_sqlite, bcmath, intl, zip
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # Blocking: every migration must apply cleanly on MySQL 8.
+      - name: Migrate on MySQL
+        run: php artisan migrate --force --no-interaction
+
+      # Advisory for now: phpunit.xml pins sqlite/:memory:, and parts of the
+      # suite were written against SQLite. Surfaces MySQL-only behaviour
+      # (e.g. the generated-column parity test) without blocking deploys until
+      # the suite is known to be engine-clean.
+      - name: MySQL-sensitive tests (advisory)
+        continue-on-error: true
+        run: php artisan test --filter='DriverOnlineParity|FleetDay|Dispatch'
+
+  # --- Container/edge config ----------------------------------------------------
+  # A typo in the FPM pool file, php.ini or Caddyfile would only show up as a
+  # crash-looping container after the swap. Build the real backend image and let
+  # php-fpm / Caddy parse their config here instead.
+  docker-config:
+    name: Docker + edge config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Compose files parse
+        run: |
+          docker compose -f docker-compose.prod.yml --env-file .env.prod.example config -q
+          SHARD_ID=ci RIDY_API_URL=https://ci DISPATCH_INGEST_SECRET=ci docker compose -f docker-compose.daemon-shard.yml config -q
+          GEO_BIND_IP=10.0.0.2 docker compose -f docker-compose.geo.yml config -q
+
+      - name: Build backend image
+        run: docker build -f docker/backend.Dockerfile -t reidey-backend-ci .
+
+      - name: PHP-FPM config test + OPcache loaded
+        run: |
+          docker run --rm reidey-backend-ci php-fpm -t
+          docker run --rm reidey-backend-ci php -m | grep -qi "zend opcache"
+
+      - name: Caddyfile parses
+        run: docker run --rm -v "$PWD/docker/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
+
   # --- Frontend: Next.js (Node 22) -------------------------------------------
   frontend:
     name: Frontend (Next.js)
@@ -61,10 +164,10 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
           cache: npm
@@ -81,3 +184,60 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # --- Dispatch daemon (Node 22) ----------------------------------------------
+  # The most offer-critical process had no automated gate at all.
+  daemon:
+    name: Dispatch daemon (Node)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dispatch-daemon
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dispatch-daemon/package-lock.json
+
+      # Same install the image does: fails if package.json and the lock drift.
+      - name: Install dependencies (lockfile)
+        run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+
+      - name: Syntax check
+        run: for f in src/*.js; do node --check "$f"; done
+
+      - name: Unit tests (node --test)
+        run: |
+          if ls test/*.test.js src/*.test.js >/dev/null 2>&1; then node --test; else echo "no daemon tests yet"; fi
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  # --- Driver app (Expo) -------------------------------------------------------
+  # OTA updates reach every driver with no store review, so at least prove the
+  # app still typechecks.
+  driver-app:
+    name: Driver app (Expo typecheck)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: driver-app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: driver-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit

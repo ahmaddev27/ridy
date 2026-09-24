@@ -1,0 +1,49 @@
+# Build context for every image in docker-compose*.yml is the REPO ROOT, and
+# BuildKit only reads .dockerignore from the context root — backend/.dockerignore
+# and frontend/.dockerignore are never consulted. Without this file every deploy
+# sent (and COPY backend/ baked into the image layers) the nightly DB dumps in
+# backend/storage/app/backups, the FCM service-account key written to
+# backend/storage/app, the logs, any .env, .git, driver-app/, docs/…
+#
+# Allow-list: exclude everything, then re-include only what a Dockerfile COPYs.
+*
+!backend/
+!frontend/
+!dispatch-daemon/
+!docker/php/
+
+# --- Never in any image ---------------------------------------------------------
+**/.git
+**/node_modules
+**/.env
+**/.env.*
+**/*.log
+**/.DS_Store
+
+# --- Backend --------------------------------------------------------------------
+# vendor/ is installed inside the image from composer.lock.
+backend/vendor
+backend/database/database.sqlite
+backend/.phpunit.result.cache
+backend/.phpunit.cache
+# Runtime state: backups, uploaded files, FCM credentials, logs, caches. The
+# .gitignore placeholders are kept so the storage/ and bootstrap/cache/ skeleton
+# still exists for the image's `chown -R www-data` step.
+backend/storage/app/**
+!backend/storage/app/**/.gitignore
+backend/storage/logs/**
+!backend/storage/logs/.gitignore
+backend/storage/framework/cache/**
+backend/storage/framework/sessions/**
+backend/storage/framework/testing/**
+backend/storage/framework/views/**
+!backend/storage/framework/**/.gitignore
+backend/bootstrap/cache/*
+!backend/bootstrap/cache/.gitignore
+# public/storage is a symlink into storage/app/public (created by storage:link).
+backend/public/storage
+
+# --- Frontend -------------------------------------------------------------------
+# Built inside the image.
+frontend/.next
+frontend/out

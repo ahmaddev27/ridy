@@ -20,10 +20,23 @@ class LogViewerController extends Controller
     private function path(string $source): ?string
     {
         return match ($source) {
-            'backend' => storage_path('logs/laravel.log'),
+            'backend' => $this->currentBackendLog(),
             'frontend' => storage_path('logs/frontend.log'),
             default => null,
         };
+    }
+
+    /**
+     * The backend log being written now. Production logs daily
+     * (laravel-YYYY-MM-DD.log, LOG_STACK=daily); local dev keeps the single
+     * laravel.log. The newest file wins, so the viewer follows the rotation.
+     */
+    private function currentBackendLog(): string
+    {
+        $candidates = glob(storage_path('logs/laravel*.log')) ?: [];
+        usort($candidates, fn (string $a, string $b): int => (int) @filemtime($b) <=> (int) @filemtime($a));
+
+        return $candidates[0] ?? storage_path('logs/laravel.log');
     }
 
     /** Tail of a log source (most recent lines last). */

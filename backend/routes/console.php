@@ -80,3 +80,7 @@ Schedule::command('network-logs:prune')->hourly()->withoutOverlapping();
 // Keep geocode_cache bounded: expired MISSES (so a re-tryable address is asked
 // again) and hits nothing has touched in a year. Nightly, off the busy hours.
 Schedule::command('geocode-cache:prune')->dailyAt('03:40')->withoutOverlapping();
+
+// The database cache store only drops an expired row when that key is read again,
+// so never-re-read keys (throttle counters, one-off lookups) piled up forever.
+Schedule::command('cache:prune-expired')->dailyAt('03:50')->withoutOverlapping();

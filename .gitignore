@@ -29,6 +29,14 @@ docs/uber-console/roster-*.json
 # Docker named-volume data (if bind-mounted locally)
 /docker/volumes/
 
+# Deploy staging tree (deploy.yml builds the next release's images here before
+# switching the live checkout)
+/.build/
+
+# Store/submit keys written by the release workflows or kept locally
+*.p8
+play-service-account.json
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

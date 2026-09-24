@@ -6,6 +6,15 @@
 #
 #   docker compose -f docker-compose.prod.yml up -d --build
 
+# Container stdout/stderr rotation. The default json-file driver never rotates,
+# so the daemon's per-cycle stream lines and FPM's access log slowly filled the
+# disk that MySQL and the backups share. Applied to every service below.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
 # Shared Laravel environment for the backend + the scheduler (kept in one place
 # via a YAML anchor so the two never drift).
 x-app-env: &app-env
@@ -15,6 +24,17 @@ x-app-env: &app-env
   APP_DEBUG: "false"
   APP_URL: https://${DOMAIN}
   FRONTEND_URL: https://${DOMAIN}
+  # The published extension's exact origin (chrome-extension://<32-char id>).
+  # In production CORS never falls back to "any extension" (config/cors.php);
+  # the extension itself calls the API from its service worker under
+  # host_permissions, which CORS does not gate, so empty is safe.
+  EXTENSION_ORIGIN: ${EXTENSION_ORIGIN:-}
+  # Logs: one file per day, kept LOG_DAILY_DAYS days (config/logging.php), at
+  # info level. The old single laravel.log grew forever at debug level and kept
+  # IPs/IDs indefinitely.
+  LOG_STACK: ${LOG_STACK:-daily}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  LOG_DAILY_DAYS: ${LOG_DAILY_DAYS:-14}
   # SANCTUM_STATEFUL_DOMAINS is deliberately NOT set: Sanctum then derives the
   # stateful host from APP_URL (= https://${DOMAIN}) automatically, so SPA-cookie
   # login just works from the domain with zero extra config. Single source of
@@ -38,6 +58,9 @@ x-app-env: &app-env
   REVERB_SCHEME: http
   REVERB_SERVER_HOST: 0.0.0.0
   REVERB_SERVER_PORT: 8080
+  # Host patterns allowed to open a WebSocket (config/reverb.php). "*" until the
+  # driver app's Origin header is confirmed; then e.g. REVERB_ALLOWED_ORIGINS=reidey.de
+  REVERB_ALLOWED_ORIGINS: ${REVERB_ALLOWED_ORIGINS:-*}
   CACHE_STORE: database
   QUEUE_CONNECTION: database
   DB_CONNECTION: mysql
@@ -62,9 +85,12 @@ x-app-env: &app-env
   # Fixed OTP for testing — leave OTP_TEST_CODE unset in prod for random codes.
   OTP_TEST_CODE: ${OTP_TEST_CODE:-}
   # Host-resource monitoring (admin System Health): the container reads the HOST's
-  # /proc and root filesystem, mounted read-only on the backend service below.
+  # /proc, mounted read-only on the backend service below. Disk usage is read
+  # from the container's own "/": overlayfs reports the filesystem that holds
+  # Docker's data root (images, the MySQL volume, logs) — the disk that actually
+  # fills up — so the host root filesystem no longer has to be mounted.
   HOST_PROC_PATH: ${HOST_PROC_PATH:-/host/proc}
-  HOST_DISK_PATH: ${HOST_DISK_PATH:-/host/root}
+  HOST_DISK_PATH: ${HOST_DISK_PATH:-/}
   # Geocoding + routing (TripGeocoder). Empty = the public OSM services (rate-limited
   # ~1 req/s). Point these at the self-hosted containers to remove the limits —
   # NOMINATIM_URL=http://nominatim:8080, OSRM_URL=http://osrm:5000 (in the root .env),
@@ -78,6 +104,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       - backend
       - frontend
@@ -106,6 +133,7 @@ services:
   mysql:
     image: mysql:8.0
     restart: unless-stopped
+    logging: *default-logging
     environment:
       MYSQL_DATABASE: ${DB_DATABASE}
       MYSQL_USER: ${DB_USERNAME}
@@ -113,8 +141,13 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
     volumes:
       - dbdata:/var/lib/mysql
+      # Server tuning (buffer pool, binlog retention, slow log) — see the file.
+      - ./docker/mysql/reidey.cnf:/etc/mysql/conf.d/reidey.cnf:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_ROOT_PASSWORD}"]
+      # No credentials: `mysqladmin ping` exits 0 whenever the server answers,
+      # even with "access denied", so the root password never has to sit in the
+      # container config (docker inspect) or the host's process list.
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--silent"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -125,6 +158,7 @@ services:
       context: .
       dockerfile: ./docker/backend.Dockerfile
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       mysql:
         condition: service_healthy
@@ -134,10 +168,13 @@ services:
       - ./backend:/var/www
       - /var/www/vendor
       # Host-resource monitoring (admin System Health): expose the HOST's /proc
-      # and root filesystem read-only so the backend can report the real machine's
-      # CPU / RAM / disk / network rather than the container's own limited view.
+      # read-only so the backend can report the real machine's CPU / RAM /
+      # network rather than the container's own limited view. The host root
+      # filesystem is deliberately NOT mounted any more: that recursive bind
+      # carried /run/docker.sock into the internet-facing FPM container (Docker
+      # API = host root). Disk usage comes from the container's own "/" instead
+      # (see HOST_DISK_PATH above).
       - /proc:/host/proc:ro
-      - /:/host/root:ro
 
   # --- Scheduler — runs Laravel's cron (offers:expire-pending, …) -----------
   # Reuses the backend image but runs `schedule:work` instead of PHP-FPM, so no
@@ -147,6 +184,12 @@ services:
       context: .
       dockerfile: ./docker/backend.Dockerfile
     restart: unless-stopped
+    logging: *default-logging
+    # Workers run as www-data (like the FPM workers), never root: a bug in a
+    # scheduled command no longer runs as uid 0, and the log/cache/backup files
+    # it creates stay writable by php-fpm.
+    user: www-data
+    security_opt: ["no-new-privileges:true"]
     command: php artisan schedule:work
     depends_on:
       mysql:
@@ -159,12 +202,15 @@ services:
 
   # --- Reverb — WebSocket server for real-time offers (Pusher protocol) -------
   # Reuses the backend image, runs the reverb daemon on :8080. Caddy proxies
-  # wss://DOMAIN/app/* + /apps/* here. The backend broadcasts events to it.
+  # wss://DOMAIN/app/* here; the backend publishes to it directly on :8080.
   reverb:
     build:
       context: .
       dockerfile: ./docker/backend.Dockerfile
     restart: unless-stopped
+    logging: *default-logging
+    user: www-data
+    security_opt: ["no-new-privileges:true"]
     command: php artisan reverb:start --host=0.0.0.0 --port=8080
     depends_on:
       mysql:
@@ -183,6 +229,9 @@ services:
       context: .
       dockerfile: ./docker/backend.Dockerfile
     restart: unless-stopped
+    logging: *default-logging
+    user: www-data
+    security_opt: ["no-new-privileges:true"]
     command: php artisan queue:work --queue=default --tries=3 --backoff=10 --max-time=3600 --sleep=2
     depends_on:
       mysql:
@@ -209,6 +258,10 @@ services:
         # for the reverb service); empty → the dashboard falls back to polling.
         NEXT_PUBLIC_REVERB_KEY: ${NEXT_PUBLIC_REVERB_KEY:-${REVERB_APP_KEY:-}}
     restart: unless-stopped
+    logging: *default-logging
+    # The image runs as the unprivileged `node` user (docker/frontend.Dockerfile).
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
 
   # --- Dispatch daemon — holds the Uber RAMEN stream ------------------------
   dispatch-daemon:
@@ -216,6 +269,11 @@ services:
       context: .
       dockerfile: ./docker/dispatch-daemon.Dockerfile
     restart: unless-stopped
+    logging: *default-logging
+    # The image runs as the unprivileged `node` user and only makes outbound
+    # HTTPS calls, so it needs no Linux capabilities at all.
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
     depends_on:
       - backend
     environment:
@@ -242,6 +300,7 @@ services:
     image: mediagis/nominatim:4.4
     profiles: ["geo"]
     restart: unless-stopped
+    logging: *default-logging
     environment:
       PBF_URL: ${GEO_PBF_URL:-https://download.geofabrik.de/europe/germany-latest.osm.pbf}
       REPLICATION_URL: ${GEO_REPLICATION_URL:-https://download.geofabrik.de/europe/germany-updates/}
@@ -256,6 +315,7 @@ services:
     image: osrm/osrm-backend:latest
     profiles: ["geo"]
     restart: unless-stopped
+    logging: *default-logging
     # Serves the pre-built graph produced by the one-time prep in the docs.
     # Uses MLD (partition/customize); switch to CH if you prepared with contract.
     command: osrm-routed --algorithm mld /data/germany-latest.osrm
