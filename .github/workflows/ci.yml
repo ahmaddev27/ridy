@@ -129,6 +129,33 @@ jobs:
         continue-on-error: true
         run: php artisan test --filter='DriverOnlineParity|FleetDay|Dispatch'
 
+  # --- Container/edge config ----------------------------------------------------
+  # A typo in the FPM pool file, php.ini or Caddyfile would only show up as a
+  # crash-looping container after the swap. Build the real backend image and let
+  # php-fpm / Caddy parse their config here instead.
+  docker-config:
+    name: Docker + edge config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Compose files parse
+        run: |
+          docker compose -f docker-compose.prod.yml --env-file .env.prod.example config -q
+          SHARD_ID=ci RIDY_API_URL=https://ci DISPATCH_INGEST_SECRET=ci docker compose -f docker-compose.daemon-shard.yml config -q
+          GEO_BIND_IP=10.0.0.2 docker compose -f docker-compose.geo.yml config -q
+
+      - name: Build backend image
+        run: docker build -f docker/backend.Dockerfile -t reidey-backend-ci .
+
+      - name: PHP-FPM config test + OPcache loaded
+        run: |
+          docker run --rm reidey-backend-ci php-fpm -t
+          docker run --rm reidey-backend-ci php -m | grep -qi "zend opcache"
+
+      - name: Caddyfile parses
+        run: docker run --rm -v "$PWD/docker/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
+
   # --- Frontend: Next.js (Node 22) -------------------------------------------
   frontend:
     name: Frontend (Next.js)
