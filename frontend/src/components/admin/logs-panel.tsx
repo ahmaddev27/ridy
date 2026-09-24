@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { getLogs, clearLogs, type LogSource } from "@/lib/api/admin";
+import { usePolling } from "@/hooks/use-polling";
 
 /** Tone a log line by its level word (ERROR red, WARNING amber, else muted). */
 function lineTone(line: string): string {
@@ -40,12 +41,11 @@ export function LogsPanel() {
     }
   }, [source]);
 
-  // Load on source change, then poll every 15s while the tab is open.
+  // Load on source change, then poll every 15s while the tab is visible.
   useEffect(() => {
     load();
-    const iv = setInterval(load, 15000);
-    return () => clearInterval(iv);
   }, [load]);
+  usePolling(load, 15000);
 
   // Auto-scroll to the newest line after each load (unless the admin turned it off).
   useEffect(() => {

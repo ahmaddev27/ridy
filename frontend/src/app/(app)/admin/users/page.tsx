@@ -190,7 +190,7 @@ export default function UsersPage() {
                         type="checkbox"
                         checked={selected.has(rowKey(u))}
                         onChange={() => toggleSelected(rowKey(u))}
-                        aria-label={`select ${u.name}`}
+                        aria-label={u.name}
                         className="h-4 w-4 cursor-pointer accent-primary"
                       />
                     </td>
