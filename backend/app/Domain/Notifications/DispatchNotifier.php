@@ -10,7 +10,9 @@ use App\Domain\Notifications\Contracts\SendsPushInBulk;
 use App\Domain\Notifications\Jobs\NotifyOwnersOfOffer;
 use App\Domain\Notifications\Models\DeviceToken;
 use App\Events\OfferBroadcast;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Turns a routed dispatch offer into a push to every device of its linked driver.
@@ -35,6 +37,15 @@ class DispatchNotifier
      */
     private const PUSH_BUDGET_SECONDS = 4.0;
 
+    /** Stops listed on the multi-stop body before it is cut with "… +k". */
+    private const MAX_PUSH_STOPS = 8;
+
+    /**
+     * FCM rejects notification + data over 4096 bytes (and iOS copies data into the
+     * 4 KB APNs payload); stay well under so the push is trimmed, never dropped.
+     */
+    private const MAX_PUSH_BYTES = 3500;
+
     public function __construct(private PushSender $sender) {}
 
     /**
@@ -47,12 +58,13 @@ class DispatchNotifier
             return 0; // unlinked offers have no one to notify
         }
 
+        // The push goes FIRST: it is the only thing racing Uber's accept window.
+        $sent = $this->pushToDriver($offer, $this->buildTitle($offer), $this->buildBody($offer), $this->offerData($offer));
+
         // Real-time nudge to the driver's open app (WebSocket) so a fresh offer
         // appears instantly, alongside the push that wakes a closed app. Best
         // -effort: a broadcast failure (Reverb down) must never break ingestion.
-        rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'new')), report: false);
-
-        $sent = $this->pushToDriver($offer, $this->buildTitle($offer), $this->buildBody($offer), $this->offerData($offer));
+        $this->broadcastSafely(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'new'));
 
         // The owners' copy leaves the hot path: only the DRIVER has a 5-second
         // window, and a company with three managers in owner mode used to add three
@@ -126,6 +138,8 @@ class DispatchNotifier
             return 0;
         }
 
+        [$body, $data] = $this->fitPayload($title, $body, $data);
+
         if ($this->sender instanceof SendsPushInBulk) {
             return $this->sender->sendMany($tokens, $title, $body, $data);
         }
@@ -148,6 +162,56 @@ class DispatchNotifier
     }
 
     /**
+     * Keep the message under FCM's size cap: first drop the stops JSON (the app
+     * re-fetches the itinerary), then cut the body to its first lines.
+     *
+     * @param  array<string, string>  $data
+     * @return array{0: string, 1: array<string, string>}
+     */
+    private function fitPayload(string $title, string $body, array $data): array
+    {
+        $size = fn (string $b, array $d): int => strlen((string) json_encode(['t' => $title, 'b' => $b, 'd' => $d], JSON_UNESCAPED_UNICODE));
+
+        $before = $size($body, $data);
+        if ($before <= self::MAX_PUSH_BYTES) {
+            return [$body, $data];
+        }
+
+        if (($data['stops'] ?? '') !== '') {
+            $data['stops'] = '';
+        }
+        if ($size($body, $data) > self::MAX_PUSH_BYTES) {
+            $body = implode("\n", array_slice(explode("\n", $body), 0, 5));
+        }
+
+        Log::warning('push.payload_trimmed', ['offer_id' => $data['offer_id'] ?? null, 'bytes' => $before]);
+
+        return [$body, $data];
+    }
+
+    /**
+     * Publish a live nudge without ever breaking (or stalling) ingestion. A failure
+     * is logged at most once a minute so a dead Reverb is visible, not a log flood.
+     */
+    private function broadcastSafely(OfferBroadcast $event): void
+    {
+        try {
+            // PendingBroadcast sends in its destructor — unset it INSIDE the try so
+            // a transport error is caught here rather than escaping later.
+            $pending = broadcast($event);
+            unset($pending);
+        } catch (Throwable $e) {
+            try {
+                if (Cache::add('dispatch_notifier.broadcast_failed', 1, 60)) {
+                    Log::warning('broadcast.failed', ['offer_id' => $event->offerId, 'error' => $e->getMessage()]);
+                }
+            } catch (Throwable) {
+                // The cache is down too — never let logging break the push path.
+            }
+        }
+    }
+
+    /**
      * Fan an offer out to the tenant's fleet owners/managers who registered a device
      * in owner mode. The driver's own push is unchanged; the owner's copy carries the
      * driver name so they know whose offer it is.
@@ -163,13 +227,16 @@ class DispatchNotifier
     {
         // Scope explicitly by the offer's tenant (bypass the global scope): owner
         // tokens are the tenant's, keyed by user_id, never a driver.
-        $tokens = DeviceToken::withoutGlobalScopes()
-            ->where('tenant_id', $offer->tenant_id)
-            ->whereNotNull('user_id')
-            ->pluck('token')
-            ->all();
+        // Each owner's own language (users.locale) — only the multi-stop title is
+        // worded, so tokens are grouped by locale and pushed once per group.
+        $tokensByLocale = DeviceToken::withoutGlobalScopes()
+            ->leftJoin('users', 'users.id', '=', 'device_tokens.user_id')
+            ->where('device_tokens.tenant_id', $offer->tenant_id)
+            ->whereNotNull('device_tokens.user_id')
+            ->get(['device_tokens.token', 'users.locale'])
+            ->groupBy(fn ($row) => (string) ($row->locale ?? ''));
 
-        if ($tokens === []) {
+        if ($tokensByLocale->isEmpty()) {
             return 0;
         }
 
@@ -177,15 +244,21 @@ class DispatchNotifier
         // then pickup, then drop-off — so the manager reads whose offer it is at a
         // glance. (The driver's own push keeps the rider on the title line.)
         $isMultiStop = $stopsCount !== null;
-        $ownerTitle = $isMultiStop ? $this->multiStopTitle($offer) : $this->buildNumbers($offer);
         $body = $isMultiStop ? $this->multiStopBody($offer, $stopsCount) : $this->buildBody($offer);
 
         $driverName = $this->driverName($offer);
         $rider = trim((string) $offer->rider_first_name);
         $names = trim($driverName.($rider !== '' ? ' · '.$rider : ''));
         $ownerBody = $names !== '' ? trim($names."\n".$body) : $body;
+        $data = $this->offerData($offer, $stopsCount);
 
-        return $this->push($tokens, $ownerTitle, $ownerBody, $this->offerData($offer, $stopsCount));
+        $sent = 0;
+        foreach ($tokensByLocale as $locale => $rows) {
+            $ownerTitle = $isMultiStop ? $this->multiStopTitle($locale ?: null) : $this->buildNumbers($offer);
+            $sent += $this->push($rows->pluck('token')->all(), $ownerTitle, $ownerBody, $data);
+        }
+
+        return $sent;
     }
 
     /** The offer's driver name, from the linked driver or the captured payload. */
@@ -225,9 +298,9 @@ class DispatchNotifier
     }
 
     /** Localized "multi-stop detected" title for the second (multi-stop) push. */
-    private function multiStopTitle(DispatchOffer $offer): string
+    private function multiStopTitle(?string $locale): string
     {
-        return match ($offer->driver?->locale) {
+        return match ($locale) {
             'en' => 'Multi-stop detected',
             'ar' => 'تم اكتشاف نقاط متعددة',
             default => 'Zwischenstopp erkannt',
@@ -237,8 +310,9 @@ class DispatchNotifier
     /**
      * Alert the DRIVER that Uber revealed more than one drop-off on their accepted
      * trip, and broadcast so the open app refreshes the offer detail live with the
-     * new stops / distance / €-per-km. Word-free like the offer push (the app
-     * localises it from `stops_count`); best-effort, never breaks ingestion.
+     * new stops / distance / €-per-km. The title is localized on the server from
+     * the recipient's stored locale (driver.locale / users.locale); best-effort,
+     * never breaks ingestion.
      *
      * @return int devices pushed
      */
@@ -248,16 +322,16 @@ class DispatchNotifier
             return 0;
         }
 
-        // Live nudge to the open app so it re-fetches the offer with the new stops.
-        rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'multistop')), report: false);
-
         // A worded, localized title so the driver instantly reads WHY a second push
         // arrived (Uber revealed extra drop-offs). This one notification is
         // intentionally localized (unlike the word-free single-offer push).
-        $title = $this->multiStopTitle($offer);
+        $title = $this->multiStopTitle($offer->driver?->locale);
         $body = $this->multiStopBody($offer, $stopsCount);
 
         $sent = $this->pushToDriver($offer, $title, $body, $this->offerData($offer, $stopsCount));
+
+        // Live nudge to the open app so it re-fetches the offer with the new stops.
+        $this->broadcastSafely(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'multistop'));
 
         // The manager in owner mode gets the follow-up too — they used to receive the
         // first offer push and then never hear about the extra drop-offs.
@@ -293,13 +367,31 @@ class DispatchNotifier
         $out = [];
         foreach ($stops as $s) {
             $address = $this->cleanAddress($s['address'] ?? null);
-            if ($address === '') {
+            $hasPoint = is_numeric($s['lat'] ?? null) && is_numeric($s['lng'] ?? null);
+            // A stop whose reverse-geocode failed still has its exact coordinate —
+            // keep it so the list stays in route order (the app treats stops[0] as
+            // the pickup and the last as the drop-off). Drop only an empty stop.
+            if ($address === '' && ! $hasPoint) {
                 continue;
             }
-            $out[] = ['address' => $address, 'lat' => $s['lat'] ?? null, 'lng' => $s['lng'] ?? null, 'leg_m' => $s['leg_m'] ?? null];
+            $out[] = ['address' => $address !== '' ? $address : null, 'lat' => $s['lat'] ?? null, 'lng' => $s['lng'] ?? null, 'leg_m' => $s['leg_m'] ?? null];
         }
 
         return $out === [] ? '' : (string) json_encode($out, JSON_UNESCAPED_UNICODE);
+    }
+
+    /** A stop's display line: its address, or its coordinate (Latin digits) when unresolved. */
+    private function stopLabel(array $stop): string
+    {
+        $address = $this->cleanAddress($stop['address'] ?? null);
+        if ($address !== '') {
+            return $address;
+        }
+        if (is_numeric($stop['lat'] ?? null) && is_numeric($stop['lng'] ?? null)) {
+            return sprintf('%.5f, %.5f', (float) $stop['lat'], (float) $stop['lng']);
+        }
+
+        return '';
     }
 
     /**
@@ -316,15 +408,23 @@ class DispatchNotifier
         }
 
         $lines = [];
-        foreach ($stops as $i => $s) {
-            $address = $this->cleanAddress($s['address'] ?? null);
-            if ($address === '') {
+        $listed = 0;
+        foreach (array_values($stops) as $i => $s) {
+            $label = $this->stopLabel(is_array($s) ? $s : []);
+            if ($label === '') {
                 continue;
+            }
+            // Keep the lock-screen body (and FCM's 4 KB cap) bounded on absurdly long
+            // itineraries; the app re-fetches the full list from the API anyway.
+            if ($listed === self::MAX_PUSH_STOPS) {
+                $lines[] = '… +'.(count($stops) - $i);
+                break;
             }
             // Pickup carries no leg; each drop-off shows the extra km from the previous stop.
             $legM = $s['leg_m'] ?? null;
             $leg = $i > 0 && $legM !== null ? ' (+'.number_format((float) $legM / 1000, 1, '.', '').' km)' : '';
-            $lines[] = '• '.$address.$leg;
+            $lines[] = '• '.$label.$leg;
+            $listed++;
         }
 
         return $lines === [] ? $this->buildBody($offer) : implode("\n", $lines);
