@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/context";
 import { digitsOnly } from "@/lib/utils";
 import { redeemSubscriptionCode } from "@/lib/api/company-subscription";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 /**
  * Redeem a subscription code from inside the dashboard. A new period stacks
@@ -37,7 +38,7 @@ export function RedeemCodeModal({
       onClose();
       onSuccess?.();
     } catch (e) {
-      toast.error(c("redeemFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("redeemFailed"), { description: apiErrorMessage(e, t) });
     } finally {
       setSubmitting(false);
     }

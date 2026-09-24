@@ -19,6 +19,7 @@ import {
   type PaymentClaimStatus,
   type Plan,
 } from "@/lib/api/admin";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 type Filter = "pending" | "confirmed" | "rejected" | "all";
 
@@ -127,7 +128,7 @@ function ClaimRow({
       toast.success(c("accepted"));
       onResolved();
     } catch (e) {
-      toast.error(c("resolveFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("resolveFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
@@ -140,7 +141,7 @@ function ClaimRow({
       toast.success(c("rejected"));
       onResolved();
     } catch (e) {
-      toast.error(c("resolveFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("resolveFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
