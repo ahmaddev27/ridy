@@ -1,12 +1,13 @@
 <?php
 
+use App\Support\OnlineDdl;
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Two tenant-scoped indexes on dispatch_offers (additive; MySQL 8 builds them
- * online, INPLACE / LOCK=NONE):
+ * Two tenant-scoped indexes on dispatch_offers (additive; built online through
+ * {@see OnlineDdl}: INPLACE / LOCK=NONE with a 10 s metadata-lock wait, so a slow
+ * reader makes the migration fail fast instead of queueing offer ingest behind it):
  *
  *  - (tenant_id, driver_id, driver_uuid): the dashboard's "unlinked offers" count
  *    (tenant_id = ? AND driver_id IS NULL, polled every 10 s), the unlinked-driver
@@ -16,30 +17,33 @@ use Illuminate\Support\Facades\Schema;
  *  - (tenant_id, received_at, status, accepted_at, fare_amount): covers the offers
  *    page's single conditional-aggregate stats query (total / taken / completed /
  *    earnings over a date window), so it never reads full rows.
+ *
+ * Idempotent: a deploy that hit the lock timeout can simply run again.
  */
 return new class extends Migration
 {
-    private const DRIVER_IDX = 'dispatch_offers_tenant_driver_uuid_idx';
+    private const TABLE = 'dispatch_offers';
 
-    private const STATS_IDX = 'dispatch_offers_tenant_stats_idx';
+    private const INDEXES = [
+        'dispatch_offers_tenant_driver_uuid_idx' => ['tenant_id', 'driver_id', 'driver_uuid'],
+        'dispatch_offers_tenant_stats_idx' => ['tenant_id', 'received_at', 'status', 'accepted_at', 'fare_amount'],
+    ];
 
     public function up(): void
     {
-        Schema::table('dispatch_offers', function (Blueprint $table) {
-            if (! Schema::hasIndex('dispatch_offers', self::DRIVER_IDX)) {
-                $table->index(['tenant_id', 'driver_id', 'driver_uuid'], self::DRIVER_IDX);
+        foreach (self::INDEXES as $name => $columns) {
+            if (! Schema::hasIndex(self::TABLE, $name)) {
+                OnlineDdl::addIndex(self::TABLE, $name, $columns);
             }
-            if (! Schema::hasIndex('dispatch_offers', self::STATS_IDX)) {
-                $table->index(['tenant_id', 'received_at', 'status', 'accepted_at', 'fare_amount'], self::STATS_IDX);
-            }
-        });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('dispatch_offers', function (Blueprint $table) {
-            $table->dropIndex(self::DRIVER_IDX);
-            $table->dropIndex(self::STATS_IDX);
-        });
+        foreach (array_keys(self::INDEXES) as $name) {
+            if (Schema::hasIndex(self::TABLE, $name)) {
+                OnlineDdl::dropIndex(self::TABLE, $name);
+            }
+        }
     }
 };
