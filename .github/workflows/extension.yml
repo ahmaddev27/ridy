@@ -1,0 +1,36 @@
+name: Extension
+
+# The browser extension ships unbundled and is uploaded to the Chrome Web Store by
+# hand, so CI is the only guard that the committed tree is the release state
+# (no localhost dev hosts) and that the background worker still behaves.
+on:
+  push:
+    branches: [main]
+    paths: ["extension/**", ".github/workflows/extension.yml"]
+  pull_request:
+    paths: ["extension/**", ".github/workflows/extension.yml"]
+
+jobs:
+  extension:
+    name: Extension (release state + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Release state (no dev hosts committed)
+        run: |
+          node extension/check-release.mjs
+          node extension/dev-hosts.mjs off
+          git diff --exit-code -- extension/
+
+      - name: Syntax check
+        run: |
+          for f in extension/*.js; do node --check "$f"; done
+          node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json','utf8'))"
+
+      - name: Background worker tests
+        run: node --test extension/tests/*.test.mjs

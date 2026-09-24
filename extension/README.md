@@ -40,6 +40,17 @@ node dev-hosts.mjs off   # يرجّع حالة الإصدار (الحالة ال
 
 > قبل عمل zip للمتجر: `node dev-hosts.mjs off` ثم تأكّد أن `git status` نظيف، وارفع رقم `version`.
 
+## بناء zip للمتجر (الطريقة الوحيدة المدعومة)
+
+```bash
+node extension/pack.mjs            # → reidey-extension-<version>.zip بجذر الريبو
+node extension/check-release.mjs   # يفحص إنه ما في localhost (بيشغّله CI و pack)
+node --test extension/tests/*.test.mjs
+```
+
+`pack.mjs` بيرفض إذا في localhost أو إذا `extension/` فيه تعديلات مش committed، وبيعمل الـzip
+من النسخة الـcommitted (`git archive`) بدون ملفات التطوير.
+
 ---
 
 ## الإعداد (مرة واحدة)
