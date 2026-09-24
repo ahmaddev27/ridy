@@ -120,6 +120,10 @@ services:
           - ${DOMAIN}
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS}
+      # Extra CSP connect-src origins (space-separated), appended in the Caddyfile.
+      # The CI deploy derives them from NEXT_PUBLIC_MAP_TILE_URL and the
+      # NEXT_PUBLIC_SENTRY_DSN host, plus the CSP_EXTRA_CONNECT secret. Empty = none.
+      CSP_EXTRA_CONNECT: ${CSP_EXTRA_CONNECT:-}
     volumes:
       - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
       # Branded maintenance page served when an upstream is unreachable (deploy/crash).
@@ -130,10 +134,18 @@ services:
       - caddy_config:/config
 
   # --- MySQL 8 --------------------------------------------------------------
+  # The CI deploy NEVER recreates this service (it only starts it when it is not
+  # running, via `up --no-recreate`), so a change to this block or to
+  # docker/mysql/reidey.cnf does NOT reach production automatically. Apply it in
+  # a quiet window with the manual step documented in docker/mysql/reidey.cnf:
+  #   docker compose -f docker-compose.prod.yml up -d --no-deps mysql
   mysql:
     image: mysql:8.0
     restart: unless-stopped
     logging: *default-logging
+    # A clean InnoDB shutdown (buffer-pool flush, redo resize) can take longer
+    # than Docker's 10 s default; a SIGKILL would force crash recovery on start.
+    stop_grace_period: 120s
     environment:
       MYSQL_DATABASE: ${DB_DATABASE}
       MYSQL_USER: ${DB_USERNAME}
@@ -257,6 +269,11 @@ services:
         # company channel for live offer updates. Reuses REVERB_APP_KEY (already set
         # for the reverb service); empty → the dashboard falls back to polling.
         NEXT_PUBLIC_REVERB_KEY: ${NEXT_PUBLIC_REVERB_KEY:-${REVERB_APP_KEY:-}}
+        # Optional commercial / self-hosted raster tiles ({z}/{x}/{y} template) +
+        # their attribution. Empty = the public OSM tiles. The tile origin must be
+        # allowed by the CSP (CSP_EXTRA_CONNECT, derived by the CI deploy).
+        NEXT_PUBLIC_MAP_TILE_URL: ${NEXT_PUBLIC_MAP_TILE_URL:-}
+        NEXT_PUBLIC_MAP_ATTRIBUTION: ${NEXT_PUBLIC_MAP_ATTRIBUTION:-}
     restart: unless-stopped
     logging: *default-logging
     # The image runs as the unprivileged `node` user (docker/frontend.Dockerfile).

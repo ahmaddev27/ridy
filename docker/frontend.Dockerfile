@@ -25,6 +25,13 @@ ARG NEXT_PUBLIC_API_URL=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_REVERB_KEY=
 ENV NEXT_PUBLIC_REVERB_KEY=$NEXT_PUBLIC_REVERB_KEY
+# Optional raster tile template + attribution (frontend/src/lib/map-style.ts).
+# Empty = public OSM tiles. A custom tile origin must also be in the CSP
+# connect-src (CSP_EXTRA_CONNECT — see docker/Caddyfile).
+ARG NEXT_PUBLIC_MAP_TILE_URL=
+ENV NEXT_PUBLIC_MAP_TILE_URL=$NEXT_PUBLIC_MAP_TILE_URL
+ARG NEXT_PUBLIC_MAP_ATTRIBUTION=
+ENV NEXT_PUBLIC_MAP_ATTRIBUTION=$NEXT_PUBLIC_MAP_ATTRIBUTION
 
 # Copy the rest of the application and produce the optimized production build.
 COPY frontend/ ./

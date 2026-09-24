@@ -6,8 +6,14 @@
 # server version does not know is skipped with a warning instead of refusing to
 # start (a refused start = full outage).
 #
-# Applying a change restarts MySQL (compose recreates the container when this
-# mount or its content changes on the next `up`). Schedule it with low traffic.
+# Applying a change restarts MySQL, so the CI deploy never does it (it starts
+# mysql only when it is not running: `up --no-recreate`). Apply a change here
+# manually on the VPS (in ~/ridy, after the deploy that brought the change) in
+# a low-traffic window:
+#   free -m                     # room for the buffer pool next to ~44 FPM workers?
+#   docker compose -f docker-compose.prod.yml up -d --no-deps mysql
+#   docker compose -f docker-compose.prod.yml exec mysql mysql -uroot -p -e 'SELECT @@innodb_buffer_pool_size, @@innodb_redo_log_capacity'
+# If RAM headroom is tight, lower innodb_buffer_pool_size to 512M first.
 
 [mysqld]
 # --- Memory ---------------------------------------------------------------------
