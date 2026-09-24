@@ -7,6 +7,8 @@ use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class DispatchDaemonTest extends TestCase
@@ -79,6 +81,30 @@ class DispatchDaemonTest extends TestCase
             ->assertJsonPath('data.0.id', $session->id)
             ->assertJsonPath('data.0.uber_org_uuid', self::ORG)
             ->assertJsonPath('data.0.cookies.0.name', 'sid');
+    }
+
+    public function test_proxy_url_reaches_the_daemon_as_plaintext_before_and_after_encryption(): void
+    {
+        $session = $this->makeSession();
+        DB::table('tenants')->where('id', $session->tenant_id)->update(['proxy_url' => 'http://u:p@plain:1']);
+
+        $this->daemon()->getJson('/api/v1/internal/dispatch/sessions')
+            ->assertOk()->assertJsonPath('data.0.proxy_url', 'http://u:p@plain:1');
+
+        // Twice: the rewrite is idempotent (an encrypted row is never re-encrypted).
+        $this->artisan('tenants:encrypt-proxy-urls')->assertSuccessful();
+        $this->artisan('tenants:encrypt-proxy-urls')->assertSuccessful();
+        $stored = (string) DB::table('tenants')->where('id', $session->tenant_id)->value('proxy_url');
+        $this->assertStringNotContainsString('plain', $stored);
+        $this->assertSame('http://u:p@plain:1', Crypt::decryptString($stored));
+
+        $this->daemon()->getJson('/api/v1/internal/dispatch/sessions')
+            ->assertOk()->assertJsonPath('data.0.proxy_url', 'http://u:p@plain:1');
+
+        // --revert restores plaintext for a rollback to a release without the cast.
+        $this->artisan('tenants:encrypt-proxy-urls', ['--revert' => true])->assertSuccessful();
+        $this->artisan('tenants:encrypt-proxy-urls', ['--revert' => true])->assertSuccessful();
+        $this->assertSame('http://u:p@plain:1', DB::table('tenants')->where('id', $session->tenant_id)->value('proxy_url'));
     }
 
     public function test_lapsed_subscription_company_is_not_streamed(): void
