@@ -180,9 +180,10 @@ Route::prefix('v1')->group(function () {
     });
 
     // Internal — the dispatch daemon. Authenticated by a shared secret
-    // (VerifyDispatchSecret, optionally IP-allowlisted), not a user session. The
-    // throttle is only a generous ceiling against a leaked secret.
-    Route::middleware(['throttle:dispatch-internal', 'dispatch.secret'])->prefix('internal/dispatch')->group(function () {
+    // (VerifyDispatchSecret, optionally IP-allowlisted via DISPATCH_ALLOWED_IPS),
+    // not a user session. Deliberately NOT throttled: this is the offer hot path
+    // and the limiter would add cache (database) writes to every ingest.
+    Route::middleware('dispatch.secret')->prefix('internal/dispatch')->group(function () {
         Route::post('ingest', [DispatchIngestController::class, 'ingest']);
         Route::get('sessions', [DispatchDaemonController::class, 'sessions']);
         Route::post('sessions/{session}/cookies', [DispatchDaemonController::class, 'refreshCookies']);
@@ -266,7 +267,7 @@ Route::prefix('v1')->group(function () {
         Route::get('dispatch/offers/export', [DispatchOfferController::class, 'export'])->middleware('can:offers.view');
         Route::get('dispatch/offers/{offer}', [DispatchOfferController::class, 'show'])->middleware('can:offers.view');
         // Extension forwards RAMEN offers captured in the manager's browser.
-        Route::post('dispatch/offers/ingest', [DispatchOfferController::class, 'ingest'])->middleware(['throttle:ext-offers', 'fleet.connected', 'can:connections.manage']);
+        Route::post('dispatch/offers/ingest', [DispatchOfferController::class, 'ingest'])->middleware(['fleet.connected', 'can:connections.manage']);
         Route::post('dispatch/offers/bulk-delete', [DispatchOfferController::class, 'bulkDestroy'])->middleware('can:offers.manage');
         Route::delete('dispatch/offers/{offer}', [DispatchOfferController::class, 'destroy'])->middleware('can:offers.manage');
 

@@ -41,18 +41,12 @@ class AuthRateLimits
         ]);
 
         // Browser-extension ingest (roster / statuses / metrics / vehicles /
-        // capture). Generous: a real extension posts every few seconds at most.
+        // capture). Generous: a real extension posts about once a minute. Offer
+        // ingest (extension + daemon) is deliberately NOT throttled — it is the
+        // latency-critical path and the limiter costs a cache write per request.
         RateLimiter::for('ext-ingest', fn (Request $request) => Limit::perMinute(240)
             ->by('ext:'.self::principalKey($request)));
 
-        // Offer ingest must never drop a real offer — only a runaway loop hits this.
-        RateLimiter::for('ext-offers', fn (Request $request) => Limit::perMinute(1200)
-            ->by('ext-offers:'.self::principalKey($request)));
-
-        // The dispatch daemon (shared secret). Only a ceiling against abuse of a
-        // leaked secret; every shard's legitimate burst stays far below it.
-        RateLimiter::for('dispatch-internal', fn (Request $request) => Limit::perMinute(6000)
-            ->by('dispatch:'.self::clientKey($request)));
     }
 
     /**
