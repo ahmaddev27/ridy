@@ -2,16 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Billing\ActivationCodeIssuer;
 use App\Domain\Billing\Models\Plan;
-use App\Domain\Billing\Models\SubscriptionCode;
-use App\Domain\Billing\PaymentReferenceGenerator;
 use App\Domain\Billing\SubscriptionCodeQuery;
 use App\Domain\Collections\Models\Collector;
 use App\Domain\Tenancy\Models\Tenant;
-use App\Http\Controllers\Concerns\GeneratesOtp;
+use App\Http\Controllers\Concerns\ResolvesPerPage;
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -23,9 +21,7 @@ use Illuminate\Validation\ValidationException;
  */
 class ResellerController extends Controller
 {
-    use GeneratesOtp;
-
-    private const CODE_TTL_MINUTES = 60;
+    use ResolvesPerPage;
 
     /** The reseller's own issued codes (with lifecycle status), filtered + paged. */
     public function codes(Request $request, SubscriptionCodeQuery $query): JsonResponse
@@ -39,7 +35,7 @@ class ResellerController extends Controller
 
         // Force the reseller's own collector — they never see other resellers' codes.
         $request->merge(['collector_id' => $collector->id]);
-        $codes = $query->forRequest($request)->paginate(min($request->integer('per_page', 20), 100));
+        $codes = $query->forRequest($request)->paginate($this->perPage($request, 20));
 
         return response()->json([
             'data' => collect($codes->items())->map(fn ($c) => $query->present($c)),
@@ -56,7 +52,15 @@ class ResellerController extends Controller
         return response()->json(['data' => $plans]);
     }
 
-    /** Search companies by name or owner phone (min 2 chars). */
+    /** Minimum digits before a query is also matched against owner phones. */
+    private const PHONE_SEARCH_MIN_DIGITS = 6;
+
+    /**
+     * Search companies by name (min 2 chars) or owner phone (min 6 digits). LIKE
+     * wildcards in the query are literal, and the owner phone is masked unless the
+     * reseller searched by that phone or already sells to the company (DSGVO data
+     * minimisation — a reseller is an external partner).
+     */
     public function searchCompanies(Request $request): JsonResponse
     {
         $q = trim((string) $request->query('q', ''));
@@ -64,23 +68,50 @@ class ResellerController extends Controller
             return response()->json(['data' => []]);
         }
 
-        $ids = Tenant::query()->where('name', 'like', "%{$q}%")->limit(20)->pluck('id')
-            ->merge(User::query()->where('phone', 'like', "%{$q}%")->whereNotNull('tenant_id')->pluck('tenant_id'))
-            ->unique()
-            ->take(15);
+        $like = '%'.addcslashes($q, '%_\\').'%';
+        $nameIds = Tenant::query()->where('name', 'like', $like)->limit(20)->pluck('id');
+        $phoneIds = strlen((string) preg_replace('/\D/', '', $q)) >= self::PHONE_SEARCH_MIN_DIGITS
+            ? User::query()->where('phone', 'like', $like)->whereNotNull('tenant_id')
+                ->distinct()->limit(20)->pluck('tenant_id')
+            : collect();
+        $ids = $nameIds->merge($phoneIds)->unique()->take(15);
 
-        $companies = Tenant::query()->whereIn('id', $ids)->orderBy('name')->get(['id', 'name'])
-            ->map(fn (Tenant $t) => [
-                'id' => $t->id,
-                'name' => $t->name,
-                'phone' => User::query()->where('tenant_id', $t->id)->whereNotNull('phone')->value('phone'),
-            ]);
+        // One query for all owner phones (was one per company).
+        $phones = User::query()->whereIn('tenant_id', $ids)->whereNotNull('phone')
+            ->orderBy('id')->get(['tenant_id', 'phone'])
+            ->unique('tenant_id')->pluck('phone', 'tenant_id');
+        $collectorId = Collector::where('user_id', $request->user()->id)->value('id');
+
+        $companies = Tenant::query()->whereIn('id', $ids)->orderBy('name')
+            ->get(['id', 'name', 'activation_collector_id'])
+            ->map(function (Tenant $t) use ($phones, $phoneIds, $collectorId) {
+                $phone = $phones->get($t->id);
+                $reveal = $phoneIds->contains($t->id)
+                    || ($collectorId !== null && $t->activation_collector_id === $collectorId);
+
+                return [
+                    'id' => $t->id,
+                    'name' => $t->name,
+                    'phone' => $phone === null || $reveal ? $phone : $this->maskPhone($phone),
+                ];
+            });
 
         return response()->json(['data' => $companies]);
     }
 
+    /** "+49 151 2345678" → "+49•••••678": enough to recognise, not to call. */
+    private function maskPhone(string $phone): string
+    {
+        $length = mb_strlen($phone);
+        if ($length <= 6) {
+            return str_repeat('•', $length);
+        }
+
+        return mb_substr($phone, 0, 3).str_repeat('•', $length - 6).mb_substr($phone, -3);
+    }
+
     /** Issue an activation code for a company on a plan. */
-    public function generate(Request $request): JsonResponse
+    public function generate(Request $request, ActivationCodeIssuer $issuer): JsonResponse
     {
         abort_unless($request->user()->can('codes.generate'), 403);
 
@@ -104,59 +135,20 @@ class ResellerController extends Controller
             throw ValidationException::withMessages(['tenant_id' => 'company_banned']);
         }
 
-        // Don't clobber a still-valid, unused code that a DIFFERENT issuer created
-        // — that would hijack the activation's attribution. The same issuer may
-        // freely regenerate; expired or already-used codes are fair to overwrite.
-        $hasPendingForeignCode = $tenant->activation_code !== null
-            && ! ($tenant->activation_code_expires_at?->isPast() ?? true)
-            && $tenant->activation_collector_id !== $collector->id;
-        if ($hasPendingForeignCode) {
-            throw ValidationException::withMessages([
-                'tenant_id' => 'code_pending_other_issuer',
-            ]);
-        }
-
-        $code = $this->newOtp();
-        $expiresAt = CarbonImmutable::now()->addMinutes(self::CODE_TTL_MINUTES);
-
-        // The fleet pays the collector for the code up front, so it's always paid.
-        $tenant->forceFill([
-            'activation_code' => $code,
-            'activation_code_expires_at' => $expiresAt,
-            'activation_days' => $plan->duration_days,
-            'activation_amount' => $plan->price,
-            'activation_paid' => true,
-            'activation_collector_id' => $collector->id,
-            'activation_attempts' => 0,
-        ])->save();
-
-        $ledger = SubscriptionCode::create([
-            'code' => $code,
-            'plan_id' => $plan->id,
-            'tenant_id' => $tenant->id,
-            'collector_id' => $collector->id,
-            'amount' => $plan->price,
-            'paid' => true,
-            // A reseller collects the fee from the fleet in person, up front — so a
-            // reseller-issued code is always a cash payment.
-            'payment_method' => 'cash',
-            'expires_at' => $expiresAt,
-            'created_by' => $request->user()->id,
-        ]);
-
-        // Human-readable reference (e.g. DIN-2026-0042) the reseller/admin uses to
-        // reconcile the bank transfer this code was issued for.
-        $paymentRef = app(PaymentReferenceGenerator::class)->assign($ledger, $tenant, (int) CarbonImmutable::now()->format('Y'));
+        // The fleet pays the reseller in person, up front — so a reseller-issued
+        // code is always paid, in cash. The issuer refuses (under a tenant lock) to
+        // clobber a still-valid code minted by a DIFFERENT issuer.
+        $issued = $issuer->issue($tenant, $plan, true, 'cash', $collector->id, $request->user()->id, protectForeignPending: true);
 
         return response()->json(['data' => [
-            'code' => $code,
-            'payment_ref' => $paymentRef,
-            'payment_method' => $ledger->payment_method,
+            'code' => $issued['code'],
+            'payment_ref' => $issued['payment_ref'],
+            'payment_method' => 'cash',
             'company' => $tenant->name,
             'plan' => $plan->name,
             'days' => $plan->duration_days,
             'price' => (float) $plan->price,
-            'expires_at' => $tenant->activation_code_expires_at->toIso8601String(),
+            'expires_at' => $issued['expires_at']->toIso8601String(),
         ]]);
     }
 }
