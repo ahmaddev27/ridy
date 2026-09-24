@@ -31,7 +31,10 @@ Schedule::call(fn () => Cache::put(InfrastructureHealthService::HEARTBEAT_KEY, n
 // exits the moment the queue is drained; --max-time keeps each run under the minute;
 // withoutOverlapping stops two runs stacking. In the BACKGROUND so its up-to-50 s
 // never delays the sweeps below. Harmless if a real worker also runs.
-Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3 --sleep=1')
+// --queue must list every queue a job is dispatched on, latency-sensitive first
+// (owner offer pushes, then OTP/transactional mail) — keep it in sync with the
+// `queue` service command in docker-compose.prod.yml.
+Schedule::command('queue:work --queue=push,mail,default --stop-when-empty --max-time=50 --tries=3 --sleep=1')
     ->everyMinute()
     ->withoutOverlapping(2)
     ->runInBackground();
@@ -72,7 +75,7 @@ Schedule::command('fleet:offline-lapsed')->everyFiveMinutes()->withoutOverlappin
 
 // Location only during live trips: clear positions/waypoints once a driver's
 // status stops syncing (DSGVO "detect, don't surveil").
-Schedule::command('fleet:purge-stale-locations')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('fleet:purge-stale-locations')->everyFiveMinutes()->withoutOverlapping(10);
 
 // Nightly gzipped database backup (kept 7 days in storage/app/backups).
 Schedule::command('db:backup')->dailyAt('03:00')->withoutOverlapping(60)->runInBackground();
