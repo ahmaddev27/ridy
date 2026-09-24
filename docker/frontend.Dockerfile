@@ -28,9 +28,14 @@ ENV NEXT_PUBLIC_REVERB_KEY=$NEXT_PUBLIC_REVERB_KEY
 
 # Copy the rest of the application and produce the optimized production build.
 COPY frontend/ ./
-RUN npm run build
+RUN npm run build \
+    && chown -R node:node /app/.next
 
 # `next start` serves the production build on port 3000.
 EXPOSE 3000
+
+# Unprivileged at runtime. Next writes only under .next/ (image-optimizer and
+# fetch caches), which the build step above hands to `node`.
+USER node
 
 CMD ["npm", "start"]

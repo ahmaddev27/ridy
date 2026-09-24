@@ -1,8 +1,38 @@
-# EAS Build only needs the Expo app in driver-app/. The rest of the monorepo is
-# irrelevant to the mobile build — and backend/storage/app/public is a Laravel
-# storage symlink that breaks the Windows tarball step (EPERM). Exclude it all.
+# EAS Build archive rules. IMPORTANT: when this file exists, eas-cli uses it
+# INSTEAD OF every .gitignore in the repo — so anything git-ignored for safety
+# (store keys, .env files) must be listed here again or it is uploaded to the
+# EAS build workers and kept in the downloadable project archive.
+# Patterns are relative to the repo root (gitignore syntax).
+
+# --- Secrets: never ship to EAS workers/archives ---------------------------------
+# eas-cli reads the submit keys on the CLI side; the build worker never needs them.
+*.p8
+**/ios-asc-key.p8
+**/play-service-account.json
+**/.env
+**/.env.*
+!**/.env.example
+
+# --- Not part of the mobile build ---------------------------------------------------
+# EAS Build only needs the Expo app in driver-app/. backend/storage/app/public is
+# also a Laravel storage symlink that breaks the Windows tarball step (EPERM).
 backend/
 frontend/
 extension/
 dispatch-daemon/
 docs/
+load-test/
+mockup/
+desing/
+uber-auth/
+.claude/
+
+# --- Mirror of driver-app/.gitignore (this file replaces it) ------------------------
+node_modules/
+driver-app/.expo/
+driver-app/dist/
+driver-app/web-build/
+driver-app/android/
+driver-app/ios/
+*.log
+.DS_Store
