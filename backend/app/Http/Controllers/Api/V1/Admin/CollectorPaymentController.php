@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Billing\Models\SubscriptionPeriod;
 use App\Domain\Collections\CollectorPaymentQuery;
 use App\Domain\Collections\Models\CollectorPayment;
 use App\Http\Controllers\Controller;
@@ -50,8 +51,18 @@ class CollectorPaymentController extends Controller
         return response()->json(['data' => $this->present($payment)], 201);
     }
 
+    /**
+     * Delete a mistaken ledger row. A payment that already settled an invoice is
+     * refused: deleting it would leave that invoice "paid" with no payment behind
+     * it and make revenue and the cash ledger disagree.
+     */
     public function destroy(CollectorPayment $payment): JsonResponse
     {
+        $settled = SubscriptionPeriod::where('collector_payment_id', $payment->id)->pluck('id');
+        if ($settled->isNotEmpty()) {
+            return response()->json(['message' => 'payment_settles_invoices', 'invoice_ids' => $settled], 409);
+        }
+
         $payment->delete();
 
         return response()->json(['data' => ['deleted' => true]]);
