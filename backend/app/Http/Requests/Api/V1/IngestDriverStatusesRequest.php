@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Domain\Dispatch\RosterSyncService;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -15,7 +16,12 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class IngestDriverStatusesRequest extends FormRequest
 {
-    public const MAX_STATUSES = 2000;
+    /**
+     * Uber's GetDriverLiveLocation returns EVERY org driver (offline ones too) and
+     * neither the daemon nor the extension chunks the batch, so the cap must admit
+     * the largest roster we accept — a lower cap 422'd every full batch of a big fleet.
+     */
+    public const MAX_STATUSES = RosterSyncService::MAX_DRIVERS;
 
     public const MAX_WAYPOINTS = 200;
 

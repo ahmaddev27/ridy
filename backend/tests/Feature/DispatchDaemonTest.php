@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Domain\Dispatch\Models\DispatchNetworkLog;
 use App\Domain\Dispatch\Models\UberFleetSession;
+use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
+use App\Http\Requests\Api\V1\IngestDriverStatusesRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -70,6 +72,18 @@ class DispatchDaemonTest extends TestCase
         $roster = DispatchNetworkLog::where('kind', 'roster')->first();
         $this->assertNotNull($roster, 'daemon roster sync must reach the Network feed');
         $this->assertSame(3, $roster->count);
+    }
+
+    public function test_a_full_status_batch_of_a_large_fleet_is_accepted(): void
+    {
+        // GetDriverLiveLocation lists every org driver and the batch isn't chunked:
+        // anything the roster endpoint admits must not 422 here.
+        $session = $this->makeSession();
+        $statuses = array_map(fn (int $i) => ['driver_uuid' => "d{$i}", 'status' => 'OFFLINE'], range(1, 2500));
+
+        $this->daemon()->postJson("/api/v1/internal/dispatch/sessions/{$session->id}/statuses", ['statuses' => $statuses])
+            ->assertOk();
+        $this->assertSame(RosterSyncService::MAX_DRIVERS, IngestDriverStatusesRequest::MAX_STATUSES);
     }
 
     public function test_sessions_endpoint_returns_active_sessions_with_cookies(): void
