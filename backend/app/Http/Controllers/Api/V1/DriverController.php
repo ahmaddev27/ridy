@@ -6,10 +6,13 @@ use App\Domain\Dispatch\Jobs\BackfillWaypointLabels;
 use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Domain\Dispatch\TripGeocoder;
+use App\Domain\Fleet\DriverEraser;
+use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Fleet\DriverStatsService;
 use App\Domain\Fleet\DriverStatusIngestor;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Geo\PostalCodes;
+use App\Domain\Notifications\Models\DeviceToken;
 use App\Events\DriversBroadcast;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
@@ -20,6 +23,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class DriverController extends Controller
@@ -174,7 +178,7 @@ class DriverController extends Controller
      * and invited without an Uber email). Route-model binding keeps it within the
      * manager's own tenant; the email stays globally unique across drivers.
      */
-    public function update(Request $request, Driver $driver): DriverResource
+    public function update(Request $request, Driver $driver, DriverInvitationService $invitations): DriverResource
     {
         $this->authorizeTenant($driver);
 
@@ -185,11 +189,42 @@ class DriverController extends Controller
         // PATCH semantics: an ABSENT email leaves the driver untouched, an empty one
         // clears it. Reading $data['email'] unconditionally 500'd on a body that
         // simply didn't carry the field.
-        if (array_key_exists('email', $data)) {
-            $driver->forceFill(['email' => $data['email'] ?: null])->save();
+        if (! array_key_exists('email', $data)) {
+            return new DriverResource($driver);
         }
 
+        $email = $data['email'] ?: null;
+        if ($email !== null) {
+            $invitations->assertEmailAvailable($driver, $email);
+        }
+
+        if ($email === $driver->email) {
+            return new DriverResource($driver);
+        }
+
+        // A NEW login address means a new person may hold the account (the phone
+        // changed hands, a test login was re-pointed). Sign the previous holder out
+        // everywhere and stop pushing offers to their devices; the new address
+        // signs in with its own one-time code.
+        DB::transaction(function () use ($driver, $email) {
+            $driver->tokens()->delete();
+            DeviceToken::withoutGlobalScopes()->where('driver_id', $driver->id)->delete();
+            $driver->forceFill(['email' => $email, 'invite_token' => null])->save();
+        });
+
         return new DriverResource($driver);
+    }
+
+    /**
+     * Erase one driver (DSGVO Art. 17 request routed through the fleet): row,
+     * logins, devices and metrics deleted, offer history anonymized. Refused
+     * while Uber still lists the driver on the fleet (a sync would recreate them).
+     */
+    public function destroy(Driver $driver, DriverEraser $eraser): JsonResponse
+    {
+        $this->authorizeTenant($driver);
+
+        return response()->json(['data' => $eraser->erase($driver)]);
     }
 
     /** Work stats for one driver, computed from our own offers/acceptance data. */

@@ -6,8 +6,10 @@ use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\SendTemplatedMail;
 use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Models\PasswordReset;
+use App\Models\User;
 use App\Support\Settings;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -34,6 +36,39 @@ class DriverInvitationService
      * doesn't have to type it; the chosen address becomes the driver's login email.
      * No password is involved — the code the driver enters is the credential.
      */
+    /**
+     * A driver's login email must be free: drivers.email is unique across ALL
+     * companies (an Uber email shared by a driver of two fleets used to 500 the
+     * invite), and it must not be another company's dashboard user — the app
+     * login resolves drivers first, so that user's owner login would otherwise
+     * land in this driver's account. The message never names the other company.
+     *
+     * @throws ValidationException 422
+     */
+    public function assertEmailAvailable(Driver $driver, string $email): void
+    {
+        $takenByDriver = Driver::withoutGlobalScopes()
+            ->where('email', $email)
+            ->whereKeyNot($driver->getKey())
+            ->exists();
+
+        $takenByForeignUser = User::query()
+            ->where('email', $email)
+            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', '!=', $driver->tenant_id))
+            ->exists();
+
+        if ($takenByDriver || $takenByForeignUser) {
+            throw $this->emailInUse();
+        }
+    }
+
+    private function emailInUse(): ValidationException
+    {
+        return ValidationException::withMessages([
+            'email' => [__('This email address is already used by another account. Set a different email for this driver first.')],
+        ]);
+    }
+
     public function invite(Driver $driver): void
     {
         $email = filled($driver->email) ? $driver->email : $driver->uber_email;
@@ -44,11 +79,18 @@ class DriverInvitationService
             ]);
         }
 
-        $driver->forceFill([
-            'email' => $email, // remember the login address (may have come from Uber)
-            'invite_token' => Str::random(48),
-            'invited_at' => now(),
-        ])->save();
+        $this->assertEmailAvailable($driver, $email);
+
+        try {
+            $driver->forceFill([
+                'email' => $email, // remember the login address (may have come from Uber)
+                'invite_token' => Str::random(48),
+                'invited_at' => now(),
+            ])->save();
+        } catch (UniqueConstraintViolationException) {
+            // Two invites raced for the same address.
+            throw $this->emailInUse();
+        }
 
         $reset = PasswordReset::updateOrCreate(
             ['email' => $email],

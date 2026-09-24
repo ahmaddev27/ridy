@@ -229,6 +229,7 @@ Route::prefix('v1')->group(function () {
         Route::get('drivers/live', [DriverController::class, 'live']);
         Route::get('drivers/{driver}', [DriverController::class, 'show']);
         Route::patch('drivers/{driver}', [DriverController::class, 'update'])->middleware('can:drivers.manage');
+        Route::delete('drivers/{driver}', [DriverController::class, 'destroy'])->middleware('can:drivers.manage');
         Route::get('drivers/{driver}/stats', [DriverController::class, 'stats']);
         // Browser-fed ingest: only for a company that has connected its own Uber
         // account (a stored session), never an arbitrary account the manager is
