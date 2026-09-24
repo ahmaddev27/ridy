@@ -2,29 +2,33 @@
 
 namespace App\Jobs;
 
-use App\Domain\Notifications\Contracts\PushSender;
-use App\Domain\Notifications\Models\DeviceToken;
-use App\Domain\Notifications\Notifier;
-use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Throwable;
+use Illuminate\Support\Str;
 
 /**
  * Fans a super-admin's free-form broadcast out to a set of users, off the
- * request cycle. Each recipient gets a bell entry AND (best-effort) an FCM
- * push via the {@see Notifier}. Recipients are processed in chunks so a large
- * audience never loads every User at once, and a failure on one recipient is
- * swallowed so the rest of the batch still receives the message.
+ * request cycle. This job only SPLITS the audience: each small chunk is its own
+ * {@see SendAdminBroadcastChunk} with its own timeout and retries. One long job
+ * doing a bell insert + FCM + synchronous SMTP per recipient used to pass the
+ * worker's 60 s timeout, get killed and re-run from the start — duplicating the
+ * first recipients' bells/emails/pushes while the rest never got it, and blocking
+ * the only worker (owner offer pushes, geocoding) the whole time.
  */
 class SendAdminBroadcast implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    private const CHUNK = 200;
+    /** Users per chunk job: each gets a bell, FCM and (synchronous) email. */
+    private const USER_CHUNK = 25;
+
+    /** Drivers per chunk job: a push only. */
+    private const DRIVER_CHUNK = 200;
+
+    public int $tries = 1;
 
     /**
      * @param  array<int, int>  $userIds
@@ -38,32 +42,18 @@ class SendAdminBroadcast implements ShouldQueue
         private readonly array $driverIds = [],
     ) {}
 
-    public function handle(Notifier $notifier, PushSender $sender): void
+    public function handle(): void
     {
-        $params = ['title' => $this->title, 'body' => $this->body];
+        // Stamped on every recipient's bell entry, so a retried chunk skips the
+        // users it already reached instead of notifying them twice.
+        $broadcastId = (string) Str::uuid();
 
-        foreach (array_chunk($this->userIds, self::CHUNK) as $chunk) {
-            User::whereIn('id', $chunk)->get()->each(function (User $user) use ($notifier, $params): void {
-                try {
-                    $notifier->toUser($user, 'admin_broadcast', $params, $this->href);
-                } catch (Throwable) {
-                    // One dead push token or transient failure must never abort the batch.
-                }
-            });
+        foreach (array_chunk($this->userIds, self::USER_CHUNK) as $chunk) {
+            SendAdminBroadcastChunk::dispatch($broadcastId, $this->title, $this->body, $this->href, $chunk, []);
         }
 
-        // Drivers get a straight FCM push to every device they're signed in on —
-        // the driver app has no bell inbox, so there's nothing else to write.
-        $data = ['type' => 'admin_broadcast', 'href' => (string) ($this->href ?? '')];
-        foreach (array_chunk($this->driverIds, self::CHUNK) as $chunk) {
-            DeviceToken::withoutGlobalScopes()->whereIn('driver_id', $chunk)->pluck('token')
-                ->each(function (string $token) use ($sender, $data): void {
-                    try {
-                        $sender->send($token, $this->title, $this->body, $data);
-                    } catch (Throwable) {
-                        // A dead token must never abort the batch.
-                    }
-                });
+        foreach (array_chunk($this->driverIds, self::DRIVER_CHUNK) as $chunk) {
+            SendAdminBroadcastChunk::dispatch($broadcastId, $this->title, $this->body, $this->href, [], $chunk);
         }
     }
 }

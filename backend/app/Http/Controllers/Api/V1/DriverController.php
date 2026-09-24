@@ -19,6 +19,7 @@ use App\Http\Resources\DriverResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 
 class DriverController extends Controller
@@ -27,6 +28,9 @@ class DriverController extends Controller
 
     /** A driver whose status hasn't synced within this many minutes is stale. */
     private const LIVE_STALE_MINUTES = 10;
+
+    /** How long a cold waypoint label, once queued, isn't queued again. */
+    private const LABEL_BACKFILL_COOLDOWN_SECONDS = 120;
 
     public function index(): AnonymousResourceCollection
     {
@@ -95,10 +99,19 @@ class DriverController extends Controller
         $cachedLabels = $geo->cachedReverseLabels($allPoints);
 
         $misses = [];
-        $drivers = $liveDrivers->map(function (Driver $d) use ($geo, $cachedLabels, &$misses) {
+        // Nearest-town lookups memoised per request: drivers and their waypoints
+        // often share a point (same pickup, same station), so each is computed once.
+        $towns = [];
+        $nearest = function (float $lat, float $lng) use (&$towns): ?array {
+            $key = round($lat, 3).','.round($lng, 3);
+
+            return $towns[$key] ??= PostalCodes::nearest($lat, $lng);
+        };
+
+        $drivers = $liveDrivers->map(function (Driver $d) use ($geo, $cachedLabels, &$misses, $nearest) {
             // Reverse the live GPS to the nearest town so the fleet map can show
             // where each driver currently is (updates every poll).
-            $near = PostalCodes::nearest((float) $d->latitude, (float) $d->longitude);
+            $near = $nearest((float) $d->latitude, (float) $d->longitude);
 
             return [
                 'id' => $d->id,
@@ -113,10 +126,10 @@ class DriverController extends Controller
                 'heading' => $d->heading !== null ? (float) $d->heading : null,
                 // Label each pickup/dropoff from the batched cache; the nearest town
                 // is the always-available fallback while a cold point is backfilled.
-                'waypoints' => collect($d->trip_waypoints ?? [])->map(function ($w) use ($geo, $cachedLabels, &$misses) {
+                'waypoints' => collect($d->trip_waypoints ?? [])->map(function ($w) use ($geo, $cachedLabels, &$misses, $nearest) {
                     $lat = (float) ($w['lat'] ?? 0);
                     $lng = (float) ($w['lng'] ?? 0);
-                    $near = PostalCodes::nearest($lat, $lng);
+                    $near = $nearest($lat, $lng);
                     $key = $geo->reverseCacheKey($lat, $lng);
                     $address = $key !== null ? ($cachedLabels[$key] ?? null) : null;
                     if ($key !== null && $address === null) {
@@ -134,8 +147,15 @@ class DriverController extends Controller
         });
 
         // Fill cold labels off the request path so the next poll serves them warm.
-        if ($misses !== []) {
-            BackfillWaypointLabels::dispatch(array_values($misses));
+        // Each cold point is queued ONCE per couple of minutes, not by every open
+        // dashboard on every 12 s poll (a Nominatim outage used to flood the queue).
+        $fresh = array_values(array_filter(
+            $misses,
+            fn ($key) => Cache::add('revgeo:inflight:'.$key, 1, self::LABEL_BACKFILL_COOLDOWN_SECONDS),
+            ARRAY_FILTER_USE_KEY,
+        ));
+        foreach (array_chunk($fresh, BackfillWaypointLabels::MAX_POINTS) as $chunk) {
+            BackfillWaypointLabels::dispatch($chunk);
         }
 
         return response()->json(['data' => $drivers]);
