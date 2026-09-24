@@ -15,6 +15,14 @@ export function apiErrorMessage(err: unknown, t: (key: string) => string): strin
   if (err instanceof ApiError && err.status === 0) {
     return t("errors.generic");
   }
+  // Throttled (login/OTP/register limiters) and server failures get a localized
+  // sentence — never a raw English server message.
+  if (err instanceof ApiError && err.status === 429) {
+    return t("errors.tooManyAttempts");
+  }
+  if (err instanceof ApiError && err.status >= 500) {
+    return t("errors.server");
+  }
   return err instanceof Error ? localizeCode(err.message, t) : t("errors.generic");
 }
 

@@ -1,6 +1,4 @@
-import { apiFetch } from "./client";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { apiFetch, apiUpload } from "./client";
 
 export type EmailTemplate = {
   key: string;
@@ -42,23 +40,10 @@ export async function previewTemplate(key: string, draft: UpdateTemplateInput): 
   return res.data;
 }
 
-function readCookie(name: string): string | null {
-  if (typeof document === "undefined") return null;
-  const m = document.cookie.match(new RegExp("(^|; )" + name + "=([^;]*)"));
-  return m ? decodeURIComponent(m[2]) : null;
-}
-
-/** Multipart upload — apiFetch is JSON-only, so this posts FormData directly. */
+/** Multipart upload of an inline template image; returns its public URL. */
 export async function uploadTemplateImage(file: File): Promise<string> {
-  await fetch(`${API_URL}/sanctum/csrf-cookie`, { credentials: "include" });
   const form = new FormData();
   form.append("image", file);
-  const res = await fetch(`${API_URL}/api/v1/admin/email-templates/image`, {
-    method: "POST",
-    credentials: "include",
-    headers: { Accept: "application/json", "X-XSRF-TOKEN": readCookie("XSRF-TOKEN") ?? "" },
-    body: form,
-  });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message ?? "upload failed");
-  return (await res.json()).data.url as string;
+  const res = await apiUpload<{ data: { url: string } }>("/api/v1/admin/email-templates/image", form);
+  return res.data.url;
 }
