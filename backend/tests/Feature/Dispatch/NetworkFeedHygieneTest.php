@@ -86,7 +86,8 @@ class NetworkFeedHygieneTest extends TestCase
         ]]);
 
         $row = DispatchNetworkLog::where('kind', 'roster')->firstOrFail()->payload[0];
-        $this->assertSame(['driverUuid', 'name'], array_keys($row));
+        // MySQL's JSON type re-orders object keys, so compare the set, not the order.
+        $this->assertEqualsCanonicalizing(['driverUuid', 'name'], array_keys($row));
     }
 
     public function test_an_oversized_capture_is_stored_as_a_marker(): void

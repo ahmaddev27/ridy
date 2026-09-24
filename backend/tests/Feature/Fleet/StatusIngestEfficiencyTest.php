@@ -55,7 +55,8 @@ class StatusIngestEfficiencyTest extends TestCase
     {
         $count = 0;
         DB::listen(function ($q) use (&$count) {
-            if (str_starts_with(strtolower($q->sql), 'update "drivers"')) {
+            // Quoting differs per engine: "drivers" on SQLite, `drivers` on MySQL.
+            if (preg_match('/^update [`"]drivers[`"]/i', $q->sql) === 1) {
                 $count++;
             }
         });
