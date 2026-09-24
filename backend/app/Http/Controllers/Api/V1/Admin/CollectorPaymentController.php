@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Domain\Billing\Models\SubscriptionPeriod;
 use App\Domain\Collections\CollectorPaymentQuery;
 use App\Domain\Collections\Models\CollectorPayment;
+use App\Http\Controllers\Concerns\ResolvesPerPage;
 use App\Http\Controllers\Controller;
 use App\Support\Csv;
 use Illuminate\Http\JsonResponse;
@@ -17,11 +18,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class CollectorPaymentController extends Controller
 {
+    use ResolvesPerPage;
+
     public function __construct(private readonly CollectorPaymentQuery $query) {}
 
     public function index(Request $request): JsonResponse
     {
-        $payments = $this->query->forRequest($request)->paginate(min($request->integer('per_page', 25), 100));
+        $payments = $this->query->forRequest($request)->paginate($this->perPage($request));
 
         return response()->json([
             'data' => collect($payments->items())->map(fn (CollectorPayment $p) => $this->present($p)),
@@ -40,11 +43,26 @@ class CollectorPaymentController extends Controller
         $data = $request->validate([
             'collector_id' => ['required', 'integer', 'exists:collectors,id'],
             'tenant_id' => ['required', 'integer', 'exists:tenants,id'],
-            'amount' => ['required', 'numeric', 'gt:0', 'max:99999999'],
-            'paid_on' => ['required', 'date'],
+            // decimal(12,2): at most 2 decimals, no silent rounding.
+            'amount' => ['required', 'numeric', 'decimal:0,2', 'gt:0', 'max:9999999999.99'],
+            'paid_on' => ['required', 'date', 'after_or_equal:2020-01-01', 'before_or_equal:today'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
         $data['created_by'] = $request->user()->id;
+
+        // A double-click / network retry must not book the same cash twice: an
+        // identical row from the same admin within the last minute is returned.
+        $duplicate = CollectorPayment::query()
+            ->where('collector_id', $data['collector_id'])
+            ->where('tenant_id', $data['tenant_id'])
+            ->where('amount', $data['amount'])
+            ->whereDate('paid_on', $data['paid_on'])
+            ->where('created_by', $data['created_by'])
+            ->where('created_at', '>=', now()->subMinute())
+            ->first();
+        if ($duplicate !== null) {
+            return response()->json(['data' => $this->present($duplicate->load(['collector:id,name', 'tenant:id,name']))]);
+        }
 
         $payment = CollectorPayment::create($data)->load(['collector:id,name', 'tenant:id,name']);
 
@@ -84,7 +102,7 @@ class CollectorPaymentController extends Controller
                     Csv::cell($p->tenant?->name),
                     Csv::cell($p->collector?->name),
                     number_format((float) $p->amount, 2, '.', ''),
-                    $p->note,
+                    Csv::cell($p->note),
                 ]);
             }
             fclose($out);
