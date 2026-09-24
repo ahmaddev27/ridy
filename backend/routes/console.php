@@ -64,6 +64,10 @@ Schedule::command('fleet:check-offer-flow')->everyFiveMinutes()->withoutOverlapp
 // last-known "online" would otherwise stay frozen in the admin list, stats and map.
 Schedule::command('fleet:offline-lapsed')->everyFiveMinutes()->withoutOverlapping();
 
+// Location only during live trips: clear positions/waypoints once a driver's
+// status stops syncing (DSGVO "detect, don't surveil").
+Schedule::command('fleet:purge-stale-locations')->everyFiveMinutes()->withoutOverlapping();
+
 // Nightly gzipped database backup (kept 7 days in storage/app/backups).
 Schedule::command('db:backup')->dailyAt('03:00')->withoutOverlapping();
 

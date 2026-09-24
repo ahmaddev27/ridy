@@ -4,12 +4,17 @@ namespace Tests\Feature\Dispatch;
 
 use App\Domain\Dispatch\Jobs\BackfillWaypointLabels;
 use App\Domain\Dispatch\Jobs\GeocodeOffer;
+use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Dispatch\OfferLifecycle;
+use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
+use App\Events\OfferBroadcast;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
@@ -29,6 +34,25 @@ class QueueHygieneTest extends TestCase
         GeocodeOffer::dispatch(43);
 
         Queue::assertPushed(GeocodeOffer::class, 2);
+    }
+
+    public function test_a_bulk_sweep_broadcasts_once_per_driver_not_once_per_row(): void
+    {
+        Event::fake([OfferBroadcast::class]);
+        $tenant = Tenant::create(['name' => 'YA', 'country' => 'DE']);
+        app(TenantContext::class)->set($tenant->id);
+        $driver = Driver::create(['tenant_id' => $tenant->id, 'name' => 'D', 'uber_driver_uuid' => 'u1', 'online_status' => 'ONLINE']);
+        foreach (['a', 'b', 'c'] as $uuid) {
+            DispatchOffer::create([
+                'tenant_id' => $tenant->id, 'driver_id' => $driver->id, 'driver_uuid' => 'u1', 'offer_uuid' => $uuid,
+                'received_at' => now()->subMinutes(5), 'raw_payload' => [], 'status' => OfferStatus::Pending,
+            ]);
+        }
+
+        $rejected = app(OfferLifecycle::class)->rejectPendingFor($tenant->id, 'u1');
+
+        $this->assertSame(3, $rejected);
+        Event::assertDispatchedTimes(OfferBroadcast::class, 1);
     }
 
     public function test_live_map_polls_queue_each_cold_waypoint_once_in_bounded_jobs(): void

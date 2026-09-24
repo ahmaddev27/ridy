@@ -18,6 +18,12 @@ use Laravel\Sanctum\HasApiTokens;
  */
 class Driver extends Authenticatable
 {
+    /**
+     * A driver whose status hasn't synced within this many minutes is stale: off
+     * the live map, and their last position is purged (fleet:purge-stale-locations).
+     */
+    public const LIVE_STALE_MINUTES = 10;
+
     use BelongsToTenant, HasApiTokens, Notifiable;
 
     /**

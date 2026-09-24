@@ -30,9 +30,6 @@ class DriverController extends Controller
 {
     use AuthorizesTenantResource;
 
-    /** A driver whose status hasn't synced within this many minutes is stale. */
-    private const LIVE_STALE_MINUTES = 10;
-
     /** How long a cold waypoint label, once queued, isn't queued again. */
     private const LABEL_BACKFILL_COOLDOWN_SECONDS = 120;
 
@@ -76,7 +73,7 @@ class DriverController extends Controller
         // Only show genuinely-live positions: a driver whose status hasn't been
         // synced within this window (dead session / closed extension) must drop
         // off the map instead of freezing in place and looking live.
-        $freshSince = now()->subMinutes(self::LIVE_STALE_MINUTES);
+        $freshSince = now()->subMinutes(Driver::LIVE_STALE_MINUTES);
 
         $liveDrivers = Driver::query()
             ->whereNotNull('latitude')

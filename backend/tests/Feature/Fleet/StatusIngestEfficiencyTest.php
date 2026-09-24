@@ -162,6 +162,22 @@ class StatusIngestEfficiencyTest extends TestCase
         $this->assertCount(DriverStatusIngestor::MAX_WAYPOINTS, Driver::withoutGlobalScopes()->first()->trip_waypoints);
     }
 
+    public function test_positions_are_purged_once_status_sync_stops(): void
+    {
+        $stale = $this->driver(['uber_driver_uuid' => 'stale', 'latitude' => 51.1, 'longitude' => 7.1, 'trip_waypoints' => [['lat' => 51.2, 'lng' => 7.2]]]);
+        Driver::withoutGlobalScopes()->whereKey($stale->id)->update(['status_synced_at' => now()->subMinutes(11)]);
+        $live = $this->driver(['uber_driver_uuid' => 'live', 'latitude' => 51.3, 'longitude' => 7.3]);
+        Driver::withoutGlobalScopes()->whereKey($live->id)->update(['status_synced_at' => now()->subMinute()]);
+
+        $this->artisan('fleet:purge-stale-locations')->assertSuccessful();
+
+        $stale = $stale->fresh();
+        $this->assertNull($stale->latitude);
+        $this->assertNull($stale->trip_waypoints);
+        $this->assertSame('MONITORING_SUPPLY_STATUS_ONLINE', $stale->online_status);
+        $this->assertNotNull($live->fresh()->latitude);
+    }
+
     public function test_a_slow_text_geocode_never_overwrites_an_uber_resolved_trip(): void
     {
         $offer = DispatchOffer::create([
