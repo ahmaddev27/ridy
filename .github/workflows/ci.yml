@@ -214,8 +214,13 @@ jobs:
         run: |
           if ls test/*.test.js src/*.test.js >/dev/null 2>&1; then node --test; else echo "no daemon tests yet"; fi
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      # Advisory only: Deploy runs only when the whole CI workflow is green, so a
+      # freshly published advisory in some transitive dependency must not block
+      # every production deploy (hotfixes included). A finding still shows as a
+      # failed step with a warning annotation on the run.
+      - name: Audit production dependencies (advisory)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high || { echo "::warning::npm audit found high-severity advisories in dispatch-daemon production dependencies"; exit 1; }
 
   # --- Driver app (Expo) -------------------------------------------------------
   # OTA updates reach every driver with no store review, so at least prove the
