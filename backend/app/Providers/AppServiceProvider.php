@@ -10,6 +10,7 @@ use App\Domain\Notifications\Push\FcmPushSender;
 use App\Domain\Notifications\Push\GoogleServiceAccountToken;
 use App\Domain\Notifications\Push\LogPushSender;
 use App\Domain\Tenancy\TenantContext;
+use App\Support\SentryScrubber;
 use App\Support\Settings;
 use Illuminate\Auth\RequestGuard;
 use Illuminate\Support\Facades\Auth;
@@ -26,6 +27,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Never ship request bodies / cookies / credential headers / SQL bindings
+        // to Sentry (no-op while SENTRY_LARAVEL_DSN is unset). In register(), so
+        // it is set before the Sentry client is first built during boot.
+        SentryScrubber::configure();
+
         // Real FCM when a service-account credentials file is present, otherwise
         // log the push so the full flow works without a Firebase project.
         $this->app->bind(PushSender::class, function () {
