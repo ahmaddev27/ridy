@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Domain\Audit\AuditLogger;
-use App\Models\User;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -12,8 +11,8 @@ use Throwable;
 
 /**
  * Writes an audit entry for every successful mutating request (POST/PUT/PATCH/
- * DELETE) made by a super-admin, or made while a super-admin is acting as a
- * company. Those are the actions with platform-wide blast radius (company
+ * DELETE) on the super-admin API (/api/v1/admin/*), or made while a super-admin
+ * is acting as a company. Those are the actions with platform-wide blast radius (company
  * deletes, subscription grants, queue flushes, broadcasts, settings) and, during
  * impersonation, actions otherwise attributed to the impersonated manager.
  *
@@ -57,10 +56,11 @@ class AuditPrivilegedMutations
             return false;
         }
 
-        $impersonating = $request->hasSession() && $request->session()->has('impersonator_id');
-        $user = $request->user();
-
-        return $impersonating || ($user instanceof User && $user->hasRole('super_admin'));
+        // The admin prefix is reachable only by super-admins (its route group enforces
+        // it), so a successful response there IS a super-admin action — no role query
+        // on the hot ingest POSTs that also pass through this group.
+        return $request->is('api/v1/admin/*')
+            || ($request->hasSession() && $request->session()->has('impersonator_id'));
     }
 
     private function record(Request $request, Response $response): void
