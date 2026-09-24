@@ -1,11 +1,12 @@
+import { memo, useEffect, useState } from "react";
 import { View, Pressable } from "react-native";
-import { Clock, Route } from "lucide-react-native";
+import { Clock, Route } from "@/components/icons";
 import { Text } from "@/components/typography";
 import { Badge, StatusBadge } from "@/components/ui";
 import { useColors, radius, cardStyle, isDarkPalette } from "@/lib/theme";
 import { isRTL, t } from "@/lib/i18n";
 import type { Offer } from "@/lib/api";
-import { fareLabel, perKmValue, distanceLabel, cleanAddress, timeLabel } from "@/lib/format";
+import { fareLabel, perKmValue, distanceLabel, cleanAddress, clockLabel, dayLabel } from "@/lib/format";
 
 const start = () => (isRTL() ? "right" : "left") as "right" | "left";
 const end = () => (isRTL() ? "left" : "right") as "left" | "right";
@@ -18,24 +19,34 @@ const rowDir = () => (isRTL() ? "row-reverse" : "row") as "row-reverse" | "row";
  * footer. View-only — the driver accepts inside Uber — so the whole card is one
  * press target that opens the details, with no accept/reject actions.
  */
-export function OfferCard({
-  offer,
-  onPress,
-  showDriver,
-}: {
+type OfferCardProps = {
   offer: Offer;
-  onPress: () => void;
+  /** Called with the offer id — a stable callback keeps the memoized card quiet. */
+  onOpen: (id: number) => void;
   showDriver?: boolean;
-}) {
+};
+
+function OfferCardImpl({ offer, onOpen, showDriver }: OfferCardProps) {
   const c = useColors();
   const status = offer.status ?? "pending";
   const dim = status === "rejected" || status === "canceled";
   const live = status === "pending";
   const perKm = perKmValue(offer.fare_amount, offer.distance_m);
+  const fare = fareLabel(offer.fare_formatted, offer.fare_amount);
+  const a11yLabel = [
+    fare,
+    perKm ? `${perKm.value} €/km` : null,
+    `${cleanAddress(offer.pickup_address)} → ${cleanAddress(offer.dropoff_address)}`,
+    t(`status.${status}`),
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => onOpen(offer.id)}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
       style={({ pressed }) => ({
         ...cardStyle(c, live),
         padding: 16,
@@ -47,13 +58,13 @@ export function OfferCard({
       <View style={{ flexDirection: rowDir(), alignItems: "flex-start", justifyContent: "space-between" }}>
         <View style={{ gap: 8, alignItems: isRTL() ? "flex-end" : "flex-start" }}>
           {live ? (
-            <Badge variant={perKm?.good ? "top" : "verified"} label={perKm?.good ? "Top Offer" : "Verified"} />
+            <Badge variant={perKm?.good ? "top" : "verified"} label={t(perKm?.good ? "offer.badge.top" : "offer.badge.verified")} />
           ) : (
             <StatusBadge status={status} label={t(`status.${status}`)} />
           )}
           {/* Hero is the total trip price. */}
           <Text style={{ color: c.ink, fontSize: 33, fontWeight: "700", letterSpacing: -1, textAlign: start() }}>
-            {fareLabel(offer.fare_formatted, offer.fare_amount)}
+            {fare}
           </Text>
         </View>
         {/* Secondary: €/km rate, top-end. */}
@@ -79,12 +90,14 @@ export function OfferCard({
       >
         <MetaCol value={distanceLabel(offer.distance_m)} label={t("offer.distance")} />
         <MetaDivider />
-        <MetaCol value={timeLabel(offer.received_at).split(",")[0]?.trim() || "—"} label={t("offer.received")} />
+        <MetaCol value={clockLabel(offer.received_at)} label={t("offer.received")} />
         <MetaDivider />
-        <MetaCol
-          value={timeLabel(offer.received_at).split(",")[1]?.trim() ?? "—"}
-          label={t("offer.requested")}
-        />
+        {/* The Uber request time when we have one; otherwise the day received. */}
+        {offer.requested_at ? (
+          <MetaCol value={clockLabel(offer.requested_at)} label={t("offer.requested")} />
+        ) : (
+          <MetaCol value={dayLabel(offer.received_at)} label={t("offer.date")} />
+        )}
       </View>
 
       {/* 3 · Route: pickup → drop-off */}
@@ -123,19 +136,68 @@ export function OfferCard({
               <Text numberOfLines={1} style={{ color: c.inkSubtle, fontSize: 12 }}>{offer.driver_name}</Text>
             ) : null}
           </View>
-          {live && offer.accept_window_seconds != null && (
-            <View style={{ flexDirection: rowDir(), alignItems: "center", gap: 6 }}>
-              <Clock size={14} color={c.inkSubtle} />
-              <Text style={{ color: c.inkMuted, fontSize: 12.5, fontWeight: "600" }}>
-                {offer.accept_window_seconds}
-                {t("offer.secShort")}
-              </Text>
-              <Text style={{ color: c.inkSubtle, fontSize: 11 }}>{t("offer.remaining")}</Text>
-            </View>
+          {live && offer.accept_window_seconds != null && offer.received_at && (
+            <CardCountdown receivedAt={offer.received_at} windowSeconds={offer.accept_window_seconds} />
           )}
         </View>
       )}
     </Pressable>
+  );
+}
+
+/** Fields the card renders — a poll that returns the same values re-renders nothing. */
+const RENDERED_FIELDS: (keyof Offer)[] = [
+  "id",
+  "status",
+  "fare_amount",
+  "fare_formatted",
+  "distance_m",
+  "received_at",
+  "requested_at",
+  "stops_count",
+  "pickup_address",
+  "dropoff_address",
+  "rider_name",
+  "driver_name",
+  "accept_window_seconds",
+];
+
+export const OfferCard = memo(
+  OfferCardImpl,
+  (a, b) =>
+    a.onOpen === b.onOpen &&
+    a.showDriver === b.showDriver &&
+    RENDERED_FIELDS.every((k) => a.offer[k] === b.offer[k]),
+);
+
+/** Live "Ns remaining" for a pending card: ticks once a second, hides at zero. */
+function CardCountdown({ receivedAt, windowSeconds }: { receivedAt: string; windowSeconds: number }) {
+  const c = useColors();
+  const deadline = Date.parse(receivedAt) + windowSeconds * 1000;
+  const [left, setLeft] = useState(() => Math.ceil((deadline - Date.now()) / 1000));
+
+  useEffect(() => {
+    if (!Number.isFinite(deadline)) return;
+    const tick = () => setLeft(Math.ceil((deadline - Date.now()) / 1000));
+    tick();
+    if (deadline <= Date.now()) return;
+    const id = setInterval(() => {
+      tick();
+      if (Date.now() >= deadline) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [deadline]);
+
+  if (!Number.isFinite(left) || left <= 0) return null;
+  return (
+    <View style={{ flexDirection: rowDir(), alignItems: "center", gap: 6 }}>
+      <Clock size={14} color={c.inkSubtle} />
+      <Text style={{ color: c.inkMuted, fontSize: 12.5, fontWeight: "600", writingDirection: "ltr" }}>
+        {left}
+        {t("offer.secShort")}
+      </Text>
+      <Text style={{ color: c.inkSubtle, fontSize: 11 }}>{t("offer.remaining")}</Text>
+    </View>
   );
 }
 
