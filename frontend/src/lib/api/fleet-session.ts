@@ -19,24 +19,3 @@ export async function getFleetSession(): Promise<FleetSession> {
 export async function prepareReconnect(): Promise<void> {
   await apiFetch("/api/v1/fleet-session/reconnect", { method: "POST" });
 }
-
-export async function deleteFleetSession(): Promise<{ deleted: number }> {
-  const res = await apiFetch<{ data: { deleted: number } }>("/api/v1/fleet-session", {
-    method: "DELETE",
-    withCsrf: true,
-  });
-  return res.data;
-}
-
-export async function captureFleetSession(input: {
-  uber_org_uuid: string;
-  cookies: Cookie[];
-  expires_at?: string;
-}): Promise<FleetSession> {
-  const res = await apiFetch<{ data: FleetSession }>("/api/v1/fleet-session", {
-    method: "POST",
-    body: input,
-    withCsrf: true,
-  });
-  return res.data;
-}

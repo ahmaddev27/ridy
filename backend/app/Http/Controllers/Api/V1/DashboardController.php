@@ -56,6 +56,7 @@ class DashboardController extends Controller
         $now = now();
         $queued = SubscriptionPeriod::where('tenant_id', $tenant->id)
             ->where('starts_at', '>', $now)
+            ->whereNull('canceled_at') // admin-ended periods stay on the books but never run
             ->get(['days', 'starts_at']);
 
         // The current period ends when the earliest queued period begins; with no

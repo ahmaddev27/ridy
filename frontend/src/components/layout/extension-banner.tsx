@@ -62,7 +62,7 @@ export function ExtensionBanner() {
       >
         {t("extBanner.action")}
       </Link>
-      <button onClick={() => setDismissed(true)} className="rounded p-1 text-amber-500 hover:bg-warning-bg" aria-label="Dismiss">
+      <button onClick={() => setDismissed(true)} className="rounded p-1 text-amber-500 hover:bg-warning-bg" aria-label={t("common.dismiss")}>
         <X className="h-4 w-4" />
       </button>
     </div>

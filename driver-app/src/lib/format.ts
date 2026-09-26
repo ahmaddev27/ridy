@@ -43,15 +43,6 @@ export function perKmValue(
   return { value: num2.format(rate), rate, good: rate > 1 };
 }
 
-/** €-quality mark by price-per-km: € (≤1), €€ (>1), €€€ (≥3). `good` when ≥ €€. */
-export function euroQuality(fare_amount: number | null, meters: number | null): { mark: string; good: boolean } {
-  if (fare_amount == null || !meters) return { mark: "€", good: false };
-  const perKm = fare_amount / (meters / 1000);
-  if (perKm >= 3) return { mark: "€€€", good: true };
-  if (perKm > 1) return { mark: "€€", good: true };
-  return { mark: "€", good: false };
-}
-
 /** Keep "Street No, Postcode City" — drop the trailing country. */
 export function cleanAddress(addr: string | null): string {
   if (!addr) return "—";
@@ -60,7 +51,29 @@ export function cleanAddress(addr: string | null): string {
 
 /** Date + time in Latin digits, 24h (kept as "02/09, 11:12" — unchanged). */
 const TIME = "en-DE";
-export function timeLabel(iso: string | null): string {
+export function timeLabel(iso: string | null | undefined): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString(TIME, { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+}
+
+/** Time of day only ("11:12"), 24h, Latin digits. */
+export function clockLabel(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString(TIME, { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+/** Day + month only ("02/09"), Latin digits. */
+export function dayLabel(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString(TIME, { day: "2-digit", month: "2-digit" });
+}
+
+/**
+ * Normalise Arabic-Indic (٠-٩) and Extended/Persian (۰-۹) digits to ASCII, so a
+ * driver typing on an Arabic keyboard can still enter a numeric code.
+ */
+export function toAsciiDigits(input: string): string {
+  return input
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
 }

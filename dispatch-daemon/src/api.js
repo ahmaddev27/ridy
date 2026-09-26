@@ -16,15 +16,42 @@ async function call(method, path, body) {
     headers,
     body: body ? JSON.stringify(body) : undefined,
     // fetch has no default timeout: without this a backend that accepts the
-    // connection but never answers parks the promise forever — and these calls sit
-    // inside the SSE read loop and the adaptive status chain, which would both
-    // stall silently. A rejection is already handled as retryable by every caller.
+    // connection but never answers parks the promise forever (a stalled status
+    // chain, a never-settling ingest). Callers decide what a rejection means:
+    // ingests are retried by the stream's queue, polls/heartbeats retry next cycle.
     signal: AbortSignal.timeout(config.apiTimeout),
   });
   if (!res.ok) {
-    throw new Error(`${method} ${path} -> ${res.status} ${await res.text().catch(() => "")}`);
+    // Bounded: an HTML error page (Caddy 503 during a deploy) would otherwise
+    // flood the logs and Sentry with kilobytes per failure.
+    const text = await res.text().catch(() => "");
+    const error = new Error(`${method} ${path} -> ${res.status} ${text.slice(0, 300)}`);
+    // Callers branch on these: the ingest queue retries only transient statuses,
+    // and a 409 stale_jar tells a stream a reconnect replaced its cookie jar.
+    error.status = res.status;
+    error.apiMessage = apiMessage(text);
+    throw error;
   }
   return res.json();
+}
+
+function apiMessage(text) {
+  try {
+    const message = JSON.parse(text)?.message;
+    return typeof message === "string" ? message : "";
+  } catch {
+    return "";
+  }
+}
+
+/** The backend refused a report from a stream whose cookie jar a reconnect replaced. */
+export function isStaleJar(error) {
+  return error?.status === 409 && error?.apiMessage === "stale_jar";
+}
+
+/** The jar generation a stream runs on, echoed so the backend can refuse stale writes. */
+function jarBody(jarVersion) {
+  return Number.isInteger(jarVersion) ? { jar_version: jarVersion } : {};
 }
 
 export const api = {
@@ -40,19 +67,19 @@ export const api = {
   },
 
   /** Persist rolling cookies captured from Set-Cookie — keeps the session alive. */
-  async refreshCookies(sessionId, cookies, expiresAt) {
-    return call("POST", `/sessions/${sessionId}/cookies`, { cookies, expires_at: expiresAt });
+  async refreshCookies(sessionId, cookies, expiresAt, jarVersion) {
+    return call("POST", `/sessions/${sessionId}/cookies`, { cookies, expires_at: expiresAt, ...jarBody(jarVersion) });
   },
 
   /** Tell the backend the session was rejected so the manager is prompted to re-link. */
-  async needsRelink(sessionId) {
-    return call("POST", `/sessions/${sessionId}/needs-relink`);
+  async needsRelink(sessionId, jarVersion) {
+    return call("POST", `/sessions/${sessionId}/needs-relink`, jarBody(jarVersion));
   },
 
   /** Fleet Hub polls are failing but the offer stream is alive: prompt a reconnect
    *  WITHOUT flagging the session broken (so the offer stream keeps running). */
-  async supplierDegraded(sessionId) {
-    return call("POST", `/sessions/${sessionId}/supplier-degraded`);
+  async supplierDegraded(sessionId, jarVersion) {
+    return call("POST", `/sessions/${sessionId}/supplier-degraded`, jarBody(jarVersion));
   },
 
   /** Forward the driver roster pulled from supplier /api/getDrivers. */

@@ -15,10 +15,34 @@ use Illuminate\Http\Request;
  */
 class UserDirectoryController extends Controller
 {
-    public function index(): JsonResponse
+    /** Tenant columns stateReason() reads (activated_at included — without it a
+     *  company with an open-ended subscription read as "inactive"). */
+    private const TENANT = 'tenant:id,name,status,banned_at,activated_at,subscription_ends_at';
+
+    /**
+     * Optional filters (the dashboard still loads the whole list): `q` matches
+     * name/email/phone, `kind` = user|driver, `company_id`. Only the columns the
+     * rows use are loaded — full Driver rows carry large JSON columns.
+     */
+    public function index(Request $request): JsonResponse
     {
-        $users = User::query()
-            ->with(['roles:id,name', 'tenant:id,name,status,banned_at,subscription_ends_at'])
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'kind' => ['nullable', 'in:user,driver'],
+            'company_id' => ['nullable', 'integer'],
+        ]);
+        $search = function ($query) use ($filters) {
+            $query->when($filters['q'] ?? null, fn ($q, string $term) => $q->where(function ($w) use ($term) {
+                $like = '%'.addcslashes($term, '%_\\').'%';
+                $w->where('name', 'like', $like)->orWhere('email', 'like', $like)->orWhere('phone', 'like', $like);
+            }))->when($filters['company_id'] ?? null, fn ($q, $id) => $q->where('tenant_id', $id));
+        };
+        $kind = $filters['kind'] ?? null;
+
+        $users = $kind === 'driver' ? collect() : User::query()
+            ->select(['id', 'name', 'email', 'phone', 'tenant_id'])
+            ->with(['roles:id,name', self::TENANT])
+            ->tap($search)
             ->orderBy('name')
             ->get()
             ->map(fn (User $u) => [
@@ -38,9 +62,11 @@ class UserDirectoryController extends Controller
         // Activated app drivers, so a super-admin can send them a test push. They
         // carry kind:'driver' (their id lives in a separate table from users) and
         // are pushed via their device tokens, not a bell entry.
-        $drivers = Driver::withoutGlobalScopes()
+        $drivers = $kind === 'user' ? collect() : Driver::withoutGlobalScopes()
+            ->select(['id', 'name', 'email', 'phone', 'tenant_id', 'activated_at'])
             ->whereNotNull('activated_at')
-            ->with('tenant:id,name,status,banned_at,subscription_ends_at')
+            ->with(self::TENANT)
+            ->tap($search)
             ->orderBy('name')
             ->get()
             ->map(fn (Driver $d) => [
@@ -63,6 +89,12 @@ class UserDirectoryController extends Controller
         // Never let an admin delete themselves or another super-admin by accident.
         if ($user->id === $request->user()->id || $user->hasRole('super_admin')) {
             return response()->json(['message' => 'cannot_delete_admin'], 422);
+        }
+
+        // A reseller whose collector received cash payments is kept (ledger rows are
+        // accounting records; the DB FK also restricts the delete).
+        if (Collector::where('user_id', $user->id)->whereHas('payments')->exists()) {
+            return response()->json(['message' => 'collector_has_payments'], 422);
         }
 
         // A reseller login and its collector are one entity — remove both, so the

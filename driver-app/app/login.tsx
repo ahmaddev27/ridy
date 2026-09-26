@@ -1,15 +1,32 @@
-import { useState } from "react";
-import { View, KeyboardAvoidingView, Platform, Pressable } from "react-native";
+import { useRef, useState } from "react";
+import { View, KeyboardAvoidingView, Platform, Pressable, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useAuth } from "@/lib/auth";
+import { ApiError } from "@/lib/api";
+import { PRIVACY_URL, IMPRINT_URL } from "@/lib/links";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
 import { useCooldown } from "@/lib/use-cooldown";
 import { Field, OtpInput, PrimaryButton, Logo } from "@/components/ui";
-import { LogIn, Mail } from "lucide-react-native";
+import { LogIn, Mail } from "@/components/icons";
 
 type Step = "email" | "code";
+
+/** Tell the failure modes apart instead of "invalid code" for everything. */
+function loginErrorKey(e: unknown, step: "send" | "verify"): string {
+  if (!(e instanceof ApiError) || e.isNetwork) return "offline.body";
+  if (e.status === 429) return "otp.tooFast";
+  if (e.status === 403) return "otp.suspended";
+  if (step === "verify" && e.status === 422) {
+    const body = (e.body ?? {}) as { errors?: { otp?: unknown[] } };
+    const code = body.errors?.otp?.[0];
+    if (code === "otp_too_many") return "otp.tooMany";
+    if (code === "otp_expired" || code === "otp_none") return "otp.expired";
+    return "otp.codeError";
+  }
+  return step === "send" ? "otp.sendError" : "otp.codeError";
+}
 
 export default function LoginScreen() {
   const { requestCode, verifyCode } = useAuth();
@@ -33,8 +50,8 @@ export default function LoginScreen() {
       await requestCode(email.trim());
       setStep("code");
       resendCooldown.start();
-    } catch {
-      setError(t("otp.sendError"));
+    } catch (e) {
+      setError(t(loginErrorKey(e, "send")));
     } finally {
       setLoading(false);
     }
@@ -47,19 +64,33 @@ export default function LoginScreen() {
       await requestCode(email.trim());
       setNotice(t("otp.resent"));
       resendCooldown.start();
-    } catch {
-      setError(t("otp.sendError"));
+    } catch (e) {
+      setError(t(loginErrorKey(e, "send")));
     }
   }
 
-  async function submitCode(codeValue: string = code) {
+  // A ref, not state: onComplete (auto-submit) and the button can fire in the
+  // same tick, and each extra request burns the verify throttle.
+  const verifying = useRef(false);
+
+  async function submitCode(codeValue?: string) {
+    const value = (typeof codeValue === "string" ? codeValue : code).trim();
+    if (verifying.current) return;
+    if (value.length !== 6) {
+      setError(t("otp.codeError"));
+      return;
+    }
+    verifying.current = true;
     setLoading(true);
     setError(null);
     try {
-      await verifyCode(email.trim(), codeValue.trim());
-    } catch {
-      setError(t("otp.codeError"));
+      await verifyCode(email.trim(), value);
+    } catch (e) {
+      const key = loginErrorKey(e, "verify");
+      if (key === "otp.tooMany") setCode(""); // the code is burnt — ask for a new one
+      setError(t(key));
     } finally {
+      verifying.current = false;
       setLoading(false);
     }
   }
@@ -102,7 +133,7 @@ export default function LoginScreen() {
             {error && <Text style={{ color: c.danger, fontSize: 14, textAlign: align }}>{error}</Text>}
             {notice && <Text style={{ color: c.inkMuted, fontSize: 14, textAlign: align }}>{notice}</Text>}
             <View style={{ marginTop: 8 }}>
-              <PrimaryButton label={t("otp.verify")} onPress={submitCode} loading={loading} icon={LogIn} />
+              <PrimaryButton label={t("otp.verify")} onPress={() => void submitCode()} loading={loading} icon={LogIn} />
             </View>
             <Pressable
               onPress={resend}
@@ -122,9 +153,18 @@ export default function LoginScreen() {
           </View>
         )}
 
-        <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: "center", position: "absolute", bottom: 20, left: 16, right: 16, lineHeight: 19 }}>
-          {t("signin.inviteNote")}
-        </Text>
+        <View style={{ position: "absolute", bottom: 20, left: 16, right: 16, gap: 8, alignItems: "center" }}>
+          <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: "center", lineHeight: 19 }}>{t("signin.inviteNote")}</Text>
+          {/* Reachable before sign-in (App Review / Play policy, DDG §5). */}
+          <View style={{ flexDirection: "row", gap: 16 }}>
+            <Text accessibilityRole="link" onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})} style={{ color: c.inkMuted, fontSize: 12.5, fontWeight: "600" }}>
+              {t("settings.privacy")}
+            </Text>
+            <Text accessibilityRole="link" onPress={() => Linking.openURL(IMPRINT_URL).catch(() => {})} style={{ color: c.inkMuted, fontSize: 12.5, fontWeight: "600" }}>
+              {t("settings.imprint")}
+            </Text>
+          </View>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

@@ -4,20 +4,17 @@
 
 (function ridyAutoCapture() {
   const api = globalThis.browser || globalThis["chrome"];
-  let done = false;
+
+  const onFleetUi = /(^|\.)(supplier|fleethub)\.uber\.com$/i.test(location.host);
 
   function findOrgUuid() {
-    // The fleet org uuid is right there in the supplier URL: /orgs/<uuid>/… —
-    // the most reliable source. Fall back to scraping the (SPA) HTML.
+    // The fleet org uuid is right there in the Fleet Hub URL: /orgs/<uuid>/… —
+    // the only reliable source. Scraping the page HTML used to pick up the first
+    // generic "uuid" (a user, driver or vehicle) and bind THAT as the fleet org;
+    // without the URL, the background discovers the org from the Fleet Hub
+    // redirect of this session instead.
     const fromUrl = location.href.match(/\/orgs\/([0-9a-f-]{36})/i);
-    if (fromUrl) return fromUrl[1];
-
-    const html = document.documentElement.innerHTML;
-    const m =
-      html.match(/CustomerGatewayUser:([0-9a-f-]{36})/i) ||
-      html.match(/"orgUuid"\s*:\s*"([0-9a-f-]{36})"/i) ||
-      html.match(/"uuid":"([0-9a-f-]{36})"/i);
-    return m ? m[1] : null;
+    return fromUrl ? fromUrl[1] : null;
   }
 
   // Best-effort fleet/organization name from the page's embedded state, so the
@@ -57,36 +54,83 @@
     setTimeout(() => el.remove(), 5000);
   }
 
-  async function tryCapture() {
-    if (done) return;
+  // Capture failures the manager has to act on — shown once, then we stop.
+  const FINAL_REASONS = {
+    not_paired: "Reidey: Bitte zuerst die Erweiterung im Dashboard koppeln.",
+    bad_api_url: "Reidey: Bitte zuerst die Erweiterung im Dashboard koppeln.",
+    unpaired: "Reidey: Kopplung abgelaufen – bitte das Reidey-Dashboard öffnen, um neu zu koppeln.",
+    autolink_blocked: "Reidey: Verbindung getrennt – bitte im Dashboard neu verbinden.",
+    uber_org_already_linked: "Reidey: Dieses Uber-Konto ist bereits mit einer anderen Firma verbunden.",
+    company_inactive: "Reidey: Deine Firma ist derzeit nicht aktiv.",
+    account_suspended: "Reidey: Dein Konto ist gesperrt – bitte den Support kontaktieren.",
+  };
+  // Still signing in / org not resolvable yet — retry quietly with backoff.
+  const RETRY_REASONS = ["no_cookies", "no_org"];
+  const RETRY_DELAYS_MS = [1500, 3000, 6000, 12000, 24000];
+
+  /** One capture attempt. Resolves true when we should try again. */
+  async function tryCapture(isLastAttempt) {
     // On account.uber.com there is no org uuid on the page — the background
     // worker discovers it from the supplier redirect, so send null and let it try.
-    const orgUuid = findOrgUuid();
-
-    done = true; // one attempt in flight at a time
-    const res = await api.runtime.sendMessage({ type: "capture", orgUuid: orgUuid || null, orgName: findOrgName() });
+    let res;
+    try {
+      res = await api.runtime.sendMessage({ type: "capture", orgUuid: findOrgUuid(), orgName: findOrgName() });
+    } catch {
+      return false; // extension reloaded under this page — nothing to retry with
+    }
 
     if (res?.ok) {
       toast(
         res.reason === "unchanged" ? "Reidey: bereits verbunden ✓" : "Reidey: Uber-Sitzung verbunden ✓",
         true,
       );
-    } else if (res && !res.ok) {
-      done = false; // retry — still signing in, or the org isn't resolvable yet
-      if (res.reason === "not_paired") {
-        toast("Reidey: Bitte zuerst die Erweiterung im Dashboard koppeln.", false);
-      } else if (!["no_cookies", "no_org"].includes(res.reason)) {
-        toast(`Reidey: ${res.reason}`, false);
-      }
+      return false;
+    }
+    const reason = res?.reason || "";
+    if (FINAL_REASONS[reason]) {
+      // autolink_blocked is expected after a disconnect: say it quietly, once.
+      toast(FINAL_REASONS[reason], reason === "autolink_blocked");
+      return false;
+    }
+    if (RETRY_REASONS.includes(reason) || !res?.status) {
+      // Network hiccup or still signing in: retry; name a real error only at the end.
+      if (isLastAttempt && reason && !RETRY_REASONS.includes(reason)) toast(`Reidey: ${reason}`, false);
+      return true;
+    }
+    toast(`Reidey: ${reason}`, false); // any other backend rejection — don't loop on it
+    return false;
+  }
+
+  // Poll briefly after load — the dashboard hydrates its user data asynchronously
+  // and a fresh sign-in may still be settling. Backs off (1.5s → 24s, five
+  // attempts in ~47s) so a login page never hammers Fleet Hub discovery.
+  async function autoCapture() {
+    for (let i = 0; i < RETRY_DELAYS_MS.length; i++) {
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[i]));
+      const again = await tryCapture(i === RETRY_DELAYS_MS.length - 1);
+      if (!again) return;
     }
   }
 
-  // Poll briefly after load — the dashboard hydrates its user data asynchronously.
-  const started = Date.now();
-  const timer = setInterval(() => {
-    tryCapture();
-    if (done || Date.now() - started > 60000) clearInterval(timer);
-  }, 1500);
+  // auth.uber.com always redirects on to Fleet Hub / account after sign-in, and
+  // the capture runs there. The devices/passkeys tabs are the ones we open right
+  // after a successful Connect, so they only capture when nothing is linked yet.
+  async function shouldAutoCapture() {
+    if (/(^|\.)auth\.uber\.com$/i.test(location.host)) return false;
+    if (/(^|\.)account\.uber\.com$/i.test(location.host) && /\/(devices|passkeys)/i.test(location.pathname)) {
+      try {
+        const { lastSync } = await api.storage.local.get(["lastSync"]);
+        return !lastSync;
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  shouldAutoCapture().then((yes) => {
+    if (yes) autoCapture();
+  });
 
   // The driver roster is pulled on demand from the dashboard via the background
   // worker (correct paginated POST to supplier getDrivers using the stored org),
@@ -96,32 +140,34 @@
   // Passive Fleet-API capture: inject.js (MAIN world) tees every supplier
   // /api/* + /graphql response the page loads and posts it here; we forward each
   // to Reidey's generic /supplier/capture so every Uber Fleet page the manager
-  // opens shows up in the admin Network feed. Runs on any injected Uber domain.
-  window.addEventListener("message", async (event) => {
-    if (event.source !== window || event.origin !== location.origin || event.data?.source !== "ridy-capture") return;
-    try {
-      await api.runtime.sendMessage({ type: "supplier_capture", kind: event.data.kind, url: event.data.url, payload: event.data.payload });
-    } catch {
-      /* extension reloaded or not paired — ignore */
-    }
-  });
+  // opens shows up in the admin Network feed. Only on the Fleet UI hosts (where
+  // inject.js tees); the background re-checks the host and the DSGVO allowlist.
+  if (onFleetUi) {
+    window.addEventListener("message", async (event) => {
+      if (event.source !== window || event.origin !== location.origin || event.data?.source !== "ridy-capture") return;
+      try {
+        await api.runtime.sendMessage({ type: "supplier_capture", kind: event.data.kind, url: event.data.url, payload: event.data.payload });
+      } catch {
+        /* extension reloaded or not paired — ignore */
+      }
+    });
 
-  // Stash a graphql request template (from inject.js) so the background worker can
-  // later REPLAY it on demand — refreshing earnings/timeline without reopening the
-  // Uber page. Just the request body + url, keyed by operationName.
-  window.addEventListener("message", async (event) => {
-    if (event.source !== window || event.origin !== location.origin || event.data?.source !== "ridy-graphql-template") return;
-    try {
-      await api.runtime.sendMessage({
-        type: "store_graphql_template",
-        operationName: event.data.operationName,
-        url: event.data.url,
-        body: event.data.body,
-      });
-    } catch {
-      /* extension reloaded or not paired — ignore */
-    }
-  });
+    // Stash a graphql request template (from inject.js) so the background worker can
+    // later REPLAY it on demand — refreshing earnings without reopening the Uber
+    // page. Just the request body, keyed by operationName; the background validates it.
+    window.addEventListener("message", async (event) => {
+      if (event.source !== window || event.origin !== location.origin || event.data?.source !== "ridy-graphql-template") return;
+      try {
+        await api.runtime.sendMessage({
+          type: "store_graphql_template",
+          operationName: event.data.operationName,
+          body: event.data.body,
+        });
+      } catch {
+        /* extension reloaded or not paired — ignore */
+      }
+    });
+  }
 
   // On vsdispatch.uber.com we do NOT open our own dispatch stream — that would
   // compete with Uber's own page for the same seq-numbered messages, so each
@@ -161,8 +207,9 @@
       if (out?.ok && Date.now() - offerToastAt > 4000) {
         offerToastAt = Date.now();
         toast(`Reidey: ${offers.length} Angebot(e) empfangen ✓`, true);
-      } else if (out && !out.ok) {
-        toast(`Reidey: ${out.reason || "Fehler"}`, false);
+      } else if (out && !out.ok && Date.now() - offerToastAt > 4000) {
+        offerToastAt = Date.now();
+        toast(FINAL_REASONS[out.reason] || `Reidey: ${out.reason || "Fehler"}`, false);
       }
     });
   }
@@ -205,9 +252,16 @@
     try {
       const btn = await waitForSignOutAllButton(25000);
       if (!btn) return report(false, "button_not_found");
+      const before = openDialogs();
       btn.click();
-      await confirmIfDialog(6000); // click the affirmative control if Uber asks
-      report(true, "clicked");
+      // Click the affirmative control if Uber asks — only in the dialog THIS click
+      // opened, never a consent/promo dialog that happened to be open already.
+      const confirmed = await confirmIfDialog(6000, before, EVICT_DIALOG_CONTEXT);
+      // Success means Uber acted: the confirmation was accepted, or the sign-out
+      // control went away (no confirmation step). Anything else is not a success.
+      const gone = await waitUntil(() => !findSignOutAllButton(), 8000);
+      if (confirmed || gone) report(true, confirmed ? "confirmed" : "button_gone");
+      else report(false, "not_confirmed");
     } catch (e) {
       report(false, e?.message || "evict_error");
     }
@@ -268,32 +322,58 @@
     });
   }
 
-  // If a confirmation dialog appears, click its affirmative control — but ONLY
-  // inside a real dialog element, never a stray page button, and never "Cancel".
-  function confirmIfDialog(timeoutMs) {
+  const DIALOG_SELECTOR = '[role="dialog"], [role="alertdialog"]';
+  // What the dialog we expect is about. A dialog that says none of this (cookie
+  // consent, promo, survey) is never touched.
+  // (Deliberately no "device"/"session": consent banners talk about both.)
+  const EVICT_DIALOG_CONTEXT = /(sign out|signout|log out|logout|abmelden|abgemeldet)/i;
+  const PASSKEY_DIALOG_CONTEXT = /(passkey|pass key|remove|entfernen|l[öo]schen)/i;
+
+  function openDialogs() {
+    return new Set(document.querySelectorAll(DIALOG_SELECTOR));
+  }
+
+  /** Resolve true once `predicate()` holds, or false after timeoutMs. */
+  function waitUntil(predicate, timeoutMs) {
     return new Promise((resolve) => {
-      const affirmative = /^(sign out|log out|logout|abmelden|confirm|best[äa]tigen|bestaetigen|continue|weiter|yes|ja|ok|delete|remove|l[öo]schen|entfernen)$/i;
-      const negative = /(cancel|abbrechen|zur[üu]ck|zurueck|nein|dismiss|schlie[ßs]en|schliessen)/i;
       const started = Date.now();
       const iv = setInterval(() => {
-        const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]');
-        if (dialog) {
-          for (const b of dialog.querySelectorAll('button, [role="button"]')) {
-            const label = (b.getAttribute("aria-label") || b.textContent || "").trim();
-            if (!label || negative.test(label.toLowerCase())) continue;
-            if (affirmative.test(label)) {
-              b.click();
-              clearInterval(iv);
-              return resolve();
-            }
-          }
+        let ok = false;
+        try {
+          ok = !!predicate();
+        } catch {
+          ok = false;
         }
-        if (Date.now() - started > timeoutMs) {
+        if (ok || Date.now() - started > timeoutMs) {
           clearInterval(iv);
-          resolve();
+          resolve(ok);
         }
       }, 500);
     });
+  }
+
+  // If a confirmation dialog appears, click its affirmative control — but ONLY
+  // inside a dialog that opened after our click (not in `before`) and that reads
+  // like the action we took, never a stray page button, and never "Cancel".
+  // Resolves true when a confirmation was clicked.
+  function confirmIfDialog(timeoutMs, before, context) {
+    const affirmative = /^(sign out|log out|logout|abmelden|confirm|best[äa]tigen|bestaetigen|continue|weiter|yes|ja|ok|delete|remove|l[öo]schen|entfernen)$/i;
+    const negative = /(cancel|abbrechen|zur[üu]ck|zurueck|nein|dismiss|schlie[ßs]en|schliessen)/i;
+    const tryConfirm = () => {
+      for (const dialog of document.querySelectorAll(DIALOG_SELECTOR)) {
+        if (before.has(dialog) || !context.test(dialog.textContent || "")) continue;
+        for (const b of dialog.querySelectorAll('button, [role="button"]')) {
+          const label = (b.getAttribute("aria-label") || b.textContent || "").trim();
+          if (!label || negative.test(label.toLowerCase())) continue;
+          if (affirmative.test(label)) {
+            b.click();
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+    return waitUntil(tryConfirm, timeoutMs);
   }
 
   // ── Remove a competitor's Linux/server passkey ──────────────────────────────
@@ -339,6 +419,11 @@
   // reliable detection instead of scraping the DOM. Returns [] on any failure so
   // the caller falls back to DOM scraping.
   async function listPasskeysViaApi() {
+    return (await fetchPasskeyNames()) ?? [];
+  }
+
+  /** Passkey names from the API, or null when the API could not be read. */
+  async function fetchPasskeyNames() {
     try {
       const res = await fetch("https://account.uber.com/api/getPasskeysInfo?localeCode=en", {
         method: "POST",
@@ -346,14 +431,25 @@
         headers: { accept: "*/*", "content-type": "application/json", "x-csrf-token": "x" },
         body: "{}",
       });
-      if (!res.ok) return [];
+      if (!res.ok) return null;
       const body = await res.json();
-      return (body?.data?.publicKeyCredentials || [])
-        .map((c) => (c?.passkeyInfo?.name || "").trim())
-        .filter(Boolean);
+      const list = body?.data?.publicKeyCredentials;
+      if (!Array.isArray(list)) return null;
+      return list.map((c) => (c?.passkeyInfo?.name || "").trim()).filter(Boolean);
     } catch {
-      return [];
+      return null;
     }
+  }
+
+  /** True once `name` no longer exists (API first, DOM when the API is unreadable). */
+  async function waitForPasskeyGone(name, timeoutMs) {
+    const started = Date.now();
+    while (Date.now() - started <= timeoutMs) {
+      await new Promise((r) => setTimeout(r, 1000));
+      const names = await fetchPasskeyNames();
+      if (names ? !names.includes(name) : !trashButtonForName(name)) return true;
+    }
+    return false;
   }
 
   // The trash button for the row whose visible name equals `name`. The DELETE is
@@ -372,13 +468,6 @@
         if (btn) return btn;
         row = row.parentElement;
       }
-    }
-    return null;
-  }
-
-  function findCompetitorPasskeyRow() {
-    for (const r of passkeyRows()) {
-      if (isCompetitorPasskey(r.name)) return r;
     }
     return null;
   }
@@ -419,13 +508,15 @@
     }
 
     const deleted = [];
+    const failed = [];
     try {
       await waitForPasskeyList(20000);
 
       // DETECT via the API (authoritative names); fall back to DOM scraping if it
       // fails. DELETE via the UI click (the endpoint is Arkose-gated — a one-time
       // challenge token the page mints when the real button is clicked, which we
-      // can't forge or replay from a background fetch).
+      // can't forge or replay from a background fetch). A name only counts as
+      // deleted once it is actually gone, never just because we clicked.
       const apiNames = await listPasskeysViaApi();
       const targets = apiNames.filter(isCompetitorPasskey);
 
@@ -433,25 +524,29 @@
         for (const name of targets.slice(0, 10)) {
           const btn = trashButtonForName(name);
           if (!btn) continue; // couldn't locate the row — skip (fail-safe)
+          const before = openDialogs();
           btn.click();
-          await confirmIfDialog(6000); // clicks Uber's "Remove" → Arkose runs transparently
-          deleted.push(name);
-          await new Promise((r) => setTimeout(r, 2000)); // let it delete + re-render
+          await confirmIfDialog(6000, before, PASSKEY_DIALOG_CONTEXT); // Uber's "Remove" → Arkose runs transparently
+          const gone = await waitForPasskeyGone(name, 6000);
+          (gone ? deleted : failed).push(name);
         }
       } else if (apiNames.length === 0) {
         // The API gave us nothing (network/format) — fall back to DOM detection.
+        const tried = new Set();
         for (let i = 0; i < 10; i++) {
-          const row = findCompetitorPasskeyRow();
+          const row = passkeyRows().find((r) => isCompetitorPasskey(r.name) && !tried.has(r.name));
           if (!row) break;
+          tried.add(row.name);
+          const before = openDialogs();
           row.button.click();
-          await confirmIfDialog(6000);
-          deleted.push(row.name);
-          await new Promise((r) => setTimeout(r, 2000));
+          await confirmIfDialog(6000, before, PASSKEY_DIALOG_CONTEXT);
+          const gone = await waitUntil(() => !passkeyRows().some((r) => r.name === row.name), 6000);
+          (gone ? deleted : failed).push(row.name);
         }
       }
     } catch {
       /* best-effort */
     }
-    api.runtime.sendMessage({ type: "passkeyResult", deleted }).catch(() => {});
+    api.runtime.sendMessage({ type: "passkeyResult", deleted, failed }).catch(() => {});
   }
 })();

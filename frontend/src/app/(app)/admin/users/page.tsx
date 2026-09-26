@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Users as UsersIcon, Trash2, Megaphone } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,10 @@ import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { listUsers, deleteUser, type PlatformUser } from "@/lib/api/admin";
 import { BroadcastModal } from "./broadcast-modal";
+import { Pager } from "@/components/ui/pager";
+import { apiErrorMessage } from "@/lib/api/error-message";
+
+const PAGE_SIZE = 50;
 
 const ROLE_TONE: Record<string, string> = {
   super_admin: "bg-primary text-primary-ink",
@@ -47,14 +51,27 @@ export default function UsersPage() {
   // Distinct roles present, for the multi-select filter chips.
   const availableRoles = useMemo(() => Array.from(new Set(users.map((u) => u.role))), [users]);
 
+  // Typing stays responsive: filtering runs on a deferred copy of the query.
+  const deferredQ = useDeferredValue(q);
   const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
+    const s = deferredQ.trim().toLowerCase();
     return users.filter((u) => {
       if (roles.size > 0 && !roles.has(u.role)) return false;
       if (!s) return true;
       return [u.name, u.email, u.phone, u.company].some((v) => (v ?? "").toLowerCase().includes(s));
     });
-  }, [users, q, roles]);
+  }, [users, deferredQ, roles]);
+
+  // Render one page at a time — the directory grows with every fleet and driver.
+  const [page, setPage] = useState(1);
+  const lastPage = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  useEffect(() => {
+    setPage(1);
+  }, [deferredQ, roles]);
+  const pageRows = useMemo(
+    () => filtered.slice((Math.min(page, lastPage) - 1) * PAGE_SIZE, Math.min(page, lastPage) * PAGE_SIZE),
+    [filtered, page, lastPage],
+  );
 
   function toggleSelected(key: string) {
     setSelected((prev) => {
@@ -65,13 +82,14 @@ export default function UsersPage() {
     });
   }
 
-  const allVisibleSelected = filtered.length > 0 && filtered.every((u) => selected.has(rowKey(u)));
+  // "Select all" covers the visible page; selections on other pages are kept.
+  const allVisibleSelected = pageRows.length > 0 && pageRows.every((u) => selected.has(rowKey(u)));
 
   function toggleSelectAll() {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (allVisibleSelected) filtered.forEach((u) => next.delete(rowKey(u)));
-      else filtered.forEach((u) => next.add(rowKey(u)));
+      if (allVisibleSelected) pageRows.forEach((u) => next.delete(rowKey(u)));
+      else pageRows.forEach((u) => next.add(rowKey(u)));
       return next;
     });
   }
@@ -93,7 +111,7 @@ export default function UsersPage() {
       toast.success(c("deleted"));
       await refetch();
     } catch (e) {
-      toast.error(c("deleteFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("deleteFailed"), { description: apiErrorMessage(e, t) });
     } finally {
       setBusy(false);
       setConfirmDel(null);
@@ -153,7 +171,7 @@ export default function UsersPage() {
                       type="checkbox"
                       checked={allVisibleSelected}
                       onChange={toggleSelectAll}
-                      aria-label="select all"
+                      aria-label={t("common.selectAll")}
                       className="h-4 w-4 cursor-pointer accent-primary"
                     />
                   </th>
@@ -166,14 +184,14 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {filtered.map((u) => (
+                {pageRows.map((u) => (
                   <tr key={rowKey(u)} className="hover:bg-surface-2">
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
                         checked={selected.has(rowKey(u))}
                         onChange={() => toggleSelected(rowKey(u))}
-                        aria-label={`select ${u.name}`}
+                        aria-label={u.name}
                         className="h-4 w-4 cursor-pointer accent-primary"
                       />
                     </td>
@@ -210,6 +228,7 @@ export default function UsersPage() {
             </table>
           </div>
         )}
+        <Pager className="border-t border-line p-3" page={Math.min(page, lastPage)} lastPage={lastPage} total={filtered.length} onPage={setPage} />
       </Card>
 
       <ConfirmModal

@@ -4,15 +4,12 @@
  *
  * Runs off the main thread and is what the browser wakes when a push arrives
  * while the dashboard is in the background (or closed). It uses the Firebase
- * *compat* CDN build because a service worker cannot consume ES modules from a
- * bundler — it must pull the SDK in via importScripts.
+ * *compat* build because a service worker cannot consume ES modules from a
+ * bundler — it must pull the SDK in via importScripts. The bundles are copied
+ * from node_modules into /firebase/ at build time (scripts/copy-firebase-sw.mjs)
+ * so they load same-origin: the site CSP only allows scripts from 'self'.
  */
-importScripts(
-  "https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js",
-);
-importScripts(
-  "https://www.gstatic.com/firebasejs/11.6.0/firebase-messaging-compat.js",
-);
+importScripts("/firebase/firebase-app-compat.js", "/firebase/firebase-messaging-compat.js");
 
 firebase.initializeApp({
   apiKey: "AIzaSyAD0V17Jn2RPhnCPQYC5S5x984Fxw75vrE",
@@ -43,7 +40,14 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   const href = (event.notification.data && event.notification.data.href) || "/";
-  const target = new URL(href, self.location.origin);
+  let target = new URL("/", self.location.origin);
+  try {
+    // Only ever open our own origin (never javascript:, data: or another site).
+    const candidate = new URL(href, self.location.origin);
+    if (candidate.origin === self.location.origin) target = candidate;
+  } catch {
+    /* malformed href — open the dashboard root */
+  }
 
   event.waitUntil(
     self.clients

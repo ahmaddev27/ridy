@@ -3,9 +3,9 @@
     "name": "Reidey",
     "slug": "reidey",
     "scheme": "reidey",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
@@ -16,19 +16,25 @@
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.developer.usernotifications.time-sensitive": true
       }
     },
     "android": {
       "package": "de.reidey.app",
-      "versionCode": 2,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#14161b"
       },
       "permissions": [
-        "POST_NOTIFICATIONS",
         "POST_NOTIFICATIONS"
+      ],
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ]
     },
     "plugins": [
@@ -70,9 +76,16 @@
           }
         }
       ],
-      "@react-native-firebase/app",
+      [
+        "@react-native-firebase/app",
+        {
+          "ios": {
+            "disableSPM": true
+          }
+        }
+      ],
       "@react-native-firebase/messaging",
-      "./plugins/withDisableFirebaseSPM.js"
+      "./plugins/withExpoOwnsFcm.js"
     ],
     "extra": {
       "apiUrl": "https://reidey.de",
@@ -83,10 +96,11 @@
       },
       "eas": {
         "projectId": "3a5c4d7f-5f4a-44b6-b3af-7c61f066d408"
-      }
+      },
+      "sentryDsn": "https://92105e781213e27f2d8026e2046d6cea@o4512028929294336.ingest.de.sentry.io/4512029017374800"
     },
     "runtimeVersion": {
-      "policy": "appVersion"
+      "policy": "fingerprint"
     },
     "updates": {
       "url": "https://u.expo.dev/3a5c4d7f-5f4a-44b6-b3af-7c61f066d408"

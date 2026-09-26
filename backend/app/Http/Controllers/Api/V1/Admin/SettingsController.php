@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Privacy\RetentionPolicy;
 use App\Http\Controllers\Controller;
 use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
 
@@ -51,6 +53,11 @@ class SettingsController extends Controller
             'app_min_ios' => Settings::get('app_min_ios'),
             'app_android_store_url' => Settings::get('app_android_store_url'),
             'app_ios_store_url' => Settings::get('app_ios_store_url'),
+
+            // Data-retention periods (DSGVO). null = disabled (keep forever) — the default.
+            'retention' => collect(RetentionPolicy::KEYS)
+                ->mapWithKeys(fn (string $key) => [$key => app(RetentionPolicy::class)->period($key)])
+                ->all(),
         ]]);
     }
 
@@ -82,6 +89,10 @@ class SettingsController extends Controller
             'app_min_ios' => ['nullable', 'string', 'max:20'],
             'app_android_store_url' => ['nullable', 'url', 'max:255'],
             'app_ios_store_url' => ['nullable', 'url', 'max:255'],
+            // Months (or days for *_days keys); null/0 disables the policy.
+            ...collect(RetentionPolicy::KEYS)->mapWithKeys(fn (string $key) => [
+                $key => ['nullable', 'integer', 'min:0', str_ends_with($key, '_days') ? 'max:3650' : 'max:120'],
+            ])->all(),
         ]);
 
         $map = [
@@ -90,6 +101,7 @@ class SettingsController extends Controller
             'pay_bank_holder', 'pay_bank_name', 'pay_bank_iban', 'pay_bank_bic', 'pay_bank_amount', 'pay_bank_note',
             'pay_cash_whatsapp', 'pay_cash_note',
             'app_min_android', 'app_min_ios', 'app_android_store_url', 'app_ios_store_url',
+            ...RetentionPolicy::KEYS,
         ];
         $values = [];
         foreach ($map as $key) {
@@ -112,6 +124,10 @@ class SettingsController extends Controller
         }
 
         Settings::setMany($values);
+
+        // Mail now leaves on the queue, and a worker applies the mail settings once at
+        // boot — signal the workers to restart so new SMTP/Resend credentials are used.
+        rescue(fn () => Artisan::call('queue:restart'), report: false);
 
         return $this->show();
     }

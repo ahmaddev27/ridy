@@ -7,7 +7,7 @@ use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\DriverMetric;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
-use Carbon\CarbonImmutable;
+use App\Support\EpochTime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -25,8 +25,9 @@ class DriverMetricController extends Controller
     {
         $data = $request->validate([
             'driver_uuid' => ['required', 'string'],
-            'period_start' => ['required', 'numeric'], // ms epoch
-            'period_end' => ['required', 'numeric'],
+            // ms epoch, from 2000 on (EpochTime rejects anything earlier)
+            'period_start' => ['required', 'numeric', 'min:946684800000'],
+            'period_end' => ['required', 'numeric', 'min:946684800000'],
             'earnings' => ['nullable', 'numeric'],
             'earnings_label' => ['nullable', 'string', 'max:16'],
             'trips' => ['nullable', 'integer'],
@@ -46,8 +47,9 @@ class DriverMetricController extends Controller
         $metric = DriverMetric::updateOrCreate(
             [
                 'driver_id' => $driver->id,
-                'period_start' => CarbonImmutable::createFromTimestampMs($data['period_start']),
-                'period_end' => CarbonImmutable::createFromTimestampMs($data['period_end']),
+                // Berlin wall-clock like every other column, not Carbon's UTC.
+                'period_start' => EpochTime::fromMs($data['period_start']),
+                'period_end' => EpochTime::fromMs($data['period_end']),
             ],
             [
                 'tenant_id' => $driver->tenant_id,

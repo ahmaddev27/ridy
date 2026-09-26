@@ -50,7 +50,13 @@ export default function LoginPage() {
       })
       .catch(() => {
         // Not signed in (401) — show the login form.
-        if (active) setCheckingSession(false);
+        if (!active) return;
+        setCheckingSession(false);
+        // Sent here by the app because the session ended or the company was
+        // suspended mid-session — say why instead of a silent bounce.
+        const reason = new URLSearchParams(window.location.search).get("reason");
+        if (reason === "expired") toast.info(t("login.sessionExpired"));
+        if (reason === "suspended") toast.warning(t("login.sessionSuspended"));
       });
     return () => {
       active = false;
@@ -100,7 +106,7 @@ export default function LoginPage() {
       const message =
         err instanceof ApiError && err.status === 422
           ? t("login.invalid")
-          : "API offline (:8090)?";
+          : apiErrorMessage(err, t);
       toast.error(t("login.failed"), { description: message });
       setSubmitting(false);
     }

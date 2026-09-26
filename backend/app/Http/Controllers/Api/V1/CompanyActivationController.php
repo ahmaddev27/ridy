@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Auth\PasswordCheck;
 use App\Domain\Billing\PaymentClaimService;
 use App\Domain\Billing\SubscriptionActivator;
 use App\Http\Controllers\Concerns\GeneratesOtp;
@@ -9,7 +10,6 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
@@ -41,7 +41,7 @@ class CompanyActivationController extends Controller
         ]);
 
         $user = User::where('email', $data['email'])->first();
-        if (! $user || ! Hash::check($data['password'], $user->password)) {
+        if (! PasswordCheck::matches($user?->password, $data['password'])) {
             throw ValidationException::withMessages(['email' => [__('auth.failed')]]);
         }
 
@@ -51,6 +51,11 @@ class CompanyActivationController extends Controller
         }
         if ($tenant->banned_at !== null) {
             return response()->json(['message' => 'account_suspended', 'reason' => 'banned'], 403);
+        }
+        // An admin-DISABLED company must not re-enable itself with a still-valid
+        // code (the activator always sets status=active). Only an admin undoes it.
+        if ($tenant->status !== 'active') {
+            return response()->json(['message' => 'account_suspended', 'reason' => 'disabled'], 403);
         }
 
         // Temporary lockout after too many wrong codes — keyed by email + IP so a
@@ -116,7 +121,7 @@ class CompanyActivationController extends Controller
         ]);
 
         $user = User::where('email', $data['email'])->first();
-        if (! $user || ! Hash::check($data['password'], $user->password)) {
+        if (! PasswordCheck::matches($user?->password, $data['password'])) {
             throw ValidationException::withMessages(['email' => [__('auth.failed')]]);
         }
 

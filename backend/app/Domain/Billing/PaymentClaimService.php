@@ -7,9 +7,11 @@ use App\Domain\Billing\Models\PaymentClaim;
 use App\Domain\Notifications\Notifier;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Models\User;
+use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
@@ -29,17 +31,20 @@ class PaymentClaimService
 
     /**
      * Open a pending claim for the company, or return the one already pending
-     * (idempotent). Race-safe: two concurrent submits yield a single claim. A
-     * newly opened claim notifies the super-admins so they can verify it.
+     * (idempotent). Race-safe: concurrent submits queue on a primary-key lock of
+     * the tenant row, so the second one sees the first one's claim. (Locking the
+     * empty pending-claim range instead took gap locks that deadlocked under
+     * InnoDB and 500'd the loser.) A newly opened claim notifies the super-admins.
      *
      * @return array{claim: PaymentClaim, created: bool}
      */
     public function open(Tenant $tenant): array
     {
         $result = DB::transaction(function () use ($tenant) {
+            Tenant::query()->whereKey($tenant->id)->lockForUpdate()->first();
+
             $existing = PaymentClaim::where('tenant_id', $tenant->id)
                 ->where('status', self::PENDING)
-                ->lockForUpdate()
                 ->first();
 
             if ($existing !== null) {
@@ -77,18 +82,37 @@ class PaymentClaimService
 
     /**
      * Confirm or reject a pending claim and email the company the outcome. A
-     * rejection carries the admin's reason. The email is best-effort — a mail
-     * failure never blocks resolving the claim.
+     * rejection carries the admin's reason.
+     *
+     * The claim is taken with a conditional update (pending → resolved), so of two
+     * concurrent confirms (two admins, a double-click) exactly one wins; the loser
+     * gets `claim_already_resolved` and issues nothing. `$issueCode` (confirm only)
+     * runs in the same transaction, so a failed issue leaves the claim pending.
+     * The email is best-effort and sent only after the commit.
+     *
+     * @param  (Closure(): string)|null  $issueCode  mints the activation code to email
+     *
+     * @throws ValidationException claim_already_resolved
      */
-    public function resolve(PaymentClaim $claim, bool $confirmed, ?string $reason, User $admin, ?string $activationCode = null): PaymentClaim
+    public function resolve(PaymentClaim $claim, bool $confirmed, ?string $reason, User $admin, ?Closure $issueCode = null): PaymentClaim
     {
-        $claim->forceFill([
-            'status' => $confirmed ? self::CONFIRMED : self::REJECTED,
-            'reason' => $reason,
-            'resolved_at' => now(),
-            'resolved_by' => $admin->id,
-        ])->save();
+        $activationCode = DB::transaction(function () use ($claim, $confirmed, $reason, $admin, $issueCode) {
+            $won = PaymentClaim::whereKey($claim->id)
+                ->where('status', self::PENDING)
+                ->update([
+                    'status' => $confirmed ? self::CONFIRMED : self::REJECTED,
+                    'reason' => $reason,
+                    'resolved_at' => now(),
+                    'resolved_by' => $admin->id,
+                ]);
+            if ($won === 0) {
+                throw ValidationException::withMessages(['status' => 'claim_already_resolved']);
+            }
 
+            return $confirmed && $issueCode !== null ? $issueCode() : null;
+        });
+
+        $claim->refresh();
         $this->emailOutcome($claim, $confirmed, $reason, $activationCode);
 
         return $claim;

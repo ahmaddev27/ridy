@@ -22,6 +22,15 @@ class BackfillWaypointLabels implements ShouldQueue
 
     public int $backoff = 15;
 
+    /** Hard stop below the worker's 60 s timeout. */
+    public int $timeout = 45;
+
+    /** Points per job — each is a reverse geocode of up to 5 s. */
+    public const MAX_POINTS = 8;
+
+    /** Stop starting new lookups after this long, so the job ends before $timeout. */
+    private const BUDGET_SECONDS = 35;
+
     /**
      * @param  array<int, array{0: float, 1: float}>  $points  [lat, lng] pairs
      */
@@ -29,7 +38,12 @@ class BackfillWaypointLabels implements ShouldQueue
 
     public function handle(TripGeocoder $geocoder): void
     {
-        foreach ($this->points as $point) {
+        $deadline = microtime(true) + self::BUDGET_SECONDS;
+
+        foreach (array_slice($this->points, 0, self::MAX_POINTS) as $point) {
+            if (microtime(true) >= $deadline) {
+                break; // the rest stay uncached; a later map poll re-enqueues them
+            }
             // reverse() caches the resolved label in geocode_cache; the next map
             // poll picks it up via the batch cache lookup. A transient failure just
             // leaves it uncached for a later attempt.

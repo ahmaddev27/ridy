@@ -9,10 +9,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn, latnLocale } from "@/lib/utils";
 import { notifContent } from "@/lib/notif-content";
-import { useAsync } from "@/hooks/use-async";
+import { useAppFeeds } from "@/components/layout/app-feeds";
 import { useI18n } from "@/lib/i18n/context";
 import {
-  listNotifications,
   markAllNotificationsRead,
   deleteNotification,
   clearNotifications,
@@ -20,7 +19,8 @@ import {
 
 export default function NotificationsPage() {
   const { t, locale } = useI18n();
-  const { data, loading, error, refetch } = useAsync(listNotifications, { refetchInterval: 15000 });
+  // Shares the app shell's single notifications poller (the bell uses the same feed).
+  const { notifications: data, notificationsLoading: loading, notificationsError: error, refetchNotifications: refetch } = useAppFeeds();
   const items = data?.items ?? [];
   const unread = data?.unread ?? 0;
 
@@ -76,7 +76,7 @@ export default function NotificationsPage() {
               <div key={i} className="h-12 animate-pulse rounded bg-surface-2" />
             ))}
           </div>
-        ) : error ? (
+        ) : error && !data ? (
           <div className="p-6 text-sm text-danger-fg">{t("screens.notifications.loadError")} {error}</div>
         ) : items.length === 0 ? (
           <EmptyState

@@ -259,17 +259,19 @@ export default function AdminDriversPage() {
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
+            aria-label={t("common.previousPage")}
             className="rounded-lg border border-line p-2 text-ink-muted transition hover:bg-surface-2 disabled:opacity-40"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
           </button>
           <span className="text-sm text-ink-muted">{c("pageOf").replace("{p}", String(page)).replace("{t}", String(lastPage))}</span>
           <button
             onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
             disabled={page >= lastPage}
+            aria-label={t("common.nextPage")}
             className="rounded-lg border border-line p-2 text-ink-muted transition hover:bg-surface-2 disabled:opacity-40"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4 rtl:rotate-180" />
           </button>
         </div>
       )}

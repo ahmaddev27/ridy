@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { latnLocale } from "@/lib/utils";
 import { toast } from "sonner";
 import { Wallet, Clock, Download, ReceiptText, CheckCircle2, Loader2, AlertCircle, Package, Plus, Pencil, Trash2, FileText } from "lucide-react";
@@ -8,6 +8,7 @@ import { Card, StatCard } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pager } from "@/components/ui/pager";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Select } from "@/components/ui/select";
@@ -32,6 +33,7 @@ import {
   type Plan,
 } from "@/lib/api/admin";
 import { downloadInvoicePdf } from "@/lib/api/invoice-template";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 export default function ReportsPage() {
   const { t, locale } = useI18n();
@@ -58,19 +60,34 @@ export default function ReportsPage() {
     expired: "error",
   };
 
+  // Paged: older (incl. unpaid, still-to-settle) invoices stay reachable.
+  const [invoicePage, setInvoicePage] = useState(1);
+  const [invoiceMeta, setInvoiceMeta] = useState<{ last_page: number; total: number } | null>(null);
+  const [invoicesLoaded, setInvoicesLoaded] = useState(false);
+  const invoiceSeq = useRef(0);
+
   async function loadInvoices() {
+    const my = ++invoiceSeq.current;
     try {
-      const r = await listSubscriptionInvoices(tenantId);
+      const r = await listSubscriptionInvoices({ tenantId, page: invoicePage, perPage: 50 });
+      if (my !== invoiceSeq.current) return;
       setInvoices(r.data);
+      setInvoiceMeta({ last_page: r.meta.last_page, total: r.meta.total });
     } catch {
-      setInvoices([]);
+      if (my === invoiceSeq.current) setInvoices([]);
+    } finally {
+      if (my === invoiceSeq.current) setInvoicesLoaded(true);
     }
   }
 
   useEffect(() => {
+    setInvoicePage(1);
+  }, [tenantId]);
+
+  useEffect(() => {
     loadInvoices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId]);
+  }, [tenantId, invoicePage]);
 
   const money = (n: number) => new Intl.NumberFormat(latnLocale(locale), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
   const maxRevenue = Math.max(1, ...(summary?.revenue_by_month.map((r) => r.total) ?? [0]));
@@ -83,7 +100,7 @@ export default function ReportsPage() {
       toast.success(c("planDeleted"));
       await refetchPlans();
     } catch (e) {
-      toast.error(c("failed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("failed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setPlanBusy(false);
       setDeletingPlan(null);
@@ -94,7 +111,7 @@ export default function ReportsPage() {
     try {
       await downloadInvoicePdf(invoiceId);
     } catch (e) {
-      toast.error(c("pdfFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("pdfFailed"), { description: apiErrorMessage(e, t, locale) });
     }
   }
 
@@ -108,7 +125,7 @@ export default function ReportsPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      toast.error(c("exportFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("exportFailed"), { description: apiErrorMessage(e, t, locale) });
     }
   }
 
@@ -226,7 +243,13 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {invoices.length === 0 ? (
+        {!invoicesLoaded ? (
+          <div className="space-y-2 p-4">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-10 animate-pulse rounded bg-surface-2" />
+            ))}
+          </div>
+        ) : invoices.length === 0 ? (
           <EmptyState icon={ReceiptText} title={c("invoicesEmpty")} />
         ) : (
           <div className="overflow-x-auto">
@@ -305,6 +328,15 @@ export default function ReportsPage() {
             </table>
           </div>
         )}
+        {invoiceMeta && (
+          <Pager
+            className="border-t border-line p-3"
+            page={invoicePage}
+            lastPage={invoiceMeta.last_page}
+            total={invoiceMeta.total}
+            onPage={setInvoicePage}
+          />
+        )}
       </Card>
 
       {settling && (
@@ -362,7 +394,7 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | null; onClose: () 
       onSaved();
       onClose();
     } catch (e) {
-      toast.error(c("failed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("failed"), { description: apiErrorMessage(e, t) });
     } finally {
       setBusy(false);
     }
@@ -440,7 +472,7 @@ function SettleModal({
       await onSettled();
       onClose();
     } catch (e) {
-      toast.error(c("settleFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("settleFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }

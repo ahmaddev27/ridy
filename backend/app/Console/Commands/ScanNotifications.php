@@ -46,15 +46,32 @@ class ScanNotifications extends Command
         // period + paid renewals) so a renewed proxy doesn't warn falsely. Pass `days`
         // too: the push text ("{label} expires in {days} days") interpolates it —
         // without it the token rendered a literal "{days}". Same source as the overview.
+        // Bounded below: an expired proxy is announced once more on the day after
+        // expiry — and only while a usable company still sits on it — instead of
+        // every morning forever. Dedupe is per proxy, so one unread notice can't
+        // hide another proxy's.
         Proxy::query()->with('renewals')->get()
-            ->filter(fn (Proxy $p) => ($d = $p->daysLeft($now)) !== null && $d <= self::PROXY_WARN_DAYS)
+            ->filter(fn (Proxy $p) => $this->shouldWarnAboutProxy($p, $p->daysLeft($now)))
             ->each(fn (Proxy $p) => $notifier->toAdmins('proxy_expiring', [
                 'label' => $p->label,
                 'days' => max(0, (int) $p->daysLeft($now)),
-            ], '/admin/proxies', dedupe: true));
+                'proxy_id' => $p->id,
+            ], '/admin/proxies', dedupe: true, dedupeParam: 'proxy_id'));
 
         $this->info('Notification scan complete.');
 
         return self::SUCCESS;
+    }
+
+    private function shouldWarnAboutProxy(Proxy $proxy, ?int $daysLeft): bool
+    {
+        if ($daysLeft === null || $daysLeft > self::PROXY_WARN_DAYS) {
+            return false;
+        }
+        if ($daysLeft >= 0) {
+            return true;
+        }
+
+        return $daysLeft === -1 && Tenant::query()->usable()->where('proxy_id', $proxy->id)->exists();
     }
 }

@@ -25,54 +25,75 @@ class BackfillAddresses extends Command
 
     public function handle(TripGeocoder $geo): int
     {
-        $offers = DispatchOffer::withoutGlobalScopes()
+        // Deferred join: pick the newest ids off the primary key (id order tracks
+        // received_at closely), then load only those rows, without raw_payload.
+        // Sorting full rows by received_at with no supporting index is the query
+        // shape behind the 'Out of sort memory' (1038) incidents.
+        $ids = DispatchOffer::withoutGlobalScopes()
             ->whereNotNull('dropoff_lat')
-            ->latest('received_at')
+            ->orderByDesc('id')
             ->limit((int) $this->option('limit'))
-            ->get();
+            ->pluck('id');
 
         $fixed = 0;
-        foreach ($offers as $offer) {
-            $changed = false;
+        $seen = 0;
+        foreach ($ids->chunk(200) as $chunk) {
+            $offers = DispatchOffer::withoutGlobalScopes()
+                ->whereIntegerInRaw('id', $chunk->all())
+                ->select(['id', 'tenant_id', 'pickup_lat', 'pickup_lng', 'dropoff_lat', 'dropoff_lng', 'pickup_display', 'dropoff_display', 'stops'])
+                ->get();
 
-            if ($offer->pickup_lat !== null && $offer->pickup_lng !== null && $this->needsUpgrade($offer->pickup_display)) {
-                $label = $geo->reverse((float) $offer->pickup_lat, (float) $offer->pickup_lng);
-                if ($this->usable($label)) {
-                    $offer->pickup_display = $label;
-                    $changed = true;
+            foreach ($offers as $offer) {
+                $seen++;
+                if ($this->upgrade($offer, $geo)) {
+                    $fixed++;
                 }
-            }
-
-            if ($offer->dropoff_lat !== null && $offer->dropoff_lng !== null && $this->needsUpgrade($offer->dropoff_display)) {
-                $label = $geo->reverse((float) $offer->dropoff_lat, (float) $offer->dropoff_lng);
-                if ($this->usable($label)) {
-                    $offer->dropoff_display = $label;
-                    $changed = true;
-                }
-            }
-
-            // Keep the itinerary's first/last stop labels in sync with the endpoints.
-            if ($changed && is_array($offer->stops) && count($offer->stops) >= 2) {
-                $stops = $offer->stops;
-                $last = count($stops) - 1;
-                if (isset($stops[0]['address']) && $offer->pickup_display) {
-                    $stops[0]['address'] = $offer->pickup_display;
-                }
-                if (isset($stops[$last]['address']) && $offer->dropoff_display) {
-                    $stops[$last]['address'] = $offer->dropoff_display;
-                }
-                $offer->stops = $stops;
-            }
-
-            if ($changed) {
-                $offer->save();
-                $fixed++;
             }
         }
 
-        $this->info("Backfilled {$fixed} of {$offers->count()} offer(s).");
+        $this->info("Backfilled {$fixed} of {$seen} offer(s).");
 
         return self::SUCCESS;
+    }
+
+    private function upgrade(DispatchOffer $offer, TripGeocoder $geo): bool
+    {
+        $changed = false;
+
+        if ($offer->pickup_lat !== null && $offer->pickup_lng !== null && $this->needsUpgrade($offer->pickup_display)) {
+            $label = $geo->reverse((float) $offer->pickup_lat, (float) $offer->pickup_lng);
+            if ($this->usable($label)) {
+                $offer->pickup_display = $label;
+                $changed = true;
+            }
+        }
+
+        if ($offer->dropoff_lat !== null && $offer->dropoff_lng !== null && $this->needsUpgrade($offer->dropoff_display)) {
+            $label = $geo->reverse((float) $offer->dropoff_lat, (float) $offer->dropoff_lng);
+            if ($this->usable($label)) {
+                $offer->dropoff_display = $label;
+                $changed = true;
+            }
+        }
+
+        // Keep the itinerary's first/last stop labels in sync with the endpoints.
+        if ($changed && is_array($offer->stops) && count($offer->stops) >= 2) {
+            $stops = $offer->stops;
+            $last = count($stops) - 1;
+            if (isset($stops[0]['address']) && $offer->pickup_display) {
+                $stops[0]['address'] = $offer->pickup_display;
+            }
+            if (isset($stops[$last]['address']) && $offer->dropoff_display) {
+                $stops[$last]['address'] = $offer->dropoff_display;
+            }
+            $offer->stops = $stops;
+        }
+
+        if ($changed) {
+            $offer->save();
+        }
+
+        return $changed;
     }
 
     /** A display that needs a real street: empty, non-Latin, or bare "PLZ City". */

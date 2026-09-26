@@ -5,6 +5,8 @@ namespace App\Support;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * The fleet/business day follows Uber: it starts at 04:00 in the app timezone
@@ -39,12 +41,45 @@ final class FleetDay
         return self::start()->subDays($days);
     }
 
-    /** Start (04:00) of the fleet-day labelled by a calendar date (Y-m-d or date). */
+    /**
+     * Start (04:00) of the fleet-day labelled by a calendar date (Y-m-d or date).
+     *
+     * Strings come straight from request filters (?from=/?to=), so they are parsed
+     * strictly: "Y-m-d" (optionally an ISO date-time) or a 422 — free text used to
+     * 500, and relative words ("tomorrow") were silently accepted. A value carrying
+     * an offset ("…Z") is moved to the app timezone first, so its 04:00 is Berlin's.
+     *
+     * @throws ValidationException on an unparseable string
+     */
     public static function startOfDate(CarbonInterface|string $date): CarbonImmutable
     {
-        $d = $date instanceof CarbonInterface ? CarbonImmutable::instance($date) : CarbonImmutable::parse($date);
+        $tz = (string) config('app.timezone');
+        $d = $date instanceof CarbonInterface
+            ? CarbonImmutable::instance($date)->setTimezone($tz)
+            : self::parseDateString($date, $tz);
 
         return $d->setTime(self::START_HOUR, 0);
+    }
+
+    private static function parseDateString(string $value, string $tz): CarbonImmutable
+    {
+        $value = trim($value);
+        $isoDate = '/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/';
+
+        try {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1) {
+                $parsed = CarbonImmutable::createFromFormat('!Y-m-d', $value, $tz);
+                if ($parsed !== false && $parsed->format('Y-m-d') === $value) {
+                    return $parsed;
+                }
+            } elseif (preg_match($isoDate, $value) === 1) {
+                return CarbonImmutable::parse($value, $tz)->setTimezone($tz);
+            }
+        } catch (Throwable) {
+            // fall through to the validation error
+        }
+
+        throw ValidationException::withMessages(['date' => 'The date must be in the format Y-m-d.']);
     }
 
     /** Exclusive end (the next 04:00) of the fleet-day labelled by a calendar date. */

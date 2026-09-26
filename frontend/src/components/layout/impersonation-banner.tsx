@@ -6,6 +6,7 @@ import { Loader2, UserCog } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { useAuth } from "@/components/auth/auth-provider";
 import { stopImpersonation } from "@/lib/api/admin";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 /**
  * Persistent, unmissable banner shown on every authenticated page while a
@@ -31,7 +32,7 @@ export function ImpersonationBanner() {
       await stopImpersonation();
       window.location.assign("/admin/companies");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : t("errors.generic"));
+      toast.error(apiErrorMessage(e, t));
       setBusy(false);
     }
   }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Audit\AuditLogger;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
@@ -24,7 +25,7 @@ class ImpersonationController extends Controller
     /** Session key holding the original super-admin id while impersonating. */
     public const KEY = 'impersonator_id';
 
-    public function start(Tenant $tenant, Request $request): JsonResponse
+    public function start(Tenant $tenant, Request $request, AuditLogger $audit): JsonResponse
     {
         // Prefer a real manager; fall back to any user bound to the tenant.
         $target = User::where('tenant_id', $tenant->id)
@@ -35,6 +36,9 @@ class ImpersonationController extends Controller
 
         abort_if($target === null, 422, 'This company has no user account to act as.');
         abort_unless($request->hasSession(), 419, 'A dashboard session is required to impersonate.');
+
+        // Logged under the company acted on, so its own audit screen shows it too.
+        $audit->log('impersonation.start', $tenant, ['target_user_id' => $target->id], $tenant->id);
 
         // Remember who started, then switch identity. migrate(true) inside the
         // guard keeps this key across the session-id regeneration.
@@ -49,7 +53,7 @@ class ImpersonationController extends Controller
         ]);
     }
 
-    public function stop(Request $request): JsonResponse
+    public function stop(Request $request, AuditLogger $audit): JsonResponse
     {
         abort_unless($request->hasSession(), 409, 'Not impersonating.');
 
@@ -58,6 +62,11 @@ class ImpersonationController extends Controller
 
         $original = User::find($originalId);
         abort_if($original === null, 409, 'Original account is gone.');
+
+        // Written while the impersonator id is still in the session, so the entry
+        // is attributed to the admin (as_user_id = the manager acted as).
+        $tenantId = $request->user()?->tenant_id;
+        $audit->log('impersonation.stop', null, [], $tenantId !== null ? (int) $tenantId : null);
 
         $request->session()->forget(self::KEY);
         Auth::guard('web')->login($original);

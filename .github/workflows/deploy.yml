@@ -1,24 +1,87 @@
 name: Deploy
 
-# Zero-touch deploy: a push to main provisions and updates the VPS entirely over
-# SSH — installs Docker if missing, clones the repo on first run, writes .env
-# from secrets, then builds + migrates. You never open the server manually.
+# Zero-touch deploy: once CI has passed on main, provision and update the VPS
+# entirely over SSH — installs Docker if missing, clones the repo on first run,
+# writes .env from secrets, then builds, migrates and swaps. You never open the
+# server manually.
+#
+# Gating: this runs only after the "CI" workflow finished SUCCESSFULLY for a push
+# to main, and deploys exactly the commit CI tested — but only while that commit
+# is still the head of main (two quick pushes whose CI runs finish out of order
+# must not put the older commit live). No run ever deploys a strict ancestor of
+# the live commit. `workflow_dispatch` (Actions → Deploy → Run workflow, on main)
+# is the manual escape hatch; it deploys the tip of main, and its `allow_older`
+# input is the only way to move production back to an older commit.
+#
+# Order (production keeps serving the previous release until step 4):
+#   1. build the new images from an exported copy of the target commit — the
+#      live checkout and running containers are untouched; a failed build ends
+#      the deploy with production exactly as it was
+#   2. in ONE-OFF containers of the NEW image running the NEW code (the staged
+#      tree): backup → migrate → first-run seed → build the bootstrap caches.
+#      The previous release keeps serving meanwhile, so migrations must stay
+#      additive (expand first, drop columns one release later)
+#   3. switch the checkout + copy in the prepared caches (a few milliseconds)
+#   4. recreate the app containers from the prebuilt images, then health-check
+#   If step 3/4 or the health check fails, the previous commit, its bootstrap
+#   caches and its images (tagged :rollback before the build) are restored and
+#   the app containers recreated from them. Migrations are NOT reversed.
+#
+# MySQL is never recreated or restarted by this workflow: it is only started
+# when it is not running. A change to the mysql service block or to
+# docker/mysql/reidey.cnf is a MANUAL step (see that file) in a quiet window.
 #
 # Required repo secrets (Settings -> Secrets and variables -> Actions):
 #   SSH_HOST                — server IP or hostname (e.g. reidey.de)
 #   SSH_USER                — deploy user (e.g. fleeteye)
 #   SSH_KEY                 — the PRIVATE SSH key (contents)
+#   SSH_HOST_FINGERPRINT    — optional host-key pin, so a DNS/network hijack cannot
+#                             collect the key and every secret below. ONLY the
+#                             `SHA256:...` token (not the "256 ... (ECDSA)" line) of
+#                             the host key the action's Go SSH client negotiates —
+#                             it prefers ECDSA over ED25519, so on stock Ubuntu /
+#                             AlmaLinux that is the ECDSA key. On the VPS:
+#                               ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key.pub | awk '{print $2}'
+#                             or from a trusted machine:
+#                               ssh-keyscan -t ecdsa <host> 2>/dev/null | ssh-keygen -lf - | awk '{print $2}'
+#                             No ECDSA host key → use the RSA key; ED25519 only if
+#                             it is the only host key. A wrong value fails every
+#                             deploy at the handshake ("fingerprint mismatch"), so
+#                             set it, then verify with one manual workflow_dispatch
+#                             run. Empty = not verified (the previous behaviour).
 #   REPO_URL                — git URL the server pulls from (https with token or ssh)
 #   DOMAIN                  — reidey.de
 #   APP_KEY                 — base64 app key (php artisan key:generate --show); or leave blank to auto-generate
 #   DB_PASSWORD, DB_ROOT_PASSWORD, DISPATCH_INGEST_SECRET  — strong random strings
+#   SUPERADMIN_PASSWORD     — >= 16 random chars. Used ONLY by the first-run seed on
+#                             a fresh box to create admin@reidey.app (the seed refuses
+#                             to run without it). Not written to .env.
+#   EXTENSION_ORIGIN        — optional: chrome-extension://<32-char Web Store id>
 #   FCM_CREDENTIALS_JSON    — the full Google service-account JSON (Firebase →
 #                             Project settings → Service accounts → Generate key).
 #                             Blank = pushes are only logged, never delivered.
 #   FCM_PROJECT_ID          — optional; defaults to the id inside the JSON
+#   NEXT_PUBLIC_MAP_TILE_URL, NEXT_PUBLIC_MAP_ATTRIBUTION — optional commercial /
+#                             self-hosted raster tiles for the dashboard maps
+#                             (empty = public OSM tiles). The tile origin is added
+#                             to the CSP connect-src automatically.
+#   CSP_EXTRA_CONNECT       — optional extra CSP connect-src origins, space-separated
+#                             (the tile origin and a non-sentry.io DSN host, e.g. a
+#                             self-hosted GlitchTip, are derived automatically).
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      allow_older:
+        description: "Allow deploying a commit OLDER than the live one (deliberate rollback; migrations are not reversed)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
 
 concurrency:
   group: production-deploy
@@ -28,9 +91,17 @@ jobs:
   deploy:
     name: Provision & deploy
     runs-on: ubuntu-latest
+    environment: production
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     steps:
       - name: Provision and deploy over SSH
-        uses: appleboy/ssh-action@v1.2.0
+        # Pinned to the v1.2.0 commit: this action receives the SSH key and every
+        # production secret, so a moved tag must not change what runs.
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
@@ -38,13 +109,82 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SSH_PORT }}
+          fingerprint: ${{ secrets.SSH_HOST_FINGERPRINT }}
           # Pass secrets as env so they never appear in the script text/logs.
-          envs: REPO_URL,DOMAIN,APP_KEY,DB_PASSWORD,DB_ROOT_PASSWORD,DISPATCH_INGEST_SECRET,FCM_CREDENTIALS_JSON,FCM_PROJECT_ID,NOMINATIM_URL,OSRM_URL,ALERT_EMAIL,OTP_TEST_CODE,SENTRY_LARAVEL_DSN,NEXT_PUBLIC_SENTRY_DSN,DAEMON_SENTRY_DSN
+          envs: DEPLOY_SHA,DEPLOY_EVENT,ALLOW_OLDER,REPO_URL,DOMAIN,APP_KEY,DB_PASSWORD,DB_ROOT_PASSWORD,DISPATCH_INGEST_SECRET,SUPERADMIN_PASSWORD,EXTENSION_ORIGIN,FCM_CREDENTIALS_JSON,FCM_PROJECT_ID,NOMINATIM_URL,OSRM_URL,ALERT_EMAIL,OTP_TEST_CODE,SENTRY_LARAVEL_DSN,NEXT_PUBLIC_SENTRY_DSN,DAEMON_SENTRY_DSN,NEXT_PUBLIC_MAP_TILE_URL,NEXT_PUBLIC_MAP_ATTRIBUTION,CSP_EXTRA_CONNECT
           script_stop: true
+          # The action's default is 10m; image builds + the pre-migrate backup
+          # can take longer, and a timeout mid-deploy is exactly what we avoid.
+          command_timeout: 45m
           script: |
             set -e
             APP_DIR="$HOME/ridy"
-            COMPOSE="docker compose -f docker-compose.prod.yml"
+            # Explicit project name = the directory name compose already derived
+            # (container names ridy-<svc>-1), so the staging tree below tags and
+            # runs the very images the live stack uses.
+            PROJECT="$(basename "$APP_DIR")"
+            COMPOSE="docker compose -p $PROJECT -f docker-compose.prod.yml"
+            BUILD_DIR="$APP_DIR/.build"
+            STATE_DIR="$APP_DIR/.deploy-state"
+            # The NEW release. Its compose file resolves ./backend to the exported
+            # tree, so a one-off `run` gets the new image AND the new code with the
+            # live .env, while the live checkout still holds the previous release.
+            STAGED="docker compose -p $PROJECT --env-file $APP_DIR/.env -f $BUILD_DIR/docker-compose.prod.yml"
+            # Long-running app services (caddy has no build). The daemon is handled
+            # separately so an app-only deploy never restarts its Uber streams.
+            APP_SERVICES="backend caddy frontend scheduler queue reverb"
+            BUILT_SERVICES="backend scheduler reverb queue frontend dispatch-daemon"
+            PHASE="prepare"
+            PREV_SHA=""
+
+            # --- Failure handling ---------------------------------------------
+            # prepare  : nothing live changed — production is untouched.
+            # migrated : the schema moved forward, the live code did not (so
+            #            migrations must stay additive: expand first, drop one
+            #            release later). Nothing to roll back.
+            # switched : the checkout / containers moved — roll code, bootstrap
+            #            caches and images back to the previous release and
+            #            recreate the app containers from them. Migrations that
+            #            already ran are NOT reversed.
+            rollback() {
+              echo "::error::rolling back to $PREV_SHA"
+              git reset --hard "$PREV_SHA" || true
+              if [ -d "$STATE_DIR/bootstrap-cache" ]; then
+                find backend/bootstrap/cache -maxdepth 1 -name '*.php' -delete || true
+                cp -a "$STATE_DIR/bootstrap-cache/." backend/bootstrap/cache/ || true
+              fi
+              if [ -f "$STATE_DIR/images" ]; then
+                while read -r svc name; do
+                  docker tag "$name:rollback" "$name" || true
+                done < "$STATE_DIR/images"
+              fi
+              docker ps -aq --filter "name=_ridy-" | xargs -r docker rm -f || true
+              $COMPOSE up -d --no-build --no-deps --force-recreate --renew-anon-volumes $APP_SERVICES || true
+              $COMPOSE up -d --no-build --no-deps dispatch-daemon || true
+              sleep 10
+              if curl -fsS --max-time 15 "https://$DOMAIN/api/v1/health" >/dev/null 2>&1; then
+                echo "::error::rolled back to $PREV_SHA and it answers. Migrations that already ran were NOT reversed — check: $COMPOSE exec backend php artisan migrate:status"
+              else
+                echo "::error::rolled back to $PREV_SHA but the health check still fails — inspect the server now."
+              fi
+            }
+            on_exit() {
+              rc=$?
+              cd "$APP_DIR" 2>/dev/null || true
+              rm -rf "$BUILD_DIR" "$BUILD_DIR.tar" 2>/dev/null || true
+              [ "$rc" -eq 0 ] && return 0
+              case "$PHASE" in
+                switched) rollback ;;
+                migrated)
+                  echo "::error::deploy failed after migrate, before the switch — the previous release is still live, on the migrated schema. Fix forward, or re-run Deploy."
+                  ;;
+                *)
+                  echo "::error::deploy failed before anything live changed — production is untouched."
+                  ;;
+              esac
+              return 0
+            }
+            trap on_exit EXIT
 
             # --- 1. Install Docker on first run -------------------------------
             # Runs as root, so no sudo. get.docker.com doesn't support AlmaLinux/
@@ -63,7 +203,7 @@ jobs:
               fi
             fi
 
-            # --- 2. Clone on first run, pull thereafter -----------------------
+            # --- 2. Clone on first run, fetch thereafter ----------------------
             if [ ! -d "$APP_DIR/.git" ]; then
               echo "Cloning repository..."
               git clone "$REPO_URL" "$APP_DIR"
@@ -75,7 +215,29 @@ jobs:
             # ("could not read Username for https://github.com").
             git remote set-url origin "$REPO_URL"
             git fetch origin main
-            git reset --hard origin/main
+            MAIN_SHA="$(git rev-parse --verify "origin/main^{commit}")"
+            # Deploy exactly the commit CI tested (DEPLOY_SHA); a manual run
+            # deploys the tip of main.
+            TARGET_SHA="$(git rev-parse --verify "${DEPLOY_SHA:-origin/main}^{commit}")"
+            PREV_SHA="$(git rev-parse HEAD)"
+            echo "Deploying $TARGET_SHA (live: $PREV_SHA, main: $MAIN_SHA)"
+
+            # Never move production backwards. CI runs for two quick pushes can
+            # finish out of order, and the older run must not replace the newer
+            # release (whose migrations would stay applied under older code).
+            #  - a CI-triggered run deploys only the current head of main; the
+            #    newer commit's own CI run deploys that one;
+            #  - no run deploys a strict ancestor of the live commit, unless a
+            #    manual run sets allow_older (a deliberate rollback).
+            if [ "$DEPLOY_EVENT" = "workflow_run" ] && [ "$TARGET_SHA" != "$MAIN_SHA" ]; then
+              echo "::notice::$TARGET_SHA is no longer the head of main ($MAIN_SHA) — skipping; the newer commit's run deploys it."
+              exit 0
+            fi
+            if [ "$TARGET_SHA" != "$PREV_SHA" ] && [ "$ALLOW_OLDER" != "true" ] \
+               && git merge-base --is-ancestor "$TARGET_SHA" "$PREV_SHA"; then
+              echo "::notice::$TARGET_SHA is older than the live commit $PREV_SHA — skipping (run Deploy manually with allow_older to roll back)."
+              exit 0
+            fi
 
             # --- 3. Write .env from secrets (idempotent) ----------------------
             # Persist a generated APP_KEY so it never rotates between deploys
@@ -97,12 +259,33 @@ jobs:
             # FCM HTTP v1: materialise the service-account JSON from the secret so
             # the backend container can read it (./backend is mounted at /var/www).
             # Empty secret -> no file -> FcmPushSender falls back to logging only.
+            # (.dockerignore keeps it out of every image.)
             FCM_CREDENTIALS_PATH=""
             if [ -n "$FCM_CREDENTIALS_JSON" ]; then
               mkdir -p "$APP_DIR/backend/storage/app"
               printf '%s' "$FCM_CREDENTIALS_JSON" > "$APP_DIR/backend/storage/app/fcm-credentials.json"
+              chmod 644 "$APP_DIR/backend/storage/app/fcm-credentials.json"
               FCM_CREDENTIALS_PATH="/var/www/storage/app/fcm-credentials.json"
             fi
+
+            # CSP connect-src extras (docker/Caddyfile): the browser must be allowed
+            # to reach a custom map-tile host and a DSN host outside sentry.io (e.g.
+            # a self-hosted GlitchTip), or the maps go blank / error reports vanish.
+            # url_origin prints scheme://host[:port]; a DSN's "key@" is dropped.
+            url_origin() {
+              printf '%s' "$1" | sed -n -E 's|^(https?)://([^/@]*@)?([^/?#]+).*|\1://\3|p'
+            }
+            CSP_EXTRA_CONNECT_VALUE="$CSP_EXTRA_CONNECT"
+            for u in "$NEXT_PUBLIC_MAP_TILE_URL" "$NEXT_PUBLIC_SENTRY_DSN"; do
+              # A {s} subdomain template becomes a CSP host wildcard.
+              origin="$(url_origin "$u" | sed -e 's/{s}/*/')"
+              case "$origin" in
+                ""|https://tile.openstreetmap.org|https://*.sentry.io) ;;
+                *) CSP_EXTRA_CONNECT_VALUE="$CSP_EXTRA_CONNECT_VALUE $origin" ;;
+              esac
+            done
+            # Only origin characters may reach the Caddyfile's quoted header value.
+            CSP_EXTRA_CONNECT_VALUE="$(printf '%s' "$CSP_EXTRA_CONNECT_VALUE" | tr '\t\r\n' '   ' | tr -cd 'A-Za-z0-9.:/*_ -' | tr -s ' ' | sed -e 's/^ *//' -e 's/ *$//')"
 
             # Write .env one safely-quoted line at a time. The old unquoted heredoc
             # (<<EOF, not <<'EOF') had to interpolate $DB_PASSWORD & friends — which also
@@ -130,6 +313,7 @@ jobs:
             env_line DB_PASSWORD "$DB_PASSWORD"
             env_line DB_ROOT_PASSWORD "$DB_ROOT_PASSWORD"
             env_line DISPATCH_INGEST_SECRET "$DISPATCH_INGEST_SECRET"
+            env_line EXTENSION_ORIGIN "$EXTENSION_ORIGIN"
             env_line FCM_CREDENTIALS "$FCM_CREDENTIALS_PATH"
             env_line FCM_PROJECT_ID "$FCM_PROJECT_ID"
             env_line ALERT_EMAIL "$ALERT_EMAIL"
@@ -139,138 +323,153 @@ jobs:
             env_line DAEMON_SENTRY_DSN "$DAEMON_SENTRY_DSN"
             env_line NOMINATIM_URL "$NOMINATIM_URL"
             env_line OSRM_URL "$OSRM_URL"
+            env_line NEXT_PUBLIC_MAP_TILE_URL "$NEXT_PUBLIC_MAP_TILE_URL"
+            env_line NEXT_PUBLIC_MAP_ATTRIBUTION "$NEXT_PUBLIC_MAP_ATTRIBUTION"
+            env_line CSP_EXTRA_CONNECT "$CSP_EXTRA_CONNECT_VALUE"
 
             # Every key must be present exactly once: a value that swallowed a newline
             # would otherwise silently shift the rest of the file into garbage.
-            for key in DOMAIN SITE_ADDRESS APP_KEY SESSION_SECURE_COOKIE SESSION_SAME_SITE REVERB_APP_ID REVERB_APP_KEY REVERB_APP_SECRET DB_DATABASE DB_USERNAME DB_PASSWORD DB_ROOT_PASSWORD DISPATCH_INGEST_SECRET FCM_CREDENTIALS FCM_PROJECT_ID ALERT_EMAIL OTP_TEST_CODE SENTRY_LARAVEL_DSN NEXT_PUBLIC_SENTRY_DSN DAEMON_SENTRY_DSN NOMINATIM_URL OSRM_URL; do
+            for key in DOMAIN SITE_ADDRESS APP_KEY SESSION_SECURE_COOKIE SESSION_SAME_SITE REVERB_APP_ID REVERB_APP_KEY REVERB_APP_SECRET DB_DATABASE DB_USERNAME DB_PASSWORD DB_ROOT_PASSWORD DISPATCH_INGEST_SECRET EXTENSION_ORIGIN FCM_CREDENTIALS FCM_PROJECT_ID ALERT_EMAIL OTP_TEST_CODE SENTRY_LARAVEL_DSN NEXT_PUBLIC_SENTRY_DSN DAEMON_SENTRY_DSN NOMINATIM_URL OSRM_URL NEXT_PUBLIC_MAP_TILE_URL NEXT_PUBLIC_MAP_ATTRIBUTION CSP_EXTRA_CONNECT; do
               count=$(grep -c "^$key=" .env || true)
               if [ "$count" != "1" ]; then
                 echo "::error::.env is malformed: $key appears $count time(s)"; exit 1
               fi
             done
 
-            # --- 4. Free the web ports + build + start ------------------------
             # AlmaLinux may ship Apache (httpd) which grabs port 80/443 and blocks
             # Caddy. Stop and mask it so it can never resurface.
             systemctl stop httpd 2>/dev/null || true
             systemctl disable httpd 2>/dev/null || true
             systemctl mask httpd 2>/dev/null || true
 
-            # Force-recreate the app services so they pick up the freshly written
-            # .env (domain/config). The dispatch-daemon is deliberately EXCLUDED
-            # and brought up separately without --force-recreate, so an app-only
-            # deploy does NOT restart it — its live Uber streams keep running and
-            # only blip when the daemon's own code/config actually changed. mysql
-            # is likewise left running (no needless DB restart).
-            # --renew-anon-volumes: the app services mount an ANONYMOUS volume at
-            # /var/www/vendor (to keep the ./backend bind-mount from hiding the image's
-            # vendor). Docker populates that volume from the image ONLY on first
-            # creation and then reuses it — so a freshly built image with a NEW
-            # dependency (e.g. laravel/reverb) was shadowed by the stale vendor volume,
-            # crash-looping queue/scheduler with "ReverbServiceProvider not found" on
-            # every deploy. Renewing the anon volumes refreshes vendor from the new
-            # image each deploy. (Named volumes like the DB are untouched.)
-            # Self-heal a prior INTERRUPTED --force-recreate: Compose renames the old
-            # container to "<hash>_ridy-<svc>-1" before replacing it; if a deploy died
-            # in between, the next recreate fails with "container name /ridy-<svc>-1 is
-            # already in use". Sweep any parked leftovers first (they carry a "_ridy-"
-            # infix; healthy containers are "ridy-..." with no leading hash).
-            docker ps -aq --filter "name=_ridy-" | xargs -r docker rm -f || true
-            $COMPOSE up -d --build --force-recreate --renew-anon-volumes --remove-orphans backend caddy frontend scheduler queue reverb
-            # Daemon: recreate only if its image/config changed (streams stay up otherwise).
-            $COMPOSE up -d --build dispatch-daemon
+            # --- 4. Remember the live images for a rollback -------------------
+            # Tag the image each running built service uses as <name>:rollback
+            # before the build moves the plain names to the new images (the tag
+            # also keeps `docker image prune` from deleting it).
+            rm -rf "$STATE_DIR"
+            mkdir -p "$STATE_DIR"
+            : > "$STATE_DIR/images"
+            for svc in $BUILT_SERVICES; do
+              cid="$($COMPOSE ps -q "$svc" 2>/dev/null | head -n1)"
+              [ -n "$cid" ] || continue
+              name="$(docker inspect --format '{{.Config.Image}}' "$cid")"
+              name="${name%%:*}"
+              docker tag "$(docker inspect --format '{{.Image}}' "$cid")" "$name:rollback"
+              echo "$svc $name" >> "$STATE_DIR/images"
+            done
 
-            # The repo is bind-mounted and owned by root, so make Laravel's
-            # writable dirs writable by php-fpm (www-data) — otherwise any log or
-            # cache write 500s the request.
-            $COMPOSE exec -T backend sh -c "chown -R www-data:www-data storage bootstrap/cache && chmod -R 775 storage bootstrap/cache" || true
+            # --- 5. Build the new images OUTSIDE the live tree ----------------
+            # The running containers bind-mount ./backend, so the live checkout is
+            # not touched until the switch. A failed build ends the deploy with
+            # production exactly as it was.
+            rm -rf "$BUILD_DIR" "$BUILD_DIR.tar"
+            mkdir -p "$BUILD_DIR"
+            git archive -o "$BUILD_DIR.tar" "$TARGET_SHA"
+            tar -xf "$BUILD_DIR.tar" -C "$BUILD_DIR"
+            rm -f "$BUILD_DIR.tar"
+            $STAGED build $BUILT_SERVICES
 
-            # --- 5. Wait for MySQL, then migrate ------------------------------
-            # Readiness and migration are SEPARATE concerns. The old loop ran
-            # `migrate --force 2>/dev/null` up to 30 times and could not tell "the
-            # database isn't up yet" from "this migration throws": it discarded the
-            # error, and once the attempts ran out the script simply carried on to
-            # config:cache and printed "Deploy complete". A broken migration shipped
-            # green with its failure text thrown away. Now readiness is polled with
-            # mysqladmin (the same probe as the service healthcheck), then migrate
-            # runs exactly ONCE, unredirected, with set -e free to fail the job.
+            # --- 6. Database: running, backed up, migrated by the NEW release --
+            # A deploy never recreates or restarts MySQL: `--no-recreate` only
+            # starts it when it is not running (first run, or after a crash). A
+            # change to its compose block or to docker/mysql/reidey.cnf is applied
+            # by the manual step documented in docker/mysql/reidey.cnf.
+            $COMPOSE up -d --no-recreate mysql
             echo "Waiting for the database..."
             db_ready=""
-            for i in $(seq 1 30); do
-              if $COMPOSE exec -T mysql mysqladmin ping -h localhost -p"$DB_ROOT_PASSWORD" --silent >/dev/null 2>&1; then
+            for i in $(seq 1 40); do
+              if $COMPOSE exec -T mysql mysqladmin ping -h localhost --silent >/dev/null 2>&1; then
                 db_ready=1
                 break
               fi
               sleep 3
             done
             if [ -z "$db_ready" ]; then
-              echo "::error::database never became reachable (90s) — aborting before migrate."
+              echo "::error::database never became reachable (120s) — aborting before migrate."
               exit 1
             fi
 
-            $COMPOSE exec -T backend php artisan migrate --force
+            # One-off containers of the NEW image on the NEW code (the staged tree),
+            # with the LIVE storage/ mounted so logs and the backup land where they
+            # always do. --no-deps: never touch mysql or any running container.
+            LIVE_STORAGE="$APP_DIR/backend/storage:/var/www/storage"
+            staged_root() {
+              $STAGED run --rm --no-deps -T -v "$LIVE_STORAGE" "$@"
+            }
+            # As www-data, so nothing they write (daily log files included) is root-owned.
+            staged() {
+              $STAGED run --rm --no-deps -T -u www-data -v "$LIVE_STORAGE" "$@"
+            }
+            # The live storage/ and the staged bootstrap/cache must be writable by
+            # www-data (php-fpm workers, queue, scheduler, reverb).
+            staged_root backend sh -c "chown -R www-data:www-data storage bootstrap/cache && chmod -R 775 storage bootstrap/cache"
 
-            # Seed the admin user only on the very first deploy.
+            # Safety copy before schema changes (non-fatal: the nightly backup
+            # exists too, and a flaky dump must not block every deploy).
+            staged backend php artisan db:backup || echo "::warning::pre-migrate backup failed — continuing with the nightly backup as the fallback"
+
+            # Runs exactly ONCE, unredirected, so a broken migration fails the job.
+            # The previous release keeps serving meanwhile, which is why migrations
+            # must stay additive (expand first, drop columns one release later).
+            PHASE="migrated"
+            staged backend php artisan migrate --force
+
+            # Seed on the very first deploy only. No "|| true": the seed refuses to
+            # create the super-admin without a strong SUPERADMIN_PASSWORD, and that
+            # must fail loudly instead of marking the box as seeded.
             if [ ! -f "$APP_DIR/.seeded" ]; then
-              $COMPOSE exec -T backend php artisan db:seed --force || true
+              staged -e SUPERADMIN_PASSWORD backend php artisan db:seed --force
               touch "$APP_DIR/.seeded"
             fi
 
-            # Clear ALL stale caches (config + routes + views + events), then
-            # re-cache config. Clearing routes is essential: a cached route file
-            # would keep serving the old middleware stack, so new route guards
-            # (e.g. fleet.connected) would silently not apply.
-            # Sync PHP deps into the bind-mounted code: the image installs vendor/,
-            # but the ./backend:/var/www mount shadows it with the host's copy, so a
-            # newly added package (e.g. Sentry) would be missing at runtime. Install
-            # against the live volume so vendor always matches composer.lock.
-            # Retry: a single transient failure here used to be swallowed by
-            # "|| true", leaving vendor/ stale (e.g. missing pusher-php-server,
-            # which the reverb broadcaster needs → "Class Pusher\Pusher not
-            # found" at runtime). Try a few times before giving up.
-            for i in 1 2 3; do
-              if $COMPOSE exec -T backend composer install --no-dev --optimize-autoloader --no-interaction; then break; fi
-              echo "composer install failed (attempt $i) — retrying in 20s..."; sleep 20
-            done
+            # The new release's bootstrap caches, built in the staged tree: clear
+            # stale caches (a cached route file would keep serving the old
+            # middleware stack), rebuild the package manifest (the image installs
+            # with --no-scripts, so a newly added provider must be discovered) and
+            # cache the config. Still before the switch.
+            staged backend sh -c "php artisan optimize:clear && php artisan package:discover && php artisan config:cache"
 
-            # These steps change RUNTIME behaviour, so they get the same
-            # retry-then-fail treatment composer install now has. A blanket "|| true"
-            # let a failed package:discover or config:cache leave the container running
-            # the PREVIOUS configuration while the deploy still reported success — the
-            # exact silent failure the composer retry was added to stop.
-            artisan_required() {
-              for i in 1 2 3; do
-                if $COMPOSE exec -T backend php artisan "$@"; then return 0; fi
-                echo "artisan $* failed (attempt $i) — retrying in 10s..."
-                sleep 10
-              done
-              echo "::error::artisan $* failed three times — aborting the deploy."
-              return 1
-            }
+            # --- 7. Switch: code + caches, then recreate from the new images --
+            # From here on any failure (health check included) rolls back code,
+            # caches and images to the previous release.
+            PHASE="switched"
+            cp -a backend/bootstrap/cache "$STATE_DIR/bootstrap-cache"
+            git reset --hard "$TARGET_SHA"
+            find backend/bootstrap/cache -maxdepth 1 -name '*.php' -delete
+            cp -a "$BUILD_DIR/backend/bootstrap/cache/." backend/bootstrap/cache/
 
-            artisan_required optimize:clear
+            # Force-recreate the app services so they pick up the freshly written
+            # .env. --no-deps: mysql is never recreated as a "changed dependency".
+            # The dispatch-daemon is deliberately EXCLUDED and brought up separately
+            # without --force-recreate, so an app-only deploy does NOT restart it —
+            # its live Uber streams keep running and only blip when the daemon's
+            # own image/config actually changed.
+            # --renew-anon-volumes: the app services mount an ANONYMOUS volume at
+            # /var/www/vendor (to keep the ./backend bind-mount from hiding the
+            # image's vendor). Docker populates it from the image only on first
+            # creation, so renewing it each deploy is what refreshes vendor/ from
+            # the new image (the image's composer install is the source of truth).
+            # Self-heal a prior INTERRUPTED --force-recreate: Compose renames the old
+            # container to "<hash>_ridy-<svc>-1" before replacing it; if a deploy died
+            # in between, the next recreate fails with "container name /ridy-<svc>-1 is
+            # already in use". Sweep any parked leftovers first.
+            docker ps -aq --filter "name=_ridy-" | xargs -r docker rm -f || true
+            $COMPOSE up -d --no-build --no-deps --force-recreate --renew-anon-volumes --remove-orphans $APP_SERVICES
+            $COMPOSE up -d --no-build --no-deps dispatch-daemon
+
             # Link public/storage so uploaded assets (invoice + email logos on the
-            # public disk) are actually served at {APP_URL}/storage/... — without
-            # this the logo URL 404s and images never render in the PDF or preview.
+            # public disk) are served at {APP_URL}/storage/... Needs root (public/).
             # Non-fatal: it legitimately fails when the link already exists.
             $COMPOSE exec -T backend php artisan storage:link || echo "::warning::storage:link failed (already linked?) — continuing"
-            # Rebuild the package-discovery manifest: the image installs deps with
-            # --no-scripts (so post-autoload-dump never runs discover), and
-            # bootstrap/cache is bind-mounted, so a stale packages.php would keep a
-            # newly added provider (e.g. Sentry) from ever registering.
-            artisan_required package:discover
-            artisan_required config:cache
-
-            # Cap the Docker build cache so it can't slowly fill the disk (it grew
-            # to 80GB before). Keeps the most recent 5GB for fast rebuilds; drops
-            # the rest. Also sweep dangling images left by --build.
-            docker builder prune -f --keep-storage 5GB || true
-            docker image prune -f || true
+            # Belt and braces: anything the switch wrote as root becomes www-data's.
+            $COMPOSE exec -T backend sh -c "chown -R www-data:www-data storage bootstrap/cache" || true
 
             # "Deploy complete" must mean the app actually answers — otherwise a green
-            # run says nothing about whether the site came back up.
+            # run says nothing about whether the site came back up. A failure here
+            # rolls back to the previous release.
             echo "Checking https://$DOMAIN/api/v1/health ..."
-            for i in 1 2 3 4 5; do
+            health_ok=""
+            for i in 1 2 3 4 5 6 7 8; do
               if curl -fsS --max-time 15 "https://$DOMAIN/api/v1/health" >/dev/null; then
                 health_ok=1
                 break
@@ -282,15 +481,28 @@ jobs:
               echo "::error::health check failed at https://$DOMAIN/api/v1/health"
               exit 1
             fi
+            PHASE="done"
 
-            echo "Deploy complete: https://$DOMAIN"
+            # Cap the Docker build cache so it can't slowly fill the disk (it grew
+            # to 80GB before). Keeps the most recent 5GB for fast rebuilds; drops
+            # the rest. Also sweep dangling images left by the rebuild (the
+            # :rollback tags keep exactly one previous release).
+            docker builder prune -f --keep-storage 5GB || true
+            docker image prune -f || true
+
+            echo "Deploy complete: https://$DOMAIN ($TARGET_SHA)"
         env:
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          DEPLOY_EVENT: ${{ github.event_name }}
+          ALLOW_OLDER: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_older && 'true' || 'false' }}
           REPO_URL: ${{ secrets.REPO_URL }}
           DOMAIN: ${{ secrets.DOMAIN }}
           APP_KEY: ${{ secrets.APP_KEY }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD }}
           DISPATCH_INGEST_SECRET: ${{ secrets.DISPATCH_INGEST_SECRET }}
+          SUPERADMIN_PASSWORD: ${{ secrets.SUPERADMIN_PASSWORD }}
+          EXTENSION_ORIGIN: ${{ secrets.EXTENSION_ORIGIN }}
           FCM_CREDENTIALS_JSON: ${{ secrets.FCM_CREDENTIALS_JSON }}
           FCM_PROJECT_ID: ${{ secrets.FCM_PROJECT_ID }}
           NOMINATIM_URL: ${{ secrets.NOMINATIM_URL }}
@@ -300,3 +512,6 @@ jobs:
           SENTRY_LARAVEL_DSN: ${{ secrets.SENTRY_LARAVEL_DSN }}
           NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
           DAEMON_SENTRY_DSN: ${{ secrets.DAEMON_SENTRY_DSN }}
+          NEXT_PUBLIC_MAP_TILE_URL: ${{ secrets.NEXT_PUBLIC_MAP_TILE_URL }}
+          NEXT_PUBLIC_MAP_ATTRIBUTION: ${{ secrets.NEXT_PUBLIC_MAP_ATTRIBUTION }}
+          CSP_EXTRA_CONNECT: ${{ secrets.CSP_EXTRA_CONNECT }}

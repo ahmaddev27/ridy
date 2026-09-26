@@ -3,6 +3,7 @@
 namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Notifications\SafeBroadcast;
 use App\Events\OfferBroadcast;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -243,12 +244,6 @@ class OfferLifecycle
     }
 
     /**
-     * Mark every pending offer whose accept window has elapsed as rejected. Runs
-     * cheaply (indexed) — used both opportunistically and by the scheduled command.
-     *
-     * @return int rows expired
-     */
-    /**
      * A driver holds AT MOST ONE pending offer: when a newer offer arrives, any
      * still-pending older offer of theirs is superseded → rejected (idle or engaged
      * alike), so the list never shows two pending offers for one driver. If the
@@ -264,7 +259,10 @@ class OfferLifecycle
         $rows = DispatchOffer::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('driver_uuid', $driverUuid)
-            ->where('id', '!=', $keepOfferId)
+            // OLDER offers only (ids are assigned at insert, and ingest inserts before it
+            // supersedes): the supersede runs after the push, seconds later, so a slow
+            // ingest on another RAMEN channel must not reject the driver's NEWER offer.
+            ->where('id', '<', $keepOfferId)
             ->where('status', OfferStatus::Pending)
             ->get(['id', 'driver_id', 'tenant_id']);
 
@@ -328,6 +326,15 @@ class OfferLifecycle
         return $changed;
     }
 
+    /**
+     * Resolve stale PENDING offers by the driver's availability: hold an engaged
+     * driver's offer (bounded by the 2 h cap — it may be a back-to-back they take
+     * once free), and reject an idle driver's offer once its accept window plus
+     * grace has elapsed (they were free and passed on it). Used opportunistically by
+     * the status ingest and by the scheduled command.
+     *
+     * @return int rows expired
+     */
     public function expirePending(?int $tenantId = null): int
     {
         // Resolve a pending offer by the driver's availability, NOT by a blanket timer:
@@ -427,15 +434,19 @@ class OfferLifecycle
      */
     private function announce($rows): void
     {
+        // ONE event per driver, not per row: each broadcast is a synchronous HTTP
+        // call to Reverb and each event makes every open tab refetch, so a sweep
+        // touching N offers used to be N sequential calls and a refetch storm. The
+        // clients refetch the whole list on any event, so the latest id suffices.
+        $latestByDriver = [];
         foreach ($rows as $offer) {
-            if ($offer->driver_id === null) {
-                continue;
+            if ($offer->driver_id !== null) {
+                $latestByDriver[(int) $offer->driver_id] = $offer;
             }
+        }
 
-            rescue(
-                fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'status')),
-                report: false,
-            );
+        foreach ($latestByDriver as $driverId => $offer) {
+            SafeBroadcast::send(new OfferBroadcast($driverId, (int) $offer->tenant_id, (int) $offer->id, 'status'), ['offer_id' => (int) $offer->id]);
         }
     }
 
@@ -463,7 +474,7 @@ class OfferLifecycle
         // Real-time nudge so the driver's open app reflects the new status (taken /
         // on-trip / completed) instantly. Best-effort — never breaks the transition.
         if ($changed && $offer->driver_id !== null) {
-            rescue(fn () => broadcast(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'status')), report: false);
+            SafeBroadcast::send(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'status'), ['offer_id' => (int) $offer->id]);
         }
 
         return $changed;

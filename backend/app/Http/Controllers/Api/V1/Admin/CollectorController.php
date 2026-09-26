@@ -56,9 +56,15 @@ class CollectorController extends Controller
 
     public function destroy(Collector $collector): JsonResponse
     {
+        // A collector who received cash payments stays: those ledger rows are
+        // accounting records (the DB FK also restricts the delete).
+        if ($collector->payments()->exists()) {
+            return response()->json(['message' => 'collector_has_payments'], 422);
+        }
+
         // A collector and its reseller login are one entity — remove both. Issued
-        // codes survive (their collector_id is nulled by the FK), so the billing
-        // records are kept even though the seller attribution is dropped.
+        // codes survive (their collector_id is nulled by the FK) even though the
+        // seller attribution is dropped.
         $collector->user?->delete();
         $collector->delete();
 

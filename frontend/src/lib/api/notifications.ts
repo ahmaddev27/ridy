@@ -13,10 +13,9 @@ export type AppNotification = {
   created_at: string | null;
 };
 
-export async function listNotifications(): Promise<{
-  items: AppNotification[];
-  unread: number;
-}> {
+export type NotificationList = { items: AppNotification[]; unread: number };
+
+export async function listNotifications(): Promise<NotificationList> {
   const res = await apiFetch<{ data: AppNotification[]; meta: { unread: number } }>(
     "/api/v1/notifications",
   );

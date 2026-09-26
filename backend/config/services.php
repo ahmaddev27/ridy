@@ -22,6 +22,9 @@ return [
         // Shared secret the Node dispatch daemon uses to authenticate to the
         // internal ingest endpoint. Must be set for that endpoint to accept calls.
         'ingest_secret' => env('DISPATCH_INGEST_SECRET'),
+        // Optional source-IP allowlist (comma-separated IPs/CIDRs) for the
+        // internal dispatch API. Empty = any IP (secret only).
+        'allowed_ips' => array_filter(array_map('trim', explode(',', (string) env('DISPATCH_ALLOWED_IPS', '')))),
     ],
 
     'resend' => [
@@ -54,13 +57,6 @@ return [
     // real production deployment so codes are random.
     'otp_test_code' => env('OTP_TEST_CODE'),
 
-    'uber_auth' => [
-        // Node uber-auth service that drives the interactive Uber sign-in browser.
-        'url' => env('UBER_AUTH_URL', 'http://localhost:8791'),
-        'secret' => env('UBER_AUTH_SECRET'),
-        'timeout' => (int) env('UBER_AUTH_TIMEOUT', 60),
-    ],
-
     'fcm' => [
         // Path to the Google service-account JSON. When unset (or the file is
         // missing) pushes are logged instead of sent — see AppServiceProvider.
@@ -82,7 +78,8 @@ return [
     ],
 
     // Ops alerting: where operational alerts (broken session / down shard) are
-    // emailed. Empty = alerts are only logged (RidyLog), never mailed.
+    // emailed (queued). Every alert is also logged as 'ops.alert' on the default
+    // channel, so with this empty the log line is the record.
     'alerts' => [
         'email' => env('ALERT_EMAIL'),
     ],

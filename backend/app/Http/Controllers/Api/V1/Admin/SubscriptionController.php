@@ -6,6 +6,7 @@ use App\Domain\Billing\ActivationCodeIssuer;
 use App\Domain\Billing\Models\Plan;
 use App\Domain\Billing\Models\SubscriptionCode;
 use App\Domain\Billing\Models\SubscriptionPeriod;
+use App\Domain\Billing\SubscriptionActivator;
 use App\Domain\Notifications\Notifier;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\ProxyPool;
@@ -14,6 +15,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -74,6 +76,7 @@ class SubscriptionController extends Controller
             ? CarbonImmutable::parse($tenant->subscription_ends_at)
             : $now;
         $endsAt = $base->addDays($data['days']);
+        SubscriptionActivator::assertWithinMaxEnd($endsAt, 'days');
 
         $tenant->forceFill([
             'status' => 'active',
@@ -137,28 +140,27 @@ class SubscriptionController extends Controller
     }
 
     /**
-     * End a company's subscription now: cancel any queued (future) periods, close
-     * the running one at today, and expire the tenant so it is gated until a new
-     * code is entered. Past periods are kept for history/audit.
+     * End a company's subscription now: mark the running and any queued (future)
+     * periods canceled, and expire the tenant so it is gated until a new code is
+     * entered. Periods are issued, numbered invoices, so they are never deleted
+     * or rewritten (GoBD) — access is gated by `subscription_ends_at` alone.
      */
     public function endSubscription(Tenant $tenant, Notifier $notifier): JsonResponse
     {
         $now = CarbonImmutable::now();
 
-        SubscriptionPeriod::where('tenant_id', $tenant->id)
-            ->where('starts_at', '>', $now)
-            ->delete();
+        DB::transaction(function () use ($tenant, $now) {
+            SubscriptionPeriod::where('tenant_id', $tenant->id)
+                ->where('ends_at', '>', $now)
+                ->whereNull('canceled_at')
+                ->update(['canceled_at' => $now]);
 
-        SubscriptionPeriod::where('tenant_id', $tenant->id)
-            ->where('starts_at', '<=', $now)
-            ->where('ends_at', '>', $now)
-            ->update(['ends_at' => $now]);
-
-        $tenant->forceFill([
-            'subscription_ends_at' => $now,
-            'activation_code' => null,
-            'activation_code_expires_at' => null,
-        ])->save();
+            $tenant->forceFill([
+                'subscription_ends_at' => $now,
+                'activation_code' => null,
+                'activation_code_expires_at' => null,
+            ])->save();
+        });
 
         $notifier->toTenant($tenant->id, 'subscription_expired', [], '/subscription');
 

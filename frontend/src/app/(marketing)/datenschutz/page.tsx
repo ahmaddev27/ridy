@@ -10,7 +10,7 @@ export default function DatenschutzPage() {
       <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">
         Datenschutzerklärung
       </h1>
-      <p className="mt-3 text-sm text-ink-subtle">Stand: 18.08.2026</p>
+      <p className="mt-3 text-sm text-ink-subtle">Stand: 24.09.2026</p>
 
       <div className="mt-10 space-y-10 text-[15px] leading-relaxed text-ink-muted">
         <section>
@@ -88,11 +88,34 @@ export default function DatenschutzPage() {
             Daten verarbeiten wir im Auftrag des Flottenbetreibers (siehe Ziffer 2).
           </p>
 
+          <h3 className="mt-5 text-base font-semibold text-ink">Fahrgastdaten</h3>
+          <p className="mt-2">
+            Zu jedem Fahrtangebot, das Uber einem Fahrer der Flotte zustellt, erhalten wir über den
+            Flottenbetreiber den Vornamen des Fahrgasts, die Abhol- und Zieladresse(n) mit
+            Koordinaten, den Fahrpreis sowie Zeitstempel. Zweck: Anzeige des Angebots für den
+            Fahrer und den Flottenbetreiber (inklusive Distanz und Preis pro Kilometer) sowie
+            Auswertung des Flottenbetriebs. Diese Daten verarbeiten wir ausschließlich im Auftrag
+            des Flottenbetreibers (siehe Ziffer 2); wir kontaktieren Fahrgäste nicht.
+          </p>
+
+          <h3 className="mt-5 text-base font-semibold text-ink">
+            Uber-Sitzungsdaten des Flottenbetreibers
+          </h3>
+          <p className="mt-2">
+            Verbindet ein Flottenbetreiber sein Uber-Flottenkonto über die Reidey-Browsererweiterung,
+            übernehmen wir die dafür nötigen Sitzungsdaten (Sitzungs-Cookies des Uber-Flottenportals).
+            Sie werden verschlüsselt gespeichert und ausschließlich verwendet, um die Fahrtangebote
+            und den Fahrerstatus der eigenen Flotte zu empfangen. Reidey nimmt dabei keine Fahrten
+            an oder ab und steuert das Uber-Konto nicht.
+          </p>
+
           <h3 className="mt-5 text-base font-semibold text-ink">Nutzungs- und Technikdaten</h3>
           <p className="mt-2">
-            IP-Adresse, Session-Cookies, Geräteinformationen und Benachrichtigungs-Token. Zweck:
-            sicherer und stabiler Betrieb der Plattform, Anmeldung, Fehleranalyse sowie Erkennung
-            und Abwehr von Missbrauch.
+            IP-Adresse, Session-Cookies, Geräteinformationen und Benachrichtigungs-Token sowie im
+            Fehlerfall technische Fehlerberichte (Fehlermeldung, aufgerufene Seite ohne
+            Zugangs-Token oder Codes, Browser- bzw. Gerätetyp). Zweck: sicherer und stabiler
+            Betrieb der Plattform, Anmeldung, Fehleranalyse sowie Erkennung und Abwehr von
+            Missbrauch.
           </p>
         </section>
 
@@ -132,11 +155,41 @@ export default function DatenschutzPage() {
           </p>
           <ul className="mt-3 list-disc space-y-1.5 pl-5">
             <li>
-              Zustellung von Push-Benachrichtigungen über Google Firebase Cloud Messaging. Dabei
-              kann es zu einer Übermittlung von Geräte-Token an Google (auch in die USA) kommen.
-              Grundlage hierfür sind die EU-Standardvertragsklauseln nach Art. 46 DSGVO.
+              Push-Benachrichtigungen über Google Firebase Cloud Messaging (Google Ireland Ltd. /
+              Google LLC). Übermittelt werden der Geräte-Token und der Inhalt der Benachrichtigung —
+              bei Fahrtangeboten also Fahrpreis, Vorname des Fahrgasts sowie Abhol- und
+              Zieladresse. Dabei kann es zu einer Übermittlung in die USA kommen; Grundlage sind
+              das EU-US Data Privacy Framework bzw. die EU-Standardvertragsklauseln (Art. 45, 46
+              DSGVO).
             </li>
-            <li>Versand von E-Mails über einen spezialisierten Zustelldienstleister.</li>
+            <li>
+              Versand von E-Mails über einen spezialisierten Zustelldienstleister (je nach
+              Konfiguration ein SMTP-Anbieter oder Resend, Inc., USA; Grundlage:
+              Standardvertragsklauseln).
+            </li>
+            <li>
+              Fehlerüberwachung über Sentry (Functional Software, Inc.): Im Fehlerfall werden
+              technische Fehlerberichte übermittelt (siehe Ziffer 3). Zugangs-Token, Codes und
+              Cookies werden vor dem Versand entfernt; IP-Adressen werden nicht gespeichert.
+              Soweit dabei eine Übermittlung in die USA erfolgt, stützt sie sich auf die
+              EU-Standardvertragsklauseln.
+            </li>
+            <li>
+              Kartendarstellung im Dashboard: Kartenkacheln werden von den Servern der
+              OpenStreetMap Foundation (Vereinigtes Königreich) geladen. Dabei werden technisch
+              bedingt Ihre IP-Adresse und Browserdaten an diese übermittelt (Angemessenheitsbeschluss
+              der EU-Kommission für das Vereinigte Königreich).
+            </li>
+            <li>
+              Adressauflösung und Routenberechnung: Zur Bestimmung von Adressen und Fahrstrecken
+              können Koordinaten bzw. Adressen der Fahrtangebote — ohne Namen — an Geocoding- und
+              Routing-Dienste auf Basis von OpenStreetMap (Nominatim, OSRM) übermittelt werden.
+            </li>
+            <li>
+              Anbindung an Uber: Der Datenverkehr zum Uber-Flottenportal wird über Proxy-Server
+              eines Netzwerkdienstleisters geleitet; dabei laufen die Angebots- und Fahrerdaten der
+              jeweiligen Flotte verschlüsselt über dessen Infrastruktur.
+            </li>
           </ul>
           <p className="mt-3">
             Eine Weitergabe Ihrer Daten zu Werbe- oder Marketingzwecken findet nicht statt. Eine
@@ -230,7 +283,7 @@ export default function DatenschutzPage() {
           <p className="mt-3">
             Wir passen diese Datenschutzerklärung an, wenn sich die Rechtslage, unsere Dienste oder
             die Datenverarbeitung ändern. Es gilt jeweils die auf dieser Seite veröffentlichte
-            aktuelle Fassung. Stand dieser Erklärung: 18.08.2026. Bei Fragen zum Datenschutz erreichen
+            aktuelle Fassung. Stand dieser Erklärung: 24.09.2026. Bei Fragen zum Datenschutz erreichen
             Sie uns unter info@reidey.de.
           </p>
         </section>

@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\FleetSessionService;
+use App\Domain\Dispatch\Models\DaemonShard;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Dispatch\ShardService;
 use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Domain\Fleet\DriverStatusIngestor;
+use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\IngestDriverStatusesRequest;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -57,6 +60,10 @@ class DispatchDaemonController extends Controller
                 // Per-company residential proxy; daemon falls back to its global
                 // UBER_PROXY_URL when null.
                 'proxy_url' => $s->tenant?->getAttribute('proxy_url'),
+                // The cookie-jar generation this stream runs on. The daemon echoes it
+                // on cookie/relink/degraded reports so a stale stream's write is
+                // refused once a reconnect stored a newer jar (see staleJar()).
+                'jar_version' => (int) $s->jar_version,
             ])
             ->values();
 
@@ -76,18 +83,34 @@ class DispatchDaemonController extends Controller
     public function refreshCookies(Request $request, int $session, SupplierNetworkRecorder $recorder): JsonResponse
     {
         $data = $request->validate([
-            'cookies' => ['required', 'array', 'min:1'],
+            'cookies' => ['required', 'array', 'min:1', 'max:200'],
             'cookies.*.name' => ['required', 'string'],
             'cookies.*.value' => ['required', 'string'],
             'expires_at' => ['nullable', 'date'],
+            'jar_version' => ['nullable', 'integer'],
         ]);
 
-        $model = $this->find($session);
+        $model = $this->find($request, $session);
+        $version = $this->jarVersion($request);
+        if ($this->staleJar($model, $version)) {
+            return $this->staleJarResponse();
+        }
+
         $model->forceFill([
             'cookies' => $data['cookies'],
             'expires_at' => isset($data['expires_at']) ? CarbonImmutable::parse($data['expires_at']) : $model->expires_at,
             'last_event_at' => CarbonImmutable::now(),
-        ])->save();
+        ]);
+
+        // Check-and-write atomically: a reconnect landing between the check above
+        // and this write must still win.
+        $written = UberFleetSession::withoutGlobalScopes()
+            ->whereKey($model->getKey())
+            ->when($version !== null, fn ($q) => $q->where('jar_version', $version))
+            ->update($model->getDirty());
+        if ($written !== 1) {
+            return $this->staleJarResponse();
+        }
 
         // Log the event WITHOUT the cookie values (secrets) — count + expiry only.
         $recorder->session((int) $model->tenant_id, 'cookies_refreshed', [
@@ -103,20 +126,18 @@ class DispatchDaemonController extends Controller
      * the statuses here. Same effect as the manager's extension sync (updates
      * presence + marks offers accepted on an ON_TRIP transition) but runs 24/7.
      */
-    public function statuses(Request $request, int $session, DriverStatusIngestor $ingestor, SupplierNetworkRecorder $recorder): JsonResponse
+    public function statuses(IngestDriverStatusesRequest $request, int $session, DriverStatusIngestor $ingestor, SupplierNetworkRecorder $recorder, FleetSessionService $sessions): JsonResponse
     {
-        $data = $request->validate([
-            'statuses' => ['required', 'array'],
-            'statuses.*.driver_uuid' => ['required', 'string'],
-            'statuses.*.status' => ['nullable', 'string'],
-            'statuses.*.location_updated_at' => ['nullable', 'numeric'],
-            'statuses.*.latitude' => ['nullable', 'numeric'],
-            'statuses.*.longitude' => ['nullable', 'numeric'],
-            'statuses.*.heading' => ['nullable', 'numeric'],
-            'statuses.*.waypoints' => ['nullable', 'array'],
-        ]);
+        $data = $request->validated();
 
-        $tenantId = (int) $this->find($session)->tenant_id;
+        $model = $this->find($request, $session);
+        $tenantId = (int) $model->tenant_id;
+        // A Fleet Hub live-status read for this org succeeded with the stored
+        // cookies: the company's claim on the org is proven.
+        $sessions->markVerified($model);
+        // Mark the daemon as this company's status source first, so a concurrent
+        // (older) extension batch stands down — see DriverController::ingestStatuses.
+        DriverStatusIngestor::markDaemonFeeding($tenantId);
         $recorder->statuses($tenantId, $data['statuses']);
         $result = $ingestor->ingest($tenantId, $data['statuses']);
 
@@ -124,10 +145,17 @@ class DispatchDaemonController extends Controller
     }
 
     /** The daemon saw Uber reject the session; flag it for manager re-link. */
-    public function needsRelink(int $session, FleetSessionService $service): JsonResponse
+    public function needsRelink(Request $request, int $session, FleetSessionService $service): JsonResponse
     {
+        $model = $this->find($request, $session);
+        // A 401 on the jar a reconnect just REPLACED says nothing about the fresh
+        // one — flagging it would stop offers right after a successful Connect.
+        if ($this->staleJar($model, $this->jarVersion($request))) {
+            return $this->staleJarResponse();
+        }
+
         // markNeedsRelink records the 'needs_relink' event (tagged source=daemon).
-        $service->markNeedsRelink($this->find($session), 'daemon');
+        $service->markNeedsRelink($model, 'daemon');
 
         return response()->json(['data' => ['status' => UberFleetSession::STATUS_NEEDS_RELINK]]);
     }
@@ -138,17 +166,22 @@ class DispatchDaemonController extends Controller
      * flagging the session broken — flagging it would drop the still-working offer
      * stream. See FleetSessionService::notifySupplierDegraded.
      */
-    public function supplierDegraded(int $session, FleetSessionService $service): JsonResponse
+    public function supplierDegraded(Request $request, int $session, FleetSessionService $service): JsonResponse
     {
-        $service->notifySupplierDegraded($this->find($session), 'daemon');
+        $model = $this->find($request, $session);
+        if ($this->staleJar($model, $this->jarVersion($request))) {
+            return $this->staleJarResponse();
+        }
+
+        $service->notifySupplierDegraded($model, 'daemon');
 
         return response()->json(['data' => ['status' => 'degraded']]);
     }
 
     /** Liveness heartbeat — records that the stream is still delivering. */
-    public function heartbeat(int $session): JsonResponse
+    public function heartbeat(Request $request, int $session): JsonResponse
     {
-        $this->find($session)->forceFill(['last_event_at' => CarbonImmutable::now()])->save();
+        $this->find($request, $session)->forceFill(['last_event_at' => CarbonImmutable::now()])->save();
 
         return response()->json(['data' => ['status' => 'ok']]);
     }
@@ -157,19 +190,71 @@ class DispatchDaemonController extends Controller
      * The daemon fetched supplier /api/getDrivers for a session's org and forwards
      * the driver list here to be upserted into the roster.
      */
-    public function roster(Request $request, int $session, RosterSyncService $roster, SupplierNetworkRecorder $recorder): JsonResponse
+    public function roster(Request $request, int $session, RosterSyncService $roster, SupplierNetworkRecorder $recorder, FleetSessionService $sessions): JsonResponse
     {
-        $data = $request->validate(['drivers' => ['required', 'array']]);
+        $data = $request->validate([
+            'drivers' => ['required', 'array', 'max:'.RosterSyncService::MAX_DRIVERS],
+            'drivers.*' => ['array'],
+        ]);
 
-        $tenantId = (int) $this->find($session)->tenant_id;
+        $model = $this->find($request, $session);
+        $tenantId = (int) $model->tenant_id;
+        $sessions->markVerified($model);
+
+        // A session left on an org the company has since switched away from must
+        // not sync: its roster would mark the current org's drivers as removed.
+        $tenantOrg = Tenant::whereKey($tenantId)->value('uber_org_uuid');
+        if ($tenantOrg !== null && $tenantOrg !== $model->uber_org_uuid) {
+            return response()->json(['data' => ['synced' => 0, 'created' => 0, 'removed' => 0, 'skipped' => 'stale_org']]);
+        }
+
         $recorder->roster($tenantId, $data['drivers']);
         $result = $roster->sync($tenantId, $data['drivers']);
 
         return response()->json(['data' => $result]);
     }
 
-    private function find(int $id): UberFleetSession
+    /**
+     * The session, refused (409) when the calling daemon box is not the shard
+     * that owns it — a box that lost the company in a rebalance/failover must not
+     * keep writing to it. Callers without a shard header (single-box legacy) and
+     * unassigned sessions pass.
+     */
+    private function find(Request $request, int $id): UberFleetSession
     {
-        return UberFleetSession::withoutGlobalScopes()->findOrFail($id);
+        $session = UberFleetSession::withoutGlobalScopes()->findOrFail($id);
+
+        $shardName = (string) $request->header('X-Shard-Id', '');
+        if ($shardName !== '' && $session->shard_id !== null) {
+            $shardId = DaemonShard::where('name', $shardName)->value('id');
+            if ($shardId !== null && (int) $shardId !== (int) $session->shard_id) {
+                abort(response()->json(['message' => 'wrong_shard'], 409));
+            }
+        }
+
+        return $session;
+    }
+
+    /** The jar version the daemon's stream runs on (body or header); null from older daemons. */
+    private function jarVersion(Request $request): ?int
+    {
+        $version = $request->input('jar_version', $request->header('X-Jar-Version'));
+
+        return is_numeric($version) ? (int) $version : null;
+    }
+
+    /**
+     * Whether the report comes from a stream on an OLDER cookie jar than the one
+     * stored (a reconnect replaced it). Reports without a version (daemons that
+     * predate it) are accepted as before.
+     */
+    private function staleJar(UberFleetSession $session, ?int $version): bool
+    {
+        return $version !== null && $version !== (int) $session->jar_version;
+    }
+
+    private function staleJarResponse(): JsonResponse
+    {
+        return response()->json(['message' => 'stale_jar'], 409);
     }
 }

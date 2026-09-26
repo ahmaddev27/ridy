@@ -7,6 +7,7 @@ use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\FleetDayRange;
 use App\Http\Resources\DispatchOfferResource;
 use App\Models\User;
 use App\Support\FleetDay;
@@ -24,12 +25,26 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
  */
 class FleetController extends Controller
 {
+    /** Most online drivers named on the owner home (the count is always exact). */
+    private const ONLINE_LIST_LIMIT = 50;
+
     /** Tenant-wide home: today's summary, online drivers, active + recent offers. */
     public function home(Request $request): JsonResponse
     {
         $tenantId = $this->tenantId($request);
 
-        $online = Driver::withoutGlobalScopes()->where('tenant_id', $tenantId)->online()->count();
+        $onlineQuery = Driver::withoutGlobalScopes()->where('tenant_id', $tenantId)->online();
+        $online = (clone $onlineQuery)->count();
+
+        // WHO is online, not just how many — on-trip first, then heading to a pickup,
+        // then available. Capped so a very large fleet can't bloat the 4–5 s poll;
+        // `online_drivers` above stays the true total.
+        $onlineList = $onlineQuery
+            ->orderByDesc('engagement')->orderBy('name')->orderBy('id')
+            ->limit(self::ONLINE_LIST_LIMIT)
+            ->get(['id', 'name', 'engagement'])
+            ->map(fn (Driver $d) => ['id' => $d->id, 'name' => $d->name, 'engagement' => (int) $d->engagement])
+            ->values();
 
         $active = $this->scoped($tenantId)
             ->with('driver:id,name,online_status')
@@ -57,6 +72,7 @@ class FleetController extends Controller
                 'company_name' => $request->user()->loadMissing('tenant')->tenant?->name,
             ],
             'online_drivers' => $online,
+            'online_drivers_list' => $onlineList,
             'today' => $this->summary($tenantId, FleetDay::todayStart(), FleetDay::todayStart()->addDay()),
             'active_offers' => DispatchOfferResource::collection($active),
             'recent' => DispatchOfferResource::collection($recent),
@@ -106,13 +122,9 @@ class FleetController extends Controller
     public function stats(Request $request): JsonResponse
     {
         $tenantId = $this->tenantId($request);
-        // Fleet-day windows (04:00 boundary), $to exclusive.
-        $from = $request->filled('from')
-            ? FleetDay::startOfDate($request->string('from'))
-            : FleetDay::startDaysAgo(30);
-        $to = $request->filled('to')
-            ? FleetDay::endOfDate($request->string('to'))
-            : FleetDay::todayStart()->addDay();
+        // Fleet-day windows (04:00 boundary), $to exclusive; validated + span-capped
+        // (the daily zero-fill loops once per day in the range).
+        [$from, $to] = FleetDayRange::window($request, 30);
 
         return response()->json(['data' => $this->summary($tenantId, $from, $to)]);
     }
@@ -128,19 +140,22 @@ class FleetController extends Controller
         return response()->json(['data' => $drivers]);
     }
 
-    /** Owner profile, mirroring the driver `me` shape so the app can restore a session. */
-    /** Update the fleet owner's own profile (User token) — the owner counterpart
-     *  of the driver's PATCH /driver/me, so saving a profile never 401s them. */
+    /**
+     * Update the fleet owner's own name / app language (User token) — the owner
+     * counterpart of the driver's PATCH /driver/me. Never the password: the app
+     * token is a read-only credential minted from an emailed code, and letting it
+     * set the DASHBOARD password escalated it to full manager access. Password
+     * changes belong to the dashboard's profile page; a sent `password` is ignored.
+     */
     public function update(Request $request): JsonResponse
     {
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:120'],
             'locale' => ['sometimes', 'in:de,en,ar'],
-            'password' => ['sometimes', 'string', 'min:8'],
         ]);
 
         $owner = $request->user();
-        $owner->fill(array_intersect_key($data, array_flip(['name', 'locale', 'password'])));
+        $owner->fill($data);
         $owner->save();
 
         return $this->me($request);
@@ -155,6 +170,7 @@ class FleetController extends Controller
         return response()->json(['message' => 'ok']);
     }
 
+    /** Owner profile, mirroring the driver `me` shape so the app can restore a session. */
     public function me(Request $request): JsonResponse
     {
         $owner = $request->user();
@@ -179,11 +195,13 @@ class FleetController extends Controller
     /** The tenant's offers with the list's filters (search / status / date range) applied. */
     private function filtered(Request $request): Builder
     {
+        [$from, $to] = FleetDayRange::filters($request);
+
         return $this->scoped($this->tenantId($request))
             ->when($request->filled('driver_id'), fn ($q) => $q->where('driver_id', $request->integer('driver_id')))
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
-            ->when($request->filled('from'), fn ($q) => $q->where('received_at', '>=', FleetDay::startOfDate($request->string('from'))))
-            ->when($request->filled('to'), fn ($q) => $q->where('received_at', '<', FleetDay::endOfDate($request->string('to'))))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', (string) $request->string('status')))
+            ->when($from !== null, fn ($q) => $q->where('received_at', '>=', $from))
+            ->when($to !== null, fn ($q) => $q->where('received_at', '<', $to))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%'.$request->string('search').'%';
                 $q->where(fn ($sub) => $sub
@@ -234,6 +252,8 @@ class FleetController extends Controller
             ->pluck('income', 'fleet_date');
 
         $daily = [];
+        // Defense in depth: never zero-fill more than the allowed span.
+        $to = $to->min($from->addDays(FleetDayRange::MAX_DAYS + 1));
         for ($cursor = $from; $cursor < $to; $cursor = $cursor->addDay()) {
             $date = $cursor->toDateString();
             $daily[] = ['date' => $date, 'income' => round((float) ($incomeByDate[$date] ?? 0), 2)];

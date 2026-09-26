@@ -6,11 +6,15 @@ use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\OfferLifecycle;
 use App\Domain\Dispatch\OfferStatus;
+use App\Domain\Fleet\DriverStatusIngestor;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Broadcasting\BroadcastException;
+use Illuminate\Broadcasting\PendingBroadcast;
+use Illuminate\Contracts\Broadcasting\Factory as BroadcastFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
@@ -587,6 +591,50 @@ class OfferAcceptanceTest extends TestCase
         $this->assertSame(OfferStatus::Pending, $newer->fresh()->status);
     }
 
+    public function test_a_late_supersede_from_an_older_offer_never_rejects_the_newer_one(): void
+    {
+        // Offer A (one RAMEN channel) is still pushing when offer B (another channel)
+        // arrives and supersedes it; A's supersede, seconds later, must not reject B.
+        $this->driver();
+        $older = $this->offer(['received_at' => now()->subSeconds(5)]);
+        $newer = $this->offer(['received_at' => now()]);
+
+        app(OfferLifecycle::class)->supersedePendingFor($this->tenant->id, self::DRIVER_UUID, $newer->id);
+        app(OfferLifecycle::class)->supersedePendingFor($this->tenant->id, self::DRIVER_UUID, $older->id);
+
+        $this->assertSame(OfferStatus::Rejected, $older->fresh()->status);
+        $this->assertSame(OfferStatus::Pending, $newer->fresh()->status);
+    }
+
+    public function test_a_failing_broadcast_never_breaks_a_transition(): void
+    {
+        // PendingBroadcast sends in its destructor: a Reverb timeout there used to
+        // escape rescue() and 500 the daemon's status batch mid-way.
+        $offer = $this->offer(['driver_id' => $this->driver()->id]); // linked → broadcasts
+        $this->app->instance(BroadcastFactory::class, new class implements BroadcastFactory
+        {
+            public function connection($name = null)
+            {
+                throw new BroadcastException('reverb timed out');
+            }
+
+            public function event($event = null)
+            {
+                // As in the real PendingBroadcast, the send (and its failure) happens on destruct.
+                return new class(app('events'), $event) extends PendingBroadcast
+                {
+                    public function __destruct()
+                    {
+                        throw new BroadcastException('reverb timed out');
+                    }
+                };
+            }
+        });
+
+        $this->assertTrue(app(OfferLifecycle::class)->accept($offer));
+        $this->assertSame(OfferStatus::Accepted, $offer->fresh()->status);
+    }
+
     public function test_invalid_transition_is_a_noop(): void
     {
         $this->driver();
@@ -654,5 +702,22 @@ class OfferAcceptanceTest extends TestCase
         $second = $this->offer();
         $this->postStatus('EN_ROUTE');
         $this->assertSame(OfferStatus::Accepted, $second->fresh()->status);
+    }
+
+    public function test_extension_statuses_stand_down_while_the_daemon_feeds_the_company(): void
+    {
+        $this->driver();
+        $offer = $this->offer();
+
+        // The daemon just applied a fresh batch for this company…
+        DriverStatusIngestor::markDaemonFeeding($this->tenant->id);
+
+        // …so the extension's (older) snapshot must not drive the lifecycle.
+        $this->postJson('/api/v1/drivers/statuses', [
+            'statuses' => [['driver_uuid' => self::DRIVER_UUID, 'status' => 'MONITORING_SUPPLY_STATUS_ON_TRIP']],
+        ])->assertOk()->assertJsonPath('data.skipped', 'daemon_active');
+
+        $this->assertNull($offer->fresh()->accepted_at);
+        $this->assertSame('MONITORING_SUPPLY_STATUS_ONLINE', Driver::withoutGlobalScopes()->first()->online_status);
     }
 }

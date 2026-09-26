@@ -134,6 +134,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Nightly logical backup (db:backup)
+    |--------------------------------------------------------------------------
+    |
+    | `dump_command` is the mysqldump executable (argv prefix, never a shell
+    | string). `schema_only_tables` are dumped structure-only: transient or
+    | huge data (cache rows can hold decrypted platform secrets, sessions,
+    | queued jobs, the GB-scale network log) that a restore never needs, while
+    | the tables themselves still exist after a restore.
+    |
+    */
+
+    'backup' => [
+        'dump_command' => ['mysqldump'],
+        'schema_only_tables' => [
+            'cache',
+            'cache_locks',
+            'sessions',
+            'jobs',
+            'dispatch_network_logs',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Redis Databases
     |--------------------------------------------------------------------------
     |

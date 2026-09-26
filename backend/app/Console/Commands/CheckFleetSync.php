@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -48,12 +49,17 @@ class CheckFleetSync extends Command
             }
 
             $stale++;
+            // max() returns the raw column string, not a Carbon — log it as-is (the
+            // old optional(...)->__toString() always yielded null).
+            $last = (clone $base)->max('status_synced_at');
             Log::warning('fleet.sync_stale', [
                 'tenant' => $tenant->id,
                 'company' => $tenant->name,
                 'linked_drivers' => $linked,
-                'last_status_sync' => optional((clone $base)->max('status_synced_at'))->__toString(),
-                'stale_for_minutes' => '>='.self::STALE_MINUTES,
+                'last_status_sync' => $last,
+                'stale_for_minutes' => $last !== null
+                    ? max(0, (int) ((time() - CarbonImmutable::parse($last)->getTimestamp()) / 60))
+                    : null,
             ]);
         }
 
