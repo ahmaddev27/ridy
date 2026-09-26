@@ -72,10 +72,15 @@ export type DriverProfile = {
 export type FleetHomeData = {
   owner: { name: string; company_name: string | null };
   online_drivers: number;
+  /** Who is online (busiest first). Absent on backends older than 2026-09-27. */
+  online_drivers_list?: FleetOnlineDriver[];
   today: DriverStats;
   active_offers: Offer[];
   recent: Offer[];
 };
+
+/** An online driver on the owner home: 0 = available, 1 = en route, 2 = on trip. */
+export type FleetOnlineDriver = { id: number; name: string; engagement: 0 | 1 | 2 };
 
 /** One fleet-day's income (SUM of completed fares), keyed by its 04:00 date. */
 export type DailyIncome = { date: string; income: number };

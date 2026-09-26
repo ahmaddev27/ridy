@@ -158,6 +158,8 @@ const de: Dict = {
   "fleet.driver": "Fahrer",
   "fleet.onlineDrivers": "Fahrer online",
   "fleet.activeNow": "Aktive Fahrten",
+  "fleet.whoOnline": "Wer ist online",
+  "fleet.moreOnline": "+{count} weitere",
   "fleet.allDrivers": "Alle Fahrer",
   "fleet.filterByDriver": "Nach Fahrer filtern",
 };
@@ -315,6 +317,8 @@ const en: Dict = {
   "fleet.driver": "Driver",
   "fleet.onlineDrivers": "drivers online",
   "fleet.activeNow": "Active trips",
+  "fleet.whoOnline": "Who's online",
+  "fleet.moreOnline": "+{count} more",
   "fleet.allDrivers": "All drivers",
   "fleet.filterByDriver": "Filter by driver",
 };
@@ -472,6 +476,8 @@ const ar: Dict = {
   "fleet.driver": "السائق",
   "fleet.onlineDrivers": "سائق متصل",
   "fleet.activeNow": "الرحلات النشطة",
+  "fleet.whoOnline": "مين أونلاين هلأ",
+  "fleet.moreOnline": "+{count} آخرين",
   "fleet.allDrivers": "كل السائقين",
   "fleet.filterByDriver": "تصفية حسب السائق",
 };
