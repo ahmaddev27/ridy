@@ -25,12 +25,26 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
  */
 class FleetController extends Controller
 {
+    /** Most online drivers named on the owner home (the count is always exact). */
+    private const ONLINE_LIST_LIMIT = 50;
+
     /** Tenant-wide home: today's summary, online drivers, active + recent offers. */
     public function home(Request $request): JsonResponse
     {
         $tenantId = $this->tenantId($request);
 
-        $online = Driver::withoutGlobalScopes()->where('tenant_id', $tenantId)->online()->count();
+        $onlineQuery = Driver::withoutGlobalScopes()->where('tenant_id', $tenantId)->online();
+        $online = (clone $onlineQuery)->count();
+
+        // WHO is online, not just how many — on-trip first, then heading to a pickup,
+        // then available. Capped so a very large fleet can't bloat the 4–5 s poll;
+        // `online_drivers` above stays the true total.
+        $onlineList = $onlineQuery
+            ->orderByDesc('engagement')->orderBy('name')->orderBy('id')
+            ->limit(self::ONLINE_LIST_LIMIT)
+            ->get(['id', 'name', 'engagement'])
+            ->map(fn (Driver $d) => ['id' => $d->id, 'name' => $d->name, 'engagement' => (int) $d->engagement])
+            ->values();
 
         $active = $this->scoped($tenantId)
             ->with('driver:id,name,online_status')
@@ -58,6 +72,7 @@ class FleetController extends Controller
                 'company_name' => $request->user()->loadMissing('tenant')->tenant?->name,
             ],
             'online_drivers' => $online,
+            'online_drivers_list' => $onlineList,
             'today' => $this->summary($tenantId, FleetDay::todayStart(), FleetDay::todayStart()->addDay()),
             'active_offers' => DispatchOfferResource::collection($active),
             'recent' => DispatchOfferResource::collection($recent),

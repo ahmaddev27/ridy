@@ -14,6 +14,7 @@ import { fareLabel, perKmValue, distanceLabel, cleanAddress } from "@/lib/format
 import { useLiveReload } from "@/lib/use-live-reload";
 import { Logo, SectionLabel, StatusBadge } from "@/components/ui";
 import { OfferCard } from "@/components/offer-card";
+import { OnlineDriversCard } from "@/components/online-drivers";
 import { LoadErrorBanner, PushHealthBanner } from "@/components/status-banner";
 
 /** The newest pending offer: the backend's `pending_offer` when it sends one
@@ -193,6 +194,14 @@ export default function HomeScreen() {
               <MapIcon size={17} color={c.ink} />
               <Text style={{ color: c.ink, fontSize: 15, fontWeight: "600" }}>{t("offer.openMaps")}</Text>
             </Pressable>
+          </View>
+        )}
+
+        {/* Owner: WHO is online (older backends send only the count — then this hides). */}
+        {isOwner && fleet?.online_drivers_list && fleet.online_drivers_list.length > 0 && (
+          <View style={{ gap: 10 }}>
+            <SectionLabel>{t("fleet.whoOnline")}</SectionLabel>
+            <OnlineDriversCard drivers={fleet.online_drivers_list} total={fleet.online_drivers} />
           </View>
         )}
 
