@@ -358,7 +358,22 @@ jobs:
               [ -n "$cid" ] || continue
               name="$(docker inspect --format '{{.Config.Image}}' "$cid")"
               name="${name%%:*}"
-              docker tag "$(docker inspect --format '{{.Image}}' "$cid")" "$name:rollback"
+              # A long-running container can outlive its image (an earlier prune
+              # removed it while the container kept running): tagging that ID fails
+              # with "No such image". Fall back to the current plain-name image, and
+              # if even that is gone, skip this service's rollback tag with a warning
+              # rather than failing the whole deploy.
+              img="$(docker inspect --format '{{.Image}}' "$cid")"
+              if docker image inspect "$img" >/dev/null 2>&1; then
+                src="$img"
+              elif docker image inspect "$name" >/dev/null 2>&1; then
+                src="$name"
+                echo "::warning::$svc: its running image $img no longer exists; the rollback tag uses the current $name image"
+              else
+                echo "::warning::$svc: no image left to keep for a rollback; skipping its rollback tag"
+                continue
+              fi
+              docker tag "$src" "$name:rollback"
               echo "$svc $name" >> "$STATE_DIR/images"
             done
 
