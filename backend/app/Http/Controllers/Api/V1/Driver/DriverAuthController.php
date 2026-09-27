@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1\Driver;
 
+use App\Domain\Audit\AuditLogger;
 use App\Domain\Auth\OtpGuard;
 use App\Domain\Auth\PasswordCheck;
+use App\Domain\Auth\ReviewLogin;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Fleet\Models\Driver;
@@ -15,6 +17,7 @@ use App\Models\User;
 use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -32,6 +35,8 @@ class DriverAuthController extends Controller
     public function __construct(
         private readonly DriverInvitationService $invitations,
         private readonly OtpGuard $otp,
+        private readonly ReviewLogin $reviewLogin,
+        private readonly AuditLogger $audit,
     ) {}
 
     /**
@@ -68,8 +73,22 @@ class DriverAuthController extends Controller
             'otp' => ['required', 'digits:6'],
         ]);
 
-        // No account-specific bypass lives here: the only non-emailed code path is
-        // GeneratesOtp::isTestCode(), which hard-refuses in production.
+        // App-store reviewer sign-in: one admin-configured email + fixed code, OFF
+        // unless turned on (`app-review:login`). Every other sign-in falls through
+        // to the emailed code below.
+        if ($this->reviewLogin->matches($data['email'], $data['otp'])) {
+            // Resolve by the CONFIGURED address, not the typed one (same idea as the
+            // OTP: never trust a look-alike the collation might match).
+            $account = $this->resolveAppAccount((string) $this->reviewLogin->email());
+            if ($account !== null && OtpGuard::sameEmail((string) $account->email, $data['email'])) {
+                $this->guardSuspendedTenant($account->loadMissing('tenant')->tenant);
+                Log::warning('auth.review_login_used', ['account' => class_basename($account).'#'.$account->id, 'ip' => $request->ip()]);
+                rescue(fn () => $this->audit->log('auth.review_login', $account, ['ip' => $request->ip()], $account->tenant_id), report: false);
+
+                return $this->completeSignIn($account);
+            }
+        }
+
         $reset = $this->otp->verifyReset($data['email'], $data['otp']);
 
         $account = $this->resolveAppAccount($reset->email);
@@ -84,6 +103,12 @@ class DriverAuthController extends Controller
         // submit gets otp_incorrect instead of a second token.
         $this->otp->consume($reset);
 
+        return $this->completeSignIn($account);
+    }
+
+    /** Mint the app token for a verified account (owner read-only, or driver). */
+    private function completeSignIn(Driver|User $account): JsonResponse
+    {
         if ($account instanceof User) {
             return $this->ownerTokenResponse($account);
         }
