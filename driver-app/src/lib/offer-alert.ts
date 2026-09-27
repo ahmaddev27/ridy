@@ -1,79 +1,100 @@
 import * as Notifications from "expo-notifications";
-import * as SecureStore from "expo-secure-store";
-import { Vibration } from "react-native";
+import { AppState, Vibration } from "react-native";
 import { cleanAddress, fareLabel } from "./format";
-import { MULTISTOP_CHANNEL } from "./push";
+import { MULTISTOP_CHANNEL, OFFERS_CHANNEL, isMultiStop } from "./notification-channels";
+import { freshUntil, isFreshOffer } from "./offer-freshness";
+import { loadPrefs } from "./prefs";
 import type { Offer } from "./api";
 
 /**
- * In-app alerting for a NEW offer that arrives while the driver has the app OPEN.
+ * In-app FALLBACK alert for a new offer while the app is open.
  *
- * The OS push chimes only in the background; in the foreground a fresh offer surfaces
- * silently via the real-time socket (Reverb) / the poll, so the driver can miss it.
- * This presents a local notification — a banner (fare · destination) the foreground
- * handler renders WITH the system sound — plus a vibration, gated on the driver's
- * notification / sound / haptic prefs. Uses expo-notifications (already in the build)
- * so it ships over-the-air, no native rebuild.
+ * The normal path is the FCM push: in the foreground the notification handler
+ * (push.ts) presents it with the channel sound. This module only covers an offer
+ * that surfaces through the socket/poll WITHOUT a push (push failed or is late):
+ * it waits a short grace for the push, then presents a local notification.
  *
- * Deduped per offer id, and only offers that ARRIVED after the app opened alert — so
- * the offers already on screen at launch stay quiet. Works from any screen (home and
- * the offers feed both call it on a socket/poll refresh).
+ * De-duplicated per `${offerId}:${kind}` so a later multi-stop follow-up for the
+ * same offer can still alert once. Freshness is judged by the offer's own accept
+ * window, not by when the app started — a stale pending offer never chimes.
  */
 
-const seen = new Set<number>();
-const APP_OPENED_AT = Date.now();
-/** Grace so an offer received just before launch still counts as "new". */
-const FRESH_GRACE_MS = 60_000;
+/** How long the FCM push gets to arrive before the local fallback fires. */
+const PUSH_GRACE_MS = 2_000;
 
-/** A boolean pref stored by the settings screen ("1"/"0"); unset = on. */
-async function prefOn(key: string): Promise<boolean> {
-  try {
-    return (await SecureStore.getItemAsync(key)) !== "0";
-  } catch {
-    return true;
+/** Offers that actually rang (push presented or fallback shown). */
+const alerted = new Set<string>();
+/** Offers the socket/poll judged stale — never fallback-chimed, but NOT treated as
+ *  alerted, so their real FCM push (e.g. with phone-clock skew) still presents. */
+const skipped = new Set<string>();
+const pendingFallback = new Map<string, ReturnType<typeof setTimeout>>();
+
+function keyFor(offerId: number | string, multi: boolean): string {
+  return `${offerId}:${multi ? "multi" : "new"}`;
+}
+
+/** Record an offer as already alerted (e.g. its FCM push was presented), and
+ *  cancel any pending local fallback for it. */
+export function markAlerted(offerId: number | string | null | undefined, multi = false): void {
+  if (offerId == null || offerId === "") return;
+  const key = keyFor(offerId, multi);
+  alerted.add(key);
+  const timer = pendingFallback.get(key);
+  if (timer) {
+    clearTimeout(timer);
+    pendingFallback.delete(key);
   }
 }
 
-/** Mark an offer as already alerted (e.g. a foreground OS push handled it), so the
- *  socket/poll refresh that follows doesn't alert for it a second time. */
-export function markAlerted(id: number | null | undefined): void {
-  if (typeof id === "number" && Number.isFinite(id)) seen.add(id);
+/** Whether this offer (kind) was already alerted in this app session. */
+export function wasAlerted(offerId: number | string | null | undefined, multi = false): boolean {
+  if (offerId == null || offerId === "") return false;
+  return alerted.has(keyFor(offerId, multi));
 }
+
+export { freshUntil, isFreshOffer };
 
 /**
- * Banner + sound + vibrate for a genuinely new pending offer. No-op for a non-pending
- * offer, one already alerted, or one that arrived before the app opened.
+ * Schedule the fallback alert for a genuinely new pending offer. No-op for a
+ * non-pending, stale or already-alerted offer.
  */
-export async function alertOffer(offer: Offer | null | undefined): Promise<void> {
-  if (!offer || offer.status !== "pending" || seen.has(offer.id)) return;
-
-  const received = offer.received_at ? new Date(offer.received_at).getTime() : 0;
-  if (received && received < APP_OPENED_AT - FRESH_GRACE_MS) return; // pre-existing offer
-
-  seen.add(offer.id);
-
-  if (!(await prefOn("pref.notifications"))) return;
-
-  if (await prefOn("pref.haptic")) {
-    Vibration.vibrate(400);
+export function alertOffer(offer: Offer | null | undefined): void {
+  if (!offer || offer.status !== "pending") return;
+  const multi = isMultiStop(offer.stops_count);
+  const key = keyFor(offer.id, multi);
+  if (alerted.has(key) || skipped.has(key) || pendingFallback.has(key)) return;
+  if (!isFreshOffer(offer)) {
+    skipped.add(key); // stale: no fallback chime, but its push may still present
+    return;
   }
+  const timer = setTimeout(() => {
+    pendingFallback.delete(key);
+    void presentFallback(offer, multi, key);
+  }, PUSH_GRACE_MS);
+  pendingFallback.set(key, timer);
+}
 
-  const sound = await prefOn("pref.sound");
+async function presentFallback(offer: Offer, multi: boolean, key: string): Promise<void> {
+  // The push won the race, the app left the foreground (the OS push covers the
+  // background), or the window closed during the grace period.
+  if (alerted.has(key) || AppState.currentState !== "active" || !isFreshOffer(offer)) return;
+  alerted.add(key);
+
+  const prefs = await loadPrefs();
+  if (!prefs.notifications) return;
+  if (prefs.haptic) Vibration.vibrate(400);
+
   const dropoff = cleanAddress(offer.dropoff_address);
-  // A multi-stop offer routes to the louder "multistop" Android channel (urgent
-  // vibration + lights) and plays the distinct multi.wav; a single-drop offer uses
-  // the routine channel + normal.wav. The `sound` name (iOS foreground) matches the
-  // wav bundled via app.json's expo-notifications `sounds`; Android takes its sound
-  // from the channel. Both ship via a native eas build (not OTA).
-  const multiStop = (offer.stops_count ?? 0) >= 2;
   await Notifications.scheduleNotificationAsync({
     content: {
       // Word-free, data-driven — mirrors the backend push (fare · destination).
       title: `${fareLabel(offer.fare_formatted, offer.fare_amount)}${dropoff ? ` · ${dropoff}` : ""}`,
       body: cleanAddress(offer.pickup_address),
-      sound: sound ? (multiStop ? "multi.wav" : "normal.wav") : undefined,
-      data: { offer_id: String(offer.id) },
+      // iOS plays this bundled wav; Android takes the sound from the channel.
+      sound: prefs.sound ? (multi ? "multi.wav" : "normal.wav") : undefined,
+      data: { offer_id: String(offer.id), stops_count: String(offer.stops_count ?? 0), local: "1" },
     },
-    trigger: multiStop ? { channelId: MULTISTOP_CHANNEL } : null,
+    // Always name the channel: without one expo falls back to "Miscellaneous".
+    trigger: { channelId: multi ? MULTISTOP_CHANNEL : OFFERS_CHANNEL },
   }).catch(() => {});
 }

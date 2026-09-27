@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Tenancy\CompanyDeleter;
 use App\Domain\Tenancy\Models\Proxy;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\ProxyPool;
@@ -121,35 +122,21 @@ class CompanyController extends Controller
         return response()->json(['data' => $this->detail($tenant->fresh())]);
     }
 
-    /** Disable (reversible) — keeps offers/session history. */
     /**
      * Permanently delete a company and everything scoped to it — Uber session
      * (which stops its daemon stream on the next reconcile), drivers, offers,
-     * device tokens, audit logs, and its users (with their notifications and API
-     * tokens). Runs in one transaction so it either fully succeeds or rolls back.
+     * network logs, device tokens, audit logs, and its users (with their
+     * notifications, roles and API tokens). A company that already has invoices or
+     * cash payments is refused with 409: those are accounting records that must be
+     * kept, so the admin disables the company (and purges its data) instead.
      */
-    public function destroy(Tenant $tenant): JsonResponse
+    public function destroy(Tenant $tenant, CompanyDeleter $deleter): JsonResponse
     {
-        DB::transaction(function () use ($tenant) {
-            $userIds = DB::table('users')->where('tenant_id', $tenant->id)->pluck('id');
+        if ($deleter->hasBillingRecords($tenant)) {
+            return response()->json(['message' => 'company_has_billing_records'], 409);
+        }
 
-            // The users' notifications + API tokens (polymorphic, no tenant_id).
-            if ($userIds->isNotEmpty()) {
-                DB::table('notifications')
-                    ->where('notifiable_type', User::class)
-                    ->whereIn('notifiable_id', $userIds)->delete();
-                DB::table('personal_access_tokens')
-                    ->where('tokenable_type', User::class)
-                    ->whereIn('tokenable_id', $userIds)->delete();
-            }
-
-            // Everything scoped directly to the tenant.
-            foreach (['device_tokens', 'dispatch_offers', 'drivers', 'uber_fleet_sessions', 'audit_logs', 'users'] as $table) {
-                DB::table($table)->where('tenant_id', $tenant->id)->delete();
-            }
-
-            $tenant->delete();
-        });
+        $deleter->delete($tenant);
 
         $this->counters->forget();
 

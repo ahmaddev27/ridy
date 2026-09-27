@@ -146,9 +146,9 @@ class DriverAppTest extends TestCase
         ]);
     }
 
-    public function test_driver_updates_profile_name_locale_and_password(): void
+    public function test_driver_updates_profile_name_and_locale_but_never_the_password(): void
     {
-        $driver = $this->driver(['activated_at' => now(), 'locale' => 'de']);
+        $driver = $this->driver(['activated_at' => now(), 'locale' => 'de', 'password' => Hash::make('oldsecret123')]);
         Sanctum::actingAs($driver, guard: 'driver');
 
         $this->patchJson('/api/v1/driver/me', [
@@ -159,7 +159,9 @@ class DriverAppTest extends TestCase
 
         $driver->refresh();
         $this->assertSame('ar', $driver->locale);
-        $this->assertTrue(Hash::check('newsecret123', $driver->password));
+        // A bearer token must not be able to plant a lasting password (passwordless app).
+        $this->assertFalse(Hash::check('newsecret123', $driver->password));
+        $this->assertTrue(Hash::check('oldsecret123', $driver->password));
     }
 
     public function test_driver_offers_feed_returns_only_own_offers(): void

@@ -21,15 +21,23 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('drivers', function (Blueprint $table) {
-            $table->index(['tenant_id', 'status_synced_at']);
-        });
-        Schema::table('dispatch_network_logs', function (Blueprint $table) {
-            $table->index('created_at');
-        });
-        Schema::table('dispatch_offers', function (Blueprint $table) {
-            $table->index(['geo_synced_at', 'received_at']);
-        });
+        // Guarded: MySQL DDL is not transactional, so a failure on the 3rd ALTER left
+        // the first two in place and every re-run died on "Duplicate key name".
+        if (! Schema::hasIndex('drivers', ['tenant_id', 'status_synced_at'])) {
+            Schema::table('drivers', function (Blueprint $table) {
+                $table->index(['tenant_id', 'status_synced_at']);
+            });
+        }
+        if (! Schema::hasIndex('dispatch_network_logs', ['created_at'])) {
+            Schema::table('dispatch_network_logs', function (Blueprint $table) {
+                $table->index('created_at');
+            });
+        }
+        if (! Schema::hasIndex('dispatch_offers', ['geo_synced_at', 'received_at'])) {
+            Schema::table('dispatch_offers', function (Blueprint $table) {
+                $table->index(['geo_synced_at', 'received_at']);
+            });
+        }
     }
 
     public function down(): void

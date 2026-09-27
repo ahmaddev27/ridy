@@ -61,6 +61,16 @@ class EarnerBreakdownParserTest extends TestCase
         $this->assertEquals(1221.71, $m->breakdown['fare']);
         $this->assertEquals(170.0, $m->breakdown['promotion']);
         $this->assertEquals(-496.82, $m->breakdown['cash_collected']);
+
+        // The period is Berlin wall-clock: 1787536889000 ms = 2026-08-24 02:01:29 UTC
+        // = 04:01:29 CEST.
+        $this->assertSame('2026-08-24 04:01:29', $m->period_start->format('Y-m-d H:i:s'));
+
+        // A re-sync of the same period updates the row in place (one upsert key).
+        $payload['data']['data']['getEarnerBreakdownsV2']['earnerEarningsBreakdowns'][0]['earnings']['amount']['amountE5'] = '200000000';
+        $this->assertSame(1, app(EarnerBreakdownParser::class)->parse($tenant->id, $payload));
+        $this->assertSame(1, DriverMetric::withoutGlobalScopes()->where('driver_id', $driver->id)->count());
+        $this->assertEquals(2000.0, (float) DriverMetric::withoutGlobalScopes()->where('driver_id', $driver->id)->value('earnings'));
     }
 
     public function test_it_ignores_unrelated_captures(): void

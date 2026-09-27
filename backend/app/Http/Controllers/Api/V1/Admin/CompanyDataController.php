@@ -10,6 +10,7 @@ use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DispatchOfferResource;
 use App\Http\Resources\DriverResource;
+use App\Support\BatchDelete;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -23,8 +24,10 @@ class CompanyDataController extends Controller
 {
     public function drivers(Tenant $tenant): AnonymousResourceCollection
     {
+        // Eager-load the device label DriverResource reads (was one query per driver).
         $drivers = Driver::withoutGlobalScopes()
             ->where('tenant_id', $tenant->id)
+            ->with('latestDeviceToken')
             ->orderBy('name')
             ->get();
 
@@ -74,7 +77,8 @@ class CompanyDataController extends Controller
     /** Purge every captured network log for a single company (scoped, irreversible). */
     public function clearNetwork(Tenant $tenant): JsonResponse
     {
-        $deleted = DispatchNetworkLog::query()->where('tenant_id', $tenant->id)->delete();
+        // Batched: the busiest table, written by live ingest while this runs.
+        $deleted = BatchDelete::run(fn () => DispatchNetworkLog::query()->where('tenant_id', $tenant->id), 5000);
 
         return response()->json(['data' => ['deleted' => $deleted]]);
     }

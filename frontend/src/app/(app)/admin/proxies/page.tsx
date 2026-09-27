@@ -10,11 +10,12 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
+import { formatMoney } from "@/lib/utils";
 import { useAsync } from "@/hooks/use-async";
 import { listProxies, createProxy, updateProxy, deleteProxy, renewProxy, type Proxy } from "@/lib/api/admin";
 
 export default function ProxiesPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.proxies.${k}`);
   const { data, loading, refetch } = useAsync(listProxies, { refetchInterval: 15000 });
   const proxies = data ?? [];
@@ -111,14 +112,14 @@ export default function ProxiesPage() {
                     </td>
                     <td className="px-4 py-3">
                       {p.price != null ? (
-                        <div className="font-medium tabular-nums text-ink">€{p.price.toFixed(2)}</div>
+                        <div className="font-medium tabular-nums text-ink">{formatMoney(p.price, locale)}</div>
                       ) : (
                         <span className="text-ink-subtle">—</span>
                       )}
                       {p.source && <div className="text-xs text-ink-subtle">{p.source}</div>}
                       {p.renewals.length > 0 && (
                         <div className="mt-0.5 text-xs font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
-                          {c("totalPaid")}: €{p.total_paid.toFixed(2)}
+                          {c("totalPaid")}: {formatMoney(p.total_paid, locale)}
                         </div>
                       )}
                     </td>
@@ -166,7 +167,7 @@ export default function ProxiesPage() {
 }
 
 function ProxyModal({ proxy, onClose, onSaved }: { proxy: Proxy | null; onClose: () => void; onSaved: () => void }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.proxies.${k}`);
   const [label, setLabel] = useState(proxy?.label ?? "");
   const [url, setUrl] = useState("");
@@ -243,7 +244,7 @@ function ProxyModal({ proxy, onClose, onSaved }: { proxy: Proxy | null; onClose:
 }
 
 function RenewProxyModal({ proxy, onClose, onSaved }: { proxy: Proxy; onClose: () => void; onSaved: () => void }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.proxies.${k}`);
   const today = new Date().toISOString().slice(0, 10);
   const [amount, setAmount] = useState(proxy.price != null ? String(proxy.price) : "");
@@ -293,7 +294,7 @@ function RenewProxyModal({ proxy, onClose, onSaved }: { proxy: Proxy; onClose: (
         <div className="grid grid-cols-2 gap-3">
           <div className="flex items-center justify-between rounded-lg bg-surface-2 px-3 py-2 text-sm">
             <span className="text-ink-subtle">{c("totalPaid")}</span>
-            <span className="font-bold tabular-nums text-ink">€{proxy.total_paid.toFixed(2)}</span>
+            <span className="font-bold tabular-nums text-ink">{formatMoney(proxy.total_paid, locale)}</span>
           </div>
           <div className="flex items-center justify-between rounded-lg bg-surface-2 px-3 py-2 text-sm">
             <span className="text-ink-subtle">{c("currentEnd")}</span>
@@ -313,7 +314,7 @@ function RenewProxyModal({ proxy, onClose, onSaved }: { proxy: Proxy; onClose: (
           <ul className="divide-y divide-line rounded-lg border border-line">
             {history.map((h) => (
               <li key={h.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
-                <span className="shrink-0 font-medium tabular-nums text-ink">€{h.amount.toFixed(2)}</span>
+                <span className="shrink-0 font-medium tabular-nums text-ink">{formatMoney(h.amount, locale)}</span>
                 <bdi dir="ltr" className="text-xs text-ink-muted">
                   {h.starts_at ?? "—"} → {h.ends_at ?? "—"}
                 </bdi>

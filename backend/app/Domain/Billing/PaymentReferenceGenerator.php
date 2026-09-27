@@ -27,13 +27,19 @@ class PaymentReferenceGenerator
             $pattern = $prefix.'-'.$year.'-%';
 
             // Lock the prefix+year's rows so a parallel generation waits for our seq.
+            // The max is taken NUMERICALLY: a string MAX stalls at "…-9999" (which
+            // sorts above "…-10000") and would then collide on every later code.
+            $head = $prefix.'-'.$year.'-';
             $last = SubscriptionCode::query()
                 ->where('payment_ref', 'like', $pattern)
                 ->lockForUpdate()
-                ->orderByDesc('payment_ref')
-                ->value('payment_ref');
+                ->pluck('payment_ref')
+                ->map(fn (string $ref) => substr($ref, strlen($head)))
+                ->filter(fn (string $seq) => ctype_digit($seq))
+                ->map(fn (string $seq) => (int) $seq)
+                ->max();
 
-            $next = $last === null ? 1 : ((int) substr((string) $last, -self::SEQUENCE_PAD)) + 1;
+            $next = ($last ?? 0) + 1;
             $ref = sprintf('%s-%d-%0'.self::SEQUENCE_PAD.'d', $prefix, $year, $next);
 
             // Persist inside the transaction while the lock is held (see the invoice

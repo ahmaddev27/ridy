@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { latnLocale } from "@/lib/utils";
+import { formatDate, formatDateTime, formatMoney, formatNumber, latnLocale } from "@/lib/utils";
+import { fleetDayKey, fleetYmd, formatYmd } from "@/lib/fleet-day";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn, Globe, Network, Copy, Files, Check, Lock } from "lucide-react";
@@ -45,6 +46,7 @@ import {
   type Plan,
 } from "@/lib/api/admin";
 import { getPaymentMethods, PAYMENT_METHOD_KEYS, paymentMethodLabel } from "@/lib/api/payments";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 /** Super-admin company detail as a full page: edit, proxy, users, session,
  *  subscription controls, plus drivers/offers/vehicles tabs. */
@@ -55,7 +57,7 @@ export function CompanyDetail({
   id: number;
   onChanged?: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.companies.${k}`);
   const [company, setCompany] = useState<Company | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +82,7 @@ export function CompanyDetail({
   const [paid, setPaid] = useState(true);
   const [freeDays, setFreeDays] = useState("30");
   const [invoices, setInvoices] = useState<SubscriptionInvoice[]>([]);
+  const [invoicesTotal, setInvoicesTotal] = useState(0);
 
   // Payment method recorded on the issued code — all known methods are selectable,
   // the ones enabled in settings are highlighted and one of them is pre-selected.
@@ -89,7 +92,12 @@ export function CompanyDetail({
   // The company's subscription history + the plans to choose from, for the tab.
   useEffect(() => {
     if (tab !== "subscription") return;
-    listSubscriptionInvoices(id).then((r) => setInvoices(r.data)).catch(() => setInvoices([]));
+    listSubscriptionInvoices({ tenantId: id, perPage: 100 })
+      .then((r) => {
+        setInvoices(r.data);
+        setInvoicesTotal(r.meta.total);
+      })
+      .catch(() => setInvoices([]));
     listPlans().then(setPlans).catch(() => setPlans([]));
     getPaymentMethods()
       .then((m) => {
@@ -145,7 +153,7 @@ export function CompanyDetail({
       await load();
       onChanged();
     } catch (e) {
-      toast.error(c("saveFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("saveFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
@@ -179,7 +187,7 @@ export function CompanyDetail({
       setResetFor(null);
       setResetPwd("");
     } catch (e) {
-      toast.error(c("resetFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("resetFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
@@ -197,7 +205,7 @@ export function CompanyDetail({
       toast.success(c("codeGenerated"));
       await load();
     } catch (e) {
-      toast.error(c("codeFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("codeFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
@@ -210,7 +218,7 @@ export function CompanyDetail({
       toast.success(c("freeGranted"));
       await load();
     } catch (e) {
-      toast.error(c("codeFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("codeFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
@@ -226,7 +234,7 @@ export function CompanyDetail({
       await load();
       onChanged();
     } catch (e) {
-      toast.error(c("actionFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("actionFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
@@ -240,7 +248,7 @@ export function CompanyDetail({
       await load();
       onChanged();
     } catch (e) {
-      toast.error(c("actionFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("actionFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
@@ -255,7 +263,7 @@ export function CompanyDetail({
       // refetch as the manager. Client-side navigation would keep stale data.
       window.location.assign("/");
     } catch (e) {
-      toast.error(c("impersonateFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("impersonateFailed"), { description: apiErrorMessage(e, t, locale) });
       setBusy(false);
     }
   }
@@ -275,7 +283,7 @@ export function CompanyDetail({
       await load();
       onChanged();
     } catch (e) {
-      toast.error(c("actionFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("actionFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
       setConfirm(null);
@@ -297,7 +305,7 @@ export function CompanyDetail({
       await load();
       onChanged();
     } catch (e) {
-      toast.error(c("purgeFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("purgeFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
       setConfirm(null);
@@ -387,7 +395,7 @@ export function CompanyDetail({
                   )}
                   {company.subscription_ends_at && (
                     <span className="text-xs text-ink-subtle" dir="ltr">
-                      → {new Date(company.subscription_ends_at).toLocaleDateString()}
+                      → {formatDate(company.subscription_ends_at, locale)}
                     </span>
                   )}
                 </div>
@@ -403,7 +411,7 @@ export function CompanyDetail({
                     >
                       <option value="">{c("selectPlan")}</option>
                       {plans.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name} · €{p.price.toFixed(2)} · {c("daysN").replace("{n}", String(p.duration_days))}</option>
+                        <option key={p.id} value={p.id}>{p.name} · {formatMoney(p.price, locale)} · {c("daysN").replace("{n}", String(p.duration_days))}</option>
                       ))}
                     </select>
                   </div>
@@ -523,10 +531,10 @@ export function CompanyDetail({
                           {invoices.map((inv) => (
                             <tr key={inv.id}>
                               <td className="text-ink-muted" dir="ltr">
-                                {new Date(inv.starts_at).toLocaleDateString()} → {new Date(inv.ends_at).toLocaleDateString()}
+                                {formatDate(inv.starts_at, locale)} → {formatDate(inv.ends_at, locale)}
                               </td>
                               <td className="tabular-nums text-ink-muted">{inv.days}</td>
-                              <td className="font-semibold tabular-nums text-ink">{inv.amount != null ? `€${inv.amount.toFixed(2)}` : "—"}</td>
+                              <td className="font-semibold tabular-nums text-ink">{formatMoney(inv.amount, locale)}</td>
                               <td className="font-mono text-xs text-ink-muted" dir="ltr">{inv.code?.payment_ref ?? "—"}</td>
                               <td className="text-ink-muted">{paymentMethodLabel(inv.code?.payment_method, t)}</td>
                               <td>
@@ -539,6 +547,14 @@ export function CompanyDetail({
                         </tbody>
                       </table>
                     </div>
+                  )}
+                  {invoicesTotal > invoices.length && (
+                    <p className="mt-2 text-xs text-ink-subtle">
+                      {t("common.showingOf").replace("{shown}", String(invoices.length)).replace("{total}", String(invoicesTotal))}{" "}
+                      <Link href="/admin/reports" className="font-medium text-primary hover:underline">
+                        {t("pages.subscriptions.title")}
+                      </Link>
+                    </p>
                   )}
                 </div>
             </Section>
@@ -877,7 +893,7 @@ function CompanyDataTab({ id, tab }: { id: number; tab: "drivers" | "vehicles" }
 /** Company offers grouped by day, paginated (mirrors the manager offers page). */
 /** The raw supplier "network" feed — every captured Uber offer payload, expandable. */
 function CompanyNetworkTab({ id }: { id: number }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.companies.${k}`);
   const [rows, setRows] = useState<CompanyNetworkRow[]>([]);
   const [page, setPage] = useState(1);
@@ -930,7 +946,7 @@ function CompanyNetworkTab({ id }: { id: number }) {
     setClearing(true);
     try {
       const { deleted } = await clearCompanyNetwork(id);
-      toast.success(c("clearNetDone").replace("{n}", deleted.toLocaleString()));
+      toast.success(c("clearNetDone").replace("{n}", formatNumber(deleted, locale)));
       setRows([]);
       setTotal(0);
       setLastPage(1);
@@ -1047,7 +1063,7 @@ function CompanyNetworkTab({ id }: { id: number }) {
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm text-ink">{o.summary ?? "—"}</div>
                 <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-ink-subtle" dir="ltr">
-                  {o.created_at && <span>{new Date(o.created_at).toLocaleString()}</span>}
+                  {o.created_at && <span>{formatDateTime(o.created_at, locale)}</span>}
                   {o.count !== null && <span>· {o.count}×</span>}
                 </div>
               </div>
@@ -1082,7 +1098,7 @@ function CompanyNetworkTab({ id }: { id: number }) {
             <button key={b.l} onClick={b.go} disabled={b.off}
               className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-ink-muted transition hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40">{b.l}</button>
           ))}
-          <span className="px-3 font-medium tabular-nums text-ink-muted">{page} / {lastPage} · {total.toLocaleString()}</span>
+          <span className="px-3 font-medium tabular-nums text-ink-muted">{page} / {lastPage} · {formatNumber(total, locale)}</span>
           {[
             { l: "›", go: () => setPage((p) => Math.min(lastPage, p + 1)), off: page >= lastPage },
             { l: "»", go: () => setPage(lastPage), off: page >= lastPage },
@@ -1103,7 +1119,7 @@ function CompanyOffersTab({ id }: { id: number }) {
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set([new Date().toDateString()]));
+  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set([fleetYmd()]));
   const toggleDay = (k: string) =>
     setOpenDays((s) => {
       const n = new Set(s);
@@ -1130,7 +1146,7 @@ function CompanyOffersTab({ id }: { id: number }) {
   const groups = useMemo(() => {
     const m = new Map<string, CompanyOfferRow[]>();
     for (const o of rows) {
-      const key = o.received_at ? new Date(o.received_at).toDateString() : "—";
+      const key = o.received_at ? fleetDayKey(o.received_at) : "—";
       (m.get(key) ?? m.set(key, []).get(key)!).push(o);
     }
     return [...m.entries()];
@@ -1159,7 +1175,7 @@ function CompanyOffersTab({ id }: { id: number }) {
             >
               <ChevronDown className={`h-4 w-4 text-ink-subtle transition ${open ? "" : "-rotate-90"}`} />
               <span className="font-semibold text-ink">
-                {day === new Date().toDateString() ? c("today") : day === "—" ? "—" : new Date(day).toLocaleDateString(latnLocale(locale), { weekday: "long", day: "numeric", month: "long" })}
+                {day === fleetYmd() ? c("today") : day === "—" ? "—" : formatYmd(day, latnLocale(locale), { weekday: "long", day: "numeric", month: "long" })}
               </span>
               <span className="rounded-full bg-surface px-2 py-0.5 text-xs font-medium text-ink-muted">{dayOffers.length}</span>
             </button>

@@ -8,9 +8,15 @@ import { Logo } from "./logo";
  * into the bends). Shown as the route loading fallback so navigations show the
  * brand instead of a blank screen.
  */
-export function Preloader() {
+export function Preloader({ inline = false }: { inline?: boolean } = {}) {
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-7 bg-surface">
+    <div
+      className={
+        inline
+          ? "flex min-h-[60vh] flex-col items-center justify-center gap-7"
+          : "fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-7 bg-surface"
+      }
+    >
       <style>{`
         @keyframes reidey-breathe { 0%,100% { opacity:.6; transform:scale(.97) } 50% { opacity:1; transform:scale(1) } }
         .reidey-mark { animation: reidey-breathe 1.8s ease-in-out infinite; }

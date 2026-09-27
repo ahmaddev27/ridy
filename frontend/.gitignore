@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# firebase compat bundles copied by scripts/copy-firebase-sw.mjs
+/public/firebase/

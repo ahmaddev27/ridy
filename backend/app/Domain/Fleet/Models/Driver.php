@@ -18,6 +18,12 @@ use Laravel\Sanctum\HasApiTokens;
  */
 class Driver extends Authenticatable
 {
+    /**
+     * A driver whose status hasn't synced within this many minutes is stale: off
+     * the live map, and their last position is purged (fleet:purge-stale-locations).
+     */
+    public const LIVE_STALE_MINUTES = 10;
+
     use BelongsToTenant, HasApiTokens, Notifiable;
 
     /**
@@ -106,7 +112,13 @@ class Driver extends Authenticatable
      */
     public function engagementStatus(): int
     {
-        $s = strtoupper((string) $this->online_status);
+        return self::engagementLevel($this->online_status);
+    }
+
+    /** Engagement level of a raw Uber status: 2 = on trip, 1 = heading to pickup, 0 = idle. */
+    public static function engagementLevel(?string $status): int
+    {
+        $s = strtoupper((string) $status);
         if (str_contains($s, 'ON_TRIP')) {
             return 2;
         }
@@ -155,6 +167,17 @@ class Driver extends Authenticatable
     public function scopeIdle(Builder $query): Builder
     {
         return $query->where('engagement', 0);
+    }
+
+    /**
+     * Live-first order: on trip → en route → online-idle → offline, then by name.
+     * Reads the `engagement` / `is_online` generated columns, so the order always
+     * agrees with {@see engagementStatus()} / {@see isOnline()} (the old LIKE
+     * '%ONLINE%' CASE sorted an online status without that literal as offline).
+     */
+    public function scopeLiveFirst(Builder $query): Builder
+    {
+        return $query->orderByDesc('engagement')->orderByDesc('is_online')->orderBy('name')->orderBy('id');
     }
 
     /**

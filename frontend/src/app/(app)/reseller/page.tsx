@@ -20,6 +20,7 @@ import {
   type ResellerCompany,
   type GeneratedCode,
 } from "@/lib/api/reseller";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 export default function ResellerPage() {
   const { t, locale } = useI18n();
@@ -72,7 +73,7 @@ export default function ResellerPage() {
       setCode(res);
       toast.success(c("generated"));
     } catch (e) {
-      toast.error(c("failed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("failed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
     }
@@ -206,7 +207,7 @@ export default function ResellerPage() {
               setCode(res);
               toast.success(c("generated"));
             } catch (e) {
-              toast.error(c("failed"), { description: e instanceof Error ? e.message : undefined });
+              toast.error(c("failed"), { description: apiErrorMessage(e, t, locale) });
             }
           }}
         />

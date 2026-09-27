@@ -1,5 +1,7 @@
 "use client";
 
+import { formatNumber } from "@/lib/utils";
+
 /** Theme-aware Recharts tooltip: a surface card with a hairline and ink text. */
 export function ChartTooltip({
   active,
@@ -17,7 +19,7 @@ export function ChartTooltip({
   return (
     <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-lg">
       <div className="text-ink-subtle">{label}</div>
-      <div className="mt-0.5 font-semibold text-ink">{valueFormat ? valueFormat(v) : v.toLocaleString()}</div>
+      <div className="mt-0.5 font-semibold text-ink">{valueFormat ? valueFormat(v) : formatNumber(v, typeof document !== "undefined" ? document.documentElement.lang : "de")}</div>
     </div>
   );
 }

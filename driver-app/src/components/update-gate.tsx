@@ -16,10 +16,11 @@ type Gate = { required: boolean; storeUrl: string | null };
 // hardcoded default.
 const ALLOWED_STORE_HOSTS = ["play.google.com", "apps.apple.com", "market.android.com"];
 const TRUSTED_DOMAIN = "reidey.de"; // our own site (admin-hosted APK / update page)
+// Our own store listings (Android package de.reidey.app, App Store id from eas.json).
 const DEFAULT_STORE_URL =
   Platform.OS === "ios"
-    ? "https://apps.apple.com/"
-    : "https://play.google.com/store/apps";
+    ? "https://apps.apple.com/app/id6804695096"
+    : "https://play.google.com/store/apps/details?id=de.reidey.app";
 
 function isAllowedUrl(url: string | null): url is string {
   if (!url) return false;
@@ -50,12 +51,14 @@ export function UpdateGate({ children }: { children: React.ReactNode }) {
   const check = useCallback(() => {
     const platform = Platform.OS === "ios" ? "ios" : "android";
     const version = Constants.expoConfig?.version ?? "1.0.0";
+    // appVersion resolves null when the check failed: keep any prior "required"
+    // state then — never drop a gate that was already shown because one
+    // foreground re-check hit a flaky network. A cold launch still fails open.
+    const keepPrevious = () => setGate((prev) => prev ?? { required: false, storeUrl: null });
     api
       .appVersion(platform, version)
-      .then((r) => setGate({ required: r.update_required, storeUrl: r.store_url }))
-      // Keep any prior "required" state on a transient error — never drop a gate
-      // that was already shown just because one refresh failed.
-      .catch(() => setGate((prev) => prev ?? { required: false, storeUrl: null }));
+      .then((r) => (r ? setGate({ required: r.update_required, storeUrl: r.store_url }) : keepPrevious()))
+      .catch(keepPrevious);
   }, []);
 
   useEffect(() => {

@@ -1,17 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { View, Pressable, ActivityIndicator, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, ChevronRight, User, UserCircle, Map, Route, type LucideIcon } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, User, UserCircle, Map, Route, type LucideIcon } from "@/components/icons";
 import Svg, { Circle } from "react-native-svg";
-import { api, type Offer } from "@/lib/api";
+import { api, ApiError, type Offer } from "@/lib/api";
 import { openRouteInMaps } from "@/lib/maps";
 import { useAuth } from "@/lib/auth";
-import { t, isRTL } from "@/lib/i18n";
+import { t, isRTL, useLocale } from "@/lib/i18n";
 import { useColors, radius, cardStyle } from "@/lib/theme";
 import { fareLabel, perKmValue, perKmLabel, distanceLabel, cleanAddress, timeLabel } from "@/lib/format";
 import { StatusBadge, RouteBlock, SectionLabel, SecondaryButton } from "@/components/ui";
+import { useLiveReload } from "@/lib/use-live-reload";
 
 /** "19 Min" / "45 Sek" / "1 Std 5 Min" — how long the trip took. */
 function durationLabel(sec: number): string {
@@ -34,71 +35,125 @@ function acceptWindow(offer: Offer | null): number {
   return offer?.accept_window_seconds ?? COUNTDOWN_FALLBACK_SECONDS;
 }
 
-/**
- * Seconds remaining in the accept window, refreshed every animation frame so the
- * SVG ring depletes smoothly. The frame loop only runs while the offer is still
- * pending and the deadline is in the future; it stops itself the moment the
- * window elapses (or the status leaves "pending"), so no work is done once the
- * trip is active. Returns null when there is no accept window to count down.
- *
- * Keyed on the offer's identity/received_at/status (not the whole object) so a
- * 4s re-fetch that returns an equivalent offer does NOT restart the RAF loop.
- */
-function useCountdown(offer: Offer | null): number | null {
-  const [now, setNow] = useState(() => Date.now());
-  const receivedAt = offer?.received_at ?? null;
-  const status = offer?.status ?? null;
-  const windowSeconds = acceptWindow(offer);
-  useEffect(() => {
-    if (!receivedAt || status !== "pending") return;
-    const deadline = new Date(receivedAt).getTime() + windowSeconds * 1000;
-    let raf = 0;
-    const tick = () => {
-      setNow(Date.now());
-      if (Date.now() < deadline) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [receivedAt, status, windowSeconds]);
-  return useMemo(() => {
-    if (!receivedAt) return null;
-    const deadline = new Date(receivedAt).getTime() + windowSeconds * 1000;
-    return Math.max(0, (deadline - now) / 1000);
-  }, [receivedAt, windowSeconds, now]);
+/** Statuses after which nothing about the offer changes any more. */
+const TERMINAL_STATUSES = new Set(["completed", "rejected", "canceled"]);
+
+/** Deadline of the accept window (ms epoch), or null without a received time. */
+function deadlineOf(receivedAt: string | null, windowSeconds: number): number | null {
+  const received = receivedAt ? Date.parse(receivedAt) : NaN;
+  return Number.isFinite(received) ? received + windowSeconds * 1000 : null;
 }
 
+/**
+ * Seconds left in the accept window, re-rendering ONLY the component that uses
+ * it, and only when the shown tenth changes (100 ms ticks) — the rest of the
+ * offer screen no longer re-renders every animation frame.
+ */
+function useSecondsLeft(deadline: number | null, active: boolean): number | null {
+  const compute = () => (deadline === null ? null : Math.max(0, Math.round((deadline - Date.now()) / 100) / 10));
+  const [left, setLeft] = useState(compute);
+  useEffect(() => {
+    setLeft(compute());
+    if (deadline === null || !active || Date.now() >= deadline) return;
+    const id = setInterval(() => {
+      const next = compute();
+      setLeft((prev) => (prev === next ? prev : next));
+      if (Date.now() >= deadline) clearInterval(id);
+    }, 100);
+    return () => clearInterval(id);
+  }, [deadline, active]);
+  return left;
+}
+
+/** True until the deadline passes — flips once (a single timeout, no ticking). */
+function useWindowOpen(deadline: number | null, active: boolean): boolean {
+  const [open, setOpen] = useState(() => deadline !== null && active && Date.now() < deadline);
+  useEffect(() => {
+    const isOpen = deadline !== null && active && Date.now() < deadline;
+    setOpen(isOpen);
+    if (!isOpen || deadline === null) return;
+    const id = setTimeout(() => setOpen(false), deadline - Date.now());
+    return () => clearTimeout(id);
+  }, [deadline, active]);
+  return open;
+}
+
+function ringColorFor(pct: number, c: ReturnType<typeof useColors>): string {
+  return pct > 0.5 ? c.completed : pct > 0.25 ? c.pending : c.canceled;
+}
+
+/** The depleting countdown arc, drawn over the static track. */
+const CountdownArc = memo(function CountdownArc({ deadline, windowSeconds }: { deadline: number | null; windowSeconds: number }) {
+  const c = useColors();
+  const left = useSecondsLeft(deadline, true);
+  if (left === null) return null;
+  const pct = windowSeconds > 0 ? Math.max(0, Math.min(1, left / windowSeconds)) : 0;
+  return (
+    <Svg width={RING} height={RING} style={{ position: "absolute", transform: [{ rotate: "-90deg" }] }}>
+      <Circle
+        cx={RING / 2} cy={RING / 2} r={R}
+        stroke={ringColorFor(pct, c)} strokeWidth={STROKE} fill="none" strokeLinecap="round"
+        strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - pct)}
+      />
+    </Svg>
+  );
+});
+
+/** The live "4.2s" label under the fare. */
+const CountdownLabel = memo(function CountdownLabel({ deadline, windowSeconds }: { deadline: number | null; windowSeconds: number }) {
+  const c = useColors();
+  const left = useSecondsLeft(deadline, true);
+  if (left === null) return null;
+  const pct = windowSeconds > 0 ? Math.max(0, Math.min(1, left / windowSeconds)) : 0;
+  return (
+    <Text style={{ color: ringColorFor(pct, c), fontSize: 16, fontWeight: "600", marginTop: 6, writingDirection: "ltr" }}>
+      {`${left.toFixed(1)}s`}
+    </Text>
+  );
+});
+
+/** What went wrong loading the offer: gone for good vs. a transient failure. */
+type LoadFailure = "not_found" | "retry" | null;
+
 export default function OfferScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string | string[] }>();
+  const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
+  // A deep link (reidey://offer/...) is attacker-controlled: numeric ids only.
+  const id = typeof rawId === "string" && /^\d+$/.test(rawId) ? rawId : null;
   const router = useRouter();
   const c = useColors();
   const { isOwner } = useAuth();
+  useLocale(); // re-render on a language switch
   const [offer, setOffer] = useState<Offer | null>(null);
-  const [error, setError] = useState(false);
-  const secondsLeft = useCountdown(offer);
+  const [failure, setFailure] = useState<LoadFailure>(id ? null : "not_found");
   const row = isRTL() ? "row-reverse" : "row";
 
-  // Load once, then poll so the status tracks the backend lifecycle (pending →
-  // rejected / accepted / started / completed / canceled), just like the
-  // dashboard — instead of a local "expired" that never updates.
-  useEffect(() => {
-    let alive = true;
-    const load = () => {
-      const fetcher = isOwner ? api.fleetOffer(id) : api.offer(id);
-      fetcher
-        .then((r) => {
-          if (!alive) return;
-          setOffer(r.data);
-          setError(false);
-        })
-        .catch(() => alive && setError(true));
-    };
-    load();
-    const iv = setInterval(load, 4000);
-    return () => {
-      alive = false;
-      clearInterval(iv);
-    };
-  }, [id, isOwner]);
+  // Load, then keep the status in sync with the backend lifecycle (pending →
+  // rejected / accepted / started / completed / canceled): poll every 4s while
+  // the socket is down, slowly while it is up, and on every event for THIS
+  // offer. Stops once the offer reaches a final state.
+  const finished = offer !== null && TERMINAL_STATUSES.has(offer.status ?? "");
+  useLiveReload(
+    async () => {
+      if (!id) return;
+      try {
+        const r = await (isOwner ? api.fleetOffer(id) : api.offer(id));
+        setOffer(r.data);
+        setFailure(null);
+      } catch (e) {
+        // 404/403: gone or not ours. Anything else (offline, timeout, 5xx) is
+        // transient — keep polling and never call it "expired".
+        const gone = e instanceof ApiError && (e.status === 404 || e.status === 403);
+        setFailure(gone ? "not_found" : "retry");
+      }
+    },
+    {
+      fastMs: 4_000,
+      slowMs: 15_000,
+      enabled: id !== null && !finished,
+      accept: (e) => e.offerId === undefined || String(e.offerId) === id,
+    },
+  );
 
   function openMaps() {
     if (!offer) return;
@@ -116,7 +171,7 @@ export default function OfferScreen() {
 
   const status = offer?.status ?? "pending";
   const win = acceptWindow(offer);
-  const pct = secondsLeft != null && win > 0 ? Math.max(0, Math.min(1, secondsLeft / win)) : 0;
+  const deadline = deadlineOf(offer?.received_at ?? null, win);
   // The status LABEL is driven ONLY by the backend `offer.status`, never by the
   // local countdown. The backend deliberately HOLDS an offer as `pending` while
   // the driver is busy (it's taken back-to-back, or rejected only once idle), so a
@@ -125,8 +180,7 @@ export default function OfferScreen() {
   // ring may still visually deplete; `counting` only decides whether the live
   // seconds are shown, not the status.
   const isPending = status === "pending";
-  const counting = isPending && secondsLeft != null && secondsLeft > 0;
-  const ringColor = pct > 0.5 ? c.completed : pct > 0.25 ? c.pending : c.canceled;
+  const counting = useWindowOpen(deadline, isPending);
 
   // Once the offer is taken, the ring stops being a countdown and becomes a
   // lifecycle progress meter in our deep green: accepted (driver → pickup) →
@@ -145,7 +199,13 @@ export default function OfferScreen() {
     <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: c.canvas }}>
       {/* Header */}
       <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", paddingHorizontal: 16, paddingVertical: 10 }}>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={{ position: "absolute", [isRTL() ? "right" : "left"]: 16 }}>
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={t("common.back")}
+          style={{ position: "absolute", [isRTL() ? "right" : "left"]: 16 }}
+        >
           {isRTL() ? <ChevronRight size={26} color={c.ink} /> : <ChevronLeft size={26} color={c.ink} />}
         </Pressable>
         <Text style={{ color: c.ink, fontSize: 17, fontWeight: "600" }}>{t("offer.header")}</Text>
@@ -153,7 +213,16 @@ export default function OfferScreen() {
 
       {!offer ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          {error ? <Text style={{ color: c.inkSubtle }}>{t("offer.expired")}</Text> : <ActivityIndicator color={c.ink} />}
+          {failure === "not_found" ? (
+            <Text style={{ color: c.inkSubtle }}>{t("offer.notFound")}</Text>
+          ) : (
+            <View style={{ alignItems: "center", gap: 12 }}>
+              <ActivityIndicator color={c.ink} />
+              {failure === "retry" && (
+                <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: "center" }}>{t("offer.reconnecting")}</Text>
+              )}
+            </View>
+          )}
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 18 }}>
@@ -162,13 +231,6 @@ export default function OfferScreen() {
             <View style={{ width: RING, height: RING, alignItems: "center", justifyContent: "center" }}>
               <Svg width={RING} height={RING} style={{ position: "absolute", transform: [{ rotate: "-90deg" }] }}>
                 <Circle cx={RING / 2} cy={RING / 2} r={R} stroke={c.line} strokeWidth={STROKE} fill="none" />
-                {isPending && secondsLeft != null && (
-                  <Circle
-                    cx={RING / 2} cy={RING / 2} r={R}
-                    stroke={ringColor} strokeWidth={STROKE} fill="none" strokeLinecap="round"
-                    strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - pct)}
-                  />
-                )}
                 {showProgress && (
                   <Circle
                     cx={RING / 2} cy={RING / 2} r={R}
@@ -177,6 +239,7 @@ export default function OfferScreen() {
                   />
                 )}
               </Svg>
+              {isPending && <CountdownArc deadline={deadline} windowSeconds={win} />}
               {/* Hero is the €/km rate — the number the driver judges in ~5s. The
                   total fare sits beneath it as the secondary figure. Falls back to
                   the total when the trip is not geo-synced yet (no per-km). */}
@@ -203,9 +266,7 @@ export default function OfferScreen() {
                 badge label always comes from the backend status: pending, then
                 rejected / accepted / started / completed / canceled. */}
             {counting ? (
-              <Text style={{ color: ringColor, fontSize: 16, fontWeight: "600", marginTop: 6 }}>
-                {`${secondsLeft!.toFixed(1)}s`}
-              </Text>
+              <CountdownLabel deadline={deadline} windowSeconds={win} />
             ) : showProgress ? (
               // Trip lifecycle progress: the percentage replaces the status word.
               <Text style={{ color: PROGRESS_GREEN, fontSize: 18, fontWeight: "700", marginTop: 8 }}>

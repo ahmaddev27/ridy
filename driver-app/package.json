@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "node --test tests/pure-logic.test.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/manrope": "^0.4.2",
@@ -23,6 +24,7 @@
     "expo-build-properties": "~57.0.14",
     "expo-constants": "~57.0.14",
     "expo-device": "~57.0.1",
+    "expo-file-system": "~57.0.5",
     "expo-font": "~57.0.1",
     "expo-linking": "~57.0.7",
     "expo-localization": "~57.0.1",

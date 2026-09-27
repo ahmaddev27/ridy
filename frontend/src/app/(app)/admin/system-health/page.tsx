@@ -12,11 +12,14 @@ import { ServerResources } from "@/components/admin/server-resources";
 import { InfrastructureHealth } from "@/components/admin/infrastructure-health";
 import { LogsPanel } from "@/components/admin/logs-panel";
 import { useI18n } from "@/lib/i18n/context";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { formatNumber, latnLocale } from "@/lib/utils";
 import { useAsync } from "@/hooks/use-async";
 import { getSystemHealth, clearNetworkLogs, type SystemHealthRow } from "@/lib/api/admin";
 
 export default function SystemHealthPage() {
   const { t, locale } = useI18n();
+  const isWide = useMediaQuery("(min-width: 768px)");
   const c = (k: string) => t(`screens.systemHealth.${k}`);
   const { data, loading, error } = useAsync(getSystemHealth, { refetchInterval: 30000 });
   const rows = data ?? [];
@@ -52,7 +55,7 @@ export default function SystemHealthPage() {
             if (!confirm(c("clearNetworkConfirm"))) return;
             try {
               const { deleted } = await clearNetworkLogs();
-              toast.success(c("clearNetworkDone").replace("{n}", deleted.toLocaleString()));
+              toast.success(c("clearNetworkDone").replace("{n}", formatNumber(deleted, locale)));
             } catch {
               toast.error(c("clearNetworkFailed"));
             }
@@ -89,8 +92,9 @@ export default function SystemHealthPage() {
           <EmptyState icon={Building2} title={c("emptyTitle")} description={c("emptyDesc")} />
         ) : (
           <>
-            {/* Desktop / tablet table */}
-            <div className="hidden overflow-x-auto md:block">
+            {/* Desktop / tablet table — only one layout is mounted. */}
+            {isWide ? (
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
                   <tr>
@@ -123,8 +127,9 @@ export default function SystemHealthPage() {
               </table>
             </div>
 
-            {/* Mobile stacked cards */}
-            <div className="divide-y divide-line md:hidden">
+            ) : (
+            /* Mobile stacked cards */
+            <div className="divide-y divide-line">
               {rows.map((r) => (
                 <div key={r.id} className="space-y-3 p-4">
                   <div className="font-semibold text-ink">{r.name}</div>
@@ -143,6 +148,7 @@ export default function SystemHealthPage() {
                 </div>
               ))}
             </div>
+            )}
           </>
         )}
           </Card>
@@ -248,13 +254,25 @@ function ProxyCell({ row, c }: { row: SystemHealthRow; c: Tr }) {
   );
 }
 
+// One formatter per locale (relTime runs for every cell on each 30 s refetch).
+const rtfCache = new Map<string, Intl.RelativeTimeFormat>();
+function relativeFormatter(locale: string): Intl.RelativeTimeFormat {
+  const key = locale || "en";
+  let rtf = rtfCache.get(key);
+  if (!rtf) {
+    rtf = new Intl.RelativeTimeFormat(latnLocale(key), { numeric: "auto", style: "short" });
+    rtfCache.set(key, rtf);
+  }
+  return rtf;
+}
+
 /** Short relative time (e.g. "3m ago"). Falls back to `never` when null. */
 function relTime(iso: string | null, locale: string, never: string): string {
   if (!iso) return never;
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return never;
   const diffSec = Math.round((then - Date.now()) / 1000);
-  const rtf = new Intl.RelativeTimeFormat(locale || "en", { numeric: "auto", style: "short" });
+  const rtf = relativeFormatter(locale);
   const abs = Math.abs(diffSec);
   if (abs < 60) return rtf.format(Math.round(diffSec), "second");
   if (abs < 3600) return rtf.format(Math.round(diffSec / 60), "minute");

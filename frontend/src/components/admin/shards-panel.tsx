@@ -8,6 +8,7 @@ import { Badge, type Status } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
+import { formatDateTime, formatNumber } from "@/lib/utils";
 import { useAsync } from "@/hooks/use-async";
 import { listShards, updateShard, rebalanceShards, type DaemonShardRow } from "@/lib/api/admin";
 
@@ -61,7 +62,7 @@ export function ShardsPanel() {
         <div className="grid grid-cols-3 gap-3">
           <Stat label={c("statShards")} value={String(rows.length)} />
           <Stat label={c("statLive")} value={String(liveCount)} />
-          <Stat label={c("statCompanies")} value={totalCompanies.toLocaleString(locale)} />
+          <Stat label={c("statCompanies")} value={formatNumber(totalCompanies, locale)} />
         </div>
       )}
 
@@ -99,9 +100,9 @@ export function ShardsPanel() {
                         {r.label && <div className="text-xs text-ink-subtle">{r.label}</div>}
                       </td>
                       <td className="px-4 py-3"><Badge status={tone}>{label}</Badge></td>
-                      <td className="px-4 py-3 font-medium text-ink">{r.companies.toLocaleString(locale)}</td>
+                      <td className="px-4 py-3 font-medium text-ink">{formatNumber(r.companies, locale)}</td>
                       <td className="px-4 py-3 text-ink-muted">
-                        {r.last_seen_at ? new Date(r.last_seen_at).toLocaleString(locale) : "—"}
+                        {r.last_seen_at ? formatDateTime(r.last_seen_at, locale) : "—"}
                       </td>
                       <td className="px-4 py-3 text-end">
                         <Button variant="secondary" size="sm" onClick={() => toggleActive(r)} disabled={busy === r.id}>

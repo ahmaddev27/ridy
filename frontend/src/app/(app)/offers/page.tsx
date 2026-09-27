@@ -1,29 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { latnLocale, toLatinDigits } from "@/lib/utils";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { formatMoney, latnLocale, toLatinDigits } from "@/lib/utils";
 import { toast } from "sonner";
 import { Radio, MapPin, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Inbox, CheckCircle2, XCircle, Gauge, Wallet, Download } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
-import { Badge, type Status } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
-import { listOffersPaged, getOfferStats, exportOffers, fareLabel, offerBadgeStatus, type DispatchOffer, type OfferStatus, type PageMeta, type OfferStats } from "@/lib/api/offers";
-import { fleetNow } from "@/lib/fleet-day";
+import { listOffersPaged, getOfferStats, exportOffers, fareLabel, offerBadgeStatus, type DispatchOffer, type PageMeta, type OfferStats } from "@/lib/api/offers";
+import { fleetDayKey, fleetYmd, formatYmd } from "@/lib/fleet-day";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
-
-/** Offer lifecycle status → badge tone. */
-const OFFER_TONE: Record<OfferStatus, Status> = {
-  pending: "expiring",
-  accepted: "info",
-  started: "private",
-  completed: "connected",
-  rejected: "neutral",
-  canceled: "personal",
-};
+import { OFFER_TONE } from "@/lib/offer-status";
+import { OPEN_OFFER_EVENT } from "@/components/offer-alerts";
+import { usePolling } from "@/hooks/use-polling";
 import { StatCard } from "@/components/ui/card";
 import { listDrivers, type Driver } from "@/lib/api/drivers";
 import { OfferDetailModal } from "./offer-detail-modal";
@@ -44,8 +38,13 @@ export default function OffersPage() {
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
   const [driverFilterOpen, setDriverFilterOpen] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
+  const router = useRouter();
   // Stable identity so the modal's fetch effect doesn't re-run every render.
-  const closeDetail = useCallback(() => setDetailId(null), []);
+  // Closing also drops a ?offer= deep link so a reload doesn't reopen it.
+  const closeDetail = useCallback(() => {
+    setDetailId(null);
+    if (new URLSearchParams(window.location.search).has("offer")) router.replace("/offers", { scroll: false });
+  }, [router]);
 
   // Deep link: /offers?offer=<id> (from the new-offer alert) opens that offer.
   useEffect(() => {
@@ -53,49 +52,73 @@ export default function OffersPage() {
     if (id > 0) setDetailId(id);
   }, []);
 
+  // "View" on a new-offer toast while already on this page opens it in place
+  // (router.push to the same route would not re-run the deep-link effect).
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const id = (e as CustomEvent<number>).detail;
+      if (typeof id === "number" && id > 0) setDetailId(id);
+    };
+    window.addEventListener(OPEN_OFFER_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_OFFER_EVENT, onOpen);
+  }, []);
+
   const [page, setPage] = useState(1);
   const [perPage] = useState(50); // fixed; offers are grouped by day, not paged by size
   // Collapsible day groups — today starts open, the rest collapsed.
-  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set([fleetNow().toDateString()]));
+  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set([fleetYmd()]));
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  // Which quick-range chip is active (today / week / month), or null for a
-  // manual range. Tracked separately so the chip can highlight and manual edits
-  // clear it.
   const [meta, setMeta] = useState<PageMeta | null>(null);
   const [stats, setStats] = useState<OfferStats | null>(null);
 
-  // A silent load (background poll) refreshes the feed in place: it keeps the
-  // skeleton hidden and preserves the manager's current checkbox selection, so
-  // new offers appear without disrupting anything on screen.
-  async function load(silent = false) {
+  // Request sequencing: only the newest list/stats request may write state, so
+  // a slow poll for an old filter can't overwrite the table after the filter
+  // changed. `listLoading` also keeps silent polls from stacking on a visible load.
+  const listSeq = useRef(0);
+  const statsSeq = useRef(0);
+  const listLoading = useRef(false);
+
+  const filterParams = () => ({
+    search: search.trim(),
+    driverUuids: driverUuids.length ? driverUuids : undefined,
+    from: from || undefined,
+    to: to || undefined,
+  });
+
+  // A silent load (background poll / realtime) refreshes the feed in place: it
+  // keeps the skeleton hidden, so new offers appear without disrupting anything.
+  async function loadList(silent = false) {
+    if (silent && listLoading.current) return;
+    const my = ++listSeq.current;
     if (!silent) {
+      listLoading.current = true;
       setLoading(true);
       setError(null);
     }
     try {
-      const { items, meta: m } = await listOffersPaged({
-        search: search.trim(),
-        driverUuids: driverUuids.length ? driverUuids : undefined,
-        from: from || undefined,
-        to: to || undefined,
-        page,
-        perPage,
-      });
+      const { items, meta: m } = await listOffersPaged({ ...filterParams(), page, perPage });
+      if (my !== listSeq.current) return;
       setOffers(items);
       setMeta(m);
-      getOfferStats({
-        search: search.trim(),
-        driverUuids: driverUuids.length ? driverUuids : undefined,
-        from: from || undefined,
-        to: to || undefined,
-      })
-        .then(setStats)
-        .catch((e) => console.error("offer stats fetch failed", e));
     } catch (e) {
-      if (!silent) setError(e instanceof Error ? e.message : "error");
+      if (my === listSeq.current && !silent) setError(e instanceof Error ? e.message : "error");
+      if (silent) throw e; // lets the poller back off
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent) listLoading.current = false;
+      if (my === listSeq.current && !silent) setLoading(false);
+    }
+  }
+
+  // The aggregates cover the whole filter (often the full offer history), so
+  // they refresh on filter changes and on a slow timer — never on every poll.
+  async function loadStats() {
+    const my = ++statsSeq.current;
+    try {
+      const s = await getOfferStats(filterParams());
+      if (my === statsSeq.current) setStats(s);
+    } catch (e) {
+      console.error("offer stats fetch failed", e);
     }
   }
 
@@ -106,31 +129,57 @@ export default function OffersPage() {
     setPage(1);
   }, [search, driverKey, from, to, perPage]);
 
-  // Debounce search + react to filter/page/page-size changes.
+  // React to filter/page changes: immediately, except typing in the search box
+  // which is debounced.
+  const lastSearch = useRef(search);
   useEffect(() => {
-    const id = setTimeout(load, 300);
+    const delay = lastSearch.current !== search ? 300 : 0;
+    lastSearch.current = search;
+    const id = setTimeout(() => void loadList(), delay);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, driverKey, from, to, page, perPage]);
 
-  // Near real-time: silently poll for new offers every 5s (offers are the most
-  // time-sensitive surface). Also refetch when the tab regains focus.
+  const lastStatsSearch = useRef(search);
   useEffect(() => {
-    const id = setInterval(() => load(true), 5000);
-    const onFocus = () => document.visibilityState === "visible" && load(true);
-    document.addEventListener("visibilitychange", onFocus);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", onFocus);
-      window.removeEventListener("focus", onFocus);
-    };
+    const delay = lastStatsSearch.current !== search ? 300 : 0;
+    lastStatsSearch.current = search;
+    const id = setTimeout(() => void loadStats(), delay);
+    return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, driverKey, from, to, page, perPage]);
+  }, [search, driverKey, from, to]);
 
-  // Live: an offer change on the company channel refreshes the feed in place at
-  // once (the 5s poll above stays as the fallback).
-  useCompanyRealtime(user?.tenant?.id, () => load(true));
+  // Timers below call the latest loaders (current filters), never a stale closure.
+  const loadListRef = useRef(loadList);
+  loadListRef.current = loadList;
+  const loadStatsRef = useRef(loadStats);
+  loadStatsRef.current = loadStats;
+
+  // Background refresh (paused in hidden tabs, backs off on errors). Kept fast
+  // even with the WebSocket up: offers of an unlinked driver get no "new"
+  // broadcast, so only this poll surfaces them.
+  usePolling(() => loadList(true), 5_000);
+  usePolling(loadStats, 60_000);
+
+  // Live: offer changes on the company channel refresh the list — coalesced so a
+  // burst of events causes one request — and the stats a little later.
+  const realtimeListTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const realtimeStatsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useCompanyRealtime(user?.tenant?.id, () => {
+    if (realtimeListTimer.current) clearTimeout(realtimeListTimer.current);
+    realtimeListTimer.current = setTimeout(() => void loadListRef.current(true).catch(() => {}), 1000);
+    realtimeStatsTimer.current ??= setTimeout(() => {
+      realtimeStatsTimer.current = null;
+      void loadStatsRef.current();
+    }, 15_000);
+  });
+  useEffect(
+    () => () => {
+      if (realtimeListTimer.current) clearTimeout(realtimeListTimer.current);
+      if (realtimeStatsTimer.current) clearTimeout(realtimeStatsTimer.current);
+    },
+    [],
+  );
 
   // All of the company's drivers (with an Uber UUID) populate the filter list.
   useEffect(() => {
@@ -174,7 +223,7 @@ export default function OffersPage() {
   const groupedByDay = useMemo(() => {
     const groups = new Map<string, DispatchOffer[]>();
     for (const o of offers) {
-      const key = o.received_at ? fleetNow(new Date(o.received_at)).toDateString() : "—";
+      const key = o.received_at ? fleetDayKey(o.received_at) : "—";
       const bucket = groups.get(key) ?? [];
       bucket.push(o);
       groups.set(key, bucket);
@@ -192,9 +241,9 @@ export default function OffersPage() {
   }
 
   function dayLabel(key: string): string {
-    if (key === fleetNow().toDateString()) return c("today");
+    if (key === fleetYmd()) return c("today");
     if (key === "—") return "—";
-    return new Date(key).toLocaleDateString(latnLocale(locale), { weekday: "long", day: "numeric", month: "long" });
+    return formatYmd(key, latnLocale(locale), { weekday: "long", day: "numeric", month: "long" });
   }
 
 
@@ -255,6 +304,7 @@ export default function OffersPage() {
 
         {/* Uber-style date-range navigator (presets + custom + ‹ › stepping). */}
         <DateRangeFilter
+          fleetDays
           from={from}
           to={to}
           onChange={(f, t2) => {
@@ -282,7 +332,7 @@ export default function OffersPage() {
           <StatCard icon={CheckCircle2} label={c("statAccepted")} value={stats.accepted.toLocaleString(latnLocale(locale))} tone="positive" />
           <StatCard icon={XCircle} label={c("statNotTaken")} value={stats.declined.toLocaleString(latnLocale(locale))} />
           <StatCard icon={Gauge} label={c("statRate")} value={`${stats.acceptance_rate}%`} tone={stats.acceptance_rate >= 50 ? "positive" : "default"} />
-          <StatCard icon={Wallet} label={c("statEarnings")} value={`€${stats.earnings.toFixed(2)}`} tone="positive" />
+          <StatCard icon={Wallet} label={c("statEarnings")} value={formatMoney(stats.earnings, locale)} tone="positive" />
         </div>
       )}
 
@@ -328,7 +378,17 @@ export default function OffersPage() {
                               className="cursor-pointer hover:bg-surface-2"
                             >
                               <td className="whitespace-nowrap px-4 py-3 text-ink-muted">
-                                {o.received_at ? new Date(o.received_at).toLocaleTimeString(latnLocale(locale)) : "—"}
+                                {/* A real control so keyboard users can open the offer too. */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDetailId(o.id);
+                                  }}
+                                  className="rounded outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                                >
+                                  {o.received_at ? new Date(o.received_at).toLocaleTimeString(latnLocale(locale)) : "—"}
+                                </button>
                               </td>
                               <td className="px-4 py-3">
                                 <div className="font-medium text-ink">{o.driver_name ?? "—"}</div>

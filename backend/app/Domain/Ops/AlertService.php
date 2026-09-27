@@ -2,10 +2,11 @@
 
 namespace App\Domain\Ops;
 
+use App\Domain\Notifications\Jobs\SendRenderedMail;
 use App\Domain\Ops\Models\AlertIncident;
 use App\Support\RidyLog;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -56,19 +57,24 @@ class AlertService
         RidyLog::event('alert.resolved', ['key' => $key, 'kind' => $open->kind]);
     }
 
+    /**
+     * Always leaves a production log line (the record when no ops address is set)
+     * and QUEUES the email: SMTP latency must never stall the scheduler tick, and a
+     * transient mailer failure is retried by the job instead of being lost.
+     */
     private function notify(string $subject, string $body): void
     {
+        Log::warning('ops.alert', ['subject' => $subject, 'body' => $body]);
+
         $to = config('services.alerts.email');
         if (empty($to)) {
-            return; // no ops address — the RidyLog entry is the record
+            return;
         }
 
         try {
-            Mail::raw($body, function ($mail) use ($to, $subject) {
-                $mail->to($to)->subject('[Reidey Ops] '.$subject);
-            });
+            SendRenderedMail::dispatch((string) $to, '[Reidey Ops] '.$subject, $body, false);
         } catch (Throwable $e) {
-            RidyLog::event('alert.email_failed', ['error' => $e->getMessage()]);
+            RidyLog::failure('alert.email_failed', ['subject' => $subject], $e);
         }
     }
 }

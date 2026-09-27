@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useId, useRef } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useDialogFocus } from "@/components/ui/modal";
 
 /**
  * A small, reusable confirmation dialog matching the dashboard design. Controlled
@@ -29,12 +30,12 @@ export function ConfirmModal({
   busy?: boolean;
   danger?: boolean;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !busy && onCancel();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, busy, onCancel]);
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const titleId = useId();
+  const messageId = useId();
+  // Focus in/trap/restore + Escape (ignored while the action is running).
+  const panelRef = useDialogFocus(open, () => !busyRef.current && onCancel());
 
   if (!open) return null;
 
@@ -44,7 +45,13 @@ export function ConfirmModal({
       onClick={() => !busy && onCancel()}
     >
       <div
-        className="w-full max-w-sm overflow-hidden rounded-2xl bg-surface text-start shadow-xl"
+        ref={panelRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={messageId}
+        tabIndex={-1}
+        className="w-full max-w-sm overflow-hidden rounded-2xl bg-surface text-start shadow-xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-5">
@@ -57,8 +64,8 @@ export function ConfirmModal({
               <AlertTriangle className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="font-semibold text-ink">{title}</h2>
-              <p className="mt-1 text-sm text-ink-muted">{message}</p>
+              <h2 id={titleId} className="font-semibold text-ink">{title}</h2>
+              <p id={messageId} className="mt-1 text-sm text-ink-muted">{message}</p>
             </div>
           </div>
         </div>

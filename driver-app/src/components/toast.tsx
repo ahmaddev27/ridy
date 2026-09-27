@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, View } from "react-native";
-import { CheckCircle, AlertCircle, Info, type LucideIcon } from "lucide-react-native";
+import { CheckCircle, AlertCircle, Info, type LucideIcon } from "@/components/icons";
 import { Text } from "@/components/typography";
 import { useColors, radius } from "@/lib/theme";
 import { isRTL } from "@/lib/i18n";

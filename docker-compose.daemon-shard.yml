@@ -11,6 +11,11 @@
 #   SHARD_ID                this box's shard name (unique per box, e.g. "shard-2")
 #   UBER_PROXY_URL          optional global fallback proxy (usually empty — proxies are per-company)
 #
+# The three required values use ${VAR:?…}, so `docker compose up` refuses to
+# start when one is missing. An unset SHARD_ID used to become "" and the daemon
+# then silently identified as "main" (the main box's identity): every company
+# was streamed twice and each box's cookie rotation tore the other's streams down.
+#
 # Deploy:
 #   docker compose -f docker-compose.daemon-shard.yml up -d --build
 #
@@ -22,10 +27,17 @@ services:
       context: .
       dockerfile: ./docker/dispatch-daemon.Dockerfile
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
     environment:
-      RIDY_API_URL: ${RIDY_API_URL}
-      DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
+      RIDY_API_URL: ${RIDY_API_URL:?RIDY_API_URL must be set (the main box, e.g. https://reidey.de)}
+      DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET:?DISPATCH_INGEST_SECRET must be set (same value as the backend)}
       UBER_DISPATCH_BASE_URL: https://vsdispatch.uber.com
       UBER_RAMEN_PATHS: /ramendca/events,/ramenphx/events
       UBER_PROXY_URL: ${UBER_PROXY_URL:-}
-      SHARD_ID: ${SHARD_ID}
+      SHARD_ID: ${SHARD_ID:?SHARD_ID must be set - unique per shard box, never main}

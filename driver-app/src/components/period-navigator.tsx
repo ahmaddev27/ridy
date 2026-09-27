@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { View, Pressable, Modal } from "react-native";
 import { Text } from "@/components/typography";
-import { ChevronLeft, ChevronRight, ChevronDown, Check, Calendar as CalendarIcon } from "lucide-react-native";
-import { t, isRTL } from "@/lib/i18n";
+import { ChevronLeft, ChevronRight, ChevronDown, Check, Calendar as CalendarIcon } from "@/components/icons";
+import { t, isRTL, intlLocale, useLocale } from "@/lib/i18n";
 import { useColors, radius, cardStyle } from "@/lib/theme";
 import { fleetNow } from "@/lib/fleet-day";
 
@@ -19,7 +19,6 @@ type Colors = ReturnType<typeof useColors>;
 export type PeriodRange = "today" | "week" | "month";
 export const PERIOD_RANGES: PeriodRange[] = ["today", "week", "month"];
 
-const DAY_LOCALE = "en-DE";
 const mondayIndex = (d: Date) => (d.getDay() + 6) % 7;
 
 /** Local yyyy-mm-dd (the date-range the stats/offers endpoints expect). */
@@ -66,12 +65,23 @@ export function endOfPeriod(r: PeriodRange, start: Date): Date {
   return e;
 }
 
-/** Human label: "Mon, 25 Aug" · "24 Aug – 31 Aug" · "August 2026". */
+/** Human label in the app language (Latin digits): "Mo., 25. Aug." · "24 Aug – 31 Aug" · "August 2026". */
 export function periodLabel(r: PeriodRange, start: Date, end: Date): string {
-  const dm = (d: Date) => d.toLocaleDateString(DAY_LOCALE, { day: "numeric", month: "short" });
-  if (r === "today") return start.toLocaleDateString(DAY_LOCALE, { weekday: "short", day: "numeric", month: "short" });
+  const locale = intlLocale();
+  const dm = (d: Date) => d.toLocaleDateString(locale, { day: "numeric", month: "short" });
+  if (r === "today") return start.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
   if (r === "week") return `${dm(start)} – ${dm(end)}`;
-  return start.toLocaleDateString(DAY_LOCALE, { month: "long", year: "numeric" });
+  return start.toLocaleDateString(locale, { month: "long", year: "numeric" });
+}
+
+/** Monday-first short weekday names in the app language ("Mo", "Mon", Arabic initials). */
+export function weekdayShortNames(): string[] {
+  const locale = intlLocale();
+  const style = locale.startsWith("ar") ? "narrow" : "short";
+  // 2024-01-01 was a Monday.
+  return Array.from({ length: 7 }, (_, i) =>
+    new Date(2024, 0, 1 + i).toLocaleDateString(locale, { weekday: style }).replace(/\.$/, ""),
+  );
 }
 
 /** from/to (fleet-day yyyy-mm-dd) + label + the containing week's Monday, for a range+offset. */
@@ -105,17 +115,21 @@ export function PeriodNavigator({
   canNext: boolean;
 }) {
   const c = useColors();
+  useLocale(); // labels follow a language switch
   const [menu, setMenu] = useState(false);
   const [picking, setPicking] = useState(false); // list ↔ calendar view inside the modal
   const rtl = isRTL();
   const Prev = rtl ? ChevronRight : ChevronLeft;
   const Next = rtl ? ChevronLeft : ChevronRight;
   const close = () => { setMenu(false); setPicking(false); };
-  const arrow = (Icon: typeof ChevronLeft, onPress: () => void, on: boolean) => (
+  const arrow = (Icon: typeof ChevronLeft, onPress: () => void, on: boolean, a11y: string) => (
     <Pressable
       onPress={on ? onPress : undefined}
       disabled={!on}
       hitSlop={10}
+      accessibilityRole="button"
+      accessibilityLabel={a11y}
+      accessibilityState={{ disabled: !on }}
       style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", opacity: on ? 1 : 0.3 }}
     >
       <Icon size={22} color={c.ink} />
@@ -124,19 +138,21 @@ export function PeriodNavigator({
 
   return (
     <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
-      {arrow(Prev, onPrev, true)}
+      {arrow(Prev, onPrev, true, t("stats.prevPeriod"))}
 
       {/* The centre pill — tap to open the range picker (⌄). */}
       <Pressable
         onPress={() => setMenu(true)}
         hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={label}
         style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 18, paddingVertical: 9, borderRadius: radius.pill, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line }}
       >
         <Text style={{ color: c.ink, fontSize: 15.5, fontWeight: "700", writingDirection: "ltr" }}>{label}</Text>
         <ChevronDown size={16} color={c.inkMuted} />
       </Pressable>
 
-      {arrow(Next, onNext, canNext)}
+      {arrow(Next, onNext, canNext, t("stats.nextPeriod"))}
 
       {/* Range picker: the today/week/month list, plus a "pick a date" row that
           swaps in an in-house month calendar (no native module → OTA-safe). */}
@@ -186,11 +202,6 @@ export function PeriodNavigator({
   );
 }
 
-/** Weekday headers (Mon-first) derived once from a known Monday. */
-const WEEK_HEAD = Array.from({ length: 7 }, (_, i) =>
-  new Date(2024, 0, 1 + i).toLocaleDateString(DAY_LOCALE, { weekday: "short" }),
-);
-
 /** First of `d`'s month, at 00:00. */
 function firstOfMonth(d: Date): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), 1);
@@ -216,7 +227,8 @@ function MonthCalendar({
 }) {
   const today = fleetNow();
   const [view, setView] = useState(() => firstOfMonth(initial));
-  const monthTitle = view.toLocaleDateString(DAY_LOCALE, { month: "long", year: "numeric" });
+  const monthTitle = view.toLocaleDateString(intlLocale(), { month: "long", year: "numeric" });
+  const weekHead = weekdayShortNames();
   const lead = mondayIndex(view); // blank cells before day 1
   const daysInMonth = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
   const cells: (Date | null)[] = [
@@ -231,15 +243,15 @@ function MonthCalendar({
     <View style={{ padding: 6, gap: 6, minWidth: 300 }}>
       {/* Month header with ‹ back and ›/‹ month steppers. */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <Pressable onPress={onBack} hitSlop={8} style={{ padding: 6 }}>
+        <Pressable onPress={onBack} hitSlop={8} style={{ padding: 6 }} accessibilityRole="button" accessibilityLabel={t("common.back")}>
           <ChevronLeft size={20} color={c.inkMuted} />
         </Pressable>
         <Text style={{ color: c.ink, fontSize: 15.5, fontWeight: "700", writingDirection: "ltr" }}>{monthTitle}</Text>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Pressable onPress={() => step(-1)} hitSlop={8} style={{ padding: 6 }}>
+          <Pressable onPress={() => step(-1)} hitSlop={8} style={{ padding: 6 }} accessibilityRole="button" accessibilityLabel={t("stats.prevPeriod")}>
             <ChevronLeft size={20} color={c.ink} />
           </Pressable>
-          <Pressable onPress={canNextMonth ? () => step(1) : undefined} disabled={!canNextMonth} hitSlop={8} style={{ padding: 6, opacity: canNextMonth ? 1 : 0.3 }}>
+          <Pressable onPress={canNextMonth ? () => step(1) : undefined} disabled={!canNextMonth} hitSlop={8} style={{ padding: 6, opacity: canNextMonth ? 1 : 0.3 }} accessibilityRole="button" accessibilityLabel={t("stats.nextPeriod")}>
             <ChevronRight size={20} color={c.ink} />
           </Pressable>
         </View>
@@ -247,8 +259,8 @@ function MonthCalendar({
 
       {/* Weekday labels. */}
       <View style={{ flexDirection: "row" }}>
-        {WEEK_HEAD.map((w) => (
-          <Text key={w} style={{ flex: 1, textAlign: "center", color: c.inkSubtle, fontSize: 11, fontWeight: "600" }}>{w}</Text>
+        {weekHead.map((w, i) => (
+          <Text key={i} style={{ flex: 1, textAlign: "center", color: c.inkSubtle, fontSize: 11, fontWeight: "600" }}>{w}</Text>
         ))}
       </View>
 

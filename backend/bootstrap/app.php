@@ -1,12 +1,15 @@
 <?php
 
 use App\Http\Middleware\EnsureDashboardToken;
+use App\Http\Middleware\EnsureDriverAccount;
 use App\Http\Middleware\EnsureDriverTenantActive;
 use App\Http\Middleware\EnsureFleetConnected;
+use App\Http\Middleware\EnsureFleetOwner;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureUserAccount;
 use App\Http\Middleware\EnsureUserTenantActive;
 use App\Http\Middleware\ResolveTenant;
+use App\Http\Middleware\TrustCloudflareClientIp;
 use App\Http\Middleware\VerifyDispatchSecret;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -46,6 +49,11 @@ return Application::configure(basePath: dirname(__DIR__))
             | Request::HEADER_X_FORWARDED_PORT
             | Request::HEADER_X_FORWARDED_PROTO);
 
+        // Cloudflare sits in front of Caddy: when the peer is a Cloudflare edge,
+        // take the real visitor IP from CF-Connecting-IP (appended = runs after
+        // TrustProxies, before any throttle), so per-IP limits aren't shared.
+        $middleware->append(TrustCloudflareClientIp::class);
+
         $middleware->alias([
             'dispatch.secret' => VerifyDispatchSecret::class,
             'super.admin' => EnsureSuperAdmin::class,
@@ -54,6 +62,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'user.active' => EnsureUserTenantActive::class,
             'fleet.connected' => EnsureFleetConnected::class,
             'dashboard.only' => EnsureDashboardToken::class,
+            'driver.account' => EnsureDriverAccount::class,
+            'fleet.owner' => EnsureFleetOwner::class,
         ]);
 
         // SECURITY: route-model binding must resolve AFTER the tenant context is

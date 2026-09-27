@@ -1,6 +1,4 @@
-import { apiFetch, apiDownload } from "./client";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { apiFetch, apiDownload, apiText, apiUpload } from "./client";
 
 /** Super-admin invoice branding + issuer/bank/tax details used to render the
  *  subscription-invoice PDFs. Mirrors the backend `InvoiceSettings` payload. */
@@ -61,26 +59,12 @@ export async function saveInvoiceTemplate(payload: InvoiceSettingsInput): Promis
   return res.data;
 }
 
-function readCookie(name: string): string | null {
-  if (typeof document === "undefined") return null;
-  const m = document.cookie.match(new RegExp("(^|; )" + name + "=([^;]*)"));
-  return m ? decodeURIComponent(m[2]) : null;
-}
-
 /** Multipart logo upload (raw file or cropped blob). The contract returns `{ url }`. */
 export async function uploadInvoiceLogo(file: Blob): Promise<{ url: string }> {
-  await fetch(`${API_URL}/sanctum/csrf-cookie`, { credentials: "include" });
   const form = new FormData();
   const name = file instanceof File ? file.name : "logo.webp";
   form.append("image", file, name);
-  const res = await fetch(`${API_URL}${base}/image`, {
-    method: "POST",
-    credentials: "include",
-    headers: { Accept: "application/json", "X-XSRF-TOKEN": readCookie("XSRF-TOKEN") ?? "" },
-    body: form,
-  });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message ?? "upload failed");
-  const body = await res.json();
+  const body = await apiUpload<{ url?: string; data?: { url?: string } }>(`${base}/image`, form);
   // Contract: `{ url }`. Stay tolerant of a `{ data: { url } }` envelope too.
   return { url: (body.url ?? body.data?.url) as string };
 }
@@ -95,12 +79,7 @@ export async function uploadInvoiceLogo(file: Blob): Promise<{ url: string }> {
  */
 export async function fetchInvoicePreview(payload: InvoiceSettingsInput): Promise<string> {
   await saveInvoiceTemplate(payload);
-  const res = await fetch(`${API_URL}${base}/preview`, {
-    credentials: "include",
-    headers: { Accept: "text/html" },
-  });
-  if (!res.ok) throw new Error("preview failed");
-  return res.text();
+  return apiText(`${base}/preview`);
 }
 
 /** Download the rendered PDF for one subscription invoice as `{invoice}.pdf`. */

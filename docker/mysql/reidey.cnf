@@ -1,0 +1,48 @@
+# Reidey MySQL 8 server tuning — mounted read-only into the mysql service at
+# /etc/mysql/conf.d/reidey.cnf (docker-compose.prod.yml). Conservative values for
+# the single shared VPS; the box also runs PHP-FPM, Reverb, Next.js and the daemon.
+#
+# Every non-core option uses the `loose-` prefix, so an option the running
+# server version does not know is skipped with a warning instead of refusing to
+# start (a refused start = full outage).
+#
+# Applying a change restarts MySQL, so the CI deploy never does it (it starts
+# mysql only when it is not running: `up --no-recreate`). Apply a change here
+# manually on the VPS (in ~/ridy, after the deploy that brought the change) in
+# a low-traffic window:
+#   free -m                     # room for the buffer pool next to ~44 FPM workers?
+#   docker compose -f docker-compose.prod.yml up -d --no-deps mysql
+#   docker compose -f docker-compose.prod.yml exec mysql mysql -uroot -p -e 'SELECT @@innodb_buffer_pool_size, @@innodb_redo_log_capacity'
+# If RAM headroom is tight, lower innodb_buffer_pool_size to 512M first.
+
+[mysqld]
+# --- Memory ---------------------------------------------------------------------
+# The stock 128 MB pool is far below the hot working set (dispatch_offers,
+# drivers updated every few seconds, the DB-backed cache/session/jobs tables),
+# so the dashboards' COUNT/SUM polls went to disk. 1 GB is safe on the prod box
+# and can be raised once RAM headroom is confirmed (target ~50-60% of the RAM
+# set aside for MySQL).
+innodb_buffer_pool_size = 1G
+
+# --- Redo log -------------------------------------------------------------------
+# Larger redo capacity smooths the constant small writes (status sync, network
+# logs) instead of forcing frequent checkpoints. MySQL >= 8.0.30.
+loose-innodb_redo_log_capacity = 512M
+
+# --- Binary log -----------------------------------------------------------------
+# Nothing replicates from this server; backups are nightly mysqldump. The binlog
+# stays on (it allows point-in-time recovery on top of the nightly dump) but is
+# kept 3 days instead of MySQL 8's 30-day default, which let every network-log
+# INSERT and prune DELETE pile up on the disk the app shares. Expired files are
+# purged automatically at startup and on each log rotation.
+loose-binlog_expire_logs_seconds = 259200
+# Only the changed columns + the key per row, not full before/after images.
+loose-binlog_row_image = MINIMAL
+
+# --- Slow query log -------------------------------------------------------------
+# Queries slower than 1 s land in the data volume for tuning. Rotate/inspect with
+#   docker compose -f docker-compose.prod.yml exec mysql sh -c 'tail -n 200 /var/lib/mysql/slow.log'
+# and truncate with `FLUSH SLOW LOGS` after moving the file aside.
+loose-slow_query_log = ON
+loose-slow_query_log_file = /var/lib/mysql/slow.log
+loose-long_query_time = 1

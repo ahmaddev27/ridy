@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { notFound } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Inbox } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -35,6 +36,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function DesignSystemPage() {
+  // Internal component gallery — not part of the product in production builds.
+  if (process.env.NODE_ENV === "production") notFound();
+  return <DesignSystemGallery />;
+}
+
+function DesignSystemGallery() {
   const { t } = useI18n();
   const [confirm, setConfirm] = useState(false);
   const [info, setInfo] = useState(false);

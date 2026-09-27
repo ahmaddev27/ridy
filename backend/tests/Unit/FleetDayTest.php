@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Support\FleetDay;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class FleetDayTest extends TestCase
@@ -40,5 +41,26 @@ class FleetDayTest extends TestCase
     {
         $this->assertSame('2026-08-20 04:00:00', FleetDay::startOfDate('2026-08-20')->format('Y-m-d H:i:s'));
         $this->assertSame('2026-08-21 04:00:00', FleetDay::endOfDate('2026-08-20')->format('Y-m-d H:i:s'));
+    }
+
+    public function test_free_text_dates_are_a_validation_error_not_a_500(): void
+    {
+        foreach (['abc', 'tomorrow', '2026-13-45', '20.08.2026'] as $bad) {
+            try {
+                FleetDay::startOfDate($bad);
+                $this->fail("'{$bad}' should be rejected");
+            } catch (ValidationException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
+    public function test_an_offset_timestamp_is_judged_in_berlin_time(): void
+    {
+        // 23:30 UTC on the 19th is 01:30 Berlin on the 20th → its date label is the 20th.
+        $start = FleetDay::startOfDate('2026-08-19T23:30:00Z');
+
+        $this->assertSame('Europe/Berlin', $start->getTimezone()->getName());
+        $this->assertSame('2026-08-20 04:00:00', $start->format('Y-m-d H:i:s'));
     }
 }

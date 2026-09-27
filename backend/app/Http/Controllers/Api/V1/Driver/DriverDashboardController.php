@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Driver;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\OfferStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\FleetDayRange;
 use App\Http\Resources\DispatchOfferResource;
 use App\Support\FleetDay;
 use Carbon\CarbonImmutable;
@@ -18,6 +19,9 @@ use Illuminate\Http\Request;
  */
 class DriverDashboardController extends Controller
 {
+    /** How far back Home looks for a still-pending (unanswered) offer. */
+    private const PENDING_OFFER_MINUTES = 15;
+
     public function home(Request $request): JsonResponse
     {
         $driver = $request->user();
@@ -25,6 +29,16 @@ class DriverDashboardController extends Controller
         $active = $this->scoped($driver->id)
             ->with('driver:id,name,online_status')
             ->whereIn('status', [OfferStatus::Accepted, OfferStatus::Started])
+            ->latest('received_at')
+            ->first();
+
+        // The live, not-yet-answered offer (if any), so Home can alert on it even when
+        // the push/WebSocket nudge was missed. Pending offers are resolved within
+        // minutes (accept, supersede or the expiry sweep); the window bounds the scan.
+        $pending = $this->scoped($driver->id)
+            ->with('driver:id,name,online_status')
+            ->where('status', OfferStatus::Pending)
+            ->where('received_at', '>=', now()->subMinutes(self::PENDING_OFFER_MINUTES))
             ->latest('received_at')
             ->first();
 
@@ -38,6 +52,8 @@ class DriverDashboardController extends Controller
             ],
             'today' => $this->summary($driver->id, FleetDay::todayStart(), FleetDay::todayStart()->addDay()),
             'active_offer' => $active ? new DispatchOfferResource($active) : null,
+            // Additive (older app builds ignore it): the live pending offer, or null.
+            'pending_offer' => $pending ? new DispatchOfferResource($pending) : null,
             'recent' => DispatchOfferResource::collection($recent),
         ]]);
     }
@@ -46,13 +62,9 @@ class DriverDashboardController extends Controller
     {
         $driver = $request->user();
         // Fleet-day windows (04:00 boundary): a picked date labels [date 04:00,
-        // next 04:00). $to is the exclusive upper bound.
-        $from = $request->filled('from')
-            ? FleetDay::startOfDate($request->string('from'))
-            : FleetDay::startDaysAgo(30);
-        $to = $request->filled('to')
-            ? FleetDay::endOfDate($request->string('to'))
-            : FleetDay::todayStart()->addDay();
+        // next 04:00). $to is the exclusive upper bound. Validated + span-capped:
+        // the daily zero-fill below loops once per day in the range.
+        [$from, $to] = FleetDayRange::window($request, 30);
 
         return response()->json(['data' => $this->summary($driver->id, $from, $to)]);
     }
@@ -98,6 +110,9 @@ class DriverDashboardController extends Controller
             ->pluck('income', 'fleet_date');
 
         $daily = [];
+        // Defense in depth: never zero-fill more than the allowed span, whatever
+        // window a future caller passes in.
+        $to = $to->min($from->addDays(FleetDayRange::MAX_DAYS + 1));
         for ($cursor = $from; $cursor < $to; $cursor = $cursor->addDay()) {
             $date = $cursor->toDateString();
             $daily[] = ['date' => $date, 'income' => round((float) ($incomeByDate[$date] ?? 0), 2)];

@@ -25,12 +25,24 @@ ARG NEXT_PUBLIC_API_URL=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_REVERB_KEY=
 ENV NEXT_PUBLIC_REVERB_KEY=$NEXT_PUBLIC_REVERB_KEY
+# Optional raster tile template + attribution (frontend/src/lib/map-style.ts).
+# Empty = public OSM tiles. A custom tile origin must also be in the CSP
+# connect-src (CSP_EXTRA_CONNECT — see docker/Caddyfile).
+ARG NEXT_PUBLIC_MAP_TILE_URL=
+ENV NEXT_PUBLIC_MAP_TILE_URL=$NEXT_PUBLIC_MAP_TILE_URL
+ARG NEXT_PUBLIC_MAP_ATTRIBUTION=
+ENV NEXT_PUBLIC_MAP_ATTRIBUTION=$NEXT_PUBLIC_MAP_ATTRIBUTION
 
 # Copy the rest of the application and produce the optimized production build.
 COPY frontend/ ./
-RUN npm run build
+RUN npm run build \
+    && chown -R node:node /app/.next
 
 # `next start` serves the production build on port 3000.
 EXPOSE 3000
+
+# Unprivileged at runtime. Next writes only under .next/ (image-optimizer and
+# fetch caches), which the build step above hands to `node`.
+USER node
 
 CMD ["npm", "start"]

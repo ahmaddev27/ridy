@@ -48,4 +48,18 @@ class DriverOnlineParityTest extends TestCase
             $this->assertSame($driver->engagementStatus(), $fresh->engagement, "engagement column vs engagementStatus() for {$label}");
         }
     }
+
+    public function test_live_first_order_agrees_with_the_canonical_online_and_engagement_logic(): void
+    {
+        $tenant = Tenant::create(['name' => 'Order', 'country' => 'DE']);
+        app(TenantContext::class)->set($tenant->id);
+
+        // An online status WITHOUT the literal "ONLINE" must sort with the online
+        // drivers (the old LIKE '%ONLINE%' CASE put it among the offline ones).
+        foreach (['OFFLINE' => 'a-off', 'DRIVER_AVAILABLE' => 'b-avail', 'ON_TRIP' => 'c-trip', 'EN_ROUTE' => 'd-route'] as $status => $name) {
+            Driver::create(['tenant_id' => $tenant->id, 'name' => $name, 'online_status' => $status]);
+        }
+
+        $this->assertSame(['c-trip', 'd-route', 'b-avail', 'a-off'], Driver::query()->liveFirst()->pluck('name')->all());
+    }
 }

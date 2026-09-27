@@ -19,8 +19,15 @@ use Illuminate\Http\Request;
  */
 class SupplierCaptureController extends Controller
 {
+    /** Largest capture accepted (bytes); a fleet earnings breakdown is far smaller. */
+    private const MAX_BODY_BYTES = 2 * 1024 * 1024;
+
     public function store(Request $request, SupplierNetworkRecorder $recorder, EarnerBreakdownParser $earnings, SupplierBreakdownParser $fleet): JsonResponse
     {
+        if (strlen((string) $request->getContent()) > self::MAX_BODY_BYTES) {
+            return response()->json(['message' => 'payload_too_large'], 413);
+        }
+
         $data = $request->validate([
             'kind' => ['required', 'string', 'max:20'],
             'summary' => ['nullable', 'string', 'max:250'],

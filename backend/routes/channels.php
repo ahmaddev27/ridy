@@ -9,8 +9,9 @@ use Illuminate\Support\Facades\Broadcast;
  * channel; the `driver` guard (Sanctum bearer) resolves the authenticated driver
  * from the token the app sends with the broadcasting-auth request.
  */
-Broadcast::channel('driver.{driverId}', function (Driver $driver, int $driverId) {
-    return (int) $driver->id === $driverId;
+Broadcast::channel('driver.{driverId}', function ($user, int $driverId) {
+    // Never a dashboard User whose users.id happens to equal a driver's id.
+    return $user instanceof Driver && (int) $user->id === $driverId;
 }, ['guards' => ['driver']]);
 
 /**
@@ -19,6 +20,6 @@ Broadcast::channel('driver.{driverId}', function (Driver $driver, int $driverId)
  * may only subscribe to their OWN company's channel, so one manager can never see
  * another company's feed. A tenant-less user (e.g. super_admin) matches nothing.
  */
-Broadcast::channel('company.{tenantId}', function (User $user, int $tenantId) {
-    return (int) ($user->tenant_id ?? 0) === $tenantId;
+Broadcast::channel('company.{tenantId}', function ($user, int $tenantId) {
+    return $user instanceof User && (int) ($user->tenant_id ?? 0) === $tenantId;
 }, ['guards' => ['web', 'sanctum']]);

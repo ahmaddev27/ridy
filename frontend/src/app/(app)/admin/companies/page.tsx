@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { latnLocale } from "@/lib/utils";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Building2, Trash2, ChevronLeft, ChevronRight, Power, PowerOff } from "lucide-react";
@@ -14,6 +15,7 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { listCompanies, deleteCompany, setCompanyActive, type Company } from "@/lib/api/admin";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 type Filter = "all" | "linked" | "expired" | "banned";
 
@@ -86,7 +88,7 @@ export default function CompaniesPage() {
       toast.success(next ? c("enabledToast") : c("disabledToast"));
       await refetch();
     } catch (e) {
-      toast.error(c("updateFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("updateFailed"), { description: apiErrorMessage(e, t, locale) });
     }
   }
 
@@ -98,7 +100,7 @@ export default function CompaniesPage() {
       toast.success(c("deletedToast"));
       await refetch();
     } catch (e) {
-      toast.error(c("deleteFailed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("deleteFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
       setConfirmDel(null);
@@ -174,7 +176,13 @@ export default function CompaniesPage() {
                     className="cursor-pointer hover:bg-surface-2"
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium text-ink">{co.name}</div>
+                      <Link
+                        href={`/admin/companies/${co.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-medium text-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
+                      >
+                        {co.name}
+                      </Link>
                       <div className="flex items-center gap-2 text-xs text-ink-subtle">
                         <span>{co.country ?? "—"}</span>
                         {co.payment_reference && (

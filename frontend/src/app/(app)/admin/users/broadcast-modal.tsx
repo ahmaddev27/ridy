@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { useI18n } from "@/lib/i18n/context";
+import { apiErrorMessage } from "@/lib/api/error-message";
 import { Modal } from "@/components/ui/modal";
 import { broadcastNotification, type BroadcastInput, type PlatformUser } from "@/lib/api/admin";
 
@@ -25,6 +27,7 @@ export function BroadcastModal({
   /** Localized label for a role key (e.g. "super_admin" → "Admin"). */
   roleLabel: (role: string) => string;
 }) {
+  const i18n = useI18n();
   const [audience, setAudience] = useState<Audience>("selected");
   const [role, setRole] = useState<string>("");
   const [title, setTitle] = useState("");
@@ -69,7 +72,7 @@ export function BroadcastModal({
       reset();
       onClose();
     } catch (e) {
-      toast.error(t("failed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(t("failed"), { description: apiErrorMessage(e, i18n.t) });
     } finally {
       setBusy(false);
     }

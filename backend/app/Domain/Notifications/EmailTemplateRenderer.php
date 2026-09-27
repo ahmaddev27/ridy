@@ -32,49 +32,28 @@ class EmailTemplateRenderer
      */
     public function renderTemplate(EmailTemplate $template, array $vars, bool $inlineAssets = false): array
     {
-        $subject = $this->substitute($template->subject, $vars);
+        // The subject is a plain-text header: variables go in raw (a company called
+        // "Y&A" must not arrive as "Y&amp;A"); line breaks are folded away.
+        $subject = str_replace(["\r", "\n"], ' ', $this->substitute($template->subject, $vars, escape: false));
         $body = $this->substitute($this->sanitize((string) $template->body_html), $vars);
 
         return ['subject' => $subject, 'html' => $this->wrap($template, $body, $inlineAssets)];
     }
 
+    /** Allowlist-sanitize admin-authored body HTML (also applied before saving). */
+    public function sanitize(string $html): string
+    {
+        return app(EmailHtmlSanitizer::class)->sanitize($html);
+    }
+
     /** @param array<string, string> $vars */
-    private function substitute(string $text, array $vars): string
+    private function substitute(string $text, array $vars, bool $escape = true): string
     {
         foreach ($vars as $name => $value) {
-            $text = str_replace('{{'.$name.'}}', e($value), $text);
+            $text = str_replace('{{'.$name.'}}', $escape ? e($value) : (string) $value, $text);
         }
 
         return $text;
-    }
-
-    /**
-     * Strip the common HTML injection vectors. The author is a trusted super-admin
-     * so this stays a blacklist, but it must cover the vectors that survive most
-     * mail clients: active-content tags, event handlers (quoted or not), and
-     * script-bearing URL schemes.
-     */
-    private function sanitize(string $html): string
-    {
-        // Remove active-content elements entirely (opening tag + body + closing).
-        $html = preg_replace(
-            '#<(script|style|iframe|object|embed|svg)\b[^>]*>.*?</\1>#is',
-            '',
-            $html,
-        );
-
-        // And any stray self-closing / unclosed occurrences of the same tags.
-        $html = preg_replace('#</?(script|style|iframe|object|embed|svg)\b[^>]*>#i', '', $html);
-
-        // Strip inline event handlers — quoted ("…"/\'…\') and unquoted/bare.
-        $html = preg_replace('#\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)#i', '', $html);
-
-        // Neutralize dangerous URL schemes in href/src (javascript:, data:text/html).
-        return preg_replace(
-            '#\b(href|src)\s*=\s*("|\')?\s*(javascript:|data:text/html)[^"\'>\s]*("|\')?#i',
-            '$1="#"',
-            $html,
-        );
     }
 
     private function wrap(EmailTemplate $template, string $body, bool $inlineAssets = false): string

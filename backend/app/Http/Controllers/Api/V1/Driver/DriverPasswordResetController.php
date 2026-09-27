@@ -2,12 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1\Driver;
 
+use App\Domain\Auth\OtpGuard;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\SendTemplatedMail;
-use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Http\Controllers\Controller;
-use App\Models\PasswordReset;
-use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -17,15 +15,14 @@ use Illuminate\Validation\ValidationException;
  * In-app password reset for drivers, mirroring the manager flow: request a 6-digit
  * OTP by email, then set a new password with the code. Responses never reveal
  * whether an email belongs to an activated driver. Only ACTIVATED drivers can
- * reset — a driver who never activated must use their invitation instead.
+ * reset — a driver who never activated must use their invitation instead. Code
+ * checks + brute-force limits live in OtpGuard.
  */
 class DriverPasswordResetController extends Controller
 {
-    use GeneratesOtp;
-
     private const OTP_TTL_MINUTES = 10;
 
-    private const MAX_ATTEMPTS = 5;
+    public function __construct(private readonly OtpGuard $otp) {}
 
     /** Step 1 — email a reset code (silently no-ops for unknown/unactivated emails). */
     public function start(Request $request): JsonResponse
@@ -34,14 +31,7 @@ class DriverPasswordResetController extends Controller
 
         $driver = $this->activatedDriver($data['email']);
         if ($driver !== null) {
-            $reset = PasswordReset::updateOrCreate(
-                ['email' => $driver->email],
-                [
-                    'otp' => $this->newOtp(),
-                    'otp_expires_at' => CarbonImmutable::now()->addMinutes(self::OTP_TTL_MINUTES),
-                    'attempts' => 0,
-                ],
-            );
+            $reset = $this->otp->issueReset($driver->email, self::OTP_TTL_MINUTES);
 
             SendTemplatedMail::to($driver->email, 'password_otp', ['name' => (string) $driver->name, 'otp' => $reset->otp]);
         }
@@ -58,7 +48,7 @@ class DriverPasswordResetController extends Controller
             'otp' => ['required', 'digits:6'],
         ]);
 
-        $this->validOtpOrFail($data['email'], $data['otp']);
+        $this->otp->verifyReset($data['email'], $data['otp']);
 
         return response()->json(['data' => ['verified' => true]]);
     }
@@ -72,21 +62,21 @@ class DriverPasswordResetController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $reset = $this->validOtpOrFail($data['email'], $data['otp']);
+        $reset = $this->otp->verifyReset($data['email'], $data['otp']);
+        // Spend the code once, before the password changes.
+        $this->otp->consume($reset);
 
         $driver = $this->activatedDriver($reset->email);
         if ($driver === null) {
-            $reset->delete();
-            throw ValidationException::withMessages(['email' => 'otp_none']);
+            // Same answer as a wrong code — never reveal whether the account exists.
+            throw ValidationException::withMessages(['otp' => 'otp_incorrect']);
         }
 
         $driver->forceFill(['password' => Hash::make($data['password'])])->save();
         // A password reset is the user's tool to evict an attacker who has their
-        // token — so revoke every existing Sanctum token (driver auth is purely
-        // bearer-based and tokens have no expiry, so a stolen one would otherwise
-        // survive the reset). The driver simply signs in again to get a fresh one.
+        // token — so revoke every existing Sanctum token. The driver simply signs
+        // in again to get a fresh one.
         $driver->tokens()->delete();
-        $reset->delete();
 
         return response()->json(['data' => ['reset' => true]]);
     }
@@ -98,29 +88,5 @@ class DriverPasswordResetController extends Controller
             ->where('email', $email)
             ->whereNotNull('activated_at')
             ->first();
-    }
-
-    /**
-     * Resolve a pending reset whose OTP matches, or throw a coded validation error
-     * (the app localizes the code). A wrong code counts an attempt.
-     */
-    private function validOtpOrFail(string $email, string $otp): PasswordReset
-    {
-        $reset = PasswordReset::where('email', $email)->first();
-        if ($reset === null) {
-            throw ValidationException::withMessages(['otp' => 'otp_none']);
-        }
-        if ($reset->otp_expires_at->isPast()) {
-            throw ValidationException::withMessages(['otp' => 'otp_expired']);
-        }
-        if ($reset->attempts >= self::MAX_ATTEMPTS) {
-            throw ValidationException::withMessages(['otp' => 'otp_too_many']);
-        }
-        if (! hash_equals($reset->otp, $otp) && ! $this->isTestCode($otp)) {
-            $reset->increment('attempts');
-            throw ValidationException::withMessages(['otp' => 'otp_incorrect']);
-        }
-
-        return $reset;
     }
 }

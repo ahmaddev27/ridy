@@ -3,14 +3,17 @@
 namespace App\Domain\Fleet;
 
 use App\Domain\Dispatch\Jobs\SyncTripFromWaypoints;
+use App\Domain\Dispatch\LockRetry;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\OfferLifecycle;
 use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
+use App\Support\EpochTime;
 use App\Support\RidyLog;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Applies a batch of live driver statuses to a tenant's roster and drives each
@@ -40,9 +43,43 @@ class DriverStatusIngestor
      */
     private const MIN_TRIP_SECONDS = 60;
 
+    /**
+     * An unchanged driver's status_synced_at is bumped at most this often. Well
+     * below every freshness window that reads it (live map 10 min, fleet:check-sync
+     * and fleet:check-offer-flow 5 min).
+     */
+    private const HEARTBEAT_SECONDS = 60;
+
+    /** Waypoints kept per driver (a pickup + a handful of drop-offs is the real max). */
+    public const MAX_WAYPOINTS = 12;
+
+    /**
+     * How long a daemon status batch keeps the extension from writing statuses for
+     * the company. The daemon polls every 3-6 s, so a lapse this long means its
+     * supplier polls stopped and the extension should take over again.
+     */
+    private const DAEMON_SOURCE_TTL_SECONDS = 20;
+
     public function __construct(
         private readonly OfferLifecycle $lifecycle,
     ) {}
+
+    /** Record that the daemon is currently this company's status source. */
+    public static function markDaemonFeeding(int $tenantId): void
+    {
+        Cache::put(self::daemonSourceKey($tenantId), 1, self::DAEMON_SOURCE_TTL_SECONDS);
+    }
+
+    /** Whether the daemon delivered a status batch for the company recently. */
+    public static function daemonIsFeeding(int $tenantId): bool
+    {
+        return Cache::has(self::daemonSourceKey($tenantId));
+    }
+
+    private static function daemonSourceKey(int $tenantId): string
+    {
+        return "status-src:daemon:{$tenantId}";
+    }
 
     /**
      * @param  array<int, array<string, mixed>>  $statuses
@@ -61,6 +98,10 @@ class DriverStatusIngestor
             ->get()
             ->keyBy('uber_driver_uuid');
 
+        // Drivers whose row had nothing new: their status_synced_at heartbeat is
+        // bumped in ONE bulk UPDATE after the loop instead of one UPDATE each.
+        $heartbeatIds = [];
+
         foreach ($statuses as $row) {
             $uuid = $row['driver_uuid'] ?? null;
             if (! $uuid) {
@@ -72,8 +113,18 @@ class DriverStatusIngestor
                 continue;
             }
 
-            $was = $this->level($driver->online_status);
-            $now = $this->level($row['status'] ?? '');
+            // Two sources write statuses (the daemon every few seconds, the extension
+            // once a minute) and a slow batch can land AFTER a newer one. Applying it
+            // would move the driver back a step and fabricate an engagement edge (a
+            // fake ON_TRIP → EN_ROUTE completes the trip and accepts the wrong offer),
+            // so a row whose fix is OLDER than the stored one is dropped.
+            $fixAt = EpochTime::fromMs($row['location_updated_at'] ?? null);
+            if ($this->isStale($fixAt, $driver->location_updated_at)) {
+                continue;
+            }
+
+            $was = Driver::engagementLevel($driver->online_status);
+            $now = Driver::engagementLevel($row['status'] ?? '');
             // Was the driver OFFLINE (not merely idle) before this poll? Distinguishes a
             // genuine idle→trip start from a reconnect that resumes a trip preserved
             // across an offline blip. Read from the pre-update status.
@@ -96,20 +147,35 @@ class DriverStatusIngestor
             // so the lifecycle can tell a real sign-off from a brief mid-trip blip.
             $onlineNow = Driver::statusIsOnline($row['status'] ?? null);
 
+            $waypoints = $lat !== null ? $this->waypoints($row['waypoints'] ?? null) : null;
+            $previousWaypointCount = count(is_array($driver->trip_waypoints) ? $driver->trip_waypoints : []);
+
             try {
-                $driver->update([
+                $driver->fill([
                     'online_status' => $row['status'] ?? null,
                     'went_offline_at' => $onlineNow ? null : ($driver->went_offline_at ?? now()),
-                    'location_updated_at' => $this->timestampMs($row['location_updated_at'] ?? null),
-                    'status_synced_at' => now(),
+                    'location_updated_at' => $fixAt,
                     'latitude' => $lat,
                     'longitude' => $lng,
-                    'heading' => $lat !== null ? ($row['heading'] ?? null) : null,
-                    'trip_waypoints' => $lat !== null && ! empty($row['waypoints']) ? $row['waypoints'] : null,
+                    'heading' => $lat !== null && is_numeric($row['heading'] ?? null) ? $row['heading'] : null,
+                    'trip_waypoints' => $waypoints,
                 ]);
+
+                // Only write a driver whose data actually changed. An unchanged row
+                // (most offline/idle drivers, every poll) just needs its freshness
+                // heartbeat, batched below — a 100-driver fleet at the 3 s cadence was
+                // ~33 no-op UPDATEs a second.
+                if ($driver->isDirty()) {
+                    $driver->status_synced_at = now();
+                    $driver->save();
+                } elseif ($this->heartbeatDue($driver)) {
+                    $heartbeatIds[] = $driver->id;
+                }
             } catch (\Throwable $e) {
                 // One malformed status row must never fail the whole batch (which
                 // would 500 the endpoint and drop every driver + acceptance).
+                $this->logUpdateFailure($tenantId, $driver, $e);
+
                 continue;
             }
             $counts['updated']++;
@@ -128,10 +194,18 @@ class DriverStatusIngestor
             // fixing an ungeocodable offer and surfacing/alerting multi-stop trips.
             // The resolve is an OSRM route + reverse-geocode (multi-second, external),
             // so it runs OFF this hot path on the queue; the multi-stop push fires
-            // once the geo resolves. Only for engaged drivers with waypoints.
-            if ($now >= 1 && ! empty($row['waypoints']) && is_array($row['waypoints'])) {
-                SyncTripFromWaypoints::dispatch($tenantId, $uuid);
+            // once the geo resolves. Only for engaged drivers with waypoints, and only
+            // when there is something new to resolve (see needsTripSync()).
+            if ($now >= 1 && $waypoints !== null
+                && $this->needsTripSync($tenantId, $uuid, $was !== $now, count($waypoints), $previousWaypointCount)) {
+                rescue(function () use ($tenantId, $uuid): void {
+                    SyncTripFromWaypoints::dispatch($tenantId, $uuid);
+                });
             }
+        }
+
+        if ($heartbeatIds !== []) {
+            Driver::withoutGlobalScopes()->whereIn('id', $heartbeatIds)->update(['status_synced_at' => now()]);
         }
 
         $this->sweepStaleOffers($tenantId);
@@ -177,13 +251,13 @@ class DriverStatusIngestor
 
                 return;
             } catch (QueryException $e) {
-                $lock = $this->isLockError($e);
+                $lock = LockRetry::isLockError($e);
                 if ($i >= $attempts || ! $lock) {
                     // A non-lock error is a real bug → Sentry. An exhausted lock
                     // retry is an expected, self-healing transient (the transition
                     // re-derives on the next poll) → log it, but don't page anyone.
                     $lock
-                        ? RidyLog::event('driver_status.transition_deadlock_retry_exhausted', [
+                        ? Log::warning('driver_status.transition_deadlock_retry_exhausted', [
                             'error' => $e->getMessage(),
                             'attempts' => $attempts,
                         ])
@@ -194,12 +268,6 @@ class DriverStatusIngestor
                 usleep(50_000 * $i); // brief, growing backoff before the retry
             }
         }
-    }
-
-    /** MySQL 1213 = deadlock, 1205 = lock wait timeout — both worth retrying. */
-    private function isLockError(QueryException $e): bool
-    {
-        return in_array((int) ($e->errorInfo[1] ?? 0), [1213, 1205], true);
     }
 
     /**
@@ -341,34 +409,70 @@ class DriverStatusIngestor
             && $active->started_at->diffInSeconds(now()) >= self::MIN_TRIP_SECONDS;
     }
 
-    /** Engagement level of a raw Uber status: 2 = on trip, 1 = heading to pickup, 0 = idle. */
-    private function level(?string $status): int
+    /**
+     * True when an incoming fix is older than the one already stored — a late batch
+     * from the slower source. Null-safe (idle/offline drivers often carry no fix),
+     * and a stored value in the future (clock skew) never blocks newer data.
+     */
+    private function isStale(?CarbonImmutable $incoming, mixed $stored): bool
     {
-        $s = strtoupper((string) $status);
-        if (str_contains($s, 'ON_TRIP')) {
-            return 2;
-        }
-        if (str_contains($s, 'EN_ROUTE')) {
-            return 1;
+        if ($incoming === null || $stored === null) {
+            return false;
         }
 
-        return 0;
+        $stored = CarbonImmutable::instance($stored);
+
+        return $stored->lessThanOrEqualTo(now()) && $incoming->lessThan($stored);
+    }
+
+    /** Whether an unchanged driver's freshness stamp is old enough to bump. */
+    private function heartbeatDue(Driver $driver): bool
+    {
+        return $driver->status_synced_at === null
+            || $driver->status_synced_at->lessThan(now()->subSeconds(self::HEARTBEAT_SECONDS));
     }
 
     /**
-     * A millisecond timestamp as a datetime, or null. Offline drivers sometimes
-     * carry 0 / garbage values that parse to year 0001, which MySQL datetime
-     * rejects — those are treated as "no fix" (null).
+     * The trip waypoints worth keeping: an array, capped. They drive an OSRM route
+     * and a reverse geocode per stop on the queue, so an oversized list must never
+     * reach the driver row.
+     *
+     * @return array<int, mixed>|null
      */
-    private function timestampMs(mixed $value): ?CarbonImmutable
+    private function waypoints(mixed $waypoints): ?array
     {
-        if (empty($value) || ! is_numeric($value) || (int) $value <= 0) {
+        if (! is_array($waypoints) || $waypoints === []) {
             return null;
         }
 
-        $ts = CarbonImmutable::createFromTimestampMs((int) $value);
+        return array_slice(array_values($waypoints), 0, self::MAX_WAYPOINTS);
+    }
 
-        return $ts->year >= 2000 ? $ts : null;
+    /**
+     * Whether an engaged driver's waypoints need a (queued) trip resolve: on an
+     * engagement edge (a new or back-to-back trip), when the stop list changed size,
+     * or when no resolve has been recorded for the current list yet. Otherwise the
+     * job would run every poll for the whole trip only to no-op.
+     */
+    private function needsTripSync(int $tenantId, string $uuid, bool $edge, int $count, int $previousCount): bool
+    {
+        if ($edge || $count !== $previousCount) {
+            return true;
+        }
+
+        return Cache::get(SyncTripFromWaypoints::syncedMarkerKey($tenantId, $uuid)) !== $count;
+    }
+
+    /** A per-driver update failure, logged (rate-limited per tenant) — RidyLog is off in prod. */
+    private function logUpdateFailure(int $tenantId, Driver $driver, \Throwable $e): void
+    {
+        if (Cache::add("driver_status.update_failed:{$tenantId}", 1, 60)) {
+            Log::warning('driver_status.update_failed', [
+                'tenant_id' => $tenantId,
+                'driver_id' => $driver->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /** A usable coordinate, or null for the 0,0 Uber returns when there's no live fix. */

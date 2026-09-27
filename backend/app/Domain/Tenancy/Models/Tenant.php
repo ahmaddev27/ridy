@@ -2,6 +2,7 @@
 
 namespace App\Domain\Tenancy\Models;
 
+use App\Casts\EncryptedWithPlaintextFallback;
 use App\Domain\Billing\CompanyReferenceGenerator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +16,9 @@ class Tenant extends Model
     ];
 
     protected $casts = [
+        // Carries residential-proxy credentials: encrypted at rest like proxies.url
+        // (tolerates legacy plaintext rows until the encrypting migration ran).
+        'proxy_url' => EncryptedWithPlaintextFallback::class,
         'settings' => 'array',
         'activated_at' => 'datetime',
         'subscription_ends_at' => 'datetime',

@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { navGroups } from "./nav-config";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/context";
 import { useAuth } from "@/components/auth/auth-provider";
-import { listContactMessages } from "@/lib/api/contact-messages";
-import { listPaymentClaims } from "@/lib/api/admin";
+import { useAppFeeds } from "./app-feeds";
 
 /**
  * The navigation list — role-filtered groups + links. Shared by the desktop
@@ -19,28 +17,11 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useI18n();
   const { user } = useAuth();
 
-  // Unread contact-form messages, shown as a badge on the admin Inbox link.
-  const isAdmin = user?.roles.includes("super_admin") ?? false;
-  const [unread, setUnread] = useState(0);
-  const [pendingClaims, setPendingClaims] = useState(0);
-  useEffect(() => {
-    if (!isAdmin) return;
-    let alive = true;
-    const load = () => {
-      listContactMessages()
-        .then((r) => alive && setUnread(r.unread))
-        .catch(() => {});
-      listPaymentClaims("pending")
-        .then((r) => alive && setPendingClaims(r.length))
-        .catch(() => {});
-    };
-    load();
-    const id = setInterval(load, 30000); // refresh a couple of times a minute
-    return () => {
-      alive = false;
-      clearInterval(id);
-    };
-  }, [isAdmin]);
+  // Admin badges (unread inbox, pending payment claims) — polled once per tab
+  // by AppFeedsProvider, not by each mounted NavList.
+  const {
+    adminBadges: { unreadMessages: unread, pendingClaims },
+  } = useAppFeeds();
 
   // Full split: admin groups show only to super-admins; company groups hide
   // from them; the account group shows to everyone.

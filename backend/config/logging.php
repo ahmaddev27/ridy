@@ -54,7 +54,9 @@ return [
 
         'stack' => [
             'driver' => 'stack',
-            'channels' => explode(',', (string) env('LOG_STACK', 'single')),
+            // Production rotates daily (LOG_DAILY_DAYS retention) so the log can
+            // neither fill the disk nor keep personal data indefinitely.
+            'channels' => explode(',', (string) env('LOG_STACK', env('APP_ENV') === 'production' ? 'daily' : 'single')),
             'ignore_exceptions' => false,
         ],
 

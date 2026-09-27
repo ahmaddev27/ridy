@@ -1,5 +1,6 @@
 import { Plug, Building2, Ban, CheckCircle2, Gift, Clock, AlertTriangle, Ticket, Bell, Megaphone, Banknote, type LucideIcon } from "lucide-react";
 import type { AppNotification } from "@/lib/api/notifications";
+import { safeHref } from "@/lib/safe-href";
 
 type Tone = "success" | "danger" | "warning" | "info" | "default";
 
@@ -39,7 +40,7 @@ function interpolate(text: string, params: Record<string, string | number>): str
 export function notifContent(n: AppNotification, t: (k: string) => string) {
   const cfg = n.type ? MAP[n.type] : undefined;
   if (!cfg || !n.type) {
-    return { icon: Bell, chip: TONE_CHIP.default, title: n.title ?? "", body: n.body ?? "", href: n.href };
+    return { icon: Bell, chip: TONE_CHIP.default, title: n.title ?? "", body: n.body ?? "", href: safeHref(n.href) };
   }
   // A super-admin broadcast carries its own free-form copy in params — there is
   // no localized template to resolve, so render it verbatim.
@@ -49,7 +50,7 @@ export function notifContent(n: AppNotification, t: (k: string) => string) {
       chip: TONE_CHIP[cfg.tone],
       title: String(n.params.title ?? n.title ?? ""),
       body: String(n.params.body ?? n.body ?? ""),
-      href: n.href,
+      href: safeHref(n.href),
     };
   }
   return {
@@ -57,6 +58,6 @@ export function notifContent(n: AppNotification, t: (k: string) => string) {
     chip: TONE_CHIP[cfg.tone],
     title: interpolate(t(`notif.${n.type}.title`), n.params),
     body: interpolate(t(`notif.${n.type}.body`), n.params),
-    href: n.href,
+    href: safeHref(n.href),
   };
 }

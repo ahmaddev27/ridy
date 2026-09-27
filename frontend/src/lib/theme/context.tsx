@@ -33,19 +33,18 @@ function initialTheme(): Theme {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("light");
 
-  // Adopt the real (persisted/system) theme after hydration.
+  // Adopt the real (persisted/system) theme after hydration. The pre-paint
+  // script already put the class on <html>; we only sync React state to it —
+  // never write the class from the initial "light" state (that flashed dark
+  // users to light on every load).
   useEffect(() => {
     setThemeState(initialTheme());
   }, []);
 
-  // Reflect the theme on <html> so `dark:` variants and tokens switch.
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    document.documentElement.classList.toggle("dark", theme === "dark");
-  }, [theme]);
-
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next);
+    // Reflect the choice on <html> so `dark:` variants and tokens switch.
+    document.documentElement.classList.toggle("dark", next === "dark");
     try {
       localStorage.setItem("theme", next);
     } catch {

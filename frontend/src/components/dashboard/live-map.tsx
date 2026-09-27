@@ -3,7 +3,8 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import { latnLocale } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
-import type { Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
+import type { Map as MapLibreMap } from "maplibre-gl";
+import { BASE_MAP_STYLE } from "@/lib/map-style";
 import { RefreshCw, Maximize2, Minimize2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -18,24 +19,11 @@ function escapeHtml(s: string): string {
 const STATUS_COLOR = (status: string | null): string => PRESENCE_COLOR[presence(status)];
 const statusLabel = (status: string | null, c: (k: string) => string): string => c(PRESENCE_LABEL_KEY[presence(status)]);
 
-/**
- * A free, token-less MapLibre style built inline from OpenStreetMap raster
- * tiles. Kept in code (not a hosted style URL) so the map never depends on any
- * API key or third-party style host.
- */
-const OSM_STYLE: StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: "© OpenStreetMap contributors",
-    },
-  },
-  layers: [{ id: "osm", type: "raster", source: "osm" }],
-};
+// Cars closer than this (degrees, ~0.1 m) to their target don't need a tween.
+const MOVE_EPSILON = 1e-6;
+// Above this many moving cars, snap instead of tweening every frame.
+const MAX_TWEENED_CARS = 300;
+const POLL_MS = 12_000;
 
 const DRIVER_SOURCE = "drivers";
 const HALO_LAYER = "driver-halo";
@@ -124,11 +112,19 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
   const { t, locale } = useI18n();
   const { user } = useAuth();
   const c = (k: string) => t(`screens.map.${k}`);
+  // The map effect runs once; it reads the CURRENT translations through this ref
+  // so labels follow a language switch.
+  const cRef = useRef(c);
+  cRef.current = c;
   // Points at the map effect's live `refresh` so the WebSocket handler can trigger it.
   const refreshRef = useRef<() => void>(() => {});
   // Live: refetch driver positions the moment the daemon ingests new statuses
   // (company channel), instead of only on the 12s poll — which stays as fallback.
   useCompanyRealtime(user?.tenant?.id, () => refreshRef.current(), ".drivers.changed");
+  // Redraw the labels right after a language switch.
+  useEffect(() => {
+    refreshRef.current();
+  }, [locale]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -161,10 +157,21 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
   useEffect(() => {
     let cancelled = false;
+    // Only the newest snapshot may be drawn (a slow poll must not move cars
+    // backwards); a hidden tab only marks the map stale and refreshes on return.
+    let seq = 0;
+    let stale = false;
 
     async function refresh() {
       const map = mapRef.current;
       if (!map || !readyRef.current) return;
+      if (document.visibilityState === "hidden") {
+        stale = true;
+        return;
+      }
+      stale = false;
+      const my = ++seq;
+      const c = cRef.current;
 
       let drivers: LiveDriver[] = [];
       try {
@@ -172,7 +179,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
       } catch {
         return;
       }
-      if (cancelled) return;
+      if (cancelled || my !== seq) return;
 
       const points: [number, number][] = [];
       const driverFeatures: GeoJSON.Feature[] = [];
@@ -276,8 +283,26 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
       const map = mapRef.current;
       if (!map) return;
       if (carRafRef.current) cancelAnimationFrame(carRafRef.current);
+      const source = () => map.getSource(DRIVER_SOURCE) as import("maplibre-gl").GeoJSONSource | undefined;
 
       const from = new Map(carPosRef.current);
+      let moving = 0;
+      for (const f of carFeaturesRef.current) {
+        const tgt = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+        const src = from.get(f.properties!.id as number);
+        if (src && (Math.abs(src[0] - tgt[0]) > MOVE_EPSILON || Math.abs(src[1] - tgt[1]) > MOVE_EPSILON)) moving++;
+      }
+      // Nothing moved (or too many to tween smoothly): draw the targets once
+      // instead of re-uploading the whole GeoJSON on every animation frame.
+      if (moving === 0 || moving > MAX_TWEENED_CARS) {
+        for (const f of carFeaturesRef.current) {
+          carPosRef.current.set(f.properties!.id as number, (f.geometry as GeoJSON.Point).coordinates as [number, number]);
+        }
+        source()?.setData({ type: "FeatureCollection", features: carFeaturesRef.current });
+        carRafRef.current = null;
+        return;
+      }
+
       const start = performance.now();
       const DURATION = 700;
 
@@ -292,7 +317,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
           carPosRef.current.set(id, cur);
           return { ...f, geometry: { type: "Point", coordinates: cur } };
         });
-        (map.getSource(DRIVER_SOURCE) as import("maplibre-gl").GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features });
+        source()?.setData({ type: "FeatureCollection", features });
         if (p < 1) carRafRef.current = requestAnimationFrame(step);
         else carRafRef.current = null;
       };
@@ -306,7 +331,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
       MRef.current = maplibregl;
       const map = new maplibregl.Map({
         container: containerRef.current,
-        style: OSM_STYLE,
+        style: BASE_MAP_STYLE,
         center: [10.4515, 51.1657],
         zoom: 5,
         attributionControl: { compact: true },
@@ -321,6 +346,8 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
         // status-colored halo beneath — both painted on the map canvas so they
         // stay pinned to the coordinate and scale with zoom (no DOM-marker drift).
         const img = await map.loadImage("/markers/car.png").catch(() => null);
+        // The map may have been torn down while the icon loaded.
+        if (cancelled) return;
         if (img && !map.hasImage(CAR_IMAGE)) map.addImage(CAR_IMAGE, img.data);
         // Pickup = a blue "rider" person marker; dropoff = a red pin — clear
         // recognisable symbols instead of faint dots.
@@ -401,16 +428,22 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
           map.on("mouseleave", layer, () => { map.getCanvas().style.cursor = ""; });
         }
 
+        if (cancelled) return;
         readyRef.current = true;
         await refresh();
       });
     })();
 
     refreshRef.current = refresh; // expose the live refresh to the realtime handler
-    const timer = setInterval(refresh, 12000);
+    const timer = setInterval(refresh, POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && stale) void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
       if (carRafRef.current) cancelAnimationFrame(carRafRef.current);
       readyRef.current = false;
       mapRef.current?.remove();

@@ -3,10 +3,12 @@
 namespace App\Domain\Notifications;
 
 use App\Domain\Notifications\Contracts\PushSender;
+use App\Domain\Notifications\Contracts\SendsPushInBulk;
 use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Notifications\Models\UserPushToken;
 use App\Models\EmailTemplate;
 use App\Models\User;
+use App\Support\RidyLog;
 use Illuminate\Support\Collection;
 use Throwable;
 
@@ -56,10 +58,14 @@ class Notifier
         $this->dispatch(User::where('tenant_id', $tenantId)->get(), $type, $params, $href, $dedupe, $push);
     }
 
-    /** Every super-admin (platform-level events). */
-    public function toAdmins(string $type, array $params = [], ?string $href = null, bool $dedupe = false, bool $push = true): void
+    /**
+     * Every super-admin (platform-level events). `$dedupeParam` narrows the dedupe to
+     * one subject — e.g. 'proxy_id', so one proxy's unread notice cannot hide
+     * another's.
+     */
+    public function toAdmins(string $type, array $params = [], ?string $href = null, bool $dedupe = false, bool $push = true, ?string $dedupeParam = null): void
     {
-        $this->dispatch(User::role('super_admin')->get(), $type, $params, $href, $dedupe, $push);
+        $this->dispatch(User::role('super_admin')->get(), $type, $params, $href, $dedupe, $push, $dedupeParam);
     }
 
     /** One specific user (e.g. the reseller who issued a code). */
@@ -74,10 +80,12 @@ class Notifier
      * @param  Collection<int, User>  $users
      * @param  array<string, mixed>  $params
      */
-    private function dispatch(Collection $users, string $type, array $params, ?string $href, bool $dedupe, bool $push): void
+    private function dispatch(Collection $users, string $type, array $params, ?string $href, bool $dedupe, bool $push, ?string $dedupeParam = null): void
     {
+        $templateKey = null; // resolved once, only if some recipient gets an email
+
         foreach ($users as $user) {
-            if ($dedupe && $this->hasUnread($user, $type)) {
+            if ($dedupe && $this->hasUnread($user, $type, $dedupeParam, $params)) {
                 continue;
             }
             $user->notify(new AppNotification($type, $params, $href));
@@ -91,7 +99,9 @@ class Notifier
                     $this->webPush($user, $type, $params, $href);
                 }
                 if ($forced || $user->wantsChannel('email', $category)) {
-                    $this->email($user, $type, $params, $href);
+                    // Prefer a per-event template when one is seeded; else the generic one.
+                    $templateKey ??= EmailTemplate::whereKey($type)->exists() ? $type : 'notification';
+                    $this->email($user, $type, $params, $href, $templateKey);
                 }
             }
         }
@@ -107,8 +117,12 @@ class Notifier
         return self::TYPE_CATEGORY[$type] ?? 'platform';
     }
 
-    /** Also deliver important events by email, in the user's language. */
-    private function email(User $user, string $type, array $params, ?string $href): void
+    /**
+     * Also deliver important events by email, in the user's language. Rendered
+     * here, delivered on the queue — the daemon's needs-relink / supplier-degraded
+     * callbacks must not wait on SMTP once per manager.
+     */
+    private function email(User $user, string $type, array $params, ?string $href, string $templateKey): void
     {
         if (in_array($type, self::EMAIL_SKIP, true) || blank($user->email)) {
             return;
@@ -118,18 +132,16 @@ class Notifier
         $copy = $this->text->for($type, $params, $locale);
         $base = rtrim((string) config('app.frontend_url', config('app.url')), '/');
 
-        // Prefer a per-event template when one is seeded; else the generic one.
-        $key = EmailTemplate::whereKey($type)->exists() ? $type : 'notification';
-
         try {
-            SendTemplatedMail::to($user->email, $key, [
+            SendTemplatedMail::to($user->email, $templateKey, [
                 'title' => $copy['title'],
                 'body' => $copy['body'],
                 'action_url' => $href ? $base.$href : $base,
                 'action_label' => self::OPEN_LABEL[$locale] ?? self::OPEN_LABEL['de'],
             ]);
-        } catch (Throwable) {
+        } catch (Throwable $e) {
             // Email is best-effort; a mailer hiccup must never break the bell write.
+            RidyLog::failure('notify.email_failed', ['user_id' => $user->id, 'type' => $type], $e);
         }
     }
 
@@ -152,17 +164,30 @@ class Notifier
         $copy = $this->text->for($type, $params, $user->locale ?: 'de');
         $data = ['type' => $type, 'href' => (string) ($href ?? '')];
 
-        foreach ($tokens as $token) {
-            try {
-                $this->sender->send($token, $copy['title'], $copy['body'], $data);
-            } catch (Throwable) {
-                // A dead token or transport hiccup must never break the bell write.
+        try {
+            // Pooled where the transport supports it: one timeout for the user, not one per device.
+            if ($this->sender instanceof SendsPushInBulk) {
+                $this->sender->sendMany($tokens->all(), $copy['title'], $copy['body'], $data);
+
+                return;
             }
+            foreach ($tokens as $token) {
+                $this->sender->send($token, $copy['title'], $copy['body'], $data);
+            }
+        } catch (Throwable $e) {
+            // A dead token or transport hiccup must never break the bell write.
+            RidyLog::failure('notify.push_failed', ['user_id' => $user->id, 'type' => $type], $e);
         }
     }
 
-    private function hasUnread(User $user, string $type): bool
+    /** @param array<string, mixed> $params */
+    private function hasUnread(User $user, string $type, ?string $dedupeParam = null, array $params = []): bool
     {
-        return $user->unreadNotifications()->where('data->type', $type)->exists();
+        $query = $user->unreadNotifications()->where('data->type', $type);
+        if ($dedupeParam !== null && array_key_exists($dedupeParam, $params)) {
+            $query->where('data->params->'.$dedupeParam, $params[$dedupeParam]);
+        }
+
+        return $query->exists();
     }
 }

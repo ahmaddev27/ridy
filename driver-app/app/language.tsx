@@ -6,7 +6,8 @@ import * as SecureStore from "expo-secure-store";
 import { Text } from "@/components/typography";
 import { Logo, PrimaryButton } from "@/components/ui";
 import { useColors, radius } from "@/lib/theme";
-import { t, isRTL, setLocale, getLocale } from "@/lib/i18n";
+import { t, isRTL, setLocale, getLocale, useLocale } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
 
 type LangCode = "de" | "en" | "ar";
 
@@ -26,6 +27,8 @@ const OPTIONS: { code: LangCode; native: string; latin: string }[] = [
 export default function LanguageScreen() {
   const c = useColors();
   const router = useRouter();
+  const { driver, updateProfile } = useAuth();
+  useLocale(); // re-render in the new language once it's applied
   const rtl = isRTL();
   const align = rtl ? "right" : "left";
   // Start on the language already in effect (not always German) so re-opening
@@ -37,10 +40,19 @@ export default function LanguageScreen() {
 
   const onContinue = () => {
     setLocale(selected);
-    // Persist the choice: its presence also marks onboarding as done, so the
-    // splash skips this screen on later launches and re-applies the language.
+    // Persist explicitly too (setLocale skips an unchanged language): the key's
+    // presence marks onboarding as done, so the splash skips this screen later.
     SecureStore.setItemAsync("locale", selected).catch(() => {});
-    router.replace("/login");
+    if (driver) {
+      // Opened from Settings while signed in: sync the language to the server
+      // (emails/pushes) without blocking, and go back where we came from —
+      // never through the login screen.
+      updateProfile({ locale: selected }).catch(() => {});
+      if (router.canGoBack()) router.back();
+      else router.replace("/");
+      return;
+    }
+    router.replace("/login"); // first-run onboarding: intro → language → login
   };
 
   return (

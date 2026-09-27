@@ -35,6 +35,11 @@ class OfflineLapsedDrivers extends Command
             ->online()
             ->whereNotIn('tenant_id', $usableTenantIds)
             ->update([
+                // Starts the offline grace, so a STARTED trip of a lapsed driver is
+                // finalized by offers:finalize-stale instead of waiting for the
+                // 100-minute cap (NULL < cutoff never matched). PHP time, not SQL
+                // NOW(), to match the Carbon cutoff finalizeStale compares against.
+                'went_offline_at' => now(),
                 'online_status' => null,
                 'latitude' => null,
                 'longitude' => null,

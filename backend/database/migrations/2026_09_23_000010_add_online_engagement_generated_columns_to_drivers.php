@@ -24,18 +24,27 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('drivers', function (Blueprint $table) {
-            $table->unsignedTinyInteger('is_online')->virtualAs("CASE WHEN online_status IS NULL OR TRIM(online_status) = '' THEN 0 WHEN UPPER(online_status) LIKE '%OFFLINE%' THEN 0 WHEN UPPER(online_status) LIKE '%UNAVAILABLE%' THEN 0 WHEN UPPER(online_status) LIKE '%DISCONNECTED%' THEN 0 WHEN UPPER(online_status) LIKE '%OFF_DUTY%' THEN 0 WHEN UPPER(online_status) LIKE '%LOGGED_OUT%' THEN 0 ELSE 1 END");
-        });
-        Schema::table('drivers', function (Blueprint $table) {
-            $table->unsignedTinyInteger('engagement')->virtualAs("CASE WHEN UPPER(online_status) LIKE '%ON_TRIP%' THEN 2 WHEN UPPER(online_status) LIKE '%EN_ROUTE%' THEN 1 ELSE 0 END");
-        });
-        Schema::table('drivers', function (Blueprint $table) {
-            $table->index('is_online');
-        });
-        Schema::table('drivers', function (Blueprint $table) {
-            $table->index('engagement');
-        });
+        // Each step guarded so a partial failure (MySQL DDL auto-commits) can be re-run.
+        if (! Schema::hasColumn('drivers', 'is_online')) {
+            Schema::table('drivers', function (Blueprint $table) {
+                $table->unsignedTinyInteger('is_online')->virtualAs("CASE WHEN online_status IS NULL OR TRIM(online_status) = '' THEN 0 WHEN UPPER(online_status) LIKE '%OFFLINE%' THEN 0 WHEN UPPER(online_status) LIKE '%UNAVAILABLE%' THEN 0 WHEN UPPER(online_status) LIKE '%DISCONNECTED%' THEN 0 WHEN UPPER(online_status) LIKE '%OFF_DUTY%' THEN 0 WHEN UPPER(online_status) LIKE '%LOGGED_OUT%' THEN 0 ELSE 1 END");
+            });
+        }
+        if (! Schema::hasColumn('drivers', 'engagement')) {
+            Schema::table('drivers', function (Blueprint $table) {
+                $table->unsignedTinyInteger('engagement')->virtualAs("CASE WHEN UPPER(online_status) LIKE '%ON_TRIP%' THEN 2 WHEN UPPER(online_status) LIKE '%EN_ROUTE%' THEN 1 ELSE 0 END");
+            });
+        }
+        if (! Schema::hasIndex('drivers', ['is_online'])) {
+            Schema::table('drivers', function (Blueprint $table) {
+                $table->index('is_online');
+            });
+        }
+        if (! Schema::hasIndex('drivers', ['engagement'])) {
+            Schema::table('drivers', function (Blueprint $table) {
+                $table->index('engagement');
+            });
+        }
     }
 
     public function down(): void

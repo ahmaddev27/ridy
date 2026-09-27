@@ -348,11 +348,6 @@ export async function getCompany(id: number): Promise<Company> {
   return res.data;
 }
 
-export async function createCompany(input: CreateCompanyInput): Promise<Company> {
-  const res = await apiFetch<{ data: Company }>(base, { method: "POST", body: input, withCsrf: true });
-  return res.data;
-}
-
 export async function updateCompany(id: number, input: UpdateCompanyInput): Promise<Company> {
   const res = await apiFetch<{ data: Company }>(`${base}/${id}`, { method: "PUT", body: input, withCsrf: true });
   return res.data;
@@ -387,11 +382,6 @@ export async function grantFreeSubscription(
     `${base}/${id}/free-subscription`,
     { method: "POST", body: { days }, withCsrf: true },
   );
-  return res.data;
-}
-
-export async function listBannedCompanies(): Promise<BannedCompany[]> {
-  const res = await apiFetch<{ data: BannedCompany[] }>("/api/v1/admin/banned-companies");
   return res.data;
 }
 
@@ -600,33 +590,9 @@ export async function listCollectorPayments(
   return apiFetch(`${paymentBase}${paymentQuery(f)}`);
 }
 
-export async function createCollectorPayment(input: {
-  collector_id: number;
-  tenant_id: number;
-  amount: number;
-  paid_on: string;
-  note?: string;
-}): Promise<CollectorPayment> {
-  const res = await apiFetch<{ data: CollectorPayment }>(paymentBase, { method: "POST", body: input, withCsrf: true });
-  return res.data;
-}
-
-export async function deleteCollectorPayment(id: number): Promise<void> {
-  await apiFetch(`${paymentBase}/${id}`, { method: "DELETE", withCsrf: true });
-}
-
-export async function exportCollectorPayments(f: PaymentFilters = {}): Promise<Blob> {
-  return apiDownload(`${paymentBase}/export${paymentQuery(f)}`);
-}
-
 /** Toggle a company between active and disabled (reversible, keeps all data). */
 export async function setCompanyActive(id: number, active: boolean): Promise<Company> {
   return updateCompany(id, { status: active ? "active" : "disabled" });
-}
-
-export async function listCompanyUsers(id: number): Promise<CompanyUser[]> {
-  const res = await apiFetch<{ data: CompanyUser[] }>(`${base}/${id}/users`);
-  return res.data;
 }
 
 export async function createCompanyUser(
@@ -651,11 +617,6 @@ export async function resetCompanyUserPassword(
     body: { password },
     withCsrf: true,
   });
-}
-
-export async function getCompanySession(id: number): Promise<CompanySession> {
-  const res = await apiFetch<{ data: CompanySession }>(`${base}/${id}/session`);
-  return res.data;
 }
 
 export async function forceRelink(id: number): Promise<void> {
@@ -754,10 +715,14 @@ export async function getBillingSummary(): Promise<BillingSummary> {
 }
 
 export async function listSubscriptionInvoices(
-  tenantId?: number,
+  params: { tenantId?: number; page?: number; perPage?: number } = {},
 ): Promise<{ data: SubscriptionInvoice[]; meta: { current_page: number; last_page: number; total: number } }> {
-  const qs = tenantId ? `?tenant_id=${tenantId}` : "";
-  return apiFetch(`/api/v1/admin/subscription-invoices${qs}`);
+  const q = new URLSearchParams();
+  if (params.tenantId) q.set("tenant_id", String(params.tenantId));
+  if (params.page) q.set("page", String(params.page));
+  if (params.perPage) q.set("per_page", String(params.perPage));
+  const qs = q.toString();
+  return apiFetch(`/api/v1/admin/subscription-invoices${qs ? `?${qs}` : ""}`);
 }
 
 export async function exportSubscriptionInvoices(tenantId?: number): Promise<Blob> {
@@ -806,15 +771,6 @@ export async function settleInvoice(invoiceId: number, collectorPaymentId: numbe
     { method: "POST", body: { collector_payment_id: collectorPaymentId }, withCsrf: true },
   );
   return res.data;
-}
-
-// ── Activation codes ledger (all resellers + admin-issued) ───────────────────
-export async function listSubscriptionCodes(filters: CodeFilters = {}): Promise<CodesPage> {
-  return apiFetch(`/api/v1/admin/subscription-codes${codesQueryString(filters)}`);
-}
-
-export async function exportSubscriptionCodes(filters: CodeFilters = {}): Promise<Blob> {
-  return apiDownload(`/api/v1/admin/subscription-codes/export${codesQueryString(filters)}`);
 }
 
 // ── Subscription plans ───────────────────────────────────────────────────────

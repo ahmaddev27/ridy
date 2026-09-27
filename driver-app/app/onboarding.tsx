@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { View, Pressable, ScrollView, useWindowDimensions, type NativeSyntheticEvent, type NativeScrollEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Radio, Gauge, Car, type LucideIcon } from "lucide-react-native";
+import { Radio, Gauge, Car, type LucideIcon } from "@/components/icons";
 import { Text } from "@/components/typography";
 import { PrimaryButton } from "@/components/ui";
 import { useColors, radius } from "@/lib/theme";

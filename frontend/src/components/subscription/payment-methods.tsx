@@ -5,7 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Landmark, Banknote, MessageCircle, Copy, Check, Loader2, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { toLatinDigits } from "@/lib/utils";
+import { formatMoney, toLatinDigits } from "@/lib/utils";
 import { buildEpcPayload, canBuildEpc } from "@/lib/epc";
 import { useI18n } from "@/lib/i18n/context";
 import { getPaymentMethods, type PaymentMethods as Methods } from "@/lib/api/payments";
@@ -33,7 +33,7 @@ export function PaymentMethods({
   headless?: boolean;
   className?: string;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.codes.${k}`);
   const [methods, setMethods] = useState<Methods | null>(null);
   const [copied, setCopied] = useState(false);
@@ -132,7 +132,7 @@ export function PaymentMethods({
               <Row label={c("payBankName")} value={methods.bank.bank} />
               <Row label={c("payBankIban")} value={methods.bank.iban} mono />
               <Row label={c("payBankBic")} value={methods.bank.bic} mono />
-              {bankAmount ? <Row label={c("payBankAmount")} value={`€${bankAmount.toFixed(2)}`} /> : null}
+              {bankAmount ? <Row label={c("payBankAmount")} value={formatMoney(bankAmount, locale)} /> : null}
             </dl>
             {methods.bank.note && <p className="mt-3 text-xs text-ink-subtle">{methods.bank.note}</p>}
             {epc && (

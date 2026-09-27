@@ -10,6 +10,7 @@ import type { Locale } from "./dictionaries";
 
 const en = {
   drivers: {
+    notFound: "This driver doesn’t exist or isn’t part of your company.", earningsCat: {"fare":"Fare","service_fee":"Service fee","promotion":"Promotions","tip":"Tips","cash_collected":"Cash collected","adjustment":"Adjustments","other_earnings":"Other earnings","refund":"Refunds","toll":"Tolls","surge":"Surge"},
     loadError: "Couldn’t load drivers",
     emptyTitle: "No drivers yet",
     emptyDesc: "Drivers appear automatically after Uber is connected and synced.",
@@ -54,6 +55,7 @@ const en = {
 
 const de: typeof en = {
   drivers: {
+    notFound: "Dieser Fahrer existiert nicht oder gehört nicht zu deiner Firma.", earningsCat: {"fare":"Fahrpreis","service_fee":"Servicegebühr","promotion":"Aktionen","tip":"Trinkgeld","cash_collected":"Bargeld kassiert","adjustment":"Anpassungen","other_earnings":"Sonstige Einnahmen","refund":"Erstattungen","toll":"Maut","surge":"Zuschlag"},
     loadError: "Fahrer konnten nicht geladen werden",
     emptyTitle: "Noch keine Fahrer",
     emptyDesc: "Fahrer erscheinen automatisch, sobald Uber verbunden und synchronisiert ist.",
@@ -98,6 +100,7 @@ const de: typeof en = {
 
 const ar: typeof en = {
   drivers: {
+    notFound: "هذا السائق غير موجود أو لا يتبع لشركتك.", earningsCat: {"fare":"الأجرة","service_fee":"رسوم الخدمة","promotion":"العروض/الحوافز","tip":"الإكراميات","cash_collected":"كاش محصّل","adjustment":"تعديلات","other_earnings":"أرباح أخرى","refund":"مبالغ مستردة","toll":"رسوم الطرق","surge":"زيادة الأسعار"},
     loadError: "تعذّر تحميل السائقين",
     emptyTitle: "لا سائقون بعد",
     emptyDesc: "يظهر السائقون تلقائياً بعد ربط أوبر ومزامنة الأسطول.",

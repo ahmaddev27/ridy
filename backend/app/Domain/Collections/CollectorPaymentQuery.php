@@ -17,6 +17,14 @@ class CollectorPaymentQuery
      */
     public function forRequest(Request $request): Builder
     {
+        // Malformed filters are a 422, never a Carbon parse 500.
+        $request->validate([
+            'collector_id' => ['nullable', 'integer'],
+            'tenant_id' => ['nullable', 'integer'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+        ]);
+
         return CollectorPayment::query()
             ->with(['collector:id,name', 'tenant:id,name'])
             ->when($request->filled('collector_id'), fn (Builder $q) => $q->where('collector_id', $request->integer('collector_id')))

@@ -75,10 +75,15 @@ class Proxy extends Model
      * the active (usable) companies assigned to it. Capacity is measured in
      * drivers, since that's what drives the proxy's real load.
      */
-    public function usedCount(): int
+    public function usedCount(?int $exceptTenantId = null): int
     {
+        $tenants = Tenant::usable()->where('proxy_id', $this->id);
+        if ($exceptTenantId !== null) {
+            $tenants->where('id', '!=', $exceptTenantId);
+        }
+
         return Driver::withoutGlobalScopes()
-            ->whereIn('tenant_id', Tenant::usable()->where('proxy_id', $this->id)->select('id'))
+            ->whereIn('tenant_id', $tenants->select('id'))
             ->count();
     }
 

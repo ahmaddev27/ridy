@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Domain\Tenancy\Models\Tenant;
 use App\Jobs\SendAdminBroadcast;
+use App\Jobs\SendAdminBroadcastChunk;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -74,6 +75,30 @@ class AdminBroadcastTest extends TestCase
         $this->assertSame('admin_broadcast', $m1->fresh()->notifications()->first()->data['type']);
         $this->assertSame('Fleet update', $m1->fresh()->notifications()->first()->data['params']['title']);
         $this->assertSame(1, $m2->fresh()->notifications()->count());
+    }
+
+    public function test_a_retried_broadcast_chunk_never_notifies_anyone_twice(): void
+    {
+        $m1 = $this->manager('m1@a.de');
+        $m2 = $this->manager('m2@a.de');
+        $chunk = new SendAdminBroadcastChunk('b-123', 'Hi', 'Body', null, [$m1->id, $m2->id], []);
+
+        app()->call([$chunk, 'handle']);
+        app()->call([$chunk, 'handle']); // the worker re-runs it after a timeout
+
+        $this->assertSame(1, $m1->fresh()->notifications()->count());
+        $this->assertSame(1, $m2->fresh()->notifications()->count());
+    }
+
+    public function test_the_broadcast_is_split_into_bounded_chunk_jobs(): void
+    {
+        Queue::fake();
+        $ids = range(1, 60);
+
+        (new SendAdminBroadcast($ids, 'T', 'B', null, range(1, 10)))->handle();
+
+        // 60 users in chunks of 25 (3 jobs) + one driver chunk.
+        Queue::assertPushed(SendAdminBroadcastChunk::class, 4);
     }
 
     public function test_empty_audience_is_rejected(): void

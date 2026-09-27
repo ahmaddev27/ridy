@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Tenancy\Models\Proxy;
 use App\Domain\Tenancy\Models\ProxyRenewal;
+use App\Domain\Tenancy\ProxyPool;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Super-admin management of the shared residential-proxy pool. `url` carries
@@ -48,22 +50,31 @@ class ProxyController extends Controller
         return response()->json(['data' => $this->present($proxy)], 201);
     }
 
-    public function update(Request $request, Proxy $proxy): JsonResponse
+    public function update(Request $request, Proxy $proxy, ProxyPool $pool): JsonResponse
     {
         $data = $this->validated($request, creating: false);
         // Keep the existing URL when the admin leaves it blank (not re-entering creds).
         if (empty($data['url'])) {
             unset($data['url']);
         }
-        $proxy->update($data);
+
+        DB::transaction(function () use ($proxy, $data, $pool) {
+            $urlChanged = isset($data['url']) && $data['url'] !== $proxy->url;
+            $proxy->update($data);
+            // Rotated credentials must reach the daemon for every assigned company.
+            if ($urlChanged) {
+                $pool->syncTenantsOf($proxy);
+            }
+        });
 
         return response()->json(['data' => $this->present($proxy->fresh())]);
     }
 
-    public function destroy(Proxy $proxy): JsonResponse
+    public function destroy(Proxy $proxy, ProxyPool $pool): JsonResponse
     {
-        // Assigned tenants have proxy_id nulled by the FK (nullOnDelete).
-        $proxy->delete();
+        // The FK only nulls proxy_id; the companies' copied proxy_url would keep
+        // streaming through the deleted credentials. Detach and re-place them first.
+        DB::transaction(fn () => $pool->remove($proxy));
 
         return response()->json(['data' => ['deleted' => true]]);
     }

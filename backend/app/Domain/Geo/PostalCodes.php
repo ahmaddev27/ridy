@@ -20,15 +20,19 @@ class PostalCodes
     private const TTL = 86400;
 
     /**
-     * In-process memo of the full centroid table for {@see nearest()}. The
-     * fleet-map endpoint calls nearest() once per driver AND once per waypoint, and
-     * each call's Cache::remember hits the (database) cache store — a full-table blob
-     * read + unserialize. Loading it once per process keeps a busy map poll to a
-     * single read instead of ~120. The table is static, so holding it is safe.
+     * Memo of the centroid grid for {@see nearest()} — for the rest of this PHP
+     * request (under FPM a static lives one request, not the whole process), so a
+     * map poll reads the cached blob once instead of once per driver/waypoint.
      *
-     * @var array<int, array{plz: string, city: string, lat: float, lng: float}>|null
+     * @var array<string, array<int, array{plz: string, city: string, lat: float, lng: float}>>|null
      */
-    private static ?array $allCentroids = null;
+    private static ?array $grid = null;
+
+    /** Grid cell size in degrees (≈11 × 7 km in Germany). */
+    private const CELL = 0.1;
+
+    /** Rings searched around a point before falling back to a full scan (≈1.5°). */
+    private const MAX_RING = 15;
 
     /** Normalize free input to a 5-digit PLZ, or null when it isn't one. */
     public static function normalize(?string $plz): ?string
@@ -82,23 +86,87 @@ class PostalCodes
      */
     public static function nearest(float $lat, float $lng): ?array
     {
-        $all = self::$allCentroids ??= Cache::remember('plz:all:v1', self::TTL, function () {
-            return DB::table('postal_codes')->get(['plz', 'city', 'lat', 'lng'])
-                ->map(fn ($r) => ['plz' => $r->plz, 'city' => $r->city, 'lat' => (float) $r->lat, 'lng' => (float) $r->lng])
-                ->all();
-        });
+        // A redacted 0,0 (or any fix far outside the region) has no meaningful town.
+        if ($lat < 44.0 || $lat > 57.0 || $lng < 3.0 || $lng > 18.0) {
+            return null;
+        }
 
+        $grid = self::grid();
+        if ($grid === []) {
+            return null;
+        }
+
+        // Search the point's cell, then widening rings of cells — tens of distance
+        // checks instead of all ~8k per point. Every cell of ring k+1 is at least
+        // k cells away, so once that bound exceeds the best distance found, no
+        // further ring can hold a nearer centroid: the result equals a full scan.
+        [$cy, $cx] = self::cellOf($lat, $lng);
         $best = null;
         $bestD = INF;
-        foreach ($all as $row) {
-            $d = ($row['lat'] - $lat) ** 2 + ($row['lng'] - $lng) ** 2;
-            if ($d < $bestD) {
-                $bestD = $d;
-                $best = $row;
+        for ($ring = 0; $ring <= self::MAX_RING; $ring++) {
+            foreach (self::ringCells($cy, $cx, $ring) as $key) {
+                foreach ($grid[$key] ?? [] as $row) {
+                    $d = ($row['lat'] - $lat) ** 2 + ($row['lng'] - $lng) ** 2;
+                    if ($d < $bestD) {
+                        $bestD = $d;
+                        $best = $row;
+                    }
+                }
+            }
+            if ($best !== null && ($ring * self::CELL) ** 2 > $bestD) {
+                break;
             }
         }
 
         return $best !== null ? ['plz' => $best['plz'], 'city' => $best['city']] : null;
+    }
+
+    /**
+     * The centroid table bucketed into CELL-degree cells, built once and cached.
+     *
+     * @return array<string, array<int, array{plz: string, city: string, lat: float, lng: float}>>
+     */
+    private static function grid(): array
+    {
+        return self::$grid ??= Cache::remember('plz:grid:v1', self::TTL, function () {
+            $grid = [];
+            foreach (DB::table('postal_codes')->get(['plz', 'city', 'lat', 'lng']) as $r) {
+                $row = ['plz' => (string) $r->plz, 'city' => (string) $r->city, 'lat' => (float) $r->lat, 'lng' => (float) $r->lng];
+                [$cy, $cx] = self::cellOf($row['lat'], $row['lng']);
+                $grid[$cy.':'.$cx][] = $row;
+            }
+
+            return $grid;
+        });
+    }
+
+    /** @return array{0: int, 1: int} */
+    private static function cellOf(float $lat, float $lng): array
+    {
+        return [(int) floor($lat / self::CELL), (int) floor($lng / self::CELL)];
+    }
+
+    /**
+     * Keys of the cells on the square ring at Chebyshev distance $ring.
+     *
+     * @return array<int, string>
+     */
+    private static function ringCells(int $cy, int $cx, int $ring): array
+    {
+        if ($ring === 0) {
+            return [$cy.':'.$cx];
+        }
+
+        $keys = [];
+        for ($dy = -$ring; $dy <= $ring; $dy++) {
+            for ($dx = -$ring; $dx <= $ring; $dx++) {
+                if (max(abs($dy), abs($dx)) === $ring) {
+                    $keys[] = ($cy + $dy).':'.($cx + $dx);
+                }
+            }
+        }
+
+        return $keys;
     }
 
     /**

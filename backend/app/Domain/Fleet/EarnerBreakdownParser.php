@@ -4,6 +4,7 @@ namespace App\Domain\Fleet;
 
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\DriverMetric;
+use App\Support\EpochTime;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
 
@@ -41,38 +42,69 @@ class EarnerBreakdownParser
 
         [$start, $end] = $this->period($payload);
 
-        $upserted = 0;
+        // Resolve every earner's driver in ONE query and write all metrics in ONE
+        // upsert — a 200-driver capture used to cost ~600 queries on the request.
+        $byUuid = [];
         foreach ($earners as $earner) {
-            $uuid = Arr::get($earner, 'earnerUuid');
-            if (! is_string($uuid) || $uuid === '') {
-                continue;
+            $uuid = is_array($earner) ? Arr::get($earner, 'earnerUuid') : null;
+            if (is_string($uuid) && $uuid !== '') {
+                $byUuid[$uuid] = $earner;
             }
+        }
+        if ($byUuid === []) {
+            return 0;
+        }
 
-            $driver = Driver::withoutGlobalScopes()
+        $driverIds = [];
+        foreach (array_chunk(array_keys($byUuid), 500) as $chunk) {
+            $driverIds += Driver::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
-                ->where('uber_driver_uuid', $uuid)
-                ->first();
-            if ($driver === null) {
+                ->whereIn('uber_driver_uuid', $chunk)
+                ->pluck('id', 'uber_driver_uuid')
+                ->all();
+        }
+
+        // upsert() bypasses model casts: dates and JSON are formatted by hand, the
+        // dates exactly as Eloquent stores them so the unique key matches on re-sync.
+        $now = CarbonImmutable::now();
+        $rows = [];
+        foreach ($byUuid as $uuid => $earner) {
+            $driverId = $driverIds[$uuid] ?? null;
+            if ($driverId === null) {
                 continue; // an earner we don't track
             }
 
-            DriverMetric::updateOrCreate(
-                ['driver_id' => $driver->id, 'period_start' => $start, 'period_end' => $end],
-                [
-                    'tenant_id' => $tenantId,
-                    'earnings' => $this->amount($earner, 'earnings.amount'),
-                    'net_outstanding' => $this->amount($earner, 'netOutstanding'),
-                    'earnings_label' => Arr::get($earner, 'earnings.amount.currencyCode'),
-                    'trips' => $this->tripInfo($earner, 'TRIP_ATTRIBUTE_NAME_COUNT'),
-                    'distance_km' => $this->distanceKm($earner),
-                    'breakdown' => $this->breakdown($earner),
-                    'synced_at' => CarbonImmutable::now(),
-                ],
-            );
-            $upserted++;
+            $rows[] = [
+                'driver_id' => $driverId,
+                'period_start' => $start->format('Y-m-d H:i:s'),
+                'period_end' => $end->format('Y-m-d H:i:s'),
+                'tenant_id' => $tenantId,
+                'earnings' => $this->amount($earner, 'earnings.amount'),
+                'net_outstanding' => $this->amount($earner, 'netOutstanding'),
+                'earnings_label' => $this->label($earner),
+                'trips' => $this->tripInfo($earner, 'TRIP_ATTRIBUTE_NAME_COUNT'),
+                'distance_km' => $this->distanceKm($earner),
+                'breakdown' => json_encode($this->breakdown($earner)),
+                'synced_at' => $now->format('Y-m-d H:i:s'),
+            ];
         }
 
-        return $upserted;
+        if ($rows !== []) {
+            DriverMetric::withoutGlobalScopes()->upsert(
+                $rows,
+                ['driver_id', 'period_start', 'period_end'],
+                ['tenant_id', 'earnings', 'net_outstanding', 'earnings_label', 'trips', 'distance_km', 'breakdown', 'synced_at'],
+            );
+        }
+
+        return count($rows);
+    }
+
+    private function label(array $earner): ?string
+    {
+        $code = Arr::get($earner, 'earnings.amount.currencyCode');
+
+        return is_scalar($code) ? (string) $code : null;
     }
 
     /** {startTime,endTime} from the request variables, defaulting to this week. */
@@ -82,8 +114,9 @@ class EarnerBreakdownParser
         $startMs = Arr::get($tr, 'startTimeUnixMillis');
         $endMs = Arr::get($tr, 'endTimeUnixMillis');
 
-        $start = $startMs !== null ? CarbonImmutable::createFromTimestampMs((int) $startMs) : CarbonImmutable::now()->startOfWeek();
-        $end = $endMs !== null ? CarbonImmutable::createFromTimestampMs((int) $endMs) : CarbonImmutable::now();
+        // Berlin wall-clock like every other column (EpochTime), not Carbon's UTC.
+        $start = EpochTime::fromMs($startMs) ?? CarbonImmutable::now()->startOfWeek();
+        $end = EpochTime::fromMs($endMs) ?? CarbonImmutable::now();
 
         return [$start, $end];
     }

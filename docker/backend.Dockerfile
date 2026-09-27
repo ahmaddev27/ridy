@@ -33,13 +33,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # sockets   : the Reverb socket server transport
 # gd        : image handling for dompdf — WITH webp, so an uploaded webp invoice
 #             logo can be converted/embedded (dompdf calls imagecreatefromwebp()).
+# opcache   : bytecode cache for php-fpm (tuned in docker/php/conf.d/zz-app.ini).
 RUN docker-php-ext-configure intl \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
-    && docker-php-ext-install -j"$(nproc)" pdo_mysql bcmath zip intl pcntl sockets gd
+    && docker-php-ext-install -j"$(nproc)" pdo_mysql bcmath zip intl pcntl sockets gd opcache
 
 # redis : phpredis client for queues / cache / Horizon (installed via PECL)
 RUN pecl install redis \
     && docker-php-ext-enable redis
+
+# --- PHP / PHP-FPM configuration --------------------------------------------
+# Production php.ini as the base, then our overrides (OPcache, limits) and the
+# FPM pool sizing (the stock pool is pm.max_children = 5). These live in the
+# image, and every deploy rebuilds it (docker compose build), so a change here
+# reaches production on the next deploy.
+RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+COPY docker/php/conf.d/zz-app.ini "$PHP_INI_DIR/conf.d/zz-app.ini"
+COPY docker/php/php-fpm.d/zz-pools.conf /usr/local/etc/php-fpm.d/zz-pools.conf
 
 # --- Composer ----------------------------------------------------------------
 # Pulled from the official composer image to pin a known, verified binary.
@@ -68,7 +78,8 @@ COPY backend/ /var/www/
 RUN composer dump-autoload --no-dev --optimize \
     && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
-# PHP-FPM listens on 9000; nginx (separate service) proxies FastCGI to it.
-EXPOSE 9000
+# PHP-FPM: pool [www] on 9000 (everything), pool [dispatch] on 9001 (daemon
+# offer ingest only — see docker/php/php-fpm.d/zz-pools.conf + docker/Caddyfile).
+EXPOSE 9000 9001
 
 CMD ["php-fpm"]

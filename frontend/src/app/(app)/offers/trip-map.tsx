@@ -2,28 +2,10 @@
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
-import type { Map as MapLibreMap, Marker, StyleSpecification } from "maplibre-gl";
+import type { Map as MapLibreMap, Marker } from "maplibre-gl";
+import { BASE_MAP_STYLE } from "@/lib/map-style";
 
 type Point = { lat: number; lng: number };
-
-/**
- * A free, token-less MapLibre style built inline from OpenStreetMap raster
- * tiles. Kept in code (not a hosted style URL) so the map never depends on any
- * API key or third-party style host. Mirrors the dashboard live map.
- */
-const OSM_STYLE: StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: "© OpenStreetMap contributors",
-    },
-  },
-  layers: [{ id: "osm", type: "raster", source: "osm" }],
-};
 
 const ROUTE_SOURCE = "trip-route";
 
@@ -103,7 +85,7 @@ export function TripMap({
 
       const map = new maplibregl.Map({
         container: containerRef.current,
-        style: OSM_STYLE,
+        style: BASE_MAP_STYLE,
         center: [pts[0][1], pts[0][0]],
         zoom: 13,
         scrollZoom: false,

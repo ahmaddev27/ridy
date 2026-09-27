@@ -14,12 +14,13 @@ export async function login(email: string, password: string, remember = false): 
     method: "POST",
     body: { email, password, remember },
     withCsrf: true,
+    skipAuthEvents: true,
   });
   return res.data;
 }
 
 export async function logout(): Promise<void> {
-  await apiFetch<void>("/api/v1/logout", { method: "POST", withCsrf: true });
+  await apiFetch<void>("/api/v1/logout", { method: "POST", withCsrf: true, skipAuthEvents: true });
 }
 
 /** `/me` returns the user under `data` plus a sibling `impersonating` flag that
@@ -27,7 +28,7 @@ export async function logout(): Promise<void> {
 export type MeResult = { user: AuthUser; impersonating: boolean };
 
 export async function fetchMe(): Promise<MeResult> {
-  const res = await apiFetch<{ data: AuthUser; impersonating?: boolean }>("/api/v1/me");
+  const res = await apiFetch<{ data: AuthUser; impersonating?: boolean }>("/api/v1/me", { skipAuthEvents: true });
   return { user: res.data, impersonating: Boolean(res.impersonating) };
 }
 

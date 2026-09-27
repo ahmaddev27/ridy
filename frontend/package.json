@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-firebase-sw.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-firebase-sw.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test \"tests/*.test.mjs\""
   },
   "dependencies": {
     "@sentry/react": "^10.70.0",

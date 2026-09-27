@@ -1,14 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, FlatList, Pressable, RefreshControl, ActivityIndicator, ScrollView } from "react-native";
+import {
+  View,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  ActivityIndicator,
+  ScrollView,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Notifications from "expo-notifications";
 import { Text, TextInput } from "@/components/typography";
 import { useRouter, useFocusEffect } from "expo-router";
-import { Search, SlidersHorizontal } from "lucide-react-native";
+import { Search, SlidersHorizontal } from "@/components/icons";
 import { api, type Offer, type OffersQuery, type FleetDriver } from "@/lib/api";
-import { connectDriverRealtime } from "@/lib/realtime";
+import { useLiveReload } from "@/lib/use-live-reload";
 import { useAuth } from "@/lib/auth";
-import { t, isRTL, getLocale } from "@/lib/i18n";
+import { t, isRTL, getLocale, useLocale } from "@/lib/i18n";
 import { useColors, radius, isDarkPalette } from "@/lib/theme";
 import { OfferCard } from "@/components/offer-card";
 import { FilterSheet, DEFAULT_FILTERS, type OfferFilters, type SortKey } from "@/components/filter-sheet";
@@ -21,9 +30,12 @@ function dayOffset(d: Date): number {
   day.setHours(0, 0, 0, 0);
   return Math.min(0, Math.round((day.getTime() - t0.getTime()) / 86_400_000));
 }
-import { alertOffer, markAlerted } from "@/lib/offer-alert";
+import { alertOffer } from "@/lib/offer-alert";
+import { LoadErrorBanner, PushHealthBanner } from "@/components/status-banner";
 
 const PER_PAGE = 20;
+/** Within this many px of the top the feed counts as "at the top" for live reloads. */
+const NEAR_TOP_PX = 200;
 
 
 /** €/km for a sort comparison (missing metrics sink to the bottom). */
@@ -40,13 +52,24 @@ function sortOffers(list: Offer[], sort: SortKey): Offer[] {
   return copy;
 }
 
+/** Append a page without duplicating rows that shifted while offers kept arriving. */
+function mergeById(prev: Offer[], next: Offer[]): Offer[] {
+  const seen = new Set(prev.map((o) => o.id));
+  return [...prev, ...next.filter((o) => !seen.has(o.id))];
+}
+
+/** Search waits for the driver to stop typing; 1-character terms are ignored. */
+const SEARCH_DEBOUNCE_MS = 350;
+
 export default function OffersScreen() {
   const c = useColors();
   const router = useRouter();
-  const { isOwner, driver } = useAuth();
+  const { isOwner } = useAuth();
+  useLocale(); // re-render on a language switch
   const align = isRTL() ? "right" : "left";
 
   const [search, setSearch] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState<OfferFilters>(DEFAULT_FILTERS);
   const [range, setRange] = useState<PeriodRange>("today");
   const [offset, setOffset] = useState(0);
@@ -60,24 +83,49 @@ export default function OffersScreen() {
   const [total, setTotal] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const h = setTimeout(() => {
+      const term = search.trim();
+      setSearchTerm(term.length === 1 ? "" : term);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(h);
+  }, [search]);
+
+  // The current query lives in a ref, so the fetcher, the poll and the live
+  // listener stay stable while filters change — no socket/poll churn per keystroke.
+  const query = { status: filters.status, range, offset, search: searchTerm, driverId };
+  const queryRef = useRef(query);
+  queryRef.current = query;
+  const queryKey = JSON.stringify(query);
+
+  // Drop responses that a newer page-1 request (filter change, poll) superseded.
+  const seq = useRef(0);
+  const loadingMoreRef = useRef(false);
 
   const fetchPage = useCallback(
     async (target: number) => {
-      const { from, to } = periodWindow(range, offset);
+      const q = queryRef.current;
+      const mine = target === 1 ? ++seq.current : seq.current;
+      const { from, to } = periodWindow(q.range, q.offset);
       const params: OffersQuery = { per_page: PER_PAGE, page: target, from, to };
-      if (filters.status !== "all") params.status = filters.status;
-      if (search.trim()) params.search = search.trim();
-      if (isOwner && driverId != null) params.driver_id = driverId;
+      if (q.status !== "all") params.status = q.status;
+      if (q.search) params.search = q.search;
+      if (isOwner && q.driverId != null) params.driver_id = q.driverId;
       const res = isOwner ? await api.fleetOffers(params) : await api.offers(params);
+      if (mine !== seq.current) return; // stale: a newer query already answered
       setLastPage(res.meta?.last_page ?? 1);
       setTotal(res.meta?.total ?? res.data.length);
       setPage(res.meta?.current_page ?? target);
-      setOffers((prev) => (target === 1 ? res.data : [...prev, ...res.data]));
-      // Chime for a new offer that arrives on the feed while the app is open (driver
-      // only). alertOffer ignores pre-existing offers and de-dupes per id.
-      if (target === 1 && !isOwner) void alertOffer(res.data.find((o) => o.status === "pending"));
+      setOffers((prev) => (target === 1 ? res.data : mergeById(prev, res.data)));
+      setLoadError(false);
+      setLoaded(true);
+      // Fallback chime for a new offer that surfaced without its push (driver only).
+      if (target === 1 && !isOwner) alertOffer(res.data.find((o) => o.status === "pending"));
     },
-    [filters.status, range, offset, search, isOwner, driverId],
+    [isOwner],
   );
 
   // Load the tenant's drivers once, for the owner-only driver filter.
@@ -86,55 +134,73 @@ export default function OffersScreen() {
     api.fleetDrivers().then((r) => setDrivers(r.data)).catch(() => { /* keep empty */ });
   }, [isOwner]);
 
-  const reload = useCallback(async () => {
-    setRefreshing(true);
-    try { await fetchPage(1); } catch { /* keep */ } finally { setRefreshing(false); }
-  }, [fetchPage]);
+  // Only auto-refresh while the driver is near the top of the feed: a silent
+  // reset to page 1 mustn't yank away rows they scrolled down to. Tracked by
+  // scroll position (not page number), so live updates resume after they
+  // scroll back up from page 2+.
+  const nearTopRef = useRef(true);
+  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    nearTopRef.current = e.nativeEvent.contentOffset.y < NEAR_TOP_PX;
+  }, []);
 
-  useEffect(() => {
-    const h = setTimeout(reload, 300);
-    return () => clearTimeout(h);
-  }, [reload]);
-
-  // Refresh page 1 without the pull-to-refresh spinner — used by the background
-  // triggers (focus / poll / incoming push) so a new offer surfaces on its own.
-  const silentReload = useCallback(async () => {
-    try { await fetchPage(1); } catch { /* keep current list */ }
-  }, [fetchPage]);
-
-  // Only auto-refresh while the driver is at the top of the feed (page 1); a
-  // silent reset to page 1 mustn't yank away pages they scrolled into. A ref
-  // keeps the guard current inside the long-lived listener/interval closures.
-  const atTopRef = useRef(true);
-  useEffect(() => { atTopRef.current = page <= 1 && !loadingMore; }, [page, loadingMore]);
-
-  // Keep the feed live: catch up on focus, poll every 5s, and refresh the moment
-  // a dispatch push lands — so a freshly offered ride appears without a manual pull.
-  useFocusEffect(
-    useCallback(() => {
-      silentReload();
-      // Keep the app icon clean — no unread badge on this app.
-      Notifications.setBadgeCountAsync(0).catch(() => { /* badge unsupported */ });
-      const poll = setInterval(() => { if (atTopRef.current) silentReload(); }, 5000);
-      const sub = Notifications.addNotificationReceivedListener((n) => {
-        markAlerted(Number(n.request.content.data?.offer_id));
-        if (atTopRef.current) silentReload();
-      });
-      // Real-time: the driver's channel reloads the feed instantly on an offer
-      // change; the 5s poll is the fallback.
-      const rt =
-        !isOwner && driver?.id
-          ? connectDriverRealtime(driver.id, api.getToken() ?? "", () => { if (atTopRef.current) silentReload(); })
-          : null;
-      return () => { clearInterval(poll); sub.remove(); rt?.disconnect(); };
-    }, [silentReload, isOwner, driver?.id]),
+  // Live feed: focus load, adaptive poll (5s without socket, 30s with), and a
+  // reload on every socket event / push / resume — one request at a time.
+  useLiveReload(
+    async () => {
+      if (!nearTopRef.current || loadingMoreRef.current) return;
+      try {
+        await fetchPage(1);
+      } catch {
+        setLoadError(true);
+      }
+    },
+    { fastMs: 5_000, slowMs: 30_000 },
   );
 
+  // Keep the app icon clean — no unread badge on this app.
+  useFocusEffect(
+    useCallback(() => {
+      Notifications.setBadgeCountAsync(0).catch(() => { /* badge unsupported */ });
+    }, []),
+  );
+
+  const reload = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchPage(1);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchPage]);
+
+  // A query change (debounced search, period, status, driver) reloads page 1.
+  // The first render is covered by the focus load.
+  const firstQuery = useRef(true);
+  useEffect(() => {
+    if (firstQuery.current) {
+      firstQuery.current = false;
+      return;
+    }
+    void reload();
+  }, [queryKey, reload]);
+
   async function loadMore() {
-    if (loadingMore || refreshing || page >= lastPage) return;
+    if (loadingMoreRef.current || refreshing || page >= lastPage) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
-    try { await fetchPage(page + 1); } catch { /* */ } finally { setLoadingMore(false); }
+    try { await fetchPage(page + 1); } catch { /* keep what we have */ } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
   }
+
+  const openOffer = useCallback((id: number) => router.push(`/offer/${id}`), [router]);
+  const renderItem = useCallback(
+    ({ item }: { item: Offer }) => <OfferCard offer={item} showDriver={isOwner} onOpen={openOffer} />,
+    [isOwner, openOffer],
+  );
 
   // Sort is applied client-side over the loaded pages.
   const shown = useMemo(() => sortOffers(offers, filters.sort), [offers, filters.sort]);
@@ -154,9 +220,14 @@ export default function OffersScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={c.ink} />}
         onEndReachedThreshold={0.4}
         onEndReached={loadMore}
+        onScroll={onScroll}
+        scrollEventThrottle={100}
         ListHeaderComponent={
           <View style={{ gap: 14, marginBottom: 2 }}>
             <Text style={{ color: c.ink, fontSize: 26, fontWeight: "700", letterSpacing: -0.5, textAlign: align }}>{t("offers.title")}</Text>
+
+            <PushHealthBanner />
+            {loadError && <LoadErrorBanner onRetry={() => void reload()} />}
 
             {/* Search */}
             <View style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", gap: 10, backgroundColor: isDarkPalette(c) ? c.surface2 : c.surface, borderRadius: radius.md, borderWidth: 1, borderColor: c.line, paddingHorizontal: 14, paddingVertical: 12 }}>
@@ -198,6 +269,8 @@ export default function OffersScreen() {
               <Pressable
                 onPress={() => setSheetOpen(true)}
                 hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={t("offers.filter")}
                 style={{ width: 36, height: 36, borderRadius: radius.control, alignItems: "center", justifyContent: "center", backgroundColor: isDarkPalette(c) ? c.surface2 : c.surface, borderWidth: 1, borderColor: c.line }}
               >
                 <SlidersHorizontal size={17} color={c.ink} />
@@ -227,11 +300,12 @@ export default function OffersScreen() {
         }
         ListEmptyComponent={refreshing ? null : (
           <View style={{ alignItems: "center", paddingTop: 60 }}>
-            <Text style={{ color: c.inkSubtle }}>{t("offers.empty")}</Text>
+            {/* A failed first load is not "no offers". */}
+            <Text style={{ color: c.inkSubtle }}>{loadError && !loaded ? t("load.noData") : t("offers.empty")}</Text>
           </View>
         )}
         ListFooterComponent={loadingMore ? <ActivityIndicator color={c.ink} style={{ paddingVertical: 16 }} /> : null}
-        renderItem={({ item }) => <OfferCard offer={item} showDriver={isOwner} onPress={() => router.push(`/offer/${item.id}`)} />}
+        renderItem={renderItem}
       />
 
       <FilterSheet open={sheetOpen} value={filters} onApply={setFilters} onClose={() => setSheetOpen(false)} />

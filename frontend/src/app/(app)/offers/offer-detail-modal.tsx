@@ -1,28 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { useDialogFocus } from "@/components/ui/modal";
 import { useRouter } from "next/navigation";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { X, MapPin, User, CircleDollarSign, Clock, Loader2, Route, Gauge, Wallet } from "lucide-react";
 import { StatCard } from "@/components/ui/card";
-import { Badge, type Status } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
+import { OFFER_TONE } from "@/lib/offer-status";
 import { StopMarker } from "@/components/ui/stop-marker";
 import { useI18n } from "@/lib/i18n/context";
-import { getOffer, fareLabel, offerBadgeStatus, type DispatchOfferDetail, type OfferStatus } from "@/lib/api/offers";
+import { getOffer, fareLabel, offerBadgeStatus, type DispatchOfferDetail } from "@/lib/api/offers";
 
 /** One row in the modal's stop list: an address with its per-leg + cumulative km. */
 type StopRow = { address: string; legKm: number | null; cumulativeKm: number | null };
-
-/** Offer lifecycle status → badge tone (mirrors the offers list). */
-const OFFER_TONE: Record<OfferStatus, Status> = {
-  pending: "expiring",
-  accepted: "info",
-  started: "private",
-  completed: "connected",
-  rejected: "neutral",
-  canceled: "personal",
-};
 
 // MapLibre GL touches `window`, so load the map client-side only.
 const TripMap = dynamic(() => import("./trip-map").then((m) => m.TripMap), {
@@ -58,11 +50,9 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
       .catch((e) => setError(e instanceof Error ? e.message : "error"));
   }, [id]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  // Escape to close, focus moved in / trapped / restored to the opener.
+  const dialogRef = useDialogFocus(true, onClose);
+  const dialogTitleId = useId();
 
   // The stop list shown in the modal. Prefer the trip's corrected pickup/drop-off
   // (they carry the completed postcode / the address reverse-geocoded from Uber's
@@ -110,13 +100,18 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
       onClick={onClose}
     >
       <div
-        className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-surface text-start shadow-xl"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={dialogTitleId}
+        tabIndex={-1}
+        className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-surface text-start shadow-xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-4 border-b border-line p-5">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-ink">
+            <h2 id={dialogTitleId} className="text-lg font-semibold text-ink">
               {offer?.rider_first_name || c("colRider") || "—"}
             </h2>
             {offer?.driver_id != null ? (

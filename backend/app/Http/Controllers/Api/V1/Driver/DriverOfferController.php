@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\V1\Driver;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\FleetDayRange;
 use App\Http\Resources\DispatchOfferResource;
-use App\Support\FleetDay;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -71,11 +71,13 @@ class DriverOfferController extends Controller
     /** The driver's offers with the list's filters (search / status / date range) applied. */
     private function filtered(Request $request): Builder
     {
+        [$from, $to] = FleetDayRange::filters($request);
+
         return DispatchOffer::withoutGlobalScopes()
             ->where('driver_id', $request->user()->id)
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
-            ->when($request->filled('from'), fn ($q) => $q->where('received_at', '>=', FleetDay::startOfDate($request->string('from'))))
-            ->when($request->filled('to'), fn ($q) => $q->where('received_at', '<', FleetDay::endOfDate($request->string('to'))))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', (string) $request->string('status')))
+            ->when($from !== null, fn ($q) => $q->where('received_at', '>=', $from))
+            ->when($to !== null, fn ($q) => $q->where('received_at', '<', $to))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%'.$request->string('search').'%';
                 $q->where(fn ($sub) => $sub

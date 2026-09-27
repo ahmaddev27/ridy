@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Billing\Models\Plan;
+use App\Domain\Billing\Models\SubscriptionCode;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,11 +34,24 @@ class PlanController extends Controller
         return response()->json(['data' => $this->present($plan->fresh())]);
     }
 
+    /**
+     * A plan that was ever sold is ARCHIVED (deactivated), not deleted: the FK
+     * nulls plan_id on delete, which blanked the plan name on every historical
+     * code and invoice. Only a never-used plan is removed for real.
+     */
     public function destroy(Plan $plan): JsonResponse
     {
+        $used = SubscriptionCode::withoutGlobalScopes()->where('plan_id', $plan->id)->exists();
+
+        if ($used) {
+            $plan->forceFill(['active' => false])->save();
+
+            return response()->json(['data' => ['deleted' => false, 'archived' => true]]);
+        }
+
         $plan->delete();
 
-        return response()->json(['data' => ['deleted' => true]]);
+        return response()->json(['data' => ['deleted' => true, 'archived' => false]]);
     }
 
     /** @return array<string, mixed> */

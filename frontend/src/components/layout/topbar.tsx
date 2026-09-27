@@ -9,9 +9,8 @@ import { useI18n } from "@/lib/i18n/context";
 import { enableWebPush, listenForeground } from "@/lib/push/web-push";
 import { useTheme } from "@/lib/theme/context";
 import { ONBOARDING_EVENT } from "@/components/onboarding/onboarding-tour";
-import { useAsync } from "@/hooks/use-async";
-import { listNotifications } from "@/lib/api/notifications";
 import { NotificationsBell } from "./notifications-bell";
+import { useAppFeeds } from "./app-feeds";
 import { cn } from "@/lib/utils";
 import { SidebarBrand } from "./sidebar";
 import { NavList } from "./nav-list";
@@ -35,9 +34,7 @@ export function Topbar() {
   const [navOpen, setNavOpen] = useState(false);
 
   // Live unread badge — polled so new notifications surface without a refresh.
-  const { data: notifications, refetch: refetchNotifications } = useAsync(listNotifications, {
-    refetchInterval: 15000,
-  });
+  const { notifications, refetchNotifications } = useAppFeeds();
   const unread = notifications?.unread ?? 0;
 
   // Offer-alert sound mute (persisted); the OfferAlerts watcher reads the same key.
@@ -63,16 +60,28 @@ export function Topbar() {
     if (typeof Notification === "undefined") return;
 
     setPushGranted(Notification.permission === "granted");
-
-    let unsubscribe: (() => void) | undefined;
     void enableWebPush(locale, true);
-    void listenForeground().then((fn) => {
-      unsubscribe = fn;
-    });
-    return () => unsubscribe?.();
     // Re-run only when the account changes; locale is read at call time.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  // Foreground push toasts — (re)attached once permission is granted, including
+  // right after the user enables push from the bell.
+  useEffect(() => {
+    if (!user || !pushGranted) return;
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+    void listenForeground(t("common.open")).then((fn) => {
+      // The effect may have been torn down before the listener resolved.
+      if (cancelled) fn();
+      else unsubscribe = fn;
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, pushGranted]);
 
   async function handleEnablePush() {
     const result = await enableWebPush(locale);
@@ -98,7 +107,7 @@ export function Topbar() {
               <button
                 onClick={() => setNavOpen(false)}
                 className="absolute end-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-ink-subtle hover:bg-surface-2"
-                aria-label="Close"
+                aria-label={t("common.close")}
               >
                 <X className="h-5 w-5" />
               </button>
@@ -113,7 +122,7 @@ export function Topbar() {
         <button
           onClick={() => setNavOpen(true)}
           className="rounded-lg p-2 text-ink-muted hover:bg-surface-2 lg:hidden"
-          aria-label="Menu"
+          aria-label={t("common.menu")}
         >
           <Menu className="h-5 w-5" />
         </button>

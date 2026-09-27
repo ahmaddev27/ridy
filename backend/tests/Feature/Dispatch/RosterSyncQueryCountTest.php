@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Dispatch;
 
+use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
@@ -62,6 +63,46 @@ class RosterSyncQueryCountTest extends TestCase
         $this->assertSame(15, $second['synced']);
         $this->assertSame(0, $second['removed']);
         $this->assertSame(15, Driver::withoutGlobalScopes()->count());
+
+        // No per-driver offer backfill UPDATE when no offer is orphaned.
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        $service->sync($this->tenant->id, $roster);
+        $offerUpdates = collect(DB::getQueryLog())
+            ->filter(fn (array $q) => stripos(ltrim($q['query']), 'update') === 0 && stripos($q['query'], 'dispatch_offers') !== false)
+            ->count();
+        DB::disableQueryLog();
+        $this->assertSame(0, $offerUpdates);
+    }
+
+    public function test_orphan_offers_are_linked_and_the_tenant_context_is_restored(): void
+    {
+        $roster = $this->roster(3);
+        $uuid = $roster[1]['driverUuid']['uuid']['uuid'];
+        $offer = DispatchOffer::withoutGlobalScopes()->create([
+            'tenant_id' => $this->tenant->id, 'driver_uuid' => $uuid, 'offer_uuid' => 'orphan',
+            'received_at' => now(), 'raw_payload' => [],
+        ]);
+        $context = app(TenantContext::class);
+        $context->set(999);
+
+        app(RosterSyncService::class)->sync($this->tenant->id, $roster);
+
+        $this->assertSame(999, $context->get(), 'sync must restore the caller\'s tenant context');
+        $driverId = Driver::withoutGlobalScopes()->where('uber_driver_uuid', $uuid)->value('id');
+        $this->assertSame($driverId, $offer->fresh()->driver_id);
+    }
+
+    public function test_non_scalar_and_non_https_roster_fields_are_dropped(): void
+    {
+        $row = $this->roster(1)[0] + ['email' => ['x' => 'y'], 'pictureUrl' => 'http://tracker.example/p.png', 'recognitionRating' => 'n/a'];
+
+        app(RosterSyncService::class)->sync($this->tenant->id, [$row]);
+
+        $driver = Driver::withoutGlobalScopes()->first();
+        $this->assertNull($driver->uber_email);
+        $this->assertNull($driver->uber_picture_url);
+        $this->assertNull($driver->uber_rating);
     }
 
     /**

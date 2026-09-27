@@ -2,16 +2,15 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
-use App\Domain\Dispatch\Models\DispatchOffer;
-use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Tenancy\LatestFleetSessions;
 use App\Domain\Tenancy\Models\Proxy;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
+use App\Support\FleetDay;
 use App\Support\PlatformCounters;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Platform overview for the super-admin dashboard: headline stats + a list of
@@ -24,11 +23,7 @@ class OverviewController extends Controller
     public function __invoke(): JsonResponse
     {
         $tenants = Tenant::query()->get();
-        // Newest session per tenant. keyBy keeps the LAST row for a duplicate key, so
-        // with a desc sort that would keep the OLDEST — unique() (keeps the first)
-        // after the desc sort keeps the newest, which is the session that's live.
-        $sessions = UberFleetSession::withoutGlobalScopes()
-            ->orderByDesc('updated_at')->get()->unique('tenant_id')->keyBy('tenant_id');
+        $sessions = LatestFleetSessions::perTenant();
 
         // "Active" means truly active (subscription live, not banned/expired/
         // disabled) — the same stateReason() rule the company row + ingest guards
@@ -76,7 +71,7 @@ class OverviewController extends Controller
             } elseif (in_array($session->status, ['expired', 'needs_relink'], true)) {
                 $alerts[] = $this->alert($tenant, $session->status);
             }
-            if ($tenant->getAttribute('proxy_url') === null) {
+            if ($tenant->proxy_id === null && $tenant->getAttribute('proxy_url') === null) {
                 $alerts[] = $this->alert($tenant, 'no_proxy');
             }
         }
@@ -107,16 +102,15 @@ class OverviewController extends Controller
         ]]);
     }
 
-    /** Platform-wide offer volume for the last 14 days (zero-filled). */
+    /**
+     * Platform-wide offer volume for the last 14 FLEET days (04:00 → 04:00, like
+     * the manager dashboard), zero-filled. The count is cached in PlatformCounters —
+     * this page polls every 20 s and the GROUP BY scans the offer table.
+     */
     private function offersDaily(): array
     {
-        $since = CarbonImmutable::now()->subDays(13)->startOfDay();
-
-        $counts = DispatchOffer::withoutGlobalScopes()
-            ->where('received_at', '>=', $since)
-            ->groupBy('day')
-            ->orderBy('day')
-            ->pluck(DB::raw('count(*) as c'), DB::raw('date(received_at) as day'));
+        $since = FleetDay::startDaysAgo(13);
+        $counts = $this->counters->offersDaily($since);
 
         $out = [];
         for ($i = 0; $i < 14; $i++) {

@@ -4,8 +4,10 @@ namespace App\Support;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\Models\Driver;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Read-through cache for the platform-wide aggregate counts the super-admin
@@ -32,6 +34,8 @@ class PlatformCounters
 
     private const DRIVERS_BY_TENANT_KEY = 'platform.drivers_by_tenant.v2';
 
+    private const OFFERS_DAILY_KEY = 'platform.offers_daily.v1';
+
     /** Offer count per tenant, keyed by tenant_id. */
     public function offersByTenant(): Collection
     {
@@ -45,12 +49,36 @@ class PlatformCounters
         return (int) Cache::remember(self::OFFERS_TOTAL_KEY, self::TTL_SECONDS, fn () => DispatchOffer::withoutGlobalScopes()->count());
     }
 
+    /**
+     * Offers per fleet-day (04:00 → 04:00) since $since, as a plain
+     * ['Y-m-d' => count] array. Grouped by the raw expression (not its alias) so
+     * it runs on MySQL and SQLite alike.
+     *
+     * @return array<string, int>
+     */
+    public function offersDaily(CarbonInterface $since): array
+    {
+        $key = self::OFFERS_DAILY_KEY.':'.$since->format('Y-m-d');
+
+        return Cache::remember($key, self::TTL_SECONDS, function () use ($since) {
+            $day = FleetDay::dateExpr('received_at');
+
+            return DispatchOffer::withoutGlobalScopes()
+                ->where('received_at', '>=', $since)
+                ->groupBy(DB::raw($day))
+                ->pluck(DB::raw('count(*) as c'), DB::raw("{$day} as day"))
+                ->map(fn ($c) => (int) $c)
+                ->all();
+        });
+    }
+
     /** Drop the cached counts so a structural change (e.g. a deleted company) shows at once. */
     public function forget(): void
     {
         Cache::forget(self::OFFERS_BY_TENANT_KEY);
         Cache::forget(self::OFFERS_TOTAL_KEY);
         Cache::forget(self::DRIVERS_BY_TENANT_KEY);
+        Cache::forget(self::OFFERS_DAILY_KEY.':'.FleetDay::startDaysAgo(13)->format('Y-m-d'));
     }
 
     /** Driver count per tenant, keyed by tenant_id. */

@@ -1,79 +1,39 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ChevronLeft, Phone, Mail, Star, Car, UserCheck, MapPin, ArrowRight, ChevronDown, Inbox, Banknote, CreditCard } from "lucide-react";
+import { ChevronLeft, Phone, Mail, Star, Car, UserCheck, MapPin, ArrowRight, ChevronDown, Inbox, Banknote, CreditCard, RotateCcw } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Badge, type Status } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
-import { latnLocale, toLatinDigits } from "@/lib/utils";
+import { formatMoney, formatNumber, latnLocale, toLatinDigits } from "@/lib/utils";
+import { ApiError } from "@/lib/api/client";
 import { getDriver, getDriverStats, getDriverMetrics, type Driver, type DriverStats, type DriverMetric } from "@/lib/api/drivers";
-import { listOffersPaged, fareLabel, offerBadgeStatus, type DispatchOffer, type OfferStatus } from "@/lib/api/offers";
+import { listOffersPaged, fareLabel, offerBadgeStatus, type DispatchOffer, type PageMeta } from "@/lib/api/offers";
+import { OFFER_TONE } from "@/lib/offer-status";
+import { fleetDayKey, fleetDayRange, fleetYmd, formatYmd } from "@/lib/fleet-day";
 import { OfferDetailModal } from "../../offers/offer-detail-modal";
 
 type RangeKey = "today" | "yesterday" | "7" | "30" | "custom";
 
-/** Offer lifecycle status → badge tone (mirrors the offers page). */
-const OFFER_TONE: Record<OfferStatus, Status> = {
-  pending: "expiring",
-  accepted: "info",
-  started: "private",
-  completed: "connected",
-  rejected: "neutral",
-  canceled: "personal",
-};
-
-// Uber measures a "day" as its business day: 04:00 → 04:00 in the fleet's
-// timezone (Europe/Berlin), NOT local midnight. Aligning our windows to the same
-// boundary is what makes the Uber performance cards match the Uber app exactly.
-const FLEET_TZ = "Europe/Berlin";
-const BIZ_START_HOUR = 4;
-const DAY_MS = 86_400_000;
-
-/** UTC ms for a given Berlin wall-clock time (handles the tz offset + DST). */
-function berlinWallMs(y: number, m: number, d: number, h: number): number {
-  const guess = Date.UTC(y, m - 1, d, h);
-  const asUtc = Date.parse(
-    new Date(guess).toLocaleString("sv-SE", { timeZone: FLEET_TZ }).replace(" ", "T") + "Z",
-  );
-  return guess - (asUtc - guess); // guess minus the Berlin offset at that instant
+// Uber measures a "day" as its business day: 04:00 → 04:00 Europe/Berlin, NOT
+// local midnight. The backend filters take INCLUSIVE fleet-day labels (to =
+// FleetDay::endOfDate = next day 04:00), so the presets are built as labels —
+// "yesterday" is one fleet-day, "7d" exactly seven.
+function rangeLabels(key: Exclude<RangeKey, "custom">): { from: string; to: string } {
+  if (key === "today") return fleetDayRange(1, 0);
+  if (key === "yesterday") return fleetDayRange(1, 1);
+  return fleetDayRange(Number(key), 0);
 }
 
-/** Start (ms) of the current Uber business day: the most recent 04:00 Berlin. */
-function businessDayStartMs(): number {
-  const parts = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: FLEET_TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false,
-  }).formatToParts(new Date());
-  const g = (type: string) => Number(parts.find((p) => p.type === type)!.value);
-  const start = berlinWallMs(g("year"), g("month"), g("day"), BIZ_START_HOUR);
-  // Before 04:00 Berlin we're still inside yesterday's business day.
-  return Date.now() >= start ? start : start - DAY_MS;
-}
-
-/** Business-day window [from,to) in ms for the selected range (Uber-aligned). */
-function rangeMs(key: RangeKey): { from: number; to: number } {
-  const now = Date.now();
-  const bizStart = businessDayStartMs();
-  if (key === "today") return { from: bizStart, to: now };
-  if (key === "yesterday") return { from: bizStart - DAY_MS, to: bizStart };
-  return { from: now - Number(key) * DAY_MS, to: now };
-}
-
-/** Currency amount with its symbol ("€1,481.04"), or "—" when absent. */
-function money(amount: number | string | null | undefined, label: string | null): string {
-  if (amount == null) return "—";
-  // Laravel serializes decimal casts as strings (e.g. "62595.12"), so coerce
-  // before formatting — amount.toFixed on a string throws.
-  const n = typeof amount === "number" ? amount : Number(amount);
-  if (Number.isNaN(n)) return "—";
-  const symbol = label === "EUR" ? "€" : label ? `${label} ` : "";
-  return `${symbol}${n.toFixed(2)}`;
-}
-
-/** "cash_collected" → "Cash collected" for a breakdown category label. */
-function prettyCat(cat: string): string {
+/** "cash_collected" → its localized label, or "Cash collected" for unknown Uber keys. */
+function prettyCat(cat: string, t: (k: string) => string): string {
+  const key = `screens.drivers.earningsCat.${cat}`;
+  const localized = t(key);
+  if (localized !== key) return localized;
   const s = cat.replace(/_/g, " ").trim();
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -107,38 +67,62 @@ export default function DriverProfilePage() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [offers, setOffers] = useState<DispatchOffer[]>([]);
+  const [offersMeta, setOffersMeta] = useState<PageMeta | null>(null);
   const [loadingOffers, setLoadingOffers] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
   // Stable identity so the modal's fetch effect doesn't re-run every render.
   const closeDetail = useCallback(() => setDetailId(null), []);
-  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set([new Date().toDateString()]));
+  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set([fleetYmd()]));
+  const [driverError, setDriverError] = useState<number | null>(null);
+  const [driverAttempt, setDriverAttempt] = useState(0);
 
   useEffect(() => {
-    getDriver(id).then(setDriver).catch(() => setDriver(null));
-  }, [id]);
+    let cancelled = false;
+    setDriverError(null);
+    getDriver(id)
+      .then((d) => !cancelled && setDriver(d))
+      .catch((e) => {
+        if (cancelled) return;
+        setDriver(null);
+        setDriverError(e instanceof ApiError ? e.status : 0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, driverAttempt]);
 
-  // The active window (ms for Uber metrics, Y-M-D for our stats), from a preset
+  // The active window as inclusive fleet-day labels (YYYY-MM-DD), from a preset
   // or a custom from→to range.
   const win = useMemo(() => {
-    if (range === "custom") {
-      const fromMs = customFrom ? new Date(customFrom).getTime() : Date.now() - 7 * 86_400_000;
-      const toMs = customTo ? new Date(customTo).getTime() + 86_400_000 : Date.now(); // include the "to" day
-      return { fromMs, toMs, fromDate: customFrom || undefined, toDate: customTo || undefined };
-    }
-    const { from, to } = rangeMs(range);
-    return { fromMs: from, toMs: to, fromDate: new Date(from).toISOString().slice(0, 10), toDate: new Date(to).toISOString().slice(0, 10) };
+    if (range === "custom") return { fromDate: customFrom || undefined, toDate: customTo || undefined };
+    const { from, to } = rangeLabels(range);
+    return { fromDate: from, toDate: to };
   }, [range, customFrom, customTo]);
 
-  // Our own stats respect the same window.
+  // Our own stats respect the same window. Cancelled on range change so a slow
+  // 30-day query can't land under the "Today" chip.
   useEffect(() => {
-    getDriverStats(id, win.fromDate, win.toDate).then(setStats).catch(() => setStats(null));
+    let cancelled = false;
+    getDriverStats(id, win.fromDate, win.toDate)
+      .then((s) => !cancelled && setStats(s))
+      .catch(() => !cancelled && setStats(null));
+    return () => {
+      cancelled = true;
+    };
   }, [id, win.fromDate, win.toDate]);
 
   // Uber's OFFICIAL earnings (captured from the Fleet Earnings page). We show the
   // most recent captured window, regardless of the selected preset, since Uber's
   // period is whatever the manager last viewed on Uber.
   useEffect(() => {
-    getDriverMetrics(id).then((m) => setUber(m[0] ?? null)).catch(() => setUber(null));
+    let cancelled = false;
+    getDriverMetrics(id)
+      .then((m) => !cancelled && setUber(m[0] ?? null))
+      .catch(() => !cancelled && setUber(null));
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   // On open, ask the extension to refresh this driver's Uber earnings on demand
@@ -164,18 +148,56 @@ export default function DriverProfilePage() {
       setOffers([]);
       return;
     }
+    let cancelled = false;
     setLoadingOffers(true);
+    setOffersMeta(null);
     listOffersPaged({ driverUuid: uuid, from: win.fromDate, to: win.toDate, perPage: 100 })
-      .then((res) => setOffers(res.items))
-      .catch(() => setOffers([]))
-      .finally(() => setLoadingOffers(false));
+      .then((res) => {
+        if (cancelled) return;
+        setOffers(res.items);
+        setOffersMeta(res.meta);
+      })
+      .catch(() => !cancelled && setOffers([]))
+      .finally(() => !cancelled && setLoadingOffers(false));
+    return () => {
+      cancelled = true;
+    };
   }, [driver?.uber_driver_uuid, win.fromDate, win.toDate]);
 
-  // Group the loaded offers into day buckets (feed is newest-first).
+  // More than one page (busy driver, long range): append the next page instead
+  // of silently capping the list at 100.
+  const hasMoreOffers = offersMeta != null && offersMeta.current_page < offersMeta.last_page;
+  const windowKey = useRef("");
+  windowKey.current = `${driver?.uber_driver_uuid}|${win.fromDate}|${win.toDate}`;
+  async function loadMoreOffers() {
+    const uuid = driver?.uber_driver_uuid;
+    if (!uuid || !offersMeta || loadingMore) return;
+    const key = `${uuid}|${win.fromDate}|${win.toDate}`;
+    setLoadingMore(true);
+    try {
+      const res = await listOffersPaged({
+        driverUuid: uuid,
+        from: win.fromDate,
+        to: win.toDate,
+        perPage: 100,
+        page: offersMeta.current_page + 1,
+      });
+      // Ignore the page if the window changed while it loaded.
+      if (key !== windowKey.current) return;
+      setOffers((prev) => [...prev, ...res.items]);
+      setOffersMeta(res.meta);
+    } catch {
+      /* keep what we have; the button stays for a retry */
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  // Group the loaded offers into fleet-day buckets (feed is newest-first).
   const groupedByDay = useMemo(() => {
     const groups = new Map<string, DispatchOffer[]>();
     for (const offer of offers) {
-      const key = offer.received_at ? new Date(offer.received_at).toDateString() : "—";
+      const key = offer.received_at ? fleetDayKey(offer.received_at) : "—";
       const bucket = groups.get(key) ?? [];
       bucket.push(offer);
       groups.set(key, bucket);
@@ -193,12 +215,35 @@ export default function DriverProfilePage() {
   }
 
   function dayLabel(key: string): string {
-    if (key === new Date().toDateString()) return o("today");
+    if (key === fleetYmd()) return o("today");
     if (key === "—") return "—";
-    return new Date(key).toLocaleDateString(latnLocale(locale), { weekday: "long", day: "numeric", month: "long" });
+    return formatYmd(key, latnLocale(locale), { weekday: "long", day: "numeric", month: "long" });
   }
 
   const status = driver ? statusLabel(driver, d) : null;
+  const money = (amount: number | string | null | undefined, label: string | null) =>
+    formatMoney(amount, locale, label || "EUR");
+
+  if (driverError != null) {
+    return (
+      <div className="space-y-6">
+        <Link href="/drivers" className="inline-flex items-center gap-1 text-sm font-medium text-ink-muted hover:text-ink">
+          <ChevronLeft className="h-4 w-4 rtl:rotate-180" /> {d("backToDrivers")}
+        </Link>
+        <Card className="flex flex-col items-center gap-3 p-8 text-center">
+          <p className="text-sm text-ink-muted">
+            {driverError === 404 || driverError === 403 ? d("notFound") : t("common.loadFailed")}
+          </p>
+          {driverError !== 404 && driverError !== 403 && (
+            <Button variant="secondary" onClick={() => setDriverAttempt((n) => n + 1)}>
+              <RotateCcw className="h-4 w-4" />
+              {t("common.retry")}
+            </Button>
+          )}
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -315,6 +360,8 @@ export default function DriverProfilePage() {
                           <ChevronDown className={`h-4 w-4 text-ink-subtle transition ${open ? "" : "-rotate-90"}`} />
                           <span className="font-semibold text-ink">{dayLabel(key)}</span>
                           <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-ink">
+                            {/* The oldest loaded day may continue on the next page. */}
+                            {hasMoreOffers && key === groupedByDay[groupedByDay.length - 1][0] ? "≥ " : ""}
                             {dayOffers.length} {o("offersCount")}
                           </span>
                         </button>
@@ -329,7 +376,16 @@ export default function DriverProfilePage() {
                                     className="cursor-pointer hover:bg-surface-2"
                                   >
                                     <td className="whitespace-nowrap px-4 py-3 text-ink-muted">
-                                      {offer.received_at ? new Date(offer.received_at).toLocaleTimeString(latnLocale(locale)) : "—"}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDetailId(offer.id);
+                                        }}
+                                        className="rounded outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                                      >
+                                        {offer.received_at ? new Date(offer.received_at).toLocaleTimeString(latnLocale(locale)) : "—"}
+                                      </button>
                                     </td>
                                     <td className="px-4 py-3 text-ink-muted">
                                       <div className="flex items-start gap-1.5">
@@ -361,6 +417,20 @@ export default function DriverProfilePage() {
                       </div>
                     );
                   })}
+                  {offersMeta && offersMeta.total > offers.length && (
+                    <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm">
+                      <span className="text-ink-muted">
+                        {t("common.showingOf")
+                          .replace("{shown}", formatNumber(offers.length, locale))
+                          .replace("{total}", formatNumber(offersMeta.total, locale))}
+                      </span>
+                      {hasMoreOffers && (
+                        <Button variant="secondary" size="sm" onClick={loadMoreOffers} disabled={loadingMore}>
+                          {loadingMore ? t("common.loading") : t("common.loadMore")}
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </Card>
@@ -416,7 +486,7 @@ export default function DriverProfilePage() {
                   <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
                     {Object.entries(uber.breakdown).map(([cat, amt]) => (
                       <div key={cat} className="flex items-center justify-between gap-2 text-sm">
-                        <span className="truncate text-ink-muted">{prettyCat(cat)}</span>
+                        <span className="truncate text-ink-muted">{prettyCat(cat, t)}</span>
                         <span className="font-medium tabular-nums text-ink" dir="ltr">{money(amt, uber.earnings_label)}</span>
                       </div>
                     ))}
@@ -441,11 +511,11 @@ export default function DriverProfilePage() {
               <h4 className="text-sm font-semibold text-ink">{d("ourData")}</h4>
               <p className="mb-3 mt-0.5 text-xs text-ink-subtle">{d("ourDataHint")}</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                <MiniStat label={d("statEarnings")} value={`€${stats.earnings.toFixed(2)}`} />
-                <MiniStat label={d("statTrips")} value={String(stats.trips)} />
+                <MiniStat label={d("statEarnings")} value={formatMoney(stats.earnings, locale)} />
+                <MiniStat label={d("statTrips")} value={formatNumber(stats.trips, locale)} />
                 <MiniStat label={d("statAccept")} value={`${stats.acceptance_rate}%`} />
-                <MiniStat label={d("statOffers")} value={String(stats.offers)} />
-                <MiniStat label={d("statAccepted")} value={String(stats.accepted)} />
+                <MiniStat label={d("statOffers")} value={formatNumber(stats.offers, locale)} />
+                <MiniStat label={d("statAccepted")} value={formatNumber(stats.accepted, locale)} />
                 <MiniStat label={d("statKm")} value={`${stats.km} km`} />
               </div>
             </Card>
@@ -463,7 +533,7 @@ export default function DriverProfilePage() {
                 </span>
               ) : "—"}
             </InfoTile>
-            <InfoTile icon={Car} label={d("colTrips")}>{driver?.total_trips != null ? driver.total_trips.toLocaleString() : "—"}</InfoTile>
+            <InfoTile icon={Car} label={d("colTrips")}>{driver?.total_trips != null ? formatNumber(driver.total_trips, locale) : "—"}</InfoTile>
             <InfoTile icon={Phone} label={d("colPhone")}>{driver?.phone ? <span dir="ltr">{driver.phone}</span> : "—"}</InfoTile>
             <InfoTile icon={Mail} label={d("email")}>{driver?.uber_email ? <span dir="ltr">{driver.uber_email}</span> : "—"}</InfoTile>
             <InfoTile icon={UserCheck} label={d("linkMethod")}>

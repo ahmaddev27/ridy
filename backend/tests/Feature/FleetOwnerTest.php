@@ -143,6 +143,29 @@ class FleetOwnerTest extends TestCase
         $this->assertCount(1, $res->json('data.active_offers'));
     }
 
+    public function test_fleet_home_names_the_online_drivers_busiest_first(): void
+    {
+        $owner = $this->owner();
+        $this->driver(['name' => 'Zaid', 'email' => 'z@ya.de', 'online_status' => 'ONLINE']);
+        $this->driver(['name' => 'Omar', 'email' => 'o@ya.de', 'online_status' => 'EN_ROUTE']);
+        $this->driver(['name' => 'Sara', 'email' => 's@ya.de', 'online_status' => 'ON_TRIP']);
+        $this->driver(['name' => 'Ali', 'email' => 'a@ya.de', 'online_status' => 'ONLINE']);
+        $this->driver(['name' => 'Offline Olga', 'email' => 'off@ya.de', 'online_status' => 'OFFLINE']);
+
+        // Another company's online driver must never be listed.
+        $other = Tenant::create(['name' => 'Other', 'country' => 'DE', 'status' => 'active', 'activated_at' => now(), 'subscription_ends_at' => now()->addMonth()]);
+        Driver::create(['tenant_id' => $other->id, 'name' => 'Stranger', 'email' => 'st@o.de', 'online_status' => 'ONLINE']);
+
+        Sanctum::actingAs($owner);
+        $res = $this->getJson('/api/v1/driver/fleet/home')->assertOk();
+
+        $res->assertJsonPath('data.online_drivers', 4);
+        $this->assertSame(
+            [['Sara', 2], ['Omar', 1], ['Ali', 0], ['Zaid', 0]],
+            collect($res->json('data.online_drivers_list'))->map(fn ($d) => [$d['name'], $d['engagement']])->all(),
+        );
+    }
+
     public function test_plain_driver_still_sees_only_their_own_offers(): void
     {
         $mine = $this->driver(['activated_at' => now()]);

@@ -20,6 +20,7 @@ import {
   deleteCollector,
   type Collector,
 } from "@/lib/api/admin";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 export default function CollectorsPage() {
   const { t, locale } = useI18n();
@@ -161,7 +162,7 @@ function CollectorModal({ collector, onClose, onSaved }: { collector: Collector 
       onSaved();
       onClose();
     } catch (e) {
-      toast.error(c("failed"), { description: e instanceof Error ? e.message : undefined });
+      toast.error(c("failed"), { description: apiErrorMessage(e, t) });
     } finally {
       setBusy(false);
     }

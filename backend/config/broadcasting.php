@@ -43,6 +43,12 @@ return [
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                // Offer broadcasts are published synchronously on the ingest path.
+                // Laravel's defaults (10 s connect / 30 s response) let a hung Reverb
+                // hold an offer past Uber's ~5 s accept window; the live nudge is
+                // best-effort, so fail fast instead.
+                'connect_timeout' => (float) env('REVERB_CONNECT_TIMEOUT', 0.5),
+                'timeout' => (float) env('REVERB_TIMEOUT', 1.0),
             ],
         ],
 

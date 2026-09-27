@@ -168,15 +168,3 @@ export async function listOffers(params?: {
   );
   return res.data;
 }
-
-export async function deleteOffer(id: number): Promise<void> {
-  await apiFetch(`/api/v1/dispatch/offers/${id}`, { method: "DELETE", withCsrf: true });
-}
-
-export async function bulkDeleteOffers(ids: number[]): Promise<number> {
-  const res = await apiFetch<{ data: { deleted: number } }>(
-    "/api/v1/dispatch/offers/bulk-delete",
-    { method: "POST", body: { ids }, withCsrf: true },
-  );
-  return res.data.deleted;
-}

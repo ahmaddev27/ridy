@@ -100,7 +100,9 @@ class InfrastructureHealthService
     {
         $last = rescue(fn () => Cache::get(self::HEARTBEAT_KEY), null, report: false);
         $at = is_string($last) && $last !== '' ? rescue(fn () => CarbonImmutable::parse($last), null, report: false) : null;
-        $seconds = $at !== null ? max(0, (int) CarbonImmutable::now()->diffInSeconds($at)) : null;
+        // Plain timestamp arithmetic: Carbon 3's now()->diffInSeconds($past) is SIGNED
+        // (negative), so the old max(0, …) always read 0 and a dead scheduler showed ok.
+        $seconds = $at !== null ? max(0, time() - $at->getTimestamp()) : null;
         $status = $seconds !== null && $seconds < self::SCHEDULER_STALE_SECONDS ? 'ok' : 'down';
 
         return ['last_run_at' => $at?->toIso8601String(), 'seconds_since' => $seconds, 'status' => $status];
@@ -109,7 +111,7 @@ class InfrastructureHealthService
     /** True when a TCP connection to the service opens within the timeout. */
     private function tcpReachable(string $host, int $port): bool
     {
-        $conn = @fsockopen($host, $port, $errno, $errstr, 2.0);
+        $conn = @fsockopen($host, $port, $errno, $errstr, 1.0);
         if ($conn === false) {
             return false;
         }
@@ -119,7 +121,7 @@ class InfrastructureHealthService
     }
 
     /**
-     * True when the URL answers with ANY HTTP status (reachable), within 4s.
+     * True when the URL answers with ANY HTTP status (reachable), within 2s.
      * Pass query params as `$query`, never embedded in `$url` (see the caller).
      *
      * @param  array<string, mixed>  $query
@@ -131,7 +133,7 @@ class InfrastructureHealthService
         }
 
         return (bool) rescue(
-            fn () => Http::withOptions(self::NO_PROXY)->timeout(4)->get($url, $query)->status() > 0,
+            fn () => Http::withOptions(self::NO_PROXY)->connectTimeout(1)->timeout(2)->get($url, $query)->status() > 0,
             false,
             report: false,
         );

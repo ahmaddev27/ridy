@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Users, Star, RefreshCw, Send, Smartphone, Loader2, Bell, Mail } from "lucide-react";
@@ -11,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
+import { formatNumber } from "@/lib/utils";
 import { useAsync } from "@/hooks/use-async";
 import { listDrivers, syncDrivers, inviteDriver, testDriverPush, updateDriverEmail, type Driver } from "@/lib/api/drivers";
 import { apiErrorMessage } from "@/lib/api/error-message";
@@ -18,7 +20,7 @@ import { syncRosterViaExtension, fetchDriverStatusesViaExtension } from "@/lib/e
 import { AdBanner } from "@/components/ads/ad-banner";
 
 export default function DriversPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const router = useRouter();
   // Poll the (cheap, DB-backed) roster list so linked/status changes surface
   // without a manual refresh. The heavier Uber pull still runs only on mount.
@@ -223,7 +225,14 @@ export default function DriversPage() {
                           />
                         </div>
                         <div>
-                          <div className="font-medium text-ink">{d.name}</div>
+                          {/* A real link so keyboard users can open the profile. */}
+                          <Link
+                            href={`/drivers/${d.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-medium text-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
+                          >
+                            {d.name}
+                          </Link>
                           {d.uber_email && (
                             <div className="text-xs text-ink-subtle">{d.uber_email}</div>
                           )}
@@ -242,7 +251,7 @@ export default function DriversPage() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-ink-muted">
-                      {d.total_trips != null ? d.total_trips.toLocaleString() : "—"}
+                      {d.total_trips != null ? formatNumber(d.total_trips, locale) : "—"}
                     </td>
                     <td className="px-4 py-3">
                       <Badge status={d.active ? "connected" : "gap"} dot>

@@ -77,7 +77,7 @@ class PaymentClaimController extends Controller
             return response()->json(['message' => 'claim_company_missing'], 422);
         }
 
-        $activationCode = null;
+        $issueCode = null;
         if ($confirmed) {
             $plan = Plan::where('active', true)->find($data['plan_id']);
             if ($plan === null) {
@@ -85,14 +85,15 @@ class PaymentClaimController extends Controller
             }
 
             // Same code-issuing flow as a manual admin code; the acceptance email
-            // carries the code so the company can activate right away.
-            $issued = $issuer->issue(
-                $tenant, $plan, (bool) ($data['paid'] ?? true), $data['payment_method'] ?? 'bank', null, $request->user()->id,
-            );
-            $activationCode = $issued['code'];
+            // carries the code so the company can activate right away. Runs inside
+            // the service's claim transaction, so only the winning confirm issues.
+            $admin = $request->user();
+            $issueCode = fn () => $issuer->issue(
+                $tenant, $plan, (bool) ($data['paid'] ?? true), $data['payment_method'] ?? 'bank', null, $admin->id,
+            )['code'];
         }
 
-        $service->resolve($claim, $confirmed, $data['reason'] ?? null, $request->user(), $activationCode);
+        $claim = $service->resolve($claim, $confirmed, $data['reason'] ?? null, $request->user(), $issueCode);
 
         return response()->json(['data' => ['resolved' => true, 'status' => $claim->status]]);
     }

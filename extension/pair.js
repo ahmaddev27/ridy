@@ -65,8 +65,12 @@ async function announce() {
     const version = api.runtime.getManifest?.().version ?? null;
     // Report whether we already hold a pairing token, so the dashboard can
     // silently re-pair us if it was lost (e.g. the extension was reinstalled).
-    const { token } = await api.storage.local.get(["token"]);
-    window.postMessage({ source: "ridy-ext-present", version, paired: !!token }, location.origin);
+    // A revoked/expired token is cleared by the background on its first 401, so
+    // `paired` turns false and the dashboard re-pairs. `paused` says why the
+    // backend asked the extension to back off (company inactive / disconnected).
+    const { token, backendPause } = await api.storage.local.get(["token", "backendPause"]);
+    const paused = backendPause && backendPause.until > Date.now() ? backendPause.reason || "paused" : null;
+    window.postMessage({ source: "ridy-ext-present", version, paired: !!token, paused }, location.origin);
   } catch {
     // Context invalidated between the check and the read — treat as stale.
     window.postMessage({ source: "ridy-ext-present", version: null, paired: false, stale: true }, location.origin);
@@ -95,19 +99,26 @@ window.addEventListener("message", async (event) => {
     window.postMessage({ source: "ridy-pair-fail", reason: "extension_stale" }, location.origin);
     return;
   }
-  try {
-    await api.storage.local.set({
-      apiUrl,
-      token: String(d.token),
-      lastSync: null, // force a fresh capture after re-pairing
-    });
-  } catch {
-    window.postMessage({ source: "ridy-pair-fail", reason: "extension_stale" }, location.origin);
+  // The background stores it: a pairing for another company (or backend) must
+  // also drop the previous company's org + replay templates, which it checks.
+  const res = await callBackground({ type: "pair", apiUrl, token: String(d.token) });
+  if (!res?.ok) {
+    window.postMessage({ source: "ridy-pair-fail", reason: res?.reason || "extension_stale" }, location.origin);
     return;
   }
 
   // Let the page know pairing succeeded so it can show a confirmation.
   window.postMessage({ source: "ridy-pair-ack" }, location.origin);
+});
+
+// The dashboard can unpair the extension (e.g. on logout), so a shared browser
+// never keeps a working token after the manager leaves. Same origin guard as
+// pairing: only the real dashboard may do this.
+window.addEventListener("message", async (event) => {
+  if (event.source !== window || !ALLOWED_PAIR_ORIGINS.includes(event.origin)) return;
+  if (event.data?.source !== "ridy-unpair") return;
+  const res = await callBackground({ type: "unpair" });
+  window.postMessage({ source: res?.ok ? "ridy-unpair-ack" : "ridy-unpair-fail", reason: res?.reason }, location.origin);
 });
 
 // The dashboard's "connect" button signals an explicit connect intent right

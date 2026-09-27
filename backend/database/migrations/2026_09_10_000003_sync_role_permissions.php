@@ -25,8 +25,11 @@ return new class extends Migration
         // NO role would lose access the moment this ships. Every user is created as
         // a fleet_manager today, so a role-less one is historical data — give it the
         // role it has always behaved as, rather than silently locking it out.
+        // lazyById (keyset on id), not each() (LIMIT/OFFSET): assigning a role
+        // shrinks the whereDoesntHave set, so offset paging skipped users past 1000.
         User::whereNotNull('tenant_id')
             ->whereDoesntHave('roles')
+            ->lazyById(500)
             ->each(fn (User $user) => $user->assignRole('fleet_manager'));
     }
 

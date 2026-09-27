@@ -118,18 +118,17 @@ export function setThemeMode(mode: ThemeMode): void {
   }
 }
 
-export function getThemeMode(): ThemeMode {
-  return currentMode;
-}
+// Stable identities so useSyncExternalStore doesn't resubscribe on every render.
+const subscribeTheme = (fn: () => void) => {
+  themeListeners.add(fn);
+  return () => {
+    themeListeners.delete(fn);
+  };
+};
+const getThemeSnapshot = () => currentMode;
 
 export function useThemeMode(): ThemeMode {
-  return useSyncExternalStore(
-    (fn) => {
-      themeListeners.add(fn);
-      return () => themeListeners.delete(fn);
-    },
-    () => currentMode,
-  );
+  return useSyncExternalStore(subscribeTheme, getThemeSnapshot);
 }
 
 /** Colors for the effective scheme: the chosen mode, or the device setting. */

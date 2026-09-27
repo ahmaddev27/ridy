@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Billing\Models\SubscriptionPeriod;
 use App\Domain\Billing\PaymentClaimService;
 use App\Domain\Billing\SubscriptionActivator;
+use App\Http\Controllers\Concerns\GeneratesOtp;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -17,10 +19,19 @@ use Illuminate\Validation\ValidationException;
  */
 class CompanySubscriptionController extends Controller
 {
+    use GeneratesOtp;
+
+    /** Wrong codes a company may enter before the redeem form locks. */
+    private const REDEEM_MAX_ATTEMPTS = 5;
+
+    /** How long the redeem lockout lasts once tripped (seconds). */
+    private const REDEEM_LOCKOUT_SECONDS = 900; // 15 minutes
+
     /**
      * Redeem a subscription code from inside the dashboard (already signed in) —
-     * a new period stacks after any remaining time. A test code (OTP_TEST_CODE)
-     * grants a default monthly period with no admin-issued plan needed.
+     * a new period stacks after any remaining time. The test code (OTP_TEST_CODE)
+     * is honoured outside production only, exactly like the public activation.
+     * Wrong codes trip a per-company lockout so the 6-digit space can't be walked.
      */
     public function redeem(Request $request, SubscriptionActivator $activator): JsonResponse
     {
@@ -30,34 +41,29 @@ class CompanySubscriptionController extends Controller
             throw ValidationException::withMessages(['code' => 'activation_no_company']);
         }
 
+        $throttleKey = 'subscription-redeem:'.$tenant->id;
+        if (RateLimiter::tooManyAttempts($throttleKey, self::REDEEM_MAX_ATTEMPTS)) {
+            throw ValidationException::withMessages(['code' => 'otp_too_many']);
+        }
+
         // A real admin/reseller-issued code takes priority over the test code, so
         // a generated code that happens to equal OTP_TEST_CODE still links its
         // ledger entry and grants the plan's days (not the test default).
-        $hasCode = $tenant->activation_code !== null;
-        $expired = $tenant->activation_code_expires_at?->isPast() ?? false;
-        $realMatch = $hasCode && ! $expired && hash_equals((string) $tenant->activation_code, $data['code']);
-
-        // TEMPORARY test backdoor: OTP_TEST_CODE activates a monthly period even in
-        // production (unlike isTestCode, which is prod-guarded). Remove after testing.
-        $fixed = config('services.otp_test_code');
-        $testCode = ! $realMatch && filled($fixed) && hash_equals((string) $fixed, $data['code']);
+        $realMatch = $activator->isPendingCode($tenant, $data['code']);
+        $testCode = ! $realMatch && $this->isTestCode($data['code']);
 
         if (! $realMatch && ! $testCode) {
+            RateLimiter::hit($throttleKey, self::REDEEM_LOCKOUT_SECONDS);
             throw ValidationException::withMessages(['code' => 'otp_incorrect']);
         }
 
-        // The test code grants a real monthly subscription (plan + activated
-        // ledger row shown on the history page); a real code applies its own plan.
+        // A real code is re-checked and consumed under the tenant row lock, so
+        // parallel submits of one code yield a single period.
         $period = $testCode
             ? $activator->applyTestMonthly($tenant, $data['code'], $request->user()->id)
-            : $activator->apply(
-                $tenant,
-                (int) $tenant->activation_days,
-                $tenant->activation_amount,
-                (bool) $tenant->activation_paid,
-                $tenant->activation_collector_id,
-                $tenant->activation_code,
-            );
+            : $activator->redeemIssuedCode($tenant, $data['code']);
+
+        RateLimiter::clear($throttleKey);
 
         return response()->json(['data' => [
             'activated' => true,
@@ -113,7 +119,8 @@ class CompanySubscriptionController extends Controller
                 // Temporal state of THIS period: the one running now is "active",
                 // future ones "scheduled", past ones "ended" — this is what the
                 // company cares about, distinct from the code's redemption status.
-                $periodStatus = $p->ends_at->isBefore($now) ? 'ended'
+                // An admin-ended period is kept on the books but no longer runs.
+                $periodStatus = ($p->isCanceled() || $p->ends_at->isBefore($now)) ? 'ended'
                     : ($p->starts_at->isAfter($now) ? 'scheduled' : 'active');
 
                 return [
@@ -124,6 +131,7 @@ class CompanySubscriptionController extends Controller
                     'payment_method' => $code?->payment_method,
                     'code_status' => $code?->status(),
                     'period_status' => $periodStatus,
+                    'canceled' => $p->isCanceled(),
                     'collector' => $code?->collector?->name,
                     'amount' => $p->amount !== null ? (float) $p->amount : null,
                     'paid' => $p->isPaid(),

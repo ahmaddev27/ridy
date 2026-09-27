@@ -1,8 +1,7 @@
 import { Tabs } from "expo-router";
 import { View, Pressable, Platform, StyleSheet } from "react-native";
-import { BlurView } from "expo-blur";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Home, Package, BarChart3, User, type LucideIcon } from "lucide-react-native";
+import { Home, Package, BarChart3, User, type LucideIcon } from "@/components/icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Text } from "@/components/typography";
 import { t, useLocale, isRTL } from "@/lib/i18n";
@@ -39,20 +38,11 @@ function BottomBar({ state, descriptors, navigation }: BottomTabBarProps) {
         borderTopWidth: StyleSheet.hairlineWidth,
         borderTopColor: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
         overflow: "hidden",
+        // A solid bar: the old blur sat under a 94%-opaque tint and was invisible.
+        backgroundColor: dark ? "rgb(16,18,21)" : "#FFFFFF",
         ...shadow(c),
       }}
     >
-      {/* Frosted glass where it renders (iOS), but the tint below is near-opaque
-          so the bar is always a clean solid colour — expo-blur is unreliable on
-          Android and would otherwise wash the bar white in dark mode. */}
-      <BlurView intensity={dark ? 40 : 60} tint={dark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: dark ? "rgba(16,18,21,0.94)" : "rgba(255,255,255,0.94)" },
-        ]}
-      />
-
       <View
         style={{
           flexDirection: isRTL() ? "row-reverse" : "row",

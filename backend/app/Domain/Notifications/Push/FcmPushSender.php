@@ -169,9 +169,20 @@ class FcmPushSender implements PushSender, SendsPushInBulk
         $isMultiStop = isset($data['stops_count']) && (int) $data['stops_count'] >= 2;
         $soundFile = $isMultiStop ? 'multi.wav' : 'normal.wav';
 
-        $aps = ['sound' => $soundFile, 'content-available' => 1];
+        // No `content-available`: the app declares no remote-notification background
+        // mode, so it was a no-op that only muddied APNs' push-type inference.
+        $aps = ['sound' => $soundFile];
         if (! empty($data['categoryId'])) {
             $aps['category'] = (string) $data['categoryId'];
+        }
+
+        $isOffer = self::isOfferPush($data);
+        if ($isOffer) {
+            // Driving Focus / Do Not Disturb hold back 'active' pushes until the
+            // Focus ends — exactly while the driver is on the road. Time-sensitive
+            // breaks through (the app's time-sensitive entitlement ships with the
+            // next native build; until then iOS treats it as 'active', no harm).
+            $aps['interruption-level'] = 'time-sensitive';
         }
 
         // App-icon badge count (unread offers). iOS sets it straight from the aps
@@ -192,19 +203,62 @@ class FcmPushSender implements PushSender, SendsPushInBulk
             $androidNotification['notification_count'] = $badge;
         }
 
+        $android = ['priority' => 'high', 'notification' => $androidNotification];
+        // Explicit alert type: never left to FCM inference (a background-classed
+        // push is capped at priority 5 and throttled by APNs).
+        $apnsHeaders = ['apns-priority' => '10', 'apns-push-type' => 'alert'];
+
+        if ($isOffer) {
+            // An offer is only actionable for seconds. Without an expiry FCM/APNs
+            // store it for weeks and a phone coming out of a tunnel rings for a ride
+            // that expired long ago. The collapse key/tag makes one offer's updates
+            // (the multi-stop follow-up) replace each other instead of piling up.
+            $ttl = self::offerTtlSeconds($data);
+            $collapse = 'offer-'.$data['offer_id'];
+
+            $android['ttl'] = $ttl.'s';
+            $android['collapse_key'] = $collapse;
+            $android['notification']['tag'] = $collapse;
+            $apnsHeaders['apns-expiration'] = (string) (time() + $ttl);
+            $apnsHeaders['apns-collapse-id'] = $collapse;
+        }
+
         return [
             'token' => $token,
             'notification' => ['title' => $title, 'body' => $body],
             'data' => array_map('strval', $data),
-            'android' => [
-                'priority' => 'high',
-                'notification' => $androidNotification,
-            ],
+            'android' => $android,
             'apns' => [
-                'headers' => ['apns-priority' => '10'],
+                'headers' => $apnsHeaders,
                 'payload' => ['aps' => $aps],
             ],
         ];
+    }
+
+    /**
+     * An offer push (driver or owner copy, first alert or multi-stop follow-up) —
+     * as opposed to admin broadcasts, bell notifications and PushDoctor tests,
+     * which keep FCM's default delivery window.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private static function isOfferPush(array $data): bool
+    {
+        return ($data['categoryId'] ?? '') === 'offer' && ! empty($data['offer_id']);
+    }
+
+    /**
+     * How long an undelivered offer push may wait for the device: the accept window
+     * plus a grace for clock skew / slow radio, clamped to 15–120 s (45 s when the
+     * window is unknown).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function offerTtlSeconds(array $data): int
+    {
+        $window = (int) ($data['accept_window'] ?? 0);
+
+        return $window > 0 ? max(15, min(120, $window + 30)) : 45;
     }
 
     private function endpoint(): string

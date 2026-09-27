@@ -60,11 +60,11 @@ class DispatchOffer extends Model
     }
 
     /**
-     * The status to show. There is NO accept-window timeout: a pending offer stays
-     * PENDING until an EVENT resolves it — a newer offer supersedes it (→ Rejected),
-     * the driver engages (→ Accepted/Started), or the driver goes offline (→ Rejected
-     * by the sweep). So the display is simply the stored status; nothing is inferred
-     * from the elapsed accept window.
+     * The status to show: simply the stored status — nothing is inferred at render
+     * time. Expiry is applied to the stored row instead: a newer offer supersedes a
+     * pending one (→ Rejected), the driver engages (→ Accepted/Started), and
+     * OfferLifecycle::expirePending (scheduled + opportunistic) rejects an IDLE
+     * driver's offer once its accept window + grace has passed.
      */
     public function displayStatus(): OfferStatus
     {

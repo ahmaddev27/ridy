@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Audit\AuditLogger;
 use App\Domain\Fleet\Models\Driver;
 use App\Http\Controllers\Controller;
 use App\Jobs\SendAdminBroadcast;
@@ -21,7 +22,7 @@ class AdminNotificationController extends Controller
     /** Roles a broadcast may target (mirrors the platform role set). */
     private const TARGETABLE_ROLES = ['super_admin', 'owner', 'fleet_manager', 'driver', 'viewer', 'reseller'];
 
-    public function broadcast(Request $request): JsonResponse
+    public function broadcast(Request $request, AuditLogger $audit): JsonResponse
     {
         $data = $request->validate([
             'title' => ['required', 'string', 'max:120'],
@@ -56,6 +57,14 @@ class AdminNotificationController extends Controller
             $data['href'] ?? null,
             $driverIds,
         );
+
+        $audit->logPlatform('admin.broadcast', null, [
+            'title' => $data['title'],
+            'body' => mb_substr($data['body'], 0, 500),
+            'users' => count($userIds),
+            'drivers' => count($driverIds),
+            'audience' => ! empty($data['all']) ? 'all' : ($data['role'] ?? 'selection'),
+        ]);
 
         return response()->json(['queued' => count($userIds) + count($driverIds)]);
     }
