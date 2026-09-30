@@ -5,6 +5,7 @@ namespace App\Domain\Notifications\Push;
 use App\Domain\Notifications\Contracts\PushSender;
 use App\Domain\Notifications\Contracts\SendsPushInBulk;
 use App\Domain\Notifications\Models\DeviceToken;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -21,6 +22,18 @@ use Throwable;
  */
 class FcmPushSender implements PushSender, SendsPushInBulk
 {
+    /**
+     * Two attempts must fit inside Uber's ~5 s accept window. Prod saw FCM calls
+     * hang for the full 5 s with 0 bytes received (cURL 28) about once a day — a
+     * stuck connection, not a slow FCM — and that one offer never reached the
+     * driver. Short per-attempt limits plus ONE retry on a connection failure
+     * recover it on a fresh connection. (A retry after FCM actually accepted the
+     * first send is harmless: offer pushes share a collapse key/tag.)
+     */
+    private const CONNECT_TIMEOUT = 1.5;
+
+    private const ATTEMPT_TIMEOUT = 2.5;
+
     public function __construct(
         private readonly GoogleServiceAccountToken $auth,
         private readonly string $projectId,
@@ -28,16 +41,30 @@ class FcmPushSender implements PushSender, SendsPushInBulk
 
     public function send(string $deviceToken, string $title, string $body, array $data = []): bool
     {
+        $payload = ['message' => $this->message($deviceToken, $title, $body, $data)];
+        $response = null;
+
         try {
-            $response = Http::withToken($this->auth->accessToken())
-                ->acceptJson()
-                ->timeout(5) // a hung FCM endpoint must never stall the ingest hot path
-                ->post($this->endpoint(), [
-                    'message' => $this->message($deviceToken, $title, $body, $data),
-                ]);
+            $accessToken = $this->auth->accessToken();
+
+            for ($attempt = 1; $attempt <= 2 && $response === null; $attempt++) {
+                try {
+                    $response = Http::withToken($accessToken)
+                        ->acceptJson()
+                        ->connectTimeout(self::CONNECT_TIMEOUT)
+                        ->timeout(self::ATTEMPT_TIMEOUT)
+                        ->post($this->endpoint(), $payload);
+                } catch (ConnectionException $e) {
+                    Log::warning($attempt === 1 ? 'push.fcm_retry' : 'push.fcm_error', ['message' => $e->getMessage()]);
+                }
+            }
         } catch (Throwable $e) {
             Log::warning('push.fcm_error', ['message' => $e->getMessage()]);
 
+            return false;
+        }
+
+        if ($response === null) {
             return false;
         }
 
@@ -71,14 +98,17 @@ class FcmPushSender implements PushSender, SendsPushInBulk
             // One OAuth mint for the batch (it is cached ~55 min anyway).
             $accessToken = $this->auth->accessToken();
 
-            /** @var array<int, Response> $responses */
-            $responses = Http::pool(fn (Pool $pool) => array_map(
-                fn (string $token) => $pool->withToken($accessToken)
-                    ->acceptJson()
-                    ->timeout(5)
-                    ->post($this->endpoint(), ['message' => $this->message($token, $title, $body, $data)]),
-                $tokens,
-            ));
+            $responses = $this->pool($accessToken, $tokens, $title, $body, $data);
+
+            // Retry ONCE, together, only the devices whose connection failed.
+            $retry = array_keys(array_filter($responses, fn ($r) => $r instanceof ConnectionException));
+            if ($retry !== []) {
+                Log::warning('push.fcm_retry', ['devices' => count($retry)]);
+                $again = $this->pool($accessToken, array_map(fn (int $i) => $tokens[$i], $retry), $title, $body, $data);
+                foreach ($retry as $n => $i) {
+                    $responses[$i] = $again[$n] ?? $responses[$i];
+                }
+            }
         } catch (Throwable $e) {
             Log::warning('push.fcm_error', ['message' => $e->getMessage()]);
 
@@ -108,6 +138,26 @@ class FcmPushSender implements PushSender, SendsPushInBulk
         }
 
         return $sent;
+    }
+
+    /**
+     * Send one message per token concurrently. Each entry is a Response OR the
+     * exception that request threw.
+     *
+     * @param  array<int, string>  $tokens
+     * @param  array<string, mixed>  $data
+     * @return array<int, Response|Throwable>
+     */
+    private function pool(string $accessToken, array $tokens, string $title, string $body, array $data): array
+    {
+        return Http::pool(fn (Pool $pool) => array_map(
+            fn (string $token) => $pool->withToken($accessToken)
+                ->acceptJson()
+                ->connectTimeout(self::CONNECT_TIMEOUT)
+                ->timeout(self::ATTEMPT_TIMEOUT)
+                ->post($this->endpoint(), ['message' => $this->message($token, $title, $body, $data)]),
+            array_values($tokens),
+        ));
     }
 
     /** Log a compact failure line and prune a permanently-dead token. */
