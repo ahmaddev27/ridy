@@ -16,10 +16,6 @@ export default function ImpressumPage() {
             <br />
             Einzelunternehmen
             <br />
-            Hölderlinstraße 17
-            <br />
-            42699 Solingen
-            <br />
             Deutschland
           </p>
         </section>
@@ -42,11 +38,7 @@ export default function ImpressumPage() {
           <h2 className="text-xl font-semibold text-ink">
             Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV
           </h2>
-          <p className="mt-3">
-            Reidey
-            <br />
-            Hölderlinstraße 17, 42699 Solingen, Deutschland
-          </p>
+          <p className="mt-3">Reidey</p>
         </section>
       </div>
     </div>
