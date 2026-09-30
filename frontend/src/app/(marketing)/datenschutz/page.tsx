@@ -30,7 +30,7 @@ export default function DatenschutzPage() {
             Verantwortlicher im Sinne des Art. 4 Nr. 7 DSGVO für den Betrieb dieser Plattform ist:
           </p>
           <p className="mt-3">
-            Reidey (Einzelunternehmen)
+            Reidey
             <br />
             E-Mail: info@reidey.de
             <br />

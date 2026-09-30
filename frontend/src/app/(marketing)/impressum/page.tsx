@@ -14,8 +14,6 @@ export default function ImpressumPage() {
           <p className="mt-3">
             Reidey
             <br />
-            Einzelunternehmen
-            <br />
             Deutschland
           </p>
         </section>
