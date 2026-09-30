@@ -32,10 +32,6 @@ export default function DatenschutzPage() {
           <p className="mt-3">
             Reidey (Einzelunternehmen)
             <br />
-            Hölderlinstraße 17
-            <br />
-            42699 Solingen, Deutschland
-            <br />
             E-Mail: info@reidey.de
             <br />
             Telefon: +49 1590 5655286
