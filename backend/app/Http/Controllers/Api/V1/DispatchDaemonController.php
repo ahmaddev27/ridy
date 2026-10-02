@@ -86,6 +86,13 @@ class DispatchDaemonController extends Controller
             'cookies' => ['required', 'array', 'min:1', 'max:200'],
             'cookies.*.name' => ['required', 'string'],
             'cookies.*.value' => ['required', 'string'],
+            // The daemon keeps the session warm from its 24/7 Fleet Hub polls: Uber
+            // rotates the shared identity cookies on those responses, so the daemon
+            // forwards the refreshed supplier jar too. Optional — a RAMEN-only
+            // rotation (or an older daemon) omits it, and the stored jar is kept.
+            'supplier_cookies' => ['nullable', 'array', 'max:200'],
+            'supplier_cookies.*.name' => ['required_with:supplier_cookies', 'string'],
+            'supplier_cookies.*.value' => ['required_with:supplier_cookies', 'string'],
             'expires_at' => ['nullable', 'date'],
             'jar_version' => ['nullable', 'integer'],
         ]);
@@ -101,6 +108,9 @@ class DispatchDaemonController extends Controller
             'expires_at' => isset($data['expires_at']) ? CarbonImmutable::parse($data['expires_at']) : $model->expires_at,
             'last_event_at' => CarbonImmutable::now(),
         ]);
+        if (! empty($data['supplier_cookies'])) {
+            $model->supplier_cookies = $data['supplier_cookies'];
+        }
 
         // Check-and-write atomically: a reconnect landing between the check above
         // and this write must still win.
@@ -115,6 +125,7 @@ class DispatchDaemonController extends Controller
         // Log the event WITHOUT the cookie values (secrets) — count + expiry only.
         $recorder->session((int) $model->tenant_id, 'cookies_refreshed', [
             'cookie_count' => count($data['cookies']),
+            'supplier_cookie_count' => isset($data['supplier_cookies']) ? count($data['supplier_cookies']) : null,
             'expires_at' => $data['expires_at'] ?? null,
         ]);
 
