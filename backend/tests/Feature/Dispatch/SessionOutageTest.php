@@ -7,6 +7,7 @@ use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -109,9 +110,9 @@ class SessionOutageTest extends TestCase
     {
         // Fixed instants (not travel()) so the duration is exactly 95 min — a
         // sub-second real-time drift otherwise rounds it to 5701s (and 96 min).
-        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-10-02 12:00:00'));
+        $this->travelTo(CarbonImmutable::parse('2026-10-02 12:00:00'));
         $this->daemonPost('needs-relink');
-        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-10-02 13:35:00'));
+        $this->travelTo(CarbonImmutable::parse('2026-10-02 13:35:00'));
         $this->capture('fresh', ['manual' => true]);
 
         $this->daemonPost('heartbeat');
