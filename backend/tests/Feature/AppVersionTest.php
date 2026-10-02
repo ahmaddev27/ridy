@@ -48,4 +48,27 @@ class AppVersionTest extends TestCase
     {
         $this->getJson('/api/v1/app/version')->assertStatus(422);
     }
+
+    public function test_stores_endpoint_returns_only_the_two_store_urls(): void
+    {
+        Settings::setMany([
+            'app_android_store_url' => 'https://play.google.com/store/apps/details?id=de.reidey.app',
+            'app_ios_store_url' => 'https://apps.apple.com/app/reidey/id1',
+        ]);
+
+        $this->getJson('/api/v1/app/stores')
+            ->assertOk()
+            ->assertExactJson(['data' => [
+                'android' => 'https://play.google.com/store/apps/details?id=de.reidey.app',
+                'ios' => 'https://apps.apple.com/app/reidey/id1',
+            ]]);
+    }
+
+    public function test_stores_endpoint_is_null_until_configured(): void
+    {
+        $this->getJson('/api/v1/app/stores')
+            ->assertOk()
+            ->assertJsonPath('data.android', null)
+            ->assertJsonPath('data.ios', null);
+    }
 }

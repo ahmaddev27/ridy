@@ -35,4 +35,17 @@ class AppVersionController extends Controller
             'store_url' => $storeUrl,
         ]]);
     }
+
+    /**
+     * The per-platform store URLs, for the public /get smart-download link (the
+     * invite email's single "install" button, which redirects by device). No
+     * auth; only the two admin-configured URLs are exposed, never other settings.
+     */
+    public function stores(): JsonResponse
+    {
+        return response()->json(['data' => [
+            'android' => Settings::get('app_android_store_url'),
+            'ios' => Settings::get('app_ios_store_url'),
+        ]]);
+    }
 }
