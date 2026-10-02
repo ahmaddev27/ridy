@@ -159,6 +159,37 @@ class DispatchDaemonTest extends TestCase
         $this->assertNotNull($fresh->last_event_at);
     }
 
+    public function test_cookie_refresh_also_persists_the_rotated_supplier_jar(): void
+    {
+        // The daemon keeps the session warm from its Fleet Hub polls: it forwards
+        // the refreshed supplier jar so an actively-used session never ages out.
+        $session = $this->makeSession();
+        $session->forceFill(['supplier_cookies' => [['name' => 'sid', 'value' => 'old']]])->save();
+
+        $this->daemon()->postJson("/api/v1/internal/dispatch/sessions/{$session->id}/cookies", [
+            'cookies' => [['name' => 'sid', 'value' => 'rotated']],
+            'supplier_cookies' => [['name' => 'sid', 'value' => 'rotated-supplier']],
+        ])->assertOk();
+
+        $fresh = UberFleetSession::withoutGlobalScopes()->find($session->id);
+        $this->assertSame('rotated-supplier', $fresh->supplier_cookies[0]['value']);
+    }
+
+    public function test_cookie_refresh_without_a_supplier_jar_keeps_the_stored_one(): void
+    {
+        // A RAMEN-only rotation (or an older daemon) omits supplier_cookies — the
+        // stored supplier jar must be left intact, never wiped.
+        $session = $this->makeSession();
+        $session->forceFill(['supplier_cookies' => [['name' => 'sid', 'value' => 'keep']]])->save();
+
+        $this->daemon()->postJson("/api/v1/internal/dispatch/sessions/{$session->id}/cookies", [
+            'cookies' => [['name' => 'sid', 'value' => 'rotated']],
+        ])->assertOk();
+
+        $fresh = UberFleetSession::withoutGlobalScopes()->find($session->id);
+        $this->assertSame('keep', $fresh->supplier_cookies[0]['value']);
+    }
+
     public function test_needs_relink_flags_the_session(): void
     {
         $session = $this->makeSession();

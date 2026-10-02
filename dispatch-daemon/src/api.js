@@ -67,8 +67,15 @@ export const api = {
   },
 
   /** Persist rolling cookies captured from Set-Cookie — keeps the session alive. */
-  async refreshCookies(sessionId, cookies, expiresAt, jarVersion) {
-    return call("POST", `/sessions/${sessionId}/cookies`, { cookies, expires_at: expiresAt, ...jarBody(jarVersion) });
+  async refreshCookies(sessionId, cookies, expiresAt, jarVersion, supplierCookies) {
+    return call("POST", `/sessions/${sessionId}/cookies`, {
+      cookies,
+      // Rotated supplier (fleethub) jar — omitted for a RAMEN-only rotation so an
+      // older backend (which ignores the field) is unaffected.
+      supplier_cookies: supplierCookies && supplierCookies.length ? supplierCookies : undefined,
+      expires_at: expiresAt,
+      ...jarBody(jarVersion),
+    });
   },
 
   /** Tell the backend the session was rejected so the manager is prompted to re-link. */
