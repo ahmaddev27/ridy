@@ -243,14 +243,15 @@ class DriverAppTest extends TestCase
         $this->assertSame('completed', $res->json('data.0.status'));
     }
 
-    public function test_invite_emails_a_login_code_and_stores_it(): void
+    public function test_invite_sends_no_code(): void
     {
         $driver = $this->driver();
 
         $this->invitationService()->invite($driver);
 
-        // The one-time code is persisted for the passwordless sign-in to verify.
-        $this->assertDatabaseHas('password_resets', ['email' => $driver->email]);
+        // The invite only carries the install link; the sign-in code is issued
+        // later, when the driver enters this email in the app (login/request).
+        $this->assertDatabaseMissing('password_resets', ['email' => $driver->email]);
     }
 
     public function test_passwordless_login_activates_driver_and_returns_token(): void
@@ -259,7 +260,7 @@ class DriverAppTest extends TestCase
         $driver = $this->driver();
         $this->invitationService()->invite($driver);
 
-        // Step 1: request a code (idempotent — invite already sent one).
+        // Step 1: the app requests the sign-in code (the invite sent none).
         $this->postJson('/api/v1/driver/login/request', ['email' => $driver->email])
             ->assertOk()->assertJsonPath('data.sent', true);
 

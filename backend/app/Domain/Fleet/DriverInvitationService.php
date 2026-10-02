@@ -4,11 +4,8 @@ namespace App\Domain\Fleet;
 
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\SendTemplatedMail;
-use App\Http\Controllers\Concerns\GeneratesOtp;
-use App\Models\PasswordReset;
 use App\Models\User;
 use App\Support\Settings;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -16,25 +13,20 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Owns the driver app onboarding lifecycle: a manager invites a driver by email,
- * the driver signs in passwordlessly with an emailed one-time code, and is
- * activated on first success. Keeps the invitation rules in one place so the
- * controllers stay thin.
+ * the driver installs the app, enters that email, and signs in passwordlessly
+ * with a code the app requests then (see DriverAuthController::loginRequest).
+ * The invite itself carries NO code — only the install link.
  */
 class DriverInvitationService
 {
-    use GeneratesOtp;
-
     /** An unused invite link stops working after this — a leaked/old link can't be replayed. */
     public const INVITE_TTL_DAYS = 7;
 
-    /** How long the emailed sign-in code stays valid. */
-    private const OTP_TTL_MINUTES = 30;
-
     /**
-     * Issue (or re-issue) an invitation: email a one-time sign-in code. Falls back
+     * Issue (or re-issue) an invitation: email the app install link. Falls back
      * to the driver's Uber email (captured when they were linked) so a manager
      * doesn't have to type it; the chosen address becomes the driver's login email.
-     * No password is involved — the code the driver enters is the credential.
+     * No code is sent here — the app requests one once the driver enters this email.
      */
     /**
      * A driver's login email must be free: drivers.email is unique across ALL
@@ -92,19 +84,12 @@ class DriverInvitationService
             throw $this->emailInUse();
         }
 
-        $reset = PasswordReset::updateOrCreate(
-            ['email' => $email],
-            [
-                'otp' => $this->newOtp(),
-                'otp_expires_at' => CarbonImmutable::now()->addMinutes(self::OTP_TTL_MINUTES),
-                'attempts' => 0,
-            ],
-        );
-
+        // No code is sent here: the driver gets a fresh sign-in code AFTER they
+        // install the app and enter their email (DriverAuthController::loginRequest).
+        // A code in the invite would just expire unused and confuse the driver.
         SendTemplatedMail::to($email, 'driver_invite', [
             'company_name' => (string) ($driver->tenant?->name ?? 'Reidey'),
             'driver_name' => (string) $driver->name,
-            'otp' => $reset->otp,
             // One smart install link: /get redirects to the right store by the
             // device's User-Agent at tap time (an email can't detect the device
             // itself). The template uses this single button.

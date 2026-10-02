@@ -73,7 +73,7 @@ class EmailTemplateController extends Controller
             'company_registration' => ['company_name' => 'YA Mobility', 'manager_name' => 'Basel', 'login_url' => $base.'/login'],
             'company_otp' => ['name' => 'Basel', 'otp' => '123456'],
             'password_otp' => ['name' => 'Basel', 'otp' => '123456'],
-            'driver_invite' => ['company_name' => 'YA Mobility', 'driver_name' => 'Ayman', 'otp' => '123456', 'download_smart' => $base.'/get', 'download_android' => 'https://play.google.com/store/apps/details?id=de.reidey.app', 'download_ios' => 'https://apps.apple.com/app/reidey/id000000000'],
+            'driver_invite' => ['company_name' => 'YA Mobility', 'driver_name' => 'Ayman', 'download_smart' => $base.'/get', 'download_android' => 'https://play.google.com/store/apps/details?id=de.reidey.app', 'download_ios' => 'https://apps.apple.com/app/reidey/id000000000'],
             'subscription_expiring' => ['title' => 'Dein Abo läuft bald ab', 'body' => 'Dein Abo läuft in 3 Tagen ab. Verlängere jetzt, um ohne Unterbrechung weiterzuarbeiten.', 'action_label' => 'Abo verlängern', 'action_url' => $base.'/settings/subscription'],
             'subscription_expired' => ['title' => 'Dein Abo ist abgelaufen', 'body' => 'Dein Abo ist abgelaufen. Reaktiviere es, um wieder vollen Zugriff zu erhalten.', 'action_label' => 'Abo reaktivieren', 'action_url' => $base.'/settings/subscription'],
             'subscription_activated' => ['title' => 'Dein Abo ist aktiv', 'body' => 'Dein Abo wurde aktiviert. Du hast jetzt vollen Zugriff auf alle Funktionen.', 'action_label' => 'Zum Dashboard', 'action_url' => $base.'/dashboard'],

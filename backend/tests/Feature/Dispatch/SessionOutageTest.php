@@ -107,8 +107,11 @@ class SessionOutageTest extends TestCase
 
     public function test_the_stream_delivering_again_closes_the_outage_and_tells_the_managers(): void
     {
+        // Fixed instants (not travel()) so the duration is exactly 95 min — a
+        // sub-second real-time drift otherwise rounds it to 5701s (and 96 min).
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-10-02 12:00:00'));
         $this->daemonPost('needs-relink');
-        $this->travel(95)->minutes();
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-10-02 13:35:00'));
         $this->capture('fresh', ['manual' => true]);
 
         $this->daemonPost('heartbeat');
