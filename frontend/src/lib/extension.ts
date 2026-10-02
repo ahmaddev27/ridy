@@ -8,10 +8,11 @@
 // The extension version this dashboard build expects. Bump it in lockstep with
 // extension/manifest.json. Store installs auto-update, so this only nudges
 // managers on an older, manually-loaded build.
-// Floor, not "latest": 1.17.0 carries the full-system-audit fixes. Raise it to
-// the version actually live on the Chrome Web Store (manifest is 1.23.0) once
-// that is confirmed published — never above it, or every manager is nagged.
-export const LATEST_EXTENSION_VERSION = "1.17.0";
+// Floor, not "latest": 1.25.0 adds the automatic session self-heal (reopens
+// Uber in the background to relink a dropped session). Confirmed live on the
+// Chrome Web Store on 2026-10-02 — never raise this above the published build,
+// or every manager is nagged to update to a version they cannot get yet.
+export const LATEST_EXTENSION_VERSION = "1.25.0";
 
 // The published (unlisted) Chrome Web Store listing. Unlisted = installable by
 // anyone with the link but hidden from search, so managers install with one
