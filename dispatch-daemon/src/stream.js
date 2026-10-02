@@ -273,6 +273,7 @@ export class RamenStream {
           return;
         }
         this.supplierRecovered();
+        this.absorbSupplierCookies(res);
         const result = await res.json();
         if (result.status !== "success") {
           console.warn(`[${this.tag()}] roster fetch: ${result.message || "not success"}`);
@@ -346,6 +347,7 @@ export class RamenStream {
       return false;
     }
     this.supplierRecovered();
+    this.absorbSupplierCookies(res);
 
     let statuses;
     try {
@@ -529,10 +531,48 @@ export class RamenStream {
     this.persistJar().catch(() => {});
   }
 
-  /** The fingerprint the backend would hold if it stored the current jar. */
+  /** The fingerprint the backend would hold if it stored the current jar (both jars). */
   liveJarFingerprint() {
     const cookies = [...this.jar].map(([name, value]) => ({ name, value }));
-    return { cookies, fp: `${jarFingerprint(cookies)}:${jarFingerprint(this.session.supplier_cookies)}` };
+    const supplierCookies = [...this.supplierJar].map(([name, value]) => ({ name, value }));
+    return { cookies, supplierCookies, fp: `${jarFingerprint(cookies)}:${jarFingerprint(supplierCookies)}` };
+  }
+
+  /**
+   * Keep the session warm from the fleethub polls that already run 24/7. Uber
+   * rotates the shared identity cookies (sid/csid/…) on these authenticated
+   * responses; absorbing them keeps BOTH jars fresh, so the offer (RAMEN) session
+   * no longer silently ages out while roster/status stays alive — the 2026-10-01
+   * Move Now outage, where fleethub synced for hours while RAMEN 404'd on a stale
+   * jar that nothing ever refreshed (no Set-Cookie on the SSE). This EXTENDS the
+   * session the company already granted by using activity that was happening
+   * anyway; it is not a re-login and stores no login credential.
+   */
+  absorbSupplierCookies(response) {
+    const setCookies = response.headers.getSetCookie?.() ?? [];
+    if (setCookies.length === 0) return;
+
+    let rotated = 0;
+    for (const raw of setCookies) {
+      const cookie = parseSetCookie(raw);
+      if (!cookie) continue;
+      if (cookie.deleted) {
+        this.supplierJar.delete(cookie.name);
+      } else {
+        this.supplierJar.set(cookie.name, cookie.value);
+        // A rotated cookie the RAMEN jar also holds is the shared .uber.com session
+        // token — refreshing it there keeps the offer stream's next reopen fresh.
+        if (this.jar.has(cookie.name)) this.jar.set(cookie.name, cookie.value);
+        rotated++;
+      }
+    }
+    if (rotated > 0) console.log(`[${this.tag()}] session kept warm: ${rotated} rotated cookie(s) from Fleet Hub`);
+
+    // Only the PRIMARY persists (secondaries don't poll, but guard anyway), and a
+    // persist is a no-op unless the fingerprint actually moved — so a poll that
+    // rotates nothing costs nothing.
+    if (!this.primary || this.stopped) return;
+    this.persistJar().catch(() => {});
   }
 
   /**
@@ -560,10 +600,10 @@ export class RamenStream {
         // A torn-down stream (or one a reconnect superseded) must not overwrite a
         // newer re-link with its old jar.
         if (this.stopped || this.jarStale) return;
-        const { cookies, fp } = this.liveJarFingerprint();
+        const { cookies, supplierCookies, fp } = this.liveJarFingerprint();
         if (fp === this.cookieFp || cookies.length === 0) continue;
         try {
-          await track(api.refreshCookies(this.session.id, cookies, undefined, this.jarVersion));
+          await track(api.refreshCookies(this.session.id, cookies, undefined, this.jarVersion, supplierCookies));
           this.cookieFp = fp;
         } catch (e) {
           // Our jar was replaced by a reconnect: never retry the write or advance
