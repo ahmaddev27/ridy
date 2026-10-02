@@ -87,6 +87,9 @@ Route::prefix('v1')->group(function () {
     // Public force-update gate for the mobile driver app (checked on launch).
     Route::get('app/version', [AppVersionController::class, 'check'])->middleware('throttle:60,1,public-read');
 
+    // Public store URLs for the /get smart-download link (invite email's install button).
+    Route::get('app/stores', [AppVersionController::class, 'stores'])->middleware('throttle:60,1,public-read');
+
     // Public plan catalogue for the marketing site's pricing section.
     Route::get('plans', [PublicPlanController::class, 'index'])->middleware('throttle:60,1,public-read');
 

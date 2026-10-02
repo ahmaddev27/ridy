@@ -105,10 +105,13 @@ class DriverInvitationService
             'company_name' => (string) ($driver->tenant?->name ?? 'Reidey'),
             'driver_name' => (string) $driver->name,
             'otp' => $reset->otp,
-            // Per-platform download links — the same admin-configured URLs the
-            // in-app force-update dialog points at (an APK before the store, a
-            // store link after). The email can't know the driver's device, so we
-            // send both and let them pick. Empty until the admin sets them.
+            // One smart install link: /get redirects to the right store by the
+            // device's User-Agent at tap time (an email can't detect the device
+            // itself). The template uses this single button.
+            'download_smart' => $this->smartDownloadUrl(),
+            // Per-platform links kept for backward compatibility with a template a
+            // manager customised before the smart link existed. The admin-configured
+            // store URLs; empty until set.
             'download_android' => (string) (Settings::get('app_android_store_url') ?? ''),
             'download_ios' => (string) (Settings::get('app_ios_store_url') ?? ''),
         ]);
@@ -145,5 +148,13 @@ class DriverInvitationService
         $base = rtrim((string) config('app.frontend_url', config('app.url')), '/');
 
         return $base.'/driver/activate?token='.$token;
+    }
+
+    /** The device-aware install link served by the Next.js /get route. */
+    private function smartDownloadUrl(): string
+    {
+        $base = rtrim((string) config('app.frontend_url', config('app.url', 'https://reidey.de')), '/');
+
+        return $base.'/get';
     }
 }
