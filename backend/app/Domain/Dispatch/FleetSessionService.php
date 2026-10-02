@@ -2,6 +2,7 @@
 
 namespace App\Domain\Dispatch;
 
+use App\Domain\Dispatch\Models\FleetSessionOutage;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Notifications\Notifier;
 use App\Domain\Tenancy\Models\Tenant;
@@ -17,12 +18,14 @@ class FleetSessionService
     public function __construct(
         private readonly Notifier $notifier,
         private readonly SupplierNetworkRecorder $recorder,
+        private readonly SessionOutageTracker $outages,
     ) {}
 
     /**
      * @param  array<int, array<string, mixed>>  $cookies  captured cookie jar (vsdispatch scope, for RAMEN)
      * @param  array<int, array<string, mixed>>|null  $supplierCookies  supplier.uber.com-scoped jar (roster/status)
      * @param  bool  $replaceOtherOrgs  a manual Connect to a DIFFERENT org: drop the company's other org sessions
+     * @param  string  $via  how the jar arrived: auto (extension self-heal) / manual (Connect) / page (an Uber page load)
      */
     public function capture(
         Tenant $tenant,
@@ -32,6 +35,7 @@ class FleetSessionService
         ?string $uberOrgName = null,
         ?array $supplierCookies = null,
         bool $replaceOtherOrgs = false,
+        string $via = FleetSessionOutage::VIA_PAGE,
     ): UberFleetSession {
         [$session, $wasActive] = DB::transaction(function () use ($tenant, $uberOrgUuid, $cookies, $expiresAt, $uberOrgName, $supplierCookies, $replaceOtherOrgs) {
             // Serialize captures per company (the extension auto-captures on every
@@ -95,6 +99,15 @@ class FleetSessionService
 
             return [UberFleetSession::withoutGlobalScopes()->create(['tenant_id' => $tenant->id, 'uber_org_uuid' => $uberOrgUuid] + $attributes), false];
         });
+
+        // During an outage a capture is only an attempt — the jar may already be
+        // dead (Uber rejects it seconds later). Count it; the managers hear
+        // "restored" once the stream actually delivers (see streamAlive).
+        if (! $wasActive && $this->outages->isOpen($session)) {
+            $this->outages->relinkAttempted($session, $via);
+
+            return $session;
+        }
 
         // Alert the fleet's managers only when the session actually (re)connects —
         // after commit, so a rolled-back capture never notifies.
@@ -167,6 +180,10 @@ class FleetSessionService
         // knocking this session out".
         $this->recorder->session((int) $session->tenant_id, 'needs_relink', ['source' => $source]);
 
+        if ($wasActive) {
+            $this->outages->open($session, $source);
+        }
+
         // Prompt the managers to reconnect — but only on the transition, and
         // deduped, so a persistently-broken session doesn't spam the bell. Pass
         // `company`: the push/email copy is "{company}: the Uber session needs
@@ -174,6 +191,31 @@ class FleetSessionService
         if ($wasActive) {
             $this->notifier->toTenant($session->tenant_id, 'session_needs_relink', ['company' => $this->companyName($session)], '/connections', dedupe: true);
         }
+    }
+
+    /**
+     * The daemon's offer stream delivered a frame on this session. If it was in an
+     * outage, close it and tell the managers how long offers were missing.
+     */
+    public function streamAlive(UberFleetSession $session): void
+    {
+        if ($session->status !== UberFleetSession::STATUS_ACTIVE) {
+            return;
+        }
+
+        $outage = $this->outages->close($session);
+        if ($outage === null) {
+            return;
+        }
+
+        $this->recorder->session((int) $session->tenant_id, 'restored', [
+            'down_seconds' => $outage->durationSeconds(),
+            'via' => $outage->recovered_via,
+        ]);
+        $this->notifier->toTenant($session->tenant_id, 'session_restored', [
+            'company' => $this->companyName($session),
+            'minutes' => max(1, (int) ceil($outage->durationSeconds() / 60)),
+        ], '/connections');
     }
 
     /**

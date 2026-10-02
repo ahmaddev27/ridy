@@ -24,7 +24,7 @@ use Throwable;
 class Notifier
 {
     /** Frequent/low-value events that stay in-app only — never emailed. */
-    private const EMAIL_SKIP = ['session_connected'];
+    private const EMAIL_SKIP = ['session_connected', 'session_restored'];
 
     /**
      * User-configurable notification categories (the bell is always on; these
@@ -37,6 +37,7 @@ class Notifier
     private const TYPE_CATEGORY = [
         'session_connected' => 'sessions',
         'session_needs_relink' => 'sessions',
+        'session_restored' => 'sessions',
         'company_registered' => 'platform',
         'company_banned' => 'platform',
         'proxy_expiring' => 'platform',

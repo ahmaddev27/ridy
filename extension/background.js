@@ -281,6 +281,11 @@ async function capture(orgUuid, orgName, { manual = false } = {}) {
   if (!pairing.ok) return { ok: false, reason: pairing.reason };
   const { lastSync } = pairing;
 
+  // A capture from the tab autoRelink() opened is tagged so the backend can
+  // measure how each outage was fixed.
+  const { autoRelinkAt } = await api.storage.local.get(["autoRelinkAt"]);
+  const auto = typeof autoRelinkAt === "number" && Date.now() - autoRelinkAt < AUTO_RELINK_TAB_MS;
+
   // Treat a pending dashboard "Connect" intent as an explicit (manual) capture,
   // so a reconnect from the dashboard clears the backend's autolink block even
   // though it flows through the auto-capture content script.
@@ -319,6 +324,7 @@ async function capture(orgUuid, orgName, { manual = false } = {}) {
       // true only when the manager pressed Connect — lets the backend refuse
       // silent auto-captures after an operator disconnected the fleet.
       manual,
+      auto: auto && !manual ? true : undefined,
     },
     { orgUuid },
   );
@@ -896,7 +902,8 @@ async function closeTabIfExpected(tabId, host) {
   try {
     const tab = await api.tabs.get(tabId);
     // Tab ids can be reused after a browser restart — never close someone else's tab.
-    if (host && hostOf(tab?.url || tab?.pendingUrl || "") !== host) return;
+    const expected = Array.isArray(host) ? host : host ? [host] : [];
+    if (expected.length && !expected.includes(hostOf(tab?.url || tab?.pendingUrl || ""))) return;
     await api.tabs.remove(tabId);
   } catch {
     /* already closed */
@@ -1065,13 +1072,20 @@ function isTrustedPairingSender(sender) {
  * org uuid, null when the company has none, or undefined when it can't tell.
  */
 async function pairedCompanyOrg(pairing) {
+  const session = await fetchCompanySession(pairing);
+  if (session === undefined) return undefined;
+  return typeof session?.uber_org_uuid === "string" ? session.uber_org_uuid : null;
+}
+
+/** The company's Uber session as the backend sees it: {uber_org_uuid, status, …}, null, or undefined when unknown. */
+async function fetchCompanySession(pairing) {
   try {
     const res = await fetch(`${pairing.apiUrl}/api/v1/fleet-session`, {
       headers: { Accept: "application/json", Authorization: `Bearer ${pairing.token}` },
     });
     if (!res.ok) return undefined;
     const body = await res.json();
-    return typeof body?.data?.uber_org_uuid === "string" ? body.data.uber_org_uuid : null;
+    return body?.data ?? null;
   } catch {
     return undefined;
   }
@@ -1224,6 +1238,59 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
+// ── Self-heal a session Uber rejected ───────────────────────────────────────
+// Uber ends a login now and then. The browser renews its own login silently on
+// the next Uber page load, but the copy the daemon streams with cannot — so the
+// company lost offers until a manager noticed the email and reconnected (12 h
+// on 2026-10-01). While the browser is open we check the session every couple
+// of minutes and, once it is flagged needs_relink, open the dispatch page in a
+// background tab: loading it renews the browser's login and its content script
+// captures the FRESH cookies (capturing the stale jar straight away is what
+// Uber rejected again at 06:17). Retries back off so a signed-out browser is
+// not reopening tabs every few minutes; the backend measures each attempt.
+const SESSION_CHECK_GAP_MS = 2 * 60 * 1000;
+const AUTO_RELINK_URL = "https://vsdispatch.uber.com/";
+const AUTO_RELINK_TAB_MS = 60 * 1000;
+const AUTO_RELINK_BACKOFF_MIN = [3, 5, 10, 15, 30];
+
+async function checkSessionHealth(pairing) {
+  const store = pollStore();
+  const { lastSessionCheckAt } = await store.get(["lastSessionCheckAt"]);
+  if (typeof lastSessionCheckAt === "number" && Date.now() - lastSessionCheckAt < SESSION_CHECK_GAP_MS) return;
+  await store.set({ lastSessionCheckAt: Date.now() });
+
+  const session = await fetchCompanySession(pairing);
+  if (session?.status === "needs_relink") {
+    await autoRelink();
+  } else if (session?.status === "active") {
+    await api.storage.local.remove(["autoRelink", "autoRelinkAt"]);
+  }
+}
+
+async function autoRelink() {
+  const { autoRelink: state } = await api.storage.local.get(["autoRelink"]);
+  const attempts = state?.attempts ?? 0;
+  if (typeof state?.nextAt === "number" && Date.now() < state.nextAt) return;
+
+  const waitMin = AUTO_RELINK_BACKOFF_MIN[Math.min(attempts, AUTO_RELINK_BACKOFF_MIN.length - 1)];
+  await api.storage.local.set({
+    autoRelink: { attempts: attempts + 1, nextAt: Date.now() + waitMin * 60 * 1000 },
+    autoRelinkAt: Date.now(),
+  });
+  // Re-post even an unchanged jar: the browser's cookies may be fine while the
+  // daemon's rotated copy was the one Uber rejected.
+  await api.storage.local.remove("lastSync");
+
+  try {
+    const tab = await api.tabs.create({ url: AUTO_RELINK_URL, active: false });
+    console.log("[Reidey bg] auto-relink: opened dispatch tab", tab?.id, "attempt", attempts + 1);
+    // A signed-out browser lands on the login page — close that too.
+    scheduleTabClose(tab?.id, AUTO_RELINK_TAB_MS, ["vsdispatch.uber.com", "auth.uber.com"]);
+  } catch (e) {
+    console.warn("[Reidey bg] auto-relink failed:", e.message); // e.g. no browser window open
+  }
+}
+
 // ── Background polling (no page needed) ──────────────────────────────────────
 // The manager only ever sees the account.uber.com tab at connect time. After
 // that, the service worker itself polls Uber (supplier, via the manager's real
@@ -1254,6 +1321,8 @@ async function runBackgroundPoll() {
 
   // Presence + acceptance every tick (catches ON_TRIP transitions promptly).
   await fetchDriverStatuses([]).catch(() => {});
+
+  await checkSessionHealth(pairing).catch((e) => console.warn("[Reidey bg] session check failed:", e?.message));
 
   // Roster refresh every 30 minutes (fetchRoster stamps lastRosterAt up front).
   const lastRosterAt = typeof pairing.lastRosterAt === "number" ? pairing.lastRosterAt : 0;

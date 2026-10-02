@@ -179,9 +179,12 @@ class DispatchDaemonController extends Controller
     }
 
     /** Liveness heartbeat — records that the stream is still delivering. */
-    public function heartbeat(Request $request, int $session): JsonResponse
+    public function heartbeat(Request $request, int $session, FleetSessionService $service): JsonResponse
     {
-        $this->find($request, $session)->forceFill(['last_event_at' => CarbonImmutable::now()])->save();
+        $model = $this->find($request, $session);
+        $model->forceFill(['last_event_at' => CarbonImmutable::now()])->save();
+        // A delivering stream is the only proof an outage is over.
+        $service->streamAlive($model);
 
         return response()->json(['data' => ['status' => 'ok']]);
     }

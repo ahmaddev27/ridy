@@ -412,6 +412,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('companies/{tenant}/subscription', [SubscriptionController::class, 'endSubscription']);
 
         Route::get('companies/{tenant}/session', [CompanySessionController::class, 'show']);
+        Route::get('companies/{tenant}/session/outages', [CompanySessionController::class, 'outages']);
         Route::post('companies/{tenant}/session/relink', [CompanySessionController::class, 'forceRelink']);
         Route::delete('companies/{tenant}/session', [CompanySessionController::class, 'destroy']);
         // Disconnect + wipe all operational fleet data (drivers/vehicles/offers/

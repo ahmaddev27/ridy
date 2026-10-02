@@ -33,6 +33,8 @@ import {
   getCompanyOffers,
   getCompanyVehicles,
   getCompanyNetwork,
+  getCompanySessionOutages,
+  type SessionOutageSummary,
   clearCompanyNetwork,
   type CompanyNetworkRow,
   listSubscriptionInvoices,
@@ -663,6 +665,7 @@ export function CompanyDetail({
                       <Trash2 className="h-4 w-4" /> {c("deleteSession")}
                     </Button>
                   </div>
+                  <SessionOutages id={id} />
                 </Group>
 
                 {/* Impersonate — swaps the SPA session to a manager. */}
@@ -775,6 +778,59 @@ function Group({
         {children}
       </div>
     </section>
+  );
+}
+
+/** Hours + minutes, Latin digits in every locale. */
+function formatDowntime(seconds: number, c: (k: string) => string): string {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h > 0 ? c("outageHours").replace("{h}", String(h)).replace("{m}", String(m)) : c("outageMinutes").replace("{m}", String(m));
+}
+
+/** Uber session outages (last 30 days): how long offers were missing and how each was fixed. */
+function SessionOutages({ id }: { id: number }) {
+  const { t, locale } = useI18n();
+  const c = (k: string) => t(`screens.companies.${k}`);
+  const [summary, setSummary] = useState<SessionOutageSummary | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    getCompanySessionOutages(id)
+      .then((s) => alive && setSummary(s))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  if (!summary) return null;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-ink-subtle">
+        {summary.count === 0
+          ? c("outagesNone")
+          : c("outagesSummary").replace("{count}", String(summary.count)).replace("{total}", formatDowntime(summary.total_seconds, c))}
+      </p>
+      {summary.outages.length > 0 && (
+        <ul className="max-h-48 space-y-1 overflow-y-auto text-xs">
+          {summary.outages.map((o) => (
+            <li key={o.started_at} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-2 px-2.5 py-1.5">
+              <span className="text-ink-muted">{formatDateTime(o.started_at, locale, { dateStyle: "short", timeStyle: "short" })}</span>
+              <span className={o.ended_at ? "font-medium text-ink" : "font-medium text-danger-fg"}>
+                {o.ended_at ? formatDowntime(o.duration_seconds, c) : c("outageOngoing")}
+              </span>
+              <span className="text-ink-subtle">
+                {o.recovered_via ? c(`outageVia_${o.recovered_via}`) : "—"}
+                {o.relink_attempts > 1 ? ` · ${c("outageAttempts").replace("{n}", String(o.relink_attempts))}` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

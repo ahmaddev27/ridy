@@ -623,6 +623,28 @@ export async function forceRelink(id: number): Promise<void> {
   await apiFetch(`${base}/${id}/session/relink`, { method: "POST", withCsrf: true });
 }
 
+export type SessionOutage = {
+  started_at: string;
+  ended_at: string | null;
+  duration_seconds: number;
+  cause: string;
+  recovered_via: "auto" | "manual" | "page" | null;
+  relink_attempts: number;
+};
+
+export type SessionOutageSummary = {
+  outages: SessionOutage[];
+  count: number;
+  total_seconds: number;
+  open: boolean;
+};
+
+/** A company's Uber session outages over the last 30 days. */
+export async function getCompanySessionOutages(id: number): Promise<SessionOutageSummary> {
+  const res = await apiFetch<{ data: SessionOutageSummary }>(`${base}/${id}/session/outages`);
+  return res.data;
+}
+
 export async function deleteCompanySession(id: number): Promise<void> {
   await apiFetch(`${base}/${id}/session`, { method: "DELETE", withCsrf: true });
 }
