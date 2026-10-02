@@ -118,6 +118,7 @@ const en = {
   },
   notif: {
     session_connected: { title: "Uber connected", body: "{company} is now streaming offers." },
+    session_restored: { title: "Uber reconnected", body: "{company}: offers are flowing again (after {minutes} min)." },
     session_needs_relink: { title: "Reconnect Uber", body: "Your Uber session stopped — reconnect to keep receiving offers." },
     company_registered: { title: "New company", body: "{company} just signed up." },
     company_banned: { title: "Company locked out", body: "{company} was locked after too many wrong codes." },
@@ -282,6 +283,7 @@ const de: typeof en = {
   },
   notif: {
     session_connected: { title: "Uber verbunden", body: "{company} streamt jetzt Angebote." },
+    session_restored: { title: "Uber wieder verbunden", body: "{company}: Angebote kommen wieder an (nach {minutes} Min.)." },
     session_needs_relink: { title: "Uber neu verbinden", body: "Deine Uber-Sitzung wurde beendet — verbinde neu, um weiter Angebote zu erhalten." },
     company_registered: { title: "Neue Firma", body: "{company} hat sich registriert." },
     company_banned: { title: "Firma gesperrt", body: "{company} wurde nach zu vielen falschen Codes gesperrt." },
@@ -447,6 +449,7 @@ const ar: typeof en = {
   },
   notif: {
     session_connected: { title: "تم ربط أوبر", body: "{company} صارت تستقبل العروض." },
+    session_restored: { title: "رجع اتصال أوبر", body: "{company}: العروض رجعت توصل (بعد {minutes} دقيقة)." },
     session_needs_relink: { title: "أعد ربط أوبر", body: "توقّفت جلسة أوبر — أعد الربط لتستمر العروض." },
     company_registered: { title: "شركة جديدة", body: "{company} سجّلت للتو." },
     company_banned: { title: "شركة محظورة", body: "{company} حُظرت بعد أكواد خاطئة كثيرة." },

@@ -48,6 +48,7 @@ function jsonResponse(status, body, headers = {}) {
 /** Load background.js with fake storage + a scripted fetch. */
 function load({ storage = {}, fetchImpl, cookies = { ramen: [], supplier: [] }, tabUrls = {} } = {}) {
   const removedTabs = [];
+  const createdTabs = [];
   const local = makeArea(storage);
   const session = makeArea();
   const calls = [];
@@ -71,7 +72,10 @@ function load({ storage = {}, fetchImpl, cookies = { ramen: [], supplier: [] }, 
       getAll: async ({ url }) => (url.includes("vsdispatch") ? cookies.ramen : cookies.supplier),
     },
     tabs: {
-      create: async () => ({ id: 1 }),
+      create: async (info) => {
+        createdTabs.push(info);
+        return { id: 1 };
+      },
       remove: async (id) => removedTabs.push(id),
       get: async (id) => {
         if (!(id in tabUrls)) throw new Error("No tab with id");
@@ -94,7 +98,7 @@ function load({ storage = {}, fetchImpl, cookies = { ramen: [], supplier: [] }, 
     Intl,
   });
   vm.runInContext(SOURCE, context);
-  return { ctx: context, local, session, calls, listeners, alarms, removedTabs };
+  return { ctx: context, local, session, calls, listeners, alarms, removedTabs, createdTabs };
 }
 
 test("persisted tab closes survive a worker restart and never close a reused tab id", async () => {
@@ -431,4 +435,67 @@ test("message router: offers only from vsdispatch, captures only from the Fleet 
 
   const pair = { type: "pair", apiUrl: "https://reidey.de", token: "9|x" };
   assert.equal(await send(pair, { id: "ext-id", url: "https://fleethub.uber.com/" }), "no-response");
+});
+
+test("a session Uber rejected is self-healed from a background dispatch tab, with backoff", async () => {
+  let status = "needs_relink";
+  const { ctx, local, session, createdTabs } = load({
+    storage: { ...PAIRED, orgUuid: ORG_A, lastSync: "v2:old" },
+    fetchImpl: (url) => (url.endsWith("/api/v1/fleet-session") ? jsonResponse(200, { data: { status } }) : jsonResponse(200, { data: {} })),
+  });
+
+  await ctx.checkSessionHealth(PAIRED);
+  assert.equal(createdTabs.length, 1);
+  assert.equal(createdTabs[0].url, "https://vsdispatch.uber.com/");
+  assert.equal(createdTabs[0].active, false, "never steals the manager's focus");
+  assert.equal(local.data.lastSync, undefined, "the next capture re-posts even an unchanged jar");
+  await ctx.sweepPendingTabCloses(); // runs after the queued close-arm on the same lock
+  assert.deepEqual([...local.data.pendingTabCloses[0].host], ["vsdispatch.uber.com", "auth.uber.com"]);
+
+  // Still broken two minutes later, but inside the backoff: no second tab yet.
+  session.data.lastSessionCheckAt = Date.now() - 3 * 60 * 1000;
+  await ctx.checkSessionHealth(PAIRED);
+  assert.equal(createdTabs.length, 1);
+
+  // Once the backoff has passed it tries again, and waits longer after that.
+  local.data.autoRelink.nextAt = Date.now() - 1;
+  session.data.lastSessionCheckAt = 0;
+  await ctx.checkSessionHealth(PAIRED);
+  assert.equal(createdTabs.length, 2);
+  assert.equal(local.data.autoRelink.attempts, 2);
+  assert.ok(local.data.autoRelink.nextAt - Date.now() > 4 * 60 * 1000);
+
+  // Healthy again: the self-heal state is cleared.
+  status = "active";
+  session.data.lastSessionCheckAt = 0;
+  await ctx.checkSessionHealth(PAIRED);
+  assert.equal(local.data.autoRelink, undefined);
+  assert.equal(local.data.autoRelinkAt, undefined);
+});
+
+test("the session check runs at most every two minutes", async () => {
+  const { ctx, calls } = load({
+    storage: { ...PAIRED, orgUuid: ORG_A },
+    fetchImpl: () => jsonResponse(200, { data: { status: "active" } }),
+  });
+  await ctx.checkSessionHealth(PAIRED);
+  await ctx.checkSessionHealth(PAIRED);
+  assert.equal(calls.filter((c) => c.url.endsWith("/api/v1/fleet-session")).length, 1);
+});
+
+test("the capture from a self-heal tab is tagged auto; a normal page capture is not", async () => {
+  const posted = [];
+  const fetchImpl = (url, init) => {
+    if (url.endsWith("/api/v1/fleet-session") && init.method === "POST") posted.push(JSON.parse(init.body));
+    return jsonResponse(201, { data: { status: "active" } });
+  };
+  const cookies = { ramen: [{ name: "sid", value: "s" }], supplier: [] };
+
+  const healing = load({ storage: { ...PAIRED, autoRelinkAt: Date.now() }, cookies, fetchImpl });
+  await healing.ctx.capture(ORG_A, null);
+  assert.equal(posted[0].auto, true);
+
+  const normal = load({ storage: { ...PAIRED, autoRelinkAt: Date.now() - 10 * 60 * 1000 }, cookies, fetchImpl });
+  await normal.ctx.capture(ORG_A, null);
+  assert.equal(posted[1].auto, undefined);
 });

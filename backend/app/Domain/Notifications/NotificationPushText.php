@@ -21,6 +21,11 @@ class NotificationPushText
             'en' => ['Reconnect Uber', '{company}: the Uber session needs relinking.'],
             'ar' => ['أعد ربط أوبر', '{company}: جلسة أوبر تحتاج إعادة ربط.'],
         ],
+        'session_restored' => [
+            'de' => ['Uber wieder verbunden', '{company}: Angebote kommen wieder an (nach {minutes} Min.).'],
+            'en' => ['Uber reconnected', '{company}: offers are flowing again (after {minutes} min).'],
+            'ar' => ['رجع اتصال أوبر', '{company}: العروض رجعت توصل (بعد {minutes} دقيقة).'],
+        ],
         'company_registered' => [
             'de' => ['Neue Firma', '{company} hat sich registriert.'],
             'en' => ['New company', '{company} just registered.'],

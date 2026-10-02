@@ -32,6 +32,9 @@ class CaptureFleetSessionRequest extends FormRequest
             // true = the manager pressed Connect; false/absent = the extension's
             // silent auto-capture (refused while the tenant is autolink-blocked).
             'manual' => ['nullable', 'boolean'],
+            // true = the extension's self-heal after the backend reported the
+            // session broken (it reopened Uber in the background to refresh it).
+            'auto' => ['nullable', 'boolean'],
         ];
     }
 }

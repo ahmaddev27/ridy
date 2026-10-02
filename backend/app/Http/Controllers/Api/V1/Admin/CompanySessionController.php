@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Dispatch\FleetSessionService;
 use App\Domain\Dispatch\Models\UberFleetSession;
+use App\Domain\Dispatch\SessionOutageTracker;
 use App\Domain\Tenancy\CompanyDataPurger;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
@@ -23,6 +24,12 @@ class CompanySessionController extends Controller
         return response()->json([
             'data' => $session ? new CompanySessionResource($session) : null,
         ]);
+    }
+
+    /** The company's Uber session outages over the last 30 days, with totals. */
+    public function outages(Tenant $tenant, SessionOutageTracker $tracker): JsonResponse
+    {
+        return response()->json(['data' => $tracker->summary($tenant->id)]);
     }
 
     /** Force the company to re-link (marks the session needs_relink). */

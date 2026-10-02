@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Dispatch\FleetSessionService;
+use App\Domain\Dispatch\Models\FleetSessionOutage;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Tenancy\CompanyDataPurger;
 use App\Domain\Tenancy\Models\Tenant;
@@ -187,12 +188,14 @@ class FleetSessionController extends Controller
             $request->filled('uber_org_name') ? (string) $request->string('uber_org_name') : null,
             $request->filled('supplier_cookies') ? $request->array('supplier_cookies') : null,
             replaceOtherOrgs: $hasOtherOrg && $manual,
+            via: $manual ? FleetSessionOutage::VIA_MANUAL : ($request->boolean('auto') ? FleetSessionOutage::VIA_AUTO : FleetSessionOutage::VIA_PAGE),
         );
 
         // Never log cookie values (they are session secrets).
         $this->audit->log('fleet_session.captured', $session, [
             'uber_org_uuid' => $orgUuid,
             'manual' => $manual,
+            'auto' => $request->boolean('auto'),
             'cookie_count' => count($cookies),
             'had_supplier_cookies' => $request->filled('supplier_cookies'),
             'replaced_other_org' => $hasOtherOrg && $manual,
