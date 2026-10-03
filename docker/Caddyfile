@@ -74,7 +74,7 @@ reidey.de {
 	}
 
 	# Laravel API + Sanctum. The backend app is mounted so its public/ is the root.
-	@laravel path /api/* /sanctum/* /up
+	@laravel path /api/* /sanctum/* /up /get
 	handle @laravel {
 		root * /var/www/public
 		php_fastcgi backend:9000
