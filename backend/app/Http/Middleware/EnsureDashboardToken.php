@@ -28,6 +28,8 @@ class EnsureDashboardToken
 
     private const FLEET_OWNER_ABILITY = 'fleet:read';
 
+    private const ELPROFESSOR_ABILITY = 'elprofessor:read';
+
     /**
      * Ability => the only "METHOD uri" pairs (Str::is patterns) a token holding it
      * may reach. Method-aware on purpose: the URI alone let the extension token
@@ -58,6 +60,10 @@ class EnsureDashboardToken
             'DELETE api/v1/driver/fleet/devices',
             'POST api/v1/driver/fleet/account/deletion-request',
         ],
+        // El-Professor's pull: the one roster read, nothing else.
+        self::ELPROFESSOR_ABILITY => [
+            'GET api/v1/elprofessor/fleet/drivers',
+        ],
     ];
 
     public function handle(Request $request, Closure $next): Response
@@ -81,6 +87,7 @@ class EnsureDashboardToken
             abort_unless(Str::is($allowed, $target), 403, match ($ability) {
                 self::EXTENSION_ABILITY => 'This token is limited to fleet-session ingest.',
                 self::FLEET_OWNER_ABILITY => 'This token is limited to the fleet-owner app.',
+                self::ELPROFESSOR_ABILITY => 'This token is limited to the El-Professor roster read.',
                 default => 'This token is limited to a narrower scope.',
             });
         }

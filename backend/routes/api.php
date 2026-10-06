@@ -54,6 +54,7 @@ use App\Http\Controllers\Api\V1\DriverController;
 use App\Http\Controllers\Api\V1\DriverInviteController;
 use App\Http\Controllers\Api\V1\DriverMetricController;
 use App\Http\Controllers\Api\V1\DriverPushController;
+use App\Http\Controllers\Api\V1\ElProfessorController;
 use App\Http\Controllers\Api\V1\ExtensionController;
 use App\Http\Controllers\Api\V1\FleetSessionController;
 use App\Http\Controllers\Api\V1\HealthController;
@@ -284,6 +285,12 @@ Route::prefix('v1')->group(function () {
 
         // Browser-extension pairing token (minted from the dashboard session)
         Route::post('extension/token', [ExtensionController::class, 'issueToken'])->middleware('can:connections.manage');
+
+        // El-Professor (payroll product) pulls the roster with a scoped token minted here.
+        Route::post('elprofessor/token', [ElProfessorController::class, 'issueToken'])->middleware('can:connections.manage');
+        Route::delete('elprofessor/token', [ElProfessorController::class, 'revokeToken'])->middleware('can:connections.manage');
+        Route::get('elprofessor/connection', [ElProfessorController::class, 'connection'])->middleware('can:connections.manage');
+        Route::get('elprofessor/fleet/drivers', [ElProfessorController::class, 'drivers']);
 
         // Uber fleet session status + capture (cookie paste OR extension via token)
         Route::get('fleet-session', [FleetSessionController::class, 'show']);

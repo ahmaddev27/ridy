@@ -338,6 +338,7 @@ class DriverAuthController extends Controller
             'company_name' => $driver->tenant?->name,
             'uber_linked' => $driver->uber_driver_uuid !== null,
             'is_owner' => false,
+            'documents_enabled' => $driver->tenant?->isElprofessorConnected() ?? false,
         ];
     }
 
@@ -356,6 +357,7 @@ class DriverAuthController extends Controller
             // session instead, so the profile matches the dashboard's status.
             'uber_linked' => $this->tenantUberLinked($owner->tenant_id),
             'is_owner' => true,
+            'documents_enabled' => $owner->tenant?->isElprofessorConnected() ?? false,
         ];
     }
 

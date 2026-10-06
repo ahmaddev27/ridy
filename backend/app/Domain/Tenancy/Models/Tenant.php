@@ -4,9 +4,11 @@ namespace App\Domain\Tenancy\Models;
 
 use App\Casts\EncryptedWithPlaintextFallback;
 use App\Domain\Billing\CompanyReferenceGenerator;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class Tenant extends Model
 {
@@ -75,6 +77,50 @@ class Tenant extends Model
     {
         $settings = $this->settings ?? [];
         unset($settings['autolink_blocked']);
+        $this->forceFill(['settings' => $settings])->save();
+    }
+
+    /**
+     * The El-Professor link, as the dashboard card and the driver app both read it.
+     * The single derivation: `connected` is true only while a token exists, is not
+     * revoked, and El-Professor has actually pulled at least once.
+     *
+     * @return array{connected: bool, token_issued_at: ?string, first_used_at: ?string, last_used_at: ?string, revoked_at: ?string}
+     */
+    public function elprofessorConnection(): array
+    {
+        $state = $this->settings['elprofessor'] ?? [];
+        $revokedAt = $state['revoked_at'] ?? null;
+        $firstUsedAt = $state['first_used_at'] ?? null;
+
+        return [
+            'connected' => $revokedAt === null && $firstUsedAt !== null && $this->elprofessorTokens()->exists(),
+            'token_issued_at' => $state['token_issued_at'] ?? null,
+            'first_used_at' => $firstUsedAt,
+            'last_used_at' => $state['last_used_at'] ?? null,
+            'revoked_at' => $revokedAt,
+        ];
+    }
+
+    public function isElprofessorConnected(): bool
+    {
+        return $this->elprofessorConnection()['connected'];
+    }
+
+    /** Every `elprofessor` token held by a user of this company. */
+    public function elprofessorTokens(): Builder
+    {
+        return PersonalAccessToken::query()
+            ->where('name', 'elprofessor')
+            ->where('tokenable_type', (new User)->getMorphClass())
+            ->whereIn('tokenable_id', User::query()->where('tenant_id', $this->id)->select('id'));
+    }
+
+    /** Merge keys into settings['elprofessor'] without touching other settings. */
+    public function mergeElprofessorState(array $changes): void
+    {
+        $settings = $this->settings ?? [];
+        $settings['elprofessor'] = array_merge($settings['elprofessor'] ?? [], $changes);
         $this->forceFill(['settings' => $settings])->save();
     }
 
