@@ -290,6 +290,7 @@ Route::prefix('v1')->group(function () {
         Route::post('elprofessor/token', [ElProfessorController::class, 'issueToken'])->middleware('can:connections.manage');
         Route::delete('elprofessor/token', [ElProfessorController::class, 'revokeToken'])->middleware('can:connections.manage');
         Route::get('elprofessor/connection', [ElProfessorController::class, 'connection'])->middleware('can:connections.manage');
+        Route::get('elprofessor/fleet', [ElProfessorController::class, 'fleet']);
         Route::get('elprofessor/fleet/drivers', [ElProfessorController::class, 'drivers']);
 
         // Uber fleet session status + capture (cookie paste OR extension via token)

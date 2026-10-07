@@ -217,4 +217,68 @@ class ElProfessorConnectionTest extends TestCase
         $this->getJson('/api/v1/elprofessor/fleet/drivers', $this->bearer($old))->assertUnauthorized();
         $this->getJson('/api/v1/elprofessor/fleet/drivers', $this->bearer($new))->assertOk();
     }
+
+    public function test_the_token_reads_its_fleet_identity_and_exactly_three_fields(): void
+    {
+        $token = $this->mint();
+
+        $response = $this->getJson('/api/v1/elprofessor/fleet', $this->bearer($token))->assertOk();
+
+        $this->assertSame(
+            ['data' => [
+                'tenant_id' => $this->tenant->id,
+                'tenant_name' => 'YA Mobility',
+                'payment_reference' => $this->tenant->fresh()->payment_reference,
+            ]],
+            $response->json(),
+        );
+    }
+
+    public function test_the_fleet_identity_does_not_widen_the_confinement(): void
+    {
+        $token = $this->mint();
+        $this->getJson('/api/v1/elprofessor/fleet', $this->bearer($token))->assertOk();
+
+        $this->getJson('/api/v1/elprofessor/connection', $this->bearer($token))->assertForbidden();
+        $this->getJson('/api/v1/drivers', $this->bearer($token))->assertForbidden();
+        $this->getJson('/api/v1/me', $this->bearer($token))->assertForbidden();
+    }
+
+    public function test_the_roster_meta_carries_the_callers_own_tenant_id(): void
+    {
+        $token = $this->mint();
+
+        $this->getJson('/api/v1/elprofessor/fleet/drivers', $this->bearer($token))
+            ->assertOk()
+            ->assertJsonPath('meta.tenant_id', $this->tenant->id)
+            ->assertJsonMissingPath('meta.tenant_name');
+    }
+
+    public function test_a_token_never_shows_another_tenants_identity(): void
+    {
+        $token = $this->mint();
+
+        $fleet = $this->getJson('/api/v1/elprofessor/fleet', $this->bearer($token))->assertOk();
+        $roster = $this->getJson('/api/v1/elprofessor/fleet/drivers', $this->bearer($token))->assertOk();
+
+        $this->assertNotSame($this->other->id, $fleet->json('data.tenant_id'));
+        $this->assertNotSame($this->other->id, $roster->json('meta.tenant_id'));
+        $this->assertStringNotContainsString('Other Fleet', $fleet->getContent());
+        $this->assertStringNotContainsString($this->other->fresh()->payment_reference, $fleet->getContent());
+    }
+
+    public function test_the_first_fleet_call_sets_first_used_at_so_connected_flips(): void
+    {
+        $token = $this->mint();
+        $this->assertNull($this->tenant->fresh()->settings['elprofessor']['first_used_at']);
+
+        $this->getJson('/api/v1/elprofessor/fleet', $this->bearer($token))->assertOk();
+
+        $state = $this->tenant->fresh()->settings['elprofessor'];
+        $this->assertNotNull($state['first_used_at']);
+        $this->assertNotNull($state['last_used_at']);
+
+        Sanctum::actingAs($this->manager, ['*']);
+        $this->getJson('/api/v1/elprofessor/connection')->assertOk()->assertJsonPath('data.connected', true);
+    }
 }

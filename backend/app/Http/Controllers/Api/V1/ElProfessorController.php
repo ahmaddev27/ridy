@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
  * roster. Nothing is ever pushed to El-Professor from this side.
  *
  * The token holds only `elprofessor:read`, which EnsureDashboardToken confines
- * to the roster route below.
+ * to the roster and fleet-identity routes below.
  */
 class ElProfessorController extends Controller
 {
@@ -65,6 +65,24 @@ class ElProfessorController extends Controller
         return response()->json(['data' => $tenant->elprofessorConnection()]);
     }
 
+    /**
+     * Who this token belongs to. The only identity a confined token can read,
+     * so El-Professor can check it matches the fleet the operator named.
+     * Deliberately three fields: no settings, counts or connection timestamps.
+     */
+    public function fleet(Request $request): JsonResponse
+    {
+        $tenant = Tenant::query()->findOrFail($request->user()->tenant_id);
+
+        $this->recordUsage($tenant->id);
+
+        return response()->json(['data' => [
+            'tenant_id' => $tenant->id,
+            'tenant_name' => $tenant->name,
+            'payment_reference' => $tenant->ensurePaymentReference(),
+        ]]);
+    }
+
     public function drivers(Request $request): JsonResponse
     {
         $tenantId = (int) $request->user()->tenant_id;
@@ -89,7 +107,12 @@ class ElProfessorController extends Controller
                 'activated_at' => $d->activated_at?->toIso8601String(),
                 'roster_removed_at' => $d->roster_removed_at?->toIso8601String(),
             ])->values(),
-            'meta' => ['page' => $page->currentPage(), 'per_page' => $page->perPage(), 'total' => $page->total()],
+            'meta' => [
+                'page' => $page->currentPage(),
+                'per_page' => $page->perPage(),
+                'total' => $page->total(),
+                'tenant_id' => $tenantId,
+            ],
         ]);
     }
 

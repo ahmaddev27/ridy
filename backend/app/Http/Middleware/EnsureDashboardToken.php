@@ -60,8 +60,12 @@ class EnsureDashboardToken
             'DELETE api/v1/driver/fleet/devices',
             'POST api/v1/driver/fleet/account/deletion-request',
         ],
-        // El-Professor's pull: the one roster read, nothing else.
+        // El-Professor's pull: the roster read and the fleet whoami that lets it
+        // check the token belongs to the fleet the operator named. Two exact
+        // patterns, not 'elprofessor/fleet*', so a later sibling route is not
+        // admitted by accident.
         self::ELPROFESSOR_ABILITY => [
+            'GET api/v1/elprofessor/fleet',
             'GET api/v1/elprofessor/fleet/drivers',
         ],
     ];
@@ -87,7 +91,7 @@ class EnsureDashboardToken
             abort_unless(Str::is($allowed, $target), 403, match ($ability) {
                 self::EXTENSION_ABILITY => 'This token is limited to fleet-session ingest.',
                 self::FLEET_OWNER_ABILITY => 'This token is limited to the fleet-owner app.',
-                self::ELPROFESSOR_ABILITY => 'This token is limited to the El-Professor roster read.',
+                self::ELPROFESSOR_ABILITY => 'This token is limited to the El-Professor fleet read.',
                 default => 'This token is limited to a narrower scope.',
             });
         }
