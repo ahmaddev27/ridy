@@ -292,6 +292,9 @@ Route::prefix('v1')->group(function () {
         Route::get('elprofessor/connection', [ElProfessorController::class, 'connection'])->middleware('can:connections.manage');
         Route::get('elprofessor/fleet', [ElProfessorController::class, 'fleet']);
         Route::get('elprofessor/fleet/drivers', [ElProfessorController::class, 'drivers']);
+        // The one thing that travels back: a company rejected what a driver
+        // submitted, so we notify that driver. Confined to this exact path.
+        Route::post('elprofessor/submissions/status', [ElProfessorController::class, 'submissionStatus']);
 
         // Uber fleet session status + capture (cookie paste OR extension via token)
         Route::get('fleet-session', [FleetSessionController::class, 'show']);

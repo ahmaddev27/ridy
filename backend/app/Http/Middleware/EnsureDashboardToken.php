@@ -67,6 +67,11 @@ class EnsureDashboardToken
         self::ELPROFESSOR_ABILITY => [
             'GET api/v1/elprofessor/fleet',
             'GET api/v1/elprofessor/fleet/drivers',
+            // The one write: marking one of this tenant's submissions decided.
+            // An exact path, never a wildcard — an ability missing from this
+            // map is not confined at all, and a wildcard here would hand the
+            // token every elprofessor route a later release adds.
+            'POST api/v1/elprofessor/submissions/status',
         ],
     ];
 
