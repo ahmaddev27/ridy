@@ -80,6 +80,25 @@ class ElProfessorConnectionTest extends TestCase
         ]);
     }
 
+    /**
+     * Act as the driver, always resolved from the database.
+     *
+     * `Sanctum::actingAs` pins the in-memory instance onto the guard, and
+     * `documents_enabled` reads `$driver->tenant` -- a relation the driver's
+     * first call lazily loads and then caches on that instance. Reusing the
+     * variable therefore answers from the tenant as it was BEFORE the pull.
+     * Measured: the database said connected, the reused instance said not.
+     * A real request resolves the tokenable per request, so this is the
+     * test's artefact and not the product's -- but a test that reads stale
+     * state cannot fail for the right reason either, which is why the
+     * revocation test uses this too.
+     */
+    private function actingAsDriver(Driver $driver): void
+    {
+        $this->app['auth']->forgetGuards();
+        Sanctum::actingAs(Driver::withoutGlobalScopes()->findOrFail($driver->id), guard: 'driver');
+    }
+
     public function test_a_user_without_connections_manage_is_refused_the_token_endpoints(): void
     {
         $viewer = $this->user('viewer', 'v@ya.de', $this->tenant);
@@ -149,7 +168,7 @@ class ElProfessorConnectionTest extends TestCase
         $driver = $this->driver($this->tenant, 'Omar');
         $token = $this->mint();
 
-        Sanctum::actingAs($driver, guard: 'driver');
+        $this->actingAsDriver($driver);
         $this->getJson('/api/v1/driver/me')->assertOk()->assertJsonPath('data.documents_enabled', false);
 
         $this->getJson('/api/v1/elprofessor/fleet/drivers', $this->bearer($token))->assertOk();
@@ -161,7 +180,7 @@ class ElProfessorConnectionTest extends TestCase
         Sanctum::actingAs($this->manager, ['*']);
         $this->getJson('/api/v1/elprofessor/connection')->assertOk()->assertJsonPath('data.connected', true);
 
-        Sanctum::actingAs($driver, guard: 'driver');
+        $this->actingAsDriver($driver);
         $this->getJson('/api/v1/driver/me')->assertOk()->assertJsonPath('data.documents_enabled', true);
     }
 
@@ -195,7 +214,7 @@ class ElProfessorConnectionTest extends TestCase
         $connection->assertJsonPath('data.connected', false);
         $this->assertNotNull($connection->json('data.revoked_at'));
 
-        Sanctum::actingAs($driver, guard: 'driver');
+        $this->actingAsDriver($driver);
         $this->getJson('/api/v1/driver/me')->assertOk()->assertJsonPath('data.documents_enabled', false);
 
         $this->getJson('/api/v1/elprofessor/fleet/drivers', $this->bearer($token))->assertUnauthorized();
@@ -280,5 +299,68 @@ class ElProfessorConnectionTest extends TestCase
 
         Sanctum::actingAs($this->manager, ['*']);
         $this->getJson('/api/v1/elprofessor/connection')->assertOk()->assertJsonPath('data.connected', true);
+    }
+
+    /**
+     * `connected` has three terms and the revocation test pins none of them:
+     * revokeToken() deletes the token rows AND records the time, so dropping
+     * either term leaves the other answering and every test still passes.
+     * Measured by mutating each term in turn -- only `first_used_at` was
+     * caught. These two tests cover the other two.
+     *
+     * This one is a state reachable without the revoke endpoint at all:
+     * Sanctum pruning, or the user who minted the token being deleted and
+     * cascading its tokens away. `first_used_at` survives in settings, so if
+     * the token-exists term went, the company would read "connected" and the
+     * driver app would offer the documents section behind a token that can
+     * pull nothing.
+     */
+    public function test_a_token_that_vanishes_outside_revocation_disconnects(): void
+    {
+        $driver = $this->driver($this->tenant, 'Omar');
+        $token = $this->mint();
+        $this->getJson('/api/v1/elprofessor/fleet/drivers', $this->bearer($token))->assertOk();
+
+        $this->tenant->fresh()->elprofessorTokens()->delete();
+
+        $state = $this->tenant->fresh()->settings['elprofessor'];
+        $this->assertNull($state['revoked_at'], 'nothing recorded a revocation, so only the token term can answer');
+        $this->assertNotNull($state['first_used_at']);
+
+        Sanctum::actingAs($this->manager, ['*']);
+        $this->getJson('/api/v1/elprofessor/connection')->assertOk()->assertJsonPath('data.connected', false);
+
+        $this->actingAsDriver($driver);
+        $this->getJson('/api/v1/driver/me')->assertOk()->assertJsonPath('data.documents_enabled', false);
+
+        $this->getJson('/api/v1/elprofessor/fleet/drivers', $this->bearer($token))->assertUnauthorized();
+    }
+
+    /**
+     * The mirror term, and this state is CONSTRUCTED rather than reachable:
+     * revokeToken() deletes before it records, so a recorded revocation never
+     * coexists with a live token row today. It is pinned anyway, because the
+     * term is what makes the recorded decision authoritative instead of
+     * inferred from a row's presence -- and a later change that keeps token
+     * rows for an audit trail would make it the only guard left.
+     */
+    public function test_a_recorded_revocation_outranks_a_surviving_token_row(): void
+    {
+        $driver = $this->driver($this->tenant, 'Omar');
+        $token = $this->mint();
+        $this->getJson('/api/v1/elprofessor/fleet/drivers', $this->bearer($token))->assertOk();
+
+        $this->tenant->fresh()->mergeElprofessorState(['revoked_at' => now()->toIso8601String()]);
+
+        $this->assertTrue(
+            $this->tenant->fresh()->elprofessorTokens()->exists(),
+            'the point of this test is a live token row beside a recorded revocation',
+        );
+
+        Sanctum::actingAs($this->manager, ['*']);
+        $this->getJson('/api/v1/elprofessor/connection')->assertOk()->assertJsonPath('data.connected', false);
+
+        $this->actingAsDriver($driver);
+        $this->getJson('/api/v1/driver/me')->assertOk()->assertJsonPath('data.documents_enabled', false);
     }
 }
