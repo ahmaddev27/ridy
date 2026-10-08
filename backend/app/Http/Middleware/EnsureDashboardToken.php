@@ -72,6 +72,13 @@ class EnsureDashboardToken
             // map is not confined at all, and a wildcard here would hand the
             // token every elprofessor route a later release adds.
             'POST api/v1/elprofessor/submissions/status',
+            // The fetch (08.10.2026). El-Professor cannot be PUSHED a payload:
+            // its intake authenticates with the token this side issued, and
+            // Sanctum keeps only a hash of it. So this side rings and it reads
+            // these two. Written out rather than 'GET api/v1/elprofessor/*',
+            // which would admit every sibling route a later release adds.
+            'GET api/v1/elprofessor/submissions',
+            'GET api/v1/elprofessor/submissions/{uuid}',
         ],
     ];
 

@@ -47,6 +47,7 @@ use App\Http\Controllers\Api\V1\Driver\DriverAuthController;
 use App\Http\Controllers\Api\V1\Driver\DriverDashboardController;
 use App\Http\Controllers\Api\V1\Driver\DriverDeviceController;
 use App\Http\Controllers\Api\V1\Driver\DriverOfferController;
+use App\Http\Controllers\Api\V1\Driver\DriverSubmissionController;
 use App\Http\Controllers\Api\V1\Driver\DriverPasswordResetController;
 use App\Http\Controllers\Api\V1\Driver\FleetController;
 use App\Http\Controllers\Api\V1\Driver\FleetDeviceController;
@@ -157,6 +158,13 @@ Route::prefix('v1')->group(function () {
                 Route::get('offers', [DriverOfferController::class, 'index']);
                 Route::post('offers/seen', [DriverOfferController::class, 'markSeen']);
                 Route::get('offers/{offer}', [DriverOfferController::class, 'show']);
+
+                // Belege und Notizen: what the driver sends their own
+                // company to review in El-Professor. The tenant and the
+                // driver come off the token, never off the request.
+                Route::get('submissions', [DriverSubmissionController::class, 'index']);
+                Route::post('submissions', [DriverSubmissionController::class, 'store'])
+                    ->middleware('throttle:30,1,driver-submissions');
 
                 // WebSocket (Reverb) channel authorisation for the driver's app —
                 // authenticates the private driver.{id} channel via the driver guard.
@@ -292,6 +300,11 @@ Route::prefix('v1')->group(function () {
         Route::get('elprofessor/connection', [ElProfessorController::class, 'connection'])->middleware('can:connections.manage');
         Route::get('elprofessor/fleet', [ElProfessorController::class, 'fleet']);
         Route::get('elprofessor/fleet/drivers', [ElProfessorController::class, 'drivers']);
+        // What a driver submitted, for El-Professor to fetch. The ring tells
+        // it one is ready; these two are how it collects them, and the
+        // second is also the only recovery for a ring that never arrived.
+        Route::get('elprofessor/submissions', [ElProfessorController::class, 'submissions']);
+        Route::get('elprofessor/submissions/{uuid}', [ElProfessorController::class, 'submission']);
         // The one thing that travels back: a company rejected what a driver
         // submitted, so we notify that driver. Confined to this exact path.
         Route::post('elprofessor/submissions/status', [ElProfessorController::class, 'submissionStatus']);

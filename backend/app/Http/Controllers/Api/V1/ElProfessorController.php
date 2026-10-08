@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Fleet\Models\ElProfessorSubmission;
 use App\Domain\Notifications\AppNotification;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
@@ -10,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * The link to El-Professor, a separate payroll product. It PULLS: the operator
@@ -21,6 +23,20 @@ use Illuminate\Support\Facades\DB;
  * so with `submissionStatus()` and we notify that driver. An acceptance sends
  * nothing — the owner's decision of 06.10.2026: a rejection is news the driver
  * must act on, an acceptance is not worth a push.
+ *
+ * ## Submissions are FETCHED from here, and the reason is a measurement
+ *
+ * A driver's note or receipt used to be described as a push to El-Professor's
+ * intake. That intake authenticates with the token this side issued — and
+ * **Sanctum stores only a hash, so this side cannot replay it.** The owner
+ * turned the direction around on 08.10.2026: this side RINGS (four fields, no
+ * payload, no credential) and El-Professor fetches the submission with the token
+ * it holds sealed. `submissions()` and `submission()` are that fetch, and
+ * `RingElProfessor` is the ring.
+ *
+ * **Without the ring configured, nothing is lost**: El-Professor's operator has
+ * a button that asks `submissions()` what is waiting. The ring only makes it
+ * immediate, which is why this side needs no outbound credential of its own.
  *
  * The token holds only `elprofessor:read`, which EnsureDashboardToken confines
  * to the exact routes listed there. That now includes one POST, which is the
@@ -133,9 +149,157 @@ class ElProfessorController extends Controller
             ],
         ));
 
+        // Since 08.10.2026 this side keeps the submissions, so the decision
+        // lands on the row as well as in the driver's notifications — which is
+        // what lets the driver's own list show WHY, rather than only a bell
+        // entry they may have dismissed.
+        //
+        // It is an update and not a requirement: a submission id this side does
+        // not know is still notified, because the notification is the point and
+        // the id belonged to El-Professor before this table existed. The tenant
+        // is a term in the query for the same reason as above.
+        ElProfessorSubmission::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('uuid', $submissionId)
+            ->update([
+                'status' => ElProfessorSubmission::STATUS_REJECTED,
+                'decided_at' => now(),
+                'decision_code' => $data['reason_code'],
+                'decision_text' => $data['reason_text'] ?? null,
+                'updated_at' => now(),
+            ]);
+
         $this->recordUsage($tenantId);
 
         return response()->json(['data' => ['notified' => true, 'duplicate' => false]]);
+    }
+
+    /**
+     * What is waiting for El-Professor to fetch, oldest first.
+     *
+     * Oldest first because the oldest is the one somebody has been waiting on;
+     * `fleet/drivers` pages by id for a different reason (a stable roster
+     * order) and the two must not be made to match.
+     *
+     * The list carries **no payload and no photo**: it is a list of what to
+     * fetch, so a catch-up that reads a hundred waiting submissions does not
+     * move a hundred photos to decide which to ask for. `subject` is in it
+     * because El-Professor must know which of its two tables a submission
+     * belongs to before it fetches one.
+     */
+    public function submissions(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->user()->tenant_id;
+        $perPage = max(1, min(self::MAX_PER_PAGE, (int) $request->query('per_page', 50)));
+        $status = (string) $request->query('status', ElProfessorSubmission::STATUS_PENDING);
+
+        // An allow-list: `status` reaches a WHERE, and the only status worth
+        // asking for from the other side is what is still waiting.
+        if (! in_array($status, [
+            ElProfessorSubmission::STATUS_PENDING,
+            ElProfessorSubmission::STATUS_TAKEN,
+        ], true)) {
+            return response()->json(['message' => 'Unknown status.'], 422);
+        }
+
+        $rows = ElProfessorSubmission::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('status', $status)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->limit($perPage)
+            ->get(['uuid', 'subject', 'status', 'created_at', 'document_bytes']);
+
+        $this->recordUsage($tenantId);
+
+        return response()->json([
+            'data' => $rows->map(fn (ElProfessorSubmission $r) => [
+                'id' => $r->uuid,
+                'subject' => $r->subject,
+                'status' => $r->status,
+                'created_at' => $r->created_at?->toIso8601String(),
+                'document_bytes' => $r->document_bytes,
+            ])->values(),
+            'meta' => ['per_page' => $perPage, 'tenant_id' => $tenantId],
+        ]);
+    }
+
+    /**
+     * One submission, with its photo, for El-Professor to record.
+     *
+     * ## The tenant is a term in the query, not a check after it
+     *
+     * Same rule as `submissionStatus()`: a submission of another fleet and one
+     * that does not exist are the same 404 **by construction**, so a caller
+     * holding one fleet's token learns nothing about another's.
+     *
+     * ## The photo travels as base64 inside the JSON
+     *
+     * The owner chose this on 08.10.2026 over a URL, and the reason is the one
+     * that governs the whole integration: a URL in a payload is a destination
+     * the other side would fetch, and these two products share a Docker network
+     * with both their databases. Base64 costs a third more bytes and needs no
+     * trust.
+     *
+     * ## Fetching marks it, and that is what stops a second ingestion
+     *
+     * `fetched_at` and `status = 'taken'` are written here, so the same
+     * submission is not offered to the next catch-up. El-Professor is idempotent
+     * on this id as well — two walls, because this one is only as good as the
+     * request completing.
+     */
+    public function submission(Request $request, string $uuid): JsonResponse
+    {
+        $tenantId = (int) $request->user()->tenant_id;
+
+        $row = ElProfessorSubmission::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('uuid', $uuid)
+            ->first();
+
+        if ($row === null) {
+            return response()->json(['message' => 'Submission not found.'], 404);
+        }
+
+        $document = null;
+        if ($row->document_path !== null) {
+            $disk = Storage::disk(config('elprofessor.disk', 'local'));
+            // A path that is in the row but not on the disk is a real state —
+            // a failed write, a cleaned volume — and it must not read as "this
+            // receipt has no photo", which is what an empty string would do on
+            // the other side. The field is absent instead, and El-Professor
+            // refuses the submission with `document_missing`.
+            if ($disk->exists($row->document_path)) {
+                $document = base64_encode($disk->get($row->document_path));
+            }
+        }
+
+        $row->forceFill([
+            'status' => $row->status === ElProfessorSubmission::STATUS_PENDING
+                ? ElProfessorSubmission::STATUS_TAKEN
+                : $row->status,
+            'fetched_at' => $row->fetched_at ?? now(),
+        ])->save();
+
+        $this->recordUsage($tenantId);
+
+        // The payload verbatim, plus the ids and the photo. El-Professor
+        // validates every field again: its `receipts` row moves money, so what
+        // this side calls an amount is a claim until its parser agrees.
+        return response()->json([
+            'data' => array_merge((array) $row->payload, [
+                'kind' => $row->subject,
+                'subject' => $row->subject,
+                'partner' => 'reidey',
+                'external_submission_id' => $row->uuid,
+                'external_driver_id' => (string) $row->driver_id,
+                ...($document !== null ? ['document' => $document] : []),
+                ...($row->document_mime !== null ? ['content_type' => $row->document_mime] : []),
+            ]),
+        ]);
     }
 
     public function issueToken(Request $request): JsonResponse

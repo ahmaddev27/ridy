@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Fleet\Models\ElProfessorSubmission;
 use App\Domain\Notifications\AppNotification;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
@@ -11,7 +12,11 @@ use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
+use App\Jobs\RingElProfessor;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -498,5 +503,398 @@ class ElProfessorConnectionTest extends TestCase
         $this->getJson('/api/v1/drivers', $this->bearer($token))->assertForbidden();
         $this->postJson('/api/v1/drivers/roster', [], $this->bearer($token))->assertForbidden();
         $this->getJson('/api/v1/me', $this->bearer($token))->assertForbidden();
+    }
+
+    // ── The fetch (08.10.2026) ───────────────────────────────────────────────
+    //
+    //  El-Professor cannot be PUSHED a payload: its intake authenticates with
+    //  the token this side issued, and Sanctum keeps only a hash. So it rings
+    //  and El-Professor fetches. These tests are about the fetch being confined,
+    //  tenant-blind across fleets, and marking what it took.
+
+    private function submission(Tenant $tenant, Driver $driver, array $attributes = []): ElProfessorSubmission
+    {
+        return ElProfessorSubmission::create(array_merge([
+            'tenant_id' => $tenant->id,
+            'driver_id' => $driver->id,
+            'subject' => 'receipt',
+            'status' => ElProfessorSubmission::STATUS_PENDING,
+            'payload' => ['receipt_date' => '2026-10-07', 'amount' => '41.47', 'category' => 'Tanken'],
+        ], $attributes));
+    }
+
+    public function test_the_pending_list_carries_what_to_fetch_and_no_payload(): void
+    {
+        $token = $this->mint();
+        $driver = $this->driver($this->tenant, 'Omar');
+        $row = $this->submission($this->tenant, $driver);
+
+        $body = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/v1/elprofessor/submissions')
+            ->assertOk()
+            ->json();
+
+        $this->assertSame([$row->uuid], array_column($body['data'], 'id'));
+        $this->assertSame('receipt', $body['data'][0]['subject']);
+        // A list of what to fetch, not the submissions themselves: a catch-up
+        // reading a hundred waiting receipts must not move a hundred photos.
+        $this->assertArrayNotHasKey('amount', $body['data'][0]);
+        $this->assertArrayNotHasKey('document', $body['data'][0]);
+        $this->assertArrayNotHasKey('payload', $body['data'][0]);
+    }
+
+    public function test_the_pending_list_is_tenant_scoped(): void
+    {
+        $token = $this->mint();
+        $mine = $this->submission($this->tenant, $this->driver($this->tenant, 'Mine'));
+        $theirs = $this->submission($this->other, $this->driver($this->other, 'Theirs'));
+
+        $ids = array_column(
+            $this->withHeaders($this->bearer($token))
+                ->getJson('/api/v1/elprofessor/submissions')->assertOk()->json('data'),
+            'id',
+        );
+
+        $this->assertContains($mine->uuid, $ids);
+        $this->assertNotContains($theirs->uuid, $ids);
+    }
+
+    public function test_an_unknown_status_filter_is_refused_rather_than_ignored(): void
+    {
+        // `status` reaches a WHERE. A value outside the allow-list answering 422
+        // is what stops it being read as "everything".
+        $token = $this->mint();
+
+        $this->withHeaders($this->bearer($token))
+            ->getJson('/api/v1/elprofessor/submissions?status=accepted')
+            ->assertStatus(422);
+    }
+
+    public function test_fetching_one_submission_returns_its_fields_and_its_photo(): void
+    {
+        Storage::fake('local');
+        $token = $this->mint();
+        $driver = $this->driver($this->tenant, 'Omar');
+        Storage::disk('local')->put('elprofessor/'.$this->tenant->id.'/x.jpg', 'JPEGBYTES');
+        $row = $this->submission($this->tenant, $driver, [
+            'document_path' => 'elprofessor/'.$this->tenant->id.'/x.jpg',
+            'document_mime' => 'image/jpeg',
+        ]);
+
+        $body = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/v1/elprofessor/submissions/'.$row->uuid)
+            ->assertOk()
+            ->json('data');
+
+        $this->assertSame('41.47', $body['amount']);
+        $this->assertSame('Tanken', $body['category']);
+        $this->assertSame('receipt', $body['subject']);
+        $this->assertSame((string) $driver->id, $body['external_driver_id']);
+        $this->assertSame($row->uuid, $body['external_submission_id']);
+        $this->assertSame('JPEGBYTES', base64_decode($body['document']));
+        $this->assertSame('image/jpeg', $body['content_type']);
+    }
+
+    public function test_a_photo_the_disk_does_not_have_is_ABSENT_rather_than_empty(): void
+    {
+        // The row names a file that is not there -- a failed write, a cleaned
+        // volume. An empty string would reach El-Professor as a photo it could
+        // not read; an absent field makes it refuse the submission by name.
+        Storage::fake('local');
+        $token = $this->mint();
+        $row = $this->submission($this->tenant, $this->driver($this->tenant, 'Omar'), [
+            'document_path' => 'elprofessor/'.$this->tenant->id.'/gone.jpg',
+            'document_mime' => 'image/jpeg',
+        ]);
+
+        $body = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/v1/elprofessor/submissions/'.$row->uuid)
+            ->assertOk()
+            ->json('data');
+
+        $this->assertArrayNotHasKey('document', $body);
+    }
+
+    public function test_fetching_marks_it_taken_so_a_catchup_does_not_offer_it_again(): void
+    {
+        Storage::fake('local');
+        $token = $this->mint();
+        $row = $this->submission($this->tenant, $this->driver($this->tenant, 'Omar'));
+
+        $this->withHeaders($this->bearer($token))
+            ->getJson('/api/v1/elprofessor/submissions/'.$row->uuid)->assertOk();
+
+        $row->refresh();
+        $this->assertSame(ElProfessorSubmission::STATUS_TAKEN, $row->status);
+        $this->assertNotNull($row->fetched_at);
+
+        $ids = array_column(
+            $this->withHeaders($this->bearer($token))
+                ->getJson('/api/v1/elprofessor/submissions')->assertOk()->json('data'),
+            'id',
+        );
+        $this->assertNotContains($row->uuid, $ids);
+    }
+
+    public function test_a_submission_of_another_tenant_is_the_same_404_as_one_that_does_not_exist(): void
+    {
+        // The tenant is a term in the query, not a check after it, so the two
+        // answers are identical BY CONSTRUCTION -- the same property the
+        // rejection endpoint has, and the same reason: a caller holding one
+        // fleet's token must not learn another fleet's submission ids exist.
+        $token = $this->mint();
+        $theirs = $this->submission($this->other, $this->driver($this->other, 'Theirs'));
+
+        $foreign = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/v1/elprofessor/submissions/'.$theirs->uuid);
+        $missing = $this->withHeaders($this->bearer($token))
+            ->getJson('/api/v1/elprofessor/submissions/'.\Illuminate\Support\Str::uuid());
+
+        $foreign->assertStatus(404);
+        $missing->assertStatus(404);
+        $this->assertSame($missing->getContent(), $foreign->getContent());
+
+        // And it was not marked by the attempt.
+        $this->assertSame(ElProfessorSubmission::STATUS_PENDING, $theirs->refresh()->status);
+    }
+
+    public function test_the_fetch_does_not_widen_the_confinement(): void
+    {
+        // The whole reason this file exists: an ability missing from
+        // CONFINED_ABILITIES is not confined at all, so each added path is
+        // tested against a route it must still not reach.
+        $token = $this->mint();
+
+        $this->withHeaders($this->bearer($token))
+            ->getJson('/api/v1/drivers')->assertStatus(403);
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/v1/elprofessor/token')->assertStatus(403);
+    }
+
+    // ── The driver's own submission ──────────────────────────────────────────
+
+    public function test_a_driver_submits_a_receipt_with_its_photo_and_it_rings(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $driver = $this->driver($this->tenant, 'Omar');
+        $this->actingAsDriver($driver);
+
+        $body = $this->postJson('/api/v1/driver/submissions', [
+            'subject' => 'receipt',
+            'receipt_date' => '2026-10-07',
+            'amount' => '41.47',
+            'category' => 'Tanken',
+            'payment_method' => 'bar',
+            'document' => UploadedFile::fake()->image('beleg.jpg'),
+        ])->assertStatus(201)->json('data');
+
+        $row = ElProfessorSubmission::withoutGlobalScopes()->firstWhere('uuid', $body['id']);
+        $this->assertNotNull($row);
+        // The driver and the fleet come off the token, never off the request.
+        $this->assertSame($driver->id, (int) $row->driver_id);
+        $this->assertSame($this->tenant->id, (int) $row->tenant_id);
+        $this->assertSame('41.47', $row->payload['amount']);
+        Storage::disk('local')->assertExists($row->document_path);
+
+        Queue::assertPushed(RingElProfessor::class);
+    }
+
+    public function test_a_receipt_with_no_photo_is_refused_at_submission_time(): void
+    {
+        // It cannot be accepted on the other side either (`document_missing`),
+        // so refusing it here is what lets the driver learn now rather than
+        // from a rejection days later.
+        Storage::fake('local');
+        Queue::fake();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        $this->postJson('/api/v1/driver/submissions', [
+            'subject' => 'receipt',
+            'receipt_date' => '2026-10-07',
+            'amount' => '41.47',
+            'category' => 'Tanken',
+        ])->assertStatus(422)->assertJsonValidationErrors('document');
+
+        $this->assertSame(0, ElProfessorSubmission::withoutGlobalScopes()->count());
+        Queue::assertNotPushed(RingElProfessor::class);
+    }
+
+    public function test_an_amount_in_german_formatting_is_refused_rather_than_coerced(): void
+    {
+        // El-Professor's own parser reads `1.234` as 1.23 and answers 0 for
+        // anything it cannot read, and this figure reaches a driver's balance.
+        Storage::fake('local');
+        Queue::fake();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        foreach (['41,47', '1.234,56', '41.47 EUR', '-5.00', 'vierzig'] as $amount) {
+            $this->postJson('/api/v1/driver/submissions', [
+                'subject' => 'receipt',
+                'receipt_date' => '2026-10-07',
+                'amount' => $amount,
+                'category' => 'Tanken',
+                'document' => UploadedFile::fake()->image('beleg.jpg'),
+            ])->assertStatus(422)->assertJsonValidationErrors('amount');
+        }
+
+        $this->assertSame(0, ElProfessorSubmission::withoutGlobalScopes()->count());
+    }
+
+    public function test_a_receipt_with_neither_category_nor_description_is_refused(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        $this->postJson('/api/v1/driver/submissions', [
+            'subject' => 'receipt',
+            'receipt_date' => '2026-10-07',
+            'amount' => '41.47',
+            'document' => UploadedFile::fake()->image('beleg.jpg'),
+        ])->assertStatus(422)->assertJsonValidationErrors('category');
+    }
+
+    public function test_a_driver_sees_their_own_submissions_and_the_reason_on_a_rejection(): void
+    {
+        Storage::fake('local');
+        $driver = $this->driver($this->tenant, 'Omar');
+        $mine = $this->submission($this->tenant, $driver, [
+            'status' => ElProfessorSubmission::STATUS_REJECTED,
+            'decision_text' => 'Foto unleserlich',
+        ]);
+        $other = $this->submission($this->tenant, $this->driver($this->tenant, 'Lena'));
+
+        $this->actingAsDriver($driver);
+        $body = $this->getJson('/api/v1/driver/submissions')->assertOk()->json('data');
+
+        $this->assertSame([$mine->uuid], array_column($body, 'id'));
+        $this->assertNotContains($other->uuid, array_column($body, 'id'));
+        // The company's own words. Without them a rejection is something the
+        // driver cannot act on.
+        $this->assertSame('Foto unleserlich', $body[0]['reason']);
+    }
+
+    public function test_a_rejection_marks_the_row_as_well_as_notifying(): void
+    {
+        $token = $this->mint();
+        $driver = $this->driver($this->tenant, 'Omar');
+        $row = $this->submission($this->tenant, $driver, [
+            'status' => ElProfessorSubmission::STATUS_TAKEN,
+        ]);
+
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/v1/elprofessor/submissions/status', [
+                'external_submission_id' => $row->uuid,
+                'external_driver_id' => $driver->id,
+                'status' => 'rejected',
+                'reason_code' => 'review_rejected',
+                'reason_text' => 'Foto unleserlich',
+                'kind' => 'receipt',
+            ])->assertOk();
+
+        $row->refresh();
+        $this->assertSame(ElProfessorSubmission::STATUS_REJECTED, $row->status);
+        $this->assertSame('Foto unleserlich', $row->decision_text);
+        $this->assertNotNull($row->decided_at);
+    }
+
+    public function test_a_rejection_for_a_submission_this_side_does_not_know_still_notifies(): void
+    {
+        // The id belonged to El-Professor before this table existed, and the
+        // notification is the point. An update that matched nothing must not
+        // turn into a refusal.
+        $token = $this->mint();
+        $driver = $this->driver($this->tenant, 'Omar');
+
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/v1/elprofessor/submissions/status', [
+                'external_submission_id' => (string) \Illuminate\Support\Str::uuid(),
+                'external_driver_id' => $driver->id,
+                'status' => 'rejected',
+                'reason_code' => 'review_rejected',
+            ])->assertOk()->assertJsonPath('data.notified', true);
+    }
+
+    public function test_a_rejection_does_not_mark_another_tenants_submission(): void
+    {
+        $token = $this->mint();
+        $driver = $this->driver($this->tenant, 'Omar');
+        $theirs = $this->submission($this->other, $this->driver($this->other, 'Theirs'), [
+            'status' => ElProfessorSubmission::STATUS_TAKEN,
+        ]);
+
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/v1/elprofessor/submissions/status', [
+                'external_submission_id' => $theirs->uuid,
+                'external_driver_id' => $driver->id,
+                'status' => 'rejected',
+                'reason_code' => 'review_rejected',
+            ])->assertOk();
+
+        $this->assertSame(ElProfessorSubmission::STATUS_TAKEN, $theirs->refresh()->status);
+    }
+
+    // ── The ring ─────────────────────────────────────────────────────────────
+
+    public function test_the_ring_carries_four_fields_and_no_payload(): void
+    {
+        Storage::fake('local');
+        config(['elprofessor.intake_url' => 'http://intake.test/functions/v1/partner-intake']);
+        config(['elprofessor.anon_key' => 'anon-key']);
+        \Illuminate\Support\Facades\Http::fake(['intake.test/*' => \Illuminate\Support\Facades\Http::response(['ok' => true])]);
+
+        $driver = $this->driver($this->tenant, 'Omar');
+        $row = $this->submission($this->tenant, $driver);
+
+        (new RingElProfessor($row->id))->handle();
+
+        \Illuminate\Support\Facades\Http::assertSent(function ($request) use ($row) {
+            $body = $request->data();
+            // Four fields and nothing else: a ring that could assert an amount
+            // or a driver would be a ring worth forging.
+            $this->assertSame([
+                'kind' => 'doorbell',
+                'partner' => 'reidey',
+                'fleet' => (string) $this->tenant->id,
+                'submission' => $row->uuid,
+                'subject' => 'receipt',
+            ], $body);
+
+            return $request->hasHeader('Authorization', 'Bearer anon-key');
+        });
+    }
+
+    public function test_an_unconfigured_ring_sends_nothing_and_does_not_fail(): void
+    {
+        // This side is a live product whose operator may never configure the
+        // link. The submission is already stored and the other side's catch-up
+        // reads it, so a missing configuration delays nothing's arrival but
+        // loses nothing either.
+        Storage::fake('local');
+        config(['elprofessor.intake_url' => null, 'elprofessor.anon_key' => null]);
+        \Illuminate\Support\Facades\Http::fake();
+
+        $row = $this->submission($this->tenant, $this->driver($this->tenant, 'Omar'));
+
+        (new RingElProfessor($row->id))->handle();
+
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+        $this->assertSame(ElProfessorSubmission::STATUS_PENDING, $row->refresh()->status);
+    }
+
+    public function test_a_submission_already_fetched_is_not_rung_again(): void
+    {
+        Storage::fake('local');
+        config(['elprofessor.intake_url' => 'http://intake.test/x', 'elprofessor.anon_key' => 'k']);
+        \Illuminate\Support\Facades\Http::fake();
+
+        $row = $this->submission($this->tenant, $this->driver($this->tenant, 'Omar'), [
+            'status' => ElProfessorSubmission::STATUS_TAKEN,
+        ]);
+
+        (new RingElProfessor($row->id))->handle();
+
+        \Illuminate\Support\Facades\Http::assertNothingSent();
     }
 }
