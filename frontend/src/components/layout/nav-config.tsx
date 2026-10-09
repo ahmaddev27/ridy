@@ -16,6 +16,7 @@ import {
   UserX,
   Ticket,
   ReceiptText,
+  FileSpreadsheet,
   FileText,
   Activity,
   Megaphone,
@@ -29,6 +30,16 @@ export type NavItem = {
   label: string;
   icon: LucideIcon;
   badge?: string;
+  /**
+   * Show the item only while the PLATFORM has opened the El-Professor link for
+   * this company. Until now the nav gated on roles alone, and a role cannot
+   * express this: every fleet manager has the same role whether or not the
+   * operator opened their company.
+   *
+   * It hides a page; it does not protect one. Every El-Professor route is
+   * behind `elprofessor.enabled` on the server, which is the wall.
+   */
+  requiresElProfessor?: boolean;
 };
 
 /**
@@ -65,6 +76,10 @@ export const navGroups: NavGroup[] = [
       { href: "/vehicles", label: "nav.vehicles", icon: Car },
       { href: "/map", label: "nav.map", icon: MapPin },
       { href: "/connections", label: "nav.connections", icon: Plug },
+      // Its own page, deliberately not inside Connections: that screen is the
+      // Uber link, and a company reading "Connections" should not have to tell
+      // two unrelated integrations apart inside one page.
+      { href: "/elprofessor", label: "nav.elprofessor", icon: FileSpreadsheet, requiresElProfessor: true },
       { href: "/subscription", label: "nav.mySubscription", icon: ReceiptText },
     ],
   },

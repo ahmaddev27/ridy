@@ -4,7 +4,7 @@ export type AuthUser = {
   id: number;
   name: string;
   email: string;
-  tenant: { id: number; name: string } | null;
+  tenant: { id: number; name: string; elprofessor_enabled?: boolean } | null;
   roles: string[];
   permissions: string[];
 };

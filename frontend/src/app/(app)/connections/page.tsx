@@ -10,7 +10,6 @@ import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { getFleetSession, prepareReconnect } from "@/lib/api/fleet-session";
 import { issueExtensionToken } from "@/lib/api/extension";
-import { ElProfessorCard } from "./elprofessor-card";
 import { LATEST_EXTENSION_VERSION, EXTENSION_STORE_URL, isExtensionOutdated } from "@/lib/extension";
 
 export default function ConnectionsPage() {
@@ -242,8 +241,6 @@ export default function ConnectionsPage() {
           </div>
         )}
       </Card>
-
-      <ElProfessorCard />
     </div>
   );
 }

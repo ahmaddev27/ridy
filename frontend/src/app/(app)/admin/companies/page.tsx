@@ -14,7 +14,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { listCompanies, deleteCompany, setCompanyActive, type Company } from "@/lib/api/admin";
+import { listCompanies, deleteCompany, setCompanyActive, setCompanyElProfessor, type Company } from "@/lib/api/admin";
 import { apiErrorMessage } from "@/lib/api/error-message";
 
 type Filter = "all" | "linked" | "expired" | "banned";
@@ -81,6 +81,9 @@ export default function CompaniesPage() {
   const pageClamped = Math.min(page, lastPage);
   const companies = filtered.slice((pageClamped - 1) * perPage, pageClamped * perPage);
 
+  // The company a close is being confirmed for; null while nothing is asked.
+  const [confirmEp, setConfirmEp] = useState<Company | null>(null);
+
   async function toggleActive(co: Company) {
     const next = co.status !== "active";
     try {
@@ -89,6 +92,37 @@ export default function CompaniesPage() {
       await refetch();
     } catch (e) {
       toast.error(c("updateFailed"), { description: apiErrorMessage(e, t, locale) });
+    }
+  }
+
+  /**
+   * Open or close the El-Professor link for one company.
+   *
+   * Opening is immediate; **closing asks first**, because it ends a live
+   * connection rather than pausing it: the company's token dies, El-Professor
+   * stops reading, and its drivers lose the section. Re-opening does not
+   * restore the link — a new token has to be issued and pasted — so this is
+   * not a switch to flick back and forth.
+   */
+  async function toggleElProfessor(co: Company) {
+    const next = !co.elprofessor_enabled;
+    if (!next && co.elprofessor_connected) {
+      setConfirmEp(co);
+
+      return;
+    }
+    await applyElProfessor(co, next);
+  }
+
+  async function applyElProfessor(co: Company, next: boolean) {
+    try {
+      await setCompanyElProfessor(co.id, next);
+      toast.success(next ? c("epEnabledToast") : c("epDisabledToast"));
+      await refetch();
+    } catch (e) {
+      toast.error(c("updateFailed"), { description: apiErrorMessage(e, t, locale) });
+    } finally {
+      setConfirmEp(null);
     }
   }
 
@@ -163,6 +197,7 @@ export default function CompaniesPage() {
                   <th className="px-4 py-3 font-semibold">{c("colName")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colStatus")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colSession")}</th>
+                  <th className="px-4 py-3 font-semibold">{c("colElProfessor")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colDrivers")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colOffers")}</th>
                   <th className="px-4 py-3" />
@@ -210,6 +245,35 @@ export default function CompaniesPage() {
                       ) : (
                         <span className="text-ink-subtle">{c("noSession")}</span>
                       )}
+                    </td>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      {/* One control that says the state and changes it. The
+                          two are different facts: `enabled` is the platform's
+                          switch, `connected` is whether the company actually
+                          completed the link — a company can be open and not
+                          yet connected, and the badge has to tell them apart
+                          or the operator cannot see who still has to paste. */}
+                      <button
+                        onClick={() => toggleElProfessor(co)}
+                        className="outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded"
+                        title={co.elprofessor_enabled ? c("epClose") : c("epOpen")}
+                      >
+                        <Badge
+                          status={
+                            // `expiring` is the kit's amber: open but not yet
+                            // linked is exactly a company that still owes the
+                            // operator an action, not an error and not done.
+                            !co.elprofessor_enabled ? "gap" : co.elprofessor_connected ? "connected" : "expiring"
+                          }
+                          dot
+                        >
+                          {!co.elprofessor_enabled
+                            ? c("epClosed")
+                            : co.elprofessor_connected
+                              ? c("epConnected")
+                              : c("epOpenNotLinked")}
+                        </Badge>
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-ink-muted">{co.driver_count.toLocaleString(latnLocale(locale))}</td>
                     <td className="px-4 py-3 text-ink-muted">{co.offer_count.toLocaleString(latnLocale(locale))}</td>
@@ -288,6 +352,20 @@ export default function CompaniesPage() {
         busy={busy}
         onConfirm={doDelete}
         onCancel={() => setConfirmDel(null)}
+      />
+
+      {/* Closing asks, because it ends a live connection: the token dies, the
+          drivers lose the section, and re-opening does not bring the link
+          back — a new token has to be issued and pasted. */}
+      <ConfirmModal
+        open={confirmEp !== null}
+        danger
+        title={c("epClose")}
+        message={c("epCloseConfirm").replace("{name}", confirmEp?.name ?? "")}
+        confirmLabel={c("epClose")}
+        cancelLabel={c("cancel")}
+        onConfirm={() => confirmEp && applyElProfessor(confirmEp, false)}
+        onCancel={() => setConfirmEp(null)}
       />
     </div>
   );

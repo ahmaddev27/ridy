@@ -22,6 +22,11 @@ export type Company = {
   session_status: string | null;
   session_last_event_at: string | null;
   session_expires_at: string | null;
+  /** The PLATFORM's switch for the El-Professor link, set per company. */
+  elprofessor_enabled: boolean;
+  /** Whether that company has actually completed the link. Derived: closing
+   *  the switch deletes the tokens, so this follows it in the same response. */
+  elprofessor_connected: boolean;
   users?: CompanyUser[] | null;
 };
 
@@ -591,6 +596,26 @@ export async function listCollectorPayments(
 }
 
 /** Toggle a company between active and disabled (reversible, keeps all data). */
+/**
+ * Open or close the El-Professor integration for one company.
+ *
+ * **Closing ENDS the connection** — the server deletes the company's tokens, so
+ * El-Professor's next read is a 401 and the drivers' app hides its section.
+ * Re-opening gives back the switch and nothing else: the company issues a new
+ * token and pastes it again.
+ *
+ * Its own endpoint rather than a field on the company update, because a switch
+ * that revokes a credential should not ride along with a name change.
+ */
+export async function setCompanyElProfessor(id: number, enabled: boolean): Promise<Company> {
+  const res = await apiFetch<{ data: Company }>(`${base}/${id}/elprofessor`, {
+    method: "PATCH",
+    body: { enabled },
+    withCsrf: true,
+  });
+  return res.data;
+}
+
 export async function setCompanyActive(id: number, active: boolean): Promise<Company> {
   return updateCompany(id, { status: active ? "active" : "disabled" });
 }
