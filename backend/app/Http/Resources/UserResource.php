@@ -20,6 +20,10 @@ class UserResource extends JsonResource
             'tenant' => $this->tenant ? [
                 'id' => $this->tenant->id,
                 'name' => $this->tenant->name,
+                // The platform's per-company switch for the El-Professor link.
+                // The sidebar hides the page on it, so it travels with the
+                // session rather than costing a request on every render.
+                'elprofessor_enabled' => $this->tenant->elprofessorEnabled(),
             ] : null,
             'roles' => $this->getRoleNames(),
             'permissions' => $this->getAllPermissions()->pluck('name')->values(),

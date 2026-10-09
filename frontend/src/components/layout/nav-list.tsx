@@ -41,7 +41,12 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
           <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
             {t(group.title)}
           </p>
-          {group.items.map((item) => {
+          {group.items
+            // A page the platform has not opened for this company is not shown.
+            // The server refuses its routes anyway; this keeps the sidebar from
+            // offering a door that answers 403.
+            .filter((item) => !item.requiresElProfessor || user?.tenant?.elprofessor_enabled === true)
+            .map((item) => {
             // Active on the exact route or any nested route (e.g. a company
             // detail page under /admin/companies). Index routes match exactly so
             // they don't light up for their siblings' sub-pages.

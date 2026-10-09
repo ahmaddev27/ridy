@@ -119,6 +119,11 @@ const en = {
     extMissingBody: "Install the Reidey browser extension to connect Uber with one click. Without it, use the manual method below.",
     installTitle: "Install Reidey",
     installBody: "One-time setup. Add the extension from the Chrome Web Store, then come back and click Connect.",
+    // The page that now holds the card. The card's own strings keep their
+    // `ep*` names under `connections` rather than being renamed across three
+    // languages for a move that changed no wording.
+    pageTitleEp: "El-Professor",
+    pageSubtitleEp: "Link this fleet to El-Professor so your drivers can send receipts and notes for review.",
     epTitle: "El-Professor connection",
     epIntro: "Connecting El-Professor lets it read your driver roster. Your drivers then get a “Receipts & notes” section in the Reidey app to submit receipts and notes, which your fleet reviews.",
     epLoadFailed: "The El-Professor connection status could not be loaded.",
@@ -306,6 +311,8 @@ const de: typeof en = {
     extMissingBody: "Installiere die Reidey-Browser-Erweiterung, um Uber mit einem Klick zu verbinden. Ohne sie nutze die manuelle Methode unten.",
     installTitle: "Reidey installieren",
     installBody: "Einmalige Einrichtung. Füge die Erweiterung aus dem Chrome Web Store hinzu und klicke dann auf Verbinden.",
+    pageTitleEp: "El-Professor",
+    pageSubtitleEp: "Verbinde diese Flotte mit El-Professor, damit deine Fahrer Belege und Notizen zur Prüfung senden können.",
     epTitle: "El-Professor-Verbindung",
     epIntro: "Mit der Verbindung kann El-Professor Ihren Fahrerstamm lesen. Ihre Fahrer erhalten dann in der Reidey-App den Bereich „Belege & Notizen“, um Belege und Notizen einzureichen, die Ihre Flotte prüft.",
     epLoadFailed: "Der Status der El-Professor-Verbindung konnte nicht geladen werden.",
@@ -492,6 +499,8 @@ const ar: typeof en = {
     extMissingBody: "ثبّت رايدي لربط أوبر بضغطة. بدونها استخدم الطريقة اليدوية أدناه.",
     installTitle: "تثبيت رايدي",
     installBody: "إعداد لمرة واحدة. أضِف الإضافة من متجر كروم ثم ارجع واضغط اتصال.",
+    pageTitleEp: "El-Professor",
+    pageSubtitleEp: "اربط هذا الأسطول مع El-Professor ليتمكن سائقوك من إرسال الفواتير والملاحظات للمراجعة.",
     epTitle: "الربط مع El-Professor",
     epIntro: "عند الربط يستطيع El-Professor قراءة قائمة سائقيك. بعدها يحصل سائقوك في تطبيق رايدي على قسم «الإيصالات والملاحظات» لإرسال الإيصالات والملاحظات، وتراجعها شركتك.",
     epLoadFailed: "تعذّر تحميل حالة الربط مع El-Professor.",
