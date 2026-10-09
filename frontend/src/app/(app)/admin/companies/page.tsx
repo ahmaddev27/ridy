@@ -12,6 +12,7 @@ import { Badge, type Status } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { Switch } from "@/components/ui/switch";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { listCompanies, deleteCompany, setCompanyActive, setCompanyElProfessor, type Company } from "@/lib/api/admin";
@@ -81,8 +82,14 @@ export default function CompaniesPage() {
   const pageClamped = Math.min(page, lastPage);
   const companies = filtered.slice((pageClamped - 1) * perPage, pageClamped * perPage);
 
-  // The company a close is being confirmed for; null while nothing is asked.
-  const [confirmEp, setConfirmEp] = useState<Company | null>(null);
+  // The change being confirmed — the company and the direction — or null
+  // while nothing is asked. The direction is held here rather than read off
+  // the row again at confirm time, so a refetch landing while the dialog is
+  // open cannot turn an "open this" into a "close this" under the cursor.
+  const [confirmEp, setConfirmEp] = useState<{ co: Company; next: boolean } | null>(null);
+  // Its own flag: `busy` belongs to the delete dialog, and sharing it would
+  // grey out whichever of the two the operator is not looking at.
+  const [epBusy, setEpBusy] = useState(false);
 
   async function toggleActive(co: Company) {
     const next = co.status !== "active";
@@ -98,23 +105,25 @@ export default function CompaniesPage() {
   /**
    * Open or close the El-Professor link for one company.
    *
-   * Opening is immediate; **closing asks first**, because it ends a live
-   * connection rather than pausing it: the company's token dies, El-Professor
-   * stops reading, and its drivers lose the section. Re-opening does not
-   * restore the link — a new token has to be issued and pasted — so this is
-   * not a switch to flick back and forth.
+   * **Both directions ask first.** Closing ends a live connection rather than
+   * pausing it: the company's token is deleted, El-Professor stops reading,
+   * and its drivers lose the receipts and notes section — and re-opening
+   * does not bring it back, a new token has to be issued and pasted. Opening
+   * is the lighter act, but it is still the platform granting a company an
+   * integration, and it sits one row away from twenty-four others.
+   *
+   * The older version asked only when closing a *connected* company, which
+   * let a stray click close an open-but-not-yet-linked one in silence — and
+   * that still revokes whatever token is in flight.
    */
-  async function toggleElProfessor(co: Company) {
-    const next = !co.elprofessor_enabled;
-    if (!next && co.elprofessor_connected) {
-      setConfirmEp(co);
-
-      return;
-    }
-    await applyElProfessor(co, next);
+  function toggleElProfessor(co: Company) {
+    setConfirmEp({ co, next: !co.elprofessor_enabled });
   }
 
-  async function applyElProfessor(co: Company, next: boolean) {
+  async function applyElProfessor() {
+    if (!confirmEp) return;
+    const { co, next } = confirmEp;
+    setEpBusy(true);
     try {
       await setCompanyElProfessor(co.id, next);
       toast.success(next ? c("epEnabledToast") : c("epDisabledToast"));
@@ -122,6 +131,7 @@ export default function CompaniesPage() {
     } catch (e) {
       toast.error(c("updateFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
+      setEpBusy(false);
       setConfirmEp(null);
     }
   }
@@ -247,33 +257,37 @@ export default function CompaniesPage() {
                       )}
                     </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      {/* One control that says the state and changes it. The
-                          two are different facts: `enabled` is the platform's
-                          switch, `connected` is whether the company actually
-                          completed the link — a company can be open and not
-                          yet connected, and the badge has to tell them apart
-                          or the operator cannot see who still has to paste. */}
-                      <button
-                        onClick={() => toggleElProfessor(co)}
-                        className="outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded"
-                        title={co.elprofessor_enabled ? c("epClose") : c("epOpen")}
-                      >
-                        <Badge
-                          status={
-                            // `expiring` is the kit's amber: open but not yet
-                            // linked is exactly a company that still owes the
-                            // operator an action, not an error and not done.
-                            !co.elprofessor_enabled ? "gap" : co.elprofessor_connected ? "connected" : "expiring"
+                      {/* The switch is `enabled`, the platform's own decision.
+                          The word beside it is the second fact the switch
+                          cannot carry: whether the company has actually
+                          completed the link. A company can be open and not yet
+                          connected, and that is precisely the row the operator
+                          is looking for — the one that still owes the paste. */}
+                      <div className="flex items-center gap-2.5">
+                        <Switch
+                          checked={co.elprofessor_enabled}
+                          onChange={() => toggleElProfessor(co)}
+                          disabled={epBusy}
+                          label={co.elprofessor_enabled ? c("epClose") : c("epOpen")}
+                        />
+                        <span
+                          className={
+                            "whitespace-nowrap text-xs " +
+                            (!co.elprofessor_enabled
+                              ? "text-ink-subtle"
+                              : co.elprofessor_connected
+                                ? "text-success-fg"
+                                : // amber: open, and still waiting on the company
+                                  "text-warning-fg")
                           }
-                          dot
                         >
                           {!co.elprofessor_enabled
                             ? c("epClosed")
                             : co.elprofessor_connected
                               ? c("epConnected")
                               : c("epOpenNotLinked")}
-                        </Badge>
-                      </button>
+                        </span>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-ink-muted">{co.driver_count.toLocaleString(latnLocale(locale))}</td>
                     <td className="px-4 py-3 text-ink-muted">{co.offer_count.toLocaleString(latnLocale(locale))}</td>
@@ -354,17 +368,22 @@ export default function CompaniesPage() {
         onCancel={() => setConfirmDel(null)}
       />
 
-      {/* Closing asks, because it ends a live connection: the token dies, the
-          drivers lose the section, and re-opening does not bring the link
-          back — a new token has to be issued and pasted. */}
+      {/* Both directions ask. Only closing is `danger`, because only closing
+          destroys something: the token dies, the drivers lose the section, and
+          re-opening does not bring the link back — a new token has to be
+          issued and pasted. */}
       <ConfirmModal
         open={confirmEp !== null}
-        danger
-        title={c("epClose")}
-        message={c("epCloseConfirm").replace("{name}", confirmEp?.name ?? "")}
-        confirmLabel={c("epClose")}
+        danger={confirmEp !== null && !confirmEp.next}
+        title={confirmEp?.next ? c("epOpen") : c("epClose")}
+        message={(confirmEp?.next ? c("epOpenConfirm") : c("epCloseConfirm")).replace(
+          "{name}",
+          confirmEp?.co.name ?? "",
+        )}
+        confirmLabel={confirmEp?.next ? c("epOpen") : c("epClose")}
         cancelLabel={c("cancel")}
-        onConfirm={() => confirmEp && applyElProfessor(confirmEp, false)}
+        busy={epBusy}
+        onConfirm={applyElProfessor}
         onCancel={() => setConfirmEp(null)}
       />
     </div>
