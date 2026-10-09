@@ -28,6 +28,8 @@ class EnsureDashboardToken
 
     private const FLEET_OWNER_ABILITY = 'fleet:read';
 
+    private const ELPROFESSOR_ABILITY = 'elprofessor:read';
+
     /**
      * Ability => the only "METHOD uri" pairs (Str::is patterns) a token holding it
      * may reach. Method-aware on purpose: the URI alone let the extension token
@@ -58,6 +60,26 @@ class EnsureDashboardToken
             'DELETE api/v1/driver/fleet/devices',
             'POST api/v1/driver/fleet/account/deletion-request',
         ],
+        // El-Professor's pull: the roster read and the fleet whoami that lets it
+        // check the token belongs to the fleet the operator named. Two exact
+        // patterns, not 'elprofessor/fleet*', so a later sibling route is not
+        // admitted by accident.
+        self::ELPROFESSOR_ABILITY => [
+            'GET api/v1/elprofessor/fleet',
+            'GET api/v1/elprofessor/fleet/drivers',
+            // The one write: marking one of this tenant's submissions decided.
+            // An exact path, never a wildcard — an ability missing from this
+            // map is not confined at all, and a wildcard here would hand the
+            // token every elprofessor route a later release adds.
+            'POST api/v1/elprofessor/submissions/status',
+            // The fetch (08.10.2026). El-Professor cannot be PUSHED a payload:
+            // its intake authenticates with the token this side issued, and
+            // Sanctum keeps only a hash of it. So this side rings and it reads
+            // these two. Written out rather than 'GET api/v1/elprofessor/*',
+            // which would admit every sibling route a later release adds.
+            'GET api/v1/elprofessor/submissions',
+            'GET api/v1/elprofessor/submissions/{uuid}',
+        ],
     ];
 
     public function handle(Request $request, Closure $next): Response
@@ -81,6 +103,7 @@ class EnsureDashboardToken
             abort_unless(Str::is($allowed, $target), 403, match ($ability) {
                 self::EXTENSION_ABILITY => 'This token is limited to fleet-session ingest.',
                 self::FLEET_OWNER_ABILITY => 'This token is limited to the fleet-owner app.',
+                self::ELPROFESSOR_ABILITY => 'This token is limited to the El-Professor fleet read.',
                 default => 'This token is limited to a narrower scope.',
             });
         }

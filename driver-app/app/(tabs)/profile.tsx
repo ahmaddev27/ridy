@@ -5,6 +5,7 @@ import Constants from "expo-constants";
 import {
   Settings as SettingsIcon,
   ShieldCheck,
+  Receipt,
   SlidersHorizontal,
   LifeBuoy,
   LogOut,
@@ -159,6 +160,22 @@ export default function ProfileScreen() {
 
         {/* Menu — functional rows only */}
         <View style={cardStyle(c)}>
+          {/* What the driver sends their own company, and what it decided —
+              shown only once that company is connected to El-Professor. Until
+              then nobody would fetch a submission, so one sent here would sit
+              unread while the driver believed it had gone. The endpoint refuses
+              it too (403 `not_connected`); this is the message, not the wall. */}
+          {driver?.documents_enabled ? (
+            <>
+              <MenuRow
+                c={c}
+                icon={Receipt}
+                label={t("subs.title")}
+                onPress={() => router.push("/submissions")}
+              />
+              <Separator c={c} />
+            </>
+          ) : null}
           <MenuRow
             c={c}
             icon={SlidersHorizontal}

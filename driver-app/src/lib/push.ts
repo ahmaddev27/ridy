@@ -18,13 +18,14 @@ import { getPrefs } from "./prefs";
 import { Sentry } from "./sentry";
 import {
   MULTISTOP_CHANNEL,
+  DOCUMENTS_CHANNEL,
   OFFERS_CHANNEL,
   OFFER_CATEGORY,
   OPEN_MAP_ACTION,
   isMultiStop,
 } from "./notification-channels";
 
-export { MULTISTOP_CHANNEL, OFFERS_CHANNEL, OFFER_CATEGORY, OPEN_MAP_ACTION };
+export { DOCUMENTS_CHANNEL, MULTISTOP_CHANNEL, OFFERS_CHANNEL, OFFER_CATEGORY, OPEN_MAP_ACTION };
 
 /**
  * Push delivery for the driver app.
@@ -155,6 +156,16 @@ async function ensureChannels(): Promise<void> {
     bypassDnd: false,
     enableLights: true,
     lightColor: "#2563EB",
+  });
+  // A company's decision about a Beleg or a note. DEFAULT importance and the
+  // system sound on purpose: an offer expires in minutes and has earned the
+  // loudest channel the app has, and a decision that arrives with the same
+  // urgency teaches the driver to ignore both.
+  await Notifications.setNotificationChannelAsync(DOCUMENTS_CHANNEL, {
+    name: t("notif.channelDocuments"),
+    importance: Notifications.AndroidImportance.DEFAULT,
+    vibrationPattern: [0, 200],
+    bypassDnd: false,
   });
 }
 

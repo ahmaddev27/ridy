@@ -189,6 +189,7 @@ class FleetController extends Controller
                 ->where('status', UberFleetSession::STATUS_ACTIVE)
                 ->exists(),
             'is_owner' => true,
+            'documents_enabled' => $owner->tenant?->isElprofessorConnected() ?? false,
         ]]);
     }
 

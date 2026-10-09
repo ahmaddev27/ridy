@@ -44,7 +44,17 @@ jobs:
     name: Android ${{ github.event.inputs.profile }}${{ github.event.inputs.submit == 'true' && ' + submit' || '' }}
     runs-on: ubuntu-latest
     environment: store-release
-    if: github.ref == 'refs/heads/main'
+    # A `production` build is a store release and stays main-only. A `preview`
+    # is an internal APK nobody can install from a store, and it is the only way
+    # to try a branch on a real phone before merging it — so it may be built
+    # from any ref the operator picks in the Actions UI.
+    #
+    # The secrets do not widen with it: both profiles still run inside the
+    # `store-release` environment, so whatever protection that environment
+    # carries (required reviewers, allowed branches) applies to a preview too.
+    # If its "Deployment branches" rule is main-only, a preview from a branch
+    # waits or is refused by GitHub — add the branch there, or drop the rule.
+    if: github.ref == 'refs/heads/main' || github.event.inputs.profile == 'preview'
     defaults:
       run:
         working-directory: driver-app
