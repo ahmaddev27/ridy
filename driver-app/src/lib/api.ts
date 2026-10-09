@@ -14,6 +14,47 @@ function devicePayload(device?: DeviceInfo): Record<string, string> {
   return payload;
 }
 
+/**
+ * One thing a driver sent their own company to review in El-Professor: a
+ * receipt with its photo, or a note. Fetched FROM here by El-Professor — see
+ * the backend's `RingElProfessor` for why it is a fetch and not a push.
+ */
+export type DriverSubmission = {
+  id: string;
+  subject: "receipt" | "note";
+  /** pending → taken → accepted | rejected. */
+  status: string;
+  /** The company's own words when it rejected. Null otherwise. */
+  reason: string | null;
+  created_at: string | null;
+};
+
+/** Everything a receipt carries. The photo is separate: it is a file. */
+export type ReceiptDraft = {
+  receipt_date: string;
+  /** A plain decimal with a dot, at most two places, and nothing else. The
+   *  other side reads `1.234` as 1.23 and answers 0 for what it cannot read,
+   *  and this figure reaches the driver's own balance. */
+  amount: string;
+  category: string | null;
+  description: string | null;
+  payment_method: "bar" | "uberweisung";
+  postal_code: string | null;
+};
+
+export type NoteDraft = {
+  note_type: string;
+  note_text: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_full_day?: boolean;
+  start_time?: string | null;
+  end_time?: string | null;
+};
+
+/** A photo picked or taken, as React Native's fetch wants it in a FormData. */
+export type PickedPhoto = { uri: string; name: string; type: string };
+
 /** Result of the launch-time force-update check. */
 export type AppVersionInfo = {
   update_required: boolean;
@@ -186,6 +227,29 @@ export class ApiClient {
     this.owner = owner;
   }
 
+  /**
+   * A multipart POST, for the one endpoint that carries a file.
+   *
+   * It cannot go through `request()`: that sets `Content-Type:
+   * application/json` on every call, and a multipart body needs the runtime to
+   * set the header WITH its boundary. Overriding the key with `undefined`
+   * does not remove it — React Native sends the string "undefined" and the
+   * server reads an empty request. So the header is simply never set here.
+   *
+   * Everything else `request()` does that matters — the bearer, the timeout,
+   * the 401 handling — is reused by delegating to it with a FormData body and
+   * a marker that suppresses the JSON header.
+   */
+  private form<T>(path: string, body: FormData, timeoutMs?: number): Promise<T> {
+    return this.request<T>(path, {
+      method: "POST",
+      body: body as unknown as BodyInit,
+      // Read by `request()`: an empty value deletes the inherited header.
+      headers: { "Content-Type": "" },
+      ...(timeoutMs ? { timeoutMs } : {}),
+    });
+  }
+
   private async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     if (!isSafePath(path)) throw new ApiError(400, "invalid_path", null);
 
@@ -208,12 +272,18 @@ export class ApiClient {
       res = await fetch(BASE + path, {
         ...init,
         signal: controller.signal,
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          ...(sentToken ? { Authorization: `Bearer ${sentToken}` } : {}),
-          ...(init.headers ?? {}),
-        },
+        // An EMPTY Content-Type from the caller means "do not send one": a
+        // multipart body needs the runtime to set the header with its own
+        // boundary, and a header set to the string "undefined" produces an
+        // empty request on the server with no message anywhere.
+        headers: Object.fromEntries(
+          Object.entries({
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            ...(sentToken ? { Authorization: `Bearer ${sentToken}` } : {}),
+            ...(init.headers ?? {}),
+          }).filter(([, v]) => v !== ""),
+        ),
       });
       // The body read can stall too, so it stays inside the timed section.
       text = await res.text();
@@ -307,6 +377,42 @@ export class ApiClient {
 
   me() {
     return this.request<{ data: DriverProfile }>("/api/v1/driver/me");
+  }
+
+  /** What this driver has sent their company, newest first, with the decision. */
+  submissions() {
+    return this.request<{ data: DriverSubmission[] }>("/api/v1/driver/submissions");
+  }
+
+  /**
+   * Send a receipt with its photo.
+   *
+   * The photo is mandatory and the company cannot accept the receipt without
+   * it, so this refuses the same thing the other side would — the driver finds
+   * out now rather than from a rejection days later.
+   *
+   * A longer timeout than the default: this is the one request that carries a
+   * file over a phone's connection.
+   */
+  submitReceipt(draft: ReceiptDraft, photo: PickedPhoto) {
+    const body = new FormData();
+    body.append("subject", "receipt");
+    body.append("receipt_date", draft.receipt_date);
+    body.append("amount", draft.amount);
+    body.append("payment_method", draft.payment_method);
+    if (draft.category) body.append("category", draft.category);
+    if (draft.description) body.append("description", draft.description);
+    if (draft.postal_code) body.append("postal_code", draft.postal_code);
+    body.append("document", photo as unknown as Blob);
+    return this.form<{ data: DriverSubmission }>("/api/v1/driver/submissions", body, 60_000);
+  }
+
+  /** Send a note. No photo, so it goes as plain JSON like everything else. */
+  submitNote(draft: NoteDraft) {
+    return this.request<{ data: DriverSubmission }>("/api/v1/driver/submissions", {
+      method: "POST",
+      body: JSON.stringify({ subject: "note", ...draft }),
+    });
   }
 
   fleetMe() {

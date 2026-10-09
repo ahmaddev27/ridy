@@ -85,7 +85,14 @@
         }
       ],
       "@react-native-firebase/messaging",
-      "./plugins/withExpoOwnsFcm.js"
+      "./plugins/withExpoOwnsFcm.js",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Reidey braucht Zugriff auf deine Fotos, damit du einen Beleg aus der Galerie an dein Unternehmen schicken kannst.",
+          "cameraPermission": "Reidey braucht die Kamera, damit du einen Beleg abfotografieren und an dein Unternehmen schicken kannst."
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "https://reidey.de",

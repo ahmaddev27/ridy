@@ -12,6 +12,8 @@ use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
+use App\Domain\Notifications\Contracts\PushSender;
+use App\Domain\Notifications\Models\DeviceToken;
 use App\Jobs\RingElProfessor;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
@@ -896,5 +898,122 @@ class ElProfessorConnectionTest extends TestCase
         (new RingElProfessor($row->id))->handle();
 
         \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
+    // ── The rejection is TOLD, not only stored ───────────────────────────────
+    //
+    //  `AppNotification::via()` is `['database']` and the driver's app has no
+    //  endpoint that reads those rows, so without a push a rejection is what a
+    //  driver finds whenever they next happen to look.
+
+    /** A sender that records what it was asked to send and can be made to fail. */
+    private function fakePush(bool $throw = false): object
+    {
+        $sender = new class($throw) implements PushSender
+        {
+            /** @var array<int, array{token: string, title: string, body: string, data: array<string, mixed>}> */
+            public array $sent = [];
+
+            public function __construct(private bool $throw) {}
+
+            public function send(string $deviceToken, string $title, string $body, array $data = []): bool
+            {
+                if ($this->throw) {
+                    throw new \RuntimeException('transport down');
+                }
+                $this->sent[] = compact('deviceToken', 'title', 'body', 'data');
+
+                return true;
+            }
+        };
+        $this->app->instance(PushSender::class, $sender);
+
+        return $sender;
+    }
+
+    public function test_a_rejection_pushes_to_the_drivers_devices_on_its_own_channel(): void
+    {
+        $sender = $this->fakePush();
+        $token = $this->mint();
+        $driver = $this->driver($this->tenant, 'Omar');
+        DeviceToken::create([
+            'tenant_id' => $this->tenant->id, 'driver_id' => $driver->id,
+            'token' => 'device-1', 'platform' => 'android',
+        ]);
+        $row = $this->submission($this->tenant, $driver, [
+            'status' => ElProfessorSubmission::STATUS_TAKEN,
+        ]);
+
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/v1/elprofessor/submissions/status', [
+                'external_submission_id' => $row->uuid,
+                'external_driver_id' => $driver->id,
+                'status' => 'rejected',
+                'reason_code' => 'review_rejected',
+                'reason_text' => 'Foto unleserlich',
+                'kind' => 'receipt',
+            ])->assertOk();
+
+        $this->assertCount(1, $sender->sent);
+        $push = $sender->sent[0];
+        $this->assertSame('device-1', $push['token'] ?? $push['deviceToken']);
+        // The reviewer's own words are the body: a push that says only
+        // "something was rejected" makes the driver open the app to learn
+        // nothing they could not have been told.
+        $this->assertSame('Foto unleserlich', $push['body']);
+        // The app routes on this and opens the submissions screen.
+        $this->assertSame('elprofessor.submission_rejected', $push['data']['type']);
+        $this->assertSame('receipt', $push['data']['kind']);
+        // Its own channel: an offer expires in minutes and owns the loudest one.
+        $this->assertSame('documents', $push['data']['channel_id']);
+    }
+
+    public function test_a_push_that_cannot_go_does_not_fail_the_decision(): void
+    {
+        // The decision is already recorded by then. A 500 here would have
+        // El-Professor retry a decision that was taken.
+        $this->fakePush(throw: true);
+        $token = $this->mint();
+        $driver = $this->driver($this->tenant, 'Omar');
+        DeviceToken::create([
+            'tenant_id' => $this->tenant->id, 'driver_id' => $driver->id,
+            'token' => 'device-1', 'platform' => 'android',
+        ]);
+        $row = $this->submission($this->tenant, $driver, [
+            'status' => ElProfessorSubmission::STATUS_TAKEN,
+        ]);
+
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/v1/elprofessor/submissions/status', [
+                'external_submission_id' => $row->uuid,
+                'external_driver_id' => $driver->id,
+                'status' => 'rejected',
+                'reason_code' => 'review_rejected',
+                'reason_text' => 'Foto unleserlich',
+            ])->assertOk();
+
+        $this->assertSame(ElProfessorSubmission::STATUS_REJECTED, $row->refresh()->status);
+    }
+
+    public function test_a_driver_with_no_device_is_simply_not_pushed(): void
+    {
+        $sender = $this->fakePush();
+        $token = $this->mint();
+        $driver = $this->driver($this->tenant, 'Omar');
+        $row = $this->submission($this->tenant, $driver, [
+            'status' => ElProfessorSubmission::STATUS_TAKEN,
+        ]);
+
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/v1/elprofessor/submissions/status', [
+                'external_submission_id' => $row->uuid,
+                'external_driver_id' => $driver->id,
+                'status' => 'rejected',
+                'reason_code' => 'review_rejected',
+            ])->assertOk();
+
+        $this->assertSame([], $sender->sent);
+        // And the list still carries it, which is the other half of the telling.
+        $this->assertSame(ElProfessorSubmission::STATUS_REJECTED, $row->refresh()->status);
     }
 }

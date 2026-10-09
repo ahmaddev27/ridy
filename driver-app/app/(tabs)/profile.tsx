@@ -5,6 +5,7 @@ import Constants from "expo-constants";
 import {
   Settings as SettingsIcon,
   ShieldCheck,
+  Receipt,
   SlidersHorizontal,
   LifeBuoy,
   LogOut,
@@ -159,6 +160,14 @@ export default function ProfileScreen() {
 
         {/* Menu — functional rows only */}
         <View style={cardStyle(c)}>
+          {/* What the driver sends their own company, and what it decided. */}
+          <MenuRow
+            c={c}
+            icon={Receipt}
+            label={t("subs.title")}
+            onPress={() => router.push("/submissions")}
+          />
+          <Separator c={c} />
           <MenuRow
             c={c}
             icon={SlidersHorizontal}

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\ElProfessorSubmission;
 use App\Domain\Notifications\AppNotification;
+use App\Domain\Notifications\SubmissionDecisionNotifier;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -139,15 +140,21 @@ class ElProfessorController extends Controller
             return response()->json(['data' => ['notified' => false, 'duplicate' => true]]);
         }
 
-        $driver->notify(new AppNotification(
-            self::REJECTED_TYPE,
-            [
-                'external_submission_id' => $submissionId,
-                'kind' => $data['kind'] ?? 'note',
-                'reason_code' => $data['reason_code'],
-                'reason_text' => $data['reason_text'] ?? null,
-            ],
-        ));
+        $params = [
+            'external_submission_id' => $submissionId,
+            'kind' => $data['kind'] ?? 'note',
+            'reason_code' => $data['reason_code'],
+            'reason_text' => $data['reason_text'] ?? null,
+        ];
+
+        $driver->notify(new AppNotification(self::REJECTED_TYPE, $params));
+
+        // The bell row above reaches nobody on its own: `AppNotification::via()`
+        // is `['database']` and the driver's app has no endpoint that reads
+        // those rows. So the telling is a push, on its own channel, and it never
+        // fails this request -- the decision is already recorded, and a
+        // transport that is down must not have El-Professor retry it.
+        app(SubmissionDecisionNotifier::class)->rejected($driver, $params);
 
         // Since 08.10.2026 this side keeps the submissions, so the decision
         // lands on the row as well as in the driver's notifications — which is
