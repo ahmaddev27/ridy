@@ -9,8 +9,9 @@ use App\Domain\Notifications\SubmissionDecisionNotifier;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -419,7 +420,7 @@ class ElProfessorController extends Controller
                 $changes['first_used_at'] = $now->toIso8601String();
             }
             $last = $state['last_used_at'] ?? null;
-            if ($last === null || $now->diffInMinutes(\Illuminate\Support\Carbon::parse($last), true) >= self::LAST_USED_INTERVAL_MINUTES) {
+            if ($last === null || $now->diffInMinutes(Carbon::parse($last), true) >= self::LAST_USED_INTERVAL_MINUTES) {
                 $changes['last_used_at'] = $now->toIso8601String();
             }
 

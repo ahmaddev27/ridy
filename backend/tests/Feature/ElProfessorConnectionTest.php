@@ -5,20 +5,22 @@ namespace Tests\Feature;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\ElProfessorSubmission;
 use App\Domain\Notifications\AppNotification;
+use App\Domain\Notifications\Contracts\PushSender;
+use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use App\Http\Controllers\Api\V1\ElProfessorController;
+use App\Jobs\RingElProfessor;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Notifications\DatabaseNotification;
-use App\Domain\Notifications\Contracts\PushSender;
-use App\Domain\Notifications\Models\DeviceToken;
-use App\Jobs\RingElProfessor;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -612,7 +614,7 @@ class ElProfessorConnectionTest extends TestCase
         $this->assertSame('image/jpeg', $body['content_type']);
     }
 
-    public function test_a_photo_the_disk_does_not_have_is_ABSENT_rather_than_empty(): void
+    public function test_a_photo_the_disk_does_not_have_is_absen_t_rather_than_empty(): void
     {
         // The row names a file that is not there -- a failed write, a cleaned
         // volume. An empty string would reach El-Professor as a photo it could
@@ -665,7 +667,7 @@ class ElProfessorConnectionTest extends TestCase
         $foreign = $this->withHeaders($this->bearer($token))
             ->getJson('/api/v1/elprofessor/submissions/'.$theirs->uuid);
         $missing = $this->withHeaders($this->bearer($token))
-            ->getJson('/api/v1/elprofessor/submissions/'.\Illuminate\Support\Str::uuid());
+            ->getJson('/api/v1/elprofessor/submissions/'.Str::uuid());
 
         $foreign->assertStatus(404);
         $missing->assertStatus(404);
@@ -831,7 +833,7 @@ class ElProfessorConnectionTest extends TestCase
 
         $this->withHeaders($this->bearer($token))
             ->postJson('/api/v1/elprofessor/submissions/status', [
-                'external_submission_id' => (string) \Illuminate\Support\Str::uuid(),
+                'external_submission_id' => (string) Str::uuid(),
                 'external_driver_id' => $driver->id,
                 'status' => 'rejected',
                 'reason_code' => 'review_rejected',
@@ -864,14 +866,14 @@ class ElProfessorConnectionTest extends TestCase
         Storage::fake('local');
         config(['elprofessor.intake_url' => 'http://intake.test/functions/v1/partner-intake']);
         config(['elprofessor.anon_key' => 'anon-key']);
-        \Illuminate\Support\Facades\Http::fake(['intake.test/*' => \Illuminate\Support\Facades\Http::response(['ok' => true])]);
+        Http::fake(['intake.test/*' => Http::response(['ok' => true])]);
 
         $driver = $this->driver($this->tenant, 'Omar');
         $row = $this->submission($this->tenant, $driver);
 
         (new RingElProfessor($row->id))->handle();
 
-        \Illuminate\Support\Facades\Http::assertSent(function ($request) use ($row) {
+        Http::assertSent(function ($request) use ($row) {
             $body = $request->data();
             // Four fields and nothing else: a ring that could assert an amount
             // or a driver would be a ring worth forging.
@@ -895,13 +897,13 @@ class ElProfessorConnectionTest extends TestCase
         // loses nothing either.
         Storage::fake('local');
         config(['elprofessor.intake_url' => null, 'elprofessor.anon_key' => null]);
-        \Illuminate\Support\Facades\Http::fake();
+        Http::fake();
 
         $row = $this->submission($this->tenant, $this->driver($this->tenant, 'Omar'));
 
         (new RingElProfessor($row->id))->handle();
 
-        \Illuminate\Support\Facades\Http::assertNothingSent();
+        Http::assertNothingSent();
         $this->assertSame(ElProfessorSubmission::STATUS_PENDING, $row->refresh()->status);
     }
 
@@ -909,7 +911,7 @@ class ElProfessorConnectionTest extends TestCase
     {
         Storage::fake('local');
         config(['elprofessor.intake_url' => 'http://intake.test/x', 'elprofessor.anon_key' => 'k']);
-        \Illuminate\Support\Facades\Http::fake();
+        Http::fake();
 
         $row = $this->submission($this->tenant, $this->driver($this->tenant, 'Omar'), [
             'status' => ElProfessorSubmission::STATUS_TAKEN,
@@ -917,7 +919,7 @@ class ElProfessorConnectionTest extends TestCase
 
         (new RingElProfessor($row->id))->handle();
 
-        \Illuminate\Support\Facades\Http::assertNothingSent();
+        Http::assertNothingSent();
     }
 
     // ── The rejection is TOLD, not only stored ───────────────────────────────
