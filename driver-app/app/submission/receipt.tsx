@@ -39,6 +39,7 @@ import { Text } from "@/components/typography";
 import { Field, PrimaryButton, SecondaryButton, SectionLabel } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { api, ApiError, type PickedPhoto } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
 
@@ -69,6 +70,10 @@ export default function ReceiptScreen() {
   const router = useRouter();
   const toast = useToast();
   const row = isRTL() ? "row-reverse" : "row";
+  // The company's connection. The endpoint answers 403 `not_connected` without
+  // it, so offering the form would be offering a send that cannot land.
+  const { driver } = useAuth();
+  const connected = driver?.documents_enabled === true;
 
   const [photo, setPhoto] = useState<PickedPhoto | null>(null);
   const [busy, setBusy] = useState(false);
@@ -169,6 +174,13 @@ export default function ReceiptScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 14 }} keyboardShouldPersistTaps="handled">
+        {!connected && (
+          <View style={{ ...cardStyle(c), gap: 6 }}>
+            <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>{t("subs.notConnected")}</Text>
+            <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("subs.notConnectedBody")}</Text>
+          </View>
+        )}
+
         <View style={{ ...cardStyle(c), gap: 6 }}>
           <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("receipt.reviewNote")}</Text>
         </View>
@@ -249,7 +261,7 @@ export default function ReceiptScreen() {
         <PrimaryButton
           label={sending ? t("receipt.sending") : t("receipt.send")}
           onPress={() => void submit()}
-          disabled={sending || busy || !photo}
+          disabled={sending || busy || !photo || !connected}
         />
         {!photo && <Text style={{ color: c.inkSubtle, fontSize: 12.5, textAlign: "center" }}>{t("receipt.photoRequired")}</Text>}
       </ScrollView>

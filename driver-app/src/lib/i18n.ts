@@ -208,6 +208,8 @@ const de: Dict = {
   // translated — only these labels around them are.
   "subs.title": "Belege & Notizen",
   "subs.mine": "Meine Eingänge",
+  "subs.notConnected": "Noch nicht freigeschaltet",
+  "subs.notConnectedBody": "Dein Unternehmen hat El-Professor noch nicht verbunden. Solange das nicht geschehen ist, kann niemand deine Belege und Notizen abrufen — frag bitte in der Disposition nach.",
   "subs.newReceipt": "Beleg senden",
   "subs.newNote": "Notiz senden",
   "subs.empty": "Du hast noch nichts gesendet",
@@ -477,6 +479,8 @@ const en: Dict = {
   // ── Belege & Notizen (El-Professor) ──────────────────────────────────────
   "subs.title": "Receipts & notes",
   "subs.mine": "My submissions",
+  "subs.notConnected": "Not enabled yet",
+  "subs.notConnectedBody": "Your company has not connected El-Professor yet. Until it does, nobody can fetch your receipts and notes — please ask your dispatcher.",
   "subs.newReceipt": "Send a receipt",
   "subs.newNote": "Send a note",
   "subs.empty": "You have not sent anything yet",
@@ -746,6 +750,8 @@ const ar: Dict = {
   // ── الفواتير والملاحظات (El-Professor) ───────────────────────────────────
   "subs.title": "الفواتير والملاحظات",
   "subs.mine": "ما أرسلته",
+  "subs.notConnected": "غير مفعّل بعد",
+  "subs.notConnectedBody": "شركتك لم تربط El-Professor بعد. وقبل الربط لا أحد يستطيع سحب فواتيرك وملاحظاتك — راجع الإدارة من فضلك.",
   "subs.newReceipt": "إرسال فاتورة",
   "subs.newNote": "إرسال ملاحظة",
   "subs.empty": "لم ترسل شيئاً بعد",

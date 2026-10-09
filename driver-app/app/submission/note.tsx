@@ -24,6 +24,7 @@ import { Text } from "@/components/typography";
 import { Field, PrimaryButton, SectionLabel } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { api, ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
 
@@ -44,6 +45,10 @@ export default function NoteScreen() {
   const router = useRouter();
   const toast = useToast();
   const row = isRTL() ? "row-reverse" : "row";
+  // The company's connection. The endpoint answers 403 `not_connected` without
+  // it, so offering the form would be offering a send that cannot land.
+  const { driver } = useAuth();
+  const connected = driver?.documents_enabled === true;
 
   const [type, setType] = useState<string>("general");
   const [text, setText] = useState("");
@@ -98,6 +103,13 @@ export default function NoteScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 14 }} keyboardShouldPersistTaps="handled">
+        {!connected && (
+          <View style={{ ...cardStyle(c), gap: 6 }}>
+            <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>{t("subs.notConnected")}</Text>
+            <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("subs.notConnectedBody")}</Text>
+          </View>
+        )}
+
         <View style={{ ...cardStyle(c), gap: 6 }}>
           <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("note.reviewNote")}</Text>
         </View>
@@ -145,7 +157,7 @@ export default function NoteScreen() {
           </View>
         )}
 
-        <PrimaryButton label={sending ? t("note.sending") : t("note.send")} onPress={() => void submit()} disabled={sending} />
+        <PrimaryButton label={sending ? t("note.sending") : t("note.send")} onPress={() => void submit()} disabled={sending || !connected} />
       </ScrollView>
     </SafeAreaView>
   );

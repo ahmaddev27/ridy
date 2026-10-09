@@ -80,6 +80,21 @@ class ElProfessorConnectionTest extends TestCase
         return $this->postJson('/api/v1/elprofessor/token')->assertOk()->json('data.token');
     }
 
+    /**
+     * Connect the company for real: mint a token and let El-Professor use it
+     * once, which is what sets `first_used_at` and makes `connected` true.
+     *
+     * Flipping the settings by hand would test a different thing -- these five
+     * submission tests exist to prove the driver's own door, and they must
+     * reach it the way a real driver does.
+     */
+    private function connectCompany(): void
+    {
+        $token = $this->mint();
+        $this->withHeaders($this->bearer($token))->getJson('/api/v1/elprofessor/fleet')->assertOk();
+        $this->app['auth']->forgetGuards();
+    }
+
     private function driver(Tenant $tenant, string $name): Driver
     {
         return Driver::create([
@@ -679,6 +694,7 @@ class ElProfessorConnectionTest extends TestCase
     {
         Storage::fake('local');
         Queue::fake();
+        $this->connectCompany();
         $driver = $this->driver($this->tenant, 'Omar');
         $this->actingAsDriver($driver);
 
@@ -709,6 +725,7 @@ class ElProfessorConnectionTest extends TestCase
         // from a rejection days later.
         Storage::fake('local');
         Queue::fake();
+        $this->connectCompany();
         $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
 
         $this->postJson('/api/v1/driver/submissions', [
@@ -728,6 +745,7 @@ class ElProfessorConnectionTest extends TestCase
         // anything it cannot read, and this figure reaches a driver's balance.
         Storage::fake('local');
         Queue::fake();
+        $this->connectCompany();
         $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
 
         foreach (['41,47', '1.234,56', '41.47 EUR', '-5.00', 'vierzig'] as $amount) {
@@ -747,6 +765,7 @@ class ElProfessorConnectionTest extends TestCase
     {
         Storage::fake('local');
         Queue::fake();
+        $this->connectCompany();
         $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
 
         $this->postJson('/api/v1/driver/submissions', [
@@ -760,6 +779,7 @@ class ElProfessorConnectionTest extends TestCase
     public function test_a_driver_sees_their_own_submissions_and_the_reason_on_a_rejection(): void
     {
         Storage::fake('local');
+        $this->connectCompany();
         $driver = $this->driver($this->tenant, 'Omar');
         $mine = $this->submission($this->tenant, $driver, [
             'status' => ElProfessorSubmission::STATUS_REJECTED,
@@ -1015,5 +1035,110 @@ class ElProfessorConnectionTest extends TestCase
         $this->assertSame([], $sender->sent);
         // And the list still carries it, which is the other half of the telling.
         $this->assertSame(ElProfessorSubmission::STATUS_REJECTED, $row->refresh()->status);
+    }
+
+    // ── A company that is not connected submits nothing ──────────────────────
+    //
+    //  `documents_enabled` is `Tenant::isElprofessorConnected()`: a live
+    //  `elprofessor` token, not revoked, AND El-Professor has actually used it
+    //  at least once. Until all three hold there is nobody to fetch a
+    //  submission, so one stored would sit unread while the driver believed it
+    //  had gone. The app hides the section on the same flag; this is the wall.
+
+    public function test_a_driver_of_an_unconnected_company_cannot_submit(): void
+    {
+        // The tenant in setUp has never issued a token, so it is not connected.
+        Storage::fake('local');
+        Queue::fake();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        $this->postJson('/api/v1/driver/submissions', [
+            'subject' => 'receipt',
+            'receipt_date' => '2026-10-07',
+            'amount' => '41.47',
+            'category' => 'Tanken',
+            'document' => UploadedFile::fake()->image('beleg.jpg'),
+        ])->assertStatus(403)->assertJsonPath('reason', 'not_connected');
+
+        $this->assertSame(0, ElProfessorSubmission::withoutGlobalScopes()->count());
+        Queue::assertNotPushed(RingElProfessor::class);
+    }
+
+    public function test_a_driver_of_an_unconnected_company_cannot_list_either(): void
+    {
+        // The list is refused too, so a stale screen says why rather than
+        // showing an empty list that reads as "you have sent nothing".
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        $this->getJson('/api/v1/driver/submissions')
+            ->assertStatus(403)
+            ->assertJsonPath('reason', 'not_connected');
+    }
+
+    public function test_a_token_that_was_never_used_is_not_connected_enough(): void
+    {
+        // Minting alone is not a connection: `connected` also needs
+        // `first_used_at`, which only El-Professor's own first read sets. A
+        // company that pasted nothing anywhere would otherwise look ready.
+        Storage::fake('local');
+        Queue::fake();
+        $this->mint();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        $this->getJson('/api/v1/driver/submissions')
+            ->assertStatus(403)
+            ->assertJsonPath('reason', 'not_connected');
+    }
+
+    public function test_once_el_professor_has_pulled_the_driver_can_submit(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $token = $this->mint();
+        // El-Professor's first read is what flips `first_used_at`.
+        $this->withHeaders($this->bearer($token))->getJson('/api/v1/elprofessor/fleet')->assertOk();
+
+        $driver = $this->driver($this->tenant, 'Omar');
+        $this->actingAsDriver($driver);
+
+        $this->getJson('/api/v1/driver/submissions')->assertOk();
+        $this->postJson('/api/v1/driver/submissions', [
+            'subject' => 'note',
+            'note_type' => 'breakdown',
+            'note_text' => 'Panne auf der A100',
+        ])->assertStatus(201);
+
+        $this->assertSame(1, ElProfessorSubmission::withoutGlobalScopes()->count());
+    }
+
+    public function test_revoking_the_connection_closes_the_door_again(): void
+    {
+        // A company that revokes stops receiving submissions immediately, even
+        // from an app that still shows the section from an older profile read.
+        Storage::fake('local');
+        Queue::fake();
+        $token = $this->mint();
+        $this->withHeaders($this->bearer($token))->getJson('/api/v1/elprofessor/fleet')->assertOk();
+
+        Sanctum::actingAs($this->manager, ['*']);
+        $this->deleteJson('/api/v1/elprofessor/token')->assertOk();
+
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+        $this->getJson('/api/v1/driver/submissions')
+            ->assertStatus(403)
+            ->assertJsonPath('reason', 'not_connected');
+    }
+
+    public function test_the_profile_carries_the_flag_the_app_gates_on(): void
+    {
+        // The app hides the Profil row on exactly this field, so a rename here
+        // would silently hide the section for everyone.
+        $token = $this->mint();
+        $this->withHeaders($this->bearer($token))->getJson('/api/v1/elprofessor/fleet')->assertOk();
+
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+        $this->getJson('/api/v1/driver/me')
+            ->assertOk()
+            ->assertJsonPath('data.documents_enabled', true);
     }
 }

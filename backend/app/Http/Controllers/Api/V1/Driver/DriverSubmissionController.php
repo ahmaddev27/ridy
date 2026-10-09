@@ -30,6 +30,19 @@ use Illuminate\Validation\Rule;
  * refuse what is obviously unusable — no photo, an amount that is not a number,
  * a date that is not a date — and not to be the authority.
  *
+ * ## A driver whose company is not connected cannot submit at all
+ *
+ * `documents_enabled` on the driver's profile is
+ * `Tenant::isElprofessorConnected()`: a live `elprofessor` token, not revoked,
+ * **and El-Professor has actually used it at least once**. Until all three hold
+ * there is nobody to fetch a submission, so one stored here would sit in a
+ * table no one reads while the driver believes it was sent.
+ *
+ * The app hides the section on the same flag, and that is the message; **this
+ * is the wall**. A stale screen, a deep link or a company that revoked its
+ * token after the app last loaded all reach here, and all are refused with a
+ * stable reason the app can render.
+ *
  * ## The photo is mandatory for a receipt
  *
  * A receipt with no photo cannot be accepted on the other side
@@ -47,8 +60,31 @@ class DriverSubmissionController extends Controller
         'general', 'other', 'blitzer', 'accident', 'kontrolle', 'breakdown', 'wait',
     ];
 
+    /**
+     * Whether this driver's company is connected to El-Professor, which is the
+     * only condition under which a submission reaches anybody.
+     */
+    private function connected(Request $request): bool
+    {
+        return $request->user()?->tenant?->isElprofessorConnected() ?? false;
+    }
+
+    private function notConnected(): JsonResponse
+    {
+        // A stable code, not a sentence: the app renders it in the driver's own
+        // language, as it does with every other refusal.
+        return response()->json([
+            'message' => 'This company is not connected to El-Professor.',
+            'reason' => 'not_connected',
+        ], 403);
+    }
+
     public function index(Request $request): JsonResponse
     {
+        if (! $this->connected($request)) {
+            return $this->notConnected();
+        }
+
         $driver = $request->user();
 
         $rows = ElProfessorSubmission::query()
@@ -74,6 +110,10 @@ class DriverSubmissionController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if (! $this->connected($request)) {
+            return $this->notConnected();
+        }
+
         $driver = $request->user();
         $subject = (string) $request->input('subject', 'receipt');
 

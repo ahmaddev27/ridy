@@ -27,6 +27,7 @@ import { ChevronLeft, FileText, Package, Plus } from "@/components/icons";
 import { Text } from "@/components/typography";
 import { SectionLabel } from "@/components/ui";
 import { api, type DriverSubmission } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
 
@@ -49,6 +50,11 @@ export default function SubmissionsScreen() {
   const c = useColors();
   const router = useRouter();
   const row = isRTL() ? "row-reverse" : "row";
+  // The company's connection, not the driver's. Hiding the Profil row is the
+  // message; this is what a deep link, a stale screen or a company that revoked
+  // its token after the app loaded runs into. The endpoint refuses them too.
+  const { driver } = useAuth();
+  const connected = driver?.documents_enabled === true;
 
   const [rows, setRows] = useState<DriverSubmission[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -97,8 +103,16 @@ export default function SubmissionsScreen() {
         contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 12 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.ink} />}
       >
+        {!connected && (
+          <View style={{ ...cardStyle(c), gap: 6 }}>
+            <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>{t("subs.notConnected")}</Text>
+            <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("subs.notConnectedBody")}</Text>
+          </View>
+        )}
+
         {/* The two things a driver can send. Side by side, because a receipt
             and a note are different acts and neither is the default. */}
+        {connected && (
         <View style={{ flexDirection: row, gap: 12 }}>
           <NewButton
             c={c}
@@ -113,6 +127,7 @@ export default function SubmissionsScreen() {
             onPress={() => router.push("/submission/note")}
           />
         </View>
+        )}
 
         <SectionLabel>{t("subs.mine")}</SectionLabel>
 

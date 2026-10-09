@@ -107,6 +107,17 @@ export type DriverProfile = {
   uber_linked: boolean;
   /** True when the signed-in account is a company owner/manager (read-only monitor). */
   is_owner?: boolean;
+  /**
+   * Whether this driver's company is connected to El-Professor: a live
+   * `elprofessor` token, not revoked, and El-Professor has actually used it at
+   * least once. The backend has sent it since the connection card shipped; the
+   * app ignored it until Belege & Notizen needed it.
+   *
+   * **Optional on purpose.** A driver whose app is newer than the backend reads
+   * `undefined`, which is falsy — so the section hides rather than offering a
+   * screen whose every call would be refused.
+   */
+  documents_enabled?: boolean;
 };
 
 /** Tenant-wide home for a fleet owner: every driver's offers, no personal trip. */
