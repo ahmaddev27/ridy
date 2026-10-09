@@ -1,7 +1,22 @@
 import Constants from "expo-constants";
 import { Sentry } from "@/lib/sentry";
 
-const BASE = (Constants.expoConfig?.extra?.apiUrl as string) ?? "https://reidey.de";
+/**
+ * Where the app talks.
+ *
+ * `EXPO_PUBLIC_API_URL` is read first and is for INTERNAL builds only: Expo
+ * inlines `EXPO_PUBLIC_*` at build time, so it is fixed in the binary and
+ * cannot be changed by anything on the phone. `eas.json` sets it on the
+ * `preview` profile and never on `production`, which keeps a store build
+ * pointing at `app.json`'s own value whatever the environment says.
+ *
+ * It exists because a branch cannot otherwise be tried against anything but
+ * live production: there is no second Reidey backend to aim at.
+ */
+const BASE =
+  (process.env.EXPO_PUBLIC_API_URL as string | undefined)?.trim() ||
+  (Constants.expoConfig?.extra?.apiUrl as string) ||
+  "https://reidey.de";
 
 /** Human phone model + OS version, captured via expo-device on push registration. */
 export type DeviceInfo = { name?: string | null; osVersion?: string | null };

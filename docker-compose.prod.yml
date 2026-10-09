@@ -76,6 +76,22 @@ x-app-env: &app-env
   # push. Point FCM_CREDENTIALS at the mounted service-account JSON. Without it the
   # app falls back to LogPushSender (pushes are only logged, not sent).
   FCM_CREDENTIALS: ${FCM_CREDENTIALS:-}
+  # El-Professor (the payroll product on the same host). Used ONLY by
+  # RingElProfessor, which tells it that a driver's submission is ready for it
+  # to fetch. Neither value is a secret: the URL is a container name on a shared
+  # Docker network, and the key is El-Professor's `anon` JWT, which ships in its
+  # own browser bundle and authorises nothing by itself — their function bounds a
+  # ring by rate-limiting it and by storing nothing it says.
+  #
+  # So they are written here rather than in `.env`: `deploy.yml` REWRITES `.env`
+  # from secrets on every deploy, and a line added to it on the server by hand is
+  # erased by the next release. Overriding either in `.env` still wins.
+  #
+  # Unset or empty = this side never rings, and nothing is lost: the submission
+  # is stored here and El-Professor's own "Eingänge abrufen" button fetches it.
+  # The ring only makes the arrival immediate.
+  ELPROFESSOR_INTAKE_URL: ${ELPROFESSOR_INTAKE_URL:-http://ya-mobility-staging-kong-1:8000/functions/v1/partner-intake}
+  ELPROFESSOR_ANON_KEY: ${ELPROFESSOR_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg5MzAxMTA2LCJleHAiOjIxMDQ2NjExMDZ9.UDPhkKcc8ne27YezE6Sw_kynp-KKHStbYEPN4JV1q5I}
   FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
   # Ops alerting: where broken-session / down-shard alerts are emailed (empty = log only).
   ALERT_EMAIL: ${ALERT_EMAIL:-}
