@@ -104,13 +104,13 @@ export default function NoteScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 14 }} keyboardShouldPersistTaps="handled">
         {!connected && (
-          <View style={{ ...cardStyle(c), gap: 6 }}>
+          <View style={{ ...cardStyle(c), padding: 16, gap: 6 }}>
             <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>{t("subs.notConnected")}</Text>
             <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("subs.notConnectedBody")}</Text>
           </View>
         )}
 
-        <View style={{ ...cardStyle(c), gap: 6 }}>
+        <View style={{ ...cardStyle(c), padding: 16, gap: 6 }}>
           <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("note.reviewNote")}</Text>
         </View>
 
@@ -132,6 +132,9 @@ export default function NoteScreen() {
           style={{
             ...cardStyle(c),
             minHeight: 120,
+            paddingHorizontal: 14,
+            paddingTop: 12,
+            paddingBottom: 12,
             textAlignVertical: "top",
             color: c.ink,
             fontSize: 14.5,

@@ -104,7 +104,7 @@ export default function SubmissionsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.ink} />}
       >
         {!connected && (
-          <View style={{ ...cardStyle(c), gap: 6 }}>
+          <View style={{ ...cardStyle(c), padding: 16, gap: 6 }}>
             <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>{t("subs.notConnected")}</Text>
             <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("subs.notConnectedBody")}</Text>
           </View>
@@ -138,21 +138,21 @@ export default function SubmissionsScreen() {
         )}
 
         {failed && (
-          <View style={{ ...cardStyle(c), gap: 6 }}>
+          <View style={{ ...cardStyle(c), padding: 16, gap: 6 }}>
             <Text style={{ color: c.danger, fontWeight: "700", fontSize: 14.5 }}>{t("subs.loadFailed")}</Text>
             <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("subs.loadFailedBody")}</Text>
           </View>
         )}
 
         {rows !== null && rows.length === 0 && (
-          <View style={{ ...cardStyle(c), gap: 6 }}>
+          <View style={{ ...cardStyle(c), padding: 16, gap: 6 }}>
             <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>{t("subs.empty")}</Text>
             <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("subs.emptyBody")}</Text>
           </View>
         )}
 
         {(rows ?? []).map((r) => (
-          <View key={r.id} style={{ ...cardStyle(c), gap: 8 }}>
+          <View key={r.id} style={{ ...cardStyle(c), padding: 16, gap: 8 }}>
             <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", gap: 10 }}>
               <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>
                 {r.subject === "receipt" ? t("subs.kind.receipt") : t("subs.kind.note")}
@@ -217,6 +217,7 @@ function NewButton({
         alignItems: "center",
         gap: 8,
         paddingVertical: 18,
+        paddingHorizontal: 12,
       }}
     >
       <Icon size={22} color={c.primary ?? c.ink} strokeWidth={1.8} />
