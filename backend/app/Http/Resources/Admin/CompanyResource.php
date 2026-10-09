@@ -54,6 +54,14 @@ class CompanyResource extends JsonResource
             'days_left' => $this->daysLeft(),
             'banned' => $this->banned_at !== null,
 
+            // The El-Professor link. `enabled` is the PLATFORM's switch — the
+            // operator opens it per company — and `connected` is whether that
+            // company has actually completed the link. Both are derived, never
+            // stored twice: closing the switch deletes the tokens, so
+            // `connected` follows it in the same request.
+            'elprofessor_enabled' => $this->elprofessorEnabled(),
+            'elprofessor_connected' => $this->isElprofessorConnected(),
+
             'session_status' => $session['status'] ?? null,
             'session_last_event_at' => $session['last_event_at'] ?? null,
             'session_expires_at' => $session['expires_at'] ?? null,

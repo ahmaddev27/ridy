@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureDashboardToken;
 use App\Http\Middleware\EnsureDriverAccount;
 use App\Http\Middleware\EnsureDriverTenantActive;
+use App\Http\Middleware\EnsureElProfessorEnabled;
 use App\Http\Middleware\EnsureFleetConnected;
 use App\Http\Middleware\EnsureFleetOwner;
 use App\Http\Middleware\EnsureSuperAdmin;
@@ -64,6 +65,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'dashboard.only' => EnsureDashboardToken::class,
             'driver.account' => EnsureDriverAccount::class,
             'fleet.owner' => EnsureFleetOwner::class,
+            // The platform's per-company switch for the El-Professor link.
+            'elprofessor.enabled' => EnsureElProfessorEnabled::class,
         ]);
 
         // SECURITY: route-model binding must resolve AFTER the tenant context is

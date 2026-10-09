@@ -16,6 +16,7 @@ use App\Http\Resources\Admin\CompanyResource;
 use App\Models\User;
 use App\Support\PlatformCounters;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -90,6 +91,24 @@ class CompanyController extends Controller
         }
 
         return response()->json(['data' => $this->detail($tenant)], 201);
+    }
+
+    /**
+     * Open or close the El-Professor integration for one company.
+     *
+     * **Closing ends the connection** rather than pausing it (owner's decision,
+     * 09.10.2026): the tokens are deleted, so El-Professor's next read is a 401
+     * and the drivers' app hides the section on its next profile read. Opening
+     * gives back the switch and nothing else — the company issues a new token
+     * and pastes it again, which is also what makes the re-link auditable.
+     */
+    public function setElProfessor(Request $request, Tenant $tenant): JsonResponse
+    {
+        $data = $request->validate(['enabled' => ['required', 'boolean']]);
+
+        $tenant->setElprofessorEnabled((bool) $data['enabled']);
+
+        return response()->json(['data' => $this->detail($tenant->refresh())]);
     }
 
     public function show(Tenant $tenant): JsonResponse

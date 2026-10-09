@@ -94,7 +94,9 @@ class Tenant extends Model
         $firstUsedAt = $state['first_used_at'] ?? null;
 
         return [
-            'connected' => $revokedAt === null && $firstUsedAt !== null && $this->elprofessorTokens()->exists(),
+            'enabled' => $this->elprofessorEnabled(),
+            'connected' => $this->elprofessorEnabled()
+                && $revokedAt === null && $firstUsedAt !== null && $this->elprofessorTokens()->exists(),
             'token_issued_at' => $state['token_issued_at'] ?? null,
             'first_used_at' => $firstUsedAt,
             'last_used_at' => $state['last_used_at'] ?? null,
@@ -105,6 +107,58 @@ class Tenant extends Model
     public function isElprofessorConnected(): bool
     {
         return $this->elprofessorConnection()['connected'];
+    }
+
+    /**
+     * Whether the PLATFORM has opened the El-Professor integration for this
+     * company. The operator decides it per company from the admin companies
+     * list; nothing a company does switches it on for itself.
+     *
+     * **Absent means off.** Every company that existed before this switch
+     * therefore starts closed, which is the owner's intent (he opens it one
+     * company at a time) and the safe direction: a flag read as "on" by
+     * default would quietly expose the integration to every fleet.
+     */
+    public function elprofessorEnabled(): bool
+    {
+        return ($this->settings['elprofessor']['enabled'] ?? false) === true;
+    }
+
+    /**
+     * Open or close the integration for this company.
+     *
+     * **Closing ENDS the connection, it does not suspend it** (owner's
+     * decision, 09.10.2026): the company's `elprofessor` tokens are deleted and
+     * the state is stamped revoked, so El-Professor's very next read is a 401
+     * and its own card shows the connection as failed. Re-opening gives back
+     * the switch and nothing else — the operator must issue a new token and
+     * paste it again.
+     *
+     * The alternative, leaving the token in place so a re-open restores the
+     * link untouched, was rejected: a company that was closed deliberately
+     * must stop sending its drivers' data the moment it is closed, and a
+     * credential that survives a revocation is a credential nobody can account
+     * for.
+     *
+     * @return bool the value now in force
+     */
+    public function setElprofessorEnabled(bool $enabled): bool
+    {
+        if ($enabled) {
+            $this->mergeElprofessorState(['enabled' => true]);
+
+            return true;
+        }
+
+        // Order matters: the tokens go first, so a pull racing this change
+        // finds nothing rather than a flag that has not reached it yet.
+        $this->elprofessorTokens()->delete();
+        $this->mergeElprofessorState([
+            'enabled' => false,
+            'revoked_at' => now()->toIso8601String(),
+        ]);
+
+        return false;
     }
 
     /** Every `elprofessor` token held by a user of this company. */
