@@ -39,6 +39,7 @@ import { Text } from "@/components/typography";
 import { Field, PrimaryButton, SecondaryButton, SectionLabel } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { api, ApiError, type PickedPhoto } from "@/lib/api";
+import { Sentry } from "@/lib/sentry";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
@@ -155,10 +156,30 @@ export default function ReceiptScreen() {
       toast.show(t("receipt.sent"));
       router.back();
     } catch (e) {
-      // A validation refusal from the backend is the driver's to fix; anything
-      // else is ours, and saying "try again" to a 422 wastes their time.
-      const known = e instanceof ApiError && e.status === 422;
-      toast.show(known ? t("receipt.rejectedByServer") : t("receipt.sendFailed"));
+      // Four different failures, four different things to do about them. One
+      // sentence for all of them is what left the first real failure with no
+      // trace anywhere: the server had logged nothing, because the request had
+      // never arrived, and the app had said only "try again later".
+      //
+      // `status === 0` is this client's marker for "no HTTP answer at all", and
+      // the message carries which kind, so a dead connection and a request that
+      // hung for a minute no longer read the same.
+      const err = e instanceof ApiError ? e : null;
+      if (err?.status === 422) toast.show(t("receipt.rejectedByServer"));
+      else if (err?.status === 413) toast.show(t("receipt.photoTooLarge"));
+      else if (err?.status === 0 && err.message === "timeout") toast.show(t("receipt.sendTimeout"));
+      else if (err?.status === 0) toast.show(t("receipt.sendOffline"));
+      else toast.show(t("receipt.sendFailed"));
+
+      // And whatever it was, it reaches Sentry with its shape. A refusal the
+      // driver caused (422) is not a defect and is not reported; everything
+      // else is one of ours until it is read.
+      if (err?.status !== 422) {
+        Sentry.captureException(e, {
+          tags: { flow: "receipt_submit" },
+          extra: { status: err?.status ?? null, kind: err?.message ?? String(e) },
+        });
+      }
     } finally {
       setSending(false);
     }
@@ -175,19 +196,19 @@ export default function ReceiptScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 14 }} keyboardShouldPersistTaps="handled">
         {!connected && (
-          <View style={{ ...cardStyle(c), gap: 6 }}>
+          <View style={{ ...cardStyle(c), padding: 16, gap: 6 }}>
             <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>{t("subs.notConnected")}</Text>
             <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("subs.notConnectedBody")}</Text>
           </View>
         )}
 
-        <View style={{ ...cardStyle(c), gap: 6 }}>
+        <View style={{ ...cardStyle(c), padding: 16, gap: 6 }}>
           <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("receipt.reviewNote")}</Text>
         </View>
 
         <SectionLabel>{t("receipt.photo")}</SectionLabel>
         {photo ? (
-          <View style={{ ...cardStyle(c), gap: 10 }}>
+          <View style={{ ...cardStyle(c), padding: 12, gap: 10 }}>
             <Image
               source={{ uri: photo.uri }}
               style={{ width: "100%", height: 260, borderRadius: radius.md, backgroundColor: c.surface2 }}
@@ -288,7 +309,7 @@ function PhotoButton({
       disabled={busy}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={{ ...cardStyle(c), flex: 1, alignItems: "center", gap: 8, paddingVertical: 20, opacity: busy ? 0.6 : 1 }}
+      style={{ ...cardStyle(c), flex: 1, alignItems: "center", gap: 8, paddingVertical: 20, paddingHorizontal: 12, opacity: busy ? 0.6 : 1 }}
     >
       {busy ? <ActivityIndicator color={c.ink} /> : <Icon size={22} color={c.primary} strokeWidth={1.8} />}
       <Text style={{ color: c.ink, fontWeight: "700", fontSize: 13.5, textAlign: "center" }}>{label}</Text>
