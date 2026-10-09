@@ -295,19 +295,25 @@ Route::prefix('v1')->group(function () {
         Route::post('extension/token', [ExtensionController::class, 'issueToken'])->middleware('can:connections.manage');
 
         // El-Professor (payroll product) pulls the roster with a scoped token minted here.
-        Route::post('elprofessor/token', [ElProfessorController::class, 'issueToken'])->middleware('can:connections.manage');
-        Route::delete('elprofessor/token', [ElProfessorController::class, 'revokeToken'])->middleware('can:connections.manage');
+        // Every El-Professor route, the company's own card included, is behind
+        // the platform's switch: a company the operator has not opened cannot
+        // even mint a token, and one that is closed loses its reads the moment
+        // it is closed (the switch deletes the tokens as well).
+        Route::post('elprofessor/token', [ElProfessorController::class, 'issueToken'])->middleware(['can:connections.manage', 'elprofessor.enabled']);
+        Route::delete('elprofessor/token', [ElProfessorController::class, 'revokeToken'])->middleware(['can:connections.manage', 'elprofessor.enabled']);
         Route::get('elprofessor/connection', [ElProfessorController::class, 'connection'])->middleware('can:connections.manage');
-        Route::get('elprofessor/fleet', [ElProfessorController::class, 'fleet']);
-        Route::get('elprofessor/fleet/drivers', [ElProfessorController::class, 'drivers']);
-        // What a driver submitted, for El-Professor to fetch. The ring tells
-        // it one is ready; these two are how it collects them, and the
-        // second is also the only recovery for a ring that never arrived.
-        Route::get('elprofessor/submissions', [ElProfessorController::class, 'submissions']);
-        Route::get('elprofessor/submissions/{uuid}', [ElProfessorController::class, 'submission']);
-        // The one thing that travels back: a company rejected what a driver
-        // submitted, so we notify that driver. Confined to this exact path.
-        Route::post('elprofessor/submissions/status', [ElProfessorController::class, 'submissionStatus']);
+        Route::middleware('elprofessor.enabled')->group(function () {
+            Route::get('elprofessor/fleet', [ElProfessorController::class, 'fleet']);
+            Route::get('elprofessor/fleet/drivers', [ElProfessorController::class, 'drivers']);
+            // What a driver submitted, for El-Professor to fetch. The ring tells
+            // it one is ready; these two are how it collects them, and the
+            // second is also the only recovery for a ring that never arrived.
+            Route::get('elprofessor/submissions', [ElProfessorController::class, 'submissions']);
+            Route::get('elprofessor/submissions/{uuid}', [ElProfessorController::class, 'submission']);
+            // The one thing that travels back: a company rejected what a driver
+            // submitted, so we notify that driver. Confined to this exact path.
+            Route::post('elprofessor/submissions/status', [ElProfessorController::class, 'submissionStatus']);
+        });
 
         // Uber fleet session status + capture (cookie paste OR extension via token)
         Route::get('fleet-session', [FleetSessionController::class, 'show']);
@@ -415,6 +421,11 @@ Route::prefix('v1')->group(function () {
         Route::get('companies/{tenant}', [CompanyController::class, 'show']);
         Route::put('companies/{tenant}', [CompanyController::class, 'update']);
         Route::delete('companies/{tenant}', [CompanyController::class, 'destroy']);
+        // The El-Professor link, opened and closed per company by the platform.
+        // Closing it ENDS an existing connection (the tokens are deleted), so it
+        // is its own route rather than a field on the company update: a switch
+        // that revokes a credential should not ride along with a name change.
+        Route::patch('companies/{tenant}/elprofessor', [CompanyController::class, 'setElProfessor']);
 
         // Read-only drill-down into a company's fleet data (admin tabs).
         Route::get('companies/{tenant}/drivers', [CompanyDataController::class, 'drivers']);

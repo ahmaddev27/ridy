@@ -75,11 +75,25 @@ class ElProfessorConnectionTest extends TestCase
         return ['Authorization' => 'Bearer '.$plainToken];
     }
 
+    /**
+     * Mint a token, opening the integration first.
+     *
+     * The platform's switch defaults to OFF, so every test that mints has to
+     * open it — which is the real order of events: the operator opens the
+     * company, then the company connects. `openIntegration()` is separate so a
+     * test can assert what a CLOSED company cannot do.
+     */
     private function mint(): string
     {
+        $this->openIntegration();
         Sanctum::actingAs($this->manager, ['*']);
 
         return $this->postJson('/api/v1/elprofessor/token')->assertOk()->json('data.token');
+    }
+
+    private function openIntegration(?Tenant $tenant = null): void
+    {
+        ($tenant ?? $this->tenant)->setElprofessorEnabled(true);
     }
 
     /**
@@ -138,6 +152,9 @@ class ElProfessorConnectionTest extends TestCase
 
     public function test_minting_returns_the_identity_and_connection_never_returns_the_token(): void
     {
+        // The platform's switch defaults to off, so a company is opened before
+        // it can mint — the real order of events.
+        $this->openIntegration();
         Sanctum::actingAs($this->manager, ['*']);
 
         $this->postJson('/api/v1/elprofessor/token')
@@ -1142,5 +1159,115 @@ class ElProfessorConnectionTest extends TestCase
         $this->getJson('/api/v1/driver/me')
             ->assertOk()
             ->assertJsonPath('data.documents_enabled', true);
+    }
+
+    // ── The platform's per-company switch ────────────────────────────────────
+    //
+    //  The operator opens the integration one company at a time, and **closing
+    //  it ENDS the connection** rather than pausing it (owner, 09.10.2026).
+
+    public function test_a_company_is_closed_until_the_platform_opens_it(): void
+    {
+        // Absent means off, so every company that existed before the switch
+        // starts closed — the safe direction, and the owner's intent.
+        $this->assertFalse($this->tenant->elprofessorEnabled());
+
+        Sanctum::actingAs($this->manager, ['*']);
+        $this->postJson('/api/v1/elprofessor/token')
+            ->assertStatus(403)
+            ->assertJsonPath('reason', 'integration_disabled');
+    }
+
+    public function test_the_card_still_reads_its_state_while_closed(): void
+    {
+        // The company's own card is deliberately NOT behind the switch: it has
+        // to answer so the screen can say "not enabled" instead of failing.
+        Sanctum::actingAs($this->manager, ['*']);
+
+        $this->getJson('/api/v1/elprofessor/connection')
+            ->assertOk()
+            ->assertJsonPath('data.enabled', false)
+            ->assertJsonPath('data.connected', false);
+    }
+
+    public function test_closing_ends_a_live_connection_and_the_token_dies(): void
+    {
+        $token = $this->mint();
+        $this->withHeaders($this->bearer($token))->getJson('/api/v1/elprofessor/fleet')->assertOk();
+        $this->assertTrue($this->tenant->refresh()->isElprofessorConnected());
+
+        // The platform closes the company.
+        $this->tenant->setElprofessorEnabled(false);
+
+        // The old token is gone, so the very next read is refused — this is
+        // what "ends" means, as opposed to "is paused".
+        $this->withHeaders($this->bearer($token))
+            ->getJson('/api/v1/elprofessor/fleet')
+            ->assertStatus(401);
+
+        $this->assertFalse($this->tenant->refresh()->isElprofessorConnected());
+        $this->assertSame(0, $this->tenant->elprofessorTokens()->count());
+    }
+
+    public function test_the_drivers_section_disappears_when_the_company_is_closed(): void
+    {
+        $this->mint();
+        $this->withHeaders($this->bearer($this->mint()))->getJson('/api/v1/elprofessor/fleet')->assertOk();
+        $driver = $this->driver($this->tenant, 'Omar');
+
+        $this->actingAsDriver($driver);
+        $this->getJson('/api/v1/driver/me')->assertOk()->assertJsonPath('data.documents_enabled', true);
+
+        $this->tenant->setElprofessorEnabled(false);
+
+        // The app hides the section on this field, and the door refuses too.
+        $this->actingAsDriver($driver);
+        $this->getJson('/api/v1/driver/me')->assertOk()->assertJsonPath('data.documents_enabled', false);
+        $this->getJson('/api/v1/driver/submissions')
+            ->assertStatus(403)
+            ->assertJsonPath('reason', 'not_connected');
+    }
+
+    public function test_reopening_gives_back_the_switch_and_nothing_else(): void
+    {
+        $token = $this->mint();
+        $this->withHeaders($this->bearer($token))->getJson('/api/v1/elprofessor/fleet')->assertOk();
+        $this->tenant->setElprofessorEnabled(false);
+
+        $this->tenant->setElprofessorEnabled(true);
+
+        // Open again, but NOT connected: the old token stays dead, so the
+        // company must issue a new one and paste it. A re-link is a deliberate
+        // act with a record, not something a toggle restores silently.
+        $this->assertTrue($this->tenant->refresh()->elprofessorEnabled());
+        $this->assertFalse($this->tenant->isElprofessorConnected());
+        $this->withHeaders($this->bearer($token))
+            ->getJson('/api/v1/elprofessor/fleet')
+            ->assertStatus(401);
+    }
+
+    public function test_only_a_super_admin_moves_the_switch(): void
+    {
+        // It is the platform's call, not the company's: a fleet manager holds
+        // `connections.manage` and still cannot open their own company.
+        Sanctum::actingAs($this->manager, ['*']);
+        $this->patchJson("/api/v1/admin/companies/{$this->tenant->id}/elprofessor", ['enabled' => true])
+            ->assertStatus(403);
+
+        $this->assertFalse($this->tenant->refresh()->elprofessorEnabled());
+    }
+
+    public function test_the_switch_moves_one_company_and_not_its_neighbour(): void
+    {
+        $admin = $this->user('super_admin', 'sa@ya.de', $this->tenant);
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson("/api/v1/admin/companies/{$this->tenant->id}/elprofessor", ['enabled' => true])
+            ->assertOk()
+            ->assertJsonPath('data.elprofessor_enabled', true)
+            ->assertJsonPath('data.elprofessor_connected', false);
+
+        $this->assertTrue($this->tenant->refresh()->elprofessorEnabled());
+        $this->assertFalse($this->other->refresh()->elprofessorEnabled());
     }
 }

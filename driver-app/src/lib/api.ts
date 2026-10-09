@@ -6,9 +6,16 @@ import { Sentry } from "@/lib/sentry";
  *
  * `EXPO_PUBLIC_API_URL` is read first and is for INTERNAL builds only: Expo
  * inlines `EXPO_PUBLIC_*` at build time, so it is fixed in the binary and
- * cannot be changed by anything on the phone. `eas.json` sets it on the
- * `preview` profile and never on `production`, which keeps a store build
- * pointing at `app.json`'s own value whatever the environment says.
+ * cannot be changed by anything on the phone. It is normally NOT SET — EAS
+ * rejects an empty value in `eas.json` ("is not allowed to be empty"), so the
+ * key is absent rather than blank, and an absent variable is `undefined`, which
+ * falls through to `app.json` exactly as before.
+ *
+ * To aim one preview build elsewhere, pass it on the command line —
+ * `EXPO_PUBLIC_API_URL=https://… eas build -p android --profile preview` — or
+ * add the key to `build.preview.env` WITH a value. Never add it to
+ * `production`: a store build must follow `app.json` whatever the environment
+ * says.
  *
  * It exists because a branch cannot otherwise be tried against anything but
  * live production: there is no second Reidey backend to aim at.

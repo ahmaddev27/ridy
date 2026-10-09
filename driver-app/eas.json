@@ -16,8 +16,7 @@
       },
       "env": {
         "EXPO_PUBLIC_SENTRY_DSN": "https://92105e781213e27f2d8026e2046d6cea@o4512028929294336.ingest.de.sentry.io/4512029017374800",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
-        "EXPO_PUBLIC_API_URL": ""
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
     "production": {
