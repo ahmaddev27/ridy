@@ -39,9 +39,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
-// The phone's own OCR: ML Kit on Android, Apple Vision on iOS. Offline,
-// and the Android model is fetched at install time by `withMlKitOcrModel`.
-import { extractTextFromImage, isSupported as ocrSupported } from "expo-text-extractor";
+// The phone's own OCR, offline, with the model bundled in the app: no
+// first-use download and no Play Services dependency. It returns LINES WITH
+// COORDINATES, which is the whole reason it is this package and not a lighter
+// one - see `rowsFromLines` for what the coordinates are for.
+import TextRecognition from "@react-native-ml-kit/text-recognition";
 import { AlertCircle, Camera, Check, ChevronLeft, ImageIcon, X } from "@/components/icons";
 import { Text } from "@/components/typography";
 import { Field, PrimaryButton, SecondaryButton, SectionLabel } from "@/components/ui";
@@ -53,6 +55,7 @@ import { t, isRTL } from "@/lib/i18n";
 // A COPY of El-Professor's rules; the two move together and are measured
 // against the same fixtures in `tests/receipt-text-parse.test.mjs`.
 import { parseReceiptText, formatAmountDE, type OcrResult } from "@/lib/receipt-text-parse";
+import { rowsFromLines } from "@/lib/ocr-lines";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
 
 /** The four El-Professor stores literally. `Other` is a sentinel it never saves,
@@ -130,15 +133,14 @@ export default function ReceiptScreen() {
     setScanNote(null);
     setCheckDate(false);
     setCheckAmount(false);
-    if (!ocrSupported) {
-      setScanNote(t("receipt.scanUnsupported"));
-      return;
-    }
     setScanning(true);
     try {
-      // Android returns text BLOCKS and iOS returns lines; both carry newlines
-      // inside them and the rules work on lines, so one join settles it.
-      const text = (await extractTextFromImage(uri)).join("\n");
+      // The engine's lines are NOT the receipt's rows: on a two-column till
+      // roll a label and its figure come back as separate lines, and every
+      // "same line" rule in the parser then sees nothing. `rowsFromLines` puts
+      // them back by where they sit on the page.
+      const result = await TextRecognition.recognize(uri);
+      const text = rowsFromLines(result.blocks.flatMap((b) => b.lines)).join("\n");
       if (text.trim() === "") {
         setScanNote(t("receipt.scanNothing"));
         return;
@@ -160,8 +162,14 @@ export default function ReceiptScreen() {
       }
       if (r.postalCode) setPlz(r.postalCode);
 
+      // Naming the field that could not be read is the difference between a
+      // driver retaking the photo and a driver assuming the app is broken.
       if (r.date === undefined && r.amount === undefined) {
         setScanNote(t("receipt.scanNothing"));
+      } else if (r.amount === undefined) {
+        setScanNote(t("receipt.scanNoAmount"));
+      } else if (r.date === undefined) {
+        setScanNote(t("receipt.scanNoDate"));
       }
     } catch {
       setScanNote(t("receipt.scanFailed"));
