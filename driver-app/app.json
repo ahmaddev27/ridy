@@ -86,6 +86,7 @@
       ],
       "@react-native-firebase/messaging",
       "./plugins/withExpoOwnsFcm.js",
+      "./plugins/withMlKitOcrModel.js",
       [
         "expo-image-picker",
         {

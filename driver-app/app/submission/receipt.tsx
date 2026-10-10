@@ -1,24 +1,29 @@
 /**
  * Send a receipt to your own company.
  *
- * ## The photo is mandatory, and it is the point
+ * ## The photo is READ here and never sent
  *
- * Everything typed here is a CLAIM. The photo is the only evidence of it, and
- * the company cannot accept the receipt without one — El-Professor refuses it
- * by name (`document_missing`) and its reviewer's accept button stays disabled
- * until the photo renders. So this screen refuses it too: the driver learns at
- * the moment they send rather than from a rejection days later.
+ * The owner decided on 10.10.2026 that a driver sends the figures, not the
+ * document. So the photo is taken, downscaled, passed to the phone's own OCR
+ * engine, and stays on the device; what travels is what is on screen after
+ * that, which the driver can correct first.
  *
- * ## Why the photo is downscaled here
+ * **That removes the only thing that could catch a misreading later.** A
+ * company reviewing a submission no longer has a document to compare the
+ * amount against, so a wrong figure nobody notices at this screen is wrong for
+ * good. Hence the marker below: a field the rules are UNSURE about is flagged
+ * in the open and the form will not send until the driver has confirmed it by
+ * hand. That guard is the whole of what replaced the evidence, and it should
+ * not be quietly relaxed.
  *
- * Two measured reasons, not tidiness. Above PHP's `post_max_size` the backend
- * receives an EMPTY request with no message at all, so a 12 MP phone photo
- * fails invisibly; and a Beleg needs legible text, not resolution — 1600px on
- * the long edge at quality 0.7 reads perfectly and lands around 300 KB.
+ * ## Why the photo is still downscaled
  *
- * `manipulateAsync` also re-encodes, which **drops the EXIF** — a phone photo
- * carries GPS and a timestamp, and a receipt photographed at home would
- * otherwise tell the company where the driver lives.
+ * Nothing is uploaded any more, so `post_max_size` no longer applies — but a
+ * 12 MP photo is slower to recognise for no gain, and 1600px on the long edge
+ * at quality 0.7 is what the rules were tuned against. `manipulateAsync` also
+ * re-encodes, which drops the EXIF; that mattered when the file travelled and
+ * is kept because a cached copy carrying the driver's home GPS is not
+ * something to leave lying on a phone.
  *
  * ## The amount has exactly one shape on the wire
  *
@@ -34,7 +39,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
-import { Camera, ChevronLeft, ImageIcon, X } from "@/components/icons";
+// The phone's own OCR: ML Kit on Android, Apple Vision on iOS. Offline,
+// and the Android model is fetched at install time by `withMlKitOcrModel`.
+import { extractTextFromImage, isSupported as ocrSupported } from "expo-text-extractor";
+import { AlertCircle, Camera, Check, ChevronLeft, ImageIcon, X } from "@/components/icons";
 import { Text } from "@/components/typography";
 import { Field, PrimaryButton, SecondaryButton, SectionLabel } from "@/components/ui";
 import { useToast } from "@/components/toast";
@@ -42,6 +50,9 @@ import { api, ApiError, type PickedPhoto } from "@/lib/api";
 import { Sentry } from "@/lib/sentry";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
+// A COPY of El-Professor's rules; the two move together and are measured
+// against the same fixtures in `tests/receipt-text-parse.test.mjs`.
+import { parseReceiptText, formatAmountDE, type OcrResult } from "@/lib/receipt-text-parse";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
 
 /** The four El-Professor stores literally. `Other` is a sentinel it never saves,
@@ -86,6 +97,14 @@ export default function ReceiptScreen() {
   const [method, setMethod] = useState<"bar" | "uberweisung">("bar");
   const [plz, setPlz] = useState("");
 
+  // What the photo said, and which of its answers still need the driver's eyes.
+  // `scanNote` is the one line explaining why a form came back empty; without
+  // it a failed read is indistinguishable from a receipt with nothing on it.
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<string | null>(null);
+  const [checkDate, setCheckDate] = useState(false);
+  const [checkAmount, setCheckAmount] = useState(false);
+
   /** Shrink and re-encode, which is also what strips the EXIF. */
   const prepare = async (uri: string): Promise<PickedPhoto> => {
     const out = await ImageManipulator.manipulateAsync(
@@ -94,6 +113,61 @@ export default function ReceiptScreen() {
       { compress: QUALITY, format: ImageManipulator.SaveFormat.JPEG },
     );
     return { uri: out.uri, name: "beleg.jpg", type: "image/jpeg" };
+  };
+
+  /**
+   * Read the receipt and fill the form from it.
+   *
+   * `Unsicher` is the marker the rules write into their own reason strings when
+   * a field scored below their confidence threshold. It is DATA, not prose:
+   * this is the one place that reads it, and it decides which field the driver
+   * has to confirm. A flagged field is not wrong — the fixtures pin a case where
+   * the amount is exactly right and still flagged, because a tax line sat next
+   * to it — it is unconfirmed, which with no photo travelling is the only
+   * difference left that anyone can act on.
+   */
+  const scan = async (uri: string) => {
+    setScanNote(null);
+    setCheckDate(false);
+    setCheckAmount(false);
+    if (!ocrSupported) {
+      setScanNote(t("receipt.scanUnsupported"));
+      return;
+    }
+    setScanning(true);
+    try {
+      // Android returns text BLOCKS and iOS returns lines; both carry newlines
+      // inside them and the rules work on lines, so one join settles it.
+      const text = (await extractTextFromImage(uri)).join("\n");
+      if (text.trim() === "") {
+        setScanNote(t("receipt.scanNothing"));
+        return;
+      }
+      const r: OcrResult = parseReceiptText(text);
+
+      if (r.date) {
+        setDate(r.date);
+        setCheckDate(r.dateReason?.startsWith("Unsicher") === true);
+      }
+      if (r.amount !== undefined) {
+        setAmount(formatAmountDE(r.amount));
+        setCheckAmount(r.amountReason?.startsWith("Unsicher") === true);
+      }
+      // A category the rules read but this build does not offer is dropped
+      // rather than shown: the four are what the other side stores literally.
+      if (r.category && (CATEGORIES as readonly string[]).includes(r.category)) {
+        setCategory(r.category);
+      }
+      if (r.postalCode) setPlz(r.postalCode);
+
+      if (r.date === undefined && r.amount === undefined) {
+        setScanNote(t("receipt.scanNothing"));
+      }
+    } catch {
+      setScanNote(t("receipt.scanFailed"));
+    } finally {
+      setScanning(false);
+    }
   };
 
   const take = async (from: "camera" | "library") => {
@@ -113,7 +187,9 @@ export default function ReceiptScreen() {
           ? await ImagePicker.launchCameraAsync({ quality: 1, exif: false })
           : await ImagePicker.launchImageLibraryAsync({ quality: 1, exif: false, mediaTypes: ["images"] });
       if (result.canceled || !result.assets?.[0]?.uri) return;
-      setPhoto(await prepare(result.assets[0].uri));
+      const prepared = await prepare(result.assets[0].uri);
+      setPhoto(prepared);
+      await scan(prepared.uri);
     } catch {
       toast.show(t("receipt.photoFailed"));
     } finally {
@@ -139,20 +215,23 @@ export default function ReceiptScreen() {
       toast.show(t("receipt.plzInvalid"));
       return;
     }
+    // The photo does not travel, so an unchecked field can never be checked
+    // against anything afterwards. This is the wall, not a reminder.
+    if (checkDate || checkAmount) {
+      toast.show(t("receipt.mustConfirm"));
+      return;
+    }
 
     setSending(true);
     try {
-      await api.submitReceipt(
-        {
-          receipt_date: date,
-          amount: wire,
-          category,
-          description: description.trim() || null,
-          payment_method: method,
-          postal_code: plz.trim() || null,
-        },
-        photo,
-      );
+      await api.submitReceipt({
+        receipt_date: date,
+        amount: wire,
+        category,
+        description: description.trim() || null,
+        payment_method: method,
+        postal_code: plz.trim() || null,
+      });
       toast.show(t("receipt.sent"));
       router.back();
     } catch (e) {
@@ -215,8 +294,22 @@ export default function ReceiptScreen() {
               resizeMode="contain"
               accessibilityLabel={t("receipt.photoAlt")}
             />
+            {scanning && (
+              <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <ActivityIndicator color={c.ink} />
+                <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("receipt.scanning")}</Text>
+              </View>
+            )}
+            {!scanning && scanNote !== null && (
+              <Text style={{ color: c.inkMuted, fontSize: 13, textAlign: "center" }}>{scanNote}</Text>
+            )}
+            {/* Said plainly, because it is the opposite of what a driver expects
+                from a button labelled "take a photo of the receipt". */}
+            <Text style={{ color: c.inkSubtle, fontSize: 12.5, textAlign: "center" }}>
+              {t("receipt.photoStaysHere")}
+            </Text>
             <Pressable
-              onPress={() => setPhoto(null)}
+              onPress={() => { setPhoto(null); setScanNote(null); setCheckDate(false); setCheckAmount(false); }}
               accessibilityRole="button"
               style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 6 }}
             >
@@ -233,15 +326,26 @@ export default function ReceiptScreen() {
 
         <SectionLabel>{t("receipt.details")}</SectionLabel>
 
-        <Field label={t("receipt.date")} value={date} onChangeText={setDate} placeholder="2026-10-07" autoCapitalize="none" />
+        {/* Typing in a flagged field clears its flag: the value is then the
+            driver's own, and asking them to confirm what they just typed is
+            noise that teaches people to tap past the warning. */}
+        <Field
+          label={t("receipt.date")}
+          value={date}
+          onChangeText={(v) => { setDate(v); setCheckDate(false); }}
+          placeholder="2026-10-07"
+          autoCapitalize="none"
+        />
+        {checkDate && <NeedsCheck c={c} row={row} onConfirm={() => setCheckDate(false)} />}
 
         <Field
           label={t("receipt.amount")}
           value={amount}
-          onChangeText={setAmount}
+          onChangeText={(v) => { setAmount(v); setCheckAmount(false); }}
           placeholder="41,47"
           keyboardType="decimal-pad"
         />
+        {checkAmount && <NeedsCheck c={c} row={row} onConfirm={() => setCheckAmount(false)} />}
 
         <SectionLabel>{t("receipt.category")}</SectionLabel>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
@@ -282,11 +386,63 @@ export default function ReceiptScreen() {
         <PrimaryButton
           label={sending ? t("receipt.sending") : t("receipt.send")}
           onPress={() => void submit()}
-          disabled={sending || busy || !photo || !connected}
+          disabled={sending || busy || scanning || checkDate || checkAmount || !photo || !connected}
         />
         {!photo && <Text style={{ color: c.inkSubtle, fontSize: 12.5, textAlign: "center" }}>{t("receipt.photoRequired")}</Text>}
+        {photo && (checkDate || checkAmount) && (
+          <Text style={{ color: c.warning, fontSize: 12.5, textAlign: "center", fontWeight: "700" }}>
+            {t("receipt.mustConfirm")}
+          </Text>
+        )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/**
+ * The marker on a field the rules were not sure about.
+ *
+ * Deliberately loud: a filled amber band, its own icon, and a button that has
+ * to be pressed. With the photo staying on the phone this is the ONLY thing
+ * standing between a misread figure and the company's books, so it is not a
+ * hint and it does not sit quietly under the field.
+ */
+function NeedsCheck({ c, row, onConfirm }: { c: Palette; row: "row" | "row-reverse"; onConfirm: () => void }) {
+  return (
+    <View
+      style={{
+        backgroundColor: c.surface,
+        borderRadius: radius.md,
+        borderWidth: 2,
+        borderColor: c.warning,
+        padding: 14,
+        gap: 10,
+      }}
+    >
+      <View style={{ flexDirection: row, alignItems: "center", gap: 8 }}>
+        <AlertCircle size={18} color={c.warning} strokeWidth={2.2} />
+        <Text style={{ color: c.warning, fontWeight: "700", fontSize: 14 }}>{t("receipt.checkTitle")}</Text>
+      </View>
+      <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("receipt.checkBody")}</Text>
+      <Pressable
+        onPress={onConfirm}
+        accessibilityRole="button"
+        accessibilityLabel={t("receipt.checkConfirm")}
+        style={{
+          flexDirection: row,
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          paddingVertical: 12,
+          paddingHorizontal: 16,
+          borderRadius: radius.control,
+          backgroundColor: c.warning,
+        }}
+      >
+        <Check size={18} color={c.surface} strokeWidth={2.4} />
+        <Text style={{ color: c.surface, fontWeight: "700", fontSize: 14 }}>{t("receipt.checkConfirm")}</Text>
+      </Pressable>
+    </View>
   );
 }
 

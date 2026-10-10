@@ -246,3 +246,9 @@ jobs:
 
       - name: Typecheck
         run: npx tsc --noEmit
+
+      # The pure-logic tests existed and nothing ran them. The receipt rules are
+      # a COPY of El-Professor's, and this is the only place a copy that has
+      # drifted from the original can be caught before a driver's figure does.
+      - name: Tests
+        run: npm test

@@ -260,29 +260,6 @@ export class ApiClient {
     this.owner = owner;
   }
 
-  /**
-   * A multipart POST, for the one endpoint that carries a file.
-   *
-   * It cannot go through `request()`: that sets `Content-Type:
-   * application/json` on every call, and a multipart body needs the runtime to
-   * set the header WITH its boundary. Overriding the key with `undefined`
-   * does not remove it — React Native sends the string "undefined" and the
-   * server reads an empty request. So the header is simply never set here.
-   *
-   * Everything else `request()` does that matters — the bearer, the timeout,
-   * the 401 handling — is reused by delegating to it with a FormData body and
-   * a marker that suppresses the JSON header.
-   */
-  private form<T>(path: string, body: FormData, timeoutMs?: number): Promise<T> {
-    return this.request<T>(path, {
-      method: "POST",
-      body: body as unknown as BodyInit,
-      // Read by `request()`: an empty value deletes the inherited header.
-      headers: { "Content-Type": "" },
-      ...(timeoutMs ? { timeoutMs } : {}),
-    });
-  }
-
   private async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     if (!isSafePath(path)) throw new ApiError(400, "invalid_path", null);
 
@@ -320,10 +297,20 @@ export class ApiClient {
       });
       // The body read can stall too, so it stays inside the timed section.
       text = await res.text();
-    } catch {
+    } catch (e) {
       // No HTTP answer at all (offline, DNS, timeout, aborted): a network error,
       // never a 401 — so it can't end the session, and restore() shows offline.
-      throw new ApiError(0, controller.signal.aborted ? "timeout" : "network", null);
+      //
+      // The original error is CARRIED, not discarded. Throwing it away made the
+      // first failed receipt unreadable: every cause arrived as the bare word
+      // "network", and the runtime's own sentence — the only thing that said
+      // which of them it was — had already been dropped here.
+      throw new ApiError(
+        0,
+        controller.signal.aborted ? "timeout" : "network",
+        null,
+        e instanceof Error ? `${e.name}: ${e.message}` : String(e),
+      );
     } finally {
       clearTimeout(timer);
       callerSignal?.removeEventListener("abort", onCallerAbort);
@@ -427,17 +414,16 @@ export class ApiClient {
    * A longer timeout than the default: this is the one request that carries a
    * file over a phone's connection.
    */
-  submitReceipt(draft: ReceiptDraft, photo: PickedPhoto) {
-    const body = new FormData();
-    body.append("subject", "receipt");
-    body.append("receipt_date", draft.receipt_date);
-    body.append("amount", draft.amount);
-    body.append("payment_method", draft.payment_method);
-    if (draft.category) body.append("category", draft.category);
-    if (draft.description) body.append("description", draft.description);
-    if (draft.postal_code) body.append("postal_code", draft.postal_code);
-    body.append("document", photo as unknown as Blob);
-    return this.form<{ data: DriverSubmission }>("/api/v1/driver/submissions", body, 60_000);
+  /**
+   * Send a receipt. The figures only — the photo is read on the phone and stays
+   * there (owner's decision, 10.10.2026), so there is no multipart body and no
+   * file to stream. It is an ordinary JSON POST like everything else.
+   */
+  submitReceipt(draft: ReceiptDraft) {
+    return this.request<{ data: DriverSubmission }>("/api/v1/driver/submissions", {
+      method: "POST",
+      body: JSON.stringify({ subject: "receipt", ...draft }),
+    });
   }
 
   /** Send a note. No photo, so it goes as plain JSON like everything else. */
@@ -579,7 +565,13 @@ export class ApiClient {
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public body: unknown) {
+  constructor(
+    public status: number,
+    message: string,
+    public body: unknown,
+    /** What the runtime itself said, when there was no HTTP answer to read. */
+    public detail?: string,
+  ) {
     super(message);
   }
 
