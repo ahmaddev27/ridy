@@ -42,11 +42,23 @@ use Illuminate\Validation\Rule;
  * token after the app last loaded all reach here, and all are refused with a
  * stable reason the app can render.
  *
- * ## The photo is mandatory for a receipt
+ * ## The photo is OPTIONAL, and new apps do not send one
  *
- * A receipt with no photo cannot be accepted on the other side
- * (`document_missing`), so refusing it here is what lets the driver learn at the
- * moment they submit rather than days later from a rejection.
+ * It was mandatory until 10.10.2026, when the owner decided a driver sends the
+ * figures and not the document: the app photographs the receipt, reads it with
+ * the phone's own OCR, and keeps the image on the device.
+ *
+ * It stays accepted rather than refused, because **an app already installed on
+ * a driver's phone still sends one**. There is no store update that reaches
+ * every device at once, so a rule that refused a photo would break every
+ * submission from an older build; and a rule that required one would break
+ * every submission from a newer one. Optional is the only shape that serves
+ * both, and it is not temporary scaffolding - it is what a fleet of phones on
+ * different versions actually needs.
+ *
+ * What is lost with it is the only way to check a figure afterwards. The app
+ * replaces that at the point of entry: a field its rules were unsure about is
+ * flagged and cannot be sent until the driver confirms it by hand.
  */
 class DriverSubmissionController extends Controller
 {
@@ -122,10 +134,12 @@ class DriverSubmissionController extends Controller
 
         if ($subject === 'receipt') {
             $rules += [
-                // The photo. Mandatory, and capped below PHP's post_max_size:
-                // above it the request arrives EMPTY with no message at all.
+                // The photo, when there is one. Older app builds still send it;
+                // builds from 10.10.2026 read the receipt on the phone and send
+                // the figures alone. Still capped below PHP's post_max_size,
+                // above which the request arrives EMPTY with no message at all.
                 'document' => [
-                    'required', 'file', 'mimes:jpg,jpeg,png,pdf',
+                    'nullable', 'file', 'mimes:jpg,jpeg,png,pdf',
                     'max:'.config('elprofessor.max_document_kb', 8192),
                 ],
                 'receipt_date' => ['required', 'date_format:Y-m-d'],
@@ -167,8 +181,8 @@ class DriverSubmissionController extends Controller
         $path = null;
         $mime = null;
         $bytes = null;
-        if ($subject === 'receipt') {
-            $file = $request->file('document');
+        $file = $subject === 'receipt' ? $request->file('document') : null;
+        if ($file !== null) {
             // One folder per fleet, so a cleanup or an export is per tenant and
             // never has to parse a filename to know whose it is.
             $path = $file->store('elprofessor/'.$driver->tenant_id, config('elprofessor.disk', 'local'));

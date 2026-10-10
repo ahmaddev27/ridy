@@ -737,25 +737,60 @@ class ElProfessorConnectionTest extends TestCase
         Queue::assertPushed(RingElProfessor::class);
     }
 
-    public function test_a_receipt_with_no_photo_is_refused_at_submission_time(): void
+    public function test_a_receipt_with_no_photo_is_accepted_and_still_rings(): void
     {
-        // It cannot be accepted on the other side either (`document_missing`),
-        // so refusing it here is what lets the driver learn now rather than
-        // from a rejection days later.
+        // This test used to assert the opposite. The owner decided on
+        // 10.10.2026 that a driver sends the FIGURES and not the document: the
+        // app photographs the receipt, reads it with the phone's own OCR, and
+        // keeps the image. So a submission with no document is the normal shape
+        // from a current build, and refusing it would refuse every one of them.
+        Storage::fake('local');
+        Queue::fake();
+        $this->connectCompany();
+        $driver = $this->driver($this->tenant, 'Omar');
+        $this->actingAsDriver($driver);
+
+        $body = $this->postJson('/api/v1/driver/submissions', [
+            'subject' => 'receipt',
+            'receipt_date' => '2026-10-07',
+            'amount' => '41.47',
+            'category' => 'Tanken',
+            'payment_method' => 'bar',
+        ])->assertStatus(201)->json('data');
+
+        $row = ElProfessorSubmission::withoutGlobalScopes()->firstWhere('uuid', $body['id']);
+        $this->assertNotNull($row);
+        $this->assertNull($row->document_path);
+        $this->assertNull($row->document_mime);
+        $this->assertNull($row->document_bytes);
+        $this->assertSame('41.47', $row->payload['amount']);
+
+        Queue::assertPushed(RingElProfessor::class);
+    }
+
+    public function test_a_receipt_with_a_photo_is_still_accepted_from_an_older_app(): void
+    {
+        // There is no store update that reaches every phone at once, so builds
+        // from before 10.10.2026 keep sending the image. Both shapes have to
+        // work at the same time, and this is the half that is easy to lose when
+        // someone later "tidies up" the now-optional rule into a refusal.
         Storage::fake('local');
         Queue::fake();
         $this->connectCompany();
         $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
 
-        $this->postJson('/api/v1/driver/submissions', [
+        $body = $this->postJson('/api/v1/driver/submissions', [
             'subject' => 'receipt',
             'receipt_date' => '2026-10-07',
             'amount' => '41.47',
             'category' => 'Tanken',
-        ])->assertStatus(422)->assertJsonValidationErrors('document');
+            'payment_method' => 'bar',
+            'document' => UploadedFile::fake()->image('beleg.jpg'),
+        ])->assertStatus(201)->json('data');
 
-        $this->assertSame(0, ElProfessorSubmission::withoutGlobalScopes()->count());
-        Queue::assertNotPushed(RingElProfessor::class);
+        $row = ElProfessorSubmission::withoutGlobalScopes()->firstWhere('uuid', $body['id']);
+        $this->assertNotNull($row->document_path);
+        Storage::disk('local')->assertExists($row->document_path);
     }
 
     public function test_an_amount_in_german_formatting_is_refused_rather_than_coerced(): void
