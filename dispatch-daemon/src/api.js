@@ -10,7 +10,9 @@ const headers = {
   "X-Shard-Id": config.shardId,
 };
 
-async function call(method, path, body) {
+// `timeoutMs` is per call because the command long-poll is MEANT to hang: the
+// backend parks it until a command exists. Every other call keeps apiTimeout.
+async function call(method, path, body, timeoutMs = config.apiTimeout) {
   const res = await fetch(`${config.apiBaseUrl}/api/v1/internal/dispatch${path}`, {
     method,
     headers,
@@ -19,7 +21,7 @@ async function call(method, path, body) {
     // connection but never answers parks the promise forever (a stalled status
     // chain, a never-settling ingest). Callers decide what a rejection means:
     // ingests are retried by the stream's queue, polls/heartbeats retry next cycle.
-    signal: AbortSignal.timeout(config.apiTimeout),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) {
     // Bounded: an HTML error page (Caddy 503 during a deploy) would otherwise
@@ -102,5 +104,30 @@ export const api = {
   /** Liveness heartbeat. */
   async heartbeat(sessionId) {
     return call("POST", `/sessions/${sessionId}/heartbeat`);
+  },
+
+  /**
+   * Claim this shard's next dispatch commands (a driver declining an offer from
+   * the panel). The backend PARKS the request until one is claimable or `wait`
+   * elapses, so it carries its own longer deadline — see config.commandApiTimeout.
+   *
+   * @param waitSeconds How long the backend may park before answering empty.
+   */
+  async commands(waitSeconds) {
+    const body = await call("GET", `/commands?wait=${waitSeconds}`, undefined, config.commandApiTimeout);
+    return Array.isArray(body?.data) ? body.data : [];
+  },
+
+  /**
+   * Report Uber's answer for a claimed command. A FAILURE is reported too: the
+   * backend leaves the offer pending on a failure, and a silent drop would leave
+   * the driver's pop-up waiting on a verdict that never comes.
+   */
+  async commandResult(commandId, { isSuccess, errorMsg, latencyMs }) {
+    return call("POST", `/commands/${commandId}/result`, {
+      is_success: isSuccess === true,
+      error: errorMsg || null,
+      latency_ms: Number.isFinite(latencyMs) ? Math.round(latencyMs) : null,
+    });
   },
 };

@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Dispatch\DispatchActionService;
+use App\Domain\Dispatch\DispatchCommandQueue;
+use App\Domain\Dispatch\DispatchCommandStatus;
 use App\Domain\Dispatch\FleetSessionService;
 use App\Domain\Dispatch\Models\DaemonShard;
+use App\Domain\Dispatch\Models\OfferDispatchCommand;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Dispatch\ShardService;
@@ -11,6 +15,7 @@ use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Domain\Fleet\DriverStatusIngestor;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\DispatchCommandResultRequest;
 use App\Http\Requests\Api\V1\IngestDriverStatusesRequest;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -73,6 +78,85 @@ class DispatchDaemonController extends Controller
             'data' => $sessions,
             'meta' => ['global_proxy_url' => null],
         ]);
+    }
+
+    /**
+     * The dispatch commands this box must send to Uber — a LONG-POLL.
+     *
+     * The request parks (see {@see DispatchCommandQueue::awaitForShard}) until a
+     * claimable command for this shard exists or `wait` elapses, then answers; an
+     * empty array means the wait timed out. The daemon re-polls immediately, so a
+     * decline a driver taps reaches Uber one poll INTERVAL later, not one poll
+     * period — the difference between beating an offer's window and missing it.
+     *
+     * Parked requests hold a worker, so this path has its own FPM pool (:9002,
+     * docker/php/php-fpm.d/zz-pools.conf) and its own Caddy matcher: a park must
+     * never be able to queue an offer's ingest behind it.
+     *
+     * The payload is the frozen mutation params — the daemon needs no lookup and
+     * no JSON decode while the clock runs.
+     */
+    public function commands(Request $request, ShardService $shards, DispatchCommandQueue $queue): JsonResponse
+    {
+        // Heartbeat like sessions() does — a parked box is a live box, and this is
+        // the only poll it makes between session refreshes. Assignment reconciliation
+        // deliberately stays on the sessions poll: rebalancing companies here would
+        // run it once per park, and a box must not take over streams it is not
+        // holding just because it asked for work.
+        $shard = $shards->heartbeat((string) ($request->header('X-Shard-Id') ?: 'main'));
+
+        $commands = $queue->awaitForShard($shard, (int) $request->integer('wait'));
+
+        return response()->json([
+            'data' => $commands->map(fn (OfferDispatchCommand $c) => [
+                'id' => $c->id,
+                'session_id' => $c->uber_fleet_session_id,
+                'action' => $c->action->value,
+                'offer_uuid' => $c->offer_uuid,
+                'real_offer_uuid' => $c->real_offer_uuid,
+                'offer_type' => $c->offer_type,
+                'driver_uuid' => $c->driver_uuid,
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * Uber's verdict on one command, as the daemon read it off the mutation.
+     *
+     * Only `is_success: true` moves the offer (see
+     * {@see DispatchActionService::applyResult}); a refusal is recorded and the
+     * offer stays pending, because the driver may still take the ride.
+     */
+    public function commandResult(
+        DispatchCommandResultRequest $request,
+        int $command,
+        DispatchCommandQueue $queue,
+        DispatchActionService $actions,
+    ): JsonResponse {
+        $data = $request->validated();
+        $model = OfferDispatchCommand::withoutGlobalScopes()->findOrFail($command);
+
+        // Same rule as every session write: a box that lost this company in a
+        // rebalance or a failover must not keep reporting on its work.
+        if (! $queue->shardOwns($model, $this->shardId($request))) {
+            return response()->json(['message' => 'wrong_shard'], 409);
+        }
+
+        // A confirmed decline is final. Re-delivery is expected (the daemon retries a
+        // report whose response it never saw), and a second answer must not be able
+        // to un-succeed a decline Uber already accepted.
+        if ($model->status === DispatchCommandStatus::Succeeded) {
+            return response()->json(['data' => ['status' => $model->status->value]]);
+        }
+
+        $actions->applyResult(
+            $model,
+            (bool) $data['is_success'],
+            $data['error'] ?? null,
+            isset($data['latency_ms']) ? (int) $data['latency_ms'] : null,
+        );
+
+        return response()->json(['data' => ['status' => $model->status->value]]);
     }
 
     /**
@@ -247,6 +331,23 @@ class DispatchDaemonController extends Controller
         }
 
         return $session;
+    }
+
+    /**
+     * The calling box's shard id, or null when it sends no header (single-box
+     * legacy) or names a shard that has never registered — the same leniency
+     * {@see find} applies, so an unknown caller is not locked out of its own work.
+     */
+    private function shardId(Request $request): ?int
+    {
+        $name = (string) $request->header('X-Shard-Id', '');
+        if ($name === '') {
+            return null;
+        }
+
+        $id = DaemonShard::where('name', $name)->value('id');
+
+        return $id !== null ? (int) $id : null;
     }
 
     /** The jar version the daemon's stream runs on (body or header); null from older daemons. */

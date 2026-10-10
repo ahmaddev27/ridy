@@ -38,6 +38,9 @@ class CompanyDataController extends Controller
     {
         $offers = DispatchOffer::withoutGlobalScopes()
             ->where('tenant_id', $tenant->id)
+            // `tenant` for the resource's `can_decline` (it reads the company's
+            // dispatch-decline switch) — lazily that is one query per row.
+            ->with('tenant')
             ->latest('received_at')
             ->paginate(50); // paginator -> the resource collection adds meta/links
 

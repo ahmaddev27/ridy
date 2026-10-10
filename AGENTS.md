@@ -4,7 +4,8 @@ You are working on **Reidey** (`reidey.de`): a multi-tenant SaaS for German Uber
 operators. It taps each fleet's **live Uber dispatch (RAMEN) offer stream**, matches every
 ride **offer** to the fleet's driver by their Uber UUID, and fires an instant push to that
 driver's phone (fare, €-quality, pickup/dropoff, road distance) inside Uber's ~5-second
-accept window. **It observes Uber — it never controls it.**
+accept window. **It observes Uber — with exactly one write: a dispatch-side decline of a
+still-pending offer** (see golden rule #1), off by default, per company.
 
 Legacy names in code/docs — `Ridy`, `DASHCAM`, `fleeteye` — all mean Reidey.
 
@@ -26,13 +27,26 @@ then grep before writing. Reuse the existing service/helper — the backend is s
 
 ## Golden rules — do NOT break without explicit confirmation
 
-- **Observe, don't control.** Never accept/reject/start/end a trip or message a rider.
-  Acceptance is **inferred from Uber driver status only** (`DriverStatusIngestor` +
-  `OfferLifecycle`). Do not reintroduce a timeline reconciler — it was tried and reverted.
+- **Observe, don't control — with one carved-out exception.** The **only** write Reidey ever
+  makes to Uber is a **dispatch-side decline of a still-pending offer** (`RejectOffers` on
+  `vsdispatch.uber.com`, the org/dispatch session the daemon already holds), triggered by the
+  driver in the app or by a manager on the panel, and gated by the per-company flag
+  `tenants.settings['dispatch_reject']['enabled']` (absent = OFF). It declines **from the
+  dispatch panel**, which is the whole point: it does not count against the driver's Uber
+  acceptance rate. Nothing else: **never accept** (`AcceptOffers` is deliberately dormant —
+  no route, no UI), never start/end a trip, never message a rider, never auto-decide for the
+  driver. Acceptance stays **inferred from Uber driver status only** (`DriverStatusIngestor` +
+  `OfferLifecycle`); the decline is the one thing we command, and we record Uber's answer
+  rather than assume it. Do not reintroduce a timeline reconciler — it was tried and reverted.
 - **Time model:** timezone **Europe/Berlin**, week starts **Monday**, the Uber fleet-day
   starts at **04:00**. All stats/windows use fleet-days.
 - **Every offer push carries** distance + dropoff + €/km with the €-quality badge; geocode
   **before** notifying. A multi-stop ride pushes a new notification with per-stop detail.
+  **Exception, flag-gated:** for a company with dispatch declines **enabled**, the *first*
+  push is deliberately **bare** — no geocoding at all, by the owner's decision, because a
+  decline is only worth anything while the offer is still open. The metrics (distance, €/km,
+  per-stop detail) follow moments later over `OfferBroadcast`. The invariant holds unchanged
+  for every other tenant, and the flag is OFF unless someone set it.
 - **Addresses:** maximize geocoding; **never change the city wrongly** (authoritative
   city/PLZ wins over a mis-biased reverse-geocode).
 - **i18n:** German is the **default** (de/en/ar everywhere, RTL for ar). Money/distance/dates
@@ -64,5 +78,5 @@ rebuild their image. `driver-app` ships **OTA** (`eas update`) unless a native m
 ## Stack
 
 Laravel 13 (PHP 8.4) · MySQL 8 (SQLite in dev) · Next.js 16 / React 19 / Tailwind v4 ·
-Expo SDK 52 driver app · Node daemon · Chrome MV3 extension · FCM (HTTP v1) · Reverb
+Expo SDK 57 driver app · Node daemon · Chrome MV3 extension · FCM (HTTP v1) · Reverb
 (WebSocket) · Docker Compose + Caddy on one VPS.

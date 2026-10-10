@@ -25,6 +25,13 @@ export const OFFER_CATEGORY = "offer";
 export const OPEN_MAP_ACTION = "open_map";
 
 /**
+ * Decline the offer on the fleet's dispatch panel, straight from the
+ * notification. Underscores only: expo-notifications warns that a `:` or `-` in
+ * a category/action id can stop the category working.
+ */
+export const REJECT_OFFER_ACTION = "reject_offer";
+
+/**
  * The semantic type Reidey's `AppNotification` carries for a rejected
  * submission. The backend stores a stable type plus structured params and
  * **never pre-rendered text**, so the sentence below is built here, in the

@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Domain\Dispatch\AddressLatinizer;
+use App\Domain\Dispatch\DispatchActionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Arr;
@@ -68,6 +69,16 @@ class DispatchOfferResource extends JsonResource
             'stops' => $this->latinStops(),
             'accept_window_seconds' => $this->accept_window_seconds,
             'received_at' => $this->received_at?->toIso8601String(),
+            // Whether a panel-side decline could be requested for this offer RIGHT
+            // NOW. Computed server-side from the same predicates the endpoint
+            // enforces ({@see DispatchActionService::canReject}), so the UI never
+            // renders a button that fails on tap — it is the one answer that depends
+            // on the company's switch, on a live daemon session and on a clock.
+            'can_decline' => app(DispatchActionService::class)->canReject($this->resource),
+            // Set once Uber CONFIRMED the decline. Also the marker that keeps the
+            // offer out of every acceptance-rate figure, so the UI can label it
+            // "declined on the panel" rather than as the driver's own decline.
+            'dispatch_rejected_at' => $this->dispatch_rejected_at?->toIso8601String(),
         ];
     }
 

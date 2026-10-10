@@ -158,6 +158,13 @@ Route::prefix('v1')->group(function () {
                 Route::get('offers', [DriverOfferController::class, 'index']);
                 Route::post('offers/seen', [DriverOfferController::class, 'markSeen']);
                 Route::get('offers/{offer}', [DriverOfferController::class, 'show']);
+                // The one write this product ever sends to Uber: decline the offer
+                // from the fleet's DISPATCH panel, so it never counts against the
+                // driver's Uber acceptance rate. Throttled per driver — the app's
+                // pop-up has a single button and a 5-second clock, so a legitimate
+                // driver taps a handful of times a minute at most.
+                Route::post('offers/{offer}/dispatch-reject', [DriverOfferController::class, 'dispatchReject'])
+                    ->middleware('throttle:60,1,dispatch-reject');
 
                 // Belege und Notizen: what the driver sends their own
                 // company to review in El-Professor. The tenant and the
@@ -213,6 +220,13 @@ Route::prefix('v1')->group(function () {
         Route::post('sessions/{session}/heartbeat', [DispatchDaemonController::class, 'heartbeat']);
         Route::post('sessions/{session}/roster', [DispatchDaemonController::class, 'roster']);
         Route::post('sessions/{session}/statuses', [DispatchDaemonController::class, 'statuses']);
+        // Dispatch commands (the panel-side offer decline). `commands` is a
+        // LONG-POLL: it parks until this shard has work, so a driver's tap reaches
+        // Uber one poll interval later instead of one poll period. Parked requests
+        // hold a worker, so this one path has its own FPM pool — see
+        // docker/php/php-fpm.d/zz-pools.conf and the matcher in docker/Caddyfile.
+        Route::get('commands', [DispatchDaemonController::class, 'commands']);
+        Route::post('commands/{command}/result', [DispatchDaemonController::class, 'commandResult']);
     });
 
     // Session basics every authenticated user needs — including tenant-less ones
@@ -288,6 +302,11 @@ Route::prefix('v1')->group(function () {
         Route::get('dispatch/offers/{offer}', [DispatchOfferController::class, 'show'])->middleware('can:offers.view');
         // Extension forwards RAMEN offers captured in the manager's browser.
         Route::post('dispatch/offers/ingest', [DispatchOfferController::class, 'ingest'])->middleware(['fleet.connected', 'can:connections.manage']);
+        // A manager declining an offer on the driver's behalf. `offers.manage` — the
+        // same permission as bulk-delete/destroy below: it writes to Uber and ends
+        // the offer, so a `viewer` must not reach it.
+        Route::post('dispatch/offers/{offer}/dispatch-reject', [DispatchOfferController::class, 'dispatchReject'])
+            ->middleware(['can:offers.manage', 'throttle:60,1,dispatch-reject']);
         Route::post('dispatch/offers/bulk-delete', [DispatchOfferController::class, 'bulkDestroy'])->middleware('can:offers.manage');
         Route::delete('dispatch/offers/{offer}', [DispatchOfferController::class, 'destroy'])->middleware('can:offers.manage');
 

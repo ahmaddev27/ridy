@@ -2,7 +2,7 @@
 
 > **مصدر الحقيقة:** [`backend/routes/api.php`](../backend/routes/api.php) (النقاط) و[`backend/routes/console.php`](../backend/routes/console.php) (المهام المجدولة). هذا الملف يلخّصهما — عند أي اختلاف، **الكود هو الحقيقة**.
 > **للتفاصيل المعمارية** (المنطق خلف كل نقطة): [`HANDOFF.md`](../HANDOFF.md) §2.
-> آخر تحديث: **2026-09-02**
+> آخر تحديث: **2026-10-10**
 
 ---
 
@@ -64,6 +64,7 @@
 | GET | `driver/home` · `driver/stats` | الرئيسية + الإحصائيات (يوم الأسطول 04:00). |
 | GET | `driver/offers` · `driver/offers/{offer}` | قائمة العروض + تفاصيل عرض. |
 | POST | `driver/offers/seen` | تعليم العروض كمقروءة. |
+| POST | `driver/offers/{offer}/dispatch-reject` | **رفض العرض من لوحة الديسباتش** (`throttle:60,1`) — انظر §4.1. |
 | POST | `driver/broadcasting/auth` | تفويض قناة Reverb الخاصة `driver.{id}`. |
 
 **وضع صاحب الأسطول (`prefix: fleet`, `auth:sanctum` + `driver.active`):** مدير/مالك يدخل نفس التطبيق ويراقب كل سواقينه (قراءة فقط)؛ توكنه يُحلّ على `User`.
@@ -89,6 +90,35 @@
 | POST | `internal/dispatch/sessions/{session}/heartbeat` | نبضة حياة الديمون. |
 | POST | `internal/dispatch/sessions/{session}/roster` | رفع الروستر المسحوب من Fleet Hub. |
 | POST | `internal/dispatch/sessions/{session}/statuses` | رفع حالات السائقين (أساس استنتاج القبول). |
+| GET | `internal/dispatch/commands?wait=<ثواني>` | **long-poll**: يحجز الطلب لحد ما يصير في أمر ديسباتش لهذا الشارد، وبيرجّع مصفوفة فاضية عند انتهاء المهلة. الادّعاء بيقلب الصف لـ`claimed` ويزيد `attempts`. |
+| POST | `internal/dispatch/commands/{command}/result` | جواب أوبر على الأمر: `{is_success: bool, error: string|null, latency_ms: int|null}`. |
+
+### 4.1 أوامر الديسباتش — العقد المشترك (الرفض من اللوحة)
+
+هاد **الكتابة الوحيدة** اللي المنتج يعملها عند أوبر (`RejectOffers` على `vsdispatch.uber.com`)؛ `AcceptOffers` **نائم بالقصد** (بلا راوت وبلا واجهة). المعمارية الكاملة: [`HANDOFF.md`](../HANDOFF.md) §2.7.
+
+**نقطتا العميل** (السائق من التطبيق، والمدير من اللوحة) إلهم **نفس الجواب بالحرف**:
+
+| Method | Path | الحارس |
+|---|---|---|
+| POST | `driver/offers/{offer}/dispatch-reject` | `auth:driver` + `driver.active` + `throttle:60,1` |
+| POST | `dispatch/offers/{offer}/dispatch-reject` | لوحة الشركة + `can:offers.manage` + `throttle:60,1` |
+
+```json
+200 { "data": { "status": "queued", "command_id": 41 } }
+200 { "data": { "status": "duplicate", "command_id": 41 } }
+200 { "data": { "status": "already_declined" } }
+200 { "data": { "status": "refused", "reason": "window_closed" } }
+```
+
+- **الرفض (`refused`) ليس خطأ HTTP** — بيرجع **200** والعميل يعرض السبب مترجَماً. أسباب الرفض السبعة: `disabled` · `not_pending` · `missing_real_offer_uuid` · `missing_driver_uuid` · `window_closed` · `no_session` · `too_many_attempts`.
+- **`404` فقط** لمّا العرض ما يكون تبع صاحب الطلب (سائق تاني أو شركة تانية).
+- `disabled` = مفتاح الشركة مطفي: `tenants.settings['dispatch_reject']['enabled']` (غايب = مطفي). مفتاح DB مش `.env` عمداً.
+- **التكرار آمن:** فهرس فريد `(dispatch_offer_id, action)` — الكبسة المزدوجة بتصير `duplicate` على نفس الصف، ما بتصير طلب تاني لأوبر.
+
+**مورد العرض** (`DispatchOfferResource`) زاد حقلين تستهلكهم اللوحة والتطبيق: `can_decline` (منطقي — حكم السيرفر، ما بينحسب عند العميل) و`dispatch_rejected_at` (ISO8601 أو `null`). وإحصاء العروض زاد `dispatch_declined`.
+
+> **ملاحظة حالة (2026-10-10):** الباكند جاهز ومختبَر، بس **منفّذ الديمون لسا ناقص** (`RamenStream.dispatchAction()` غير موجود واللوب مش مشغّل)، فالأمر اليوم يُكتب ولا حد يدّعيه وينتهي بالمهلة عبر `dispatch:expire-commands`، والعرض يضل `pending`.
 
 ---
 
@@ -122,6 +152,7 @@
 | POST | `supplier/capture` | التقاط عام لأي تبويب Fleet Hub (`fleet.connected`) → Network feed. |
 | GET | `dispatch/offers` · `.../stats` · `.../export` · `.../{offer}` | تغذية العروض + إحصاء + تصدير + تفصيل. |
 | POST | `dispatch/offers/ingest` | عروض RAMEN من متصفّح المدير (`fleet.connected`). |
+| POST | `dispatch/offers/{offer}/dispatch-reject` | **رفض العرض من لوحة الديسباتش** (`can:offers.manage`, `throttle:60,1`) — انظر §4.1. |
 | POST · DELETE | `dispatch/offers/bulk-delete` · `dispatch/offers/{offer}` | حذف جماعي / مفرد. |
 | POST | `uber-login/start` · `uber-login/mfa` | دخول أوبر تفاعلي (إيميل/كلمة مرور → MFA). |
 | POST | `extension/token` | إصدار توكن اقتران للإضافة من جلسة اللوحة. |
@@ -190,6 +221,7 @@
 | `queue:work --stop-when-empty --max-time=50` | كل دقيقة | تصريف احتياطي للطابور (الأساسي حاوية `queue`). |
 | نبضة الـscheduler (cache stamp) | كل دقيقة | إشارة حياة الـscheduler لصفحة الصحّة. |
 | `offers:expire-pending` | كل دقيقة | إنهاء العروض المعلّقة بعد نافذة القبول. |
+| `dispatch:expire-commands` | كل دقيقة | إنهاء أوامر الديسباتش اللي فاتت مهلة تسليمها (§4.1). |
 | `offers:finalize-stale` | كل 5د | إنهاء رحلات عالقة (>100د) / قبول مهجور (>20د). |
 | `offers:backfill-geo --limit=12` | كل 10د | جيوكودنغ متأخّر للعروض التي فشل إثراؤها. |
 | `fleet:check-sync` | كل 5د | كشف انكسار مزامنة أوبر الصامت. |

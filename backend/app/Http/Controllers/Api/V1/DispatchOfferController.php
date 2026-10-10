@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\AddressFormatter;
+use App\Domain\Dispatch\DispatchActionService;
 use App\Domain\Dispatch\DispatchOfferIngestor;
 use App\Domain\Dispatch\Jobs\GeocodeOffer;
 use App\Domain\Dispatch\Models\DispatchOffer;
@@ -43,9 +44,11 @@ class DispatchOfferController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        // `tenant` is eager-loaded for the resource's `can_decline`, which reads the
+        // company's dispatch-decline switch: lazily that is one query per row.
         $offers = DispatchOffer::query()
             ->whereIn('id', $page->pluck('id'))
-            ->with('driver:id,name,online_status')
+            ->with(['driver:id,name,online_status', 'tenant'])
             ->orderByDesc('received_at')->orderByDesc('id')
             ->get();
 
@@ -112,11 +115,17 @@ class DispatchOfferController extends Controller
         // "not taken" (declined) per the product decision. Earnings count COMPLETED
         // trips only, summed from the numeric fare column. ONE conditional-aggregate
         // pass instead of four scans — the offers page polls this every few seconds.
+        // Offers declined on the dispatch panel are excluded from total/accepted and
+        // counted on their own: they never reached the driver's Uber app, so they are
+        // not part of an acceptance rate ({@see DispatchOffer::scopeReachedDriver}).
+        // Still one aggregate pass — the offers page polls this every few seconds —
+        // and total + dispatch_declined reconciles with the list, which shows them.
         $completedStatus = OfferStatus::Completed->value;
         $row = $this->filtered($request)->toBase()
             ->selectRaw(
-                'COUNT(*) as total, '
-                .'SUM(CASE WHEN accepted_at IS NOT NULL THEN 1 ELSE 0 END) as accepted, '
+                'SUM(CASE WHEN dispatch_rejected_at IS NULL THEN 1 ELSE 0 END) as total, '
+                .'SUM(CASE WHEN dispatch_rejected_at IS NULL AND accepted_at IS NOT NULL THEN 1 ELSE 0 END) as accepted, '
+                .'SUM(CASE WHEN dispatch_rejected_at IS NOT NULL THEN 1 ELSE 0 END) as dispatch_declined, '
                 .'SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as completed, '
                 .'COALESCE(SUM(CASE WHEN status = ? THEN fare_amount END), 0) as earnings',
                 [$completedStatus, $completedStatus],
@@ -132,6 +141,7 @@ class DispatchOfferController extends Controller
             'total' => $total,
             'accepted' => $accepted,
             'declined' => $total - $accepted,
+            'dispatch_declined' => (int) ($row->dispatch_declined ?? 0),
             'completed' => $completed,
             'acceptance_rate' => $total > 0 ? (int) round($accepted / $total * 100) : 0,
             'earnings' => round($earnings, 2),
@@ -293,6 +303,21 @@ class DispatchOfferController extends Controller
         }
 
         return DriverStatsService::parseFare($formatted);
+    }
+
+    /**
+     * Decline this offer on the fleet's DISPATCH panel — a manager answering for a
+     * driver who is not looking at their phone.
+     *
+     * Same contract as the driver's own button: a refusal (window closed, switch
+     * off, no live session) comes back 200 with a reason so the dashboard can say
+     * WHY, and 404 is only ever a foreign offer.
+     */
+    public function dispatchReject(Request $request, DispatchOffer $offer, DispatchActionService $actions): JsonResponse
+    {
+        $this->authorizeTenant($offer);
+
+        return response()->json(['data' => $actions->requestReject($offer, null, $request->user())]);
     }
 
     /** Delete a single offer. */

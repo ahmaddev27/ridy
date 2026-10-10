@@ -4,18 +4,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney, latnLocale, toLatinDigits } from "@/lib/utils";
 import { toast } from "sonner";
-import { Radio, MapPin, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Inbox, CheckCircle2, XCircle, Gauge, Wallet, Download } from "lucide-react";
+import { Radio, MapPin, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Inbox, CheckCircle2, XCircle, Gauge, Wallet, Download, Ban } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
-import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
-import { listOffersPaged, getOfferStats, exportOffers, fareLabel, offerBadgeStatus, type DispatchOffer, type PageMeta, type OfferStats } from "@/lib/api/offers";
+import { listOffersPaged, getOfferStats, exportOffers, fareLabel, type DispatchOffer, type PageMeta, type OfferStats } from "@/lib/api/offers";
 import { fleetDayKey, fleetYmd, formatYmd } from "@/lib/fleet-day";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
-import { OFFER_TONE } from "@/lib/offer-status";
+import { OfferStatusBadge } from "@/components/ui/offer-status-badge";
+import { DeclineOfferButton } from "./decline-offer-button";
 import { OPEN_OFFER_EVENT } from "@/components/offer-alerts";
 import { usePolling } from "@/hooks/use-polling";
 import { StatCard } from "@/components/ui/card";
@@ -327,10 +327,20 @@ export default function OffersPage() {
 
       {/* Stat cards for the current filter */}
       {stats && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <StatCard icon={Inbox} label={c("statTotal")} value={stats.total.toLocaleString(latnLocale(locale))} />
           <StatCard icon={CheckCircle2} label={c("statAccepted")} value={stats.accepted.toLocaleString(latnLocale(locale))} tone="positive" />
           <StatCard icon={XCircle} label={c("statNotTaken")} value={stats.declined.toLocaleString(latnLocale(locale))} />
+          {/* Carried separately because the list still shows these rows while the
+              other three figures exclude them — otherwise the counts look broken.
+              The value is defaulted because frontend and backend ship separately:
+              an older API body would crash the render on a missing field. */}
+          <StatCard
+            icon={Ban}
+            label={c("statDispatchDeclined")}
+            value={(stats.dispatch_declined ?? 0).toLocaleString(latnLocale(locale))}
+            hint={c("statDispatchDeclinedHint")}
+          />
           <StatCard icon={Gauge} label={c("statRate")} value={`${stats.acceptance_rate}%`} tone={stats.acceptance_rate >= 50 ? "positive" : "default"} />
           <StatCard icon={Wallet} label={c("statEarnings")} value={formatMoney(stats.earnings, locale)} tone="positive" />
         </div>
@@ -415,10 +425,11 @@ export default function OffersPage() {
                                 {toLatinDigits(fareLabel(o, latnLocale(locale)))}
                               </td>
                               <td className="px-4 py-3">
-                                {(() => {
-                                  const st = offerBadgeStatus(o);
-                                  return <Badge status={OFFER_TONE[st]} dot>{c(`st_${st}`)}</Badge>;
-                                })()}
+                                <OfferStatusBadge offer={o} />
+                              </td>
+                              {/* Declining must not also open the detail modal. */}
+                              <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
+                                <DeclineOfferButton offer={o} />
                               </td>
                             </tr>
                           ))}

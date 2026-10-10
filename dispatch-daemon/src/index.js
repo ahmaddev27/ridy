@@ -4,6 +4,7 @@
 import { config } from "./config.js";
 import { inflight } from "./stream.js";
 import { streams, reconcileTick } from "./supervisor.js";
+import { startCommandLoop, stopCommandLoop } from "./commands.js";
 import { initSentry, captureException, flush } from "./sentry.js";
 
 // Shutdown budget: stay under Docker's default 10s stop grace period.

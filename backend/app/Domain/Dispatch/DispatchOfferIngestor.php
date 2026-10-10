@@ -101,6 +101,10 @@ class DispatchOfferIngestor
                 'driver_id' => $driver?->id,
                 'offer_uuid' => $offerUuid,
                 'real_offer_uuid' => $this->nullableScalar($offer, 'realOfferUUID'),
+                // Absent from all 1003 production offers inspected; stored anyway so
+                // a decline uses Uber's own value the day Uber starts sending one,
+                // instead of DispatchActionService's client-side constant.
+                'offer_type' => $this->nullableScalar($offer, 'offerType'),
                 'partner_uuid' => $this->nullableScalar($offer, 'partnerUUID'),
                 'seq' => $seq,
                 'rider_first_name' => $this->nullableScalar($offer, 'riderFirstName'),
@@ -179,13 +183,29 @@ class DispatchOfferIngestor
      * streets are cache-warm so they resolve instantly. A cold address that would
      * eat the accept window trips the deadline and is left to the async GeocodeOffer
      * job — the push still goes out, just without metrics.
+     *
+     * UNLESS the company has dispatch declines on. Then the offer is not something
+     * the driver reads, it is something they ANSWER: the app opens a pop-up with a
+     * countdown and a decline button, and every millisecond spent resolving an
+     * address is a millisecond off the only window in which that button does
+     * anything. So the pre-push geocode is skipped ENTIRELY — not shortened, not
+     * best-effort — and the metrics arrive a moment later by the queued GeocodeOffer
+     * below plus the OfferBroadcast('status') the geocode already emits. Nothing is
+     * lost; it just stops being on the critical path.
+     *
+     * With the switch off (the default for every company) this is byte-for-byte the
+     * behaviour it always had.
      */
     private function notifyDriver(DispatchOffer $record, ?float $geocodeDeadline): void
     {
-        rescue(fn () => $this->geocoder->enrichForNotify($record, $geocodeDeadline), report: false);
+        $fast = $record->tenant?->dispatchRejectEnabled() === true;
+
+        if (! $fast) {
+            rescue(fn () => $this->geocoder->enrichForNotify($record, $geocodeDeadline), report: false);
+        }
 
         try {
-            $sent = $this->notifier->notify($record);
+            $sent = $this->notifier->notify($record, $fast);
             RidyLog::event('dispatch_offer.notified', [
                 'offer_id' => $record->id,
                 'driver_id' => $record->driver_id,

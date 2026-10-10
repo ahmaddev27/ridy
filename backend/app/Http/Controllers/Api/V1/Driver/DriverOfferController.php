@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Driver;
 
+use App\Domain\Dispatch\DispatchActionService;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FleetDayRange;
@@ -33,7 +34,7 @@ class DriverOfferController extends Controller
 
         $offers = DispatchOffer::withoutGlobalScopes()
             ->whereIn('id', $page->pluck('id'))
-            ->with('driver:id,name,online_status')
+            ->with(['driver:id,name,online_status', 'tenant'])
             ->orderByDesc('received_at')->orderByDesc('id')
             ->get();
 
@@ -55,6 +56,25 @@ class DriverOfferController extends Controller
             ->findOrFail($offer);
 
         return new DispatchOfferResource($record);
+    }
+
+    /**
+     * Decline this offer on the fleet's DISPATCH panel — the driver tapped the one
+     * button on the instant pop-up.
+     *
+     * A refusal is NOT an HTTP error: the window may have closed, the company's
+     * switch may be off, or the company may have no live daemon session. All of
+     * those are things the pop-up has to TELL the driver, so they come back as 200
+     * with a reason ({@see DispatchActionService::requestReject}). 404 is reserved
+     * for an offer that is not this driver's.
+     */
+    public function dispatchReject(Request $request, string $offer, DispatchActionService $actions): JsonResponse
+    {
+        $record = DispatchOffer::withoutGlobalScopes()
+            ->where('driver_id', $request->user()->id)
+            ->findOrFail($offer);
+
+        return response()->json(['data' => $actions->requestReject($record, $request->user())]);
     }
 
     /**

@@ -75,6 +75,14 @@ class NotifyOwnersOfOffer implements ShouldQueue
             return; // the company was wiped between dispatch and run
         }
 
+        // Declined on the dispatch panel while this sat on the queue. A decline
+        // resolves in seconds — well inside MAX_AGE_SECONDS — so without this the
+        // manager's phone would ring for an offer that is already dead, which is
+        // exactly the noise the feature is meant to remove.
+        if ($offer->dispatch_rejected_at !== null) {
+            return;
+        }
+
         $notifier->notifyOwners($offer, $this->stopsCount);
     }
 }

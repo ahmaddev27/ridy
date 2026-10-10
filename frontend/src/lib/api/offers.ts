@@ -3,6 +3,13 @@ import { apiFetch, apiDownload } from "./client";
 export type OfferStatus = "pending" | "accepted" | "started" | "completed" | "rejected" | "canceled";
 
 /**
+ * What a badge shows. One value more than the lifecycle `status`, because an
+ * offer the fleet declined from the dispatch panel ends up `rejected` as well —
+ * Uber's stream can only say "not taken" — and the two must not look alike.
+ */
+export type OfferBadgeStatus = OfferStatus | "dispatch_declined";
+
+/**
  * The badge status for an offer — the backend `status` is the single source of
  * truth for the offer lifecycle. A fresh offer is held `pending` while the
  * driver is busy (kept for back-to-back) and is only moved to `rejected` once
@@ -10,8 +17,15 @@ export type OfferStatus = "pending" | "accepted" | "started" | "completed" | "re
  * must NOT flip the label. So a missing status resolves to `pending` (a waiting
  * state), never a terminal "not taken" — only `rejected`/`canceled` read as
  * declined.
+ *
+ * A confirmed dispatch decline outranks all of that: the offer never reached the
+ * driver, so labelling it "not taken" would read as the driver's own choice.
  */
-export function offerBadgeStatus(offer: { status: OfferStatus | null }): OfferStatus {
+export function offerBadgeStatus(offer: {
+  status: OfferStatus | null;
+  dispatch_rejected_at?: string | null;
+}): OfferBadgeStatus {
+  if (offer.dispatch_rejected_at) return "dispatch_declined";
   return offer.status ?? "pending";
 }
 
@@ -39,6 +53,13 @@ export type DispatchOffer = {
   trip_duration_seconds: number | null;
   // Number of drop-offs once resolved from Uber's live map (>= 2 = multi-stop).
   stops_count: number | null;
+  // Set once Uber CONFIRMED a decline sent from the dispatch panel — the only
+  // thing that tells such an offer apart from one nobody took.
+  dispatch_rejected_at: string | null;
+  // The server's own verdict on whether it would accept a decline for this offer
+  // right now (company flag, offer still pending, window open, attempts left).
+  // Never recomputed here: a button the server would refuse must not be shown.
+  can_decline: boolean;
 };
 
 /**
@@ -86,6 +107,32 @@ export async function getOffer(id: number): Promise<DispatchOfferDetail> {
   return res.data;
 }
 
+/** How the server took the request — "refused" carries a `reason` code. */
+export type DispatchRejectStatus = "queued" | "duplicate" | "already_declined" | "refused";
+
+export type DispatchRejectResult = {
+  status: DispatchRejectStatus;
+  reason?: string;
+  command_id?: number;
+};
+
+/**
+ * Ask the fleet's own Uber dispatch session to decline the offer, so declining
+ * never touches the driver's acceptance rate.
+ *
+ * Queuing is all this confirms. Whether Uber took the decline shows up later on
+ * the offer itself (`dispatch_rejected_at`), carried in by the feed's realtime
+ * refresh. A refusal arrives as a 200 with `status: "refused"` — a verdict, not
+ * a transport failure — so callers surface the reason instead of an error.
+ */
+export async function dispatchRejectOffer(id: number): Promise<DispatchRejectResult> {
+  const res = await apiFetch<{ data: DispatchRejectResult }>(
+    `/api/v1/dispatch/offers/${id}/dispatch-reject`,
+    { method: "POST", withCsrf: true },
+  );
+  return res.data;
+}
+
 export type PageMeta = { current_page: number; last_page: number; total: number; per_page: number };
 
 /** Paginated offers with page metadata — powers the offers data table. */
@@ -120,6 +167,10 @@ export type OfferStats = {
   completed: number;
   acceptance_rate: number;
   earnings: number;
+  // Offers declined from the dispatch panel. They are excluded from `total`,
+  // `accepted` and `declined` (they never reached a driver, so they are no
+  // driver's offer), which is why the list can show more rows than `total`.
+  dispatch_declined: number;
 };
 
 /** Aggregates for the current filter set (powers the offers stat cards). */

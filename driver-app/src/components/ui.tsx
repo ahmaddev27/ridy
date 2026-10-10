@@ -40,12 +40,18 @@ export function Logo({ size = 40, color }: { size?: number; color?: string }) {
  * Full-width primary action — the design's solid button (near-white on dark,
  * near-black on light), 12px radius. Pass `style` to flex it inside an action
  * row next to a SecondaryButton.
+ *
+ * `destructive` repaints it in the error hue for the one action in the app that
+ * takes something away (declining an offer). It stays the same control — same
+ * loading, disabled and accessibility behaviour — because the shape is what the
+ * driver has learned to hit.
  */
 export function PrimaryButton({
   label,
   onPress,
   loading,
   disabled,
+  destructive,
   icon,
   style,
 }: {
@@ -53,12 +59,17 @@ export function PrimaryButton({
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
+  destructive?: boolean;
   icon?: LucideIcon;
   style?: ViewStyle;
 }) {
   const c = useColors();
   const off = disabled || loading;
   const Icon = icon;
+  // The danger hue is dark enough in both schemes for a white label, where the
+  // monochrome primary inverts with the scheme.
+  const bg = destructive ? c.danger : c.primary;
+  const ink = destructive ? "#ffffff" : c.primaryInk;
   return (
     <Pressable
       onPress={() => onPress()}
@@ -70,7 +81,7 @@ export function PrimaryButton({
         {
           flexDirection: isRTL() ? "row-reverse" : "row",
           gap: 8,
-          backgroundColor: c.primary,
+          backgroundColor: bg,
           borderRadius: radius.control,
           paddingVertical: 14,
           alignItems: "center",
@@ -81,11 +92,11 @@ export function PrimaryButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={c.primaryInk} />
+        <ActivityIndicator color={ink} />
       ) : (
         <>
-          {Icon && <Icon size={17} color={c.primaryInk} />}
-          <Text style={{ color: c.primaryInk, fontWeight: "700", fontSize: 15 }}>{label}</Text>
+          {Icon && <Icon size={17} color={ink} />}
+          <Text style={{ color: ink, fontWeight: "700", fontSize: 15 }}>{label}</Text>
         </>
       )}
     </Pressable>

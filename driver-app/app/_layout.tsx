@@ -8,7 +8,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { ToastProvider } from "@/components/toast";
-import { registerOfferCategory, startPushRegistration, OPEN_MAP_ACTION } from "@/lib/push";
+import { registerOfferCategory, startPushRegistration, OPEN_MAP_ACTION, REJECT_OFFER_ACTION } from "@/lib/push";
+import { OfferPopupHost, requestOfferPopup } from "@/components/offer-popup";
 import { markAlerted } from "@/lib/offer-alert";
 import { SUBMISSION_REJECTED_TYPE } from "@/lib/notification-channels";
 import { isMultiStop } from "@/lib/notification-channels";
@@ -230,6 +231,17 @@ function Gate() {
     if (data.offer_id != null && data.local !== "1") {
       markAlerted(data.offer_id, isMultiStop(data.stops_count));
     }
+    // "Ablehnen" straight from the notification: the tap IS the decision, so the
+    // decline fires the moment the app is up and the pop-up shows what came back.
+    // It has to foreground — react-native-firebase's messaging service is stripped
+    // from the manifest (plugins/withExpoOwnsFcm.js) so expo-notifications owns
+    // FCM, which leaves NO background FCM message handler: there is no JS runtime
+    // to send a background-only decline from.
+    if (response.actionIdentifier === REJECT_OFFER_ACTION) {
+      const offerId = Number(data.offer_id);
+      if (Number.isInteger(offerId) && offerId > 0) requestOfferPopup(offerId, true);
+      return;
+    }
     // "Open in map" action button: route through every stop of a multi-stop trip
     // (Google Maps waypoints). Prefer Uber's exact coordinates so a
     // house-number-less address still pins right.
@@ -288,19 +300,25 @@ function Gate() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.canvas } }}>
-      <Stack.Screen name="login" />
-      <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
-      <Stack.Screen name="language" />
-      <Stack.Screen name="splash" options={{ gestureEnabled: false }} />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="offer/[id]" options={{ presentation: "modal" }} />
-      <Stack.Screen name="settings" options={{ presentation: "modal" }} />
-      {/* Belege & Notizen: a stack pushed from Profil, not a fifth tab —
-          the four tabs are fixed and every driver sees all of them. */}
-      <Stack.Screen name="submissions" />
-      <Stack.Screen name="submission/receipt" />
-      <Stack.Screen name="submission/note" />
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.canvas } }}>
+        <Stack.Screen name="login" />
+        <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="language" />
+        <Stack.Screen name="splash" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="offer/[id]" options={{ presentation: "modal" }} />
+        <Stack.Screen name="settings" options={{ presentation: "modal" }} />
+        {/* Belege & Notizen: a stack pushed from Profil, not a fifth tab —
+            the four tabs are fixed and every driver sees all of them. */}
+        <Stack.Screen name="submissions" />
+        <Stack.Screen name="submission/receipt" />
+        <Stack.Screen name="submission/note" />
+      </Stack>
+      {/* The instant offer decision, floating over whatever screen is up. It is a
+          Modal, so it sits outside the navigator on purpose: a pushed route would
+          be something the driver has to navigate back out of. */}
+      <OfferPopupHost />
+    </>
   );
 }

@@ -126,11 +126,23 @@ class OfferLifecycle
      * A not-yet-accepted offer is takeable only if it is still PENDING, or was
      * REJECTED very recently (a late-detected accept). A long-rejected offer stays
      * rejected — never re-attributed to an unrelated later trip.
+     *
+     * The grace exists because our rejections are GUESSES: nobody tells us the
+     * driver accepted, so expirePending marks an idle-looking driver's offer
+     * rejected and a status poll a moment later can reveal they did take it.
+     *
+     * A dispatch-side decline is not a guess — Uber confirmed it. Re-attributing it
+     * would credit the driver with an offer we ourselves declined on their behalf,
+     * which can happen whenever the ride they actually took is missing from our data
+     * (a stream gap, or a trip from outside our capture): the declined offer would
+     * then be the only takeable candidate left for that engagement edge.
      */
     private function takeableGuard(Builder $q): void
     {
-        $q->where('status', '!=', OfferStatus::Rejected)
-            ->orWhere('rejected_at', '>=', now()->subMinutes(self::LATE_ACCEPT_GRACE_MINUTES));
+        $q->whereNull('dispatch_rejected_at')
+            ->where(fn ($inner) => $inner
+                ->where('status', '!=', OfferStatus::Rejected)
+                ->orWhere('rejected_at', '>=', now()->subMinutes(self::LATE_ACCEPT_GRACE_MINUTES)));
     }
 
     /**

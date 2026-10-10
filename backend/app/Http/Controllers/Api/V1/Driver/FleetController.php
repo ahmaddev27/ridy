@@ -47,7 +47,7 @@ class FleetController extends Controller
             ->values();
 
         $active = $this->scoped($tenantId)
-            ->with('driver:id,name,online_status')
+            ->with(['driver:id,name,online_status', 'tenant'])
             ->whereIn('status', [OfferStatus::Accepted, OfferStatus::Started])
             ->latest('received_at')
             ->limit(30)
@@ -61,7 +61,7 @@ class FleetController extends Controller
             ->values();
 
         $recent = $this->scoped($tenantId)
-            ->with('driver:id,name,online_status')
+            ->with(['driver:id,name,online_status', 'tenant'])
             ->latest('received_at')
             ->limit(8)
             ->get();
@@ -95,7 +95,7 @@ class FleetController extends Controller
 
         $offers = DispatchOffer::withoutGlobalScopes()
             ->whereIn('id', $page->pluck('id'))
-            ->with('driver:id,name,online_status')
+            ->with(['driver:id,name,online_status', 'tenant'])
             ->orderByDesc('received_at')->orderByDesc('id')
             ->get();
 
@@ -112,7 +112,7 @@ class FleetController extends Controller
     public function showOffer(Request $request, string $offer): DispatchOfferResource
     {
         $record = $this->scoped($this->tenantId($request))
-            ->with('driver:id,name,online_status')
+            ->with(['driver:id,name,online_status', 'tenant'])
             ->findOrFail($offer);
 
         return new DispatchOfferResource($record);
@@ -215,7 +215,11 @@ class FleetController extends Controller
     /** @return array<string, mixed> */
     private function summary(int $tenantId, CarbonImmutable $from, CarbonImmutable $to): array
     {
-        $base = fn () => $this->scoped($tenantId)->where('received_at', '>=', $from)->where('received_at', '<', $to);
+        $all = fn () => $this->scoped($tenantId)->where('received_at', '>=', $from)->where('received_at', '<', $to);
+        // Offers declined on the dispatch panel never reached the driver's Uber app,
+        // so they are outside every accepted/declined figure — reported on their own
+        // instead ({@see DispatchOffer::scopeReachedDriver}).
+        $base = fn () => $all()->reachedDriver();
 
         $total = $base()->count();
         $accepted = $base()->whereNotNull('accepted_at')->count();
@@ -227,6 +231,7 @@ class FleetController extends Controller
             'total' => $total,
             'accepted' => $accepted,
             'declined' => $total - $accepted,
+            'dispatch_declined' => $all()->whereNotNull('dispatch_rejected_at')->count(),
             'completed' => $completed,
             'acceptance_rate' => $total > 0 ? (int) round($accepted / $total * 100) : 0,
             'earnings' => round($earnings, 2),

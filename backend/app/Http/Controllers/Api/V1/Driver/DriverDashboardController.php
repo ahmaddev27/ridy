@@ -27,7 +27,7 @@ class DriverDashboardController extends Controller
         $driver = $request->user();
 
         $active = $this->scoped($driver->id)
-            ->with('driver:id,name,online_status')
+            ->with(['driver:id,name,online_status', 'tenant'])
             ->whereIn('status', [OfferStatus::Accepted, OfferStatus::Started])
             ->latest('received_at')
             ->first();
@@ -36,13 +36,13 @@ class DriverDashboardController extends Controller
         // the push/WebSocket nudge was missed. Pending offers are resolved within
         // minutes (accept, supersede or the expiry sweep); the window bounds the scan.
         $pending = $this->scoped($driver->id)
-            ->with('driver:id,name,online_status')
+            ->with(['driver:id,name,online_status', 'tenant'])
             ->where('status', OfferStatus::Pending)
             ->where('received_at', '>=', now()->subMinutes(self::PENDING_OFFER_MINUTES))
             ->latest('received_at')
             ->first();
 
-        $recent = $this->scoped($driver->id)->with('driver:id,name,online_status')->latest('received_at')->limit(5)->get();
+        $recent = $this->scoped($driver->id)->with(['driver:id,name,online_status', 'tenant'])->latest('received_at')->limit(5)->get();
 
         return response()->json(['data' => [
             'driver' => [
@@ -72,7 +72,11 @@ class DriverDashboardController extends Controller
     /** @return array<string, mixed> */
     private function summary(int $driverId, CarbonImmutable $from, CarbonImmutable $to): array
     {
-        $base = fn () => $this->scoped($driverId)->where('received_at', '>=', $from)->where('received_at', '<', $to);
+        $all = fn () => $this->scoped($driverId)->where('received_at', '>=', $from)->where('received_at', '<', $to);
+        // Offers we declined on the dispatch panel never reached the driver's Uber
+        // app, so they are outside every accepted/declined figure — reported on
+        // their own instead ({@see DispatchOffer::scopeReachedDriver}).
+        $base = fn () => $all()->reachedDriver();
 
         $total = $base()->count();
         $accepted = $base()->whereNotNull('accepted_at')->count();
@@ -84,6 +88,7 @@ class DriverDashboardController extends Controller
             'total' => $total,
             'accepted' => $accepted,
             'declined' => $total - $accepted,
+            'dispatch_declined' => $all()->whereNotNull('dispatch_rejected_at')->count(),
             'completed' => $completed,
             'acceptance_rate' => $total > 0 ? (int) round($accepted / $total * 100) : 0,
             'earnings' => round($earnings, 2),

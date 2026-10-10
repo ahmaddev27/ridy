@@ -22,10 +22,11 @@ import {
   OFFERS_CHANNEL,
   OFFER_CATEGORY,
   OPEN_MAP_ACTION,
+  REJECT_OFFER_ACTION,
   isMultiStop,
 } from "./notification-channels";
 
-export { DOCUMENTS_CHANNEL, MULTISTOP_CHANNEL, OFFERS_CHANNEL, OFFER_CATEGORY, OPEN_MAP_ACTION };
+export { DOCUMENTS_CHANNEL, MULTISTOP_CHANNEL, OFFERS_CHANNEL, OFFER_CATEGORY, OPEN_MAP_ACTION, REJECT_OFFER_ACTION };
 
 /**
  * Push delivery for the driver app.
@@ -119,7 +120,21 @@ async function writeOfferCategory(): Promise<void> {
       // from a background action handler.
       options: { opensAppToForeground: true },
     },
+    {
+      identifier: REJECT_OFFER_ACTION,
+      buttonTitle: t("notif.rejectOffer"),
+      // Foregrounding is NOT a nicety here, it is the only way this can work:
+      // the react-native-firebase messaging service is stripped from the manifest
+      // (plugins/withExpoOwnsFcm.js) so expo-notifications owns FCM, which leaves
+      // the app with NO background FCM message handler. A background-only decline
+      // would have no JS runtime to send the request from. So the tap brings the
+      // app up and the pop-up fires the decline and shows what came back.
+      options: { opensAppToForeground: true, isDestructive: true },
+    },
   ]);
+  // Kept second on purpose: "Karte öffnen" has been the first button since the
+  // feature shipped, and a destructive action must not land under the thumb that
+  // learned to open the map.
 }
 
 /** Registers the "offer" notification category. Safe to call repeatedly. */

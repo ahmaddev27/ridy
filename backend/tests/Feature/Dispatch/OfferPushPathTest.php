@@ -206,6 +206,56 @@ class OfferPushPathTest extends TestCase
         $this->assertSame($seen[0], $seen[1], 'every offer in one request must share a single budget');
     }
 
+    /**
+     * The counterpart to the shared-deadline test above: with dispatch declines ON,
+     * the pre-push geocode is skipped ENTIRELY so nothing stands between the offer
+     * landing and the driver's decline pop-up opening. The metrics still arrive —
+     * the queued GeocodeOffer fills them in and its own broadcast carries them — so
+     * what is dropped here is only the WAIT, never the data.
+     */
+    public function test_a_company_with_dispatch_declines_on_pushes_without_geocoding_first(): void
+    {
+        Tenant::withoutGlobalScopes()->firstOrFail()->setDispatchRejectEnabled(true);
+
+        $calls = 0;
+        $this->partialMock(TripGeocoder::class, function ($mock) use (&$calls) {
+            $mock->shouldReceive('enrichForNotify')->andReturnUsing(function ($offer) use (&$calls) {
+                $calls++;
+
+                return $offer;
+            });
+        });
+
+        $this->ingest([$this->offer('f-1')])->assertOk()->assertJsonPath('data.routed', 1);
+
+        $this->assertSame(0, $calls, 'the fast path must not geocode ahead of the push');
+        $this->assertSame(['phone'], $this->spy->tokens, 'the push still goes out');
+        // The offer is left for the async job, exactly as a deadline-tripped one is.
+        $this->assertNull(DispatchOffer::withoutGlobalScopes()->where('offer_uuid', 'f-1')->value('geo_synced_at'));
+    }
+
+    public function test_the_fast_push_tells_the_app_it_is_the_bare_one(): void
+    {
+        Tenant::withoutGlobalScopes()->firstOrFail()->setDispatchRejectEnabled(true);
+
+        $sender = new class implements PushSender
+        {
+            public array $data = [];
+
+            public function send(string $deviceToken, string $title, string $body, array $data = []): bool
+            {
+                $this->data[] = $data;
+
+                return true;
+            }
+        };
+        $this->app->instance(PushSender::class, $sender);
+
+        $this->ingest([$this->offer('f-2')])->assertOk()->assertJsonPath('data.routed', 1);
+
+        $this->assertSame('1', $sender->data[0]['fast'] ?? null);
+    }
+
     public function test_offer_epoch_ms_times_are_stored_as_berlin_wall_clock(): void
     {
         // 2026-07-01 12:00:00 UTC = 14:00 in Berlin (CEST).

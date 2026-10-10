@@ -118,6 +118,33 @@ export type Offer = {
   received_at: string | null;
   /** When Uber requested the trip, if distinct from when we received the offer. */
   requested_at?: string | null;
+  /** When UBER generated the offer (its own `offerGeneratedAtMs`). The countdown
+   *  prefers it over `received_at` so our ingest latency isn't handed back to the
+   *  driver as time they don't have. Optional: the live broadcast carries it, an
+   *  older backend's REST resource may not. */
+  offer_generated_at?: string | null;
+  /** Whether THIS offer can still be declined from the fleet's dispatch panel —
+   *  the server owns every predicate (feature flag, live session, window, attempts).
+   *  Absent on a backend without the feature, which reads as "ask and find out". */
+  can_decline?: boolean | null;
+  /** Set once Uber CONFIRMED a dispatch decline. Such an offer never reached the
+   *  driver, so it counts in no acceptance figure of theirs. */
+  dispatch_rejected_at?: string | null;
+};
+
+/**
+ * What the dispatch-decline endpoint answers. `status` is `queued` once the
+ * command is on its way to Uber, `duplicate`/`already_declined` when there was
+ * nothing left to do, and `refused` when a predicate said no — then `reason`
+ * names which one (disabled, not_pending, window_closed, no_session, …).
+ *
+ * A refusal is a 200, not an error: it is an answer about the OFFER, not about
+ * the request, and the driver is told which.
+ */
+export type DispatchRejectResult = {
+  status: "queued" | "duplicate" | "already_declined" | "refused" | string;
+  reason?: string;
+  command_id?: number;
 };
 
 export type DriverProfile = {
@@ -208,6 +235,10 @@ export type PaginationMeta = {
  *  fast enough that session restore falls through to the offline screen and a
  *  poller can try again, instead of hanging forever. */
 const DEFAULT_TIMEOUT_MS = 15_000;
+
+/** Budget for a decision the driver is making against a live Uber window: it has
+ *  to fail while they can still reach for their phone's Uber app. */
+const DISPATCH_ACTION_TIMEOUT_MS = 6_000;
 
 /** Request options: plain fetch init plus an optional per-call timeout. */
 export type RequestOptions = RequestInit & { timeoutMs?: number };
@@ -575,6 +606,26 @@ export class ApiClient {
    *  scanning list page 1 (which falsely reads as "expired" off that page). */
   offer(id: string | number) {
     return this.request<{ data: Offer }>(offerPath("/api/v1/driver/offers", id));
+  }
+
+  /**
+   * Decline a still-pending offer on the fleet's DISPATCH panel, so it never
+   * counts against the driver's Uber acceptance rate.
+   *
+   * The call only QUEUES the command — Uber's own answer comes back later over
+   * the driver's Reverb channel — so the budget is a fraction of the default: the
+   * driver is deciding inside a window measured in seconds, and a stalled mobile
+   * network must surface as a failure they can still act on ("decline it in the
+   * Uber app") rather than swallow the tap in silence.
+   *
+   * No owner-mode twin: the pop-up that calls this is driven by the private
+   * `driver.{id}` channel, which a fleet owner's token has no part in.
+   */
+  dispatchRejectOffer(id: string | number) {
+    return this.request<{ data: DispatchRejectResult }>(
+      `${offerPath("/api/v1/driver/offers", id)}/dispatch-reject`,
+      { method: "POST", timeoutMs: DISPATCH_ACTION_TIMEOUT_MS },
+    );
   }
 }
 

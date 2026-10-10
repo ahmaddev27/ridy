@@ -53,6 +53,16 @@ function intEnv(name, fallback, min) {
   return Math.floor(value);
 }
 
+// Boolean switch. Only an explicit off value disables a feature; a typo throws
+// rather than silently turning the dispatch reject path off on a whole shard.
+function boolEnv(name, fallback) {
+  const raw = (process.env[name] || "").trim().toLowerCase();
+  if (raw === "") return fallback;
+  if (["1", "true", "on", "yes"].includes(raw)) return true;
+  if (["0", "false", "off", "no"].includes(raw)) return false;
+  throw new Error(`Invalid ${name}: "${raw}" (expected true or false)`);
+}
+
 // Uber hosts must stay https: the session cookies ride these requests through
 // third-party residential proxies, so a plaintext override would expose them.
 function httpsBase(name, fallback) {
@@ -79,6 +89,16 @@ function ramenPaths() {
   }
   return paths;
 }
+
+// How long the backend may PARK our command long-poll before answering with an
+// empty list. Clamped to a minute: a park longer than a proxy's or load
+// balancer's idle timeout gets cut mid-flight on every single cycle, which would
+// turn the long-poll into a permanent error loop instead of a quiet wait.
+const COMMAND_POLL_WAIT_MAX_MS = 60000;
+const commandPollWait = Math.min(
+  intEnv("COMMAND_POLL_WAIT_MS", 20000, 1000),
+  COMMAND_POLL_WAIT_MAX_MS,
+);
 
 export const config = {
   // Ridy Laravel API base, e.g. http://localhost:8090
@@ -175,6 +195,25 @@ export const config = {
   // handshake/HTTP/404 error before the stream opened) and drop storms.
   streamCycleDelay: intEnv("STREAM_CYCLE_MS", 250, 0),
 
+  // Deadline for one dispatch-panel mutation on vsdispatch (ms). Deliberately
+  // tight: a decline is only worth sending while Uber might still take it, and a
+  // driver's app is waiting on the answer — so a stalled residential proxy must
+  // fail fast and be REPORTED rather than parked. Uber's real deadline for a
+  // panel decline is unknown; we attempt and record whatever Uber answers.
+  dispatchActionTimeout: intEnv("DISPATCH_ACTION_TIMEOUT_MS", 2500, 500),
+
+  // The outbound command loop (src/commands.js): how long one long-poll parks on
+  // the backend, and that call's own deadline. The shared apiTimeout (8s) would
+  // abort a 20s park on every cycle, so this call gets the park plus a margin for
+  // the round-trip; the other calls keep the short deadline.
+  commandPollWait,
+  commandApiTimeout: intEnv("COMMAND_API_TIMEOUT_MS", commandPollWait + 5000, 1000),
+
+  // Kill switch for the command loop. ON by default: the per-company flag that
+  // actually gates declining lives in the backend (tenant settings), so this one
+  // is only an operator's lever to silence a whole shard.
+  commandsEnabled: boolEnv("COMMANDS_ENABLED", true),
+
   // Horizontal sharding is DB-driven and admin-controlled: this box identifies
   // itself by a stable shard NAME and the backend returns only the companies
   // assigned to it (auto-balanced across boxes, with failover). One box → leave
@@ -187,6 +226,11 @@ export const config = {
 
 if (config.reconnectMaxDelay < config.reconnectMinDelay) {
   throw new Error("Invalid RECONNECT_MAX_MS: must be >= RECONNECT_MIN_MS");
+}
+if (config.commandApiTimeout <= config.commandPollWait) {
+  // A deadline inside the park aborts every poll exactly when the backend is
+  // doing what it was asked to do, and the loop would read that as an outage.
+  throw new Error("Invalid COMMAND_API_TIMEOUT_MS: must be > COMMAND_POLL_WAIT_MS");
 }
 if (!isSupportedProxyUrl(config.proxyUrl)) {
   throw new Error("Invalid UBER_PROXY_URL: only http:// or https:// proxies are supported");

@@ -42,6 +42,12 @@ Schedule::command('queue:work --queue=push,mail,default --stop-when-empty --max-
 // Expire pending offers whose accept window elapsed (safety net for idle tenants).
 Schedule::command('offers:expire-pending')->everyMinute()->withoutOverlapping(2);
 
+// Settle dispatch commands (panel-side declines) nothing delivered in time: one no
+// daemon collected, or one a box claimed and then died without reporting. Beside the
+// offer sweep above because it closes the same kind of hole — a row left waiting on
+// an answer that is never coming.
+Schedule::command('dispatch:expire-commands')->everyMinute()->withoutOverlapping(2);
+
 // Force-finalize stale offers (over-long trips / abandoned accepts) the poll missed.
 Schedule::command('offers:finalize-stale')->everyFiveMinutes()->withoutOverlapping(10);
 

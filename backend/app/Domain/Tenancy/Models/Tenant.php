@@ -81,6 +81,32 @@ class Tenant extends Model
     }
 
     /**
+     * Whether this company may decline offers on the Uber dispatch panel — the one
+     * place the product WRITES to Uber instead of only observing it.
+     *
+     * **Absent means off**, so every existing company starts closed and today's
+     * behaviour is unchanged for them. Switching it on also turns on the bare
+     * instant offer push (no geocode on the hot path) that the decline window needs.
+     *
+     * This is deliberately a per-company setting and NOT an env var: CI rewrites the
+     * production .env from GitHub secrets on every deploy, so an env kill switch
+     * would silently re-enable itself on the next push to main. For the only code
+     * that acts on Uber, the off switch has to survive a deploy.
+     */
+    public function dispatchRejectEnabled(): bool
+    {
+        return ($this->settings['dispatch_reject']['enabled'] ?? false) === true;
+    }
+
+    /** Open or close dispatch declines for this company. The immediate kill switch. */
+    public function setDispatchRejectEnabled(bool $enabled): void
+    {
+        $settings = $this->settings ?? [];
+        $settings['dispatch_reject'] = array_merge($settings['dispatch_reject'] ?? [], ['enabled' => $enabled]);
+        $this->forceFill(['settings' => $settings])->save();
+    }
+
+    /**
      * The El-Professor link, as the dashboard card and the driver app both read it.
      * The single derivation: `connected` is true only while a token exists, is not
      * revoked, and El-Professor has actually pulled at least once.

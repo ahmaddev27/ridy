@@ -9,8 +9,29 @@ const KEY = extra.reverbKey ?? "";
 
 export type RealtimeHandle = { disconnect: () => void };
 
-/** Payload of the backend's `offer.changed` broadcast (OfferBroadcast). */
-export type OfferChangedEvent = { offer_id?: number; reason?: string };
+/**
+ * Payload of the backend's `offer.changed` broadcast (OfferBroadcast).
+ *
+ * `reason` is `new` | `status` | `multistop`. A `new` broadcast additionally
+ * inlines the BARE offer fields — everything Uber's own dispatch payload gives
+ * for free, nothing that needs geocoding — so the instant pop-up can render the
+ * whole decision without a single extra request inside the accept window.
+ * Distance and €/km are deliberately absent: they arrive later and must never
+ * be waited for.
+ */
+export type OfferChangedEvent = {
+  offer_id?: number;
+  reason?: string;
+  offer_uuid?: string;
+  /** Uber's `formattedUFP` string, or the numeric fare on a backend that sends one. */
+  fare?: string | number | null;
+  pickup?: string | null;
+  dropoff?: string | null;
+  rider_name?: string | null;
+  accept_window?: number | null;
+  offer_generated_at?: string | null;
+  received_at?: string | null;
+};
 
 type PusherConnection = { bind: (event: string, cb: (payload: { current?: string }) => void) => void };
 
