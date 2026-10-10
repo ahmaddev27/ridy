@@ -1,4 +1,6 @@
 import Constants from "expo-constants";
+// The legacy entry point: `uploadAsync` is not part of the new File API.
+import * as FileSystem from "expo-file-system/legacy";
 import { Sentry } from "@/lib/sentry";
 
 /**
@@ -260,29 +262,6 @@ export class ApiClient {
     this.owner = owner;
   }
 
-  /**
-   * A multipart POST, for the one endpoint that carries a file.
-   *
-   * It cannot go through `request()`: that sets `Content-Type:
-   * application/json` on every call, and a multipart body needs the runtime to
-   * set the header WITH its boundary. Overriding the key with `undefined`
-   * does not remove it — React Native sends the string "undefined" and the
-   * server reads an empty request. So the header is simply never set here.
-   *
-   * Everything else `request()` does that matters — the bearer, the timeout,
-   * the 401 handling — is reused by delegating to it with a FormData body and
-   * a marker that suppresses the JSON header.
-   */
-  private form<T>(path: string, body: FormData, timeoutMs?: number): Promise<T> {
-    return this.request<T>(path, {
-      method: "POST",
-      body: body as unknown as BodyInit,
-      // Read by `request()`: an empty value deletes the inherited header.
-      headers: { "Content-Type": "" },
-      ...(timeoutMs ? { timeoutMs } : {}),
-    });
-  }
-
   private async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     if (!isSafePath(path)) throw new ApiError(400, "invalid_path", null);
 
@@ -305,10 +284,12 @@ export class ApiClient {
       res = await fetch(BASE + path, {
         ...init,
         signal: controller.signal,
-        // An EMPTY Content-Type from the caller means "do not send one": a
-        // multipart body needs the runtime to set the header with its own
-        // boundary, and a header set to the string "undefined" produces an
-        // empty request on the server with no message anywhere.
+        // An EMPTY Content-Type from the caller means "do not send one".
+        // Nothing uses it today — the one upload goes through `uploadAsync`,
+        // which builds its own body — but it stays because the alternative a
+        // caller would reach for does not work: overriding the key with
+        // `undefined` sends the literal string "undefined" and the server then
+        // reads an empty request with no message anywhere.
         headers: Object.fromEntries(
           Object.entries({
             Accept: "application/json",
@@ -320,10 +301,20 @@ export class ApiClient {
       });
       // The body read can stall too, so it stays inside the timed section.
       text = await res.text();
-    } catch {
+    } catch (e) {
       // No HTTP answer at all (offline, DNS, timeout, aborted): a network error,
       // never a 401 — so it can't end the session, and restore() shows offline.
-      throw new ApiError(0, controller.signal.aborted ? "timeout" : "network", null);
+      //
+      // The original error is CARRIED, not discarded. Throwing it away is what
+      // made the first failed receipt unreadable: every cause arrived as the
+      // bare word "network", and the runtime's own sentence — the only thing
+      // that said which of them it was — had already been dropped here.
+      throw new ApiError(
+        0,
+        controller.signal.aborted ? "timeout" : "network",
+        null,
+        e instanceof Error ? `${e.name}: ${e.message}` : String(e),
+      );
     } finally {
       clearTimeout(timer);
       callerSignal?.removeEventListener("abort", onCallerAbort);
@@ -427,17 +418,76 @@ export class ApiClient {
    * A longer timeout than the default: this is the one request that carries a
    * file over a phone's connection.
    */
-  submitReceipt(draft: ReceiptDraft, photo: PickedPhoto) {
-    const body = new FormData();
-    body.append("subject", "receipt");
-    body.append("receipt_date", draft.receipt_date);
-    body.append("amount", draft.amount);
-    body.append("payment_method", draft.payment_method);
-    if (draft.category) body.append("category", draft.category);
-    if (draft.description) body.append("description", draft.description);
-    if (draft.postal_code) body.append("postal_code", draft.postal_code);
-    body.append("document", photo as unknown as Blob);
-    return this.form<{ data: DriverSubmission }>("/api/v1/driver/submissions", body, 60_000);
+  /**
+   * Send a receipt with its photo.
+   *
+   * **This one does not go through `request()`, and that is the point.** React
+   * Native's `FormData` takes a `{ uri, name, type }` object and streams the
+   * file itself; on this stack that rejected before a byte left the phone —
+   * `fetch` threw, so there was no status, no server log and no row anywhere,
+   * while a JSON POST to the same url in the same session went through.
+   *
+   * `uploadAsync` builds the multipart body natively and reads the file on the
+   * native side, so nothing depends on the JS layer being able to open a cache
+   * URI the image manipulator just wrote. It is a different code path, so the
+   * answer is mapped onto the same `ApiError` the rest of the client throws and
+   * the screen already reads.
+   */
+  async submitReceipt(draft: ReceiptDraft, photo: PickedPhoto): Promise<{ data: DriverSubmission }> {
+    const path = "/api/v1/driver/submissions";
+    if (!isSafePath(path)) throw new ApiError(400, "invalid_path", null);
+
+    // Every value crosses as a string: multipart has no other type.
+    const parameters: Record<string, string> = {
+      subject: "receipt",
+      receipt_date: draft.receipt_date,
+      amount: draft.amount,
+      payment_method: draft.payment_method,
+    };
+    if (draft.category) parameters.category = draft.category;
+    if (draft.description) parameters.description = draft.description;
+    if (draft.postal_code) parameters.postal_code = draft.postal_code;
+
+    // A bare path without the scheme is not a file URI, and the native side
+    // needs one. The manipulator writes `file://…`; this costs nothing and
+    // removes a way for a platform difference to look like a network failure.
+    const fileUri = photo.uri.startsWith("file://") ? photo.uri : `file://${photo.uri}`;
+
+    const sentToken = this.token;
+    let res: FileSystem.FileSystemUploadResult;
+    try {
+      res = await FileSystem.uploadAsync(BASE + path, fileUri, {
+        httpMethod: "POST",
+        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+        fieldName: "document",
+        mimeType: photo.type,
+        parameters,
+        headers: {
+          Accept: "application/json",
+          ...(sentToken ? { Authorization: `Bearer ${sentToken}` } : {}),
+        },
+      });
+    } catch (e) {
+      throw new ApiError(0, "network", null, e instanceof Error ? `${e.name}: ${e.message}` : String(e));
+    }
+
+    let parsed: unknown = null;
+    try {
+      parsed = res.body ? JSON.parse(res.body) : null;
+    } catch {
+      parsed = null;
+    }
+    const body = (parsed && typeof parsed === "object" ? parsed : {}) as { message?: unknown };
+
+    if (res.status < 200 || res.status >= 300) {
+      throw new ApiError(
+        res.status,
+        typeof body.message === "string" ? body.message : "request_failed",
+        parsed,
+      );
+    }
+    if (!parsed || typeof parsed !== "object") throw new ApiError(res.status, "invalid_response", null);
+    return parsed as { data: DriverSubmission };
   }
 
   /** Send a note. No photo, so it goes as plain JSON like everything else. */
@@ -579,7 +629,13 @@ export class ApiClient {
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public body: unknown) {
+  constructor(
+    public status: number,
+    message: string,
+    public body: unknown,
+    /** What the runtime itself said, when there was no HTTP answer to read. */
+    public detail?: string,
+  ) {
     super(message);
   }
 

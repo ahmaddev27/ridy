@@ -177,7 +177,13 @@ export default function ReceiptScreen() {
       if (err?.status !== 422) {
         Sentry.captureException(e, {
           tags: { flow: "receipt_submit" },
-          extra: { status: err?.status ?? null, kind: err?.message ?? String(e) },
+          extra: {
+            status: err?.status ?? null,
+            kind: err?.message ?? String(e),
+            // The runtime's own sentence, which is the only thing that names a
+            // network failure's real cause.
+            detail: err?.detail ?? null,
+          },
         });
       }
     } finally {
