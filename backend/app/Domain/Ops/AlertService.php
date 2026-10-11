@@ -66,15 +66,58 @@ class AlertService
     {
         Log::warning('ops.alert', ['subject' => $subject, 'body' => $body]);
 
-        $to = config('services.alerts.email');
-        if (empty($to)) {
+        $to = self::recipients();
+        if ($to === []) {
             return;
         }
 
         try {
-            SendRenderedMail::dispatch((string) $to, '[Reidey Ops] '.$subject, $body, false);
+            SendRenderedMail::dispatch($to, '[Reidey Ops] '.$subject, $body, false);
         } catch (Throwable $e) {
             RidyLog::failure('alert.email_failed', ['subject' => $subject], $e);
         }
+    }
+
+    /**
+     * Who gets ops alerts, as a list.
+     *
+     * ALERT_EMAIL takes one address or several separated by a comma, semicolon or
+     * whitespace — an operator who wants a second pair of eyes on broken sessions
+     * should not need a code change or a second secret for it.
+     *
+     * It used to be passed through as a single `(string)`, which Symfony Mailer
+     * reads as ONE address: adding a second one silently broke the alert for BOTH
+     * recipients, so the very thing meant to add coverage removed it. Hence the
+     * split, the validation (a typo drops that one address rather than failing the
+     * whole send) and the log line naming what was dropped.
+     *
+     * @return array<int, string>
+     */
+    public static function recipients(): array
+    {
+        $raw = (string) config('services.alerts.email');
+        if (trim($raw) === '') {
+            return [];
+        }
+
+        $parts = preg_split('/[,;\s]+/', trim($raw), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        $valid = [];
+        $invalid = [];
+        foreach ($parts as $address) {
+            if (filter_var($address, FILTER_VALIDATE_EMAIL)) {
+                $valid[] = $address;
+            } else {
+                $invalid[] = $address;
+            }
+        }
+
+        if ($invalid !== []) {
+            // Not silent: a mistyped ops address means alerts quietly stop reaching
+            // someone, which is the same failure mode as having no alerting at all.
+            Log::warning('ops.alert_recipient_invalid', ['dropped' => $invalid]);
+        }
+
+        return array_values(array_unique($valid));
     }
 }

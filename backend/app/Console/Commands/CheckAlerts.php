@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Domain\Dispatch\Models\DaemonShard;
+use App\Domain\Dispatch\Models\FleetSessionOutage;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Ops\AlertService;
 use App\Domain\Ops\Models\AlertIncident;
@@ -61,7 +62,7 @@ class CheckAlerts extends Command
                 "session_relink:{$s->id}",
                 'session_relink',
                 "Uber session broken for {$company}",
-                "The Uber fleet session for \"{$company}\" is {$s->status}. Offers stop until a manager reconnects it in the dashboard.",
+                $this->sessionAlertBody($s, $company),
             );
         }
 
@@ -75,6 +76,40 @@ class CheckAlerts extends Command
                 $alerts->resolve((string) $key);
             }
         }
+    }
+
+    /**
+     * What the ops email says about a broken session.
+     *
+     * Carries the DIAGNOSIS, not just the fact. Without it the alert said only
+     * "the session is broken", so answering "why?" meant an SSH session and four
+     * queries — every time. `cause` names who was refused (the daemon's own
+     * /ack-/recv, the manager's browser, or an operator), which is the first thing
+     * that narrows it, and the relink count says whether the extension's self-heal
+     * is trying and failing rather than not trying at all.
+     */
+    private function sessionAlertBody(UberFleetSession $session, string $company): string
+    {
+        $lines = ["The Uber fleet session for \"{$company}\" is {$session->status}."];
+
+        $outage = FleetSessionOutage::where('uber_fleet_session_id', $session->id)
+            ->whereNull('ended_at')
+            ->latest('started_at')
+            ->first();
+
+        if ($outage !== null) {
+            $lines[] = '';
+            $lines[] = 'Detected by: '.$outage->cause.'  (daemon = Uber refused OUR stream; '
+                .'extension = the browser reported it; admin = flagged from the panel)';
+            $lines[] = 'Started at:  '.$outage->started_at;
+            $lines[] = 'Relink attempts since: '.$outage->relink_attempts;
+        }
+
+        $lines[] = '';
+        $lines[] = 'Offers stop until the session is reconnected in the dashboard.';
+
+        return implode('
+', $lines);
     }
 
     /** An active shard that stopped heartbeating means its daemon box is down. */

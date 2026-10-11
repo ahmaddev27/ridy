@@ -229,4 +229,56 @@ class FleetSessionTest extends TestCase
 
         $this->assertSame(UberFleetSession::STATUS_NEEDS_RELINK, $session->fresh()->status);
     }
+
+    public function test_every_outage_alerts_the_managers_even_when_the_last_notice_is_unread(): void
+    {
+        // The 5.6-hour outage on 2026-10-06 was invisible to the manager because an
+        // earlier relink notice sat unread and the dedupe skipped them ENTIRELY —
+        // bell, push and email. An outage that stops a fleet's offers has to
+        // announce itself every time.
+        $session = $this->activeSession();
+
+        Sanctum::actingAs($this->manager);
+        $this->postJson('/api/v1/fleet-session/report-broken')->assertOk();
+        $this->assertSame(1, $this->relinkNotices());
+
+        // Recover and break again, with the FIRST notice still unread. refresh()
+        // first: the in-memory model still believes it is active, so forceFill on a
+        // stale instance is not dirty and save() would quietly do nothing.
+        $session->refresh()->forceFill(['status' => UberFleetSession::STATUS_ACTIVE])->save();
+        $this->postJson('/api/v1/fleet-session/report-broken')->assertOk();
+
+        $this->assertSame(2, $this->relinkNotices(), 'the second outage was swallowed');
+        $this->assertSame(2, $this->manager->unreadNotifications()->count());
+    }
+
+    public function test_a_persistently_broken_session_still_does_not_spam(): void
+    {
+        // What actually keeps the bell quiet is the active → broken TRANSITION, not
+        // the dedupe: a session already flagged cannot re-announce itself.
+        $this->activeSession();
+
+        Sanctum::actingAs($this->manager);
+        $this->postJson('/api/v1/fleet-session/report-broken')->assertOk();
+        $this->postJson('/api/v1/fleet-session/report-broken')->assertOk();
+        $this->postJson('/api/v1/fleet-session/report-broken')->assertOk();
+
+        $this->assertSame(1, $this->relinkNotices());
+    }
+
+    /** An active session the daemon is not holding, so the browser's report counts. */
+    private function activeSession(): UberFleetSession
+    {
+        return UberFleetSession::withoutGlobalScopes()->create([
+            'tenant_id' => $this->tenant->id, 'uber_org_uuid' => self::ORG,
+            'cookies' => [['name' => 'sid', 'value' => 'v']],
+            'status' => UberFleetSession::STATUS_ACTIVE,
+            'last_event_at' => now()->subHour(),
+        ]);
+    }
+
+    private function relinkNotices(): int
+    {
+        return $this->manager->notifications()->where('data->type', 'session_needs_relink')->count();
+    }
 }

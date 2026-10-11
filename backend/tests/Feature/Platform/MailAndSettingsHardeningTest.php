@@ -65,7 +65,10 @@ class MailAndSettingsHardeningTest extends TestCase
 
         app(AlertService::class)->open('shard_down:9', 'shard_down', 'Shard down');
 
-        Queue::assertPushed(SendRenderedMail::class, fn (SendRenderedMail $job) => $job->to === 'ops@reidey.de' && $job->html === false);
+        // A LIST even for one address: ALERT_EMAIL may name several, and passing the
+        // raw string through made Symfony Mailer read the lot as one address and
+        // deliver to none (see AlertRecipientsTest).
+        Queue::assertPushed(SendRenderedMail::class, fn (SendRenderedMail $job) => $job->to === ['ops@reidey.de'] && $job->html === false);
     }
 
     public function test_subject_variables_are_not_html_escaped_but_body_ones_are(): void

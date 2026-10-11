@@ -184,12 +184,21 @@ class FleetSessionService
             $this->outages->open($session, $source);
         }
 
-        // Prompt the managers to reconnect — but only on the transition, and
-        // deduped, so a persistently-broken session doesn't spam the bell. Pass
-        // `company`: the push/email copy is "{company}: the Uber session needs
-        // relinking" — without it the token rendered a literal "{company}".
+        // Prompt the managers to reconnect. Pass `company`: the push/email copy is
+        // "{company}: the Uber session needs relinking" — without it the token
+        // rendered a literal "{company}".
+        //
+        // NOT deduped, deliberately. `$wasActive` already makes this fire only on
+        // the active → broken TRANSITION, so it cannot spam a persistently-broken
+        // session; that is what keeps the bell quiet. Deduping on top of it meant
+        // something worse: the dedupe skips a recipient who still has an UNREAD
+        // notice of this type, and it skips them entirely — no bell, no push and no
+        // EMAIL. So once a manager left one relink notice unread, every later outage
+        // for that company was silent to them, which is how a real outage went
+        // unnoticed for 5.6 hours on 2026-10-06. An outage that stops a fleet's
+        // offers has to announce itself every single time.
         if ($wasActive) {
-            $this->notifier->toTenant($session->tenant_id, 'session_needs_relink', ['company' => $this->companyName($session)], '/connections', dedupe: true);
+            $this->notifier->toTenant($session->tenant_id, 'session_needs_relink', ['company' => $this->companyName($session)], '/connections');
         }
     }
 
@@ -230,8 +239,9 @@ class FleetSessionService
     {
         $this->recorder->session((int) $session->tenant_id, 'supplier_degraded', ['source' => $source]);
 
-        // Same manager prompt as a real relink (deduped), since the fix is the same
-        // action — reconnect — but the offer stream is untouched.
+        // Same manager prompt as a real relink, and this one STAYS deduped: the
+        // offer stream is untouched, so the fleet is still earning and a repeat
+        // notice is noise. Only a real outage (above) announces itself every time.
         $this->notifier->toTenant($session->tenant_id, 'session_needs_relink', ['company' => $this->companyName($session)], '/connections', dedupe: true);
     }
 
