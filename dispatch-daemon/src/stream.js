@@ -37,6 +37,39 @@ export function jarFingerprint(cookies) {
 }
 
 /**
+ * The supplier cookies a session EFFECTIVELY runs on: its own when it has them,
+ * otherwise the RAMEN jar, which is the fallback the stream constructor applies for
+ * sessions captured before supplier cookies existed.
+ *
+ * Exists so that fallback has exactly ONE definition. It used to be applied when
+ * building `supplierJar` but not when computing the stored fingerprint, and the two
+ * fingerprints were then compared against each other — see sessionJarFingerprint.
+ */
+export function effectiveSupplierCookies(session) {
+  const own = toCookieList(session?.supplier_cookies);
+
+  return own.length > 0 ? own : toCookieList(session?.cookies);
+}
+
+/**
+ * The fingerprint of a session ROW, with the supplier fallback applied — the single
+ * definition shared by the stream constructor and the supervisor's reconcile.
+ *
+ * This has to agree with {@link RamenStream#liveJarFingerprint}, which hashes the
+ * live Maps. It did not: the constructor hashed the RAW `supplier_cookies` column
+ * while `supplierJar` had already fallen back to the RAMEN cookies, so for any
+ * session row without supplier cookies the stored and live fingerprints could never
+ * be equal. persistJar()'s "nothing changed" guard therefore never fired — the
+ * daemon wrote the jar back on the first Set-Cookie even when nothing had rotated,
+ * and reconcile then read the drift as "cookies changed" and restarted the stream.
+ * That is the cookie-churn pattern behind the offer-loss incident, so keep all
+ * three readings of a fingerprint going through one function.
+ */
+export function sessionJarFingerprint(session) {
+  return `${jarFingerprint(session?.cookies)}:${jarFingerprint(effectiveSupplierCookies(session))}`;
+}
+
+/**
  * Backend writes that must not be cut off by a restart (offer ingests, rotated
  * cookie persists). The SIGTERM handler waits for these, briefly, before exiting.
  */
@@ -204,7 +237,7 @@ export class RamenStream {
     // whenever the manager reconnects — even when the new token has the same cookie
     // COUNT (the old count-only fingerprint missed a value rotation and stuck the
     // stream on dead cookies with a RAMEN 404 until a manual restart).
-    this.cookieFp = `${jarFingerprint(session.cookies)}:${jarFingerprint(session.supplier_cookies)}`;
+    this.cookieFp = sessionJarFingerprint(session);
     // The backend's jar generation this stream was built from. Echoed on cookie /
     // relink / degraded reports so a stream a reconnect replaced can't clobber the
     // fresh capture. Adopting our own rotation never changes it (the backend only
