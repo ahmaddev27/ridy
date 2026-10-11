@@ -55,6 +55,73 @@ class AdminCompanyTest extends TestCase
         $this->assertStringNotContainsString('secret', json_encode($acme)); // creds never exposed
     }
 
+    public function test_only_a_super_admin_may_switch_dispatch_declines_for_a_company(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $manager = User::create([
+            'name' => 'M', 'email' => 'm@acme.de', 'password' => Hash::make('password'), 'tenant_id' => $tenant->id,
+        ]);
+        $manager->assignRole('fleet_manager');
+
+        // The only feature that writes to Uber: a company must never be able to
+        // open it for itself, however senior the role inside that company.
+        Sanctum::actingAs($manager);
+        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/dispatch-reject", ['enabled' => true])
+            ->assertForbidden();
+
+        $this->assertFalse($tenant->refresh()->dispatchRejectEnabled());
+    }
+
+    public function test_a_company_starts_with_dispatch_declines_closed_and_the_operator_opens_it(): void
+    {
+        Sanctum::actingAs($this->superAdmin());
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+
+        // Absent means OFF, so every company that predates the feature is closed.
+        $this->getJson("/api/v1/admin/companies/{$tenant->id}")
+            ->assertOk()
+            ->assertJsonPath('data.dispatch_reject_enabled', false);
+
+        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/dispatch-reject", ['enabled' => true])
+            ->assertOk()
+            ->assertJsonPath('data.dispatch_reject_enabled', true);
+        $this->assertTrue($tenant->refresh()->dispatchRejectEnabled());
+
+        // And closing it again is the kill switch — it must work at any moment.
+        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/dispatch-reject", ['enabled' => false])
+            ->assertOk()
+            ->assertJsonPath('data.dispatch_reject_enabled', false);
+        $this->assertFalse($tenant->refresh()->dispatchRejectEnabled());
+    }
+
+    public function test_the_dispatch_decline_switch_leaves_other_company_settings_alone(): void
+    {
+        Sanctum::actingAs($this->superAdmin());
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $tenant->setElprofessorEnabled(true);
+
+        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/dispatch-reject", ['enabled' => true])
+            ->assertOk();
+
+        // Both switches live in the same settings JSON column, so one must not
+        // overwrite the other's key on its way in.
+        $tenant->refresh();
+        $this->assertTrue($tenant->dispatchRejectEnabled());
+        $this->assertTrue($tenant->elprofessorEnabled());
+    }
+
+    public function test_the_dispatch_decline_switch_requires_an_explicit_boolean(): void
+    {
+        Sanctum::actingAs($this->superAdmin());
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+
+        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/dispatch-reject", [])
+            ->assertStatus(422);
+
+        $this->assertFalse($tenant->refresh()->dispatchRejectEnabled());
+    }
+
     public function test_create_company_with_first_manager_in_one_call(): void
     {
         Sanctum::actingAs($this->superAdmin());

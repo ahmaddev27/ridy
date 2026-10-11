@@ -111,6 +111,31 @@ class CompanyController extends Controller
         return response()->json(['data' => $this->detail($tenant->refresh())]);
     }
 
+    /**
+     * Open or close dispatch-side offer declines for one company — the only
+     * feature that WRITES to Uber, so the operator holds the switch per company
+     * rather than it being a company's own setting.
+     *
+     * Unlike the El-Professor switch, closing this revokes nothing and ends no
+     * connection: it simply stops new declines being accepted and returns the
+     * company's offer push to the normal geocode-first path. It is therefore safe
+     * to flip either way at any time, and it is the immediate kill switch — it
+     * lives in the DB precisely so a deploy cannot reset it (CI rewrites the
+     * production .env from GitHub secrets on every push to main).
+     *
+     * Commands already queued are left alone: the daemon will still report what
+     * Uber answered for them, which is the honest outcome for a decline the driver
+     * actually asked for a moment before the switch moved.
+     */
+    public function setDispatchReject(Request $request, Tenant $tenant): JsonResponse
+    {
+        $data = $request->validate(['enabled' => ['required', 'boolean']]);
+
+        $tenant->setDispatchRejectEnabled((bool) $data['enabled']);
+
+        return response()->json(['data' => $this->detail($tenant->refresh())]);
+    }
+
     public function show(Tenant $tenant): JsonResponse
     {
         $tenant->ensurePaymentReference(); // backfill for any company created before the feature

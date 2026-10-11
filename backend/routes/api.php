@@ -446,6 +446,13 @@ Route::prefix('v1')->group(function () {
         // that revokes a credential should not ride along with a name change.
         Route::patch('companies/{tenant}/elprofessor', [CompanyController::class, 'setElProfessor']);
 
+        // Dispatch-side declines, opened and closed per company by the platform —
+        // the only feature that writes to Uber, so the operator holds the switch.
+        // Its own route for the same reason as the one above: a switch that changes
+        // what we send to a third party should not ride along with a name change.
+        // Flipping it off is the immediate kill switch and revokes nothing.
+        Route::patch('companies/{tenant}/dispatch-reject', [CompanyController::class, 'setDispatchReject']);
+
         // Read-only drill-down into a company's fleet data (admin tabs).
         Route::get('companies/{tenant}/drivers', [CompanyDataController::class, 'drivers']);
         Route::get('companies/{tenant}/offers', [CompanyDataController::class, 'offers']);

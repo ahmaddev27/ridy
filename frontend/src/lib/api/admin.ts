@@ -27,6 +27,8 @@ export type Company = {
   /** Whether that company has actually completed the link. Derived: closing
    *  the switch deletes the tokens, so this follows it in the same response. */
   elprofessor_connected: boolean;
+  /** The PLATFORM's switch for dispatch-side offer declines, set per company. */
+  dispatch_reject_enabled: boolean;
   users?: CompanyUser[] | null;
 };
 
@@ -609,6 +611,28 @@ export async function listCollectorPayments(
  */
 export async function setCompanyElProfessor(id: number, enabled: boolean): Promise<Company> {
   const res = await apiFetch<{ data: Company }>(`${base}/${id}/elprofessor`, {
+    method: "PATCH",
+    body: { enabled },
+    withCsrf: true,
+  });
+  return res.data;
+}
+
+/**
+ * Turn dispatch-side offer declines on or off for one company.
+ *
+ * This is the one thing Reidey writes to Uber: with it on, a driver or manager
+ * can decline a still-pending offer from the dispatch panel.
+ *
+ * Its own endpoint rather than a field on the company update, because a switch
+ * that changes what we send to a third party should not ride along with a name
+ * change. Unlike the El-Professor switch, closing this revokes nothing and ends
+ * no connection — it only stops new declines being accepted and returns that
+ * company's offer push to the normal geocode-first path, so it is safe to flip
+ * either way at any time.
+ */
+export async function setCompanyDispatchReject(id: number, enabled: boolean): Promise<Company> {
+  const res = await apiFetch<{ data: Company }>(`${base}/${id}/dispatch-reject`, {
     method: "PATCH",
     body: { enabled },
     withCsrf: true,
