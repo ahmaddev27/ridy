@@ -62,6 +62,11 @@ class CompanyResource extends JsonResource
             'elprofessor_enabled' => $this->elprofessorEnabled(),
             'elprofessor_connected' => $this->isElprofessorConnected(),
 
+            // Dispatch-side declines: the one thing Reidey writes to Uber. The
+            // PLATFORM's switch, opened per company by the operator — absent = off,
+            // so every company that existed before the feature starts closed.
+            'dispatch_reject_enabled' => $this->dispatchRejectEnabled(),
+
             'session_status' => $session['status'] ?? null,
             'session_last_event_at' => $session['last_event_at'] ?? null,
             'session_expires_at' => $session['expires_at'] ?? null,
