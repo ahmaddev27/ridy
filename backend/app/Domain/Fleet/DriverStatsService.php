@@ -18,10 +18,17 @@ class DriverStatsService
     public function forDriver(Driver $driver, CarbonImmutable $from, CarbonImmutable $to): array
     {
         // $to is an exclusive upper bound (fleet-day next-04:00 boundary).
-        $offers = DispatchOffer::where('driver_uuid', $driver->uber_driver_uuid)
+        $rows = DispatchOffer::where('driver_uuid', $driver->uber_driver_uuid)
             ->where('received_at', '>=', $from)
             ->where('received_at', '<', $to)
-            ->get(['fare_amount', 'distance_m', 'accepted_at', 'status']);
+            ->get(['fare_amount', 'distance_m', 'accepted_at', 'status', 'dispatch_rejected_at']);
+
+        // Partitioned in PHP rather than with a second query: offers we declined on
+        // the dispatch panel never reached the driver's Uber app, so they are no part
+        // of their accepted/declined record ({@see DispatchOffer::scopeReachedDriver}),
+        // but they are still reported on their own so nothing silently vanishes.
+        $dispatchDeclined = $rows->whereNotNull('dispatch_rejected_at')->count();
+        $offers = $rows->whereNull('dispatch_rejected_at');
 
         $total = $offers->count();
         $acceptedCount = $offers->whereNotNull('accepted_at')->count();
@@ -35,6 +42,7 @@ class DriverStatsService
             'offers' => $total,
             'accepted' => $acceptedCount,
             'declined' => $total - $acceptedCount,
+            'dispatch_declined' => $dispatchDeclined,
             'acceptance_rate' => $total > 0 ? (int) round($acceptedCount / $total * 100) : 0,
             'earnings' => round($earnings, 2),
             'trips' => $completed->count(),

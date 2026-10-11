@@ -63,6 +63,17 @@ reidey.de {
 		respond 404
 	}
 
+	# The daemon's dispatch-command long-poll gets a pool of its OWN ([command] on
+	# :9002): it parks the request for up to 25 s waiting for a driver to tap
+	# "decline", so every daemon box permanently occupies a worker. On the
+	# [dispatch] pool those parks would eat the ingest capacity that pool exists to
+	# protect. MUST stay ABOVE the /api/v1/internal/dispatch/* handler below —
+	# Caddy sorts path matchers by specificity, and this longer prefix wins.
+	handle /api/v1/internal/dispatch/commands* {
+		root * /var/www/public
+		php_fastcgi backend:9002
+	}
+
 	# Daemon offer/status ingest gets its own PHP-FPM pool ([dispatch] on :9001,
 	# docker/php/php-fpm.d/zz-pools.conf), so dashboard and driver-app polling on
 	# the main pool can never queue an offer behind them inside Uber's ~5 s accept

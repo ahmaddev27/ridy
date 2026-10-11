@@ -339,6 +339,11 @@ class DriverAuthController extends Controller
             'uber_linked' => $driver->uber_driver_uuid !== null,
             'is_owner' => false,
             'documents_enabled' => $driver->tenant?->isElprofessorConnected() ?? false,
+            // Whether this company declines offers on the dispatch panel. The app
+            // registers the destructive Reject action on the offer notification
+            // only when it is true, so a company with the feature off never shows
+            // its drivers a button whose only possible answer is "disabled".
+            'dispatch_reject_enabled' => $driver->tenant?->dispatchRejectEnabled() ?? false,
         ];
     }
 
@@ -358,6 +363,10 @@ class DriverAuthController extends Controller
             'uber_linked' => $this->tenantUberLinked($owner->tenant_id),
             'is_owner' => true,
             'documents_enabled' => $owner->tenant?->isElprofessorConnected() ?? false,
+            // Kept on the owner's profile only so both shapes match for the app's
+            // single Profile type. An owner watches the fleet read-only and never
+            // gets the decline pop-up or the notification action.
+            'dispatch_reject_enabled' => false,
         ];
     }
 

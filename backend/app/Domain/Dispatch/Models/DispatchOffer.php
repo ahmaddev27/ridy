@@ -18,7 +18,7 @@ class DispatchOffer extends Model
     use BelongsToTenant;
 
     protected $fillable = [
-        'tenant_id', 'driver_uuid', 'driver_id', 'offer_uuid', 'real_offer_uuid',
+        'tenant_id', 'driver_uuid', 'driver_id', 'offer_uuid', 'real_offer_uuid', 'offer_type',
         'partner_uuid', 'seq', 'rider_first_name', 'driver_first_name', 'driver_last_name',
         'pickup_address', 'dropoff_address', 'pickup_display', 'dropoff_display', 'pickup_station_name', 'dropoff_station_name',
         'fare_formatted', 'accept_window_seconds',
@@ -26,6 +26,7 @@ class DispatchOffer extends Model
         'pickup_lat', 'pickup_lng', 'dropoff_lat', 'dropoff_lng',
         'distance_m', 'route_geometry', 'geo_confidence', 'geo_source', 'stops', 'stops_count', 'geo_synced_at', 'geo_attempts',
         'status', 'fare_amount', 'started_at', 'completed_at', 'rejected_at', 'canceled_at',
+        'dispatch_rejected_at',
     ];
 
     protected $casts = [
@@ -52,6 +53,7 @@ class DispatchOffer extends Model
         'completed_at' => 'datetime',
         'rejected_at' => 'datetime',
         'canceled_at' => 'datetime',
+        'dispatch_rejected_at' => 'datetime',
     ];
 
     public function driver(): BelongsTo
@@ -80,5 +82,25 @@ class DispatchOffer extends Model
     public function scopeCompleted(Builder $query): Builder
     {
         return $query->where('status', OfferStatus::Completed);
+    }
+
+    /**
+     * Offers that actually became the driver's to answer — the denominator of every
+     * accepted / declined / acceptance-rate figure.
+     *
+     * A dispatch-side decline is answered inside Uber's 5-second window, while the
+     * offer is still on the dispatch panel and BEFORE Uber forwards it to the
+     * driver's own Uber app. Uber therefore never counts it against their
+     * acceptance rate, and neither may we: it is not a decline by the driver, it
+     * never became their offer at all.
+     *
+     * Deliberately NOT applied to the offer LISTS — the operator and the driver
+     * should still see what was declined. Every stat surface instead reports those
+     * rows separately as `dispatch_declined`, so no row silently disappears and
+     * reached + dispatch_declined always reconciles with the list.
+     */
+    public function scopeReachedDriver(Builder $query): Builder
+    {
+        return $query->whereNull('dispatch_rejected_at');
     }
 }

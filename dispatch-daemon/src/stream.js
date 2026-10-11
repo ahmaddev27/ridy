@@ -132,6 +132,42 @@ const ROSTER_FILTERS = {
   gigTypeDocumentStatusFilter: [],
 };
 
+// The two dispatch-panel mutations, keyed by action. Copied VERBATIM from the
+// owner's own browser capture of Uber's panel (which answered isSuccess: true with
+// no Arkose challenge) — the document text is part of the contract Uber's resolver
+// matches on, so do not reformat or "tidy" these strings.
+//
+// `accept` exists so the executor is symmetric with Uber's own panel, but nothing
+// in Reidey creates an accept command: the product observes Uber, it never drives
+// it. Declining is the one exception the owner asked for, because it spares the
+// driver's acceptance rate.
+const DISPATCH_MUTATIONS = {
+  reject: {
+    operationName: "RejectOffers",
+    field: "rejectOffers",
+    query:
+      "mutation RejectOffers($offers:[Offer__Input]){rejectOffers(offers:$offers){offerResponse{offerUUID action driverUUID isSuccess errorMsg __typename}__typename}}",
+  },
+  accept: {
+    operationName: "AcceptOffers",
+    field: "acceptOffers",
+    query:
+      "mutation AcceptOffers($offers:[Offer__Input]){acceptOffers(offers:$offers){offerResponse{offerUUID action driverUUID isSuccess errorMsg __typename}__typename}}",
+  },
+};
+
+// Bound the error text we carry back to the backend: a Caddy/Uber HTML error page
+// would otherwise land kilobytes in uber_error and in the logs.
+const DISPATCH_ERROR_MAX = 200;
+
+/** Bound an error string for uber_error / the logs; null stays null. */
+function clipError(message) {
+  if (message === null || message === undefined) return null;
+  const text = String(message);
+
+  return text.length > DISPATCH_ERROR_MAX ? `${text.slice(0, DISPATCH_ERROR_MAX)}…` : text;
+}
+
 /** Release a response body we won't read, so its connection is freed right away. */
 function discardBody(response) {
   try {
@@ -692,6 +728,131 @@ export class RamenStream {
     this.supplierAuthFails = 0;
     this.supplierDegradedAt = null;
     this.supplierBackoffMs = 0;
+  }
+
+  /**
+   * Apply a dispatch-panel action to one offer — the ONE place this product writes
+   * to Uber instead of only reading it.
+   *
+   * Runs on THIS stream deliberately: the mutation needs the same vsdispatch
+   * session that is receiving the offers (this.jar, via headers() — NOT
+   * supplierHeaders(), which carries the fleethub jar) and the same residential
+   * exit (this.dispatcher), because Uber answers RAMEN with 404 from a datacenter
+   * IP. The jar here is also the freshest copy in the system: the backend's stored
+   * copy can lag a rotation by up to a full session poll.
+   *
+   * origin / referer / sec-fetch-* are set explicitly because undici never sends
+   * them and a browser always does. They are the one header class the verified
+   * browser capture carried that we would otherwise omit, and the likeliest real
+   * CSRF gate given that x-csrf-token is the constant "x".
+   *
+   * Resolves for EVERY outcome — a refused decline, a dead session and a network
+   * failure are all results the backend must record, never exceptions. The caller
+   * reports whatever comes back, so a throw here would leave the driver's UI
+   * waiting on a command that never settles.
+   *
+   * @returns {Promise<{isSuccess: boolean|null, errorMsg: string|null, latencyMs: number}>}
+   *   isSuccess null means we never got a verdict out of Uber at all.
+   */
+  async dispatchAction({ action, offerUUID, realOfferUUID, offerType, driverUUID }) {
+    const mutation = DISPATCH_MUTATIONS[action];
+    const started = Date.now();
+    const fail = (errorMsg) => ({ isSuccess: false, errorMsg: clipError(errorMsg), latencyMs: Date.now() - started });
+    const unknown = (errorMsg) => ({ isSuccess: null, errorMsg: clipError(errorMsg), latencyMs: Date.now() - started });
+
+    if (!mutation) return unknown(`unknown dispatch action "${action}"`);
+    // Defence in depth for the product's own rule. Nothing in Reidey creates an
+    // accept command — no route, no UI, and the backend service refuses to write
+    // one — but `action` arrives from the backend and the accept mutation is right
+    // there in the map, so a bug or a hand-edited row must not be able to accept a
+    // ride on a driver's behalf. Acceptance stays INFERRED from Uber driver status.
+    // Opening this needs a deliberate product decision, not a passing allowlist.
+    if (action !== "reject") return unknown(`refusing to send "${action}": only reject is enabled`);
+    if (!offerUUID || !realOfferUUID || !driverUUID) {
+      return unknown("incomplete command payload (offerUUID / realOfferUUID / driverUUID)");
+    }
+    if (this.stopped) return unknown("stream stopped before the action was sent");
+
+    let res;
+    try {
+      res = await fetch(`${config.uberDispatchBase}/graphql`, {
+        method: "POST",
+        headers: {
+          ...this.headers(),
+          "content-type": "application/json",
+          "x-csrf-token": "x",
+          origin: config.uberDispatchBase,
+          referer: `${config.uberDispatchBase}/`,
+          "sec-fetch-site": "same-origin",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-dest": "empty",
+        },
+        dispatcher: this.dispatcher,
+        // Its own deadline, NOT the stream's controller: aborting the stream must
+        // never cancel an action already in flight inside Uber's window.
+        signal: AbortSignal.timeout(config.dispatchActionTimeout),
+        body: JSON.stringify({
+          operationName: mutation.operationName,
+          variables: { offers: [{ params: { offerUUID, offerType, realOfferUUID }, driverUUID }] },
+          query: mutation.query,
+        }),
+      });
+    } catch (e) {
+      // A timeout or a dead proxy. Unknown, not refused: Uber may well have applied
+      // it, so the backend must not record a confirmed decline from this.
+      //
+      // Unwrap e.cause: undici reports every transport failure as the useless
+      // "fetch failed" and hides the diagnosis (ECONNREFUSED, socket hang up, a
+      // proxy's TLS error) underneath. uber_error exists to be read by a human.
+      if (e.name === "TimeoutError") return unknown(`timeout after ${config.dispatchActionTimeout}ms`);
+      const cause = e.cause?.message ?? e.cause?.code;
+
+      return unknown(cause ? `${e.message}: ${cause}` : e.message);
+    }
+
+    // A credentialed vsdispatch call, and Uber rotates the session cookie on it —
+    // a free jar refresh on exactly the path that matters most.
+    this.absorbCookies(res);
+
+    if (!res.ok) {
+      discardBody(res);
+      // Deliberately NOT routed into handleStreamAuthFailure, even on 401/403.
+      // That handler flags the session needs_relink and stops the stream, which
+      // would let ONE refused decline take down the company's entire offer ingest.
+      //
+      // A write may be gated differently from the read stream — CSRF, an Arkose
+      // challenge, or an org permission the manager's account simply lacks — so a
+      // 403 here is NOT evidence that the session feeding offers is dead. The same
+      // reasoning the supplier path already learned the hard way: see
+      // handleSupplierAuthFailure, which exists because treating a Fleet Hub 401 as
+      // a dead session cost a 4.5-hour outage on 2026-09-12.
+      //
+      // The offer stream has its own auth handling on /ack and /recv; if the
+      // session really is gone, that path will say so within seconds.
+      return unknown(`HTTP ${res.status}`);
+    }
+
+    let body;
+    try {
+      body = await res.json();
+    } catch (e) {
+      return unknown(`unreadable response: ${e.message}`);
+    }
+
+    if (Array.isArray(body?.errors) && body.errors.length > 0) {
+      return fail(body.errors.map((x) => x?.message).filter(Boolean).join("; ") || "graphql error");
+    }
+
+    const answer = body?.data?.[mutation.field]?.offerResponse?.[0];
+    if (!answer || typeof answer.isSuccess !== "boolean") {
+      return unknown("no offerResponse in the reply");
+    }
+
+    return {
+      isSuccess: answer.isSuccess,
+      errorMsg: answer.isSuccess ? null : clipError(answer.errorMsg || "Uber refused without a reason"),
+      latencyMs: Date.now() - started,
+    };
   }
 
   async run() {

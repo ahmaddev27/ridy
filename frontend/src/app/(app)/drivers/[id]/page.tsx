@@ -5,15 +5,14 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ChevronLeft, Phone, Mail, Star, Car, UserCheck, MapPin, ArrowRight, ChevronDown, Inbox, Banknote, CreditCard, RotateCcw } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { formatMoney, formatNumber, latnLocale, toLatinDigits } from "@/lib/utils";
 import { ApiError } from "@/lib/api/client";
 import { getDriver, getDriverStats, getDriverMetrics, type Driver, type DriverStats, type DriverMetric } from "@/lib/api/drivers";
-import { listOffersPaged, fareLabel, offerBadgeStatus, type DispatchOffer, type PageMeta } from "@/lib/api/offers";
-import { OFFER_TONE } from "@/lib/offer-status";
+import { listOffersPaged, fareLabel, type DispatchOffer, type PageMeta } from "@/lib/api/offers";
+import { OfferStatusBadge } from "@/components/ui/offer-status-badge";
 import { fleetDayKey, fleetDayRange, fleetYmd, formatYmd } from "@/lib/fleet-day";
 import { OfferDetailModal } from "../../offers/offer-detail-modal";
 
@@ -403,10 +402,7 @@ export default function DriverProfilePage() {
                                       {toLatinDigits(fareLabel(offer, latnLocale(locale)))}
                                     </td>
                                     <td className="px-4 py-3">
-                                      {(() => {
-                                        const st = offerBadgeStatus(offer);
-                                        return <Badge status={OFFER_TONE[st]} dot>{o(`st_${st}`)}</Badge>;
-                                      })()}
+                                      <OfferStatusBadge offer={offer} />
                                     </td>
                                   </tr>
                                 ))}

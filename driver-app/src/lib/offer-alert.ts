@@ -17,6 +17,10 @@ import type { Offer } from "./api";
  * De-duplicated per `${offerId}:${kind}` so a later multi-stop follow-up for the
  * same offer can still alert once. Freshness is judged by the offer's own accept
  * window, not by when the app started — a stale pending offer never chimes.
+ *
+ * The instant offer pop-up rings through the SAME dedupe (`alertOfferNow`), only
+ * without the grace wait — so the pop-up and this fallback can never both chime
+ * for one offer.
  */
 
 /** How long the FCM push gets to arrive before the local fallback fires. */
@@ -59,6 +63,23 @@ export { freshUntil, isFreshOffer };
  * non-pending, stale or already-alerted offer.
  */
 export function alertOffer(offer: Offer | null | undefined): void {
+  scheduleAlert(offer, PUSH_GRACE_MS);
+}
+
+/**
+ * Alert NOW, for an offer the instant pop-up is already putting on screen.
+ *
+ * The push grace exists to let the FCM push win the race; it cannot apply here,
+ * because 2 s of waiting sits inside the accept window the driver is deciding
+ * in — the chime would land after the pop-up, or after the decision. Same
+ * guards, same `alerted` set, zero delay: whichever of the pop-up, the push and
+ * the delayed fallback gets there first is the ONLY one that rings.
+ */
+export function alertOfferNow(offer: Offer | null | undefined): void {
+  scheduleAlert(offer, 0);
+}
+
+function scheduleAlert(offer: Offer | null | undefined, delayMs: number): void {
   if (!offer || offer.status !== "pending") return;
   const multi = isMultiStop(offer.stops_count);
   const key = keyFor(offer.id, multi);
@@ -70,7 +91,7 @@ export function alertOffer(offer: Offer | null | undefined): void {
   const timer = setTimeout(() => {
     pendingFallback.delete(key);
     void presentFallback(offer, multi, key);
-  }, PUSH_GRACE_MS);
+  }, delayMs);
   pendingFallback.set(key, timer);
 }
 

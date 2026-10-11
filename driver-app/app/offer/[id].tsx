@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { useState } from "react";
 import { View, Pressable, ActivityIndicator, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
@@ -12,6 +12,17 @@ import { t, isRTL, useLocale } from "@/lib/i18n";
 import { useColors, radius, cardStyle } from "@/lib/theme";
 import { fareLabel, perKmValue, perKmLabel, distanceLabel, cleanAddress, timeLabel } from "@/lib/format";
 import { StatusBadge, RouteBlock, SectionLabel, SecondaryButton } from "@/components/ui";
+import {
+  CountdownArc,
+  CountdownLabel,
+  RING,
+  RING_CIRC,
+  RING_R,
+  STROKE,
+  acceptWindow,
+  deadlineOf,
+  useWindowOpen,
+} from "@/components/countdown";
 import { useLiveReload } from "@/lib/use-live-reload";
 
 /** "19 Min" / "45 Sek" / "1 Std 5 Min" — how long the trip took. */
@@ -22,95 +33,8 @@ function durationLabel(sec: number): string {
   return `${Math.floor(m / 60)} ${t("offer.hrShort")} ${m % 60} ${t("offer.minShort")}`;
 }
 
-const RING = 216;
-const STROKE = 10;
-const R = (RING - STROKE) / 2;
-const CIRC = 2 * Math.PI * R;
-
-/** Accept-window fallback (seconds) when the offer carries no real window. */
-const COUNTDOWN_FALLBACK_SECONDS = 10;
-
-/** The offer's real accept window in seconds, falling back to the default. */
-function acceptWindow(offer: Offer | null): number {
-  return offer?.accept_window_seconds ?? COUNTDOWN_FALLBACK_SECONDS;
-}
-
 /** Statuses after which nothing about the offer changes any more. */
 const TERMINAL_STATUSES = new Set(["completed", "rejected", "canceled"]);
-
-/** Deadline of the accept window (ms epoch), or null without a received time. */
-function deadlineOf(receivedAt: string | null, windowSeconds: number): number | null {
-  const received = receivedAt ? Date.parse(receivedAt) : NaN;
-  return Number.isFinite(received) ? received + windowSeconds * 1000 : null;
-}
-
-/**
- * Seconds left in the accept window, re-rendering ONLY the component that uses
- * it, and only when the shown tenth changes (100 ms ticks) — the rest of the
- * offer screen no longer re-renders every animation frame.
- */
-function useSecondsLeft(deadline: number | null, active: boolean): number | null {
-  const compute = () => (deadline === null ? null : Math.max(0, Math.round((deadline - Date.now()) / 100) / 10));
-  const [left, setLeft] = useState(compute);
-  useEffect(() => {
-    setLeft(compute());
-    if (deadline === null || !active || Date.now() >= deadline) return;
-    const id = setInterval(() => {
-      const next = compute();
-      setLeft((prev) => (prev === next ? prev : next));
-      if (Date.now() >= deadline) clearInterval(id);
-    }, 100);
-    return () => clearInterval(id);
-  }, [deadline, active]);
-  return left;
-}
-
-/** True until the deadline passes — flips once (a single timeout, no ticking). */
-function useWindowOpen(deadline: number | null, active: boolean): boolean {
-  const [open, setOpen] = useState(() => deadline !== null && active && Date.now() < deadline);
-  useEffect(() => {
-    const isOpen = deadline !== null && active && Date.now() < deadline;
-    setOpen(isOpen);
-    if (!isOpen || deadline === null) return;
-    const id = setTimeout(() => setOpen(false), deadline - Date.now());
-    return () => clearTimeout(id);
-  }, [deadline, active]);
-  return open;
-}
-
-function ringColorFor(pct: number, c: ReturnType<typeof useColors>): string {
-  return pct > 0.5 ? c.completed : pct > 0.25 ? c.pending : c.canceled;
-}
-
-/** The depleting countdown arc, drawn over the static track. */
-const CountdownArc = memo(function CountdownArc({ deadline, windowSeconds }: { deadline: number | null; windowSeconds: number }) {
-  const c = useColors();
-  const left = useSecondsLeft(deadline, true);
-  if (left === null) return null;
-  const pct = windowSeconds > 0 ? Math.max(0, Math.min(1, left / windowSeconds)) : 0;
-  return (
-    <Svg width={RING} height={RING} style={{ position: "absolute", transform: [{ rotate: "-90deg" }] }}>
-      <Circle
-        cx={RING / 2} cy={RING / 2} r={R}
-        stroke={ringColorFor(pct, c)} strokeWidth={STROKE} fill="none" strokeLinecap="round"
-        strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - pct)}
-      />
-    </Svg>
-  );
-});
-
-/** The live "4.2s" label under the fare. */
-const CountdownLabel = memo(function CountdownLabel({ deadline, windowSeconds }: { deadline: number | null; windowSeconds: number }) {
-  const c = useColors();
-  const left = useSecondsLeft(deadline, true);
-  if (left === null) return null;
-  const pct = windowSeconds > 0 ? Math.max(0, Math.min(1, left / windowSeconds)) : 0;
-  return (
-    <Text style={{ color: ringColorFor(pct, c), fontSize: 16, fontWeight: "600", marginTop: 6, writingDirection: "ltr" }}>
-      {`${left.toFixed(1)}s`}
-    </Text>
-  );
-});
 
 /** What went wrong loading the offer: gone for good vs. a transient failure. */
 type LoadFailure = "not_found" | "retry" | null;
@@ -171,6 +95,12 @@ export default function OfferScreen() {
 
   const status = offer?.status ?? "pending";
   const win = acceptWindow(offer);
+  // Deliberately measured from OUR received_at, not Uber's offer_generated_at,
+  // even though the payload now carries it. This screen predates the decline
+  // feature and its ring must keep reading exactly as it always has; switching to
+  // Uber's clock would silently shorten every driver's countdown by our ingest
+  // latency. The decline pop-up — a new surface, where the remaining window is the
+  // whole decision — is the one that counts from Uber's clock.
   const deadline = deadlineOf(offer?.received_at ?? null, win);
   // The status LABEL is driven ONLY by the backend `offer.status`, never by the
   // local countdown. The backend deliberately HOLDS an offer as `pending` while
@@ -230,12 +160,12 @@ export default function OfferScreen() {
           <View style={{ alignItems: "center", marginTop: 8 }}>
             <View style={{ width: RING, height: RING, alignItems: "center", justifyContent: "center" }}>
               <Svg width={RING} height={RING} style={{ position: "absolute", transform: [{ rotate: "-90deg" }] }}>
-                <Circle cx={RING / 2} cy={RING / 2} r={R} stroke={c.line} strokeWidth={STROKE} fill="none" />
+                <Circle cx={RING / 2} cy={RING / 2} r={RING_R} stroke={c.line} strokeWidth={STROKE} fill="none" />
                 {showProgress && (
                   <Circle
-                    cx={RING / 2} cy={RING / 2} r={R}
+                    cx={RING / 2} cy={RING / 2} r={RING_R}
                     stroke={PROGRESS_GREEN} strokeWidth={STROKE} fill="none" strokeLinecap="round"
-                    strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - lifePct)}
+                    strokeDasharray={RING_CIRC} strokeDashoffset={RING_CIRC * (1 - lifePct)}
                   />
                 )}
               </Svg>

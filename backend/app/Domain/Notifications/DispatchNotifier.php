@@ -10,6 +10,7 @@ use App\Domain\Notifications\Contracts\SendsPushInBulk;
 use App\Domain\Notifications\Jobs\NotifyOwnersOfOffer;
 use App\Domain\Notifications\Models\DeviceToken;
 use App\Events\OfferBroadcast;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -35,6 +36,16 @@ class DispatchNotifier
      */
     private const PUSH_BUDGET_SECONDS = 4.0;
 
+    /**
+     * Hard cap on the live publish when it runs AHEAD of the push (the fast path).
+     *
+     * Reverb sits on the internal Docker network, so a healthy publish is ~2-5 ms.
+     * 300 ms is two orders of magnitude of headroom and still negligible against
+     * the accept window — a Reverb that needs longer than that is broken, and the
+     * push must not wait for it.
+     */
+    private const FAST_BROADCAST_TIMEOUT_SECONDS = 0.3;
+
     /** Stops listed on the multi-stop body before it is cut with "… +k". */
     private const MAX_PUSH_STOPS = 8;
 
@@ -47,25 +58,53 @@ class DispatchNotifier
     public function __construct(private PushSender $sender) {}
 
     /**
+     * @param  bool  $fast  the company has dispatch declines enabled, so this offer
+     *                      takes the bare instant path: broadcast first, no geocode
+     *                      ahead of it (see {@see DispatchOfferIngestor::notifyDriver})
      * @return int number of the DRIVER's devices the offer was pushed to (the fleet
      *             owners' copy is queued — see {@see NotifyOwnersOfOffer})
      */
-    public function notify(DispatchOffer $offer): int
+    public function notify(DispatchOffer $offer, bool $fast = false): int
     {
         if ($offer->driver_id === null) {
             return 0; // unlinked offers have no one to notify
         }
 
-        // The FCM push goes FIRST: it is what wakes the driver's phone inside the
-        // ~5-second accept window. The Reverb broadcast is a synchronous HTTP call
-        // (up to its client timeout when Reverb is slow), so running it before the
-        // push could eat the window.
-        $sent = $this->pushToDriver($offer, $this->buildTitle($offer), $this->buildBody($offer), $this->offerData($offer));
+        $data = $this->offerData($offer);
+        if ($fast) {
+            // Tells the app this is the bare push: show the decline pop-up now and
+            // expect the metrics to arrive by the later OfferBroadcast('status').
+            $data['fast'] = '1';
+        }
 
-        // Real-time nudge to the driver's open app (WebSocket) so a fresh offer
-        // appears instantly, alongside the push that wakes a closed app. Best
-        // -effort: a broadcast failure (Reverb down) must never break ingestion.
-        $this->broadcastSafely(new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'new'));
+        $event = new OfferBroadcast((int) $offer->driver_id, (int) $offer->tenant_id, (int) $offer->id, 'new');
+        $title = $this->buildTitle($offer);
+        $body = $this->buildBody($offer);
+
+        // ORDER, and why it INVERTS on the fast path.
+        //
+        // Normally the FCM push goes first: it is what wakes a CLOSED phone inside
+        // the ~5-second accept window, and the Reverb publish is a synchronous HTTP
+        // call that could eat that window if it hung.
+        //
+        // On the fast path the app is expected to be OPEN — the whole point is a
+        // pop-up with a countdown and a decline button — and the publish is a local
+        // call over the Docker network (~2-5 ms) while FCM takes 1-3 s. Running it
+        // first therefore puts the offer on screen seconds earlier. The reason the
+        // original order existed is answered by a HARD timeout instead of by
+        // ordering: a slow Reverb is abandoned in ~300 ms, so it still cannot delay
+        // the push.
+        if ($fast) {
+            $this->broadcastSafely($event, self::FAST_BROADCAST_TIMEOUT_SECONDS);
+            $sent = $this->pushToDriver($offer, $title, $body, $data);
+        } else {
+            $sent = $this->pushToDriver($offer, $title, $body, $data);
+
+            // Real-time nudge to the driver's open app (WebSocket) so a fresh offer
+            // appears instantly, alongside the push that wakes a closed app. Best
+            // -effort: a broadcast failure (Reverb down) must never break ingestion.
+            $this->broadcastSafely($event);
+        }
 
         // The owners' copy leaves the hot path: only the DRIVER has a 5-second
         // window, and a company with three managers in owner mode used to add three
@@ -196,10 +235,42 @@ class DispatchNotifier
     /**
      * Publish a live nudge without ever breaking (or stalling) ingestion. A failure
      * is logged at most once a minute so a dead Reverb is visible, not a log flood.
+     *
+     * $timeoutSeconds tightens the connection for THIS publish only — see
+     * {@see notify}, where the publish runs ahead of the push and must therefore be
+     * abandoned fast rather than be allowed to delay it.
      */
-    private function broadcastSafely(OfferBroadcast $event): void
+    private function broadcastSafely(OfferBroadcast $event, ?float $timeoutSeconds = null): void
     {
-        SafeBroadcast::send($event, ['offer_id' => $event->offerId]);
+        $context = ['offer_id' => $event->offerId];
+
+        if ($timeoutSeconds === null) {
+            SafeBroadcast::send($event, $context);
+
+            return;
+        }
+
+        // The timeout lives in the connection's Guzzle client_options, which the
+        // broadcaster reads when it is CONSTRUCTED — hence the purge either side, so
+        // the tightened client is built for this publish and the configured one is
+        // rebuilt after it. Restored in a finally: a company with declines enabled
+        // must not leave every later publish in the request on the short timeout.
+        $connection = (string) config('broadcasting.default');
+        $key = 'broadcasting.connections.'.$connection.'.client_options';
+        $original = config($key);
+
+        config([$key => array_merge(is_array($original) ? $original : [], [
+            'connect_timeout' => $timeoutSeconds,
+            'timeout' => $timeoutSeconds,
+        ])]);
+
+        try {
+            rescue(fn () => Broadcast::purge($connection), report: false);
+            SafeBroadcast::send($event, $context);
+        } finally {
+            config([$key => $original]);
+            rescue(fn () => Broadcast::purge($connection), report: false);
+        }
     }
 
     /**

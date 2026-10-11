@@ -1,5 +1,5 @@
 import { AppState, type AppStateStatus, type NativeEventSubscription } from "react-native";
-import { connectDriverRealtime, type RealtimeHandle } from "./realtime";
+import { connectDriverRealtime, type OfferChangedEvent, type RealtimeHandle } from "./realtime";
 
 /**
  * Session-scoped "something changed, reload" bus.
@@ -14,7 +14,34 @@ import { connectDriverRealtime, type RealtimeHandle } from "./realtime";
  * delivery) and reopened on resume.
  */
 export type LiveReason = "socket" | "push" | "resume";
-export type LiveEvent = { reason: LiveReason; offerId?: number };
+
+/**
+ * The bare offer fields a `new` broadcast inlines — fare, route, rider and the
+ * two timestamps the countdown needs. Exactly what Uber's dispatch payload gives
+ * away for free, so the instant pop-up renders with ZERO extra fetch. Anything
+ * that needs geocoding (distance, €/km) is NOT here on purpose: it fills in later.
+ */
+export type LiveOfferPayload = {
+  offerUuid: string | null;
+  fare: string | null;
+  fareAmount: number | null;
+  pickup: string | null;
+  dropoff: string | null;
+  riderName: string | null;
+  acceptWindow: number | null;
+  offerGeneratedAt: string | null;
+  receivedAt: string | null;
+};
+
+export type LiveEvent = {
+  reason: LiveReason;
+  offerId?: number;
+  /** The broadcast's own reason — `new` | `status` | `multistop` — when it came
+   *  over the socket. Distinct from `reason`, which says HOW we heard. */
+  offerReason?: string;
+  /** Present only on a `new` socket broadcast that inlined the bare fields. */
+  offer?: LiveOfferPayload;
+};
 type Listener = (event: LiveEvent) => void;
 
 /** How long the socket may stay open while the app is in the background. */
@@ -51,12 +78,53 @@ export function isLiveConnected(): boolean {
   return connected;
 }
 
+/** Narrow a broadcast field to a non-empty string, else null. */
+function str(value: unknown): string | null {
+  return typeof value === "string" && value !== "" ? value : null;
+}
+
+/** Narrow a broadcast field to a finite number, else null. */
+function num(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * The bare fields of a `new` broadcast, or undefined when it carried none (an
+ * older backend, or any other reason). Every field is narrowed here, once, so no
+ * screen has to re-check what the wire actually sent.
+ */
+function offerPayloadOf(e: OfferChangedEvent): LiveOfferPayload | undefined {
+  if (e.reason !== "new") return undefined;
+  const payload: LiveOfferPayload = {
+    offerUuid: str(e.offer_uuid),
+    // Uber sends `formattedUFP`, a string; a numeric fare is accepted too so the
+    // app formats it itself (the project's one money shape) when it gets one.
+    fare: str(e.fare),
+    fareAmount: num(e.fare),
+    pickup: str(e.pickup),
+    dropoff: str(e.dropoff),
+    riderName: str(e.rider_name),
+    acceptWindow: num(e.accept_window),
+    offerGeneratedAt: str(e.offer_generated_at),
+    receivedAt: str(e.received_at),
+  };
+  // Without a receive/generation time there is no window to count down, so the
+  // pop-up would have to fetch anyway — let it, rather than render a dead ring.
+  return payload.receivedAt || payload.offerGeneratedAt ? payload : undefined;
+}
+
 function openSocket(): void {
   if (!session || handle) return;
   handle = connectDriverRealtime(
     session.driverId,
     session.token,
-    (e) => emitLive({ reason: "socket", offerId: typeof e.offer_id === "number" ? e.offer_id : undefined }),
+    (e) =>
+      emitLive({
+        reason: "socket",
+        offerId: typeof e.offer_id === "number" ? e.offer_id : undefined,
+        offerReason: str(e.reason) ?? undefined,
+        offer: offerPayloadOf(e),
+      }),
     (isUp) => {
       const wasUp = connected;
       connected = isUp;

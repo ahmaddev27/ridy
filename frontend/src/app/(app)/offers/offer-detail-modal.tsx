@@ -7,11 +7,10 @@ import { latnLocale, toLatinDigits } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { X, MapPin, User, CircleDollarSign, Clock, Loader2, Route, Gauge, Wallet } from "lucide-react";
 import { StatCard } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { OFFER_TONE } from "@/lib/offer-status";
+import { OfferStatusBadge } from "@/components/ui/offer-status-badge";
 import { StopMarker } from "@/components/ui/stop-marker";
 import { useI18n } from "@/lib/i18n/context";
-import { getOffer, fareLabel, offerBadgeStatus, type DispatchOfferDetail } from "@/lib/api/offers";
+import { getOffer, fareLabel, type DispatchOfferDetail } from "@/lib/api/offers";
 
 /** One row in the modal's stop list: an address with its per-leg + cumulative km. */
 type StopRow = { address: string; legKm: number | null; cumulativeKm: number | null };
@@ -123,10 +122,7 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
             )}
           </div>
           <div className="flex items-center gap-2">
-            {offer && (() => {
-              const st = offerBadgeStatus(offer);
-              return <Badge status={OFFER_TONE[st]} dot>{c(`st_${st}`)}</Badge>;
-            })()}
+            {offer && <OfferStatusBadge offer={offer} />}
             {(offer?.fare_amount != null || offer?.fare_formatted) && (
               <span className="rounded-lg bg-success-bg px-2.5 py-1 text-sm font-semibold text-success-fg">
                 {toLatinDigits(fareLabel(offer, latnLocale(locale)))}

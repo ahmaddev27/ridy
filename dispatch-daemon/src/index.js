@@ -4,6 +4,7 @@
 import { config } from "./config.js";
 import { inflight } from "./stream.js";
 import { streams, reconcileTick } from "./supervisor.js";
+import { startCommandLoop, stopCommandLoop } from "./commands.js";
 import { initSentry, captureException, flush } from "./sentry.js";
 
 // Shutdown budget: stay under Docker's default 10s stop grace period.
@@ -24,6 +25,10 @@ async function main() {
   );
   await reconcileTick();
   reconcileTimer = setInterval(reconcileTick, config.sessionPollInterval);
+  // AFTER the first reconcile, so the streams a command needs already exist: a
+  // command claimed before its session's stream is up would only report
+  // "no live stream" and burn one of its few attempts.
+  startCommandLoop();
 }
 
 // Graceful stop: close the streams, give in-flight offer ingests and cookie
@@ -35,6 +40,10 @@ async function shutdown(signal) {
   shuttingDown = true;
   console.log(`\n${signal} received, stopping ${streams.size} stream(s)...`);
   clearInterval(reconcileTimer);
+  // Before the streams: the loop must stop asking for work it could no longer
+  // execute, and a parked long-poll has to be released so it does not hold the
+  // shutdown past Docker's stop grace period.
+  stopCommandLoop();
   for (const stream of streams.values()) stream.stop();
 
   if (inflight.size > 0) {
