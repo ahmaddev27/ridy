@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Link2, Hourglass, CheckCircle2, Copy, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
@@ -12,6 +13,7 @@ import { ApiError } from "@/lib/api/client";
 import { latnLocale } from "@/lib/utils";
 import {
   getElProfessorConnection,
+  setElProfessorGalleryImport,
   issueElProfessorToken,
   revokeElProfessorToken,
   type ElProfessorToken,
@@ -27,6 +29,7 @@ export function ElProfessorCard() {
   const [issued, setIssued] = useState<ElProfessorToken | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [savingGallery, setSavingGallery] = useState(false);
 
   const failure = (e: unknown, fallbackKey: string) => {
     toast.error(e instanceof ApiError && e.status === 403 ? c("epForbidden") : c(fallbackKey), {
@@ -43,6 +46,28 @@ export function ElProfessorCard() {
       failure(e, "epGenerateFailed");
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * Turn gallery import on or off for this company's drivers.
+   *
+   * No confirmation either way: nothing is destroyed and nothing is revoked
+   * — the next receipt simply offers one button or two. That is the opposite
+   * of the platform's own switch, which ends a connection and asks first.
+   */
+  async function toggleGallery() {
+    if (!data) return;
+    const next = !data.gallery_import;
+    setSavingGallery(true);
+    try {
+      await setElProfessorGalleryImport(next);
+      toast.success(next ? c("epGalleryOnToast") : c("epGalleryOffToast"));
+      await refetch();
+    } catch (e) {
+      failure(e, "epGalleryFailed");
+    } finally {
+      setSavingGallery(false);
     }
   }
 
@@ -162,6 +187,23 @@ export function ElProfessorCard() {
               </Button>
             )}
           </div>
+        </div>
+      )}
+
+      {/* The company's own setting, shown once the platform has opened the
+          integration. Before that there is nothing for it to govern. */}
+      {!loading && data?.enabled && (
+        <div className="mt-6 flex items-start justify-between gap-4 rounded-xl border border-line bg-surface-2 px-4 py-4">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-ink">{c("epGalleryTitle")}</p>
+            <p className="mt-1 text-sm text-ink-muted">{c("epGalleryBody")}</p>
+          </div>
+          <Switch
+            checked={data.gallery_import}
+            onChange={() => void toggleGallery()}
+            disabled={savingGallery}
+            label={data.gallery_import ? c("epGalleryOff") : c("epGalleryOn")}
+          />
         </div>
       )}
 

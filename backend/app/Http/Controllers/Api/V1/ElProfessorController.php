@@ -344,6 +344,28 @@ class ElProfessorController extends Controller
         return response()->json(['data' => $tenant->fresh()->elprofessorConnection()]);
     }
 
+    /**
+     * The company's own El-Professor settings. One today: whether a driver may
+     * attach a receipt from the gallery rather than only from the camera.
+     *
+     * It is a setting of the COMPANY, not of the platform: the platform's
+     * switch decides whether this company has the integration at all, and this
+     * one decides how its own drivers may use it. Same capability as issuing
+     * the token (`connections.manage`), because both are decisions about what
+     * this company's drivers can send.
+     */
+    public function updateSettings(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'gallery_import' => ['required', 'boolean'],
+        ]);
+
+        $tenant = Tenant::query()->findOrFail($request->user()->tenant_id);
+        $tenant->setElprofessorGalleryImport((bool) $data['gallery_import']);
+
+        return response()->json(['data' => $tenant->fresh()->elprofessorConnection()]);
+    }
+
     /** Never returns the token itself. */
     public function connection(Request $request): JsonResponse
     {

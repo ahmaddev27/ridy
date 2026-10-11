@@ -321,6 +321,7 @@ Route::prefix('v1')->group(function () {
         Route::post('elprofessor/token', [ElProfessorController::class, 'issueToken'])->middleware(['can:connections.manage', 'elprofessor.enabled']);
         Route::delete('elprofessor/token', [ElProfessorController::class, 'revokeToken'])->middleware(['can:connections.manage', 'elprofessor.enabled']);
         Route::get('elprofessor/connection', [ElProfessorController::class, 'connection'])->middleware('can:connections.manage');
+        Route::patch('elprofessor/settings', [ElProfessorController::class, 'updateSettings'])->middleware(['can:connections.manage', 'elprofessor.enabled']);
         Route::middleware('elprofessor.enabled')->group(function () {
             Route::get('elprofessor/fleet', [ElProfessorController::class, 'fleet']);
             Route::get('elprofessor/fleet/drivers', [ElProfessorController::class, 'drivers']);

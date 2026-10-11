@@ -121,6 +121,7 @@ class Tenant extends Model
 
         return [
             'enabled' => $this->elprofessorEnabled(),
+            'gallery_import' => $this->elprofessorGalleryImportEnabled(),
             'connected' => $this->elprofessorEnabled()
                 && $revokedAt === null && $firstUsedAt !== null && $this->elprofessorTokens()->exists(),
             'token_issued_at' => $state['token_issued_at'] ?? null,
@@ -185,6 +186,29 @@ class Tenant extends Model
         ]);
 
         return false;
+    }
+
+    /**
+     * May this company's drivers attach a receipt photo from the GALLERY, or
+     * only from the camera?
+     *
+     * **It defaults to false, and that is the point.** A camera photo is taken
+     * now, of something in front of the driver. A gallery photo can be any
+     * image on the phone - an old receipt, a colleague's, a screenshot, one
+     * taken by somebody else. The company decides whether it is willing to
+     * accept that; it is not the app's decision and not a convenience setting.
+     *
+     * It is read only where documents are already enabled, so a company that
+     * never connected El-Professor is unaffected either way.
+     */
+    public function elprofessorGalleryImportEnabled(): bool
+    {
+        return ($this->settings['elprofessor']['gallery_import'] ?? false) === true;
+    }
+
+    public function setElprofessorGalleryImport(bool $enabled): void
+    {
+        $this->mergeElprofessorState(['gallery_import' => $enabled]);
     }
 
     /** Every `elprofessor` token held by a user of this company. */
