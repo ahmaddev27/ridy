@@ -89,6 +89,10 @@ export default function ReceiptScreen() {
   // it, so offering the form would be offering a send that cannot land.
   const { driver } = useAuth();
   const connected = driver?.documents_enabled === true;
+  // A camera photo is taken now, of something in front of the driver; a
+  // gallery picture can be any image on the phone. So the company decides,
+  // and an older server that sends nothing here means camera only.
+  const galleryAllowed = driver?.gallery_import_enabled === true;
 
   const [photo, setPhoto] = useState<PickedPhoto | null>(null);
   const [busy, setBusy] = useState(false);
@@ -328,7 +332,9 @@ export default function ReceiptScreen() {
         ) : (
           <View style={{ flexDirection: row, gap: 12 }}>
             <PhotoButton c={c} icon={Camera} label={t("receipt.takePhoto")} busy={busy} onPress={() => void take("camera")} />
-            <PhotoButton c={c} icon={ImageIcon} label={t("receipt.fromLibrary")} busy={busy} onPress={() => void take("library")} />
+            {galleryAllowed && (
+              <PhotoButton c={c} icon={ImageIcon} label={t("receipt.fromLibrary")} busy={busy} onPress={() => void take("library")} />
+            )}
           </View>
         )}
 

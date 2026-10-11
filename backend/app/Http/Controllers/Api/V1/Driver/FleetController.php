@@ -190,6 +190,7 @@ class FleetController extends Controller
                 ->exists(),
             'is_owner' => true,
             'documents_enabled' => $owner->tenant?->isElprofessorConnected() ?? false,
+            'gallery_import_enabled' => $owner->tenant?->elprofessorGalleryImportEnabled() ?? false,
         ]]);
     }
 

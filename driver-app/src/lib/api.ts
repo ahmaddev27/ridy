@@ -167,6 +167,10 @@ export type DriverProfile = {
    * screen whose every call would be refused.
    */
   documents_enabled?: boolean;
+  /** The company's own setting: may a receipt come from the gallery, or
+   *  only from the camera? Absent on an older server, and absent reads as
+   *  false - camera only is the safe reading of "we do not know". */
+  gallery_import_enabled?: boolean;
   /** The company declines offers on the dispatch panel (per-company flag). */
   dispatch_reject_enabled?: boolean;
 };
