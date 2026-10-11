@@ -4,7 +4,7 @@
 
 import { config } from "./config.js";
 import { api } from "./api.js";
-import { RamenStream, jarFingerprint } from "./stream.js";
+import { RamenStream, sessionJarFingerprint } from "./stream.js";
 import { captureException, captureThrottled } from "./sentry.js";
 import { normalizeSession } from "./util.js";
 
@@ -92,7 +92,7 @@ async function reconcile() {
   // count-only fingerprint missed a value rotation, so a reconnect left the stream
   // stuck on the dead cookies (RAMEN 404) until a manual daemon restart.
   const effectiveFp = new Map(
-    sessions.map((s) => [s.id, `${jarFingerprint(s.cookies)}:${jarFingerprint(s.supplier_cookies)}`]),
+    sessions.map((s) => [s.id, sessionJarFingerprint(s)]),
   );
 
   // The backend bumps jar_version on every browser capture with new cookie values.
