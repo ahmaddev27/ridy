@@ -228,8 +228,10 @@ async function readSupplierCookies() {
 // is ADOPTED without a teardown (supervisor.js reconcile), and even a real restart
 // reopens in ~250 ms and resumes from its `seq`. And posting the rotation is what
 // bumps `jar_version`, which is what makes the backend answer a racing
-// `needs-relink` with 409 stale_jar instead of flagging the session — that guard
-// existed all along but could never fire, because nothing ever bumped the version.
+// `needs-relink` with 409 stale_jar instead of flagging the session. That guard has
+// always worked for the captures that DID bump the version — a sid/csid change, a
+// cookie appearing, any cookie changing length — but it could never cover the one
+// case that mattered, because a same-length rotation posted nothing at all.
 const SESSION_IDENTITY_COOKIES = /^(sid|csid|jwt-session)$/i;
 
 function jarSignature(cookies) {
