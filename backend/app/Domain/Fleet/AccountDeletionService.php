@@ -5,6 +5,7 @@ namespace App\Domain\Fleet;
 use App\Domain\Audit\Models\AuditLog;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\Models\DeviceToken;
+use App\Domain\Ops\AlertService;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -73,8 +74,11 @@ class AccountDeletionService
     {
         Log::info('account.deletion_requested', ['account' => $account, 'id' => $id, 'tenant_id' => $tenantId]);
 
-        $to = config('services.alerts.email');
-        if (empty($to)) {
+        // Shared with the ops alerts, so it honours the same multi-recipient form:
+        // ALERT_EMAIL may list several addresses, and passing the raw string through
+        // would make Symfony Mailer read the lot as ONE address and deliver to none.
+        $to = AlertService::recipients();
+        if ($to === []) {
             return;
         }
 
