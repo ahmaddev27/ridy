@@ -49,6 +49,52 @@ class DispatchDaemonTest extends TestCase
         return $this->withHeader('X-Dispatch-Secret', self::SECRET);
     }
 
+    public function test_a_relink_report_on_a_superseded_jar_is_refused_not_acted_on(): void
+    {
+        // The guard the whole token-rotation fix rests on. Uber rotates the token the
+        // browser holds; the extension posts it, which bumps jar_version; and for up
+        // to a minute the daemon is still streaming the OLD jar and may hit a 403.
+        // Its relink report must be REFUSED, not flag a company whose session the
+        // backend already has a fresher copy of — otherwise the very rotation that
+        // repairs the session is what reports it broken.
+        $session = $this->makeSession();
+        $session->forceFill(['jar_version' => 5])->save();
+
+        $this->daemon()
+            ->postJson("/api/v1/internal/dispatch/sessions/{$session->id}/needs-relink", ['jar_version' => 4])
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'stale_jar');
+
+        $this->assertSame(UberFleetSession::STATUS_ACTIVE, $session->fresh()->status);
+    }
+
+    public function test_a_relink_report_on_the_current_jar_does_flag_the_session(): void
+    {
+        // The real outage still has to get through: same jar_version means the
+        // backend has nothing fresher, so Uber's refusal is about the live session.
+        $session = $this->makeSession();
+        $session->forceFill(['jar_version' => 5])->save();
+
+        $this->daemon()
+            ->postJson("/api/v1/internal/dispatch/sessions/{$session->id}/needs-relink", ['jar_version' => 5])
+            ->assertOk();
+
+        $this->assertSame(UberFleetSession::STATUS_NEEDS_RELINK, $session->fresh()->status);
+    }
+
+    public function test_a_relink_report_from_a_daemon_too_old_to_send_a_version_still_flags(): void
+    {
+        // Backwards compatibility: a daemon image predating jar_version sends none,
+        // and its report must not be silently swallowed.
+        $session = $this->makeSession();
+
+        $this->daemon()
+            ->postJson("/api/v1/internal/dispatch/sessions/{$session->id}/needs-relink", [])
+            ->assertOk();
+
+        $this->assertSame(UberFleetSession::STATUS_NEEDS_RELINK, $session->fresh()->status);
+    }
+
     public function test_daemon_status_and_roster_syncs_are_recorded_to_the_network_feed(): void
     {
         $session = $this->makeSession();

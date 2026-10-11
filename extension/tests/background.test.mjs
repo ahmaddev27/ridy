@@ -127,15 +127,39 @@ test("fingerprint changes when the session id value changes but lengths stay equ
   const a = await ctx.fingerprint(ORG_A, [{ name: "sid", value: "aaaa" }, { name: "jwt-session", value: "xxxx" }]);
   const b = await ctx.fingerprint(ORG_A, [{ name: "sid", value: "bbbb" }, { name: "jwt-session", value: "xxxx" }]);
   assert.notEqual(a, b);
-  assert.match(a, /^v2:[0-9a-f]{64}$/);
+  assert.match(a, /^v3:[0-9a-f]{64}$/);
   assert.ok(!a.includes("aaaa"), "no plaintext cookie in the fingerprint");
 });
 
-test("fingerprint ignores a same-length rotation of short-lived tokens (no daemon restart)", async () => {
+test("fingerprint CHANGES on a same-length rotation of jwt-session", async () => {
+  // This assertion used to be the opposite, and that is what kept flagging healthy
+  // companies needs_relink: jwt-session is the token Uber VALIDATES, it rotates on
+  // ordinary browsing without changing length, so a length-only hash read
+  // "unchanged", nothing was posted, and the daemon went on presenting a token Uber
+  // had already invalidated — 403 for the daemon while the browser worked fine.
   const { ctx } = load();
   const a = await ctx.fingerprint(ORG_A, [{ name: "sid", value: "s1" }, { name: "jwt-session", value: "abcd" }]);
   const b = await ctx.fingerprint(ORG_A, [{ name: "jwt-session", value: "wxyz" }, { name: "sid", value: "s1" }]);
+  assert.notEqual(a, b);
+});
+
+test("fingerprint still ignores a same-length rotation of the OTHER short-lived tokens", async () => {
+  // csrf and analytics cookies are not presented to Uber by the daemon, so re-posting
+  // on their churn would restart the offer stream for nothing.
+  const { ctx } = load();
+  const a = await ctx.fingerprint(ORG_A, [{ name: "sid", value: "s1" }, { name: "csrf", value: "abcd" }]);
+  const b = await ctx.fingerprint(ORG_A, [{ name: "csrf", value: "wxyz" }, { name: "sid", value: "s1" }]);
   assert.equal(a, b);
+});
+
+test("fingerprint is versioned, so an upgrade cannot reuse a v2 hash", async () => {
+  // Every installed extension holds a v2 hash computed while jwt-session counted by
+  // length. A v2 hash can equal the v3 one for a jar whose token has since rotated,
+  // so without the prefix an upgraded extension would read "unchanged" and never
+  // post the rotation this change exists to deliver.
+  const { ctx } = load();
+  const fp = await ctx.fingerprint(ORG_A, [{ name: "sid", value: "s1" }]);
+  assert.ok(fp.startsWith("v3:"), fp);
 });
 
 test("fingerprint covers the supplier jar and the org", async () => {
@@ -274,7 +298,7 @@ test("a successful capture stores the hashed fingerprint and lifts a pause", asy
   const res = await ctx.capture(ORG_A, null, { manual: true });
   assert.equal(res.ok, true);
   assert.equal(local.data.orgUuid, ORG_A);
-  assert.match(local.data.lastSync, /^v2:/);
+  assert.match(local.data.lastSync, /^v3:/);
   assert.equal(local.data.backendPause, undefined);
 });
 

@@ -209,12 +209,28 @@ async function readSupplierCookies() {
   return cookies.map((c) => ({ name: c.name, value: c.value }));
 }
 
-// Cookies that identify the Uber login itself. Their VALUE changes on a new
-// sign-in (other account, password change, logout/login), which a length-only
-// fingerprint could miss. Short-lived tokens (jwt-session, csrf, analytics)
-// rotate on their own and are deliberately NOT hashed by value: re-posting on
-// every such rotation would restart the daemon's offer stream each page load.
-const SESSION_IDENTITY_COOKIES = /^(sid|csid)$/i;
+// Cookies whose VALUE goes into the fingerprint, so a change to any of them
+// re-POSTs the session and the daemon learns the new value.
+//
+// `sid` / `csid` identify the login: they change on a new sign-in (other account,
+// password change, logout/login), which a length-only fingerprint could miss.
+//
+// `jwt-session` is here because it is the token Uber actually VALIDATES, and it
+// rotates on ordinary browsing. It used to be hashed by length only — deliberately,
+// to avoid re-posting on every rotation — but the effect was the 403 that kept
+// flagging healthy companies `needs_relink`: Uber rotated it, the length did not
+// change, the fingerprint read "unchanged", nothing was posted, and the daemon kept
+// presenting a token Uber had already invalidated. The browser worked (it had the
+// new value) while the daemon was refused, which is exactly how an operator sees
+// "it says reconnect and everything looks fine".
+//
+// The reason it was excluded is gone: a rotation the primary channel already holds
+// is ADOPTED without a teardown (supervisor.js reconcile), and even a real restart
+// reopens in ~250 ms and resumes from its `seq`. And posting the rotation is what
+// bumps `jar_version`, which is what makes the backend answer a racing
+// `needs-relink` with 409 stale_jar instead of flagging the session — that guard
+// existed all along but could never fire, because nothing ever bumped the version.
+const SESSION_IDENTITY_COOKIES = /^(sid|csid|jwt-session)$/i;
 
 function jarSignature(cookies) {
   return [...cookies]
@@ -231,9 +247,16 @@ async function sha256Hex(text) {
 /**
  * Fingerprint of the session so an unchanged one is not re-POSTed on every
  * visit. Only a hash is stored, never a second plaintext copy of a cookie.
+ *
+ * The "v3:" prefix matters on upgrade. Every installed extension has a stored v2
+ * hash, computed while jwt-session counted by LENGTH only — and a v2 hash can equal
+ * the v3 one for a jar whose token has since rotated. Keeping the prefix would let
+ * an upgraded extension read "unchanged" and never post the very rotation this
+ * change exists to deliver. Bumping it forces exactly one re-POST per install,
+ * after which the stored and computed hashes are comparable again.
  */
 async function fingerprint(orgUuid, cookies, supplierCookies = []) {
-  return "v2:" + (await sha256Hex(`${orgUuid}\n${jarSignature(cookies)}\n${jarSignature(supplierCookies)}`));
+  return "v3:" + (await sha256Hex(`${orgUuid}\n${jarSignature(cookies)}\n${jarSignature(supplierCookies)}`));
 }
 
 // A null discovery is cached briefly so several Uber tabs (or a login page's
