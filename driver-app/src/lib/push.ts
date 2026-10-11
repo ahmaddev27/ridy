@@ -21,12 +21,10 @@ import {
   DOCUMENTS_CHANNEL,
   OFFERS_CHANNEL,
   OFFER_CATEGORY,
-  OPEN_MAP_ACTION,
-  REJECT_OFFER_ACTION,
   isMultiStop,
 } from "./notification-channels";
 
-export { DOCUMENTS_CHANNEL, MULTISTOP_CHANNEL, OFFERS_CHANNEL, OFFER_CATEGORY, OPEN_MAP_ACTION, REJECT_OFFER_ACTION };
+export { DOCUMENTS_CHANNEL, MULTISTOP_CHANNEL, OFFERS_CHANNEL, OFFER_CATEGORY };
 
 /**
  * Push delivery for the driver app.
@@ -111,53 +109,20 @@ AppState.addEventListener("change", (state) => {
 // Category ("Open in map" action) + channels — re-labelled on language change
 // ---------------------------------------------------------------------------
 
-async function writeOfferCategory(withReject: boolean): Promise<void> {
-  await Notifications.setNotificationCategoryAsync(OFFER_CATEGORY, [
-    {
-      identifier: OPEN_MAP_ACTION,
-      buttonTitle: t("notif.openMap"),
-      // The app must come to the foreground: iOS refuses to open a URL (Maps)
-      // from a background action handler.
-      options: { opensAppToForeground: true },
-    },
-    ...(!withReject ? [] : [{
-      identifier: REJECT_OFFER_ACTION,
-      buttonTitle: t("notif.rejectOffer"),
-      // Foregrounding is NOT a nicety here, it is the only way this can work:
-      // the react-native-firebase messaging service is stripped from the manifest
-      // (plugins/withExpoOwnsFcm.js) so expo-notifications owns FCM, which leaves
-      // the app with NO background FCM message handler. A background-only decline
-      // would have no JS runtime to send the request from. So the tap brings the
-      // app up and the pop-up fires the decline and shows what came back.
-      options: { opensAppToForeground: true, isDestructive: true },
-    }]),
-  ]);
-  // Kept second on purpose: "Karte öffnen" has been the first button since the
-  // feature shipped, and a destructive action must not land under the thumb that
-  // learned to open the map.
+async function writeOfferCategory(): Promise<void> {
+  // Registered with an EMPTY action list: an offer notification has no buttons.
+  // See OFFER_CATEGORY for why, and why the category still has to exist.
+  await Notifications.setNotificationCategoryAsync(OFFER_CATEGORY, []);
 }
 
-/**
- * Registers the "offer" notification category. Safe to call repeatedly.
- *
- * `withReject` carries the per-company flag onto the notification itself: a
- * company that does not decline offers on the dispatch panel must not grow a
- * destructive button whose only possible answer is "disabled". Re-registering
- * replaces the category outright, so flipping the flag off also removes it.
- */
-export async function registerOfferCategory(withReject = false): Promise<void> {
-  offerCategoryHasReject = withReject;
+/** Registers the offer notification category. Safe to call repeatedly. */
+export async function registerOfferCategory(): Promise<void> {
   try {
-    await writeOfferCategory(withReject);
+    await writeOfferCategory();
   } catch {
     /* retried on the next call / language change */
   }
 }
-
-// Remembered so the locale-change re-register below keeps the category it had:
-// re-registering replaces it wholesale, so defaulting to false there would drop
-// the Reject button the moment the driver switched language.
-let offerCategoryHasReject = false;
 
 /**
  * Ensure both Android channels exist. Re-running it only updates the NAME —
@@ -198,7 +163,7 @@ async function ensureChannels(): Promise<void> {
 }
 
 onLocaleChange(() => {
-  void registerOfferCategory(offerCategoryHasReject);
+  void registerOfferCategory();
   void ensureChannels().catch(() => {});
 });
 

@@ -19,17 +19,22 @@ export const MULTISTOP_CHANNEL = "multistop";
  */
 export const DOCUMENTS_CHANNEL = "documents";
 
-/** Category id shared with the backend (data.categoryId) so the notification
- *  renders the "Open in map" action. Keep in sync with DispatchNotifier. */
-export const OFFER_CATEGORY = "offer";
-export const OPEN_MAP_ACTION = "open_map";
-
 /**
- * Decline the offer on the fleet's dispatch panel, straight from the
- * notification. Underscores only: expo-notifications warns that a `:` or `-` in
- * a category/action id can stop the category working.
+ * Category id shared with the backend (`data.categoryId`), kept in sync with
+ * DispatchNotifier.
+ *
+ * It is registered with NO ACTIONS, on purpose. An offer notification carries no
+ * buttons: the decision lives in the pop-up, on the screen that shows the fare and
+ * the countdown it should be judged on, and a tap on a tray notification — under
+ * time pressure, away from that context — is the wrong place for it. "Open in map"
+ * went the same way: it meant nothing on an offer nobody had taken yet, and once
+ * the ride IS the driver's they are on the offer screen, which has the button.
+ *
+ * The category is still named and registered, because the backend sets this field
+ * to mark a push as an offer push (FcmPushSender::isOfferPush) and that is what
+ * gives it its TTL and collapse key.
  */
-export const REJECT_OFFER_ACTION = "reject_offer";
+export const OFFER_CATEGORY = "offer";
 
 /**
  * The semantic type Reidey's `AppNotification` carries for a rejected

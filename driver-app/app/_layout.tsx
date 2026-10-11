@@ -8,7 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { ToastProvider } from "@/components/toast";
-import { registerOfferCategory, startPushRegistration, OPEN_MAP_ACTION, REJECT_OFFER_ACTION } from "@/lib/push";
+import { registerOfferCategory, startPushRegistration } from "@/lib/push";
 import { OfferPopupHost, requestOfferPopup } from "@/components/offer-popup";
 import { markAlerted } from "@/lib/offer-alert";
 import { SUBMISSION_REJECTED_TYPE } from "@/lib/notification-channels";
@@ -199,16 +199,13 @@ function Gate() {
     };
   }, [driverId, isOwner]);
 
-  // The offer notification's buttons. Its own effect, keyed on the CAPABILITY
-  // rather than the identity, for two reasons: re-registering replaces the
-  // category outright, so it has to re-run when the operator flips the company's
-  // decline flag; and it must not drag push re-registration and the socket along
-  // with it, which is exactly what the identity-keyed effect above guards against.
-  const canDecline = driver?.dispatch_reject_enabled === true && !isOwner;
+  // The offer notification categories. Nothing about them is per-company any
+  // more — the first push carries no actions at all and the decision lives in the
+  // pop-up — so this is keyed on identity alone, like the effect above.
   useEffect(() => {
     if (driverId == null) return;
-    void registerOfferCategory(canDecline);
-  }, [driverId, canDecline]);
+    void registerOfferCategory();
+  }, [driverId]);
 
   // Notification taps. Registered once, independent of auth: "Open in map" needs
   // only the payload, and an offer tap is queued until the app can show it.
@@ -242,30 +239,6 @@ function Gate() {
       markAlerted(data.offer_id, isMultiStop(data.stops_count));
     }
     // "Ablehnen" straight from the notification: the tap IS the decision, so the
-    // decline fires the moment the app is up and the pop-up shows what came back.
-    // It has to foreground — react-native-firebase's messaging service is stripped
-    // from the manifest (plugins/withExpoOwnsFcm.js) so expo-notifications owns
-    // FCM, which leaves NO background FCM message handler: there is no JS runtime
-    // to send a background-only decline from.
-    if (response.actionIdentifier === REJECT_OFFER_ACTION) {
-      const offerId = Number(data.offer_id);
-      if (Number.isInteger(offerId) && offerId > 0) requestOfferPopup(offerId, true);
-      return;
-    }
-    // "Open in map" action button: route through every stop of a multi-stop trip
-    // (Google Maps waypoints). Prefer Uber's exact coordinates so a
-    // house-number-less address still pins right.
-    if (response.actionIdentifier === OPEN_MAP_ACTION) {
-      openRouteInMaps({
-        pickup: data.pickup,
-        dropoff: data.dropoff,
-        pickupPoint: { lat: numOrNull(data.pickup_lat), lng: numOrNull(data.pickup_lng) },
-        dropoffPoint: { lat: numOrNull(data.dropoff_lat), lng: numOrNull(data.dropoff_lng) },
-        stops: parseStops(data.stops),
-        exact: data.geo_source === "uber",
-      });
-      return;
-    }
     // Default tap: only a numeric offer id — the payload is attacker-influenced,
     // so never interpolate an arbitrary string into the route.
     if (data.offer_id && /^\d+$/.test(String(data.offer_id))) {

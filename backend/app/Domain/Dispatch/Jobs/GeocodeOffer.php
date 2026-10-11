@@ -4,6 +4,8 @@ namespace App\Domain\Dispatch\Jobs;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\TripGeocoder;
+use App\Domain\Notifications\Jobs\SendEnrichedOfferPush;
+use CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -47,8 +49,40 @@ class GeocodeOffer implements ShouldBeUnique, ShouldQueue
         // context, and enrich() only reads/writes this one row + the shared
         // geocode_cache. A deleted offer (company wiped) just no-ops.
         $offer = DispatchOffer::withoutGlobalScopes()->find($this->offerId);
-        if ($offer !== null && $offer->geo_synced_at === null) {
-            $geocoder->enrich($offer);
+        if ($offer === null || $offer->geo_synced_at !== null) {
+            return;
         }
+
+        $geocoder->enrich($offer);
+
+        // On a company that declines from the dispatch panel, the driver's FIRST
+        // push was deliberately bare — no geocoding, so it could go out while the
+        // offer was still open. Now that the metrics exist, follow up with them,
+        // but only once the decision window has passed and only if the offer was
+        // not declined. SendEnrichedOfferPush owns both of those rules.
+        if ($offer->tenant?->dispatchRejectEnabled() !== true) {
+            return;
+        }
+
+        rescue(function () use ($offer): void {
+            SendEnrichedOfferPush::dispatch($offer->id)->delay($this->detailsDueAt($offer));
+        });
+    }
+
+    /**
+     * When the trip details may land: after the offer's own window plus a grace.
+     *
+     * Measured from Uber's clock (`offer_generated_at`) where it sent one, so the
+     * wait reflects the offer's real remaining window rather than our ingest
+     * latency. Never negative — a geocode that finished late sends immediately.
+     */
+    private function detailsDueAt(DispatchOffer $offer): CarbonImmutable
+    {
+        $base = $offer->offer_generated_at ?? $offer->received_at ?? CarbonImmutable::now();
+        $window = max((int) ($offer->accept_window_seconds ?? 0), 5);
+        $due = CarbonImmutable::parse($base)
+            ->addSeconds($window + SendEnrichedOfferPush::DECISION_GRACE_SECONDS);
+
+        return $due->isPast() ? CarbonImmutable::now() : $due;
     }
 }
