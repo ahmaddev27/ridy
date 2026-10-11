@@ -72,8 +72,9 @@ class DispatchNotifier
 
         $data = $this->offerData($offer);
         if ($fast) {
-            // Tells the app this is the bare push: show the decline pop-up now and
-            // expect the metrics to arrive by the later OfferBroadcast('status').
+            // Tells the app this is the bare push: raise the decline pop-up now and
+            // expect the metrics to arrive by the later OfferBroadcast('status') and
+            // the enriched follow-up push.
             $data['fast'] = '1';
         }
 
@@ -128,8 +129,11 @@ class DispatchNotifier
     private function offerData(DispatchOffer $offer, ?int $stopsCount = null): array
     {
         $data = [
-            // Ties the push to the app's "offer" notification category so the
-            // "Open in map" action button is rendered (see FcmPushSender::message).
+            // Marks this as an offer push, which is what gives it its TTL and
+            // collapse key (FcmPushSender::isOfferPush). The app registers that
+            // category with NO actions: an offer notification carries no buttons,
+            // because the one decision belongs in the pop-up, on the screen that
+            // shows the fare and the countdown it should be judged on.
             'categoryId' => 'offer',
             'offer_id' => (string) $offer->id,
             'offer_uuid' => (string) $offer->offer_uuid,

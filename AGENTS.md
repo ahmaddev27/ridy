@@ -42,11 +42,22 @@ then grep before writing. Reuse the existing service/helper — the backend is s
   starts at **04:00**. All stats/windows use fleet-days.
 - **Every offer push carries** distance + dropoff + €/km with the €-quality badge; geocode
   **before** notifying. A multi-stop ride pushes a new notification with per-stop detail.
-  **Exception, flag-gated:** for a company with dispatch declines **enabled**, the *first*
-  push is deliberately **bare** — no geocoding at all, by the owner's decision, because a
-  decline is only worth anything while the offer is still open. The metrics (distance, €/km,
-  per-stop detail) follow moments later over `OfferBroadcast`. The invariant holds unchanged
-  for every other tenant, and the flag is OFF unless someone set it.
+  **Exception, flag-gated:** a company with dispatch declines **enabled** gets **two** pushes
+  per offer. The *first* is deliberately **bare** — no geocoding at all, by the owner's
+  decision, because a decline is only worth anything while the offer is still open. The
+  *second* carries the distance, €/km and badge, and is sent **only once the decision window
+  has closed and only if the offer was not declined** (`SendEnrichedOfferPush`): a decline
+  means the ride never became the driver's, so following it with its price would argue with a
+  decision they just made. The invariant holds unchanged for every other tenant, and the flag
+  is OFF unless someone set it.
+- **No offer notification carries action buttons** — not the bare one, not the enriched one.
+  The one decision lives in the app's pop-up, on the screen that shows the fare and the
+  countdown it should be judged on; a tap on a tray notification, under time pressure and away
+  from that context, is the wrong place for it. "Open in map" was removed for the same reason:
+  it meant nothing on an offer nobody had taken, and once the ride IS the driver's they are on
+  the offer screen, which has the button. The `offer` category is still registered (with an
+  empty action list) because the backend sets `categoryId` to mark an offer push, and that is
+  what gives it its TTL and collapse key.
 - **Addresses:** maximize geocoding; **never change the city wrongly** (authoritative
   city/PLZ wins over a mis-biased reverse-geocode).
 - **i18n:** German is the **default** (de/en/ar everywhere, RTL for ar). Money/distance/dates
