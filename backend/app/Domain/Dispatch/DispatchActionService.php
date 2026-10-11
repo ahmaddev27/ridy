@@ -100,16 +100,7 @@ class DispatchActionService
             return ['status' => 'refused', 'reason' => 'window_closed'];
         }
 
-        // Only a session the daemon is actually streaming can carry the mutation.
-        // Offers captured by the manager's browser extension belong to companies
-        // with no residential proxy and therefore no live stream: the feature is
-        // genuinely unavailable for them, and the API says so rather than queueing
-        // work nothing will ever pick up.
-        $session = UberFleetSession::withoutGlobalScopes()
-            ->where('tenant_id', $offer->tenant_id)
-            ->where('status', UberFleetSession::STATUS_ACTIVE)
-            ->latest('id')
-            ->first();
+        $session = $this->liveSession($offer->tenant_id);
 
         if ($session === null) {
             return ['status' => 'refused', 'reason' => 'no_session'];
@@ -133,7 +124,15 @@ class DispatchActionService
             && $offer->displayStatus() === OfferStatus::Pending
             && ($offer->real_offer_uuid ?? '') !== ''
             && ($offer->driver_uuid ?? '') !== ''
-            && ! $this->deliveryDeadline($offer)->isPast();
+            && ! $this->deliveryDeadline($offer)->isPast()
+            // The session predicate belongs here too, or this diverges from
+            // requestReject() exactly where it matters most: companies whose offers
+            // come from the manager's browser extension have no residential proxy
+            // and therefore no live stream, so the feature is genuinely unavailable
+            // to them. It is also the gate the driver app uses to decide whether to
+            // open the pop-up at all, so a false positive here means a modal whose
+            // only button answers "no_session".
+            && $this->hasLiveSession($offer->tenant_id);
     }
 
     /**
@@ -146,25 +145,30 @@ class DispatchActionService
      */
     public function applyResult(
         OfferDispatchCommand $command,
-        bool $success,
+        ?bool $success,
         ?string $error = null,
-        ?int $latencyMs = null,
+        ?int $callMs = null,
     ): void {
         $command->forceFill([
-            'status' => $success ? DispatchCommandStatus::Succeeded : DispatchCommandStatus::Failed,
+            // null (no verdict) is a failed command but NOT a recorded refusal:
+            // uber_success stays null so the measurement can tell "Uber said no"
+            // apart from "we never heard", which are different facts about the
+            // deadline we are trying to find.
+            'status' => $success === true ? DispatchCommandStatus::Succeeded : DispatchCommandStatus::Failed,
             'uber_success' => $success,
             'uber_error' => $error !== null ? mb_substr($error, 0, 255) : null,
-            'latency_ms' => $latencyMs,
+            'latency_ms' => $this->endToEndLatency($command, $callMs),
             'completed_at' => now(),
         ])->save();
 
-        if (! $success) {
-            Log::warning('dispatch_action.refused_by_uber', [
+        if ($success !== true) {
+            Log::warning($success === false ? 'dispatch_action.refused_by_uber' : 'dispatch_action.no_verdict', [
                 'command_id' => $command->id,
                 'offer_id' => $command->dispatch_offer_id,
                 'action' => $command->action->value,
                 'error' => $error,
-                'latency_ms' => $latencyMs,
+                'call_ms' => $callMs,
+                'offer_age_ms' => $command->latency_ms,
             ]);
 
             return;
@@ -175,10 +179,35 @@ class DispatchActionService
             return;
         }
 
-        // Stamp the marker BEFORE the transition: it is what keeps the offer out of
-        // the driver's stats and out of OfferLifecycle::takeableGuard, and it must
-        // hold even if the status move is a no-op because something else already
-        // moved the row.
+        // Uber accepted the decline, but the offer may have moved on in the seconds
+        // the round trip took: DriverStatusIngestor infers an accept from the
+        // driver's engagement edge, so by now the row can already be ACCEPTED,
+        // STARTED or even COMPLETED.
+        //
+        // Never stamp a taken offer. dispatch_rejected_at means "this never reached
+        // the driver", and on a real trip that is a lie with teeth: the offer drops
+        // out of their stats entirely, so its fare and kilometres vanish from their
+        // earnings, while the dashboard renders a finished trip as declined.
+        //
+        // Uber's verdict is still recorded on the command row either way, so the
+        // disagreement stays visible rather than being silently resolved in favour
+        // of the decline. A race this way round means the driver got the ride — and
+        // the ride is the truth worth keeping.
+        $offer->refresh();
+
+        if ($offer->displayStatus()->isTaken() || $offer->accepted_at !== null) {
+            Log::warning('dispatch_action.offer_already_taken', [
+                'command_id' => $command->id,
+                'offer_id' => $offer->id,
+                'status' => $offer->displayStatus()->value,
+            ]);
+
+            return;
+        }
+
+        // Stamped BEFORE the transition: it is what keeps the offer out of the
+        // driver's stats and out of OfferLifecycle::takeableGuard, and it has to
+        // hold even when the status move is a no-op.
         $offer->forceFill(['dispatch_rejected_at' => now()])->save();
         $this->lifecycle->reject($offer);
 
@@ -186,8 +215,75 @@ class DispatchActionService
             'command_id' => $command->id,
             'offer_id' => $offer->id,
             'action' => $command->action->value,
-            'latency_ms' => $latencyMs,
+            'call_ms' => $callMs,
+            // How old the offer was when Uber accepted the decline — the number the
+            // unknown deadline turns on, so it belongs in the one event that fires
+            // on a success.
+            'offer_age_ms' => $command->latency_ms,
         ]);
+    }
+
+    /**
+     * The session whose live jar can carry the mutation.
+     *
+     * Only a session a daemon is actually streaming can send anything: offers
+     * captured by the manager's browser extension belong to companies with no
+     * residential proxy, which Uber answers on RAMEN with 404. For them the feature
+     * is genuinely unavailable, and both requestReject() and canReject() say so
+     * rather than queueing work nothing will ever pick up.
+     *
+     * Memoized per tenant: canReject() runs once per offer in a list that the
+     * dashboard polls every few seconds.
+     *
+     * @var array<int, UberFleetSession|null>
+     */
+    private array $sessionCache = [];
+
+    private function liveSession(?int $tenantId): ?UberFleetSession
+    {
+        if ($tenantId === null) {
+            return null;
+        }
+
+        return $this->sessionCache[$tenantId] ??= UberFleetSession::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('status', UberFleetSession::STATUS_ACTIVE)
+            ->latest('id')
+            ->first();
+    }
+
+    private function hasLiveSession(?int $tenantId): bool
+    {
+        return $this->liveSession($tenantId) !== null;
+    }
+
+    /**
+     * How old the offer was when Uber answered, in ms — the one number that can
+     * settle the open question this feature exists under: Uber's real deadline for
+     * a dispatch decline is unknown, and `acceptWindowInSeconds` (always 5) may be
+     * the DRIVER's window rather than the panel's.
+     *
+     * Measured from Uber's own clock (`offer_generated_at`), so it is the offer's
+     * true age and not our ingest latency subtracted out. It includes the daemon's
+     * report hop back to us — tens of milliseconds against a window measured in
+     * seconds, and erring high is the safe direction for a deadline estimate.
+     *
+     * Falls back to the daemon's own call duration when Uber sent no generation
+     * time (never seen across 1003 production offers, so this is a guard).
+     */
+    private function endToEndLatency(OfferDispatchCommand $command, ?int $callMs): ?int
+    {
+        $generatedAt = $command->offer?->offer_generated_at;
+
+        if ($generatedAt === null) {
+            return $callMs;
+        }
+
+        // Guard the clock: Uber's epoch-ms and ours can disagree, and a negative or
+        // absurd age would poison the very measurement this column exists for.
+        $age = (int) round(now()->diffInMilliseconds($generatedAt, absolute: true));
+
+        return $age >= 0 && $age < 600_000 ? $age : $callMs;
     }
 
     /** Mark a command nothing claimed in time, so the UI stops waiting on it. */
@@ -302,10 +398,33 @@ class DispatchActionService
      */
     private function reuse(OfferDispatchCommand $existing, CarbonImmutable $expiresAt): array
     {
+        // An expired command is NOT a duplicate. Both clients read 'duplicate' as
+        // "the panel has it, Uber's answer is coming", so reporting it that way
+        // would leave the driver on "sent" for an answer nothing is going to
+        // produce. It is a retry candidate like a failure: nobody ever collected
+        // it, so it was never attempted.
+        if ($existing->status === DispatchCommandStatus::Expired) {
+            return $this->requeue($existing, $expiresAt);
+        }
+
         if (! $existing->status->isRetryable()) {
             return ['status' => 'duplicate', 'command_id' => $existing->id];
         }
 
+        return $this->requeue($existing, $expiresAt);
+    }
+
+    /**
+     * Put a settled-but-unapplied command back in the queue.
+     *
+     * Bounded by MAX_ATTEMPTS, which counts DELIVERIES rather than taps: it is how
+     * many times this one offer may ever be handed to Uber, so a stuck client
+     * cannot turn one offer into a stream of mutations.
+     *
+     * @return array{status: string, reason?: string, command_id?: int}
+     */
+    private function requeue(OfferDispatchCommand $existing, CarbonImmutable $expiresAt): array
+    {
         if ($existing->attempts >= self::MAX_ATTEMPTS) {
             return ['status' => 'refused', 'reason' => 'too_many_attempts', 'command_id' => $existing->id];
         }

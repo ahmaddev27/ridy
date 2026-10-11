@@ -98,9 +98,13 @@ export function OfferPopupHost() {
   // The live subscription must see the CURRENT open offer without being torn
   // down and rebuilt on every state change (which would drop events mid-window).
   const openId = useRef<number | null>(null);
+  // The offer itself, not just its id: the notification's Reject action needs the
+  // open offer to act on without re-fetching it inside the decision window.
+  const current = useRef<Offer | null>(null);
   useEffect(() => {
     openId.current = offer?.id ?? null;
-  }, [offer?.id]);
+    current.current = offer;
+  }, [offer]);
 
   /** Pull the server's own view over the bare payload: status, can_decline, and
    *  the geocoded metrics once they exist. Best-effort — a failed refresh leaves
@@ -157,18 +161,35 @@ export function OfferPopupHost() {
   /** Open for an offer we only know the id of (a push, or a notification action). */
   const openById = useCallback(
     async (id: number, rejectNow: boolean) => {
-      if (handled.has(id) || openId.current === id) return;
+      if (handled.has(id)) return;
+      // Already on screen for this offer. Re-opening it would be pointless, but an
+      // explicit Reject from the notification must still FIRE — and this is the
+      // common case, not the edge one: the broadcast puts the pop-up up within
+      // milliseconds while the FCM push (and its buttons) lands a second or two
+      // later, so the driver is almost always tapping Ablehnen on a notification
+      // whose offer is already open. Dropping it here looked like a dead button.
+      if (openId.current === id) {
+        if (rejectNow && current.current) void reject(current.current);
+
+        return;
+      }
       try {
         const r = await api.offer(id);
         // A pop-up is a decision: only a still-pending offer inside its window is
         // one. Anything else belongs on the detail screen, not over the app.
         if (r.data.status !== "pending" || !isFreshOffer(r.data)) return;
+        // And a decision needs an action to take. can_decline is the server's own
+        // answer to "could this driver decline this offer right now", so it is also
+        // the gate that carries the per-company flag all the way to the phone: a
+        // company with declines switched off must never start seeing a full-screen
+        // modal, and nobody should be shown a button whose only reply is "disabled".
+        if (r.data.can_decline !== true) return;
         open(r.data, rejectNow);
       } catch {
         /* gone, not ours, or offline — nothing to decide on */
       }
     },
-    [open],
+    [open, reject],
   );
 
   const close = useCallback(() => {

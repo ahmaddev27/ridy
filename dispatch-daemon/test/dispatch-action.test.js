@@ -255,15 +255,20 @@ test("a stopped stream never fires the mutation", async () => {
   assert.equal(out.isSuccess, null);
 });
 
-test("accept maps to Uber's AcceptOffers — present in the executor, created by nothing", async () => {
+test("accept is refused by the executor even though the mutation exists", async () => {
   const stream = newStream();
   const seen = intercept(() => [200, { data: { acceptOffers: { offerResponse: [{ isSuccess: true, errorMsg: null }] } } }]);
 
   const out = await stream.dispatchAction({ ...command, action: "accept" });
 
-  assert.equal(seen[0].body.operationName, "AcceptOffers");
-  assert.match(seen[0].body.query, /mutation AcceptOffers/);
-  assert.equal(out.isSuccess, true);
+  // The AcceptOffers document is kept for executor symmetry with Uber's panel, but
+  // accepting a ride on a driver's behalf is a different product decision from
+  // declining one: acceptance stays INFERRED from Uber driver status. Nothing
+  // creates an accept command, and this is the last line of defence if something
+  // ever does. Flipping it needs a deliberate decision, not a one-word change.
+  assert.equal(seen.length, 0, "an accept must never reach Uber");
+  assert.equal(out.isSuccess, null);
+  assert.match(out.errorMsg, /only reject is enabled/);
   stream.stop();
 });
 

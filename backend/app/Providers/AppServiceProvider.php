@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Domain\Auth\AuthRateLimits;
 use App\Domain\Auth\BearerTokenGuard;
 use App\Domain\Auth\TokenLifecycle;
+use App\Domain\Dispatch\DispatchActionService;
 use App\Domain\Notifications\Contracts\PushSender;
 use App\Domain\Notifications\Push\FcmPushSender;
 use App\Domain\Notifications\Push\GoogleServiceAccountToken;
@@ -33,6 +34,13 @@ class AppServiceProvider extends ServiceProvider
         // to Sentry (no-op while SENTRY_LARAVEL_DSN is unset). In register(), so
         // it is set before the Sentry client is first built during boot.
         SentryScrubber::configure();
+
+        // One instance per request, so the fleet-session lookup behind
+        // DispatchOfferResource's `can_decline` is memoized instead of re-queried
+        // once per offer in a list the dashboard polls every few seconds. Scoped
+        // rather than singleton: the cache is per-tenant state and must not survive
+        // into the next queued job on a long-lived worker.
+        $this->app->scoped(DispatchActionService::class);
 
         // Real FCM when a service-account credentials file is present, otherwise
         // log the push so the full flow works without a Firebase project.

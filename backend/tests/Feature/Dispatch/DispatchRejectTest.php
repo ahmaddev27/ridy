@@ -299,13 +299,54 @@ class DispatchRejectTest extends TestCase
 
         $command->refresh();
         $this->assertTrue($command->uber_success);
-        $this->assertSame(820, $command->latency_ms);
         $this->assertNotNull($command->completed_at);
+
+        // latency_ms is the OFFER'S AGE when Uber answered, computed here from
+        // offer_generated_at — not the 820 ms the daemon reported for its own call.
+        // That is the whole point of the column: Uber's real deadline for a dispatch
+        // decline is unknown, and only the offer's age at the verdict can reveal it.
+        $generatedAt = $this->offerOf($command)->offer_generated_at;
+        $this->assertNotNull($generatedAt);
+        $this->assertNotSame(820, $command->latency_ms);
+        $this->assertGreaterThanOrEqual(0, $command->latency_ms);
+        $this->assertLessThanOrEqual(
+            (int) round(now()->diffInMilliseconds($generatedAt, absolute: true)) + 50,
+            $command->latency_ms,
+        );
 
         $offer = $this->offerOf($command);
         $this->assertSame(OfferStatus::Rejected, $offer->status);
         $this->assertNotNull($offer->dispatch_rejected_at);
         Event::assertDispatched(OfferBroadcast::class);
+    }
+
+    public function test_a_decline_confirmed_after_the_driver_already_took_the_ride_leaves_the_trip_alone(): void
+    {
+        $command = $this->claimed();
+        $offer = $this->offerOf($command);
+
+        // The round trip to Uber takes seconds, and acceptance is INFERRED from the
+        // driver's engagement edge — so the offer can legitimately be accepted (even
+        // completed) by the time the verdict lands.
+        app(OfferLifecycle::class)->accept($offer);
+
+        $this->daemon('main')
+            ->postJson("/api/v1/internal/dispatch/commands/{$command->id}/result", [
+                'is_success' => true, 'error' => null, 'latency_ms' => 4200,
+            ])
+            ->assertOk();
+
+        // Uber's verdict is still recorded, so the disagreement stays visible...
+        $command->refresh();
+        $this->assertTrue($command->uber_success);
+
+        // ...but the offer must NOT be stamped. dispatch_rejected_at means "this
+        // never reached the driver", and on a ride they actually took that erases
+        // its fare and kilometres from their stats and renders a real trip as
+        // declined. The ride is the truth worth keeping.
+        $offer->refresh();
+        $this->assertNull($offer->dispatch_rejected_at);
+        $this->assertSame(OfferStatus::Accepted, $offer->status);
     }
 
     public function test_a_refused_decline_leaves_the_offer_pending_and_stores_the_error(): void

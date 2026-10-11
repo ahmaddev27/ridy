@@ -125,8 +125,15 @@ export const api = {
    */
   async commandResult(commandId, { isSuccess, errorMsg, latencyMs }) {
     return call("POST", `/commands/${commandId}/result`, {
-      is_success: isSuccess === true,
+      // Reported as THREE values, not a boolean. dispatchAction separates "Uber
+      // refused" (false) from "we never got a verdict" (null: a timeout, a dead
+      // proxy, a 5xx, an unreadable body), and collapsing null to false would tell
+      // the backend Uber definitively refused a call it may actually have applied.
+      is_success: isSuccess === true ? true : isSuccess === false ? false : null,
       error: errorMsg || null,
+      // How long OUR call to Uber took. The end-to-end number the deadline question
+      // needs — how old the offer was when Uber answered — is computed by the
+      // backend, which is the side that holds offer_generated_at.
       latency_ms: Number.isFinite(latencyMs) ? Math.round(latencyMs) : null,
     });
   },

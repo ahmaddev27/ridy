@@ -191,7 +191,6 @@ function Gate() {
   useEffect(() => {
     if (driverId == null) return;
     const stopPush = startPushRegistration(isOwner);
-    void registerOfferCategory();
     // Owners have no driver channel; they rely on push + polling.
     startLive(isOwner ? null : driverId, api.getToken());
     return () => {
@@ -199,6 +198,17 @@ function Gate() {
       stopLive();
     };
   }, [driverId, isOwner]);
+
+  // The offer notification's buttons. Its own effect, keyed on the CAPABILITY
+  // rather than the identity, for two reasons: re-registering replaces the
+  // category outright, so it has to re-run when the operator flips the company's
+  // decline flag; and it must not drag push re-registration and the socket along
+  // with it, which is exactly what the identity-keyed effect above guards against.
+  const canDecline = driver?.dispatch_reject_enabled === true && !isOwner;
+  useEffect(() => {
+    if (driverId == null) return;
+    void registerOfferCategory(canDecline);
+  }, [driverId, canDecline]);
 
   // Notification taps. Registered once, independent of auth: "Open in map" needs
   // only the payload, and an offer tap is queued until the app can show it.

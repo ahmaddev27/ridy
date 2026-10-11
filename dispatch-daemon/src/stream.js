@@ -761,6 +761,13 @@ export class RamenStream {
     const unknown = (errorMsg) => ({ isSuccess: null, errorMsg: clipError(errorMsg), latencyMs: Date.now() - started });
 
     if (!mutation) return unknown(`unknown dispatch action "${action}"`);
+    // Defence in depth for the product's own rule. Nothing in Reidey creates an
+    // accept command — no route, no UI, and the backend service refuses to write
+    // one — but `action` arrives from the backend and the accept mutation is right
+    // there in the map, so a bug or a hand-edited row must not be able to accept a
+    // ride on a driver's behalf. Acceptance stays INFERRED from Uber driver status.
+    // Opening this needs a deliberate product decision, not a passing allowlist.
+    if (action !== "reject") return unknown(`refusing to send "${action}": only reject is enabled`);
     if (!offerUUID || !realOfferUUID || !driverUUID) {
       return unknown("incomplete command payload (offerUUID / realOfferUUID / driverUUID)");
     }
@@ -809,10 +816,19 @@ export class RamenStream {
 
     if (!res.ok) {
       discardBody(res);
-      // A 401/403 here means the session is gone, which the stream's own handler
-      // turns into a relink prompt; the action itself is simply lost.
-      await this.handleStreamAuthFailure(res.status);
-
+      // Deliberately NOT routed into handleStreamAuthFailure, even on 401/403.
+      // That handler flags the session needs_relink and stops the stream, which
+      // would let ONE refused decline take down the company's entire offer ingest.
+      //
+      // A write may be gated differently from the read stream — CSRF, an Arkose
+      // challenge, or an org permission the manager's account simply lacks — so a
+      // 403 here is NOT evidence that the session feeding offers is dead. The same
+      // reasoning the supplier path already learned the hard way: see
+      // handleSupplierAuthFailure, which exists because treating a Fleet Hub 401 as
+      // a dead session cost a 4.5-hour outage on 2026-09-12.
+      //
+      // The offer stream has its own auth handling on /ack and /recv; if the
+      // session really is gone, that path will say so within seconds.
       return unknown(`HTTP ${res.status}`);
     }
 

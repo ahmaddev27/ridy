@@ -151,7 +151,8 @@ class DispatchDaemonController extends Controller
 
         $actions->applyResult(
             $model,
-            (bool) $data['is_success'],
+            // Kept nullable all the way through: null is "no verdict", not "refused".
+            $data['is_success'] === null ? null : (bool) $data['is_success'],
             $data['error'] ?? null,
             isset($data['latency_ms']) ? (int) $data['latency_ms'] : null,
         );

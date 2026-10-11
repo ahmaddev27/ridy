@@ -86,6 +86,16 @@ class OfferBroadcast implements ShouldBroadcastNow
             return $payload;
         }
 
+        // The inline detail exists for ONE consumer: the driver app's decline
+        // pop-up. So it ships only for a company that has declines switched on,
+        // and that is deliberately the whole gate — the app opens the pop-up when
+        // the event carries this detail, so a company with the flag off cannot
+        // start getting a full-screen modal its drivers never had. Keep this
+        // conditional and the flag keeps reaching all the way to the phone.
+        if ($offer->tenant?->dispatchRejectEnabled() !== true) {
+            return $payload;
+        }
+
         return $payload + [
             'offer_uuid' => (string) $offer->offer_uuid,
             'fare' => (string) ($offer->fare_formatted ?? ''),

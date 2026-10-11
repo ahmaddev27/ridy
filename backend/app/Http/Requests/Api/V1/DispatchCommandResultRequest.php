@@ -26,12 +26,20 @@ class DispatchCommandResultRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'is_success' => ['required', 'boolean'],
+            // Present but NULLABLE, and the three values mean three different
+            // things: true = Uber accepted the decline, false = Uber refused it,
+            // null = we never got a verdict (a timeout, a dead proxy, a 5xx, an
+            // unreadable body). Only `true` may settle the offer, and null must not
+            // be recorded as a refusal — Uber may have applied a call whose answer
+            // never reached us.
+            'is_success' => ['present', 'nullable', 'boolean'],
             // Uber's errorMsg, stored as-is for the measurement. Capped to the
             // column so a verbose GraphQL error can never 500 the report.
             'error' => ['nullable', 'string', 'max:255'],
-            // offer_generated_at -> Uber's answer, measured by the daemon. The
-            // number that says whether a human tap can beat Uber's window at all.
+            // How long the daemon's own call to Uber took. The end-to-end figure —
+            // how old the offer was when Uber answered, which is what the unknown
+            // deadline actually turns on — is computed server-side from
+            // offer_generated_at, the column only this side holds.
             'latency_ms' => ['nullable', 'integer', 'min:0'],
         ];
     }

@@ -95,9 +95,13 @@ export default function OfferScreen() {
 
   const status = offer?.status ?? "pending";
   const win = acceptWindow(offer);
-  // Uber's own generation time wins over our receive time when the payload has
-  // it, so the ring counts the window the driver really still has.
-  const deadline = deadlineOf(offer?.received_at ?? null, win, offer?.offer_generated_at);
+  // Deliberately measured from OUR received_at, not Uber's offer_generated_at,
+  // even though the payload now carries it. This screen predates the decline
+  // feature and its ring must keep reading exactly as it always has; switching to
+  // Uber's clock would silently shorten every driver's countdown by our ingest
+  // latency. The decline pop-up — a new surface, where the remaining window is the
+  // whole decision — is the one that counts from Uber's clock.
+  const deadline = deadlineOf(offer?.received_at ?? null, win);
   // The status LABEL is driven ONLY by the backend `offer.status`, never by the
   // local countdown. The backend deliberately HOLDS an offer as `pending` while
   // the driver is busy (it's taken back-to-back, or rejected only once idle), so a

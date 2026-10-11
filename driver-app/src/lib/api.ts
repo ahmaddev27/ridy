@@ -167,6 +167,8 @@ export type DriverProfile = {
    * screen whose every call would be refused.
    */
   documents_enabled?: boolean;
+  /** The company declines offers on the dispatch panel (per-company flag). */
+  dispatch_reject_enabled?: boolean;
 };
 
 /** Tenant-wide home for a fleet owner: every driver's offers, no personal trip. */
