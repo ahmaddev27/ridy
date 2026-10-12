@@ -5,7 +5,7 @@ namespace App\Domain\Dispatch\Jobs;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\TripGeocoder;
 use App\Domain\Notifications\Jobs\SendEnrichedOfferPush;
-use CarbonImmutable;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
