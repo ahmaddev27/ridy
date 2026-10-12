@@ -151,6 +151,20 @@ class DriverSubmissionController extends Controller
                 'description' => ['nullable', 'string', 'max:500'],
                 'payment_method' => ['nullable', Rule::in(['bar', 'uberweisung'])],
                 'postal_code' => ['nullable', 'regex:/^\d{5}$/'],
+                // What the Beleg itself says, beyond the amount. The company
+                // reviews all of it on the other side; this validator's job is
+                // to refuse what is obviously unusable, not to be the
+                // authority - the same rule the rest of this method follows.
+                'merchant_name' => ['nullable', 'string', 'max:200'],
+                'city' => ['nullable', 'string', 'max:120'],
+                'receipt_time' => ['nullable', 'date_format:H:i'],
+                // Fuel only, and the app sends null on everything else. One
+                // shape on the wire, as with the amount: a plain decimal with
+                // a dot, two places for litres and three for the unit price.
+                // El-Professor's parser reads `1.234` as 1.23 if it is handed
+                // German formatting, and these figures reach an accountant.
+                'litres' => ['nullable', 'regex:/^\d{1,8}(\.\d{1,2})?$/'],
+                'price_per_litre' => ['nullable', 'regex:/^\d{1,8}(\.\d{1,3})?$/'],
             ];
         } else {
             $rules += [

@@ -74,6 +74,21 @@ function today(): string {
 }
 
 /** German typing to the one shape the wire takes, or null if it is not money. */
+/**
+ * German typing to one wire shape, with a given number of decimal places.
+ *
+ * A litre count has two (`41,47`) and a unit price three (`1,789`), and both
+ * reach a figure an accountant reads. Same rule as the amount: a comma from
+ * the keyboard is converted ONCE, here, and anything that is not a plain
+ * decimal is refused by name rather than coerced to zero.
+ */
+export function toWireDecimal(input: string, places: number): string | null {
+  const cleaned = input.trim().replace(/\s/g, "").replace(",", ".");
+  const shape = new RegExp(`^\\d{1,8}(\\.\\d{1,${places}})?$`);
+  if (!shape.test(cleaned)) return null;
+  return cleaned;
+}
+
 export function toWireAmount(input: string): string | null {
   const cleaned = input.trim().replace(/\s/g, "").replace(",", ".");
   if (!/^\d{1,8}(\.\d{1,2})?$/.test(cleaned)) return null;
@@ -103,6 +118,15 @@ export default function ReceiptScreen() {
   const [description, setDescription] = useState("");
   const [method, setMethod] = useState<"bar" | "uberweisung">("bar");
   const [plz, setPlz] = useState("");
+  // What the receipt itself says, beyond the amount. The owner asked for all
+  // of them on 11.10.2026; the two fuel figures are required on `Tanken` only,
+  // because a car wash has neither and demanding them would block every
+  // receipt that is not a refuel.
+  const [merchant, setMerchant] = useState("");
+  const [city, setCity] = useState("");
+  const [receiptTime, setReceiptTime] = useState("");
+  const [litres, setLitres] = useState("");
+  const [pricePerLitre, setPricePerLitre] = useState("");
 
   // What the photo said, and which of its answers still need the driver's eyes.
   // `scanNote` is the one line explaining why a form came back empty; without
@@ -165,6 +189,14 @@ export default function ReceiptScreen() {
         setCategory(r.category);
       }
       if (r.postalCode) setPlz(r.postalCode);
+      if (r.merchantName) setMerchant(r.merchantName);
+      if (r.city) setCity(r.city);
+      if (r.time) setReceiptTime(r.time);
+      // German decimals on screen, converted once on the way out.
+      if (r.litres !== undefined) setLitres(r.litres.toFixed(2).replace(".", ","));
+      if (r.pricePerLitre !== undefined) {
+        setPricePerLitre(r.pricePerLitre.toFixed(3).replace(".", ","));
+      }
 
       // Naming the field that could not be read is the difference between a
       // driver retaking the photo and a driver assuming the app is broken.
@@ -227,6 +259,35 @@ export default function ReceiptScreen() {
       toast.show(t("receipt.plzInvalid"));
       return;
     }
+    if (merchant.trim() === "") {
+      toast.show(t("receipt.merchantRequired"));
+      return;
+    }
+    if (city.trim() === "") {
+      toast.show(t("receipt.cityRequired"));
+      return;
+    }
+    // `HH:MM`, and the hour is checked: `25:00` is not a time, and a parser
+    // that accepts it shifts the entry into the next day.
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(receiptTime.trim())) {
+      toast.show(t("receipt.timeInvalid"));
+      return;
+    }
+    // The two fuel figures, on a fuel receipt only.
+    let wireLitres: string | null = null;
+    let wirePrice: string | null = null;
+    if (category === "Tanken") {
+      wireLitres = toWireDecimal(litres, 2);
+      if (wireLitres === null) {
+        toast.show(t("receipt.litresInvalid"));
+        return;
+      }
+      wirePrice = toWireDecimal(pricePerLitre, 3);
+      if (wirePrice === null) {
+        toast.show(t("receipt.priceInvalid"));
+        return;
+      }
+    }
     // The photo does not travel, so an unchecked field can never be checked
     // against anything afterwards. This is the wall, not a reminder.
     if (checkDate || checkAmount) {
@@ -243,6 +304,13 @@ export default function ReceiptScreen() {
         description: description.trim() || null,
         payment_method: method,
         postal_code: plz.trim() || null,
+        merchant_name: merchant.trim(),
+        city: city.trim(),
+        receipt_time: receiptTime.trim(),
+        // Null on anything that is not fuel, never an empty string: the other
+        // side stores a numeric column and '' is not a number.
+        litres: wireLitres,
+        price_per_litre: wirePrice,
       });
       toast.show(t("receipt.sent"));
       router.back();
@@ -390,12 +458,55 @@ export default function ReceiptScreen() {
         )}
 
         <Field
+          label={t("receipt.merchant")}
+          value={merchant}
+          onChangeText={setMerchant}
+          placeholder={t("receipt.merchantHint")}
+        />
+
+        <Field
+          label={t("receipt.time")}
+          value={receiptTime}
+          onChangeText={setReceiptTime}
+          placeholder="14:32"
+          keyboardType="numbers-and-punctuation"
+        />
+
+        <Field
           label={t("receipt.plz")}
           value={plz}
           onChangeText={setPlz}
           placeholder="10179"
           keyboardType="number-pad"
         />
+
+        <Field
+          label={t("receipt.city")}
+          value={city}
+          onChangeText={setCity}
+          placeholder="Berlin"
+        />
+
+        {/* Fuel only. A car wash has no litres, and showing the fields there
+            would invite a number that means nothing. */}
+        {category === "Tanken" && (
+          <>
+            <Field
+              label={t("receipt.litres")}
+              value={litres}
+              onChangeText={setLitres}
+              placeholder="41,47"
+              keyboardType="decimal-pad"
+            />
+            <Field
+              label={t("receipt.pricePerLitre")}
+              value={pricePerLitre}
+              onChangeText={setPricePerLitre}
+              placeholder="1,789"
+              keyboardType="decimal-pad"
+            />
+          </>
+        )}
 
         <PrimaryButton
           label={sending ? t("receipt.sending") : t("receipt.send")}

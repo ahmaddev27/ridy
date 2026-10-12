@@ -62,6 +62,15 @@ export type ReceiptDraft = {
   description: string | null;
   payment_method: "bar" | "uberweisung";
   postal_code: string | null;
+  /** Where the Beleg is from, as printed on it. */
+  merchant_name: string;
+  city: string;
+  /** `HH:MM` as printed on the Beleg, not when it was sent. */
+  receipt_time: string;
+  /** Fuel only, and null on everything else. Plain decimals with a dot:
+   *  two places for litres, three for the unit price. */
+  litres: string | null;
+  price_per_litre: string | null;
 };
 
 export type NoteDraft = {
