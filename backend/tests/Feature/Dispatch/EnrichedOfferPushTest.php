@@ -160,7 +160,6 @@ class EnrichedOfferPushTest extends TestCase
         return $sent;
     }
 
-    /** @param  array<string, mixed>  $attributes */
     /**
      * The follow-up is only worth anything if it lands AFTER the decision window,
      * so the delay — not the dispatch — is the thing worth asserting.
@@ -216,6 +215,7 @@ class EnrichedOfferPushTest extends TestCase
         Queue::assertNotPushed(SendEnrichedOfferPush::class);
     }
 
+    /** @param  array<string, mixed>  $attributes */
     private function offer(array $attributes = []): DispatchOffer
     {
         $uuid = 'o-'.uniqid();
