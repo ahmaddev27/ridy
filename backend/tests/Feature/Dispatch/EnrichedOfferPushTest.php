@@ -4,17 +4,21 @@ namespace Tests\Feature\Dispatch;
 
 use App\Domain\Dispatch\DispatchCommandAction;
 use App\Domain\Dispatch\DispatchCommandStatus;
+use App\Domain\Dispatch\Jobs\GeocodeOffer;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\OfferDispatchCommand;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\OfferStatus;
+use App\Domain\Dispatch\TripGeocoder;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\DispatchNotifier;
 use App\Domain\Notifications\Jobs\SendEnrichedOfferPush;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Mockery;
 use Tests\TestCase;
 
@@ -157,6 +161,61 @@ class EnrichedOfferPushTest extends TestCase
     }
 
     /** @param  array<string, mixed>  $attributes */
+    /**
+     * The follow-up is only worth anything if it lands AFTER the decision window,
+     * so the delay — not the dispatch — is the thing worth asserting.
+     *
+     * The geocode job shipped importing the root-namespace `CarbonImmutable`,
+     * which does not exist, so computing the delay threw. That did not stop the
+     * push: `dispatch()` is evaluated before `->delay()`, so the PendingDispatch
+     * it returned still queued the job from its destructor while the exception
+     * unwound — unscheduled. The follow-up went out the moment a worker picked it
+     * up, which is exactly the "argue with a decision just made" case this whole
+     * class exists to prevent. A test asserting only that it was pushed passes
+     * with the bug in place; this one does not.
+     */
+    public function test_the_geocode_schedules_the_follow_up_past_the_decision_window(): void
+    {
+        Queue::fake();
+        $offer = $this->offer([
+            'geo_synced_at' => null,
+            'distance_m' => null,
+            // Whole seconds: the column is a `timestamp`, so the copy the job
+            // re-reads carries no microseconds and the two clocks must agree.
+            'offer_generated_at' => now()->startOfSecond(),
+        ]);
+
+        $geocoder = Mockery::mock(TripGeocoder::class);
+        $geocoder->shouldReceive('enrich')->once();
+
+        (new GeocodeOffer($offer->id))->handle($geocoder);
+
+        // Uber's clock, not ours: the offer's own window plus the grace.
+        $due = CarbonImmutable::parse($offer->offer_generated_at)
+            ->addSeconds(5 + SendEnrichedOfferPush::DECISION_GRACE_SECONDS);
+
+        Queue::assertPushed(
+            SendEnrichedOfferPush::class,
+            fn (SendEnrichedOfferPush $job) => $job->delay !== null
+                && CarbonImmutable::parse($job->delay)->equalTo($due)
+        );
+    }
+
+    /** Every other company keeps the one geocoded push: no follow-up is scheduled. */
+    public function test_the_geocode_schedules_no_follow_up_without_the_flag(): void
+    {
+        $this->tenant->setDispatchRejectEnabled(false);
+        Queue::fake();
+        $offer = $this->offer(['geo_synced_at' => null, 'distance_m' => null]);
+
+        $geocoder = Mockery::mock(TripGeocoder::class);
+        $geocoder->shouldReceive('enrich')->once();
+
+        (new GeocodeOffer($offer->id))->handle($geocoder);
+
+        Queue::assertNotPushed(SendEnrichedOfferPush::class);
+    }
+
     private function offer(array $attributes = []): DispatchOffer
     {
         $uuid = 'o-'.uniqid();

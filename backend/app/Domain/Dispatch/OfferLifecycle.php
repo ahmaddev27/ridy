@@ -95,12 +95,12 @@ class OfferLifecycle
      */
     public function activeOfferFor(int $tenantId, string $driverUuid): ?DispatchOffer
     {
-        return DispatchOffer::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('driver_uuid', $driverUuid)
-            ->whereIn('status', [OfferStatus::Accepted, OfferStatus::Started])
-            ->latest('received_at')
-            ->first();
+        return $this->newest(
+            DispatchOffer::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('driver_uuid', $driverUuid)
+                ->whereIn('status', [OfferStatus::Accepted, OfferStatus::Started])
+        );
     }
 
     /**
@@ -112,14 +112,37 @@ class OfferLifecycle
      */
     public function pendingOfferFor(int $tenantId, string $driverUuid): ?DispatchOffer
     {
-        return DispatchOffer::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('driver_uuid', $driverUuid)
-            ->whereNull('accepted_at')
-            ->where('received_at', '>=', now()->subMinutes(self::ATTRIBUTION_MINUTES))
-            ->where(fn ($q) => $this->takeableGuard($q))
-            ->latest('received_at')
-            ->first();
+        return $this->newest(
+            DispatchOffer::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('driver_uuid', $driverUuid)
+                ->whereNull('accepted_at')
+                ->where('received_at', '>=', now()->subMinutes(self::ATTRIBUTION_MINUTES))
+                ->where(fn ($q) => $this->takeableGuard($q))
+        );
+    }
+
+    /**
+     * The newest offer a driver query matches, resolved WITHOUT sorting wide rows.
+     *
+     * `raw_payload` is a JSON column, and MySQL sizes a filesort record by the
+     * selected columns' declared maximum — one such row does not fit the 256 KB
+     * default sort buffer, so any ORDER BY the optimizer cannot serve straight
+     * from an index dies with SQLSTATE[HY001] 1038, "Out of sort memory".
+     *
+     * Indexes were the 2026-09-22 fix for exactly these two methods. It held
+     * until the optimizer started preferring (tenant_id, status, received_at)
+     * for activeOfferFor, whose two status ranges cannot keep received_at
+     * ordered — filesort returned, and so did the 1038. Sorting over `id` alone
+     * keeps the payload out of the sort buffer, so the query no longer depends
+     * on which index is chosen; the row is then read by primary key. Same
+     * deferred read the offers list already uses.
+     */
+    private function newest(Builder $query): ?DispatchOffer
+    {
+        $id = $query->orderByDesc('received_at')->orderByDesc('id')->value('id');
+
+        return $id === null ? null : DispatchOffer::withoutGlobalScopes()->find($id);
     }
 
     /**
@@ -153,14 +176,14 @@ class OfferLifecycle
      */
     public function nextTakeableOfferAfter(int $tenantId, string $driverUuid, CarbonInterface $after): ?DispatchOffer
     {
-        return DispatchOffer::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('driver_uuid', $driverUuid)
-            ->whereNull('accepted_at')
-            ->where('received_at', '>', $after)
-            ->where(fn ($q) => $this->takeableGuard($q))
-            ->latest('received_at')
-            ->first();
+        return $this->newest(
+            DispatchOffer::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('driver_uuid', $driverUuid)
+                ->whereNull('accepted_at')
+                ->where('received_at', '>', $after)
+                ->where(fn ($q) => $this->takeableGuard($q))
+        );
     }
 
     /**
