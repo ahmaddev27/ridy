@@ -56,6 +56,7 @@ import { t, isRTL } from "@/lib/i18n";
 // against the same fixtures in `tests/receipt-text-parse.test.mjs`.
 import { parseReceiptText, formatAmountDE, type OcrResult } from "@/lib/receipt-text-parse";
 import { rowsFromLines } from "@/lib/ocr-lines";
+import { readOdometer } from "@/lib/odometer-read";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
 
 /** The four El-Professor stores literally. `Other` is a sentinel it never saves,
@@ -127,6 +128,14 @@ export default function ReceiptScreen() {
   const [receiptTime, setReceiptTime] = useState("");
   const [litres, setLitres] = useState("");
   const [pricePerLitre, setPricePerLitre] = useState("");
+
+  // The odometer, required with a refuel. Its photo is read here and kept
+  // here, exactly like the Beleg's: what travels is the two figures.
+  const [odoPhoto, setOdoPhoto] = useState<PickedPhoto | null>(null);
+  const [odoScanning, setOdoScanning] = useState(false);
+  const [odoNote, setOdoNote] = useState<string | null>(null);
+  const [odometerKm, setOdometerKm] = useState("");
+  const [rangeKm, setRangeKm] = useState("");
 
   // What the photo said, and which of its answers still need the driver's eyes.
   // `scanNote` is the one line explaining why a form came back empty; without
@@ -214,6 +223,53 @@ export default function ReceiptScreen() {
     }
   };
 
+  /**
+   * Photograph the cluster and read it.
+   *
+   * The rule behind `readOdometer` ABSTAINS rather than guessing, and that is
+   * the behaviour this screen is built around: measured on 59 photos, a vision
+   * model answered every one of them and was impossible on 15, where the rule
+   * answered 35 and said nothing on 24. An empty field a driver fills in is
+   * recoverable; a plausible wrong total is not, because the photo stays here.
+   */
+  const takeOdometer = async () => {
+    setBusy(true);
+    setOdoNote(null);
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(t("receipt.permTitle"), t("receipt.permBody"));
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({ quality: 1, exif: false });
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+      const prepared = await prepare(result.assets[0].uri);
+      setOdoPhoto(prepared);
+
+      setOdoScanning(true);
+      try {
+        const recognised = await TextRecognition.recognize(prepared.uri);
+        const reading = readOdometer(recognised.blocks.flatMap((b) => b.lines));
+        if (reading.odometerKm !== null) {
+          setOdometerKm(String(reading.odometerKm));
+        } else {
+          // Naming the miss is what sends a driver back for a sharper photo
+          // instead of leaving them to decide the app is broken.
+          setOdoNote(t("receipt.odoNotRead"));
+        }
+        if (reading.rangeKm !== null) setRangeKm(String(reading.rangeKm));
+      } catch {
+        setOdoNote(t("receipt.odoScanFailed"));
+      } finally {
+        setOdoScanning(false);
+      }
+    } catch {
+      toast.show(t("receipt.photoFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const take = async (from: "camera" | "library") => {
     setBusy(true);
     try {
@@ -273,6 +329,19 @@ export default function ReceiptScreen() {
       toast.show(t("receipt.timeInvalid"));
       return;
     }
+    // The odometer, on a fuel receipt only. Its photo is required too: the
+    // figure is read from it, and without one there is nothing to read.
+    if (category === "Tanken") {
+      if (odoPhoto === null) {
+        toast.show(t("receipt.odoPhotoRequired"));
+        return;
+      }
+      if (!/^\d{4,7}$/.test(odometerKm.trim())) {
+        toast.show(t("receipt.odoInvalid"));
+        return;
+      }
+    }
+
     // The two fuel figures, on a fuel receipt only.
     let wireLitres: string | null = null;
     let wirePrice: string | null = null;
@@ -311,6 +380,11 @@ export default function ReceiptScreen() {
         // side stores a numeric column and '' is not a number.
         litres: wireLitres,
         price_per_litre: wirePrice,
+        // Null on anything that is not fuel. The range is the fuel reading:
+        // the gauge is a bar of lit blocks that nothing could read, and
+        // `199 km left` is a figure a fleet manager can act on anyway.
+        odometer_km: category === "Tanken" ? odometerKm.trim() : null,
+        range_km: category === "Tanken" && rangeKm.trim() !== "" ? rangeKm.trim() : null,
       });
       toast.show(t("receipt.sent"));
       router.back();
@@ -491,6 +565,57 @@ export default function ReceiptScreen() {
             would invite a number that means nothing. */}
         {category === "Tanken" && (
           <>
+            <SectionLabel>{t("receipt.odoSection")}</SectionLabel>
+            {odoPhoto ? (
+              <View style={{ ...cardStyle(c), padding: 12, gap: 10 }}>
+                <Image
+                  source={{ uri: odoPhoto.uri }}
+                  style={{ width: "100%", height: 180, borderRadius: radius.md, backgroundColor: c.surface2 }}
+                  resizeMode="contain"
+                  accessibilityLabel={t("receipt.odoAlt")}
+                />
+                {odoScanning && (
+                  <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 8 }}>
+                    <ActivityIndicator color={c.ink} />
+                    <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("receipt.odoReading")}</Text>
+                  </View>
+                )}
+                {!odoScanning && odoNote !== null && (
+                  <Text style={{ color: c.inkMuted, fontSize: 13, textAlign: "center" }}>{odoNote}</Text>
+                )}
+                <Text style={{ color: c.inkSubtle, fontSize: 12.5, textAlign: "center" }}>
+                  {t("receipt.photoStaysHere")}
+                </Text>
+                <Pressable
+                  onPress={() => { setOdoPhoto(null); setOdoNote(null); }}
+                  accessibilityRole="button"
+                  style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 6 }}
+                >
+                  <X size={16} color={c.danger} strokeWidth={2} />
+                  <Text style={{ color: c.danger, fontWeight: "700", fontSize: 13.5 }}>{t("receipt.photoRemove")}</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <PhotoButton c={c} icon={Camera} label={t("receipt.odoTake")} busy={busy} onPress={() => void takeOdometer()} />
+            )}
+
+            <Field
+              label={t("receipt.odometer")}
+              value={odometerKm}
+              onChangeText={setOdometerKm}
+              placeholder="25382"
+              keyboardType="number-pad"
+            />
+            {/* The range, not a gauge position: it is the only fuel figure on
+                the panel that is text, and it says something actionable. */}
+            <Field
+              label={t("receipt.range")}
+              value={rangeKm}
+              onChangeText={setRangeKm}
+              placeholder="277"
+              keyboardType="number-pad"
+            />
+
             <Field
               label={t("receipt.litres")}
               value={litres}

@@ -793,6 +793,151 @@ class ElProfessorConnectionTest extends TestCase
         Storage::disk('local')->assertExists($row->document_path);
     }
 
+    public function test_a_refuel_carries_the_odometer_and_the_range_into_the_payload(): void
+    {
+        // Both figures are read on the phone from a photo of the cluster that
+        // never leaves it, so the payload is the only record of them.
+        Storage::fake('local');
+        Queue::fake();
+        $this->connectCompany();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        $body = $this->postJson('/api/v1/driver/submissions', [
+            'subject' => 'receipt',
+            'receipt_date' => '2026-10-07',
+            'amount' => '41.47',
+            'category' => 'Tanken',
+            'payment_method' => 'bar',
+            'merchant_name' => 'ARAL Tankstelle',
+            'city' => 'Berlin',
+            'receipt_time' => '14:32',
+            'litres' => '41.47',
+            'price_per_litre' => '1.789',
+            'odometer_km' => '25382',
+            'range_km' => '277',
+        ])->assertStatus(201)->json('data');
+
+        $row = ElProfessorSubmission::withoutGlobalScopes()->firstWhere('uuid', $body['id']);
+        $this->assertNotNull($row);
+
+        // Strings, every one, because this payload is merged into the fetch
+        // response verbatim and the other side reads strings or nothing.
+        $this->assertSame('25382', $row->payload['odometer_km']);
+        $this->assertSame('277', $row->payload['range_km']);
+        $this->assertSame('41.47', $row->payload['litres']);
+        $this->assertSame('1.789', $row->payload['price_per_litre']);
+        $this->assertSame('ARAL Tankstelle', $row->payload['merchant_name']);
+        $this->assertSame('14:32', $row->payload['receipt_time']);
+    }
+
+    public function test_a_bare_number_odometer_is_refused_rather_than_stored_as_one(): void
+    {
+        // This is the silent-loss case, and it is why the rule says `string`.
+        // The payload reaches El-Professor verbatim; its parser answers null
+        // for a non-string, so a numeric odometer would vanish between a 201
+        // here and a 200 there, on the one field the owner made MANDATORY.
+        Storage::fake('local');
+        Queue::fake();
+        $this->connectCompany();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        $this->postJson('/api/v1/driver/submissions', [
+            'subject' => 'receipt',
+            'receipt_date' => '2026-10-07',
+            'amount' => '41.47',
+            'category' => 'Tanken',
+            'odometer_km' => 25382,
+        ])->assertStatus(422)->assertJsonValidationErrors('odometer_km');
+
+        $this->postJson('/api/v1/driver/submissions', [
+            'subject' => 'receipt',
+            'receipt_date' => '2026-10-07',
+            'amount' => '41.47',
+            'category' => 'Tanken',
+            'range_km' => 277,
+        ])->assertStatus(422)->assertJsonValidationErrors('range_km');
+
+        $this->assertSame(0, ElProfessorSubmission::withoutGlobalScopes()->count());
+    }
+
+    public function test_the_odometer_bounds_are_numeric_and_not_string_lengths(): void
+    {
+        // With both `string` and `integer` on one field, Laravel could size
+        // `min`/`max` either way. It sizes numerically because `getSize()`
+        // checks the numeric rules first - and that is measured here rather
+        // than taken on trust, because if it sized by LENGTH then `min:1000`
+        // would refuse every real odometer ever sent.
+        Storage::fake('local');
+        Queue::fake();
+        $this->connectCompany();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        $send = function (array $extra) {
+            return $this->postJson('/api/v1/driver/submissions', array_merge([
+                'subject' => 'receipt',
+                'receipt_date' => '2026-10-07',
+                'amount' => '41.47',
+                'category' => 'Tanken',
+            ], $extra));
+        };
+
+        // Five digits, well under a length bound of 1000 and well over a
+        // numeric one: accepted only if the bound is numeric.
+        $send(['odometer_km' => '25382'])->assertStatus(201);
+        // Three digits: a range or a trip meter, which is the confusion the
+        // app's own rule exists to refuse. Numerically below the floor.
+        $send(['odometer_km' => '691'])->assertStatus(422)
+            ->assertJsonValidationErrors('odometer_km');
+        // Eight digits: over the ceiling numerically, under it by length.
+        $send(['odometer_km' => '99999999'])->assertStatus(422)
+            ->assertJsonValidationErrors('odometer_km');
+        // Zero range is a real reading and must survive a `min:0`.
+        $send(['range_km' => '0'])->assertStatus(201);
+        $send(['range_km' => '2001'])->assertStatus(422)
+            ->assertJsonValidationErrors('range_km');
+    }
+
+    public function test_a_decimal_odometer_is_refused_because_a_cluster_shows_none(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $this->connectCompany();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        foreach (['25382.0', '25382,0', '25382 km', '-25382', '2 5382'] as $value) {
+            $this->postJson('/api/v1/driver/submissions', [
+                'subject' => 'receipt',
+                'receipt_date' => '2026-10-07',
+                'amount' => '41.47',
+                'category' => 'Tanken',
+                'odometer_km' => $value,
+            ])->assertStatus(422)->assertJsonValidationErrors('odometer_km');
+        }
+
+        $this->assertSame(0, ElProfessorSubmission::withoutGlobalScopes()->count());
+    }
+
+    public function test_a_receipt_that_is_not_a_refuel_needs_neither_figure(): void
+    {
+        // The app demands the odometer on `Tanken` only; a car wash has no
+        // cluster photo to read, and a rule here would refuse every one.
+        Storage::fake('local');
+        Queue::fake();
+        $this->connectCompany();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        $body = $this->postJson('/api/v1/driver/submissions', [
+            'subject' => 'receipt',
+            'receipt_date' => '2026-10-07',
+            'amount' => '60.00',
+            'category' => 'Autowäsche',
+        ])->assertStatus(201)->json('data');
+
+        $row = ElProfessorSubmission::withoutGlobalScopes()->firstWhere('uuid', $body['id']);
+        $this->assertArrayNotHasKey('odometer_km', $row->payload);
+        $this->assertArrayNotHasKey('range_km', $row->payload);
+    }
+
     public function test_an_amount_in_german_formatting_is_refused_rather_than_coerced(): void
     {
         // El-Professor's own parser reads `1.234` as 1.23 and answers 0 for

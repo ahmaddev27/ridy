@@ -165,6 +165,26 @@ class DriverSubmissionController extends Controller
                 // German formatting, and these figures reach an accountant.
                 'litres' => ['nullable', 'regex:/^\d{1,8}(\.\d{1,2})?$/'],
                 'price_per_litre' => ['nullable', 'regex:/^\d{1,8}(\.\d{1,3})?$/'],
+                // The odometer, read on the phone from a photo of the cluster
+                // that stays there. Four to seven digits: below that it is a
+                // range or a trip meter, which is the exact confusion the
+                // app's own rule exists to refuse.
+                //
+                // `string` BEFORE `integer` is load-bearing and not a style
+                // choice. This payload travels to El-Professor VERBATIM
+                // (`ElProfessorController::submission()` merges it as it is),
+                // and El-Professor's parser takes a string or nothing - a bare
+                // JSON number reaches it as a value its `text()` reader answers
+                // null for, so a MANDATORY odometer would be dropped in
+                // silence, with a 200 on both sides. `integer` alone admits
+                // `25382` as well as `"25382"`, so one shape is pinned here.
+                // With `integer` present Laravel still sizes `min`/`max`
+                // numerically rather than by string length (`getSize()` checks
+                // the numeric rules first) - pinned by a test, not assumed.
+                'odometer_km' => ['nullable', 'string', 'integer', 'min:1000', 'max:9999999'],
+                // Range left, the only fuel figure on that panel that is text.
+                // Zero is a real reading: a car driven to empty shows it.
+                'range_km' => ['nullable', 'string', 'integer', 'min:0', 'max:2000'],
             ];
         } else {
             $rules += [

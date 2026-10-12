@@ -71,6 +71,13 @@ export type ReceiptDraft = {
    *  two places for litres, three for the unit price. */
   litres: string | null;
   price_per_litre: string | null;
+  /** The car's total distance, read from a photo of the cluster that stays on
+   *  the phone. Required with a refuel, null otherwise. */
+  odometer_km: string | null;
+  /** Kilometres of range left. This is the fuel reading: the gauge is a bar of
+   *  lit blocks that no reader could interpret, and a range is a figure a
+   *  fleet manager can act on. */
+  range_km: string | null;
 };
 
 export type NoteDraft = {
