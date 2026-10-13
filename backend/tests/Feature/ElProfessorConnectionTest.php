@@ -4,9 +4,6 @@ namespace Tests\Feature;
 
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\ElProfessorSubmission;
-use App\Domain\Notifications\AppNotification;
-use App\Domain\Notifications\Contracts\PushSender;
-use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use App\Jobs\RingElProfessor;
@@ -14,7 +11,6 @@ use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -407,144 +403,6 @@ class ElProfessorConnectionTest extends TestCase
         $this->getJson('/api/v1/driver/me')->assertOk()->assertJsonPath('data.documents_enabled', false);
     }
 
-    /**
-     * The rejection path. `AppNotification` stores a semantic type and params,
-     * never rendered text, so these assert the SHAPE the driver app renders
-     * from — not a sentence.
-     */
-    public function test_a_rejection_notifies_nobody_and_still_records(): void
-    {
-        // This test used to assert the opposite, and the owner removed the
-        // thing it was asserting on 13.10.2026: there is no review, so there
-        // is no rejection, so there is nobody to tell. A push saying a receipt
-        // was refused would be the product contradicting itself.
-        //
-        // What the route must still do is record whatever reaches it, because
-        // deleting it in the same change that stops calling it would get the
-        // deploy order wrong — this repository releases on push and
-        // El-Professor's release is a separate button.
-        $driver = $this->driver($this->tenant, 'Omar');
-        $token = $this->mint();
-
-        $row = ElProfessorSubmission::create([
-            'tenant_id' => $this->tenant->id,
-            'driver_id' => $driver->id,
-            'subject' => 'receipt',
-            'status' => ElProfessorSubmission::STATUS_PENDING,
-            'payload' => ['amount' => '41.47'],
-        ]);
-
-        $this->postJson('/api/v1/elprofessor/submissions/status', [
-            'external_submission_id' => $row->uuid,
-            'external_driver_id' => $driver->id,
-            'status' => 'rejected',
-            'reason_code' => 'review_rejected',
-            'reason_text' => 'Beleg fehlt',
-        ], $this->bearer($token))
-            ->assertOk()
-            ->assertJsonPath('data.notified', false);
-
-        // Nothing at all reached the driver.
-        $this->assertSame(0, DatabaseNotification::query()
-            ->where('notifiable_id', $driver->id)->count());
-
-        // And the row still carries what was said, so the record is complete.
-        $row->refresh();
-        $this->assertSame(ElProfessorSubmission::STATUS_REJECTED, $row->status);
-        $this->assertSame('review_rejected', $row->decision_code);
-        $this->assertSame('Beleg fehlt', $row->decision_text);
-    }
-
-    public function test_a_resent_rejection_still_notifies_nobody(): void
-    {
-        // The old dedupe existed to stop a driver being told twice. With
-        // nobody being told, the property that matters is simply that a repeat
-        // is harmless and never grows a notification.
-        $driver = $this->driver($this->tenant, 'Omar');
-        $token = $this->mint();
-        $payload = [
-            'external_submission_id' => 'sub-1',
-            'external_driver_id' => $driver->id,
-            'status' => 'rejected',
-            'reason_code' => 'review_rejected',
-        ];
-
-        $this->postJson('/api/v1/elprofessor/submissions/status', $payload, $this->bearer($token))
-            ->assertOk()->assertJsonPath('data.notified', false);
-        $this->postJson('/api/v1/elprofessor/submissions/status', $payload, $this->bearer($token))
-            ->assertOk()->assertJsonPath('data.notified', false);
-
-        $this->assertSame(0, DatabaseNotification::query()->count());
-    }
-
-    public function test_a_driver_of_another_tenant_is_the_same_404_as_one_that_does_not_exist(): void
-    {
-        $theirs = $this->driver($this->other, 'Theirs');
-        $token = $this->mint();
-
-        $foreign = [
-            'status' => 'rejected',
-            'reason_code' => 'review_rejected',
-            'external_submission_id' => 'sub-1',
-            'external_driver_id' => $theirs->id,
-        ];
-        $nobody = $foreign;
-        $nobody['external_driver_id'] = 999999;
-
-        $other = $this->postJson('/api/v1/elprofessor/submissions/status', $foreign, $this->bearer($token));
-        $missing = $this->postJson('/api/v1/elprofessor/submissions/status', $nobody, $this->bearer($token));
-
-        $other->assertNotFound();
-        $missing->assertNotFound();
-        // Byte-identical, so the caller cannot tell a foreign fleet's driver
-        // from a driver nobody has.
-        $this->assertSame($missing->getContent(), $other->getContent());
-        $this->assertSame(0, DatabaseNotification::query()->count());
-    }
-
-    public function test_only_a_rejection_is_accepted_and_nothing_is_silently_ignored(): void
-    {
-        $driver = $this->driver($this->tenant, 'Omar');
-        $token = $this->mint();
-
-        foreach (['accepted', 'pending', 'whatever'] as $status) {
-            $this->postJson('/api/v1/elprofessor/submissions/status', [
-                'external_submission_id' => 'sub-1',
-                'external_driver_id' => $driver->id,
-                'status' => $status,
-                'reason_code' => 'review_rejected',
-            ], $this->bearer($token))->assertStatus(422);
-        }
-
-        $this->assertSame(0, DatabaseNotification::query()->count());
-    }
-
-    /**
-     * The point of the whole middleware: the token gained ONE write and must
-     * have gained nothing else. An ability missing from CONFINED_ABILITIES is
-     * not confined at all, and a wildcard would have handed it every
-     * elprofessor route a later release adds.
-     */
-    public function test_the_status_write_does_not_widen_the_confinement(): void
-    {
-        $driver = $this->driver($this->tenant, 'Omar');
-        $token = $this->mint();
-
-        $this->postJson('/api/v1/elprofessor/submissions/status', [
-            'external_submission_id' => 'sub-1',
-            'external_driver_id' => $driver->id,
-            'status' => 'rejected',
-            'reason_code' => 'review_rejected',
-        ], $this->bearer($token))->assertOk();
-
-        $this->postJson('/api/v1/elprofessor/token', [], $this->bearer($token))->assertForbidden();
-        $this->deleteJson('/api/v1/elprofessor/token', [], $this->bearer($token))->assertForbidden();
-        $this->getJson('/api/v1/elprofessor/connection', $this->bearer($token))->assertForbidden();
-        $this->getJson('/api/v1/drivers', $this->bearer($token))->assertForbidden();
-        $this->postJson('/api/v1/drivers/roster', [], $this->bearer($token))->assertForbidden();
-        $this->getJson('/api/v1/me', $this->bearer($token))->assertForbidden();
-    }
-
     // ── The fetch (08.10.2026) ───────────────────────────────────────────────
     //
     //  El-Professor cannot be PUSHED a payload: its intake authenticates with
@@ -679,9 +537,10 @@ class ElProfessorConnectionTest extends TestCase
     public function test_a_submission_of_another_tenant_is_the_same_404_as_one_that_does_not_exist(): void
     {
         // The tenant is a term in the query, not a check after it, so the two
-        // answers are identical BY CONSTRUCTION -- the same property the
-        // rejection endpoint has, and the same reason: a caller holding one
-        // fleet's token must not learn another fleet's submission ids exist.
+        // answers are identical BY CONSTRUCTION: a caller holding one fleet's
+        // token must not learn another fleet's submission ids exist. (The
+        // status route that carried the same property for a driver id is
+        // gone; this is the one enumeration surface left on the token.)
         $token = $this->mint();
         $theirs = $this->submission($this->other, $this->driver($this->other, 'Theirs'));
 
@@ -709,6 +568,37 @@ class ElProfessorConnectionTest extends TestCase
             ->getJson('/api/v1/drivers')->assertStatus(403);
         $this->withHeaders($this->bearer($token))
             ->postJson('/api/v1/elprofessor/token')->assertStatus(403);
+        $this->withHeaders($this->bearer($token))
+            ->deleteJson('/api/v1/elprofessor/token')->assertStatus(403);
+        $this->withHeaders($this->bearer($token))
+            ->getJson('/api/v1/elprofessor/connection')->assertStatus(403);
+        $this->withHeaders($this->bearer($token))
+            ->postJson('/api/v1/drivers/roster')->assertStatus(403);
+        $this->withHeaders($this->bearer($token))
+            ->getJson('/api/v1/me')->assertStatus(403);
+    }
+
+    public function test_the_token_has_no_write_left(): void
+    {
+        // The token's ONE write, the status route, was removed on 13.10.2026.
+        // Its CONFINED_ABILITIES entry went with it, so the ability is read-only
+        // again and the path is refused rather than served.
+        $driver = $this->driver($this->tenant, 'Omar');
+        $token = $this->mint();
+        $row = $this->submission($this->tenant, $driver, [
+            'status' => ElProfessorSubmission::STATUS_TAKEN,
+        ]);
+
+        $response = $this->withHeaders($this->bearer($token))
+            ->postJson('/api/v1/elprofessor/submissions/status', [
+                'external_submission_id' => $row->uuid,
+                'external_driver_id' => $driver->id,
+                'status' => 'rejected',
+                'reason_code' => 'review_rejected',
+            ]);
+
+        $this->assertContains($response->getStatusCode(), [403, 404, 405]);
+        $this->assertSame(ElProfessorSubmission::STATUS_TAKEN, $row->refresh()->status);
     }
 
     // ── The driver's own submission ──────────────────────────────────────────
@@ -1000,66 +890,6 @@ class ElProfessorConnectionTest extends TestCase
         $this->assertSame('Foto unleserlich', $body[0]['reason']);
     }
 
-    public function test_a_rejection_marks_the_row_as_well_as_notifying(): void
-    {
-        $token = $this->mint();
-        $driver = $this->driver($this->tenant, 'Omar');
-        $row = $this->submission($this->tenant, $driver, [
-            'status' => ElProfessorSubmission::STATUS_TAKEN,
-        ]);
-
-        $this->withHeaders($this->bearer($token))
-            ->postJson('/api/v1/elprofessor/submissions/status', [
-                'external_submission_id' => $row->uuid,
-                'external_driver_id' => $driver->id,
-                'status' => 'rejected',
-                'reason_code' => 'review_rejected',
-                'reason_text' => 'Foto unleserlich',
-                'kind' => 'receipt',
-            ])->assertOk();
-
-        $row->refresh();
-        $this->assertSame(ElProfessorSubmission::STATUS_REJECTED, $row->status);
-        $this->assertSame('Foto unleserlich', $row->decision_text);
-        $this->assertNotNull($row->decided_at);
-    }
-
-    public function test_a_rejection_for_a_submission_this_side_does_not_know_is_still_accepted(): void
-    {
-        // The id belonged to El-Professor before this table existed, so an
-        // update that matched nothing must not turn into a refusal. What has
-        // changed since 13.10.2026 is only who is told: nobody.
-        $token = $this->mint();
-        $driver = $this->driver($this->tenant, 'Omar');
-
-        $this->withHeaders($this->bearer($token))
-            ->postJson('/api/v1/elprofessor/submissions/status', [
-                'external_submission_id' => (string) Str::uuid(),
-                'external_driver_id' => $driver->id,
-                'status' => 'rejected',
-                'reason_code' => 'review_rejected',
-            ])->assertOk()->assertJsonPath('data.notified', false);
-    }
-
-    public function test_a_rejection_does_not_mark_another_tenants_submission(): void
-    {
-        $token = $this->mint();
-        $driver = $this->driver($this->tenant, 'Omar');
-        $theirs = $this->submission($this->other, $this->driver($this->other, 'Theirs'), [
-            'status' => ElProfessorSubmission::STATUS_TAKEN,
-        ]);
-
-        $this->withHeaders($this->bearer($token))
-            ->postJson('/api/v1/elprofessor/submissions/status', [
-                'external_submission_id' => $theirs->uuid,
-                'external_driver_id' => $driver->id,
-                'status' => 'rejected',
-                'reason_code' => 'review_rejected',
-            ])->assertOk();
-
-        $this->assertSame(ElProfessorSubmission::STATUS_TAKEN, $theirs->refresh()->status);
-    }
-
     // ── The ring ─────────────────────────────────────────────────────────────
 
     public function test_the_ring_carries_four_fields_and_no_payload(): void
@@ -1121,125 +951,6 @@ class ElProfessorConnectionTest extends TestCase
         (new RingElProfessor($row->id))->handle();
 
         Http::assertNothingSent();
-    }
-
-    // ── The rejection is TOLD, not only stored ───────────────────────────────
-    //
-    //  `AppNotification::via()` is `['database']` and the driver's app has no
-    //  endpoint that reads those rows, so without a push a rejection is what a
-    //  driver finds whenever they next happen to look.
-
-    /** A sender that records what it was asked to send and can be made to fail. */
-    private function fakePush(bool $throw = false): object
-    {
-        $sender = new class($throw) implements PushSender
-        {
-            /** @var array<int, array{token: string, title: string, body: string, data: array<string, mixed>}> */
-            public array $sent = [];
-
-            public function __construct(private bool $throw) {}
-
-            public function send(string $deviceToken, string $title, string $body, array $data = []): bool
-            {
-                if ($this->throw) {
-                    throw new \RuntimeException('transport down');
-                }
-                $this->sent[] = compact('deviceToken', 'title', 'body', 'data');
-
-                return true;
-            }
-        };
-        $this->app->instance(PushSender::class, $sender);
-
-        return $sender;
-    }
-
-    public function test_a_rejection_pushes_nothing_to_the_drivers_devices(): void
-    {
-        // The inverse of what this asserted until 13.10.2026. With the review
-        // step gone there is no decision, so a push announcing one would tell a
-        // driver something that did not happen — and the device token, the
-        // channel and the whole transport stay in place for the notifications
-        // that ARE real (offers), which is why this is a test and not a
-        // deletion: it proves the documents channel went quiet without taking
-        // the push system with it.
-        $sender = $this->fakePush();
-        $token = $this->mint();
-        $driver = $this->driver($this->tenant, 'Omar');
-        DeviceToken::create([
-            'tenant_id' => $this->tenant->id, 'driver_id' => $driver->id,
-            'token' => 'device-1', 'platform' => 'android',
-        ]);
-        $row = $this->submission($this->tenant, $driver, [
-            'status' => ElProfessorSubmission::STATUS_TAKEN,
-        ]);
-
-        $this->withHeaders($this->bearer($token))
-            ->postJson('/api/v1/elprofessor/submissions/status', [
-                'external_submission_id' => $row->uuid,
-                'external_driver_id' => $driver->id,
-                'status' => 'rejected',
-                'reason_code' => 'review_rejected',
-                'reason_text' => 'Foto unleserlich',
-                'kind' => 'receipt',
-            ])->assertOk();
-
-        $this->assertCount(0, $sender->sent);
-
-        // And the decision is still on the row, so nothing was lost by going
-        // quiet — only the telling went.
-        $row->refresh();
-        $this->assertSame(ElProfessorSubmission::STATUS_REJECTED, $row->status);
-        $this->assertSame('Foto unleserlich', $row->decision_text);
-    }
-
-    public function test_a_push_that_cannot_go_does_not_fail_the_decision(): void
-    {
-        // The decision is already recorded by then. A 500 here would have
-        // El-Professor retry a decision that was taken.
-        $this->fakePush(throw: true);
-        $token = $this->mint();
-        $driver = $this->driver($this->tenant, 'Omar');
-        DeviceToken::create([
-            'tenant_id' => $this->tenant->id, 'driver_id' => $driver->id,
-            'token' => 'device-1', 'platform' => 'android',
-        ]);
-        $row = $this->submission($this->tenant, $driver, [
-            'status' => ElProfessorSubmission::STATUS_TAKEN,
-        ]);
-
-        $this->withHeaders($this->bearer($token))
-            ->postJson('/api/v1/elprofessor/submissions/status', [
-                'external_submission_id' => $row->uuid,
-                'external_driver_id' => $driver->id,
-                'status' => 'rejected',
-                'reason_code' => 'review_rejected',
-                'reason_text' => 'Foto unleserlich',
-            ])->assertOk();
-
-        $this->assertSame(ElProfessorSubmission::STATUS_REJECTED, $row->refresh()->status);
-    }
-
-    public function test_a_driver_with_no_device_is_simply_not_pushed(): void
-    {
-        $sender = $this->fakePush();
-        $token = $this->mint();
-        $driver = $this->driver($this->tenant, 'Omar');
-        $row = $this->submission($this->tenant, $driver, [
-            'status' => ElProfessorSubmission::STATUS_TAKEN,
-        ]);
-
-        $this->withHeaders($this->bearer($token))
-            ->postJson('/api/v1/elprofessor/submissions/status', [
-                'external_submission_id' => $row->uuid,
-                'external_driver_id' => $driver->id,
-                'status' => 'rejected',
-                'reason_code' => 'review_rejected',
-            ])->assertOk();
-
-        $this->assertSame([], $sender->sent);
-        // And the list still carries it, which is the other half of the telling.
-        $this->assertSame(ElProfessorSubmission::STATUS_REJECTED, $row->refresh()->status);
     }
 
     // ── A company that is not connected submits nothing ──────────────────────

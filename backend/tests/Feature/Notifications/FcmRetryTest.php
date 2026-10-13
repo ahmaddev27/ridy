@@ -69,4 +69,31 @@ class FcmRetryTest extends TestCase
         // delivered count — not assertSentCount — is the proof.)
         $this->assertSame(2, $sent);
     }
+
+    /**
+     * Carries what the deleted submission-decision notifier used to prove for
+     * its own caller: a push transport that is down must not throw into the
+     * request that triggered it. The guarantee lives here, in the sender.
+     */
+    private function senderWhoseTokenExchangeFails(): FcmPushSender
+    {
+        $auth = new class('x') extends GoogleServiceAccountToken
+        {
+            public function accessToken(): string
+            {
+                throw new \RuntimeException('FCM token exchange failed');
+            }
+        };
+
+        return new FcmPushSender($auth, 'my-project');
+    }
+
+    public function test_a_transport_that_cannot_authenticate_reports_failure_instead_of_throwing(): void
+    {
+        Http::fake();
+
+        $this->assertFalse($this->senderWhoseTokenExchangeFails()->send('device-1', 'T', 'B'));
+        $this->assertSame(0, $this->senderWhoseTokenExchangeFails()->sendMany(['device-a', 'device-b'], 'T', 'B'));
+        Http::assertNothingSent();
+    }
 }
