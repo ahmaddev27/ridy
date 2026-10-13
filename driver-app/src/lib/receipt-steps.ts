@@ -21,7 +21,7 @@
  */
 
 /** The steps in order. `fuel` exists only on a refuel. */
-export type ReceiptStep = 'photo' | 'details' | 'fuel' | 'confirm';
+export type ReceiptStep = 'photo' | 'details' | 'fuel' | 'odometer' | 'confirm';
 
 /** The four the company stores literally; `Other` is never stored as a word. */
 export const FUEL_CATEGORY = 'Tanken';
@@ -57,7 +57,7 @@ export function toWireAmount(input: string): string | null {
  */
 export function stepsFor(category: string | null): ReceiptStep[] {
   return category === FUEL_CATEGORY
-    ? ['photo', 'details', 'fuel', 'confirm']
+    ? ['photo', 'details', 'fuel', 'odometer', 'confirm']
     : ['photo', 'details', 'confirm'];
 }
 
@@ -76,10 +76,20 @@ export type DetailsState = {
   unconfirmed: boolean;
 };
 
-/** Everything the fuel step is responsible for. */
+/** The two figures printed on the fuel receipt itself. */
 export type FuelState = {
   litres: string;
   pricePerLitre: string;
+};
+
+/**
+ * The cluster, which is a different act from reading the receipt.
+ *
+ * It got its own step on 13.10.2026 (owner): the photo is of a different
+ * object, taken at a different moment, and burying a camera button under two
+ * number fields made it read as optional — which it is not.
+ */
+export type OdometerState = {
   hasOdoPhoto: boolean;
   odometerKm: string;
 };
@@ -119,16 +129,21 @@ export function detailsProblem(v: DetailsState): string | null {
   return null;
 }
 
+/** What is wrong with the two figures on the fuel receipt, or null. */
+export function fuelProblem(v: FuelState): string | null {
+  if (toWireDecimal(v.litres, 2) === null) return 'receipt.litresInvalid';
+  if (toWireDecimal(v.pricePerLitre, 3) === null) return 'receipt.priceInvalid';
+  return null;
+}
+
 /**
- * What is wrong with the refuel figures, as a translation key, or null.
+ * What is wrong with the odometer, as a translation key, or null.
  *
  * The cluster photo is required because the odometer is read FROM it: without
  * one there is nothing to read, and a number typed with no photo behind it is
  * the case the owner said he does not trust ("مفش ثقة بالسائقين").
  */
-export function fuelProblem(v: FuelState): string | null {
-  if (toWireDecimal(v.litres, 2) === null) return 'receipt.litresInvalid';
-  if (toWireDecimal(v.pricePerLitre, 3) === null) return 'receipt.priceInvalid';
+export function odometerProblem(v: OdometerState): string | null {
   if (!v.hasOdoPhoto) return 'receipt.odoPhotoRequired';
   if (!/^\d{4,7}$/.test(v.odometerKm.trim())) return 'receipt.odoInvalid';
   return null;
@@ -141,15 +156,21 @@ export function fuelProblem(v: FuelState): string | null {
  * the step that collected it, and inventing a new refusal on the last screen
  * is how a driver ends up stuck with no field to fix.
  */
-export function stepProblem(
-  step: ReceiptStep,
-  state: { photo: PhotoState; details: DetailsState; fuel: FuelState },
-): string | null {
+export function stepProblem(step: ReceiptStep, state: FormState): string | null {
   if (step === 'photo') return photoProblem(state.photo);
   if (step === 'details') return detailsProblem(state.details);
   if (step === 'fuel') return fuelProblem(state.fuel);
+  if (step === 'odometer') return odometerProblem(state.odometer);
   return null;
 }
+
+/** Everything the steps and the send both read. */
+export type FormState = {
+  photo: PhotoState;
+  details: DetailsState;
+  fuel: FuelState;
+  odometer: OdometerState;
+};
 
 /**
  * Every problem the send must refuse, in step order.
@@ -158,11 +179,7 @@ export function stepProblem(
  * disagree about what a valid receipt is. The fuel figures are checked only on
  * a refuel, exactly as `stepsFor` decides whether that step exists.
  */
-export function submitProblem(state: {
-  photo: PhotoState;
-  details: DetailsState;
-  fuel: FuelState;
-}): string | null {
+export function submitProblem(state: FormState): string | null {
   for (const step of stepsFor(state.details.category)) {
     const problem = stepProblem(step, state);
     if (problem !== null) return problem;
