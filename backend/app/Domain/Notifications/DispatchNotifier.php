@@ -72,9 +72,10 @@ class DispatchNotifier
 
         $data = $this->offerData($offer);
         if ($fast) {
-            // Tells the app this is the bare push: raise the decline pop-up now and
-            // expect the metrics to arrive by the later OfferBroadcast('status') and
-            // the enriched follow-up push.
+            // Tells the app this is the bare push: raise the decline pop-up now.
+            // It is also the ONLY push this offer gets — the metrics follow on the
+            // later OfferBroadcast('status'), into a screen the driver opens, not
+            // into a second notification ({@see GeocodeOffer}).
             $data['fast'] = '1';
         }
 

@@ -42,15 +42,18 @@ then grep before writing. Reuse the existing service/helper — the backend is s
   starts at **04:00**. All stats/windows use fleet-days.
 - **Every offer push carries** distance + dropoff + €/km with the €-quality badge; geocode
   **before** notifying. A multi-stop ride pushes a new notification with per-stop detail.
-  **Exception, flag-gated:** a company with dispatch declines **enabled** gets **two** pushes
-  per offer. The *first* is deliberately **bare** — no geocoding at all, by the owner's
-  decision, because a decline is only worth anything while the offer is still open. The
-  *second* carries the distance, €/km and badge, and is sent **only once the decision window
-  has closed and only if the offer was not declined** (`SendEnrichedOfferPush`): a decline
-  means the ride never became the driver's, so following it with its price would argue with a
-  decision they just made. The invariant holds unchanged for every other tenant, and the flag
-  is OFF unless someone set it.
-- **No offer notification carries action buttons** — not the bare one, not the enriched one.
+  **Exception, flag-gated:** a company with dispatch declines **enabled** gets exactly **ONE**
+  push per offer, and it is deliberately **bare** — no geocoding at all, a one-to-one relay of
+  what Uber sent — because a decline is only worth anything while the offer is still open. That
+  single push is the accept/decline one. The distance, €/km and badge still reach the phone, but
+  through the existing `OfferBroadcast('status')` **into a screen the driver opens**, never as a
+  second notification: an offer they did not decline is already theirs and already in the app, so
+  ringing again to recite its price interrupts someone who has nothing left to decide. **Do not
+  reintroduce a follow-up push** — `SendEnrichedOfferPush` was built, shipped and removed on
+  13.10.2026 by the owner's decision. The invariant above holds unchanged for every other tenant
+  (one push, geocoded, carrying everything), and the flag is OFF unless someone set it. The
+  **multi-stop** push is separate and goes to **every** driver on **every** company, enabled or not.
+- **No offer notification carries action buttons** — not the bare one, not the multi-stop one.
   The one decision lives in the app's pop-up, on the screen that shows the fare and the
   countdown it should be judged on; a tap on a tray notification, under time pressure and away
   from that context, is the wrong place for it. "Open in map" was removed for the same reason:

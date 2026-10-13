@@ -3,6 +3,7 @@
 namespace Tests\Feature\Dispatch;
 
 use App\Domain\Dispatch\DispatchOfferIngestor;
+use App\Domain\Dispatch\Jobs\GeocodeOffer;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\OfferLifecycle;
@@ -16,6 +17,8 @@ use App\Domain\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
+use Mockery;
 use Tests\TestCase;
 
 /**
@@ -232,6 +235,38 @@ class OfferPushPathTest extends TestCase
         $this->assertSame(['phone'], $this->spy->tokens, 'the push still goes out');
         // The offer is left for the async job, exactly as a deadline-tripped one is.
         $this->assertNull(DispatchOffer::withoutGlobalScopes()->where('offer_uuid', 'f-1')->value('geo_synced_at'));
+    }
+
+    /**
+     * ONE push, and the geocode that follows it stays silent.
+     *
+     * A second, enriched push was built on this path and removed on 13.10.2026 by
+     * the owner's decision: an offer the driver did not decline is already theirs
+     * and already on their screen, so ringing again to recite its price interrupts
+     * someone who has nothing left to decide. The metrics still reach the phone —
+     * through OfferBroadcast('status'), into a screen they chose to open. This is
+     * the guard against a follow-up push being wired back in.
+     */
+    public function test_the_geocode_sends_no_second_push_to_a_declining_company(): void
+    {
+        Tenant::withoutGlobalScopes()->firstOrFail()->setDispatchRejectEnabled(true);
+        $this->ingest([$this->offer('f-3')])->assertOk();
+        $offer = DispatchOffer::withoutGlobalScopes()->where('offer_uuid', 'f-3')->firstOrFail();
+        // The queue is `sync` here, so the ingest's own GeocodeOffer already ran and
+        // stamped the row. Put it back to "not geocoded" so this test drives the job
+        // itself and actually reaches the code under test.
+        $offer->forceFill(['geo_synced_at' => null])->save();
+
+        // The bare push has gone out; everything after this point must be silent.
+        $this->spy->tokens = [];
+        Queue::fake();
+
+        $geocoder = Mockery::mock(TripGeocoder::class);
+        $geocoder->shouldReceive('enrich')->once();
+        (new GeocodeOffer((int) $offer->id))->handle($geocoder);
+
+        $this->assertSame([], $this->spy->tokens, 'the geocode must never notify');
+        Queue::assertNothingPushed();
     }
 
     public function test_the_fast_push_tells_the_app_it_is_the_bare_one(): void
