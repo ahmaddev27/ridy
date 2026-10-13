@@ -74,6 +74,9 @@ class EnsureDashboardToken
             // which would admit every sibling route a later release adds.
             'GET api/v1/elprofessor/submissions',
             'GET api/v1/elprofessor/submissions/{uuid}',
+            // Uber earnings per driver (13.10.2026): one exact pattern, query
+            // string only, so it admits no sibling.
+            'GET api/v1/elprofessor/earnings',
         ],
     ];
 

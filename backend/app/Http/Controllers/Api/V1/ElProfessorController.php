@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Fleet\Earnings\EarningsReport;
+use App\Domain\Fleet\Earnings\UberEarningsException;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\ElProfessorSubmission;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -44,6 +47,9 @@ use Illuminate\Support\Facades\Storage;
 class ElProfessorController extends Controller
 {
     private const MAX_PER_PAGE = 100;
+
+    /** One Uber week is 7; a month is the most any screen asks for. */
+    private const MAX_EARNINGS_DAYS = 31;
 
     private const LAST_USED_INTERVAL_MINUTES = 60;
 
@@ -254,6 +260,52 @@ class ElProfessorController extends Controller
             'tenant_name' => $tenant->name,
             'payment_reference' => $tenant->ensurePaymentReference(),
         ]]);
+    }
+
+    /**
+     * What each driver earned on Uber in a range, pulled live from Fleet Hub with
+     * the company's own stored session (El-Professor cannot make that request
+     * itself). Money is text, never a JSON number: see EarnerFigures::money().
+     *
+     * The tenant is the token's, and the session, proxy and drivers are all
+     * looked up by it, so there is no id in the request that could name another.
+     */
+    public function earnings(Request $request, EarningsReport $report): JsonResponse
+    {
+        $data = $request->validate([
+            'from' => ['required', 'date_format:Y-m-d'],
+            'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
+        ]);
+        $from = CarbonImmutable::createFromFormat('!Y-m-d', $data['from']);
+        $to = CarbonImmutable::createFromFormat('!Y-m-d', $data['to']);
+        if ($from->diffInDays($to) > self::MAX_EARNINGS_DAYS) {
+            return response()->json(['message' => 'The range is too long.', 'reason' => 'range_too_long'], 422);
+        }
+
+        $tenant = Tenant::query()->findOrFail($request->user()->tenant_id);
+
+        try {
+            $result = $report->forTenant($tenant, $from, $to);
+        } catch (UberEarningsException $e) {
+            return response()->json(['message' => $e->getMessage(), 'reason' => $e->reason], $e->status);
+        } catch (\UnexpectedValueException) {
+            return response()->json(['message' => 'Uber returned a figure that could not be read.', 'reason' => 'unreadable_amount'], 502);
+        }
+
+        $this->recordUsage($tenant->id);
+
+        return response()->json([
+            'data' => [
+                'from' => $result['from'],
+                'to' => $result['to'],
+                'currency' => $result['currency'],
+                'drivers' => $result['drivers'],
+            ],
+            'meta' => [
+                'driver_count' => count($result['drivers']),
+                'unmatched_count' => $result['unmatched'],
+            ],
+        ]);
     }
 
     public function drivers(Request $request): JsonResponse
