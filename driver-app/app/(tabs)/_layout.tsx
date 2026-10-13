@@ -1,10 +1,11 @@
 import { Tabs } from "expo-router";
 import { View, Pressable, Platform, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Home, Package, BarChart3, User, type LucideIcon } from "@/components/icons";
+import { Home, Package, BarChart3, User, FileText, type LucideIcon } from "@/components/icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Text } from "@/components/typography";
 import { t, useLocale, isRTL } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
 import { useColors, isDarkPalette, type Palette } from "@/lib/theme";
 
 /** Lucide icon for each route (single outline cut; active state = color/stroke). */
@@ -14,6 +15,8 @@ function iconFor(routeName: string): LucideIcon {
       return Package;
     case "statistics":
       return BarChart3;
+    case "submissions":
+      return FileText;
     case "profile":
       return User;
     default: // index / home
@@ -30,6 +33,18 @@ function iconFor(routeName: string): LucideIcon {
 function BottomBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const c = useColors();
   const insets = useSafeAreaInsets();
+  const { driver } = useAuth();
+
+  // The same switch the receipt screen and the profile already read: the
+  // company's El-Professor connection, which Reidey fills from
+  // `isElprofessorConnected()`. A company without it keeps the four tabs it
+  // has always had, and the route stays unreachable rather than empty.
+  const connected = driver?.documents_enabled === true;
+  const routes = connected
+    ? state.routes
+    : state.routes.filter(
+        (route: BottomTabBarProps["state"]["routes"][number]) => route.name !== "submissions",
+      );
 
   const dark = isDarkPalette(c);
   return (
@@ -51,8 +66,10 @@ function BottomBar({ state, descriptors, navigation }: BottomTabBarProps) {
           paddingBottom: Math.max(insets.bottom, 12),
         }}
       >
-        {state.routes.map((route: BottomTabBarProps["state"]["routes"][number], index: number) => {
-          const focused = state.index === index;
+        {routes.map((route: BottomTabBarProps["state"]["routes"][number]) => {
+          // `state.index` indexes the FULL list, so comparing it to a filtered
+          // position would highlight the wrong tab once one is hidden.
+          const focused = state.routes[state.index]?.key === route.key;
           const { options } = descriptors[route.key];
           const label = typeof options.title === "string" ? options.title : t(`tabs.${route.name}`);
           const Icon = iconFor(route.name);
@@ -103,10 +120,13 @@ export default function TabsLayout() {
   useLocale(); // re-render tab labels when the language changes
   return (
     <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <BottomBar {...props} />}>
-      {/* Order: Home · Statistics · Offers · Profile. */}
+      {/* Order: Home · Statistics · Offers · Submissions · Profile.
+          Submissions sits before the profile because it is where a driver goes
+          to DO something; the profile is where they go to change something. */}
       <Tabs.Screen name="index" options={{ title: t("tabs.home") }} />
       <Tabs.Screen name="statistics" options={{ title: t("tabs.statistics") }} />
       <Tabs.Screen name="offers" options={{ title: t("tabs.offers") }} />
+      <Tabs.Screen name="submissions" options={{ title: t("tabs.submissions") }} />
       <Tabs.Screen name="profile" options={{ title: t("tabs.profile") }} />
     </Tabs>
   );

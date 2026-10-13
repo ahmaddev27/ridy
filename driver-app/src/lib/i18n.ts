@@ -117,6 +117,7 @@ const de: Dict = {
   // Tabs
   "tabs.home": "Startseite",
   "tabs.offers": "Angebote",
+  "tabs.submissions": "Eingänge",
   "tabs.profile": "Profil",
   "tabs.statistics": "Statistiken", "stats.title": "Statistiken", "stats.totalIncome": "Gesamteinnahmen", "stats.avgPerKm": "Ø €/km",
   // Home
@@ -238,6 +239,10 @@ const de: Dict = {
   "receipt.stepPhoto": "Beleg fotografieren",
   "receipt.stepDetails": "Angaben prüfen",
   "receipt.stepFuel": "Tankdaten",
+  "receipt.stepOdometer": "Kilometerstand",
+  "receipt.odoIntro": "Fotografieren Sie das Kombiinstrument. Das Telefon liest den Kilometerstand aus; das Foto bleibt auf dem Gerät.",
+  "receipt.odoKeep": "Übernehmen",
+  "receipt.odoRetake": "Neu fotografieren",
   "receipt.stepConfirm": "Prüfen und senden",
   "receipt.next": "Weiter",
   "receipt.back": "Zurück",
@@ -447,6 +452,7 @@ const en: Dict = {
   // Tabs
   "tabs.home": "Home",
   "tabs.offers": "Offers",
+  "tabs.submissions": "Submissions",
   "tabs.profile": "Profile",
   "tabs.statistics": "Statistics", "stats.title": "Statistics", "stats.totalIncome": "Total income", "stats.avgPerKm": "Avg. €/km",
   // Home
@@ -565,6 +571,10 @@ const en: Dict = {
   "receipt.stepPhoto": "Photograph the receipt",
   "receipt.stepDetails": "Check the details",
   "receipt.stepFuel": "Refuel figures",
+  "receipt.stepOdometer": "Odometer",
+  "receipt.odoIntro": "Photograph the instrument cluster. The phone reads the odometer; the photo stays on the device.",
+  "receipt.odoKeep": "Use these figures",
+  "receipt.odoRetake": "Take another photo",
   "receipt.stepConfirm": "Check and send",
   "receipt.next": "Continue",
   "receipt.back": "Back",
@@ -774,6 +784,7 @@ const ar: Dict = {
   // Tabs
   "tabs.home": "الرئيسية",
   "tabs.offers": "العروض",
+  "tabs.submissions": "الواردات",
   "tabs.profile": "البروفايل",
   "tabs.statistics": "الإحصائيات", "stats.title": "الإحصائيات", "stats.totalIncome": "إجمالي الدخل", "stats.avgPerKm": "متوسط €/كم",
   // Home
@@ -892,6 +903,10 @@ const ar: Dict = {
   "receipt.stepPhoto": "صوّر الفاتورة",
   "receipt.stepDetails": "راجع البيانات",
   "receipt.stepFuel": "بيانات التعبئة",
+  "receipt.stepOdometer": "عداد الكيلومترات",
+  "receipt.odoIntro": "صوّر لوحة العدّاد. التلفون بيقرأ الكيلومترات، والصورة بتضلّ على الجهاز.",
+  "receipt.odoKeep": "اعتمد الأرقام",
+  "receipt.odoRetake": "صوّر من جديد",
   "receipt.stepConfirm": "راجع وأرسل",
   "receipt.next": "متابعة",
   "receipt.back": "رجوع",

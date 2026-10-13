@@ -34,7 +34,7 @@
  * converts it once, here, before anything is sent.
  */
 import { useState } from "react";
-import { View, ScrollView, Pressable, Image, ActivityIndicator, Alert } from "react-native";
+import { View, ScrollView, Pressable, Image, ActivityIndicator, Alert, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -118,6 +118,10 @@ export default function ReceiptScreen() {
   // The odometer, required with a refuel. Its photo is read here and kept
   // here, exactly like the Beleg's: what travels is the two figures.
   const [odoPhoto, setOdoPhoto] = useState<PickedPhoto | null>(null);
+  // The uri the popup is showing. Separate from `odoPhoto` because the popup
+  // closes while the photo stays: one is what is on screen, the other is what
+  // the receipt carries.
+  const [odoShot, setOdoShot] = useState<string | null>(null);
   const [odoScanning, setOdoScanning] = useState(false);
   const [odoNote, setOdoNote] = useState<string | null>(null);
   const [odometerKm, setOdometerKm] = useState("");
@@ -145,7 +149,8 @@ export default function ReceiptScreen() {
       receiptTime,
       unconfirmed: checkDate || checkAmount,
     },
-    fuel: { litres, pricePerLitre, hasOdoPhoto: odoPhoto !== null, odometerKm },
+    fuel: { litres, pricePerLitre },
+    odometer: { hasOdoPhoto: odoPhoto !== null, odometerKm },
   };
 
   const steps = stepsFor(category);
@@ -266,6 +271,7 @@ export default function ReceiptScreen() {
       if (result.canceled || !result.assets?.[0]?.uri) return;
       const prepared = await prepare(result.assets[0].uri);
       setOdoPhoto(prepared);
+      setOdoShot(prepared.uri);
 
       setOdoScanning(true);
       try {
@@ -420,6 +426,7 @@ export default function ReceiptScreen() {
             {step === "photo" ? t("receipt.stepPhoto")
               : step === "details" ? t("receipt.stepDetails")
               : step === "fuel" ? t("receipt.stepFuel")
+              : step === "odometer" ? t("receipt.stepOdometer")
               : t("receipt.stepConfirm")}
           </Text>
         </View>
@@ -588,7 +595,18 @@ export default function ReceiptScreen() {
               keyboardType="decimal-pad"
             />
 
-            <SectionLabel>{t("receipt.odoSection")}</SectionLabel>
+          </>
+        )}
+
+        {/* The cluster is a different act from reading the receipt: a different
+            object, photographed at a different moment. It used to be two fields
+            under the litres, which made a MANDATORY capture read as optional. */}
+        {step === "odometer" && (
+          <>
+            <View style={{ ...cardStyle(c), padding: 16, gap: 6 }}>
+              <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("receipt.odoIntro")}</Text>
+            </View>
+
             {odoPhoto ? (
               <View style={{ ...cardStyle(c), padding: 12, gap: 10 }}>
                 <Image
@@ -597,13 +615,7 @@ export default function ReceiptScreen() {
                   resizeMode="contain"
                   accessibilityLabel={t("receipt.odoAlt")}
                 />
-                {odoScanning && (
-                  <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 8 }}>
-                    <ActivityIndicator color={c.ink} />
-                    <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("receipt.odoReading")}</Text>
-                  </View>
-                )}
-                {!odoScanning && odoNote !== null && (
+                {odoNote !== null && (
                   <Text style={{ color: c.inkMuted, fontSize: 13, textAlign: "center" }}>{odoNote}</Text>
                 )}
                 <Text style={{ color: c.inkSubtle, fontSize: 12.5, textAlign: "center" }}>
@@ -638,7 +650,6 @@ export default function ReceiptScreen() {
               placeholder="277"
               keyboardType="number-pad"
             />
-
           </>
         )}
 
@@ -709,6 +720,68 @@ export default function ReceiptScreen() {
           </Text>
         </Pressable>
       </ScrollView>
+
+      {/* The popup the owner asked for. The camera itself is a system sheet, so
+          what a modal adds is the moment AFTER it: the shot, the reading, and
+          the two figures, over the form instead of buried in it. It cannot be
+          dismissed while the read is running — a half-read cluster that looks
+          dismissed is how a driver sends yesterday's number. */}
+      <Modal
+        visible={odoShot !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { if (!odoScanning) setOdoShot(null); }}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: c.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: 16, gap: 12 }}>
+            <Text style={{ color: c.ink, fontWeight: "700", fontSize: 16 }}>{t("receipt.odoSection")}</Text>
+            <Image
+              source={{ uri: odoShot ?? "" }}
+              style={{ width: "100%", height: 200, borderRadius: radius.md, backgroundColor: c.surface2 }}
+              resizeMode="contain"
+              accessibilityLabel={t("receipt.odoAlt")}
+            />
+            {odoScanning ? (
+              <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <ActivityIndicator color={c.ink} />
+                <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("receipt.odoReading")}</Text>
+              </View>
+            ) : (
+              <>
+                {odoNote !== null && (
+                  <Text style={{ color: c.inkMuted, fontSize: 13, textAlign: "center" }}>{odoNote}</Text>
+                )}
+                <Field
+                  label={t("receipt.odometer")}
+                  value={odometerKm}
+                  onChangeText={setOdometerKm}
+                  placeholder="25382"
+                  keyboardType="number-pad"
+                />
+                <Field
+                  label={t("receipt.range")}
+                  value={rangeKm}
+                  onChangeText={setRangeKm}
+                  placeholder="277"
+                  keyboardType="number-pad"
+                />
+                <PrimaryButton label={t("receipt.odoKeep")} onPress={() => setOdoShot(null)} />
+                {/* Retake throws the photo away with it: keeping a photo whose
+                    figures were rejected is how the two drift apart. */}
+                <Pressable
+                  onPress={() => { setOdoShot(null); setOdoPhoto(null); setOdoNote(null); }}
+                  accessibilityRole="button"
+                  style={{ paddingVertical: 10 }}
+                >
+                  <Text style={{ color: c.danger, fontSize: 13.5, textAlign: "center", fontWeight: "700" }}>
+                    {t("receipt.odoRetake")}
+                  </Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

@@ -15,6 +15,7 @@ const {
   submitProblem,
   detailsProblem,
   fuelProblem,
+  odometerProblem,
   photoProblem,
   toWireAmount,
   toWireDecimal,
@@ -34,6 +35,9 @@ const goodDetails = {
 const goodFuel = {
   litres: "41,47",
   pricePerLitre: "1,789",
+};
+
+const goodOdo = {
   hasOdoPhoto: true,
   odometerKm: "25382",
 };
@@ -42,10 +46,14 @@ const good = {
   photo: { hasPhoto: true, scanning: false },
   details: goodDetails,
   fuel: goodFuel,
+  odometer: goodOdo,
 };
 
-test("a refuel has a fuel step and nothing else does", () => {
-  assert.deepEqual(stepsFor("Tanken"), ["photo", "details", "fuel", "confirm"]);
+test("a refuel has a fuel step and an odometer step; nothing else does", () => {
+  // The odometer got its own step on 13.10.2026: the photo is of a different
+  // object, taken at a different moment, and burying a camera button under two
+  // number fields made a MANDATORY capture read as optional.
+  assert.deepEqual(stepsFor("Tanken"), ["photo", "details", "fuel", "odometer", "confirm"]);
   assert.deepEqual(stepsFor("Autowäsche"), ["photo", "details", "confirm"]);
   // `Other` clears the category; the free text is then the subject.
   assert.deepEqual(stepsFor(null), ["photo", "details", "confirm"]);
@@ -108,15 +116,19 @@ test("an unconfirmed reading blocks the step, and it is checked last", () => {
   );
 });
 
-test("the cluster photo is required, because the odometer is read from it", () => {
+test("the receipt's own two figures are the fuel step's business", () => {
   assert.equal(fuelProblem(goodFuel), null);
-  assert.equal(fuelProblem({ ...goodFuel, hasOdoPhoto: false }), "receipt.odoPhotoRequired");
-  // Under four digits it is a range or a trip meter, which is the exact
-  // confusion the reading rule exists to refuse.
-  assert.equal(fuelProblem({ ...goodFuel, odometerKm: "691" }), "receipt.odoInvalid");
-  assert.equal(fuelProblem({ ...goodFuel, odometerKm: "25382,0" }), "receipt.odoInvalid");
   assert.equal(fuelProblem({ ...goodFuel, litres: "" }), "receipt.litresInvalid");
   assert.equal(fuelProblem({ ...goodFuel, pricePerLitre: "" }), "receipt.priceInvalid");
+});
+
+test("the cluster photo is required, because the odometer is read from it", () => {
+  assert.equal(odometerProblem(goodOdo), null);
+  assert.equal(odometerProblem({ ...goodOdo, hasOdoPhoto: false }), "receipt.odoPhotoRequired");
+  // Under four digits it is a range or a trip meter, which is the exact
+  // confusion the reading rule exists to refuse.
+  assert.equal(odometerProblem({ ...goodOdo, odometerKm: "691" }), "receipt.odoInvalid");
+  assert.equal(odometerProblem({ ...goodOdo, odometerKm: "25382,0" }), "receipt.odoInvalid");
 });
 
 test("a car wash is never asked for litres or a cluster", () => {
@@ -126,7 +138,8 @@ test("a car wash is never asked for litres or a cluster", () => {
   const carWash = {
     photo: { hasPhoto: true, scanning: false },
     details: { ...goodDetails, category: "Autowäsche" },
-    fuel: { litres: "", pricePerLitre: "", hasOdoPhoto: false, odometerKm: "" },
+    fuel: { litres: "", pricePerLitre: "" },
+    odometer: { hasOdoPhoto: false, odometerKm: "" },
   };
   assert.equal(submitProblem(carWash), null);
   assert.equal(stepProblem("confirm", carWash), null);
@@ -142,9 +155,10 @@ test("every refusal the send makes is one a step already made", () => {
     ["details", { ...good, details: { ...goodDetails, city: "" } }],
     ["details", { ...good, details: { ...goodDetails, receiptTime: "25:00" } }],
     ["details", { ...good, details: { ...goodDetails, unconfirmed: true } }],
-    ["fuel", { ...good, fuel: { ...goodFuel, hasOdoPhoto: false } }],
-    ["fuel", { ...good, fuel: { ...goodFuel, odometerKm: "12" } }],
     ["fuel", { ...good, fuel: { ...goodFuel, litres: "41,473" } }],
+    ["fuel", { ...good, fuel: { ...goodFuel, pricePerLitre: "x" } }],
+    ["odometer", { ...good, odometer: { ...goodOdo, hasOdoPhoto: false } }],
+    ["odometer", { ...good, odometer: { ...goodOdo, odometerKm: "12" } }],
   ];
   for (const [owner, state] of cases) {
     const sendSays = submitProblem(state);
