@@ -4,13 +4,10 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\ElProfessorSubmission;
-use App\Domain\Notifications\AppNotification;
-use App\Domain\Notifications\SubmissionDecisionNotifier;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -123,49 +120,26 @@ class ElProfessorController extends Controller
         }
 
         $submissionId = $data['external_submission_id'];
-        $already = DatabaseNotification::query()
-            ->where('notifiable_type', $driver->getMorphClass())
-            ->where('notifiable_id', $driver->getKey())
-            ->where('type', AppNotification::class)
-            ->latest()
-            ->limit(200)
-            ->get()
-            ->contains(function (DatabaseNotification $row) use ($submissionId) {
-                $params = $row->data['params'] ?? [];
 
-                return ($row->data['type'] ?? null) === self::REJECTED_TYPE
-                    && ($params['external_submission_id'] ?? null) === $submissionId;
-            });
-
-        if ($already) {
-            return response()->json(['data' => ['notified' => false, 'duplicate' => true]]);
-        }
-
-        $params = [
-            'external_submission_id' => $submissionId,
-            'kind' => $data['kind'] ?? 'note',
-            'reason_code' => $data['reason_code'],
-            'reason_text' => $data['reason_text'] ?? null,
-        ];
-
-        $driver->notify(new AppNotification(self::REJECTED_TYPE, $params));
-
-        // The bell row above reaches nobody on its own: `AppNotification::via()`
-        // is `['database']` and the driver's app has no endpoint that reads
-        // those rows. So the telling is a push, on its own channel, and it never
-        // fails this request -- the decision is already recorded, and a
-        // transport that is down must not have El-Professor retry it.
-        app(SubmissionDecisionNotifier::class)->rejected($driver, $params);
-
-        // Since 08.10.2026 this side keeps the submissions, so the decision
-        // lands on the row as well as in the driver's notifications — which is
-        // what lets the driver's own list show WHY, rather than only a bell
-        // entry they may have dismissed.
+        // THE DRIVER IS NO LONGER TOLD, because there is no longer a decision
+        // to tell them about. The owner removed the review step on 13.10.2026:
+        // every receipt and note is accepted the moment it arrives, so a
+        // rejection is a thing that cannot happen, and a push saying one did
+        // would be the product contradicting itself.
         //
-        // It is an update and not a requirement: a submission id this side does
-        // not know is still notified, because the notification is the point and
-        // the id belonged to El-Professor before this table existed. The tenant
-        // is a term in the query for the same reason as above.
+        // What is left is this route recording whatever still reaches it. It is
+        // kept, rather than deleted with the notification, because deleting a
+        // live route in the same change that stops calling it gets the deploy
+        // order wrong: this repository releases on push, and El-Professor's own
+        // release is a separate button. An in-flight call therefore still gets
+        // a 200 and still lands on the row. Delete the route once nothing calls
+        // it -- measured, not assumed.
+
+        // The decision still lands on the row, so the record of what arrived
+        // stays complete. It is an update and not a requirement: a submission
+        // id this side does not know is accepted quietly, because the id
+        // belonged to El-Professor before this table existed. The tenant is a
+        // term in the query for the same reason as the lookup above.
         ElProfessorSubmission::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
@@ -180,7 +154,10 @@ class ElProfessorController extends Controller
 
         $this->recordUsage($tenantId);
 
-        return response()->json(['data' => ['notified' => true, 'duplicate' => false]]);
+        // `notified` is false and stays false. The key is kept so a caller
+        // built against the old shape does not break on a missing field, and
+        // it now reports the truth rather than a notification nobody sent.
+        return response()->json(['data' => ['notified' => false, 'duplicate' => false]]);
     }
 
     /**
