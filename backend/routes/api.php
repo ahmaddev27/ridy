@@ -330,6 +330,8 @@ Route::prefix('v1')->group(function () {
             // second is also the only recovery for a ring that never arrived.
             Route::get('elprofessor/submissions', [ElProfessorController::class, 'submissions']);
             Route::get('elprofessor/submissions/{uuid}', [ElProfessorController::class, 'submission']);
+            // Per-driver Uber earnings for a date range, pulled live from Fleet Hub.
+            Route::get('elprofessor/earnings', [ElProfessorController::class, 'earnings']);
         });
 
         // Uber fleet session status + capture (cookie paste OR extension via token)

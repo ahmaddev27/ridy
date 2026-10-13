@@ -2,14 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\ElProfessorSubmission;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use App\Jobs\RingElProfessor;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -1166,5 +1169,280 @@ class ElProfessorConnectionTest extends TestCase
 
         $this->assertTrue($this->tenant->refresh()->elprofessorEnabled());
         $this->assertFalse($this->other->refresh()->elprofessorEnabled());
+    }
+
+    // ── Uber earnings, pulled for El-Professor ───────────────────────────────
+
+    private function uberSession(Tenant $tenant, array $overrides = []): UberFleetSession
+    {
+        return UberFleetSession::withoutGlobalScopes()->create($overrides + [
+            'tenant_id' => $tenant->id, 'uber_org_uuid' => 'org-'.$tenant->id,
+            'cookies' => [['name' => 'sid', 'value' => 'ramen']],
+            'supplier_cookies' => [['name' => 'sid', 'value' => 'hub'], ['name' => 'csid', 'value' => '2']],
+            'status' => UberFleetSession::STATUS_ACTIVE,
+        ]);
+    }
+
+    private function withProxy(Tenant $tenant): void
+    {
+        $tenant->forceFill(['proxy_url' => 'http://user:pw@proxy.test:8080'])->save();
+    }
+
+    private function earner(string $uuid, int $fareE5, int $tipE5, int $cashE5, int $netE5): array
+    {
+        return [
+            'earnerUuid' => $uuid,
+            'tripInfos' => [['tripAttributeName' => 'TRIP_ATTRIBUTE_NAME_COUNT', 'value' => '67']],
+            'netOutstanding' => ['amountE5' => (string) $netE5, 'currencyCode' => 'EUR'],
+            'earnings' => ['categoryName' => 'earnings', 'amount' => ['amountE5' => (string) ($fareE5 + $tipE5)], 'children' => [
+                ['categoryName' => 'fare', 'amount' => ['amountE5' => (string) $fareE5]],
+                ['categoryName' => 'tip', 'amount' => ['amountE5' => (string) $tipE5]],
+            ]],
+            'payouts' => ['categoryName' => 'payouts', 'amount' => ['amountE5' => (string) -$cashE5], 'children' => [
+                ['categoryName' => 'cash_collected', 'amount' => ['amountE5' => (string) -$cashE5]],
+            ]],
+        ];
+    }
+
+    /** A second Http::fake() in one test is ignored (the first stub wins), so start clean. */
+    private function refake(array $stubs): void
+    {
+        app()->forgetInstance(Factory::class);
+        Http::clearResolvedInstances();
+        Http::fake($stubs);
+    }
+
+    private function hubPage(array $earners, ?string $next): array
+    {
+        return ['data' => ['getEarnerBreakdownsV2' => [
+            'earnerEarningsBreakdowns' => $earners, 'pageInfo' => ['nextPageToken' => $next],
+        ]]];
+    }
+
+    private function pullEarnings(string $token, string $query = 'from=2026-10-06&to=2026-10-12')
+    {
+        return $this->withHeaders($this->bearer($token))->getJson('/api/v1/elprofessor/earnings?'.$query);
+    }
+
+    public function test_earnings_come_back_per_driver_as_strings_across_pages(): void
+    {
+        $token = $this->mint();
+        $this->uberSession($this->tenant);
+        $this->withProxy($this->tenant);
+        $ahmed = $this->driver($this->tenant, 'Ahmed');
+        $ahmed->forceFill(['uber_driver_uuid' => 'u-ahmed'])->save();
+        $omar = $this->driver($this->tenant, 'Omar');
+        $omar->forceFill(['uber_driver_uuid' => 'u-omar'])->save();
+
+        Http::fake(['*/graphql' => Http::sequence()
+            ->push($this->hubPage([$this->earner('u-ahmed', 66_419_000, 2_800_000, 22_626_000, 46_593_000)], 'page-2'))
+            ->push($this->hubPage([
+                $this->earner('u-omar', 10_000_000, 0, 0, 10_000_000),
+                $this->earner('u-stranger', 1_000_000, 0, 0, 1_000_000),
+            ], null)),
+        ]);
+
+        $response = $this->pullEarnings($token)->assertOk();
+
+        $response->assertJsonPath('meta.driver_count', 2)->assertJsonPath('meta.unmatched_count', 1);
+        $row = $response->json('data.drivers.0');
+        $this->assertSame($ahmed->id, $row['driver_id']);
+        $this->assertSame('u-ahmed', $row['uber_driver_uuid']);
+        $this->assertSame('664.19', $row['fare']);
+        $this->assertSame('28.00', $row['tips']);
+        $this->assertSame('226.26', $row['cash']);
+        $this->assertSame('465.93', $row['net_outstanding']);
+        $this->assertSame('0.00', $row['promotion']);
+        $this->assertSame(67, $row['trips']);
+        // (664.19 + 28.00) - 226.26 = 465.93; Uber says 465.93.
+        $this->assertSame('0.00', $row['difference']);
+        $this->assertSame('EUR', $response->json('data.currency'));
+        $this->assertSame('2026-10-06', $response->json('data.from'));
+        // No money is a JSON number: the raw body carries them quoted.
+        $this->assertStringContainsString('"fare":"664.19"', $response->getContent());
+
+        // Two pages were asked for, the second with the token of the first, the
+        // jar and the CSRF header on both.
+        Http::assertSentCount(2);
+        Http::assertSent(fn ($r) => $r['operationName'] === 'getEarnerBreakdownsV2'
+            && $r['variables']['pageOptions']['pageToken'] === 'page-2'
+            && $r['variables']['supplierUuid'] === 'org-'.$this->tenant->id
+            && $r->hasHeader('x-csrf-token', 'x')
+            && $r->hasHeader('cookie', 'sid=hub; csid=2'));
+    }
+
+    public function test_an_unmatched_earner_is_named_not_just_counted_and_carries_no_money(): void
+    {
+        $token = $this->mint();
+        $this->uberSession($this->tenant);
+        $this->withProxy($this->tenant);
+        $stranger = $this->earner('u-stranger', 5_000_000, 0, 0, 5_000_000);
+        $stranger['earnerMetadata'] = ['name' => 'Ahmed Hemaid'];
+        Http::fake(['*/graphql' => Http::response($this->hubPage([$stranger], null))]);
+
+        $response = $this->pullEarnings($token)->assertOk();
+
+        $response->assertJsonPath('meta.unmatched_count', 1)
+            ->assertJsonPath('meta.unmatched_truncated', false)
+            ->assertJsonPath('meta.unmatched.0.name', 'Ahmed Hemaid')
+            ->assertJsonPath('meta.unmatched.0.uber_driver_uuid', 'u-stranger')
+            ->assertJsonPath('meta.unmatched.0.trips', 67);
+        $this->assertSame(['name', 'trips', 'uber_driver_uuid'], collect($response->json('meta.unmatched.0'))->keys()->sort()->values()->all());
+        $this->assertSame([], $response->json('data.drivers'));
+    }
+
+    public function test_the_unmatched_list_is_capped_but_the_count_is_not(): void
+    {
+        $token = $this->mint();
+        $this->uberSession($this->tenant);
+        $this->withProxy($this->tenant);
+        $earners = [];
+        for ($i = 0; $i < 105; $i++) {
+            $earners[] = $this->earner("u-$i", 1_000_000, 0, 0, 1_000_000);
+        }
+        Http::fake(['*/graphql' => Http::response($this->hubPage($earners, null))]);
+
+        $response = $this->pullEarnings($token)->assertOk();
+
+        $response->assertJsonPath('meta.unmatched_count', 105)->assertJsonPath('meta.unmatched_truncated', true);
+        $this->assertCount(100, $response->json('meta.unmatched'));
+    }
+
+    public function test_another_fleets_driver_with_the_same_uber_uuid_is_never_returned(): void
+    {
+        $token = $this->mint();
+        $this->uberSession($this->tenant);
+        $this->withProxy($this->tenant);
+        $theirs = $this->driver($this->other, 'Theirs');
+        $theirs->forceFill(['uber_driver_uuid' => 'shared-uuid'])->save();
+
+        Http::fake(['*/graphql' => Http::response($this->hubPage([$this->earner('shared-uuid', 1_000_000, 0, 0, 1_000_000)], null))]);
+
+        $this->pullEarnings($token)->assertOk()
+            ->assertJsonPath('meta.driver_count', 0)->assertJsonPath('meta.unmatched_count', 1)
+            ->assertJsonPath('data.drivers', []);
+    }
+
+    public function test_another_fleets_session_is_not_used(): void
+    {
+        $token = $this->mint();
+        $this->uberSession($this->other);
+        $this->withProxy($this->tenant);
+        Http::fake();
+
+        $this->pullEarnings($token)->assertStatus(409)->assertJsonPath('reason', 'no_uber_session');
+        Http::assertNothingSent();
+    }
+
+    public function test_without_a_proxy_nothing_is_sent_to_uber(): void
+    {
+        $token = $this->mint();
+        $this->uberSession($this->tenant);
+        Http::fake();
+
+        $this->pullEarnings($token)->assertStatus(409)->assertJsonPath('reason', 'no_proxy');
+        Http::assertNothingSent();
+    }
+
+    public function test_an_expired_session_and_a_rejected_one_are_told_apart_from_an_outage(): void
+    {
+        $token = $this->mint();
+        $session = $this->uberSession($this->tenant, ['status' => UberFleetSession::STATUS_NEEDS_RELINK]);
+        $this->withProxy($this->tenant);
+        Http::fake();
+        $this->pullEarnings($token)->assertStatus(409)->assertJsonPath('reason', 'no_uber_session');
+
+        $session->forceFill(['status' => UberFleetSession::STATUS_ACTIVE])->save();
+        $this->refake(['*/graphql' => Http::response('', 401)]);
+        $this->pullEarnings($token)->assertStatus(409)->assertJsonPath('reason', 'uber_session_rejected');
+
+        $this->refake(['*/graphql' => Http::response('', 503)]);
+        $this->pullEarnings($token)->assertStatus(502)->assertJsonPath('reason', 'uber_error');
+    }
+
+    public function test_a_graphql_error_or_an_unreadable_amount_is_a_failure_not_a_zero(): void
+    {
+        $token = $this->mint();
+        $this->uberSession($this->tenant);
+        $this->withProxy($this->tenant);
+        $this->driver($this->tenant, 'Ahmed')->forceFill(['uber_driver_uuid' => 'u-ahmed'])->save();
+
+        Http::fake(['*/graphql' => Http::response(['errors' => [['message' => 'nope']]])]);
+        $this->pullEarnings($token)->assertStatus(502)->assertJsonPath('reason', 'uber_graphql_error');
+
+        $bad = $this->earner('u-ahmed', 1, 0, 0, 1);
+        $bad['netOutstanding']['amountE5'] = '12.5';
+        $this->refake(['*/graphql' => Http::response($this->hubPage([$bad], null))]);
+        $this->pullEarnings($token)->assertStatus(502)->assertJsonPath('reason', 'unreadable_amount');
+    }
+
+    public function test_a_pagination_that_never_ends_is_refused_rather_than_cut_short(): void
+    {
+        $token = $this->mint();
+        $this->uberSession($this->tenant);
+        $this->withProxy($this->tenant);
+        $n = 0;
+        Http::fake(['*/graphql' => function () use (&$n) {
+            return Http::response($this->hubPage([], 'p'.++$n));
+        }]);
+
+        $this->pullEarnings($token)->assertStatus(502)->assertJsonPath('reason', 'too_many_pages');
+    }
+
+    public function test_the_range_is_validated(): void
+    {
+        $token = $this->mint();
+        Http::fake();
+
+        $this->pullEarnings($token, '')->assertStatus(422);
+        $this->pullEarnings($token, 'from=06.10.2026&to=12.10.2026')->assertStatus(422);
+        $this->pullEarnings($token, 'from=2026-10-12&to=2026-10-06')->assertStatus(422);
+        $this->pullEarnings($token, 'from=2026-01-01&to=2026-12-31')->assertStatus(422)->assertJsonPath('reason', 'range_exceeds_31_days')->assertJsonPath('max_days', 31);
+        Http::assertNothingSent();
+    }
+
+    public function test_the_range_is_sent_as_whole_berlin_days(): void
+    {
+        $token = $this->mint();
+        $this->uberSession($this->tenant);
+        $this->withProxy($this->tenant);
+        Http::fake(['*/graphql' => Http::response($this->hubPage([], null))]);
+
+        $this->pullEarnings($token, 'from=2026-10-06&to=2026-10-12')->assertOk();
+
+        $start = CarbonImmutable::parse('2026-10-06', 'Europe/Berlin')->getTimestampMs();
+        $end = CarbonImmutable::parse('2026-10-13', 'Europe/Berlin')->getTimestampMs();
+        Http::assertSent(fn ($r) => $r['variables']['timeRange']['startTimeUnixMillis'] === $start
+            && $r['variables']['timeRange']['endTimeUnixMillis'] === $end
+            && $r['variables']['timeRange']['unixMilliOrDate'] === 'Unix_Time_Range'
+            && $r['variables']['pageOptions']['pageSize'] === 10);
+    }
+
+    public function test_the_earnings_route_needs_a_token_and_a_closed_company_is_refused(): void
+    {
+        $this->getJson('/api/v1/elprofessor/earnings?from=2026-10-06&to=2026-10-12')->assertStatus(401);
+
+        $token = $this->mint();
+        $this->tenant->setElprofessorEnabled(false);
+        $this->app['auth']->forgetGuards();
+        // The switch deletes the tokens, so the closed company's token is gone: 401.
+        $this->pullEarnings($token)->assertStatus(401);
+    }
+
+    public function test_the_earnings_route_widens_nothing_it_is_exactly_one_get(): void
+    {
+        $token = $this->mint();
+        Http::fake();
+
+        // Reachable: the confinement lets the pattern through (a 422 is the
+        // route itself answering, not the middleware refusing).
+        $this->pullEarnings($token, '')->assertStatus(422);
+
+        // Not reachable: neighbours of the new path, and the write verbs.
+        $this->withHeaders($this->bearer($token))->getJson('/api/v1/elprofessor/earnings/anything')->assertStatus(404);
+        $this->withHeaders($this->bearer($token))->postJson('/api/v1/elprofessor/earnings')->assertStatus(405);
+        $this->withHeaders($this->bearer($token))->getJson('/api/v1/elprofessor')->assertStatus(404);
+        $this->withHeaders($this->bearer($token))->getJson('/api/v1/fleet-session')->assertStatus(403);
+        $this->withHeaders($this->bearer($token))->getJson('/api/v1/dispatch/offers')->assertStatus(403);
     }
 }
