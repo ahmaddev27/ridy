@@ -15,11 +15,13 @@
  * ## Nothing here enters anybody's books
  *
  * Everything a driver sends is a CLAIM waiting for a person at the company to
- * accept or reject it. The empty state and the status words say so plainly,
+ * read it. There is no decision to wait for: since 13.10.2026 a submission
+ * is accepted on arrival (owner's decision), so this screen is a RECORD of
+ * what the driver sent, not a queue. The empty state says so plainly,
  * because a driver who believes a submitted receipt is already paid will not
  * chase it.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, ScrollView, Pressable, RefreshControl, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -28,22 +30,76 @@ import { Text } from "@/components/typography";
 import { SectionLabel } from "@/components/ui";
 import { api, type DriverSubmission } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { t, isRTL } from "@/lib/i18n";
+import { t, isRTL, intlLocale } from "@/lib/i18n";
+import { groupSubmissions, shortDay } from "@/lib/submission-groups";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
 
 /**
- * How each state reads. `pending` and `taken` are the same thing from the
- * driver's side — whether El-Professor has fetched it yet is our plumbing, not
- * news — so both show as waiting.
+ * One collapsible week.
  *
- * A rejection uses the offer lifecycle's `canceled` hue and not its `rejected`
- * one: `rejected` is the muted grey an expired offer gets, and a company
- * refusing a receipt is something the driver has to act on.
+ * The newest week opens by default and the rest stay shut: a driver who sends
+ * a few things a day would otherwise land on a wall of rows, which is the
+ * complaint this grouping answers.
  */
-function statusStyle(status: string, c: Palette): { fg: string; bg: string; label: string } {
-  if (status === "accepted") return { fg: c.accepted, bg: c.completedBg, label: t("subs.status.accepted") };
-  if (status === "rejected") return { fg: c.canceled, bg: c.canceledBg, label: t("subs.status.rejected") };
-  return { fg: c.pending, bg: c.pendingBg, label: t("subs.status.pending") };
+function WeekBlock({
+  c,
+  row,
+  title,
+  count,
+  open,
+  onToggle,
+  children,
+}: {
+  c: Palette;
+  row: "row" | "row-reverse";
+  title: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={{ gap: 10 }}>
+      <Pressable
+        onPress={onToggle}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        style={{
+          ...cardStyle(c),
+          padding: 14,
+          flexDirection: row,
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+        }}
+      >
+        <View style={{ flexDirection: row, alignItems: "center", gap: 8, flexShrink: 1 }}>
+          {/* The chevron turns, so the control says which way it goes without
+              a second label. Mirrored in Arabic like every other chevron here. */}
+          <ChevronLeft
+            size={18}
+            color={c.inkMuted}
+            strokeWidth={2}
+            style={{ transform: [{ rotate: open ? "-90deg" : isRTL() ? "0deg" : "180deg" }] }}
+          />
+          <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }} numberOfLines={1}>
+            {title}
+          </Text>
+        </View>
+        <View
+          style={{
+            paddingHorizontal: 9,
+            paddingVertical: 3,
+            borderRadius: radius.pill,
+            backgroundColor: c.surface2,
+          }}
+        >
+          <Text style={{ color: c.inkMuted, fontWeight: "700", fontSize: 12.5 }}>{count}</Text>
+        </View>
+      </Pressable>
+      {open && <View style={{ gap: 10, paddingHorizontal: 4 }}>{children}</View>}
+    </View>
+  );
 }
 
 export default function SubmissionsScreen() {
@@ -59,6 +115,23 @@ export default function SubmissionsScreen() {
   const [rows, setRows] = useState<DriverSubmission[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // The weeks a driver has opened. The newest one is open without being in
+  // here, so the screen is useful before anything is tapped and a driver who
+  // closes it stays closed.
+  const [closed, setClosed] = useState<Set<string>>(new Set());
+  const [opened, setOpened] = useState<Set<string>>(new Set());
+
+  // Re-grouped only when the rows change: the month and week arithmetic walks
+  // every row, and this screen re-renders on every pull-to-refresh frame.
+  const months = useMemo(() => groupSubmissions(rows ?? []), [rows]);
+  const newestWeekKey = months[0]?.weeks[0] !== undefined
+    ? `${months[0].monthKey}/${months[0].weeks[0].mondayIso}`
+    : null;
+
+  const monthLabel = (year: number, month: number) =>
+    new Intl.DateTimeFormat(intlLocale(), { month: "long", year: "numeric" })
+      .format(new Date(year, month - 1, 1));
 
   const load = useCallback(async () => {
     setFailed(false);
@@ -151,43 +224,68 @@ export default function SubmissionsScreen() {
           </View>
         )}
 
-        {(rows ?? []).map((r) => (
-          <View key={r.id} style={{ ...cardStyle(c), padding: 16, gap: 8 }}>
-            <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>
-                {r.subject === "receipt" ? t("subs.kind.receipt") : t("subs.kind.note")}
-              </Text>
-              {(() => {
-                const st = statusStyle(r.status, c);
-                return (
-                  <View
-                    style={{
-                      paddingHorizontal: 10,
-                      paddingVertical: 4,
-                      borderRadius: radius.pill,
-                      backgroundColor: st.bg,
-                    }}
-                  >
-                    <Text style={{ color: st.fg, fontWeight: "700", fontSize: 12.5 }}>{st.label}</Text>
-                  </View>
-                );
-              })()}
-            </View>
+        {months.map((group) => (
+          <View key={group.monthKey || "undated"} style={{ gap: 10 }}>
+            {/* The month, in the reader's own language. `intlLocale()` keeps
+                Latin digits in Arabic, which is this product's rule for every
+                date, amount and distance. */}
+            <SectionLabel>
+              {group.monthKey === "" ? t("subs.undated") : monthLabel(group.year, group.month)}
+            </SectionLabel>
 
-            {r.created_at && (
-              <Text style={{ color: c.inkMuted, fontSize: 12.5 }}>
-                {new Date(r.created_at).toLocaleDateString()}
-              </Text>
-            )}
-
-            {/* The company's own words. Without them a rejection is something
-                the driver cannot do anything about. */}
-            {r.status === "rejected" && r.reason ? (
-              <View style={{ gap: 2 }}>
-                <Text style={{ color: c.inkMuted, fontSize: 12.5 }}>{t("subs.reason")}</Text>
-                <Text style={{ color: c.ink, fontSize: 13.5 }}>{r.reason}</Text>
-              </View>
-            ) : null}
+            {group.weeks.map((week) => {
+              const key = `${group.monthKey}/${week.mondayIso}`;
+              const isNewest = key === newestWeekKey;
+              const open = isNewest ? !closed.has(key) : opened.has(key);
+              const title = week.weekNo === 0
+                ? t("subs.undated")
+                : `${t("subs.week", { n: String(week.weekNo) })} · ${shortDay(week.mondayIso)}–${shortDay(week.sundayIso)}`;
+              return (
+                <WeekBlock
+                  key={key}
+                  c={c}
+                  row={row}
+                  title={title}
+                  count={week.items.length}
+                  open={open}
+                  onToggle={() => {
+                    // Two sets rather than one, because "open" means the
+                    // opposite thing for the newest week: one set would make
+                    // the first tap on it do nothing.
+                    if (isNewest) {
+                      setClosed((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(key)) next.delete(key);
+                        else next.add(key);
+                        return next;
+                      });
+                    } else {
+                      setOpened((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(key)) next.delete(key);
+                        else next.add(key);
+                        return next;
+                      });
+                    }
+                  }}
+                >
+                  {week.items.map((r) => (
+                    <View key={r.id} style={{ ...cardStyle(c), padding: 14, gap: 6 }}>
+                      <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                        <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>
+                          {r.subject === "receipt" ? t("subs.kind.receipt") : t("subs.kind.note")}
+                        </Text>
+                        {r.created_at && (
+                          <Text style={{ color: c.inkMuted, fontSize: 12.5 }}>
+                            {new Date(r.created_at).toLocaleDateString(intlLocale())}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                </WeekBlock>
+              );
+            })}
           </View>
         ))}
       </ScrollView>

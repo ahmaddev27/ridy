@@ -215,6 +215,8 @@ const de: Dict = {
   // it. The category VALUES are El-Professor's stored vocabulary and are never
   // translated — only these labels around them are.
   "subs.title": "Belege & Notizen",
+  "subs.week": "Woche {n}",
+  "subs.undated": "Ohne Datum",
   "subs.mine": "Meine Eingänge",
   "subs.notConnected": "Noch nicht freigeschaltet",
   "subs.notConnectedBody": "Dein Unternehmen hat El-Professor noch nicht verbunden. Solange das nicht geschehen ist, kann niemand deine Belege und Notizen abrufen — frag bitte in der Disposition nach.",
@@ -528,6 +530,8 @@ const en: Dict = {
 
   // ── Belege & Notizen (El-Professor) ──────────────────────────────────────
   "subs.title": "Receipts & notes",
+  "subs.week": "Week {n}",
+  "subs.undated": "No date",
   "subs.mine": "My submissions",
   "subs.notConnected": "Not enabled yet",
   "subs.notConnectedBody": "Your company has not connected El-Professor yet. Until it does, nobody can fetch your receipts and notes — please ask your dispatcher.",
@@ -841,6 +845,8 @@ const ar: Dict = {
 
   // ── الفواتير والملاحظات (El-Professor) ───────────────────────────────────
   "subs.title": "الفواتير والملاحظات",
+  "subs.week": "الأسبوع {n}",
+  "subs.undated": "بلا تاريخ",
   "subs.mine": "ما أرسلته",
   "subs.notConnected": "غير مفعّل بعد",
   "subs.notConnectedBody": "شركتك لم تربط El-Professor بعد. وقبل الربط لا أحد يستطيع سحب فواتيرك وملاحظاتك — راجع الإدارة من فضلك.",
