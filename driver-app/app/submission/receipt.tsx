@@ -56,6 +56,14 @@ import { t, isRTL } from "@/lib/i18n";
 // against the same fixtures in `tests/receipt-text-parse.test.mjs`.
 import { parseReceiptText, formatAmountDE, type OcrResult } from "@/lib/receipt-text-parse";
 import { rowsFromLines } from "@/lib/ocr-lines";
+import {
+  stepsFor,
+  stepProblem,
+  submitProblem,
+  toWireAmount,
+  toWireDecimal,
+  type ReceiptStep,
+} from "@/lib/receipt-steps";
 import { readOdometer } from "@/lib/odometer-read";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
 
@@ -72,28 +80,6 @@ function today(): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
-/** German typing to the one shape the wire takes, or null if it is not money. */
-/**
- * German typing to one wire shape, with a given number of decimal places.
- *
- * A litre count has two (`41,47`) and a unit price three (`1,789`), and both
- * reach a figure an accountant reads. Same rule as the amount: a comma from
- * the keyboard is converted ONCE, here, and anything that is not a plain
- * decimal is refused by name rather than coerced to zero.
- */
-export function toWireDecimal(input: string, places: number): string | null {
-  const cleaned = input.trim().replace(/\s/g, "").replace(",", ".");
-  const shape = new RegExp(`^\\d{1,8}(\\.\\d{1,${places}})?$`);
-  if (!shape.test(cleaned)) return null;
-  return cleaned;
-}
-
-export function toWireAmount(input: string): string | null {
-  const cleaned = input.trim().replace(/\s/g, "").replace(",", ".");
-  if (!/^\d{1,8}(\.\d{1,2})?$/.test(cleaned)) return null;
-  return cleaned;
 }
 
 export default function ReceiptScreen() {
@@ -142,10 +128,45 @@ export default function ReceiptScreen() {
   // it a failed read is indistinguishable from a receipt with nothing on it.
   const [scanning, setScanning] = useState(false);
   const [scanNote, setScanNote] = useState<string | null>(null);
+  // Which step is on screen. The list itself is derived, because a refuel has
+  // a step a car wash does not — changing the category changes the flow.
+  const [step, setStep] = useState<ReceiptStep>("photo");
+
   const [checkDate, setCheckDate] = useState(false);
   const [checkAmount, setCheckAmount] = useState(false);
 
   /** Shrink and re-encode, which is also what strips the EXIF. */
+  // One description of the form, asked by the step gate AND by the send, so
+  // the two can never disagree about what a valid receipt is.
+  const formState = {
+    photo: { hasPhoto: photo !== null, scanning },
+    details: {
+      amount, category, description, merchant, city, plz,
+      receiptTime,
+      unconfirmed: checkDate || checkAmount,
+    },
+    fuel: { litres, pricePerLitre, hasOdoPhoto: odoPhoto !== null, odometerKm },
+  };
+
+  const steps = stepsFor(category);
+  const stepIndex = Math.max(0, steps.indexOf(step));
+  const blocker = stepProblem(step, formState);
+
+  const goNext = () => {
+    if (blocker !== null) {
+      toast.show(t(blocker));
+      return;
+    }
+    const next = steps[stepIndex + 1];
+    if (next !== undefined) setStep(next);
+  };
+
+  const goBack = () => {
+    const previous = steps[stepIndex - 1];
+    if (previous === undefined) router.back();
+    else setStep(previous);
+  };
+
   const prepare = async (uri: string): Promise<PickedPhoto> => {
     const out = await ImageManipulator.manipulateAsync(
       uri,
@@ -298,69 +319,22 @@ export default function ReceiptScreen() {
   };
 
   const submit = async () => {
-    if (!photo) {
-      toast.show(t("receipt.photoRequired"));
+    // The last wall, and it asks the SAME function the steps do. A second copy
+    // of this list would drift the first time one of them changed, and the
+    // driver would be refused on the final screen for a field two steps back.
+    const problem = submitProblem(formState);
+    if (problem !== null) {
+      toast.show(t(problem));
       return;
     }
     const wire = toWireAmount(amount);
+    const wireLitres = category === "Tanken" ? toWireDecimal(litres, 2) : null;
+    const wirePrice = category === "Tanken" ? toWireDecimal(pricePerLitre, 3) : null;
+    // `submitProblem` already refused every unreadable figure, so these are
+    // non-null here. The check is kept because TypeScript cannot know that and
+    // because a silent `null` would reach the wire as a missing amount.
     if (wire === null) {
       toast.show(t("receipt.amountInvalid"));
-      return;
-    }
-    if (!category && description.trim() === "") {
-      toast.show(t("receipt.subjectRequired"));
-      return;
-    }
-    if (plz.trim() !== "" && !/^\d{5}$/.test(plz.trim())) {
-      toast.show(t("receipt.plzInvalid"));
-      return;
-    }
-    if (merchant.trim() === "") {
-      toast.show(t("receipt.merchantRequired"));
-      return;
-    }
-    if (city.trim() === "") {
-      toast.show(t("receipt.cityRequired"));
-      return;
-    }
-    // `HH:MM`, and the hour is checked: `25:00` is not a time, and a parser
-    // that accepts it shifts the entry into the next day.
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(receiptTime.trim())) {
-      toast.show(t("receipt.timeInvalid"));
-      return;
-    }
-    // The odometer, on a fuel receipt only. Its photo is required too: the
-    // figure is read from it, and without one there is nothing to read.
-    if (category === "Tanken") {
-      if (odoPhoto === null) {
-        toast.show(t("receipt.odoPhotoRequired"));
-        return;
-      }
-      if (!/^\d{4,7}$/.test(odometerKm.trim())) {
-        toast.show(t("receipt.odoInvalid"));
-        return;
-      }
-    }
-
-    // The two fuel figures, on a fuel receipt only.
-    let wireLitres: string | null = null;
-    let wirePrice: string | null = null;
-    if (category === "Tanken") {
-      wireLitres = toWireDecimal(litres, 2);
-      if (wireLitres === null) {
-        toast.show(t("receipt.litresInvalid"));
-        return;
-      }
-      wirePrice = toWireDecimal(pricePerLitre, 3);
-      if (wirePrice === null) {
-        toast.show(t("receipt.priceInvalid"));
-        return;
-      }
-    }
-    // The photo does not travel, so an unchecked field can never be checked
-    // against anything afterwards. This is the wall, not a reminder.
-    if (checkDate || checkAmount) {
-      toast.show(t("receipt.mustConfirm"));
       return;
     }
 
@@ -435,8 +409,25 @@ export default function ReceiptScreen() {
           </View>
         )}
 
+        {/* Where the driver is, and what this step is for. Two lines rather
+            than a progress bar: a bar shows how far along you are, and what a
+            driver needs to know is what is being asked of them now. */}
+        <View style={{ gap: 4 }}>
+          <Text style={{ color: c.inkSubtle, fontSize: 12.5 }}>
+            {t("receipt.stepOf", { n: String(stepIndex + 1), total: String(steps.length) })}
+          </Text>
+          <Text style={{ color: c.ink, fontWeight: "700", fontSize: 17 }}>
+            {step === "photo" ? t("receipt.stepPhoto")
+              : step === "details" ? t("receipt.stepDetails")
+              : step === "fuel" ? t("receipt.stepFuel")
+              : t("receipt.stepConfirm")}
+          </Text>
+        </View>
+
+        {step === "photo" && (
+        <>
         <View style={{ ...cardStyle(c), padding: 16, gap: 6 }}>
-          <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("receipt.reviewNote")}</Text>
+          <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("receipt.photoIntro")}</Text>
         </View>
 
         <SectionLabel>{t("receipt.photo")}</SectionLabel>
@@ -480,8 +471,18 @@ export default function ReceiptScreen() {
           </View>
         )}
 
-        <SectionLabel>{t("receipt.details")}</SectionLabel>
+        {/* Said once the read is done, so the driver knows the next screen is
+            a check and not a form to fill from nothing. */}
+        {photo !== null && !scanning && (
+          <Text style={{ color: c.inkSubtle, fontSize: 12.5, textAlign: "center" }}>
+            {t("receipt.photoRead")}
+          </Text>
+        )}
+        </>
+        )}
 
+        {step === "details" && (
+        <>
         {/* Typing in a flagged field clears its flag: the value is then the
             driver's own, and asking them to confirm what they just typed is
             noise that teaches people to tap past the warning. */}
@@ -561,10 +562,32 @@ export default function ReceiptScreen() {
           placeholder="Berlin"
         />
 
-        {/* Fuel only. A car wash has no litres, and showing the fields there
-            would invite a number that means nothing. */}
-        {category === "Tanken" && (
+        </>
+        )}
+
+        {/* Fuel only, and the step only exists on a refuel — `stepsFor` is
+            what decides that, so the category is not re-tested here. */}
+        {step === "fuel" && (
           <>
+            <View style={{ ...cardStyle(c), padding: 16, gap: 6 }}>
+              <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("receipt.fuelIntro")}</Text>
+            </View>
+
+            <Field
+              label={t("receipt.litres")}
+              value={litres}
+              onChangeText={setLitres}
+              placeholder="41,47"
+              keyboardType="decimal-pad"
+            />
+            <Field
+              label={t("receipt.pricePerLitre")}
+              value={pricePerLitre}
+              onChangeText={setPricePerLitre}
+              placeholder="1,789"
+              keyboardType="decimal-pad"
+            />
+
             <SectionLabel>{t("receipt.odoSection")}</SectionLabel>
             {odoPhoto ? (
               <View style={{ ...cardStyle(c), padding: 12, gap: 10 }}>
@@ -616,36 +639,101 @@ export default function ReceiptScreen() {
               keyboardType="number-pad"
             />
 
-            <Field
-              label={t("receipt.litres")}
-              value={litres}
-              onChangeText={setLitres}
-              placeholder="41,47"
-              keyboardType="decimal-pad"
-            />
-            <Field
-              label={t("receipt.pricePerLitre")}
-              value={pricePerLitre}
-              onChangeText={setPricePerLitre}
-              placeholder="1,789"
-              keyboardType="decimal-pad"
-            />
           </>
         )}
 
+        {step === "confirm" && (
+          <>
+            <View style={{ ...cardStyle(c), padding: 16, gap: 6 }}>
+              <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("receipt.confirmIntro")}</Text>
+            </View>
+
+            {/* Everything that will be sent, in one place. The photo is not
+                shown again: it does not travel, and showing it here would
+                suggest the company receives it. */}
+            <View style={{ ...cardStyle(c), padding: 16, gap: 10 }}>
+              <SummaryRow c={c} row={row} label={t("receipt.date")} value={date} />
+              <SummaryRow c={c} row={row} label={t("receipt.amount")} value={`${amount} €`} />
+              <SummaryRow
+                c={c}
+                row={row}
+                label={t("receipt.category")}
+                value={category ?? description.trim()}
+              />
+              <SummaryRow
+                c={c}
+                row={row}
+                label={t("receipt.payment")}
+                value={method === "bar" ? t("receipt.cash") : t("receipt.transfer")}
+              />
+              <SummaryRow c={c} row={row} label={t("receipt.merchant")} value={merchant} />
+              <SummaryRow c={c} row={row} label={t("receipt.time")} value={receiptTime} />
+              <SummaryRow c={c} row={row} label={t("receipt.city")} value={city} />
+              <SummaryRow c={c} row={row} label={t("receipt.plz")} value={plz} />
+              {category === "Tanken" && (
+                <>
+                  <SummaryRow c={c} row={row} label={t("receipt.litres")} value={litres} />
+                  <SummaryRow c={c} row={row} label={t("receipt.pricePerLitre")} value={pricePerLitre} />
+                  <SummaryRow c={c} row={row} label={t("receipt.odometer")} value={odometerKm} />
+                  <SummaryRow c={c} row={row} label={t("receipt.range")} value={rangeKm} />
+                </>
+              )}
+            </View>
+          </>
+        )}
+
+        {/* The way forward and the way back, always in the same place. The
+            last step sends instead of advancing; nothing else changes. */}
+        {step !== "confirm" ? (
+          <>
+            <PrimaryButton label={t("receipt.next")} onPress={goNext} disabled={busy || sending} />
+            {/* The reason this step will not let go, said before it is tapped
+                rather than as a toast afterwards. */}
+            {blocker !== null && (
+              <Text style={{ color: c.inkSubtle, fontSize: 12.5, textAlign: "center" }}>
+                {t(blocker)}
+              </Text>
+            )}
+          </>
+        ) : (
         <PrimaryButton
           label={sending ? t("receipt.sending") : t("receipt.send")}
           onPress={() => void submit()}
           disabled={sending || busy || scanning || checkDate || checkAmount || !photo || !connected}
         />
-        {!photo && <Text style={{ color: c.inkSubtle, fontSize: 12.5, textAlign: "center" }}>{t("receipt.photoRequired")}</Text>}
-        {photo && (checkDate || checkAmount) && (
-          <Text style={{ color: c.warning, fontSize: 12.5, textAlign: "center", fontWeight: "700" }}>
-            {t("receipt.mustConfirm")}
-          </Text>
         )}
+
+        <Pressable onPress={goBack} accessibilityRole="button" style={{ paddingVertical: 10 }}>
+          <Text style={{ color: c.inkMuted, fontSize: 13.5, textAlign: "center", fontWeight: "700" }}>
+            {t("receipt.back")}
+          </Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/** One label-and-value line of the confirmation, with a dash when empty. */
+function SummaryRow({
+  c,
+  row,
+  label,
+  value,
+}: {
+  c: Palette;
+  row: "row" | "row-reverse";
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={{ flexDirection: row, alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+      <Text style={{ color: c.inkMuted, fontSize: 13 }}>{label}</Text>
+      <Text
+        style={{ color: c.ink, fontSize: 13.5, fontWeight: "700", flexShrink: 1, textAlign: isRTL() ? "left" : "right" }}
+      >
+        {value.trim() === "" ? t("receipt.notGiven") : value}
+      </Text>
+    </View>
   );
 }
 

@@ -9,7 +9,6 @@ use App\Domain\Notifications\Contracts\PushSender;
 use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
-use App\Http\Controllers\Api\V1\ElProfessorController;
 use App\Jobs\RingElProfessor;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
@@ -413,37 +412,54 @@ class ElProfessorConnectionTest extends TestCase
      * never rendered text, so these assert the SHAPE the driver app renders
      * from — not a sentence.
      */
-    public function test_a_rejection_notifies_the_named_driver_with_a_type_and_params(): void
+    public function test_a_rejection_notifies_nobody_and_still_records(): void
     {
+        // This test used to assert the opposite, and the owner removed the
+        // thing it was asserting on 13.10.2026: there is no review, so there
+        // is no rejection, so there is nobody to tell. A push saying a receipt
+        // was refused would be the product contradicting itself.
+        //
+        // What the route must still do is record whatever reaches it, because
+        // deleting it in the same change that stops calling it would get the
+        // deploy order wrong — this repository releases on push and
+        // El-Professor's release is a separate button.
         $driver = $this->driver($this->tenant, 'Omar');
         $token = $this->mint();
 
+        $row = ElProfessorSubmission::create([
+            'tenant_id' => $this->tenant->id,
+            'driver_id' => $driver->id,
+            'subject' => 'receipt',
+            'status' => ElProfessorSubmission::STATUS_PENDING,
+            'payload' => ['amount' => '41.47'],
+        ]);
+
         $this->postJson('/api/v1/elprofessor/submissions/status', [
-            'external_submission_id' => 'sub-1',
+            'external_submission_id' => $row->uuid,
             'external_driver_id' => $driver->id,
             'status' => 'rejected',
             'reason_code' => 'review_rejected',
             'reason_text' => 'Beleg fehlt',
         ], $this->bearer($token))
             ->assertOk()
-            ->assertJsonPath('data.notified', true)
-            ->assertJsonPath('data.duplicate', false);
+            ->assertJsonPath('data.notified', false);
 
-        $row = DatabaseNotification::query()
-            ->where('notifiable_type', $driver->getMorphClass())
-            ->where('notifiable_id', $driver->id)
-            ->sole();
+        // Nothing at all reached the driver.
+        $this->assertSame(0, DatabaseNotification::query()
+            ->where('notifiable_id', $driver->id)->count());
 
-        $this->assertSame(AppNotification::class, $row->type);
-        $this->assertSame(ElProfessorController::REJECTED_TYPE, $row->data['type']);
-        $this->assertSame('sub-1', $row->data['params']['external_submission_id']);
-        $this->assertSame('review_rejected', $row->data['params']['reason_code']);
-        $this->assertSame('Beleg fehlt', $row->data['params']['reason_text']);
-        $this->assertSame('note', $row->data['params']['kind']);
+        // And the row still carries what was said, so the record is complete.
+        $row->refresh();
+        $this->assertSame(ElProfessorSubmission::STATUS_REJECTED, $row->status);
+        $this->assertSame('review_rejected', $row->decision_code);
+        $this->assertSame('Beleg fehlt', $row->decision_text);
     }
 
-    public function test_a_resent_rejection_does_not_notify_the_driver_twice(): void
+    public function test_a_resent_rejection_still_notifies_nobody(): void
     {
+        // The old dedupe existed to stop a driver being told twice. With
+        // nobody being told, the property that matters is simply that a repeat
+        // is harmless and never grows a notification.
         $driver = $this->driver($this->tenant, 'Omar');
         $token = $this->mint();
         $payload = [
@@ -454,23 +470,11 @@ class ElProfessorConnectionTest extends TestCase
         ];
 
         $this->postJson('/api/v1/elprofessor/submissions/status', $payload, $this->bearer($token))
-            ->assertOk()->assertJsonPath('data.notified', true);
+            ->assertOk()->assertJsonPath('data.notified', false);
         $this->postJson('/api/v1/elprofessor/submissions/status', $payload, $this->bearer($token))
-            ->assertOk()
-            ->assertJsonPath('data.notified', false)
-            ->assertJsonPath('data.duplicate', true);
+            ->assertOk()->assertJsonPath('data.notified', false);
 
-        $this->assertSame(1, DatabaseNotification::query()
-            ->where('notifiable_id', $driver->id)->count());
-
-        // A DIFFERENT submission is a different occurrence and does notify, or
-        // the dedupe above would be indistinguishable from "notify once ever".
-        $second = $payload;
-        $second['external_submission_id'] = 'sub-2';
-        $this->postJson('/api/v1/elprofessor/submissions/status', $second, $this->bearer($token))
-            ->assertOk()->assertJsonPath('data.notified', true);
-        $this->assertSame(2, DatabaseNotification::query()
-            ->where('notifiable_id', $driver->id)->count());
+        $this->assertSame(0, DatabaseNotification::query()->count());
     }
 
     public function test_a_driver_of_another_tenant_is_the_same_404_as_one_that_does_not_exist(): void
@@ -1020,11 +1024,11 @@ class ElProfessorConnectionTest extends TestCase
         $this->assertNotNull($row->decided_at);
     }
 
-    public function test_a_rejection_for_a_submission_this_side_does_not_know_still_notifies(): void
+    public function test_a_rejection_for_a_submission_this_side_does_not_know_is_still_accepted(): void
     {
-        // The id belonged to El-Professor before this table existed, and the
-        // notification is the point. An update that matched nothing must not
-        // turn into a refusal.
+        // The id belonged to El-Professor before this table existed, so an
+        // update that matched nothing must not turn into a refusal. What has
+        // changed since 13.10.2026 is only who is told: nobody.
         $token = $this->mint();
         $driver = $this->driver($this->tenant, 'Omar');
 
@@ -1034,7 +1038,7 @@ class ElProfessorConnectionTest extends TestCase
                 'external_driver_id' => $driver->id,
                 'status' => 'rejected',
                 'reason_code' => 'review_rejected',
-            ])->assertOk()->assertJsonPath('data.notified', true);
+            ])->assertOk()->assertJsonPath('data.notified', false);
     }
 
     public function test_a_rejection_does_not_mark_another_tenants_submission(): void
@@ -1150,8 +1154,15 @@ class ElProfessorConnectionTest extends TestCase
         return $sender;
     }
 
-    public function test_a_rejection_pushes_to_the_drivers_devices_on_its_own_channel(): void
+    public function test_a_rejection_pushes_nothing_to_the_drivers_devices(): void
     {
+        // The inverse of what this asserted until 13.10.2026. With the review
+        // step gone there is no decision, so a push announcing one would tell a
+        // driver something that did not happen — and the device token, the
+        // channel and the whole transport stay in place for the notifications
+        // that ARE real (offers), which is why this is a test and not a
+        // deletion: it proves the documents channel went quiet without taking
+        // the push system with it.
         $sender = $this->fakePush();
         $token = $this->mint();
         $driver = $this->driver($this->tenant, 'Omar');
@@ -1173,18 +1184,13 @@ class ElProfessorConnectionTest extends TestCase
                 'kind' => 'receipt',
             ])->assertOk();
 
-        $this->assertCount(1, $sender->sent);
-        $push = $sender->sent[0];
-        $this->assertSame('device-1', $push['token'] ?? $push['deviceToken']);
-        // The reviewer's own words are the body: a push that says only
-        // "something was rejected" makes the driver open the app to learn
-        // nothing they could not have been told.
-        $this->assertSame('Foto unleserlich', $push['body']);
-        // The app routes on this and opens the submissions screen.
-        $this->assertSame('elprofessor.submission_rejected', $push['data']['type']);
-        $this->assertSame('receipt', $push['data']['kind']);
-        // Its own channel: an offer expires in minutes and owns the loudest one.
-        $this->assertSame('documents', $push['data']['channel_id']);
+        $this->assertCount(0, $sender->sent);
+
+        // And the decision is still on the row, so nothing was lost by going
+        // quiet — only the telling went.
+        $row->refresh();
+        $this->assertSame(ElProfessorSubmission::STATUS_REJECTED, $row->status);
+        $this->assertSame('Foto unleserlich', $row->decision_text);
     }
 
     public function test_a_push_that_cannot_go_does_not_fail_the_decision(): void
