@@ -36,14 +36,6 @@ export const DOCUMENTS_CHANNEL = "documents";
  */
 export const OFFER_CATEGORY = "offer";
 
-/**
- * The semantic type Reidey's `AppNotification` carries for a rejected
- * submission. The backend stores a stable type plus structured params and
- * **never pre-rendered text**, so the sentence below is built here, in the
- * driver's own language, from `params`.
- */
-export const SUBMISSION_REJECTED_TYPE = "elprofessor.submission_rejected";
-
 /** True when an FCM/local payload describes a multi-stop offer (louder channel). */
 export function isMultiStop(stopsCount: unknown): boolean {
   const n = Number(stopsCount ?? 0);

@@ -8,14 +8,14 @@
  *
  * ## Why the list exists at all, and not just the two forms
  *
- * A rejection the driver cannot see is a rejection they cannot act on. The push
- * notification is the first telling; this screen is where the reason still is
- * tomorrow, after the notification was swiped away.
+ * So a driver can see what they have already sent. Nothing arrives to tell
+ * them — there is no push and no decision — so without this screen a receipt
+ * sent twice would be indistinguishable from one sent once.
  *
- * ## Nothing here enters anybody's books
+ * ## What a driver sends goes into the books
  *
- * Everything a driver sends is a CLAIM waiting for a person at the company to
- * read it. There is no decision to wait for: since 13.10.2026 a submission
+ * And it goes in immediately: there is no decision to wait for, because since
+ * 13.10.2026 a submission
  * is accepted on arrival (owner's decision), so this screen is a RECORD of
  * what the driver sent, not a queue. The empty state says so plainly,
  * because a driver who believes a submitted receipt is already paid will not
