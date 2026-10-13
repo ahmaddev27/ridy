@@ -330,9 +330,6 @@ Route::prefix('v1')->group(function () {
             // second is also the only recovery for a ring that never arrived.
             Route::get('elprofessor/submissions', [ElProfessorController::class, 'submissions']);
             Route::get('elprofessor/submissions/{uuid}', [ElProfessorController::class, 'submission']);
-            // The one thing that travels back: a company rejected what a driver
-            // submitted, so we notify that driver. Confined to this exact path.
-            Route::post('elprofessor/submissions/status', [ElProfessorController::class, 'submissionStatus']);
         });
 
         // Uber fleet session status + capture (cookie paste OR extension via token)

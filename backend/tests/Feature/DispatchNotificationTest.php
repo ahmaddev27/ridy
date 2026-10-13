@@ -105,6 +105,17 @@ class DispatchNotificationTest extends TestCase
         $this->assertCount(0, $this->sent);
     }
 
+    public function test_a_linked_driver_with_no_device_is_simply_not_pushed(): void
+    {
+        // Carries what the deleted submission-decision notifier proved for its
+        // own path: no registered device is not an error, it is nobody to push.
+        Driver::create(['name' => 'Mhmoud', 'uber_driver_uuid' => self::DRIVER_UUID]);
+
+        app(DispatchOfferIngestor::class)->ingest($this->tenant->id, $this->offer());
+
+        $this->assertCount(0, $this->sent);
+    }
+
     public function test_driver_app_registers_device_token(): void
     {
         $this->seed(RolePermissionSeeder::class);

@@ -11,7 +11,6 @@ import { ToastProvider } from "@/components/toast";
 import { registerOfferCategory, startPushRegistration } from "@/lib/push";
 import { OfferPopupHost, requestOfferPopup } from "@/components/offer-popup";
 import { markAlerted } from "@/lib/offer-alert";
-import { SUBMISSION_REJECTED_TYPE } from "@/lib/notification-channels";
 import { isMultiStop } from "@/lib/notification-channels";
 import { startLive, stopLive } from "@/lib/live";
 import { openRouteInMaps } from "@/lib/maps";
@@ -221,14 +220,6 @@ function Gate() {
       Notifications.clearLastNotificationResponse();
     } catch {
       /* unsupported on this platform */
-    }
-
-    // A decision from the driver's own company: open the list, which is where
-    // the reason still is tomorrow, after the notification was swiped away.
-    const raw = (response.notification.request.content.data ?? {}) as Record<string, unknown>;
-    if (raw.type === SUBMISSION_REJECTED_TYPE) {
-      router.push("/submissions");
-      return;
     }
 
     const data = (response.notification.request.content.data ?? {}) as OfferPushData;
