@@ -134,12 +134,22 @@ GRAPHQL;
             'supplierUuid' => $session->uber_org_uuid,
             'timeRange' => [
                 'unixMilliOrDate' => 'Unix_Time_Range',
-                'startTimeUnixMillis' => $startMs,
-                'endTimeUnixMillis' => $endMs,
+                // STRINGS, like the Fleet Hub page itself sends. A Unix
+                // millisecond stamp is about 1.76e12 and GraphQL's Int is a
+                // signed 32-bit number capped at 2147483647, so a JSON number
+                // here cannot be coerced whatever the field's declared type --
+                // and the gateway answers 400 with no GraphQL error body to
+                // read. This was sent as int until 13.10.2026 and the first
+                // real call to Uber is what found it.
+                'startTimeUnixMillis' => (string) $startMs,
+                'endTimeUnixMillis' => (string) $endMs,
             ],
             'driverListOrPageOptions' => 'Page_Options',
             'driverList' => null,
-            'pageOptions' => ['pageSize' => 10, 'pageToken' => $token],
+            // The empty string is the FIRST page, not null: `pageToken` inside
+            // PaginationOption__Input takes a string, and the page sends '' to
+            // start. Null is a second coercion fault in the same request.
+            'pageOptions' => ['pageSize' => 10, 'pageToken' => $token ?? ''],
             'excludeAdjustmentItems' => true,
         ];
     }

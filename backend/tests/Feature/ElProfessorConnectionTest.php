@@ -1415,10 +1415,38 @@ class ElProfessorConnectionTest extends TestCase
 
         $start = CarbonImmutable::parse('2026-10-06', 'Europe/Berlin')->getTimestampMs();
         $end = CarbonImmutable::parse('2026-10-13', 'Europe/Berlin')->getTimestampMs();
-        Http::assertSent(fn ($r) => $r['variables']['timeRange']['startTimeUnixMillis'] === $start
-            && $r['variables']['timeRange']['endTimeUnixMillis'] === $end
+        // STRINGS, and the empty string for the first page: this test pinned
+        // ints and a null token until 13.10.2026, so it passed against a fake
+        // while Uber answered 400 -- a fake validates nothing about a schema.
+        Http::assertSent(fn ($r) => $r['variables']['timeRange']['startTimeUnixMillis'] === (string) $start
+            && $r['variables']['timeRange']['endTimeUnixMillis'] === (string) $end
             && $r['variables']['timeRange']['unixMilliOrDate'] === 'Unix_Time_Range'
-            && $r['variables']['pageOptions']['pageSize'] === 10);
+            && $r['variables']['pageOptions']['pageSize'] === 10
+            && $r['variables']['pageOptions']['pageToken'] === '');
+    }
+
+    public function test_the_millis_are_strings_because_they_overflow_a_graphql_int(): void
+    {
+        // The reason, stated as an assertion rather than as a comment: both
+        // stamps are larger than PHP_INT_MAX would suggest is safe to send as
+        // a GraphQL Int, whose range is a signed 32-bit number. If someone
+        // "simplifies" the casts away, this is what says why they were there.
+        $token = $this->mint();
+        $this->uberSession($this->tenant);
+        $this->withProxy($this->tenant);
+        Http::fake(['*/graphql' => Http::response($this->hubPage([], null))]);
+
+        $this->pullEarnings($token, 'from=2026-10-06&to=2026-10-12')->assertOk();
+
+        Http::assertSent(function ($r) {
+            $range = $r['variables']['timeRange'];
+            foreach (['startTimeUnixMillis', 'endTimeUnixMillis'] as $key) {
+                $this->assertIsString($range[$key], $key.' must be a string');
+                $this->assertGreaterThan(2147483647, (int) $range[$key], $key.' overflows a GraphQL Int');
+            }
+
+            return true;
+        });
     }
 
     public function test_the_earnings_route_needs_a_token_and_a_closed_company_is_refused(): void
