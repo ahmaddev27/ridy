@@ -1271,6 +1271,43 @@ class ElProfessorConnectionTest extends TestCase
             && $r->hasHeader('cookie', 'sid=hub; csid=2'));
     }
 
+    public function test_an_unmatched_earner_is_named_not_just_counted_and_carries_no_money(): void
+    {
+        $token = $this->mint();
+        $this->uberSession($this->tenant);
+        $this->withProxy($this->tenant);
+        $stranger = $this->earner('u-stranger', 5_000_000, 0, 0, 5_000_000);
+        $stranger['earnerMetadata'] = ['name' => 'Ahmed Hemaid'];
+        Http::fake(['*/graphql' => Http::response($this->hubPage([$stranger], null))]);
+
+        $response = $this->pullEarnings($token)->assertOk();
+
+        $response->assertJsonPath('meta.unmatched_count', 1)
+            ->assertJsonPath('meta.unmatched_truncated', false)
+            ->assertJsonPath('meta.unmatched.0.name', 'Ahmed Hemaid')
+            ->assertJsonPath('meta.unmatched.0.uber_driver_uuid', 'u-stranger')
+            ->assertJsonPath('meta.unmatched.0.trips', 67);
+        $this->assertSame(['name', 'trips', 'uber_driver_uuid'], collect($response->json('meta.unmatched.0'))->keys()->sort()->values()->all());
+        $this->assertSame([], $response->json('data.drivers'));
+    }
+
+    public function test_the_unmatched_list_is_capped_but_the_count_is_not(): void
+    {
+        $token = $this->mint();
+        $this->uberSession($this->tenant);
+        $this->withProxy($this->tenant);
+        $earners = [];
+        for ($i = 0; $i < 105; $i++) {
+            $earners[] = $this->earner("u-$i", 1_000_000, 0, 0, 1_000_000);
+        }
+        Http::fake(['*/graphql' => Http::response($this->hubPage($earners, null))]);
+
+        $response = $this->pullEarnings($token)->assertOk();
+
+        $response->assertJsonPath('meta.unmatched_count', 105)->assertJsonPath('meta.unmatched_truncated', true);
+        $this->assertCount(100, $response->json('meta.unmatched'));
+    }
+
     public function test_another_fleets_driver_with_the_same_uber_uuid_is_never_returned(): void
     {
         $token = $this->mint();
@@ -1360,7 +1397,7 @@ class ElProfessorConnectionTest extends TestCase
         $this->pullEarnings($token, '')->assertStatus(422);
         $this->pullEarnings($token, 'from=06.10.2026&to=12.10.2026')->assertStatus(422);
         $this->pullEarnings($token, 'from=2026-10-12&to=2026-10-06')->assertStatus(422);
-        $this->pullEarnings($token, 'from=2026-01-01&to=2026-12-31')->assertStatus(422)->assertJsonPath('reason', 'range_too_long');
+        $this->pullEarnings($token, 'from=2026-01-01&to=2026-12-31')->assertStatus(422)->assertJsonPath('reason', 'range_exceeds_31_days')->assertJsonPath('max_days', 31);
         Http::assertNothingSent();
     }
 

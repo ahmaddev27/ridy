@@ -278,8 +278,14 @@ class ElProfessorController extends Controller
         ]);
         $from = CarbonImmutable::createFromFormat('!Y-m-d', $data['from']);
         $to = CarbonImmutable::createFromFormat('!Y-m-d', $data['to']);
-        if ($from->diffInDays($to) > self::MAX_EARNINGS_DAYS) {
-            return response()->json(['message' => 'The range is too long.', 'reason' => 'range_too_long'], 422);
+        if ($from->diffInDays($to) + 1 > self::MAX_EARNINGS_DAYS) {
+            $max = self::MAX_EARNINGS_DAYS;
+
+            return response()->json([
+                'message' => "The range may cover at most {$max} days.",
+                'reason' => "range_exceeds_{$max}_days",
+                'max_days' => $max,
+            ], 422);
         }
 
         $tenant = Tenant::query()->findOrFail($request->user()->tenant_id);
@@ -304,6 +310,10 @@ class ElProfessorController extends Controller
             'meta' => [
                 'driver_count' => count($result['drivers']),
                 'unmatched_count' => $result['unmatched'],
+                // Uber drivers with no linked ridy driver, named so El-Professor can
+                // say whom to link. Capped; the count above is always the full one.
+                'unmatched' => $result['unmatched_list'],
+                'unmatched_truncated' => $result['unmatched'] > count($result['unmatched_list']),
             ],
         ]);
     }

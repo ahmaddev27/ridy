@@ -16,13 +16,16 @@ use Carbon\CarbonImmutable;
  */
 class EarningsReport
 {
+    /** A fleet that never linked anyone must not return a thousand entries. */
+    public const MAX_UNMATCHED_LISTED = 100;
+
     public function __construct(
         private readonly UberEarningsFetcher $fetcher,
         private readonly EarningsClassifier $classifier,
     ) {}
 
     /**
-     * @return array{from: string, to: string, currency: string, drivers: list<array<string, mixed>>, unmatched: int}
+     * @return array{from: string, to: string, currency: string, drivers: list<array<string, mixed>>, unmatched: int, unmatched_list: list<array<string, mixed>>}
      *
      * @throws UberEarningsException
      */
@@ -55,7 +58,7 @@ class EarningsReport
 
     /**
      * @param  list<array<string, mixed>>  $earners
-     * @return array{from: string, to: string, currency: string, drivers: list<array<string, mixed>>, unmatched: int}
+     * @return array{from: string, to: string, currency: string, drivers: list<array<string, mixed>>, unmatched: int, unmatched_list: list<array<string, mixed>>}
      */
     public function assemble(Tenant $tenant, CarbonImmutable $from, CarbonImmutable $to, array $earners): array
     {
@@ -69,10 +72,14 @@ class EarningsReport
         $rows = [];
         $currency = null;
         $unmatched = 0;
+        $unmatchedList = [];
         foreach ($earners as $earner) {
             $driver = $drivers->get($earner['earnerUuid'] ?? '');
             if ($driver === null) {
                 $unmatched++;
+                if (count($unmatchedList) < self::MAX_UNMATCHED_LISTED) {
+                    $unmatchedList[] = $this->unmatchedRow($earner);
+                }
 
                 continue;
             }
@@ -87,6 +94,25 @@ class EarningsReport
             'currency' => $currency ?? 'EUR',
             'drivers' => $rows,
             'unmatched' => $unmatched,
+            'unmatched_list' => $unmatchedList,
+        ];
+    }
+
+    /**
+     * Who to link, and nothing about their pay: no money for an earner we cannot
+     * attribute, so the refusal can name them without disclosing figures.
+     *
+     * @param  array<string, mixed>  $earner
+     * @return array<string, mixed>
+     */
+    private function unmatchedRow(array $earner): array
+    {
+        $name = $earner['earnerMetadata']['name'] ?? null;
+
+        return [
+            'name' => is_string($name) && $name !== '' ? $name : null,
+            'uber_driver_uuid' => is_string($earner['earnerUuid'] ?? null) ? $earner['earnerUuid'] : null,
+            'trips' => $this->classifier->classify($earner)->trips,
         ];
     }
 
