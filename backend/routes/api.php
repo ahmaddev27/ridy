@@ -170,6 +170,8 @@ Route::prefix('v1')->group(function () {
                 // company to review in El-Professor. The tenant and the
                 // driver come off the token, never off the request.
                 Route::get('submissions', [DriverSubmissionController::class, 'index']);
+                // The fleet's plates for the note form's picker.
+                Route::get('vehicles', [DriverSubmissionController::class, 'vehicles']);
                 Route::post('submissions', [DriverSubmissionController::class, 'store'])
                     ->middleware('throttle:30,1,driver-submissions');
 
