@@ -1,5 +1,6 @@
 import Constants from "expo-constants";
 import { Sentry } from "@/lib/sentry";
+import type { Vehicle } from "@/lib/note-rules";
 
 /**
  * Where the app talks.
@@ -88,6 +89,8 @@ export type NoteDraft = {
   is_full_day?: boolean;
   start_time?: string | null;
   end_time?: string | null;
+  /** Picked from `driverVehicles()`, never typed. Absent unless chosen. */
+  vehicle_plate?: string;
 };
 
 /** A photo picked or taken, as React Native's fetch wants it in a FormData. */
@@ -485,6 +488,11 @@ export class ApiClient {
       method: "POST",
       body: JSON.stringify({ subject: "note", ...draft }),
     });
+  }
+
+  /** The fleet's plates for the note form's picker. */
+  driverVehicles() {
+    return this.request<{ data: Vehicle[] }>("/api/v1/driver/vehicles");
   }
 
   fleetMe() {

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\ElProfessorSubmission;
+use App\Domain\Fleet\Models\Vehicle;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use App\Jobs\RingElProfessor;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -1024,6 +1026,7 @@ class ElProfessorConnectionTest extends TestCase
         $this->postJson('/api/v1/driver/submissions', [
             'subject' => 'note',
             'note_type' => 'breakdown',
+            'vehicle_plate' => 'B-XX 1234',
             'note_text' => 'Panne auf der A100',
         ])->assertStatus(201);
 
@@ -1444,5 +1447,112 @@ class ElProfessorConnectionTest extends TestCase
         $this->withHeaders($this->bearer($token))->getJson('/api/v1/elprofessor')->assertStatus(404);
         $this->withHeaders($this->bearer($token))->getJson('/api/v1/fleet-session')->assertStatus(403);
         $this->withHeaders($this->bearer($token))->getJson('/api/v1/dispatch/offers')->assertStatus(403);
+    }
+
+    //
+    //  Notes: the ten types, and the vehicle the five incident types must name.
+    //  El-Professor refuses an incident without a plate (`vehicle_required`);
+    //  these prove the refusal happens here first.
+
+    private function connectedDriver(): Driver
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $token = $this->mint();
+        $this->withHeaders($this->bearer($token))->getJson('/api/v1/elprofessor/fleet')->assertOk();
+        $driver = $this->driver($this->tenant, 'Omar');
+        $this->actingAsDriver($driver);
+
+        return $driver;
+    }
+
+    private function note(array $extra): TestResponse
+    {
+        return $this->postJson('/api/v1/driver/submissions', $extra + [
+            'subject' => 'note', 'note_text' => 'Text',
+        ]);
+    }
+
+    public function test_an_incident_note_without_a_plate_is_refused_here_and_never_stored(): void
+    {
+        $this->connectedDriver();
+
+        foreach (['blitzer', 'accident', 'kontrolle', 'breakdown', 'wait'] as $type) {
+            $this->note(['note_type' => $type])->assertStatus(422)->assertJsonValidationErrors('vehicle_plate');
+            $this->note(['note_type' => $type, 'vehicle_plate' => '  '])->assertStatus(422)->assertJsonValidationErrors('vehicle_plate');
+            $this->note(['note_type' => $type, 'vehicle_plate' => 'null'])->assertStatus(422)->assertJsonValidationErrors('vehicle_plate');
+        }
+
+        $this->assertSame(0, ElProfessorSubmission::withoutGlobalScopes()->count());
+        Queue::assertNotPushed(RingElProfessor::class);
+    }
+
+    public function test_an_incident_note_with_a_plate_travels_with_it_verbatim(): void
+    {
+        $this->connectedDriver();
+
+        $this->note(['note_type' => 'blitzer', 'vehicle_plate' => 'B-XX 1234'])->assertStatus(201);
+
+        $row = ElProfessorSubmission::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame('B-XX 1234', $row->payload['vehicle_plate']);
+    }
+
+    public function test_a_plate_over_32_characters_is_refused(): void
+    {
+        $this->connectedDriver();
+
+        $this->note(['note_type' => 'blitzer', 'vehicle_plate' => str_repeat('A', 33)])->assertStatus(422);
+        $this->note(['note_type' => 'blitzer', 'vehicle_plate' => str_repeat('A', 32)])->assertStatus(201);
+    }
+
+    public function test_the_other_five_types_need_no_plate_and_send_none(): void
+    {
+        $this->connectedDriver();
+
+        foreach (['general', 'other', 'sick', 'vacation', 'off'] as $type) {
+            $this->note(['note_type' => $type])->assertStatus(201);
+            $this->note(['note_type' => $type, 'vehicle_plate' => ''])->assertStatus(201);
+        }
+
+        foreach (ElProfessorSubmission::withoutGlobalScopes()->get() as $row) {
+            $this->assertArrayNotHasKey('vehicle_plate', $row->payload);
+        }
+    }
+
+    public function test_the_absence_types_cross_and_an_unknown_type_does_not(): void
+    {
+        $this->connectedDriver();
+
+        $this->note(['note_type' => 'sick'])->assertStatus(201);
+        $this->note(['note_type' => 'vacation'])->assertStatus(201);
+        $this->note(['note_type' => 'off'])->assertStatus(201);
+        foreach (['krank', 'krankheit', 'Sick', 'blitzr'] as $type) {
+            $this->note(['note_type' => $type])->assertStatus(422)->assertJsonValidationErrors('note_type');
+        }
+    }
+
+    public function test_the_vehicle_list_is_this_fleets_plates_only_and_reduced(): void
+    {
+        $mine = Vehicle::create(['tenant_id' => $this->tenant->id, 'uber_vehicle_uuid' => 'u1', 'license_plate' => 'B-AA 1', 'make' => 'VW', 'model' => 'Touran', 'vin' => 'SECRETVIN']);
+        Vehicle::create(['tenant_id' => $this->tenant->id, 'uber_vehicle_uuid' => 'u2', 'license_plate' => null]);
+        Vehicle::withoutGlobalScopes()->create(['tenant_id' => $this->other->id, 'uber_vehicle_uuid' => 'u3', 'license_plate' => 'M-ZZ 9']);
+        $this->connectedDriver();
+
+        $response = $this->getJson('/api/v1/driver/vehicles')->assertOk();
+
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.license_plate', 'B-AA 1');
+        $this->assertSame(['id', 'license_plate', 'make', 'model'], array_keys($response->json('data.0')));
+        $this->assertSame($mine->id, $response->json('data.0.id'));
+    }
+
+    public function test_the_vehicle_list_is_refused_to_an_unconnected_company_and_to_a_dashboard_token(): void
+    {
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+        $this->getJson('/api/v1/driver/vehicles')->assertStatus(403)->assertJsonPath('reason', 'not_connected');
+
+        // The fleet-owner and El-Professor tokens are confined and are not drivers.
+        $token = $this->mint();
+        $this->assertContains($this->withHeaders($this->bearer($token))->getJson('/api/v1/driver/vehicles')->status(), [401, 403]);
     }
 }

@@ -1,13 +1,17 @@
 /**
- * Send a note to your own company — a breakdown, a police check, a wait.
+ * Send a note to your own company - a breakdown, a police check, a wait, or an
+ * absence.
  *
- * ## Seven types, and the three that are missing are missing on purpose
+ * ## Ten types, and the rules are not in this file
  *
- * `sick`, `vacation` and `off` are not offered. They are health and absence
- * data — Art. 9 — and El-Professor refuses them at its own door, so offering
- * them here would produce a submission that is rejected every time with a
- * reason the driver cannot act on. Absence stays between the driver and their
- * company the way it already works.
+ * All ten of El-Professor's note types may cross, the absence ones included
+ * (owner's decision, 13.10.2026). What a note needs before it may be sent is
+ * `lib/note-rules.ts`, which the send asks and a test pins.
+ *
+ * ## The vehicle is picked, never typed
+ *
+ * The five incident types must name one. A failed load is shown as a failure,
+ * not as an empty picker.
  *
  * ## No photo, so this half ships over the air
  *
@@ -15,7 +19,7 @@
  * build, and that is why the two forms are separate screens rather than one
  * with a switch: this one can reach installed phones immediately.
  */
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View, ScrollView, Pressable, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -26,19 +30,14 @@ import { useToast } from "@/components/toast";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
+import { NOTE_TYPES, noteProblem, platePayload, vehicleRequired, type VehicleList } from "@/lib/note-rules";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
-
-/** The seven that may cross. Their labels live in the dictionary; the VALUES
- *  are El-Professor's own stored vocabulary and are never translated. */
-const TYPES = ["general", "blitzer", "accident", "kontrolle", "breakdown", "wait", "other"] as const;
 
 function today(): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
-
-const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export default function NoteScreen() {
   const c = useColors();
@@ -57,19 +56,29 @@ export default function NoteScreen() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [sending, setSending] = useState(false);
+  const [plate, setPlate] = useState<string | null>(null);
+  const [vehicles, setVehicles] = useState<VehicleList>({ status: "loading" });
+
+  const loadVehicles = useCallback(async () => {
+    setVehicles({ status: "loading" });
+    try {
+      const res = await api.driverVehicles();
+      setVehicles({ status: "ready", vehicles: res.data });
+    } catch {
+      setVehicles({ status: "failed" });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (connected) void loadVehicles();
+  }, [connected, loadVehicles]);
 
   const submit = async () => {
-    if (text.trim() === "") {
-      toast.show(t("note.textRequired"));
+    const problem = noteProblem({ type, text, fullDay, from, to, plate, vehicles });
+    if (problem) {
+      const vars = problem.vars ? { field: t(problem.vars.field) } : undefined;
+      toast.show(t(problem.key, vars));
       return;
-    }
-    // An hour outside 00–23 is not a typo the other side can repair: its own
-    // parser turns `25:00` into minutes and walks into the next day.
-    for (const [value, label] of [[from, "note.from"], [to, "note.to"]] as const) {
-      if (!fullDay && value.trim() !== "" && !TIME.test(value.trim())) {
-        toast.show(t("note.timeInvalid", { field: t(label) }));
-        return;
-      }
     }
 
     setSending(true);
@@ -82,6 +91,7 @@ export default function NoteScreen() {
         is_full_day: fullDay,
         start_time: fullDay ? null : from.trim() || null,
         end_time: fullDay ? null : to.trim() || null,
+        vehicle_plate: platePayload(plate, vehicles),
       });
       toast.show(t("note.sent"));
       router.back();
@@ -116,10 +126,13 @@ export default function NoteScreen() {
 
         <SectionLabel>{t("note.type")}</SectionLabel>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-          {TYPES.map((item) => (
+          {NOTE_TYPES.map((item) => (
             <Chip key={item} c={c} label={t(`note.type.${item}`)} active={type === item} onPress={() => setType(item)} />
           ))}
         </View>
+
+        <SectionLabel>{t("note.vehicle")}</SectionLabel>
+        <VehiclePicker c={c} list={vehicles} plate={plate} onPick={setPlate} onRetry={() => void loadVehicles()} required={vehicleRequired(type)} />
 
         <SectionLabel>{t("note.text")}</SectionLabel>
         <TextInput
@@ -183,5 +196,32 @@ function Chip({ c, label, active, onPress }: { c: Palette; label: string; active
     >
       <Text style={{ color: active ? c.ink : c.inkMuted, fontWeight: active ? "700" : "500", fontSize: 13 }}>{label}</Text>
     </Pressable>
+  );
+}
+
+/** Pick a plate from the fleet's list. A failed load says so and offers a retry. */
+function VehiclePicker({ c, list, plate, onPick, onRetry, required }: {
+  c: Palette; list: VehicleList; plate: string | null; onPick: (p: string | null) => void; onRetry: () => void; required: boolean;
+}) {
+  if (list.status === "loading") return <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("note.vehiclesLoading")}</Text>;
+  if (list.status === "failed") {
+    return (
+      <View style={{ gap: 8 }}>
+        <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("note.vehiclesFailed")}</Text>
+        <Chip c={c} label={t("note.vehiclesRetry")} active={false} onPress={onRetry} />
+      </View>
+    );
+  }
+  if (list.vehicles.length === 0) return <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("note.vehiclesNone")}</Text>;
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("note.vehicleHint")}</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {!required && <Chip c={c} label={t("note.vehicleNone")} active={plate === null} onPress={() => onPick(null)} />}
+        {list.vehicles.map((v) => (
+          <Chip key={v.id} c={c} label={v.license_plate} active={plate === v.license_plate} onPress={() => onPick(v.license_plate)} />
+        ))}
+      </View>
+    </View>
   );
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Driver;
 
 use App\Domain\Fleet\Models\ElProfessorSubmission;
+use App\Domain\Fleet\Models\Vehicle;
 use App\Http\Controllers\Controller;
 use App\Jobs\RingElProfessor;
 use Illuminate\Http\JsonResponse;
@@ -65,11 +66,23 @@ class DriverSubmissionController extends Controller
     /** What the company's screen stores literally; `Other` is never one. */
     private const CATEGORIES = ['Tanken', 'Autowäsche', 'Autozubehör', 'Öl wechseln'];
 
-    /** The ten note types El-Professor stores; the three absence types are
-     *  refused at its own door and are not offered here either. */
+    /**
+     * The ten note types El-Professor stores, as an allow-list on purpose: a
+     * type this build has not heard of (`krank`, a typo) must be refused, never
+     * waved through as an ordinary note, which a deny-list would do.
+     */
     private const NOTE_TYPES = [
         'general', 'other', 'blitzer', 'accident', 'kontrolle', 'breakdown', 'wait',
+        'sick', 'vacation', 'off',
     ];
+
+    /**
+     * The types El-Professor plans around (`must_include_in_plan`). It refuses
+     * these with `vehicle_required` when no plate comes with them; refusing here
+     * first means the driver is told at once instead of the note travelling to
+     * be refused there.
+     */
+    private const INCIDENT_NOTE_TYPES = ['blitzer', 'accident', 'kontrolle', 'breakdown', 'wait'];
 
     /**
      * Whether this driver's company is connected to El-Professor, which is the
@@ -115,6 +128,35 @@ class DriverSubmissionController extends Controller
                 // them, or the rejection is something they cannot act on.
                 'reason' => $r->decision_text,
                 'created_at' => $r->created_at?->toIso8601String(),
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * The fleet's plates, for the note form's picker. The tenant is a term in
+     * the query, so another fleet's vehicle is not a refusal after the fact but
+     * a row that is never selected. Only what a picker needs.
+     */
+    public function vehicles(Request $request): JsonResponse
+    {
+        if (! $this->connected($request)) {
+            return $this->notConnected();
+        }
+
+        $rows = Vehicle::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->whereNotNull('license_plate')
+            ->where('license_plate', '!=', '')
+            ->orderBy('license_plate')
+            ->get(['id', 'license_plate', 'make', 'model']);
+
+        return response()->json([
+            'data' => $rows->map(fn (Vehicle $v) => [
+                'id' => $v->id,
+                'license_plate' => $v->license_plate,
+                'make' => $v->make,
+                'model' => $v->model,
             ])->values(),
         ]);
     }
@@ -190,6 +232,15 @@ class DriverSubmissionController extends Controller
             $rules += [
                 'note_type' => ['required', Rule::in(self::NOTE_TYPES)],
                 'note_text' => ['required', 'string', 'max:2000'],
+                // The plate as the fleet knows it, picked from `vehicles()`
+                // and never typed. 32 is El-Professor's own bound. A blank
+                // value reaches here as null (the framework trims and nulls
+                // it), and the literal word `null` is refused there, so it is
+                // refused here too rather than travelling to be refused.
+                'vehicle_plate' => [
+                    Rule::requiredIf(fn () => in_array($request->input('note_type'), self::INCIDENT_NOTE_TYPES, true)),
+                    'nullable', 'string', 'max:32', 'regex:/^(?!\s*null\s*$)/i',
+                ],
                 'start_date' => ['nullable', 'date_format:Y-m-d'],
                 'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
                 'is_full_day' => ['nullable', 'boolean'],
@@ -224,8 +275,10 @@ class DriverSubmissionController extends Controller
             $bytes = $file->getSize();
         }
 
+        // An absent plate is sent as an absent field, never as null.
         $payload = collect($data)
             ->except(['subject', 'document'])
+            ->reject(fn ($value, $key) => $key === 'vehicle_plate' && $value === null)
             ->all();
 
         $row = ElProfessorSubmission::create([
