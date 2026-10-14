@@ -26,9 +26,21 @@ class CheckAlerts extends Command
     /** Half the measured 24h jwt-session lifetime; see checkTokenExpiries(). */
     private const TOKEN_WARN_HOURS = 12;
 
-    /** @var array<string, string> expiry column => label used in the email */
+    /**
+     * Only `sp-jwt-session` (supplier jar, 14 days) is alerted on — NOT `jwt-session`.
+     *
+     * `jwt-session` (RAMEN jar) lives 24h, so a 12h warning would cross for every
+     * company every single day: ~4 noise emails a day. And measured on production, an
+     * expired one does not stop the offer stream: one tenant ran healthily for 13 days
+     * with it expired; another's lapsed 2h earlier with no 401/403; a re-capture that
+     * brought in an already-expired one reopened both streams cleanly. In every
+     * recorded outage the daemon logged `Fleet Hub auth rejected (403)` (supplier jar)
+     * FIRST, then `stream auth rejected (403)`. The dashboard still shows
+     * session_token_expires_at; it just must not email. Do not add it back.
+     *
+     * @var array<string, string> expiry column => label used in the email
+     */
     private const TOKEN_COLUMNS = [
-        'session_token_expires_at' => 'jwt-session (offer stream)',
         'supplier_token_expires_at' => 'sp-jwt-session (Fleet Hub)',
     ];
 
@@ -102,7 +114,8 @@ class CheckAlerts extends Command
      * De-duped on the expiry itself: the incident key embeds it, so the same expiry
      * emails once, while a renewed token (new expiry) can alert again later.
      * Stale incidents are closed silently — a token that renewed or expired needs
-     * no "resolved" email.
+     * no "resolved" email. This also sweeps up incidents left open for a column no
+     * longer alerted on (`session_token_expires_at`): their keys are never current.
      */
     private function checkTokenExpiries(AlertService $alerts): void
     {

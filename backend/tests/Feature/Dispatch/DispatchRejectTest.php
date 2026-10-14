@@ -118,6 +118,26 @@ class DispatchRejectTest extends TestCase
         $this->assertNull($command->driver_id);
     }
 
+    #[DataProvider('tokenExpiryCases')]
+    public function test_the_command_records_whether_the_session_token_had_expired(?int $hoursFromNow, ?bool $expected): void
+    {
+        $this->session->forceFill([
+            'session_token_expires_at' => $hoursFromNow === null ? null : now()->addHours($hoursFromNow),
+        ])->save();
+        $offer = $this->offer();
+        Sanctum::actingAs($this->driver, guard: 'driver');
+
+        $this->postJson("/api/v1/driver/offers/{$offer->id}/dispatch-reject")->assertOk();
+
+        $this->assertSame($expected, OfferDispatchCommand::withoutGlobalScopes()->firstOrFail()->session_token_expired);
+    }
+
+    /** @return array<string, array{0: ?int, 1: ?bool}> */
+    public static function tokenExpiryCases(): array
+    {
+        return ['expired' => [-3, true], 'still valid' => [5, false], 'unknown' => [null, null]];
+    }
+
     public function test_a_viewer_may_not_decline_an_offer(): void
     {
         $offer = $this->offer();

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Dispatch;
 
 use App\Domain\Dispatch\FleetSessionService;
+use App\Domain\Dispatch\Models\DispatchNetworkLog;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\SessionTokenExpiry;
 use App\Domain\Notifications\Jobs\SendRenderedMail;
@@ -98,7 +99,7 @@ class SessionTokenExpiryTest extends TestCase
     {
         config(['services.alerts.email' => 'ops@reidey.de']);
         Bus::fake();
-        $this->sessionExpiring($this->tenant(), 'session_token_expires_at', CarbonImmutable::now()->addHours(5));
+        $this->sessionExpiring($this->tenant(), 'supplier_token_expires_at', CarbonImmutable::now()->addHours(5));
 
         $this->artisan('alerts:check')->assertSuccessful();
         $this->artisan('alerts:check')->assertSuccessful();
@@ -127,10 +128,10 @@ class SessionTokenExpiryTest extends TestCase
         config(['services.alerts.email' => 'ops@reidey.de']);
         Bus::fake();
         $tenant = $this->tenant();
-        $this->sessionExpiring($tenant, 'session_token_expires_at', CarbonImmutable::now()->addHours(2));
+        $this->sessionExpiring($tenant, 'supplier_token_expires_at', CarbonImmutable::now()->addHours(2));
         $this->artisan('alerts:check')->assertSuccessful();
 
-        $this->sessionExpiring($tenant, 'session_token_expires_at', CarbonImmutable::now()->addHours(30));
+        $this->sessionExpiring($tenant, 'supplier_token_expires_at', CarbonImmutable::now()->addHours(30));
         $this->artisan('alerts:check')->assertSuccessful();
         Bus::assertDispatchedTimes(SendRenderedMail::class, 1);
 
@@ -138,5 +139,119 @@ class SessionTokenExpiryTest extends TestCase
         $this->artisan('alerts:check')->assertSuccessful();
 
         Bus::assertDispatchedTimes(SendRenderedMail::class, 2);
+    }
+
+    public function test_an_expiring_jwt_session_does_not_alert(): void
+    {
+        config(['services.alerts.email' => 'ops@reidey.de']);
+        Bus::fake();
+        $this->sessionExpiring($this->tenant(), 'session_token_expires_at', CarbonImmutable::now()->addHours(5));
+
+        $this->artisan('alerts:check')->assertSuccessful();
+
+        Bus::assertNotDispatched(SendRenderedMail::class);
+        $this->assertSame(0, AlertIncident::where('kind', 'token_expiry')->count());
+    }
+
+    public function test_an_open_incident_for_the_dropped_column_is_resolved_not_stranded(): void
+    {
+        config(['services.alerts.email' => 'ops@reidey.de']);
+        Bus::fake();
+        $session = $this->sessionExpiring($this->tenant(), 'session_token_expires_at', CarbonImmutable::now()->addHours(5));
+        $legacy = AlertIncident::create([
+            'key' => "token_expiry:{$session->id}:session_token_expires_at:".now()->addHours(5)->getTimestamp(),
+            'kind' => 'token_expiry', 'title' => 'legacy', 'opened_at' => now(),
+        ]);
+
+        $this->artisan('alerts:check')->assertSuccessful();
+
+        $this->assertNotNull($legacy->fresh()->resolved_at);
+    }
+
+    /** Stores a session, then captures $incoming over it; returns [stored session after, in-memory jars]. */
+    private function recapture(array $stored, array $incoming, string $via): UberFleetSession
+    {
+        $tenant = $this->tenant();
+        $service = app(FleetSessionService::class);
+        $service->capture($tenant, self::ORG, $this->ramenJar($stored['ramen']), supplierCookies: $this->supplierJar($stored['supplier']), via: 'manual');
+
+        return $service->capture($tenant, self::ORG, $this->ramenJar($incoming['ramen']), supplierCookies: $this->supplierJar($incoming['supplier']), via: $via)->fresh();
+    }
+
+    private function ramenJar(?CarbonImmutable $exp): array
+    {
+        return [['name' => 'sid', 'value' => 'x'], ['name' => 'jwt-session', 'value' => $this->jwt($exp ? ['exp' => $exp->timestamp] : ['sub' => 'x'])]];
+    }
+
+    private function supplierJar(?CarbonImmutable $exp): array
+    {
+        return [['name' => 'csid', 'value' => 'y'], ['name' => 'sp-jwt-session', 'value' => $this->jwt($exp ? ['exp' => $exp->timestamp] : ['sub' => 'x'])]];
+    }
+
+    public function test_an_automatic_capture_never_downgrades_the_supplier_jar(): void
+    {
+        $new = CarbonImmutable::now()->addDays(10)->startOfSecond();
+        $old = $new->subDays(7);
+        $r = CarbonImmutable::now()->addHours(10)->startOfSecond();
+
+        $session = $this->recapture(['ramen' => $r, 'supplier' => $new], ['ramen' => $r, 'supplier' => $old], 'auto');
+
+        $this->assertSame($new->timestamp, $session->supplier_token_expires_at->timestamp);
+        $this->assertSame($new->timestamp, SessionTokenExpiry::fromJar($session->supplier_cookies, 'sp-jwt-session')->timestamp);
+        $this->assertSame(1, DispatchNetworkLog::where('kind', 'session')->count());
+    }
+
+    public function test_an_automatic_capture_with_a_newer_token_replaces_the_jar(): void
+    {
+        $old = CarbonImmutable::now()->addDays(3)->startOfSecond();
+        $new = $old->addDays(7);
+        $r = CarbonImmutable::now()->addHours(10)->startOfSecond();
+
+        $session = $this->recapture(['ramen' => $r, 'supplier' => $old], ['ramen' => $r, 'supplier' => $new], 'page');
+
+        $this->assertSame($new->timestamp, $session->supplier_token_expires_at->timestamp);
+        $this->assertSame(0, DispatchNetworkLog::where('kind', 'session')->count());
+    }
+
+    public function test_a_manual_capture_replaces_the_jar_even_with_an_older_token(): void
+    {
+        $new = CarbonImmutable::now()->addDays(10)->startOfSecond();
+        $old = $new->subDays(7);
+        $r = CarbonImmutable::now()->addHours(10)->startOfSecond();
+
+        $session = $this->recapture(['ramen' => $r, 'supplier' => $new], ['ramen' => $r->subHours(5), 'supplier' => $old], 'manual');
+
+        $this->assertSame($old->timestamp, $session->supplier_token_expires_at->timestamp);
+        $this->assertSame($r->subHours(5)->timestamp, $session->session_token_expires_at->timestamp);
+    }
+
+    public function test_a_missing_token_on_either_side_never_blocks(): void
+    {
+        $t = CarbonImmutable::now()->addDays(10)->startOfSecond();
+
+        $incomingNull = $this->recapture(['ramen' => $t, 'supplier' => $t], ['ramen' => null, 'supplier' => null], 'auto');
+        $this->assertNull($incomingNull->supplier_token_expires_at);
+        $this->assertNull($incomingNull->session_token_expires_at);
+    }
+
+    public function test_a_stored_session_without_a_token_accepts_any_incoming_jar(): void
+    {
+        $t = CarbonImmutable::now()->addDays(2)->startOfSecond();
+
+        $session = $this->recapture(['ramen' => null, 'supplier' => null], ['ramen' => $t, 'supplier' => $t], 'auto');
+
+        $this->assertSame($t->timestamp, $session->supplier_token_expires_at->timestamp);
+        $this->assertSame($t->timestamp, $session->session_token_expires_at->timestamp);
+    }
+
+    public function test_the_two_jars_are_judged_independently(): void
+    {
+        $t = CarbonImmutable::now()->addDays(5)->startOfSecond();
+
+        // RAMEN incoming is older (kept); supplier incoming is newer (taken).
+        $session = $this->recapture(['ramen' => $t, 'supplier' => $t], ['ramen' => $t->subHours(3), 'supplier' => $t->addDays(2)], 'auto');
+
+        $this->assertSame($t->timestamp, $session->session_token_expires_at->timestamp);
+        $this->assertSame($t->addDays(2)->timestamp, $session->supplier_token_expires_at->timestamp);
     }
 }

@@ -360,6 +360,8 @@ class DispatchActionService
             'offer_type' => $this->offerTypeFor($offer),
             'driver_uuid' => $offer->driver_uuid,
             'status' => DispatchCommandStatus::Queued,
+            // Evidence only; never gates the decline.
+            'session_token_expired' => $session->session_token_expires_at?->isPast(),
             'expires_at' => $expiresAt,
         ];
 

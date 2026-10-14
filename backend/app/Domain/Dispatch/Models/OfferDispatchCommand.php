@@ -31,7 +31,7 @@ class OfferDispatchCommand extends Model
         'tenant_id', 'dispatch_offer_id', 'uber_fleet_session_id', 'action',
         'driver_id', 'user_id',
         'offer_uuid', 'real_offer_uuid', 'offer_type', 'driver_uuid',
-        'status', 'attempts', 'uber_success', 'uber_error', 'latency_ms',
+        'status', 'attempts', 'session_token_expired', 'uber_success', 'uber_error', 'latency_ms',
         'expires_at', 'claimed_at', 'completed_at',
     ];
 
@@ -39,6 +39,7 @@ class OfferDispatchCommand extends Model
         'action' => DispatchCommandAction::class,
         'status' => DispatchCommandStatus::class,
         'attempts' => 'integer',
+        'session_token_expired' => 'boolean',
         'uber_success' => 'boolean',
         'latency_ms' => 'integer',
         'expires_at' => 'datetime',

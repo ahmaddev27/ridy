@@ -37,7 +37,8 @@ class FleetSessionService
         bool $replaceOtherOrgs = false,
         string $via = FleetSessionOutage::VIA_PAGE,
     ): UberFleetSession {
-        [$session, $wasActive] = DB::transaction(function () use ($tenant, $uberOrgUuid, $cookies, $expiresAt, $uberOrgName, $supplierCookies, $replaceOtherOrgs) {
+        $refused = [];
+        [$session, $wasActive] = DB::transaction(function () use ($tenant, $uberOrgUuid, $cookies, $expiresAt, $uberOrgName, $supplierCookies, $replaceOtherOrgs, $via, &$refused) {
             // Serialize captures per company (the extension auto-captures on every
             // Uber page load, so two can race).
             Tenant::whereKey($tenant->id)->lockForUpdate()->first();
@@ -77,12 +78,16 @@ class FleetSessionService
                 $attributes['supplier_cookies'] = $supplierCookies;
             }
 
+            if ($existing !== null && $via !== FleetSessionOutage::VIA_MANUAL) {
+                [$attributes, $refused] = $this->withoutDowngrades($existing, $attributes);
+            }
+
             // A NEW jar (not the routine re-capture of the same values) gets a new
             // version, so the daemon's still-running stream on the previous jar can
             // no longer overwrite it or flag it broken (see DispatchDaemonController).
             if ($existing === null) {
                 $attributes['jar_version'] = 1;
-            } elseif ($this->jarChanged($existing, $cookies, $attributes['supplier_cookies'] ?? null)) {
+            } elseif ($this->jarChanged($existing, $attributes['cookies'], $attributes['supplier_cookies'] ?? null)) {
                 $attributes['jar_version'] = (int) $existing->jar_version + 1;
             }
 
@@ -99,6 +104,10 @@ class FleetSessionService
 
             return [UberFleetSession::withoutGlobalScopes()->create(['tenant_id' => $tenant->id, 'uber_org_uuid' => $uberOrgUuid] + $attributes), false];
         });
+
+        foreach ($refused as $jar => $expiries) {
+            $this->recorder->session((int) $session->tenant_id, 'capture_downgrade_refused', ['jar' => $jar, 'via' => $via] + $expiries);
+        }
 
         // During an outage a capture is only an attempt — the jar may already be
         // dead (Uber rejects it seconds later). Count it; the managers hear
@@ -136,6 +145,45 @@ class FleetSessionService
      * @param  array<int, array<string, mixed>>  $cookies
      * @param  array<int, array<string, mixed>>|null  $supplierCookies
      */
+    /**
+     * Keep a stored jar whose token is strictly NEWER than the incoming one.
+     *
+     * The daemon keeps its jar fresh by absorbing Set-Cookie from its own Fleet Hub
+     * polls (~50/day), while the manager's browser only rotates when they use Uber —
+     * so the stored jar is routinely fresher than what the extension posts. Observed
+     * twice on production: an operator re-linked a healthy company and sp-jwt-session
+     * went from exp 2026-10-22 back to 2026-10-15. The more an extension captures
+     * (the two companies that keep dropping post the most), the more chances to
+     * downgrade. Token expiry is the only freshness signal we have; each jar is
+     * judged on its own cookie, and a missing token on either side never blocks
+     * (a tenant ran for a while with no jwt-session at all). Manual captures skip
+     * this entirely: an operator must be able to replace a newer-but-dead jar.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array{0: array<string, mixed>, 1: array<string, array<string, string|null>>}
+     */
+    private function withoutDowngrades(UberFleetSession $existing, array $attributes): array
+    {
+        $refused = [];
+        $jars = [
+            'ramen' => ['cookies', 'session_token_expires_at', SessionTokenExpiry::RAMEN_COOKIE],
+            'supplier' => ['supplier_cookies', 'supplier_token_expires_at', SessionTokenExpiry::SUPPLIER_COOKIE],
+        ];
+
+        foreach ($jars as $name => [$jarKey, $expiryKey, $cookie]) {
+            $incoming = $attributes[$expiryKey] ?? null;
+            $stored = SessionTokenExpiry::fromJar($existing->{$jarKey}, $cookie) ?? $existing->{$expiryKey};
+            if ($incoming === null || $stored === null || ! $incoming->lt($stored)) {
+                continue;
+            }
+            $attributes[$jarKey] = $existing->{$jarKey};
+            $attributes[$expiryKey] = $stored;
+            $refused[$name] = ['incoming_exp' => $incoming->toIso8601String(), 'stored_exp' => $stored->toIso8601String()];
+        }
+
+        return [$attributes, $refused];
+    }
+
     private function jarChanged(UberFleetSession $existing, array $cookies, ?array $supplierCookies): bool
     {
         if ($this->fingerprint($existing->cookies ?? []) !== $this->fingerprint($cookies)) {

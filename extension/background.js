@@ -1274,32 +1274,45 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // Uber rejected again at 06:17). Retries back off so a signed-out browser is
 // not reopening tabs every few minutes; the backend measures each attempt.
 const SESSION_CHECK_GAP_MS = 2 * 60 * 1000;
+// REACTIVE self-heal (needs_relink): re-establishes the dead DISPATCH session,
+// whose jar (jwt-session, read from vsdispatch.uber.com) the daemon streams with.
 const AUTO_RELINK_URL = "https://vsdispatch.uber.com/";
+const AUTO_RELINK_CLOSE_HOSTS = ["vsdispatch.uber.com", "auth.uber.com"];
+// PROACTIVE renewal: refreshes sp-jwt-session, the SUPPLIER jar, which is read
+// from fleethub.uber.com (see readSupplierCookies). Do NOT point this at
+// vsdispatch: different hosts rotate different cookies, and a dispatch visit
+// left sp-jwt-session on its 2026-10-01 copy.
+const PROACTIVE_RENEW_URL = "https://fleethub.uber.com/";
+const PROACTIVE_RENEW_CLOSE_HOSTS = ["fleethub.uber.com", "auth.uber.com"];
 const AUTO_RELINK_TAB_MS = 60 * 1000;
 const AUTO_RELINK_BACKOFF_MIN = [3, 5, 10, 15, 30];
 
-// Proactive renewal. Uber's two session JWTs carry a signed expiry nobody can
+// Proactive renewal. Uber's session JWTs carry a signed expiry nobody can
 // extend; only a real browser can be handed a new one, and only while it is
 // open. Waiting for needs_relink means the token is already dead, usually at
 // night with no window to open a tab in (4 outages, 0 self-recoveries). So we
-// renew during the day instead. 12 h is half the measured 24 h lifetime of the
-// shorter-lived jwt-session: the token is reissued while at least half of its
-// life is left, giving the open browser ~12 h of polls to catch it.
+// renew during the day instead.
+// Only the SUPPLIER token (sp-jwt-session, 14 d life) is worth renewing: every
+// recorded outage logged "Fleet Hub auth rejected (403)" first, and Fleet Hub
+// authenticates with that jar. An expired jwt-session (24 h, RAMEN) is
+// harmless - one company ran 13 days on one, streams reopen cleanly after a
+// capture carrying one - so it never triggers a renewal (it would only reopen
+// a tab daily for nothing). Fleet Hub is where sp-jwt-session rotates.
+// 12 h before expiry the open browser has ~12 h of polls to catch the reissue.
 const RENEW_BEFORE_EXPIRY_MS = 12 * 60 * 60 * 1000;
 const PROACTIVE_RENEW_GAP_MS = 60 * 60 * 1000; // at most one attempt per hour
 const PROACTIVE_RENEW_KEY = "proactiveRenewAt"; // separate from the reactive autoRelink state
 
-/** Soonest expiry still in the future, or null when no field gives an opinion. */
-function soonestLiveExpiry(session, now) {
-  const times = [session?.session_token_expires_at, session?.supplier_token_expires_at]
-    .map((v) => (typeof v === "string" ? Date.parse(v) : NaN))
-    .filter((t) => Number.isFinite(t) && t > now);
-  return times.length ? Math.min(...times) : null;
+/** Supplier-token expiry still in the future, or null when absent/expired. */
+function liveSupplierExpiry(session, now) {
+  const v = session?.supplier_token_expires_at;
+  const t = typeof v === "string" ? Date.parse(v) : NaN;
+  return Number.isFinite(t) && t > now ? t : null;
 }
 
 async function maybeRenewProactively(session) {
   const now = Date.now();
-  const soonest = soonestLiveExpiry(session, now);
+  const soonest = liveSupplierExpiry(session, now);
   if (soonest === null || soonest - now >= RENEW_BEFORE_EXPIRY_MS) {
     await api.storage.local.remove(PROACTIVE_RENEW_KEY);
     return;
@@ -1308,15 +1321,15 @@ async function maybeRenewProactively(session) {
   const last = stored[PROACTIVE_RENEW_KEY];
   if (typeof last === "number" && now - last < PROACTIVE_RENEW_GAP_MS) return;
   await api.storage.local.set({ [PROACTIVE_RENEW_KEY]: now, autoRelinkAt: now });
-  await openRenewalTab("proactive renewal");
+  await openRenewalTab("proactive renewal", PROACTIVE_RENEW_URL, PROACTIVE_RENEW_CLOSE_HOSTS);
 }
 
-async function openRenewalTab(label) {
+async function openRenewalTab(label, url, closeHosts) {
   try {
-    const tab = await api.tabs.create({ url: AUTO_RELINK_URL, active: false });
-    console.log(`[Reidey bg] ${label}: opened dispatch tab`, tab?.id);
+    const tab = await api.tabs.create({ url, active: false });
+    console.log(`[Reidey bg] ${label}: opened tab`, tab?.id);
     // A signed-out browser lands on the login page — close that too.
-    scheduleTabClose(tab?.id, AUTO_RELINK_TAB_MS, ["vsdispatch.uber.com", "auth.uber.com"]);
+    scheduleTabClose(tab?.id, AUTO_RELINK_TAB_MS, closeHosts);
   } catch (e) {
     console.warn(`[Reidey bg] ${label} failed:`, e.message); // e.g. no browser window open
   }
@@ -1351,7 +1364,7 @@ async function autoRelink() {
   // daemon's rotated copy was the one Uber rejected.
   await api.storage.local.remove("lastSync");
 
-  await openRenewalTab("auto-relink");
+  await openRenewalTab("auto-relink", AUTO_RELINK_URL, AUTO_RELINK_CLOSE_HOSTS);
 }
 
 // ── Background polling (no page needed) ──────────────────────────────────────

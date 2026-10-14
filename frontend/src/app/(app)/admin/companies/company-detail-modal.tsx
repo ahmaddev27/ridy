@@ -847,7 +847,7 @@ function SessionTab({
 
       {session && (
         <Group title={c("tokens")}>
-          <TokenRow label={c("tokenJwt")} iso={session.session_token_expires_at} when={when} />
+          <TokenRow label={c("tokenJwt")} iso={session.session_token_expires_at} when={when} neverAlarm hint={c("tokenJwtHint")} />
           <TokenRow label={c("tokenSupplier")} iso={session.supplier_token_expires_at} when={when} />
         </Group>
       )}
@@ -872,21 +872,24 @@ function SessionTab({
 }
 
 /** One Uber token's remaining life. An expired token is NOT a failure (it can run for days), so it stays muted; only an unexpired one under 12 h goes amber. */
-function TokenRow({ label, iso, when }: { label: string; iso: string | null; when: (iso: string | null) => string }) {
+function TokenRow({ label, iso, when, neverAlarm = false, hint }: { label: string; iso: string | null; when: (iso: string | null) => string; neverAlarm?: boolean; hint?: string }) {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.companies.${k}`);
   const ms = iso ? new Date(iso).getTime() : NaN;
   const known = Number.isFinite(ms);
   const left = ms - Date.now();
-  const warn = known && left > 0 && left < TOKEN_WARN_MS;
+  const warn = !neverAlarm && known && left > 0 && left < TOKEN_WARN_MS;
   const key = left > 0 ? "tokenExpires" : "tokenExpired";
   const text = known ? c(key).replace("{t}", relTime(iso, locale, "")) : "—";
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm">
-      <span className="font-medium text-ink">{label}</span>
-      <span className={"text-xs " + (warn ? "text-warning-fg" : "text-ink-subtle")} title={when(iso)}>
-        {text}
-      </span>
+    <div className="rounded-lg bg-surface-2 px-3 py-2 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-medium text-ink">{label}</span>
+        <span className={"text-xs " + (warn ? "text-warning-fg" : "text-ink-subtle")} title={when(iso)}>
+          {text}
+        </span>
+      </div>
+      {hint && <p className="mt-1 text-xs text-ink-subtle">{hint}</p>}
     </div>
   );
 }
