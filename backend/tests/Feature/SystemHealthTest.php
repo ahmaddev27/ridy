@@ -77,6 +77,8 @@ class SystemHealthTest extends TestCase
         $res->assertJsonPath('data.0.name', 'Broken Co')
             ->assertJsonPath('data.0.subscription.state', 'expired')
             ->assertJsonPath('data.0.session.ok', false)
+            ->assertJsonPath('data.0.session.session_token_expires_at', null)
+            ->assertJsonPath('data.0.session.supplier_token_expires_at', null)
             ->assertJsonPath('data.0.daemon.ok', false)
             ->assertJsonPath('data.0.proxy.ok', false)
             ->assertJsonPath('data.1.name', 'Healthy Co')

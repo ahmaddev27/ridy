@@ -33,9 +33,12 @@ class FleetSessionController extends Controller
     {
         $session = $this->tenantSessions($this->tenantOrFail())->orderByDesc('updated_at')->first();
 
-        return response()->json(['data' => $session?->only([
+        return response()->json(['data' => $session === null ? null : $session->only([
             'uber_org_uuid', 'status', 'expires_at', 'last_event_at',
-        ])]);
+        ]) + [
+            'session_token_expires_at' => $session->session_token_expires_at?->toIso8601String(),
+            'supplier_token_expires_at' => $session->supplier_token_expires_at?->toIso8601String(),
+        ]]);
     }
 
     /**

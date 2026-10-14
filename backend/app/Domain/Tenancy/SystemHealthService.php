@@ -70,11 +70,11 @@ class SystemHealthService
         ];
     }
 
-    /** @return array{status: string|null, last_seen: string|null, ok: bool} */
+    /** @return array{status: string|null, last_seen: string|null, ok: bool, session_token_expires_at: string|null, supplier_token_expires_at: string|null} */
     private function session(?UberFleetSession $session, CarbonInterface $now): array
     {
         if ($session === null) {
-            return ['status' => null, 'last_seen' => null, 'ok' => false];
+            return ['status' => null, 'last_seen' => null, 'ok' => false, 'session_token_expires_at' => null, 'supplier_token_expires_at' => null];
         }
 
         return [
@@ -82,6 +82,8 @@ class SystemHealthService
             'last_seen' => $session->last_event_at?->toIso8601String(),
             'ok' => $session->status === UberFleetSession::STATUS_ACTIVE
                 && $this->isFresh($session->last_event_at, $now),
+            'session_token_expires_at' => $session->session_token_expires_at?->toIso8601String(),
+            'supplier_token_expires_at' => $session->supplier_token_expires_at?->toIso8601String(),
         ];
     }
 

@@ -1278,6 +1278,50 @@ const AUTO_RELINK_URL = "https://vsdispatch.uber.com/";
 const AUTO_RELINK_TAB_MS = 60 * 1000;
 const AUTO_RELINK_BACKOFF_MIN = [3, 5, 10, 15, 30];
 
+// Proactive renewal. Uber's two session JWTs carry a signed expiry nobody can
+// extend; only a real browser can be handed a new one, and only while it is
+// open. Waiting for needs_relink means the token is already dead, usually at
+// night with no window to open a tab in (4 outages, 0 self-recoveries). So we
+// renew during the day instead. 12 h is half the measured 24 h lifetime of the
+// shorter-lived jwt-session: the token is reissued while at least half of its
+// life is left, giving the open browser ~12 h of polls to catch it.
+const RENEW_BEFORE_EXPIRY_MS = 12 * 60 * 60 * 1000;
+const PROACTIVE_RENEW_GAP_MS = 60 * 60 * 1000; // at most one attempt per hour
+const PROACTIVE_RENEW_KEY = "proactiveRenewAt"; // separate from the reactive autoRelink state
+
+/** Soonest expiry still in the future, or null when no field gives an opinion. */
+function soonestLiveExpiry(session, now) {
+  const times = [session?.session_token_expires_at, session?.supplier_token_expires_at]
+    .map((v) => (typeof v === "string" ? Date.parse(v) : NaN))
+    .filter((t) => Number.isFinite(t) && t > now);
+  return times.length ? Math.min(...times) : null;
+}
+
+async function maybeRenewProactively(session) {
+  const now = Date.now();
+  const soonest = soonestLiveExpiry(session, now);
+  if (soonest === null || soonest - now >= RENEW_BEFORE_EXPIRY_MS) {
+    await api.storage.local.remove(PROACTIVE_RENEW_KEY);
+    return;
+  }
+  const stored = await api.storage.local.get([PROACTIVE_RENEW_KEY]);
+  const last = stored[PROACTIVE_RENEW_KEY];
+  if (typeof last === "number" && now - last < PROACTIVE_RENEW_GAP_MS) return;
+  await api.storage.local.set({ [PROACTIVE_RENEW_KEY]: now, autoRelinkAt: now });
+  await openRenewalTab("proactive renewal");
+}
+
+async function openRenewalTab(label) {
+  try {
+    const tab = await api.tabs.create({ url: AUTO_RELINK_URL, active: false });
+    console.log(`[Reidey bg] ${label}: opened dispatch tab`, tab?.id);
+    // A signed-out browser lands on the login page — close that too.
+    scheduleTabClose(tab?.id, AUTO_RELINK_TAB_MS, ["vsdispatch.uber.com", "auth.uber.com"]);
+  } catch (e) {
+    console.warn(`[Reidey bg] ${label} failed:`, e.message); // e.g. no browser window open
+  }
+}
+
 async function checkSessionHealth(pairing) {
   const store = pollStore();
   const { lastSessionCheckAt } = await store.get(["lastSessionCheckAt"]);
@@ -1289,6 +1333,7 @@ async function checkSessionHealth(pairing) {
     await autoRelink();
   } else if (session?.status === "active") {
     await api.storage.local.remove(["autoRelink", "autoRelinkAt"]);
+    await maybeRenewProactively(session);
   }
 }
 
@@ -1306,14 +1351,7 @@ async function autoRelink() {
   // daemon's rotated copy was the one Uber rejected.
   await api.storage.local.remove("lastSync");
 
-  try {
-    const tab = await api.tabs.create({ url: AUTO_RELINK_URL, active: false });
-    console.log("[Reidey bg] auto-relink: opened dispatch tab", tab?.id, "attempt", attempts + 1);
-    // A signed-out browser lands on the login page — close that too.
-    scheduleTabClose(tab?.id, AUTO_RELINK_TAB_MS, ["vsdispatch.uber.com", "auth.uber.com"]);
-  } catch (e) {
-    console.warn("[Reidey bg] auto-relink failed:", e.message); // e.g. no browser window open
-  }
+  await openRenewalTab("auto-relink");
 }
 
 // ── Background polling (no page needed) ──────────────────────────────────────

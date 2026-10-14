@@ -8,18 +8,30 @@ use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Ops\AlertService;
 use App\Domain\Ops\Models\AlertIncident;
 use App\Domain\Tenancy\Models\Tenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 
 /**
- * Periodic operational health check. Raises (and clears) alerts for the two
+ * Periodic operational health check. Raises (and clears) alerts for the
  * highest-signal, actionable failures:
  *  - a fleet company's Uber session broke (expired / needs relink) → its offers
  *    stop until a manager reconnects;
  *  - an active daemon shard went stale (its box is down) → ops should look,
- *    even though the fleet auto-fails-over to live shards.
+ *    even though the fleet auto-fails-over to live shards;
+ *  - an active session's Uber token is about to expire, while renewal is still
+ *    possible (the manager's browser must be open to receive a new one).
  */
 class CheckAlerts extends Command
 {
+    /** Half the measured 24h jwt-session lifetime; see checkTokenExpiries(). */
+    private const TOKEN_WARN_HOURS = 12;
+
+    /** @var array<string, string> expiry column => label used in the email */
+    private const TOKEN_COLUMNS = [
+        'session_token_expires_at' => 'jwt-session (offer stream)',
+        'supplier_token_expires_at' => 'sp-jwt-session (Fleet Hub)',
+    ];
+
     protected $signature = 'alerts:check';
 
     protected $description = 'Detect broken fleet sessions / down shards and alert ops';
@@ -29,7 +41,7 @@ class CheckAlerts extends Command
         // Isolate the two checks: one throwing (a bad row, a DB hiccup) must not
         // skip the other — a session-check failure used to blind shard alerts too.
         $ok = true;
-        foreach (['checkSessions', 'checkShards'] as $check) {
+        foreach (['checkSessions', 'checkTokenExpiries', 'checkShards'] as $check) {
             try {
                 $this->{$check}($alerts);
             } catch (\Throwable $e) {
@@ -74,6 +86,60 @@ class CheckAlerts extends Command
             $id = (int) substr((string) $key, strlen('session_relink:'));
             if (! isset($broken[$id])) {
                 $alerts->resolve((string) $key);
+            }
+        }
+    }
+
+    /**
+     * Warn BEFORE an active session's Uber token lapses.
+     *
+     * Window: 12h, half the measured 24h `jwt-session` lifetime — late enough not to
+     * nag all day, early enough that an operator can get the manager's browser
+     * open before it lapses. Only tokens NOT already expired: one that died days
+     * ago (an expired jwt-session on a live session has been observed for 13 days)
+     * would otherwise alert forever.
+     *
+     * De-duped on the expiry itself: the incident key embeds it, so the same expiry
+     * emails once, while a renewed token (new expiry) can alert again later.
+     * Stale incidents are closed silently — a token that renewed or expired needs
+     * no "resolved" email.
+     */
+    private function checkTokenExpiries(AlertService $alerts): void
+    {
+        $now = CarbonImmutable::now();
+        $horizon = $now->addHours(self::TOKEN_WARN_HOURS);
+        $current = [];
+
+        foreach (self::TOKEN_COLUMNS as $column => $label) {
+            $sessions = UberFleetSession::withoutGlobalScopes()
+                ->select(['id', 'tenant_id', $column])
+                ->with('tenant:id,name')
+                ->where('status', UberFleetSession::STATUS_ACTIVE)
+                ->whereIn('tenant_id', Tenant::query()->usable()->select('id'))
+                ->where($column, '>', $now)
+                ->where($column, '<=', $horizon)
+                ->get();
+
+            foreach ($sessions as $s) {
+                $expiry = $s->getAttribute($column);
+                $key = "token_expiry:{$s->id}:{$column}:{$expiry->getTimestamp()}";
+                $current[$key] = true;
+                $company = $s->tenant?->getAttribute('name') ?? "tenant {$s->tenant_id}";
+                $local = $expiry->timezone('Europe/Berlin')->format('d.m.Y H:i');
+                $alerts->open(
+                    $key,
+                    'token_expiry',
+                    "Uber {$label} token for {$company} expires {$local}",
+                    "The Uber {$label} token for \"{$company}\" expires at {$local} (Europe/Berlin). "
+                        ."Uber renews it only while the manager's browser is open and logged in to Uber.",
+                );
+            }
+        }
+
+        $stale = AlertIncident::where('kind', 'token_expiry')->whereNull('resolved_at')->pluck('key');
+        foreach ($stale as $key) {
+            if (! isset($current[$key])) {
+                AlertIncident::where('key', $key)->update(['resolved_at' => $now]);
             }
         }
     }

@@ -25,7 +25,7 @@ class UberFleetSession extends Model
 
     protected $fillable = [
         'tenant_id', 'uber_org_uuid', 'cookies', 'supplier_cookies', 'expires_at', 'status', 'last_event_at',
-        'verified_at', 'jar_version',
+        'verified_at', 'jar_version', 'session_token_expires_at', 'supplier_token_expires_at',
     ];
 
     protected $casts = [
@@ -34,6 +34,8 @@ class UberFleetSession extends Model
         'expires_at' => 'datetime',
         'last_event_at' => 'datetime',
         'verified_at' => 'datetime',
+        'session_token_expires_at' => 'datetime',
+        'supplier_token_expires_at' => 'datetime',
         'jar_version' => 'integer',
     ];
 

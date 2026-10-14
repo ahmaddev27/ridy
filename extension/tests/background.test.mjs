@@ -523,3 +523,67 @@ test("the capture from a self-heal tab is tagged auto; a normal page capture is 
   await normal.ctx.capture(ORG_A, null);
   assert.equal(posted[1].auto, undefined);
 });
+
+const HOURS = 60 * 60 * 1000;
+const iso = (ms) => new Date(Date.now() + ms).toISOString();
+
+function proactive(data) {
+  return load({
+    storage: { ...PAIRED, orgUuid: ORG_A },
+    fetchImpl: (url) => jsonResponse(200, { data: { status: "active", ...data() } }),
+  });
+}
+
+test("proactive renewal: a token inside the 12h window opens a dispatch tab, tagged auto", async () => {
+  const { ctx, local, createdTabs } = proactive(() => ({ session_token_expires_at: iso(6 * HOURS) }));
+  await ctx.checkSessionHealth(PAIRED);
+  assert.equal(createdTabs.length, 1);
+  assert.equal(createdTabs[0].url, "https://vsdispatch.uber.com/");
+  assert.equal(createdTabs[0].active, false);
+  assert.equal(typeof local.data.autoRelinkAt, "number");
+  assert.equal(typeof local.data.proactiveRenewAt, "number");
+  assert.equal(local.data.autoRelink, undefined, "reactive state untouched");
+});
+
+test("proactive renewal: far-off, already-expired, null and absent expiries do nothing", async () => {
+  for (const fields of [
+    { session_token_expires_at: iso(13 * HOURS), supplier_token_expires_at: iso(100 * HOURS) },
+    { session_token_expires_at: iso(-13 * 24 * HOURS), supplier_token_expires_at: iso(100 * HOURS) },
+    { session_token_expires_at: null, supplier_token_expires_at: null },
+    {},
+  ]) {
+    const { ctx, createdTabs } = proactive(() => fields);
+    await ctx.checkSessionHealth(PAIRED);
+    assert.equal(createdTabs.length, 0, JSON.stringify(fields));
+  }
+});
+
+test("proactive renewal: throttled to one attempt per hour, and re-armed once the token is fresh", async () => {
+  let fields = { supplier_token_expires_at: iso(2 * HOURS) };
+  const { ctx, local, session, createdTabs } = proactive(() => fields);
+  await ctx.checkSessionHealth(PAIRED);
+  session.data.lastSessionCheckAt = 0;
+  await ctx.checkSessionHealth(PAIRED);
+  assert.equal(createdTabs.length, 1, "second poll inside the hour is blocked");
+
+  local.data.proactiveRenewAt = Date.now() - 61 * 60 * 1000;
+  session.data.lastSessionCheckAt = 0;
+  await ctx.checkSessionHealth(PAIRED);
+  assert.equal(createdTabs.length, 2, "allowed again after an hour");
+
+  fields = { supplier_token_expires_at: iso(300 * HOURS) };
+  session.data.lastSessionCheckAt = 0;
+  await ctx.checkSessionHealth(PAIRED);
+  assert.equal(local.data.proactiveRenewAt, undefined, "throttle cleared when comfortably far");
+});
+
+test("proactive renewal: needs_relink still takes the reactive path only", async () => {
+  const { ctx, local, createdTabs } = load({
+    storage: { ...PAIRED, orgUuid: ORG_A },
+    fetchImpl: () => jsonResponse(200, { data: { status: "needs_relink", session_token_expires_at: iso(2 * HOURS) } }),
+  });
+  await ctx.checkSessionHealth(PAIRED);
+  assert.equal(createdTabs.length, 1);
+  assert.equal(local.data.autoRelink.attempts, 1);
+  assert.equal(local.data.proactiveRenewAt, undefined);
+});

@@ -10,6 +10,7 @@ use App\Domain\Dispatch\Models\DaemonShard;
 use App\Domain\Dispatch\Models\OfferDispatchCommand;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
+use App\Domain\Dispatch\SessionTokenExpiry;
 use App\Domain\Dispatch\ShardService;
 use App\Domain\Dispatch\SupplierNetworkRecorder;
 use App\Domain\Fleet\DriverStatusIngestor;
@@ -196,6 +197,7 @@ class DispatchDaemonController extends Controller
         if (! empty($data['supplier_cookies'])) {
             $model->supplier_cookies = $data['supplier_cookies'];
         }
+        $model->forceFill(SessionTokenExpiry::columns($data['cookies'], $data['supplier_cookies'] ?? null));
 
         // Check-and-write atomically: a reconnect landing between the check above
         // and this write must still win.
