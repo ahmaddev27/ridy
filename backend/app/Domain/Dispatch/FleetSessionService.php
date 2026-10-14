@@ -70,7 +70,7 @@ class FleetSessionService
                 'cookies' => $cookies,
                 'expires_at' => $expiresAt,
                 'status' => UberFleetSession::STATUS_ACTIVE,
-            ];
+            ] + SessionTokenExpiry::columns($cookies, $supplierCookies);
             // Only overwrite the supplier jar when the extension actually sent one, so
             // an older extension (no supplier cookies) never wipes a good stored jar.
             if ($supplierCookies !== null && $supplierCookies !== []) {

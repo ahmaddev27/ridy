@@ -13,7 +13,7 @@ import { InfrastructureHealth } from "@/components/admin/infrastructure-health";
 import { LogsPanel } from "@/components/admin/logs-panel";
 import { useI18n } from "@/lib/i18n/context";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { formatNumber, latnLocale } from "@/lib/utils";
+import { formatDateTime, formatNumber, latnLocale } from "@/lib/utils";
 import { useAsync } from "@/hooks/use-async";
 import { getSystemHealth, clearNetworkLogs, type SystemHealthRow } from "@/lib/api/admin";
 
@@ -219,6 +219,28 @@ function SessionCell({ row, c, locale }: { row: SystemHealthRow; c: Tr; locale: 
           {c("lastSeen").replace("{t}", relTime(last_seen, locale, c("never")))}
         </div>
       )}
+      <TokenExpiry row={row} c={c} locale={locale} />
+    </div>
+  );
+}
+
+const TOKEN_WARN_MS = 12 * 3600 * 1000;
+
+/** Soonest not-yet-expired Uber token. Already-expired ones are not a failure, so they render nothing. */
+function TokenExpiry({ row, c, locale }: { row: SystemHealthRow; c: Tr; locale: string }) {
+  const now = Date.now();
+  const upcoming = [row.session.session_token_expires_at, row.session.supplier_token_expires_at]
+    .map((iso) => (iso ? new Date(iso).getTime() : NaN))
+    .filter((ms) => Number.isFinite(ms) && ms > now);
+  if (upcoming.length === 0) return null;
+  const soonest = Math.min(...upcoming);
+  const title = formatDateTime(soonest, locale, { timeZone: "Europe/Berlin", dateStyle: "medium", timeStyle: "short" });
+  return (
+    <div
+      title={title}
+      className={"text-[11px] " + (soonest - now < TOKEN_WARN_MS ? "text-warning-fg" : "text-ink-subtle")}
+    >
+      {c("tokenExpires").replace("{t}", relTime(new Date(soonest).toISOString(), locale, ""))}
     </div>
   );
 }

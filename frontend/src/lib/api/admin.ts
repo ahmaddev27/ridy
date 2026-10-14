@@ -161,7 +161,15 @@ export type SystemHealthRow = {
   id: number;
   name: string;
   subscription: { state: "disabled" | "banned" | "expired" | "inactive" | null; days_left: number | null };
-  session: { status: string | null; last_seen: string | null; ok: boolean };
+  session: {
+    status: string | null;
+    last_seen: string | null;
+    ok: boolean;
+    /** 24h `jwt-session`; absent/null until the backend sends it. */
+    session_token_expires_at?: string | null;
+    /** 14-day `sp-jwt-session`. */
+    supplier_token_expires_at?: string | null;
+  };
   daemon: { ok: boolean; last_heartbeat: string | null };
   proxy: { label: string | null; expires_at: string | null; ok: boolean };
 };

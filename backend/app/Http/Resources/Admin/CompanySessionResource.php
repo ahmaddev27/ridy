@@ -19,6 +19,8 @@ class CompanySessionResource extends JsonResource
             'status' => $this->status,
             'expires_at' => $this->expires_at?->toIso8601String(),
             'last_event_at' => $this->last_event_at?->toIso8601String(),
+            'session_token_expires_at' => $this->session_token_expires_at?->toIso8601String(),
+            'supplier_token_expires_at' => $this->supplier_token_expires_at?->toIso8601String(),
         ];
     }
 }
