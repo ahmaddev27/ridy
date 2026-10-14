@@ -32,11 +32,13 @@ class SessionTokenExpiry
             return null;
         }
 
-        // App timezone, not UTC: timestamp columns store the wall-clock of the value's own zone.
         $json = base64_decode(strtr($parts[1], '-_', '+/'), true);
         $claims = $json === false ? null : json_decode($json, true);
         $exp = is_array($claims) ? ($claims['exp'] ?? null) : null;
 
+        // Built in the app timezone, not UTC: a `timestamp` column stores the
+        // wall-clock of whatever zone the value carries, so a UTC instance would
+        // be written two hours off in Berlin summer time.
         return is_numeric($exp) ? CarbonImmutable::createFromTimestamp((int) $exp, config('app.timezone')) : null;
     }
 
