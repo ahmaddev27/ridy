@@ -13,7 +13,7 @@ import { InfrastructureHealth } from "@/components/admin/infrastructure-health";
 import { LogsPanel } from "@/components/admin/logs-panel";
 import { useI18n } from "@/lib/i18n/context";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { formatDateTime, formatNumber, latnLocale } from "@/lib/utils";
+import { formatDateTime, formatNumber, relTime, TOKEN_WARN_MS } from "@/lib/utils";
 import { useAsync } from "@/hooks/use-async";
 import { getSystemHealth, clearNetworkLogs, type SystemHealthRow } from "@/lib/api/admin";
 
@@ -224,8 +224,6 @@ function SessionCell({ row, c, locale }: { row: SystemHealthRow; c: Tr; locale: 
   );
 }
 
-const TOKEN_WARN_MS = 12 * 3600 * 1000;
-
 /** Soonest not-yet-expired Uber token. Already-expired ones are not a failure, so they render nothing. */
 function TokenExpiry({ row, c, locale }: { row: SystemHealthRow; c: Tr; locale: string }) {
   const now = Date.now();
@@ -274,30 +272,4 @@ function ProxyCell({ row, c }: { row: SystemHealthRow; c: Tr }) {
       </div>
     </div>
   );
-}
-
-// One formatter per locale (relTime runs for every cell on each 30 s refetch).
-const rtfCache = new Map<string, Intl.RelativeTimeFormat>();
-function relativeFormatter(locale: string): Intl.RelativeTimeFormat {
-  const key = locale || "en";
-  let rtf = rtfCache.get(key);
-  if (!rtf) {
-    rtf = new Intl.RelativeTimeFormat(latnLocale(key), { numeric: "auto", style: "short" });
-    rtfCache.set(key, rtf);
-  }
-  return rtf;
-}
-
-/** Short relative time (e.g. "3m ago"). Falls back to `never` when null. */
-function relTime(iso: string | null, locale: string, never: string): string {
-  if (!iso) return never;
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return never;
-  const diffSec = Math.round((then - Date.now()) / 1000);
-  const rtf = relativeFormatter(locale);
-  const abs = Math.abs(diffSec);
-  if (abs < 60) return rtf.format(Math.round(diffSec), "second");
-  if (abs < 3600) return rtf.format(Math.round(diffSec / 60), "minute");
-  if (abs < 86400) return rtf.format(Math.round(diffSec / 3600), "hour");
-  return rtf.format(Math.round(diffSec / 86400), "day");
 }

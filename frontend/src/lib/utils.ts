@@ -72,3 +72,32 @@ export function formatDateTime(
   const d = iso instanceof Date ? iso : new Date(iso);
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString(latnLocale(locale), options);
 }
+
+// One formatter per locale (relTime runs for every cell on each 30 s refetch).
+const rtfCache = new Map<string, Intl.RelativeTimeFormat>();
+function relativeFormatter(locale: string): Intl.RelativeTimeFormat {
+  const key = locale || "en";
+  let rtf = rtfCache.get(key);
+  if (!rtf) {
+    rtf = new Intl.RelativeTimeFormat(latnLocale(key), { numeric: "auto", style: "short" });
+    rtfCache.set(key, rtf);
+  }
+  return rtf;
+}
+
+/** Short relative time (e.g. "3m ago"). Falls back to `never` when null. */
+export function relTime(iso: string | null, locale: string, never: string): string {
+  if (!iso) return never;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return never;
+  const diffSec = Math.round((then - Date.now()) / 1000);
+  const rtf = relativeFormatter(locale);
+  const abs = Math.abs(diffSec);
+  if (abs < 60) return rtf.format(Math.round(diffSec), "second");
+  if (abs < 3600) return rtf.format(Math.round(diffSec / 60), "minute");
+  if (abs < 86400) return rtf.format(Math.round(diffSec / 3600), "hour");
+  return rtf.format(Math.round(diffSec / 86400), "day");
+}
+
+/** A not-yet-expired Uber token turns amber when it is closer than this. */
+export const TOKEN_WARN_MS = 12 * 3600 * 1000;
