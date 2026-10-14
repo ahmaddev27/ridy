@@ -8,6 +8,7 @@ use App\Domain\Fleet\Models\ElProfessorSubmission;
 use App\Domain\Fleet\Models\Vehicle;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
+use App\Http\Controllers\Api\V1\ElProfessorController;
 use App\Jobs\RingElProfessor;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -1400,8 +1401,52 @@ class ElProfessorConnectionTest extends TestCase
         $this->pullEarnings($token, '')->assertStatus(422);
         $this->pullEarnings($token, 'from=06.10.2026&to=12.10.2026')->assertStatus(422);
         $this->pullEarnings($token, 'from=2026-10-12&to=2026-10-06')->assertStatus(422);
-        $this->pullEarnings($token, 'from=2026-01-01&to=2026-12-31')->assertStatus(422)->assertJsonPath('reason', 'range_exceeds_31_days')->assertJsonPath('max_days', 31);
+        $this->pullEarnings($token, 'from=2026-01-01&to=2026-12-31')->assertStatus(422)->assertJsonPath('reason', 'range_exceeds_'.$this->maxEarningsDays().'_days');
         Http::assertNothingSent();
+    }
+
+    private function maxEarningsDays(): int
+    {
+        return (new \ReflectionClassConstant(ElProfessorController::class, 'MAX_EARNINGS_DAYS'))->getValue();
+    }
+
+    private function rangeOf(int $days): string
+    {
+        $from = CarbonImmutable::parse('2026-09-01');
+
+        return 'from='.$from->toDateString().'&to='.$from->addDays($days - 1)->toDateString();
+    }
+
+    public function test_a_range_of_exactly_the_cap_is_accepted_and_one_day_more_is_refused(): void
+    {
+        $token = $this->mint();
+        $this->uberSession($this->tenant);
+        $this->withProxy($this->tenant);
+        Http::fake(['*/graphql' => Http::response($this->hubPage([], null))]);
+        $max = $this->maxEarningsDays();
+
+        $this->pullEarnings($token, $this->rangeOf($max))->assertOk();
+        $this->pullEarnings($token, $this->rangeOf($max + 1))->assertStatus(422)
+            ->assertJsonPath('reason', "range_exceeds_{$max}_days")
+            ->assertJsonPath('max_days', $max);
+    }
+
+    public function test_a_five_week_business_month_is_not_refused(): void
+    {
+        // A business month owns the weeks whose Monday falls in it. June 2026
+        // has five Mondays (1, 8, 15, 22, 29), so its business month is five
+        // whole Uber weeks: 35 days, from Monday 1 June to Sunday 5 July.
+        $from = CarbonImmutable::parse('2026-06-01');
+        $this->assertTrue($from->isMonday());
+        $to = $from->addWeeks(5)->subDay();
+        $this->assertSame(35, (int) $from->diffInDays($to) + 1);
+
+        $token = $this->mint();
+        $this->uberSession($this->tenant);
+        $this->withProxy($this->tenant);
+        Http::fake(['*/graphql' => Http::response($this->hubPage([], null))]);
+
+        $this->pullEarnings($token, 'from='.$from->toDateString().'&to='.$to->toDateString())->assertOk();
     }
 
     public function test_the_range_is_sent_as_uber_operating_days_starting_at_four(): void

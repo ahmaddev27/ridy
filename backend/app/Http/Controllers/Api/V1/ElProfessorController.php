@@ -48,8 +48,13 @@ class ElProfessorController extends Controller
 {
     private const MAX_PER_PAGE = 100;
 
-    /** One Uber week is 7; a month is the most any screen asks for. */
-    private const MAX_EARNINGS_DAYS = 31;
+    /**
+     * The longest business month is 5 Uber weeks = 35 days (a month owns the
+     * weeks whose Monday falls in it); 38 leaves room for a partial piece at
+     * either end. El-Professor calls this route once per week, so what the cap
+     * really bounds is the outbound calls to Uber: at most 6 at 38.
+     */
+    private const MAX_EARNINGS_DAYS = 38;
 
     private const LAST_USED_INTERVAL_MINUTES = 60;
 
