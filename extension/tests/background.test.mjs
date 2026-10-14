@@ -534,15 +534,32 @@ function proactive(data) {
   });
 }
 
-test("proactive renewal: a token inside the 12h window opens a dispatch tab, tagged auto", async () => {
-  const { ctx, local, createdTabs } = proactive(() => ({ session_token_expires_at: iso(6 * HOURS) }));
+test("proactive renewal: a supplier token inside the 12h window opens a Fleet Hub tab, tagged auto", async () => {
+  const { ctx, local, createdTabs } = proactive(() => ({ supplier_token_expires_at: iso(6 * HOURS) }));
   await ctx.checkSessionHealth(PAIRED);
   assert.equal(createdTabs.length, 1);
-  assert.equal(createdTabs[0].url, "https://vsdispatch.uber.com/");
+  assert.equal(createdTabs[0].url, "https://fleethub.uber.com/");
+  await ctx.sweepPendingTabCloses();
+  assert.deepEqual([...local.data.pendingTabCloses[0].host], ["fleethub.uber.com", "auth.uber.com"]);
   assert.equal(createdTabs[0].active, false);
   assert.equal(typeof local.data.autoRelinkAt, "number");
   assert.equal(typeof local.data.proactiveRenewAt, "number");
   assert.equal(local.data.autoRelink, undefined, "reactive state untouched");
+});
+
+test("proactive renewal: a session (jwt-session) token inside the window opens nothing", async () => {
+  const { ctx, createdTabs } = proactive(() => ({
+    session_token_expires_at: iso(2 * HOURS),
+    supplier_token_expires_at: iso(100 * HOURS),
+  }));
+  await ctx.checkSessionHealth(PAIRED);
+  assert.equal(createdTabs.length, 0);
+});
+
+test("proactive renewal: an expired supplier token opens nothing", async () => {
+  const { ctx, createdTabs } = proactive(() => ({ supplier_token_expires_at: iso(-HOURS) }));
+  await ctx.checkSessionHealth(PAIRED);
+  assert.equal(createdTabs.length, 0);
 });
 
 test("proactive renewal: far-off, already-expired, null and absent expiries do nothing", async () => {
@@ -580,10 +597,11 @@ test("proactive renewal: throttled to one attempt per hour, and re-armed once th
 test("proactive renewal: needs_relink still takes the reactive path only", async () => {
   const { ctx, local, createdTabs } = load({
     storage: { ...PAIRED, orgUuid: ORG_A },
-    fetchImpl: () => jsonResponse(200, { data: { status: "needs_relink", session_token_expires_at: iso(2 * HOURS) } }),
+    fetchImpl: () => jsonResponse(200, { data: { status: "needs_relink", supplier_token_expires_at: iso(2 * HOURS) } }),
   });
   await ctx.checkSessionHealth(PAIRED);
   assert.equal(createdTabs.length, 1);
+  assert.equal(createdTabs[0].url, "https://vsdispatch.uber.com/");
   assert.equal(local.data.autoRelink.attempts, 1);
   assert.equal(local.data.proactiveRenewAt, undefined);
 });
