@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { formatDate, formatDateTime, formatMoney, formatNumber, latnLocale } from "@/lib/utils";
+import { formatDate, formatDateTime, formatMoney, formatNumber, latnLocale, relTime, TOKEN_WARN_MS } from "@/lib/utils";
 import { fleetDayKey, fleetYmd, formatYmd } from "@/lib/fleet-day";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -33,7 +33,9 @@ import {
   getCompanyOffers,
   getCompanyVehicles,
   getCompanyNetwork,
+  getCompanySession,
   getCompanySessionOutages,
+  type CompanySession,
   type SessionOutageSummary,
   clearCompanyNetwork,
   type CompanyNetworkRow,
@@ -72,7 +74,7 @@ export function CompanyDetail({
   const [orgUuid, setOrgUuid] = useState("");
   const [proxyId, setProxyId] = useState("");
   const [proxies, setProxies] = useState<Proxy[]>([]);
-  const [tab, setTab] = useState<"details" | "subscription" | "managers" | "drivers" | "offers" | "vehicles" | "network">("details");
+  const [tab, setTab] = useState<"details" | "subscription" | "managers" | "drivers" | "offers" | "vehicles" | "network" | "session">("details");
 
   // Sub-actions.
   const [confirm, setConfirm] = useState<null | "disable" | "relink" | "deleteSession" | "purgeData">(null);
@@ -348,6 +350,7 @@ export function CompanyDetail({
             { k: "drivers", icon: Users },
             { k: "offers", icon: Radio },
             { k: "network", icon: Network },
+            { k: "session", icon: Plug },
             { k: "vehicles", icon: Car },
           ] as const).map(({ k: tk, icon: Icon }) => {
             const active = tab === tk;
@@ -380,6 +383,14 @@ export function CompanyDetail({
             <CompanyOffersTab id={id} />
           ) : tab === "network" ? (
             <CompanyNetworkTab id={id} />
+          ) : tab === "session" ? (
+            <SessionTab
+              id={id}
+              company={company}
+              busy={busy}
+              onRelink={() => setConfirm("relink")}
+              onDelete={() => setConfirm("deleteSession")}
+            />
           ) : tab === "drivers" || tab === "vehicles" ? (
             <CompanyDataTab id={id} tab={tab} />
           ) : tab === "subscription" ? (
@@ -654,20 +665,6 @@ export function CompanyDetail({
                   <p className="text-xs text-ink-subtle">{c("proxyPoolHint")}</p>
                 </Group>
 
-                {/* Uber session controls */}
-                <Group title={c("session")}>
-                  <p className="text-xs text-ink-subtle">{c("sessionHint")}</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="secondary" onClick={() => setConfirm("relink")} disabled={busy || !company.session_status}>
-                      <RefreshCw className="h-4 w-4" /> {c("forceRelink")}
-                    </Button>
-                    <Button variant="secondary" onClick={() => setConfirm("deleteSession")} disabled={busy || !company.session_status}>
-                      <Trash2 className="h-4 w-4" /> {c("deleteSession")}
-                    </Button>
-                  </div>
-                  <SessionOutages id={id} />
-                </Group>
-
                 {/* Impersonate — swaps the SPA session to a manager. */}
                 <Group title={c("impersonate")}>
                   <p className="text-xs text-ink-subtle">{c("impersonateHint")}</p>
@@ -789,6 +786,111 @@ function formatDowntime(seconds: number, c: (k: string) => string): string {
   return h > 0 ? c("outageHours").replace("{h}", String(h)).replace("{m}", String(m)) : c("outageMinutes").replace("{m}", String(m));
 }
 
+/** The Uber session: state, token lifetimes, actions and the 30-day outage history. */
+function SessionTab({
+  id,
+  company,
+  busy,
+  onRelink,
+  onDelete,
+}: {
+  id: number;
+  company: Company;
+  busy: boolean;
+  onRelink: () => void;
+  onDelete: () => void;
+}) {
+  const { t, locale } = useI18n();
+  const c = (k: string) => t(`screens.companies.${k}`);
+  const [session, setSession] = useState<CompanySession>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  // `company` is replaced by every load() after a relink/delete, so it doubles as the refetch trigger.
+  useEffect(() => {
+    let alive = true;
+    getCompanySession(id)
+      .then((s) => alive && setSession(s))
+      .catch(() => alive && setSession(null))
+      .finally(() => alive && setLoaded(true));
+    return () => {
+      alive = false;
+    };
+  }, [id, company]);
+
+  const when = (iso: string | null) =>
+    iso ? formatDateTime(iso, locale, { timeZone: "Europe/Berlin", dateStyle: "medium", timeStyle: "short" }) : "—";
+  const statusLabel = (status: string) => {
+    const label = c(`session_${status}`);
+    return label.startsWith("screens.") ? status : label;
+  };
+
+  return (
+    <div className="space-y-6">
+      <Group title={c("sessionState")}>
+        {!loaded ? (
+          <Loader2 className="h-4 w-4 animate-spin text-ink-subtle" />
+        ) : !session ? (
+          <p className="text-sm text-ink-subtle">{c("noSession")}</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <StatTile icon={Plug} label={c("sessionStatus")} value={statusLabel(session.status)} />
+            <StatTile
+              icon={Globe}
+              label={c("sessionOrg")}
+              value={<span dir="ltr" className="font-mono text-xs">{session.uber_org_uuid ?? "—"}</span>}
+            />
+            <StatTile icon={Lock} label={c("sessionExpires")} value={when(session.expires_at)} />
+            <StatTile icon={Radio} label={c("sessionLastSeen")} value={relTime(session.last_event_at, locale, c("neverSeen"))} />
+          </div>
+        )}
+      </Group>
+
+      {session && (
+        <Group title={c("tokens")}>
+          <TokenRow label={c("tokenJwt")} iso={session.session_token_expires_at} when={when} />
+          <TokenRow label={c("tokenSupplier")} iso={session.supplier_token_expires_at} when={when} />
+        </Group>
+      )}
+
+      <Group title={c("session")}>
+        <p className="text-xs text-ink-subtle">{c("sessionHint")}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={onRelink} disabled={busy || !company.session_status}>
+            <RefreshCw className="h-4 w-4" /> {c("forceRelink")}
+          </Button>
+          <Button variant="secondary" onClick={onDelete} disabled={busy || !company.session_status}>
+            <Trash2 className="h-4 w-4" /> {c("deleteSession")}
+          </Button>
+        </div>
+      </Group>
+
+      <Group title={c("outagesTitle")}>
+        <SessionOutages id={id} />
+      </Group>
+    </div>
+  );
+}
+
+/** One Uber token's remaining life. An expired token is NOT a failure (it can run for days), so it stays muted; only an unexpired one under 12 h goes amber. */
+function TokenRow({ label, iso, when }: { label: string; iso: string | null; when: (iso: string | null) => string }) {
+  const { t, locale } = useI18n();
+  const c = (k: string) => t(`screens.companies.${k}`);
+  const ms = iso ? new Date(iso).getTime() : NaN;
+  const known = Number.isFinite(ms);
+  const left = ms - Date.now();
+  const warn = known && left > 0 && left < TOKEN_WARN_MS;
+  const key = left > 0 ? "tokenExpires" : "tokenExpired";
+  const text = known ? c(key).replace("{t}", relTime(iso, locale, "")) : "—";
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm">
+      <span className="font-medium text-ink">{label}</span>
+      <span className={"text-xs " + (warn ? "text-warning-fg" : "text-ink-subtle")} title={when(iso)}>
+        {text}
+      </span>
+    </div>
+  );
+}
+
 /** Uber session outages (last 30 days): how long offers were missing and how each was fixed. */
 function SessionOutages({ id }: { id: number }) {
   const { t, locale } = useI18n();
@@ -807,6 +909,12 @@ function SessionOutages({ id }: { id: number }) {
 
   if (!summary) return null;
 
+  const stamp = (iso: string) => formatDateTime(iso, locale, { timeZone: "Europe/Berlin", dateStyle: "short", timeStyle: "short" });
+  const cause = (v: string) => {
+    const label = c(`outageCause_${v}`);
+    return label.startsWith("screens.") ? v : label;
+  };
+
   return (
     <div className="space-y-2">
       <p className="text-xs text-ink-subtle">
@@ -815,20 +923,33 @@ function SessionOutages({ id }: { id: number }) {
           : c("outagesSummary").replace("{count}", String(summary.count)).replace("{total}", formatDowntime(summary.total_seconds, c))}
       </p>
       {summary.outages.length > 0 && (
-        <ul className="max-h-48 space-y-1 overflow-y-auto text-xs">
-          {summary.outages.map((o) => (
-            <li key={o.started_at} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-2 px-2.5 py-1.5">
-              <span className="text-ink-muted">{formatDateTime(o.started_at, locale, { dateStyle: "short", timeStyle: "short" })}</span>
-              <span className={o.ended_at ? "font-medium text-ink" : "font-medium text-danger-fg"}>
-                {o.ended_at ? formatDowntime(o.duration_seconds, c) : c("outageOngoing")}
-              </span>
-              <span className="text-ink-subtle">
-                {o.recovered_via ? c(`outageVia_${o.recovered_via}`) : "—"}
-                {o.relink_attempts > 1 ? ` · ${c("outageAttempts").replace("{n}", String(o.relink_attempts))}` : ""}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="max-h-80 overflow-auto rounded-lg border border-line">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-surface-2 text-ink-subtle">
+              <tr>
+                {["outageStart", "outageEnd", "outageDuration", "outageCause", "outageRecovery"].map((k) => (
+                  <th key={k} className="whitespace-nowrap px-2.5 py-2 text-start font-medium">{c(k)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {summary.outages.map((o) => (
+                <tr key={o.started_at}>
+                  <td className="whitespace-nowrap px-2.5 py-1.5 text-ink-muted">{stamp(o.started_at)}</td>
+                  <td className={"whitespace-nowrap px-2.5 py-1.5 " + (o.ended_at ? "text-ink-muted" : "font-medium text-danger-fg")}>
+                    {o.ended_at ? stamp(o.ended_at) : c("outageOngoing")}
+                  </td>
+                  <td className="whitespace-nowrap px-2.5 py-1.5 font-medium text-ink">{formatDowntime(o.duration_seconds, c)}</td>
+                  <td className="px-2.5 py-1.5 text-ink-muted">{cause(o.cause)}</td>
+                  <td className="px-2.5 py-1.5 text-ink-subtle">
+                    {o.recovered_via ? c(`outageVia_${o.recovered_via}`) : "—"}
+                    {o.relink_attempts > 1 ? ` · ${c("outageAttempts").replace("{n}", String(o.relink_attempts))}` : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

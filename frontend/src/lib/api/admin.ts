@@ -55,6 +55,8 @@ export type CompanySession = {
   status: string;
   expires_at: string | null;
   last_event_at: string | null;
+  session_token_expires_at: string | null;
+  supplier_token_expires_at: string | null;
 } | null;
 
 export type CreateCompanyInput = {
@@ -678,6 +680,12 @@ export async function resetCompanyUserPassword(
 
 export async function forceRelink(id: number): Promise<void> {
   await apiFetch(`${base}/${id}/session/relink`, { method: "POST", withCsrf: true });
+}
+
+/** A company's Uber session, or null when it has none. */
+export async function getCompanySession(id: number): Promise<CompanySession> {
+  const res = await apiFetch<{ data: CompanySession }>(`${base}/${id}/session`);
+  return res.data;
 }
 
 export type SessionOutage = {
