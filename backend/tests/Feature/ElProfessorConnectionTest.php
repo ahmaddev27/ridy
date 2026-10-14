@@ -1404,7 +1404,7 @@ class ElProfessorConnectionTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_the_range_is_sent_as_whole_berlin_days(): void
+    public function test_the_range_is_sent_as_uber_operating_days_starting_at_four(): void
     {
         $token = $this->mint();
         $this->uberSession($this->tenant);
@@ -1413,8 +1413,8 @@ class ElProfessorConnectionTest extends TestCase
 
         $this->pullEarnings($token, 'from=2026-10-06&to=2026-10-12')->assertOk();
 
-        $start = CarbonImmutable::parse('2026-10-06', 'Europe/Berlin')->getTimestampMs();
-        $end = CarbonImmutable::parse('2026-10-13', 'Europe/Berlin')->getTimestampMs();
+        $start = CarbonImmutable::parse('2026-10-06 04:00', 'Europe/Berlin')->getTimestampMs();
+        $end = CarbonImmutable::parse('2026-10-13 04:00', 'Europe/Berlin')->getTimestampMs();
         // STRINGS, and the empty string for the first page: this test pinned
         // ints and a null token until 13.10.2026, so it passed against a fake
         // while Uber answered 400 -- a fake validates nothing about a schema.
@@ -1423,6 +1423,34 @@ class ElProfessorConnectionTest extends TestCase
             && $r['variables']['timeRange']['unixMilliOrDate'] === 'Unix_Time_Range'
             && $r['variables']['pageOptions']['pageSize'] === 10
             && $r['variables']['pageOptions']['pageToken'] === '');
+    }
+
+    public function test_the_window_is_uber_s_week_monday_four_to_monday_four_not_midnights(): void
+    {
+        // Uber's own weeks run 04:00 -> 04:00 Europe/Berlin. The owner compares
+        // our totals with the figures on Uber's screen, so midnights make them
+        // differ for any ride starting between 00:00 and 04:00 on the boundary
+        // day. If this fails after a "simplification" to startOfDay(), that is why.
+        $token = $this->mint();
+        $this->uberSession($this->tenant);
+        $this->withProxy($this->tenant);
+        Http::fake(['*/graphql' => Http::response($this->hubPage([], null))]);
+
+        $this->pullEarnings($token, 'from=2026-10-05&to=2026-10-11')->assertOk();
+
+        $from = CarbonImmutable::parse('2026-10-05', 'Europe/Berlin')->setTime(4, 0);
+        $after = CarbonImmutable::parse('2026-10-11', 'Europe/Berlin')->addDay()->setTime(4, 0);
+        Http::assertSent(function ($r) use ($from, $after) {
+            $range = $r['variables']['timeRange'];
+            $start = CarbonImmutable::createFromTimestampMs((int) $range['startTimeUnixMillis'], 'Europe/Berlin');
+            $end = CarbonImmutable::createFromTimestampMs((int) $range['endTimeUnixMillis'], 'Europe/Berlin');
+
+            $this->assertSame($from->format('Y-m-d H:i'), $start->format('Y-m-d H:i'), 'the window must start at 04:00 Berlin on the from day, not at midnight');
+            $this->assertSame($after->format('Y-m-d H:i'), $end->format('Y-m-d H:i'), 'the window must end at 04:00 Berlin on the day after the to day, not at midnight');
+            $this->assertSame(7 * 24 * 3600, $end->getTimestamp() - $start->getTimestamp(), 'one Uber week is exactly 7 x 24 hours');
+
+            return true;
+        });
     }
 
     public function test_the_millis_are_strings_because_they_overflow_a_graphql_int(): void

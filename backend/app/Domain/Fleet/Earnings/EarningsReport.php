@@ -19,6 +19,17 @@ class EarningsReport
     /** A fleet that never linked anyone must not return a thousand entries. */
     public const MAX_UNMATCHED_LISTED = 100;
 
+    /**
+     * Uber's operating day starts at 04:00 Europe/Berlin, so its weeks run
+     * Monday 04:00 -> next Monday 04:00, not midnight to midnight (owner,
+     * 14.10.2026; his Fleet Hub lists e.g. 05/10/2026 04:01 AM - 12/10/2026
+     * 04:01 AM). The 04:01 / 04:02 drift Uber displays is its own display;
+     * 04:00 is the rule we ask on. Asking for midnights made our totals
+     * differ from the figures he reads there (5 of 2151 rides in August 2026
+     * start on a Monday before 04:00).
+     */
+    public const UBER_OPERATING_DAY_START_HOUR = 4;
+
     public function __construct(
         private readonly UberEarningsFetcher $fetcher,
         private readonly EarningsClassifier $classifier,
@@ -47,9 +58,13 @@ class EarningsReport
             throw new UberEarningsException('no_proxy', 'This company has no residential proxy assigned.', 409);
         }
 
-        // Berlin days; the end is the start of the day AFTER `to`, so `to` is whole.
-        $startMs = $from->startOfDay()->getTimestampMs();
-        $endMs = $to->addDay()->startOfDay()->getTimestampMs();
+        // `from` and `to` are Berlin calendar dates, but the window is NOT
+        // midnight to midnight: it is Uber's operating days. It starts at
+        // `from` 04:00 and ends at 04:00 on the day AFTER `to`, so `to`'s
+        // operating day is whole. setTime (not addHours) keeps 04:00 on the
+        // two daylight-saving nights.
+        $startMs = $from->startOfDay()->setTime(self::UBER_OPERATING_DAY_START_HOUR, 0)->getTimestampMs();
+        $endMs = $to->addDay()->startOfDay()->setTime(self::UBER_OPERATING_DAY_START_HOUR, 0)->getTimestampMs();
 
         $earners = $this->fetcher->fetch($session, $proxy, $startMs, $endMs);
 
