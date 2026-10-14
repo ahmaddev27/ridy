@@ -8,16 +8,19 @@
 // The extension version this dashboard build expects. Bump it in lockstep with
 // extension/manifest.json. Store installs auto-update, so this only nudges
 // managers on an older, manually-loaded build.
-// Floor, not "latest": 1.27.0 renews the Uber session token BEFORE it lapses
-// (under 12h remaining, while the manager's browser is actually open), and
-// 1.26.0 before it fixed the capture fingerprint that let a rotated
-// `jwt-session` pass as unchanged. Both only reach a browser that updates, so
-// a stale floor here silently withholds them — the dashboard showed 1.25.0
-// while two newer builds were live, and nobody was ever prompted.
+// Floor, not "latest": 1.27.1 points the proactive token renewal at
+// fleethub.uber.com, the host that actually rotates `sp-jwt-session` — 1.27.0
+// opened vsdispatch and so refreshed the one cookie whose expiry is harmless
+// while never touching the one the Fleet Hub channel fails on. Before that,
+// 1.26.0 fixed the capture fingerprint that let a rotated `jwt-session` pass as
+// unchanged. None of them reach a browser that does not update, so a stale
+// floor here silently withholds them — this read 1.25.0 while two newer builds
+// were live, and nobody was ever prompted.
 // Confirmed live on the Chrome Web Store on 2026-10-14 — never raise this
 // above the published build, or every manager is nagged to update to a version
-// they cannot get yet.
-export const LATEST_EXTENSION_VERSION = "1.27.0";
+// they cannot get yet. That is why the bump cannot ride along with the
+// extension's own PR: at that point the store has not published it.
+export const LATEST_EXTENSION_VERSION = "1.27.1";
 
 // The published (unlisted) Chrome Web Store listing. Unlisted = installable by
 // anyone with the link but hidden from search, so managers install with one
