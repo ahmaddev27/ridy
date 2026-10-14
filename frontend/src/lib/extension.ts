@@ -8,11 +8,16 @@
 // The extension version this dashboard build expects. Bump it in lockstep with
 // extension/manifest.json. Store installs auto-update, so this only nudges
 // managers on an older, manually-loaded build.
-// Floor, not "latest": 1.25.0 adds the automatic session self-heal (reopens
-// Uber in the background to relink a dropped session). Confirmed live on the
-// Chrome Web Store on 2026-10-02 — never raise this above the published build,
-// or every manager is nagged to update to a version they cannot get yet.
-export const LATEST_EXTENSION_VERSION = "1.25.0";
+// Floor, not "latest": 1.27.0 renews the Uber session token BEFORE it lapses
+// (under 12h remaining, while the manager's browser is actually open), and
+// 1.26.0 before it fixed the capture fingerprint that let a rotated
+// `jwt-session` pass as unchanged. Both only reach a browser that updates, so
+// a stale floor here silently withholds them — the dashboard showed 1.25.0
+// while two newer builds were live, and nobody was ever prompted.
+// Confirmed live on the Chrome Web Store on 2026-10-14 — never raise this
+// above the published build, or every manager is nagged to update to a version
+// they cannot get yet.
+export const LATEST_EXTENSION_VERSION = "1.27.0";
 
 // The published (unlisted) Chrome Web Store listing. Unlisted = installable by
 // anyone with the link but hidden from search, so managers install with one
