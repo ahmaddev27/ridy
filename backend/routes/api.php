@@ -327,6 +327,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('elprofessor.enabled')->group(function () {
             Route::get('elprofessor/fleet', [ElProfessorController::class, 'fleet']);
             Route::get('elprofessor/fleet/drivers', [ElProfessorController::class, 'drivers']);
+            Route::get('elprofessor/vehicles', [ElProfessorController::class, 'vehicles']);
             // What a driver submitted, for El-Professor to fetch. The ring tells
             // it one is ready; these two are how it collects them, and the
             // second is also the only recovery for a ring that never arrived.

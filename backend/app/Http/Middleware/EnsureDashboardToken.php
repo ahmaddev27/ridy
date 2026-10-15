@@ -67,6 +67,8 @@ class EnsureDashboardToken
         self::ELPROFESSOR_ABILITY => [
             'GET api/v1/elprofessor/fleet',
             'GET api/v1/elprofessor/fleet/drivers',
+            // The fleet's vehicles (15.10.2026): one exact pattern, like the roster.
+            'GET api/v1/elprofessor/vehicles',
             // The fetch (08.10.2026). El-Professor cannot be PUSHED a payload:
             // its intake authenticates with the token this side issued, and
             // Sanctum keeps only a hash of it. So this side rings and it reads
