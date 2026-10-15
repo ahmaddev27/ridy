@@ -6,6 +6,7 @@ use App\Domain\Fleet\Earnings\EarningsReport;
 use App\Domain\Fleet\Earnings\UberEarningsException;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\ElProfessorSubmission;
+use App\Domain\Fleet\Models\Vehicle;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
 use Carbon\CarbonImmutable;
@@ -346,6 +347,47 @@ class ElProfessorController extends Controller
                 'uber_driver_uuid' => $d->uber_driver_uuid,
                 'activated_at' => $d->activated_at?->toIso8601String(),
                 'roster_removed_at' => $d->roster_removed_at?->toIso8601String(),
+            ])->values(),
+            'meta' => [
+                'page' => $page->currentPage(),
+                'per_page' => $page->perPage(),
+                'total' => $page->total(),
+                'tenant_id' => $tenantId,
+            ],
+        ]);
+    }
+
+    /**
+     * The company's vehicles, for El-Professor's onboarding import.
+     *
+     * Reidey's `vehicles` table is filled ONLY when the browser extension syncs
+     * (VehicleController::ingest). A company that never ran the extension has
+     * zero vehicles, so an empty list here is a real state, not a failure.
+     *
+     * A vehicle with no plate is returned as it is (`license_plate: null`);
+     * El-Professor decides what to do with it. Reduced on purpose to four fields
+     * (id, Uber UUID, plate, assigned driver): El-Professor stores only the plate,
+     * and this is one company's data crossing to another product.
+     */
+    public function vehicles(Request $request): JsonResponse
+    {
+        $tenantId = (int) $request->user()->tenant_id;
+        $perPage = max(1, min(self::MAX_PER_PAGE, (int) $request->query('per_page', 50)));
+
+        $page = Vehicle::query()
+            ->where('tenant_id', $tenantId)
+            ->orderBy('id')
+            ->select(['id', 'uber_vehicle_uuid', 'license_plate', 'assigned_driver_uuid'])
+            ->paginate($perPage);
+
+        $this->recordUsage($tenantId);
+
+        return response()->json([
+            'data' => $page->getCollection()->map(fn (Vehicle $v) => [
+                'id' => $v->id,
+                'uber_vehicle_uuid' => $v->uber_vehicle_uuid,
+                'license_plate' => $v->license_plate,
+                'assigned_driver_uuid' => $v->assigned_driver_uuid,
             ])->values(),
             'meta' => [
                 'page' => $page->currentPage(),

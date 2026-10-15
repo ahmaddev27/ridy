@@ -1656,4 +1656,113 @@ class ElProfessorConnectionTest extends TestCase
         $token = $this->mint();
         $this->assertContains($this->withHeaders($this->bearer($token))->getJson('/api/v1/driver/vehicles')->status(), [401, 403]);
     }
+
+    // -- The vehicle list for El-Professor's onboarding import -----------------
+
+    private function pullVehicles(string $token, string $query = ''): TestResponse
+    {
+        return $this->getJson('/api/v1/elprofessor/vehicles'.($query === '' ? '' : '?'.$query), $this->bearer($token));
+    }
+
+    public function test_the_vehicle_pull_is_this_tenants_and_not_another(): void
+    {
+        $mine = Vehicle::create(['tenant_id' => $this->tenant->id, 'uber_vehicle_uuid' => 'mine-1', 'license_plate' => 'B-AA 1']);
+        Vehicle::create(['tenant_id' => $this->tenant->id, 'uber_vehicle_uuid' => 'mine-2', 'license_plate' => null]);
+        Vehicle::withoutGlobalScopes()->create(['tenant_id' => $this->other->id, 'uber_vehicle_uuid' => 'theirs-1', 'license_plate' => 'M-ZZ 9']);
+        $token = $this->mint();
+
+        $response = $this->pullVehicles($token)
+            ->assertOk()
+            ->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('meta.tenant_id', $this->tenant->id)
+            ->assertJsonPath('data.0.id', $mine->id)
+            ->assertJsonPath('data.1.license_plate', null);
+
+        $this->assertStringNotContainsString('theirs-1', $response->getContent());
+        $this->assertStringNotContainsString('M-ZZ 9', $response->getContent());
+    }
+
+    public function test_the_vehicle_pull_pages_and_caps_like_the_roster(): void
+    {
+        foreach (range(1, 3) as $i) {
+            Vehicle::create(['tenant_id' => $this->tenant->id, 'uber_vehicle_uuid' => 'v'.$i]);
+        }
+        $token = $this->mint();
+
+        $this->pullVehicles($token, 'per_page=500')
+            ->assertOk()
+            ->assertJsonPath('meta.per_page', 100)
+            ->assertJsonPath('meta.page', 1);
+
+        $this->pullVehicles($token, 'per_page=2&page=2')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('meta.per_page', 2)
+            ->assertJsonPath('meta.page', 2)
+            ->assertJsonPath('meta.total', 3);
+    }
+
+    public function test_a_token_without_the_el_professor_ability_cannot_pull_vehicles(): void
+    {
+        $this->openIntegration();
+        Vehicle::create(['tenant_id' => $this->tenant->id, 'uber_vehicle_uuid' => 'v1']);
+
+        // No credential at all.
+        $this->getJson('/api/v1/elprofessor/vehicles')->assertUnauthorized();
+
+        // A real token holding only the extension's ability is confined by that
+        // ability's own list, which does not name this route.
+        $other = $this->manager->createToken('ext', ['fleet-session:write'])->plainTextToken;
+        $this->app['auth']->forgetGuards();
+        $this->getJson('/api/v1/elprofessor/vehicles', $this->bearer($other))->assertForbidden();
+    }
+
+    public function test_the_vehicle_pull_is_refused_when_the_integration_is_disabled(): void
+    {
+        $token = $this->mint();
+        // Disabled WITHOUT deleting the token (setElprofessorEnabled(false) would
+        // make it a 401): the middleware is the wall under test.
+        $this->tenant->fresh()->mergeElprofessorState(['enabled' => false]);
+
+        $this->pullVehicles($token)
+            ->assertStatus(403)
+            ->assertJsonPath('reason', 'integration_disabled');
+    }
+
+    public function test_the_vehicle_pull_carries_exactly_the_listed_fields(): void
+    {
+        Vehicle::create([
+            'tenant_id' => $this->tenant->id, 'uber_vehicle_uuid' => 'u1', 'license_plate' => 'B-AA 1',
+            'make' => 'VW', 'model' => 'Touran', 'year' => 2022, 'vin' => 'WVW123',
+            'color' => 'Black', 'color_hex' => '#000000', 'image_url' => 'https://img/car.png',
+            'compliance_status' => 'ok', 'assigned_driver_uuid' => 'drv-1', 'synced_at' => now(),
+        ]);
+        $token = $this->mint();
+
+        $response = $this->pullVehicles($token)->assertOk();
+
+        $keys = array_keys($response->json('data.0'));
+        sort($keys);
+        $this->assertSame(
+            ['assigned_driver_uuid', 'id', 'license_plate', 'uber_vehicle_uuid'],
+            $keys,
+        );
+        $this->assertStringNotContainsString('vin', $response->getContent());
+        $this->assertStringNotContainsString('image_url', $response->getContent());
+        $this->assertStringNotContainsString('color_hex', $response->getContent());
+        $this->assertStringNotContainsString('img/car.png', $response->getContent());
+    }
+
+    public function test_the_vehicle_route_widens_nothing_it_is_exactly_one_get(): void
+    {
+        $token = $this->mint();
+
+        $this->pullVehicles($token)->assertOk();
+
+        $this->withHeaders($this->bearer($token))->postJson('/api/v1/elprofessor/vehicles')->assertStatus(405);
+        $this->withHeaders($this->bearer($token))->getJson('/api/v1/elprofessor/vehicles/1')->assertStatus(404);
+        // The dashboard's own vehicle list stays out of reach.
+        $this->withHeaders($this->bearer($token))->getJson('/api/v1/vehicles')->assertStatus(403);
+        $this->withHeaders($this->bearer($token))->postJson('/api/v1/vehicles')->assertStatus(403);
+    }
 }
