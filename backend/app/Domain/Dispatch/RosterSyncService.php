@@ -3,6 +3,7 @@
 namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Fleet\DriverOnboardingService;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\DriverMetric;
 use App\Domain\Notifications\Models\DeviceToken;
@@ -28,7 +29,7 @@ class RosterSyncService
 
     private const LOCK_WAIT_SECONDS = 10;
 
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private DriverOnboardingService $onboarding) {}
 
     /**
      * @param  array<int, array<string, mixed>>  $drivers  the `data.drivers` array
@@ -86,6 +87,9 @@ class RosterSyncService
 
         // uuid => driver id of every rostered driver, for the orphan-offer backfill.
         $driverIdByUuid = [];
+        // Every row this sync touched, and which of them it created (for onboarding).
+        $touched = new Collection;
+        $createdIds = [];
 
         foreach ($drivers as $row) {
             if (! is_array($row)) {
@@ -123,6 +127,7 @@ class RosterSyncService
                 $attributes['uber_link_method'] = 'auto';
                 $driver = Driver::create($attributes);
                 $created++;
+                $createdIds[] = $driver->id;
                 // Register the fresh row so a duplicate of this UUID later in the
                 // same roster resolves to it rather than creating a second driver.
                 $existing->put($uuid, ($existing->get($uuid) ?? new Collection)->push($driver));
@@ -133,10 +138,14 @@ class RosterSyncService
             }
 
             $driverIdByUuid[$uuid] = $driver->id;
+            $touched->push($driver);
             $synced++;
         }
 
         $this->linkOrphanOffers($tenantId, $driverIdByUuid);
+
+        // One batched pass: adopt a previous company's account, then invite the new rows.
+        $this->onboarding->onboard($touched, $createdIds);
 
         // Reconcile removals: a driver Uber no longer lists is marked removed from
         // the fleet — NEVER deleted. The row and its offer history stay with the

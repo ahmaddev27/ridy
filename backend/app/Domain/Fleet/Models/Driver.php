@@ -86,6 +86,12 @@ class Driver extends Authenticatable
     }
 
     /** App onboarding state for the manager dashboard. */
+    /** Whether an invite could be sent: not yet activated and some email to send it to. */
+    public function canBeInvited(): bool
+    {
+        return $this->activated_at === null && (filled($this->email) || filled($this->uber_email));
+    }
+
     public function appStatus(): string
     {
         // A still-pending invite that outlived the link TTL reads as "expired" — the

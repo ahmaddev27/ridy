@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\Admin\CompanyDataController;
 use App\Http\Controllers\Api\V1\Admin\CompanySessionController;
 use App\Http\Controllers\Api\V1\Admin\CompanyUserController;
 use App\Http\Controllers\Api\V1\Admin\ContactMessageController;
+use App\Http\Controllers\Api\V1\Admin\DriverConflictController;
 use App\Http\Controllers\Api\V1\Admin\DriverDirectoryController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Api\V1\Admin\ImpersonationController;
@@ -429,6 +430,8 @@ Route::prefix('v1')->group(function () {
 
         Route::get('drivers', DriverDirectoryController::class);
         Route::get('orphan-drivers', OrphanDriverController::class);
+        Route::get('driver-conflicts', [DriverConflictController::class, 'index']);
+        Route::post('driver-conflicts/transfer', [DriverConflictController::class, 'transfer']);
 
         // Broadcast a bell + push notification to a set of users (queued).
         Route::post('notifications/broadcast', [AdminNotificationController::class, 'broadcast']);

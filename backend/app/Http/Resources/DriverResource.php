@@ -34,6 +34,9 @@ class DriverResource extends JsonResource
             'location_updated_at' => $this->location_updated_at?->toIso8601String(),
             'email' => $this->email,
             'app_status' => $this->appStatus(),
+            // Server-computed: false when there is no email (own or from Uber) to invite,
+            // so the dashboard can say "cannot be invited — no email" instead of a dead button.
+            'can_be_invited' => $this->canBeInvited(),
             // Human label of the driver's most-recent app device (model + OS),
             // e.g. "Pixel 7 Â· Android 14"; null until a build that reports it registers.
             'device_label' => $this->latestDeviceToken?->label(),
