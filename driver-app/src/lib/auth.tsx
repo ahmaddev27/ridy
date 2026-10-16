@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { AppState } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { api, ApiError, type DriverProfile, type SessionInvalidBody } from "./api";
 import { revokeLocalPush, unregisterForPush } from "./push";
@@ -159,6 +160,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     restore().catch(() => setReady(true));
   }, [restore, endSession]);
+
+  /**
+   * Re-read the profile when the app comes back to the foreground.
+   *
+   * `restore()` otherwise runs once per mount, and a phone keeps this app alive
+   * in the background for days — so anything the server changed underneath it
+   * stayed invisible. That is not hypothetical: when a driver moves to another
+   * fleet their account is transferred server-side, and the app went on showing
+   * the OLD company's name until the driver happened to force-quit it. Nobody
+   * tells a driver to do that. A suspended company and an expired subscription
+   * were equally invisible.
+   *
+   * A resume is not a cold start: the session already exists, so a failure here
+   * must stay silent. `restore()` keeps the session on a network error and only
+   * ends it on a 401 or a suspension, which is exactly what we want.
+   */
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") void restore();
+    });
+
+    return () => sub.remove();
+  }, [restore]);
 
   const retry = useCallback(async () => {
     await restore();
