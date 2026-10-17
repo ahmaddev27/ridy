@@ -83,9 +83,21 @@ x-app-env: &app-env
   # own browser bundle and authorises nothing by itself — their function bounds a
   # ring by rate-limiting it and by storing nothing it says.
   #
-  # So they are written here rather than in `.env`: `deploy.yml` REWRITES `.env`
-  # from secrets on every deploy, and a line added to it on the server by hand is
-  # erased by the next release. Overriding either in `.env` still wins.
+  # The defaults below are El-Professor's STAGING stack, and they are the
+  # fallback rather than the setting. The live values come from two repository
+  # secrets of the same name, which `deploy.yml` writes into `.env`, and `.env`
+  # wins over a default here. Three consequences worth knowing:
+  #
+  #   - A secret left empty or unset falls back to these staging defaults, so a
+  #     deploy never rings the wrong stack by accident, and clearing the pair is
+  #     how the switch is reversed.
+  #   - Production's key therefore never enters this repository's history. It is
+  #     not a secret in the cryptographic sense - it is an `anon` JWT that ships
+  #     in El-Professor's own browser bundle - but it belongs to the other
+  #     product, and a value two teams read is better held in one place.
+  #   - A line added to `.env` on the SERVER by hand is still erased by the next
+  #     release, because `deploy.yml` truncates `.env` and rewrites it. The
+  #     secrets are the only durable way in.
   #
   # Unset or empty = this side never rings, and nothing is lost: the submission
   # is stored here and El-Professor's own "Eingänge abrufen" button fetches it.
