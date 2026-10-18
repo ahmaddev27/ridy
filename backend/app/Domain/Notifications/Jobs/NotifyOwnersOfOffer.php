@@ -23,10 +23,52 @@ class NotifyOwnersOfOffer implements ShouldQueue
 {
     use Queueable;
 
-    /** A transient FCM failure is worth one retry; past that the offer is stale. */
-    public int $tries = 2;
+    /**
+     * Attempts here are mostly RELEASES, not failures: the job puts itself back
+     * while it waits for the geocode (see GEO_WAIT_BUDGET_SECONDS) and a release
+     * spends an attempt. `maxExceptions` keeps the original rule for a real
+     * failure — a transient FCM error is worth one retry, past that the offer is
+     * stale — so widening `tries` for the wait cannot turn into an FCM retry storm.
+     */
+    public int $tries = 8;
+
+    public int $maxExceptions = 2;
 
     public int $backoff = 5;
+
+    /**
+     * How long the manager's copy waits for the metrics before going out bare.
+     *
+     * The driver's push cannot wait — Uber's accept window is ~5 seconds and on a
+     * declines-enabled company the pre-push geocode is skipped ENTIRELY so the
+     * decline pop-up is up as fast as possible. **The manager's copy has no such
+     * window**: the only decline they can trigger is on the dispatch panel (web),
+     * `DispatchOfferController::dispatchReject` behind `can:offers.manage` — the
+     * app's single decline route is `auth:driver` and its pop-up is driver-only.
+     * Their push is a monitor, so a few seconds buys it the distance and €/km that
+     * are most of what it is for.
+     *
+     * Measured on production 18.10.2026: offer 22311 was received at 13:02:23 and
+     * geocoded at 13:06:14 — the number existed, 3m51s too late for a push already
+     * sent. On the two declines-enabled companies that was EVERY offer.
+     *
+     * The budget is a floor on usefulness, never a cost to correctness: once it is
+     * spent the push goes out exactly as it does today, bare. It also ends as soon
+     * as `geo_synced_at` is stamped, which the geocoder does even when it decides
+     * not to trust a distance — so a withheld distance is not waited on twice.
+     *
+     * Only the OFFER push waits. The multi-stop follow-up is queued after the driver
+     * accepted, by which point the trip is resolved from Uber's own waypoints, so it
+     * has nothing to wait for and holding it back would delay a push about a ride
+     * already under way.
+     *
+     * Nor does it wait on the `sync` connection: a released job is retried only by a
+     * real queue, and on `sync` there is no later attempt — the copy would be lost
+     * rather than delayed. Production runs `database`; the test suite runs `sync`.
+     */
+    public const GEO_WAIT_SECONDS = 3;
+
+    public const GEO_WAIT_BUDGET_SECONDS = 18;
 
     /**
      * Past this age a queued owner copy is dropped: after a worker outage or a
@@ -80,6 +122,20 @@ class NotifyOwnersOfOffer implements ShouldQueue
         // manager's phone would ring for an offer that is already dead, which is
         // exactly the noise the feature is meant to remove.
         if ($offer->dispatch_rejected_at !== null) {
+            return;
+        }
+
+        // Wait, briefly, for the numbers — see GEO_WAIT_BUDGET_SECONDS. A copy that
+        // reads "16.79 €" when the row will read "16.79 €€ · 16.2 km · €1.04/km" a
+        // moment later is the worse of the two pushes, and the manager is not racing
+        // anyone for it. The row is re-read on every attempt, so a release picks up
+        // whatever landed meanwhile. A payload with no `queuedAt` (queued before that
+        // field existed) cannot be bounded, so it never waits.
+        if ($this->stopsCount === null && $offer->geo_synced_at === null && $this->queuedAt !== null
+            && config('queue.default') !== 'sync'
+            && time() - $this->queuedAt < self::GEO_WAIT_BUDGET_SECONDS) {
+            $this->release(self::GEO_WAIT_SECONDS);
+
             return;
         }
 

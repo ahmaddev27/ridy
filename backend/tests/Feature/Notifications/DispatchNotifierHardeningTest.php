@@ -165,4 +165,103 @@ class DispatchNotifierHardeningTest extends TestCase
         $this->assertSame(NotifyOwnersOfOffer::QUEUE, (new NotifyOwnersOfOffer(1))->queue);
         $this->assertSame('push', NotifyOwnersOfOffer::QUEUE);
     }
+
+    /** An owner with one registered device, so a push has somewhere to land. */
+    private function ownerWithDevice(): void
+    {
+        $owner = User::create(['name' => 'Boss', 'email' => 'b@ya.de', 'password' => 'x', 'tenant_id' => $this->tenant->id]);
+        DeviceToken::create(['user_id' => $owner->id, 'token' => 'own', 'tenant_id' => $this->tenant->id]);
+    }
+
+    public function test_owner_offer_push_waits_for_the_metrics_rather_than_going_out_bare(): void
+    {
+        // Production runs the `database` queue; the suite runs `sync`, where a release
+        // is never retried and the wait is deliberately skipped.
+        config(['queue.default' => 'database']);
+        $driver = Driver::create(['name' => 'Omar']);
+        $this->ownerWithDevice();
+        // Not geocoded yet — exactly the state a declines-enabled company's offer is
+        // in when notify() queues this job, because its pre-push geocode is skipped.
+        $offer = $this->offer($driver, ['fare_amount' => 16.79]);
+        $spy = $this->pushSpy();
+
+        $waiting = new NotifyOwnersOfOffer((int) $offer->id);
+        $waiting->withFakeQueueInteractions();
+        $waiting->handle(new DispatchNotifier($spy));
+
+        // Asserting "no push" alone would also pass if the job had simply dropped it.
+        $waiting->assertReleased(NotifyOwnersOfOffer::GEO_WAIT_SECONDS);
+        $this->assertCount(0, $spy->calls);
+
+        // The geocode lands; the next attempt re-reads the row and carries the numbers.
+        $offer->forceFill(['distance_m' => 16192, 'geo_confidence' => 'exact', 'geo_synced_at' => now()])->save();
+
+        $retry = new NotifyOwnersOfOffer((int) $offer->id);
+        $retry->withFakeQueueInteractions();
+        $retry->handle(new DispatchNotifier($spy));
+
+        $retry->assertNotReleased();
+        $this->assertCount(1, $spy->calls);
+        $this->assertSame('16.79 €€ · 16.2 km · €1.04/km', $spy->calls[0]['title']);
+    }
+
+    public function test_the_wait_never_costs_the_owner_their_push(): void
+    {
+        // Production runs the `database` queue; the suite runs `sync`, where a release
+        // is never retried and the wait is deliberately skipped.
+        config(['queue.default' => 'database']);
+        $driver = Driver::create(['name' => 'Omar']);
+        $this->ownerWithDevice();
+        $offer = $this->offer($driver, ['fare_amount' => 16.79]);
+        $spy = $this->pushSpy();
+
+        // Budget spent and still no geocode: the bare push goes out, as it does today.
+        $spent = new NotifyOwnersOfOffer((int) $offer->id);
+        $spent->withFakeQueueInteractions();
+        $spent->queuedAt = time() - NotifyOwnersOfOffer::GEO_WAIT_BUDGET_SECONDS - 1;
+        $spent->handle(new DispatchNotifier($spy));
+
+        $spent->assertNotReleased();
+        $this->assertCount(1, $spy->calls);
+        $this->assertSame('16.79 €', $spy->calls[0]['title']);
+    }
+
+    public function test_multi_stop_follow_up_never_waits_for_a_geocode(): void
+    {
+        // Production runs the `database` queue; the suite runs `sync`, where a release
+        // is never retried and the wait is deliberately skipped.
+        config(['queue.default' => 'database']);
+        $driver = Driver::create(['name' => 'Omar']);
+        $this->ownerWithDevice();
+        $offer = $this->offer($driver, ['status' => OfferStatus::Accepted]);
+        $spy = $this->pushSpy();
+
+        // Queued after acceptance, when Uber's own waypoints resolve the trip: it has
+        // nothing to wait for, and holding it back delays a ride already under way.
+        $followUp = new NotifyOwnersOfOffer((int) $offer->id, 2);
+        $followUp->withFakeQueueInteractions();
+        $followUp->handle(new DispatchNotifier($spy));
+
+        $followUp->assertNotReleased();
+        $this->assertCount(1, $spy->calls);
+    }
+
+    public function test_on_sync_the_copy_is_sent_rather_than_released_into_nowhere(): void
+    {
+        $driver = Driver::create(['name' => 'Omar']);
+        $this->ownerWithDevice();
+        $offer = $this->offer($driver, ['fare_amount' => 16.79]);
+        $spy = $this->pushSpy();
+
+        // `sync` runs the job inline and never retries a released one, so waiting
+        // there would not delay the manager's copy — it would lose it.
+        config(['queue.default' => 'sync']);
+
+        $job = new NotifyOwnersOfOffer((int) $offer->id);
+        $job->withFakeQueueInteractions();
+        $job->handle(new DispatchNotifier($spy));
+
+        $job->assertNotReleased();
+        $this->assertCount(1, $spy->calls);
+    }
 }
