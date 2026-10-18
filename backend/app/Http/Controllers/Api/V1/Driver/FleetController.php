@@ -189,8 +189,13 @@ class FleetController extends Controller
                 ->where('status', UberFleetSession::STATUS_ACTIVE)
                 ->exists(),
             'is_owner' => true,
-            'documents_enabled' => $owner->tenant?->isElprofessorConnected() ?? false,
-            'gallery_import_enabled' => $owner->tenant?->elprofessorGalleryImportEnabled() ?? false,
+            // FALSE for an owner even on a connected company — see the matching
+            // note in DriverAuthController::ownerProfile(). The two owner payloads
+            // must agree: this one answers the app's resume refresh, that one the
+            // login, and a disagreement would make the button appear or vanish
+            // depending on which call ran last.
+            'documents_enabled' => false,
+            'gallery_import_enabled' => false,
         ]]);
     }
 

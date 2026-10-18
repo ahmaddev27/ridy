@@ -25,7 +25,7 @@ const APP_VERSION = Constants.expoConfig?.version ?? "1.1.0";
 export default function ProfileScreen() {
   const c = useColors();
   const router = useRouter();
-  const { driver, logout } = useAuth();
+  const { driver, isOwner, logout } = useAuth();
   useLocale(); // re-render on a language switch
   const align = isRTL() ? "right" : "left";
   const row = isRTL() ? "row-reverse" : "row";
@@ -164,8 +164,11 @@ export default function ProfileScreen() {
               shown only once that company is connected to El-Professor. Until
               then nobody would fetch a submission, so one sent here would sit
               unread while the driver believed it had gone. The endpoint refuses
-              it too (403 `not_connected`); this is the message, not the wall. */}
-          {driver?.documents_enabled ? (
+              it too (403 `not_connected`); this is the message, not the wall.
+              Never for an OWNER: a submission goes up from a driver to their
+              company, and an owner has none above them. The server answers
+              `documents_enabled: false` for them, and this says so too. */}
+          {driver?.documents_enabled && !isOwner ? (
             <>
               <MenuRow
                 c={c}

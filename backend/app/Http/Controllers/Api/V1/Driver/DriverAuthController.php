@@ -365,10 +365,17 @@ class DriverAuthController extends Controller
             // session instead, so the profile matches the dashboard's status.
             'uber_linked' => $this->tenantUberLinked($owner->tenant_id),
             'is_owner' => true,
-            'documents_enabled' => $owner->tenant?->isElprofessorConnected() ?? false,
-            // Read only where documents are enabled; the app hides the whole
-            // section otherwise, so this never stands on its own.
-            'gallery_import_enabled' => $owner->tenant?->elprofessorGalleryImportEnabled() ?? false,
+            // FALSE for an owner even on a connected company, like
+            // `dispatch_reject_enabled` below and for the same reason. The field
+            // reads "this ACCOUNT may submit documents", not "the company is
+            // connected": a submission is a driver sending a Beleg or a Notiz UP
+            // to their company, and an owner has no company above them. Every
+            // screen behind it is `auth:driver`, so an owner who reached one would
+            // get a 401 — the flag is the message, not the wall. Reporting the
+            // company's true state here is what put the floating button and the
+            // Profil row on the owner's phone.
+            'documents_enabled' => false,
+            'gallery_import_enabled' => false,
             // Kept on the owner's profile only so both shapes match for the app's
             // single Profile type. An owner watches the fleet read-only and never
             // gets the decline pop-up or the notification action.

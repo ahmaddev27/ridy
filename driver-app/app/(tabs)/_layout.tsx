@@ -174,7 +174,7 @@ function SubmissionsFab({ bottom }: { bottom: number }) {
 
 export default function TabsLayout() {
   useLocale(); // re-render tab labels when the language changes
-  const { driver } = useAuth();
+  const { driver, isOwner } = useAuth();
   const pathname = usePathname();
 
   // The bar's height is measured rather than recomputed: it is built from a
@@ -186,7 +186,12 @@ export default function TabsLayout() {
   // company's El-Professor connection, which Reidey fills from
   // `isElprofessorConnected()`. A company without it gets neither the button nor
   // a way in, exactly as before.
-  const connected = driver?.documents_enabled === true;
+  // An owner never gets the button. The server already answers
+  // `documents_enabled: false` for them, so this is the second lock rather than
+  // the first: it says what we mean in the UI, so restoring that field to the
+  // company's true connection state cannot quietly put the button back. A
+  // submission goes UP from a driver to their company, and an owner has none.
+  const connected = driver?.documents_enabled === true && !isOwner;
   const showFab = connected && barHeight > 0 && !pathname.startsWith("/submissions");
 
   return (
