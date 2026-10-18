@@ -1052,6 +1052,38 @@ class ElProfessorConnectionTest extends TestCase
             ->assertJsonPath('reason', 'not_connected');
     }
 
+    public function test_an_owner_is_never_told_they_may_submit_documents(): void
+    {
+        // The company IS connected here — that is the point. `documents_enabled`
+        // answers "may this ACCOUNT submit", not "is the company connected", and
+        // an owner has no company above them to send a Beleg to. Reporting the
+        // company's state put the floating button and the Profil row on the
+        // owner's phone. Both payloads are asserted because they answer different
+        // moments — the login and the app's resume refresh — and a disagreement
+        // would make the button come and go depending on which ran last.
+        $this->connectCompany();
+
+        // A FRESH User, exactly as `actingAsDriver` re-fetches its driver. The
+        // instance held from setUp has already had `tenant` lazy-loaded by the
+        // mint, so `loadMissing('tenant')` is a no-op on it and the controller
+        // would read a pre-connection snapshot — the test would then pass against
+        // the OLD code too, proving nothing. A real request builds the user from
+        // the database on every call.
+        Sanctum::actingAs(User::findOrFail($this->manager->id), ['*']);
+        $this->getJson('/api/v1/driver/fleet/me')
+            ->assertOk()
+            ->assertJsonPath('data.is_owner', true)
+            ->assertJsonPath('data.documents_enabled', false)
+            ->assertJsonPath('data.gallery_import_enabled', false);
+
+        // The same company still enables it for an actual driver, so this is a
+        // rule about the ACCOUNT and not the connection being switched off.
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+        $this->getJson('/api/v1/driver/me')
+            ->assertOk()
+            ->assertJsonPath('data.documents_enabled', true);
+    }
+
     public function test_the_profile_carries_the_flag_the_app_gates_on(): void
     {
         // The app hides the Profil row on exactly this field, so a rename here
