@@ -72,7 +72,8 @@
             "buildToolsVersion": "36.0.0"
           },
           "ios": {
-            "useFrameworks": "static"
+            "useFrameworks": "static",
+            "enableSceneSupport": true
           }
         }
       ],
