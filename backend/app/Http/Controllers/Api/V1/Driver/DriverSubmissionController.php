@@ -117,7 +117,7 @@ class DriverSubmissionController extends Controller
             ->where('driver_id', $driver->id)
             ->orderByDesc('created_at')
             ->limit(50)
-            ->get(['uuid', 'subject', 'status', 'decision_text', 'created_at']);
+            ->get(['uuid', 'subject', 'status', 'decision_text', 'payload', 'created_at']);
 
         return response()->json([
             'data' => $rows->map(fn (ElProfessorSubmission $r) => [
@@ -127,9 +127,44 @@ class DriverSubmissionController extends Controller
                 // The company's own words on a rejection. The driver has to see
                 // them, or the rejection is something they cannot act on.
                 'reason' => $r->decision_text,
+                'detail' => $this->detail($r),
                 'created_at' => $r->created_at?->toIso8601String(),
             ])->values(),
         ]);
+    }
+
+    /**
+     * A few of the driver's own figures, so two rows in their list can be told
+     * apart. A whitelist, not the payload: the payload also carries the odometer
+     * and the fuel readings, which the list has no use for, and a field added to
+     * it later must not reach this response by being there. It is the driver's
+     * own submission going back to the driver, so nothing here is new exposure.
+     *
+     * Every key is always present and null when unknown: rows sent by an older
+     * build, or a payload that lacks a field, must not break the app's reader.
+     *
+     * @return array<string, string|null>
+     */
+    private function detail(ElProfessorSubmission $r): array
+    {
+        $p = is_array($r->payload) ? $r->payload : [];
+        $text = fn (string $key): ?string => isset($p[$key]) && is_scalar($p[$key]) && trim((string) $p[$key]) !== ''
+            ? trim((string) $p[$key])
+            : null;
+
+        if ($r->subject === 'receipt') {
+            return [
+                'amount' => $text('amount'),
+                'category' => $text('category'),
+                'merchant_name' => $text('merchant_name'),
+            ];
+        }
+
+        return [
+            'note_type' => $text('note_type'),
+            'note_text' => $text('note_text'),
+            'vehicle_plate' => $text('vehicle_plate'),
+        ];
     }
 
     /**
