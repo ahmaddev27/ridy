@@ -31,6 +31,7 @@ import { SectionLabel } from "@/components/ui";
 import { api, type DriverSubmission } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, intlLocale } from "@/lib/i18n";
+import { amountLabel, cleanText, statusKind } from "@/lib/submission-detail";
 import { groupSubmissions, shortDay } from "@/lib/submission-groups";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
 
@@ -270,18 +271,7 @@ export default function SubmissionsScreen() {
                   }}
                 >
                   {week.items.map((r) => (
-                    <View key={r.id} style={{ ...cardStyle(c), padding: 14, gap: 6 }}>
-                      <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                        <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>
-                          {r.subject === "receipt" ? t("subs.kind.receipt") : t("subs.kind.note")}
-                        </Text>
-                        {r.created_at && (
-                          <Text style={{ color: c.inkMuted, fontSize: 12.5 }}>
-                            {new Date(r.created_at).toLocaleDateString(intlLocale())}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
+                    <SubmissionRow key={r.id} c={c} row={row} item={r} />
                   ))}
                 </WeekBlock>
               );
@@ -290,6 +280,86 @@ export default function SubmissionsScreen() {
         ))}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/**
+ * One submission. Everything a driver needs to tell two rows apart sits on the
+ * card itself, not behind a tap: the amount and merchant of a receipt, the
+ * kind and first lines of a note, and the company's verdict.
+ *
+ * Direction comes from `row`, never a hard-coded "row", so the badge and the
+ * date swap sides in Arabic like the rest of the screen.
+ */
+function SubmissionRow({
+  c,
+  row,
+  item,
+}: {
+  c: Palette;
+  row: "row" | "row-reverse";
+  item: DriverSubmission;
+}) {
+  const isReceipt = item.subject === "receipt";
+  const d = item.detail ?? {};
+  const kind = statusKind(item.status);
+  const reason = kind === "rejected" ? cleanText(item.reason) : null;
+
+  const amount = isReceipt ? amountLabel(d.amount) : null;
+  // The category is the company's own stored word (the picker shows it as is),
+  // so it is not translated here either.
+  const receiptLine = isReceipt
+    ? [cleanText(d.merchant_name), cleanText(d.category)].filter(Boolean).join(" · ")
+    : "";
+  const noteType = !isReceipt && d.note_type ? t(`note.type.${d.note_type}`) : null;
+  const noteLine = !isReceipt
+    ? [noteType, cleanText(d.vehicle_plate)].filter(Boolean).join(" · ")
+    : "";
+  const noteText = !isReceipt ? cleanText(d.note_text) : null;
+
+  const badge =
+    kind === "accepted"
+      ? { fg: c.accepted, bg: c.completedBg }
+      : kind === "rejected"
+        ? { fg: c.danger, bg: c.canceledBg }
+        : { fg: c.pending, bg: c.pendingBg };
+
+  return (
+    <View style={{ ...cardStyle(c), padding: 14, gap: 6 }}>
+      <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5, flexShrink: 1 }} numberOfLines={1}>
+          {isReceipt ? t("subs.kind.receipt") : t("subs.kind.note")}
+          {amount ? ` · ${amount}` : ""}
+        </Text>
+        {kind && (
+          <View style={{ paddingHorizontal: 9, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: badge.bg }}>
+            <Text style={{ color: badge.fg, fontWeight: "700", fontSize: 12 }}>{t(`subs.status.${kind}`)}</Text>
+          </View>
+        )}
+      </View>
+
+      {(isReceipt ? receiptLine : noteLine) !== "" && (
+        <Text style={{ color: c.inkMuted, fontSize: 13.5 }} numberOfLines={1}>
+          {isReceipt ? receiptLine : noteLine}
+        </Text>
+      )}
+      {noteText && (
+        <Text style={{ color: c.inkMuted, fontSize: 13.5 }} numberOfLines={2}>
+          {noteText}
+        </Text>
+      )}
+      {reason && (
+        <Text style={{ color: c.danger, fontSize: 13.5 }}>
+          <Text style={{ fontWeight: "700", color: c.danger }}>{t("subs.reason")}: </Text>
+          {reason}
+        </Text>
+      )}
+      {item.created_at && (
+        <Text style={{ color: c.inkSubtle, fontSize: 12.5 }}>
+          {new Date(item.created_at).toLocaleDateString(intlLocale())}
+        </Text>
+      )}
+    </View>
   );
 }
 

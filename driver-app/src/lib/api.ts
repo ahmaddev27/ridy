@@ -49,7 +49,23 @@ export type DriverSubmission = {
   status: string;
   /** The company's own words when it rejected. Null otherwise. */
   reason: string | null;
+  /**
+   * A few of the driver's own figures, to tell two rows apart. Absent on a
+   * server that predates it, and every key inside is null when unknown, so
+   * read it as optional all the way down.
+   */
+  detail?: SubmissionDetail | null;
   created_at: string | null;
+};
+
+/** What the list shows of a submission. Amounts are plain decimals with a dot. */
+export type SubmissionDetail = {
+  amount?: string | null;
+  category?: string | null;
+  merchant_name?: string | null;
+  note_type?: string | null;
+  note_text?: string | null;
+  vehicle_plate?: string | null;
 };
 
 /** Everything a receipt carries. The photo is separate: it is a file. */

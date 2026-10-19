@@ -896,6 +896,36 @@ class ElProfessorConnectionTest extends TestCase
         $this->assertSame('Foto unleserlich', $body[0]['reason']);
     }
 
+    public function test_the_list_carries_a_whitelisted_detail_for_a_receipt_and_for_a_note(): void
+    {
+        Storage::fake('local');
+        $this->connectCompany();
+        $driver = $this->driver($this->tenant, 'Omar');
+        $this->submission($this->tenant, $driver, [
+            'created_at' => now()->subMinute(),
+            'payload' => [
+                'receipt_date' => '2026-10-07', 'amount' => '41.47', 'category' => 'Tanken',
+                'merchant_name' => 'Aral', 'litres' => '30.10', 'odometer_km' => '25382', 'range_km' => '410',
+            ],
+        ]);
+        $this->submission($this->tenant, $driver, [
+            'subject' => 'note',
+            'payload' => ['note_type' => 'blitzer', 'note_text' => 'Radar an der B1', 'vehicle_plate' => 'B-AB 123'],
+        ]);
+
+        $this->actingAsDriver($driver);
+        $bySubject = collect($this->getJson('/api/v1/driver/submissions')->assertOk()->json('data'))
+            ->keyBy('subject');
+
+        $this->assertSame([
+            'amount' => '41.47', 'category' => 'Tanken', 'merchant_name' => 'Aral',
+        ], $bySubject['receipt']['detail']);
+        // The fuel readings and the odometer stay out: the list has no use for them.
+        $this->assertSame([
+            'note_type' => 'blitzer', 'note_text' => 'Radar an der B1', 'vehicle_plate' => 'B-AB 123',
+        ], $bySubject['note']['detail']);
+    }
+
     // ── The ring ─────────────────────────────────────────────────────────────
 
     public function test_the_ring_carries_four_fields_and_no_payload(): void
