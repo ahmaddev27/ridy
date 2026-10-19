@@ -16,13 +16,13 @@ import {
   UserX,
   Ticket,
   ReceiptText,
-  FileSpreadsheet,
   FileText,
   Activity,
   Megaphone,
   Inbox,
   type LucideIcon,
 } from "lucide-react";
+import { ElProfessorIcon } from "@/components/brand/elprofessor-icon";
 
 /** `title`/`label` are i18n keys resolved in the Sidebar via useI18n(). */
 export type NavItem = {
@@ -79,7 +79,7 @@ export const navGroups: NavGroup[] = [
       // Its own page, deliberately not inside Connections: that screen is the
       // Uber link, and a company reading "Connections" should not have to tell
       // two unrelated integrations apart inside one page.
-      { href: "/elprofessor", label: "nav.elprofessor", icon: FileSpreadsheet, requiresElProfessor: true },
+      { href: "/elprofessor", label: "nav.elprofessor", icon: ElProfessorIcon, requiresElProfessor: true },
       { href: "/subscription", label: "nav.mySubscription", icon: ReceiptText },
     ],
   },
