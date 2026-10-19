@@ -1,41 +1,42 @@
 import { forwardRef } from "react";
 import type { LucideProps } from "lucide-react";
 
-/** El-Professor's own app icon, served from `public/`. 192px: the sidebar draws
- *  it at 16, so this stays sharp to a 3x display and still weighs 23 KB. */
-const SRC = "/brand/elprofessor.png";
-
 /**
- * El-Professor's logo, used verbatim as their sidebar icon.
+ * El-Professor's own mark, background removed, in the colour each theme needs.
  *
- * **This is their image, not a drawing of it** — the owner's decision, made
- * twice and against the alternative being offered. Two redraws were tried and
- * rejected: a glasses-and-quiff glyph ("where is the face, the beard, the
- * hair?"), then a filled face with hair, outlined glasses and a beard, which
- * still read as an interpretation rather than the mark. The brand is his, and
- * recognising it is the point of putting it here.
+ * Two files because the artwork is two-tone, not monochrome: the mark is drawn
+ * light (silver hair, white beard) to sit on dark, and dark to sit on light. A
+ * single transparent asset would be invisible in one theme — the light-on-dark
+ * version all but disappears on a white sidebar, which is exactly what removing
+ * the navy plate exposed. `currentColor` is not an option either: these are
+ * bitmaps, and the blue glasses are part of the mark.
  *
- * **What that costs, recorded so nobody re-litigates it later:** the mark is a
- * detailed face on a dark navy rounded square, and at the 16px a sidebar icon
- * gets it does not resolve into a face — measured at 16, 18, 20 and 22px, at
- * 1x and 2x. It is also a filled colour tile among transparent line glyphs, and
- * its dark plate sits close to the dark theme's own background. All of that was
- * put to the owner with renders before this shipped.
+ * Both were cut from El-Professor's own exports, not redrawn:
+ *   - light theme ← `email-templates/logo.png`, the dark colourway. Its white
+ *     background is keyed out by flood-filling from the BORDER only, so the
+ *     white highlights inside the hair survive; a plain colour-key punched holes
+ *     through them.
+ *   - dark theme  ← `brand/mark-on-dark.png`, which already ships transparent.
  *
- * The SAME image serves light and dark, which is what was asked for: no
- * per-theme variant, nothing to keep in sync.
+ * Each is then cropped to the artwork and padded back to a square, which is the
+ * "make it bigger" half of the request: the face now fills the icon box instead
+ * of floating inside the margin the source carried. The box itself is 18px
+ * rather than the neighbours' 16, set inline so it beats the `h-4 w-4` that
+ * `nav-list.tsx` passes without that file having to know about this one.
  *
- * ## Why an `<svg>` wrapping an `<image>` rather than an `<img>`
+ * ## Why an `<svg>` wrapping `<image>` rather than an `<img>`
  *
- * `NavItem.icon` is typed `LucideIcon`, and `nav-list.tsx` renders it as
- * `<Icon className="h-4 w-4" />`. Wrapping the bitmap in an SVG keeps that
- * contract exactly — same ref type, same sizing from the same class — so
- * neither the shared type nor the sidebar had to change for one entry.
+ * `NavItem.icon` is typed `LucideIcon` and `nav-list.tsx` renders it as
+ * `<Icon className="h-4 w-4" />`. Wrapping the bitmaps in an SVG keeps that
+ * contract exactly — same ref type, same call site — so neither the shared type
+ * nor the sidebar changed for one entry.
  *
- * The rounded corners are baked into the PNG (its corners are transparent), so
- * no radius is applied here. `preserveAspectRatio` is explicit because the
- * default would letterbox if the asset were ever replaced with a non-square one.
+ * Both images are always in the DOM and `display` picks one, so the swap costs
+ * no JavaScript and cannot flash the wrong colourway on a theme change.
  */
+const LIGHT = "/brand/elprofessor-light.png";
+const DARK = "/brand/elprofessor-dark.png";
+
 export const ElProfessorIcon = forwardRef<SVGSVGElement, LucideProps>(
   function ElProfessorIcon({ className, ...props }, ref) {
     return (
@@ -46,11 +47,14 @@ export const ElProfessorIcon = forwardRef<SVGSVGElement, LucideProps>(
         role="img"
         aria-hidden="true"
         {...props}
-        // Lucide's defaults would paint over a bitmap; they mean nothing here.
+        // Lucide's stroke/fill defaults would paint over a bitmap, and the
+        // inline size deliberately overrides the class the sidebar passes.
         fill="none"
         stroke="none"
+        style={{ width: 18, height: 18 }}
       >
-        <image href={SRC} x="0" y="0" width="24" height="24" preserveAspectRatio="xMidYMid meet" />
+        <image className="dark:hidden" href={LIGHT} x="0" y="0" width="24" height="24" preserveAspectRatio="xMidYMid meet" />
+        <image className="hidden dark:block" href={DARK} x="0" y="0" width="24" height="24" preserveAspectRatio="xMidYMid meet" />
       </svg>
     );
   },
