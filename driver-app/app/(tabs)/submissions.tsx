@@ -31,7 +31,7 @@ import { SectionLabel } from "@/components/ui";
 import { api, type DriverSubmission } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, intlLocale } from "@/lib/i18n";
-import { amountLabel, cleanText, statusKind } from "@/lib/submission-detail";
+import { amountLabel, cleanText } from "@/lib/submission-detail";
 import { groupSubmissions, shortDay } from "@/lib/submission-groups";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
 
@@ -286,7 +286,11 @@ export default function SubmissionsScreen() {
 /**
  * One submission. Everything a driver needs to tell two rows apart sits on the
  * card itself, not behind a tap: the amount and merchant of a receipt, the
- * kind and first lines of a note, and the company's verdict.
+ * kind and first lines of a note.
+ *
+ * No status and no rejection reason, on purpose: a submission is accepted on
+ * arrival and the flow has neither (owner, 19.10.2026). The API still returns
+ * both fields; the screen simply does not draw them.
  *
  * Direction comes from `row`, never a hard-coded "row", so the badge and the
  * date swap sides in Arabic like the rest of the screen.
@@ -302,8 +306,6 @@ function SubmissionRow({
 }) {
   const isReceipt = item.subject === "receipt";
   const d = item.detail ?? {};
-  const kind = statusKind(item.status);
-  const reason = kind === "rejected" ? cleanText(item.reason) : null;
 
   const amount = isReceipt ? amountLabel(d.amount) : null;
   // The category is the company's own stored word (the picker shows it as is),
@@ -317,13 +319,6 @@ function SubmissionRow({
     : "";
   const noteText = !isReceipt ? cleanText(d.note_text) : null;
 
-  const badge =
-    kind === "accepted"
-      ? { fg: c.accepted, bg: c.completedBg }
-      : kind === "rejected"
-        ? { fg: c.danger, bg: c.canceledBg }
-        : { fg: c.pending, bg: c.pendingBg };
-
   return (
     <View style={{ ...cardStyle(c), padding: 14, gap: 6 }}>
       <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", gap: 10 }}>
@@ -331,11 +326,6 @@ function SubmissionRow({
           {isReceipt ? t("subs.kind.receipt") : t("subs.kind.note")}
           {amount ? ` · ${amount}` : ""}
         </Text>
-        {kind && (
-          <View style={{ paddingHorizontal: 9, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: badge.bg }}>
-            <Text style={{ color: badge.fg, fontWeight: "700", fontSize: 12 }}>{t(`subs.status.${kind}`)}</Text>
-          </View>
-        )}
       </View>
 
       {(isReceipt ? receiptLine : noteLine) !== "" && (
@@ -346,12 +336,6 @@ function SubmissionRow({
       {noteText && (
         <Text style={{ color: c.inkMuted, fontSize: 13.5 }} numberOfLines={2}>
           {noteText}
-        </Text>
-      )}
-      {reason && (
-        <Text style={{ color: c.danger, fontSize: 13.5 }}>
-          <Text style={{ fontWeight: "700", color: c.danger }}>{t("subs.reason")}: </Text>
-          {reason}
         </Text>
       )}
       {item.created_at && (

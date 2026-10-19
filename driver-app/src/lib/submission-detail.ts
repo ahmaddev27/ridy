@@ -19,17 +19,6 @@ export function amountLabel(raw: string | null | undefined): string | null {
   return eur.format(Number(raw.trim()));
 }
 
-/**
- * Which of the three status words applies. `pending` and `taken` are one thing
- * to a driver — the company has not decided — so both read "in review". An
- * unknown value answers null and the screen shows no badge, never a raw code.
- */
-export function statusKind(status: string | null | undefined): "pending" | "accepted" | "rejected" | null {
-  if (status === "accepted" || status === "rejected") return status;
-  if (status === "pending" || status === "taken") return "pending";
-  return null;
-}
-
 /** Non-empty trimmed text or null. */
 export function cleanText(raw: string | null | undefined): string | null {
   const v = typeof raw === "string" ? raw.trim() : "";
