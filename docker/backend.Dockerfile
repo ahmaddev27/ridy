@@ -1,12 +1,28 @@
 # syntax=docker/dockerfile:1
 #
-# DASHCAM backend image (Laravel 13 / PHP 8.3, PHP-FPM).
-# Used by the `backend`, `horizon` and `scheduler` Compose services.
+# Reidey backend image (Laravel 13 / PHP 8.4, PHP-FPM).
+# Used by the `backend`, `queue`, `scheduler` and `reverb` Compose services.
 #
 # Build context is the repository root; this Dockerfile lives in ./docker.
 # Production target DB is MySQL 8 (local dev uses sqlite — see README).
 
-FROM php:8.4-fpm AS base
+# PINNED to an exact patch, not the floating `8.4-fpm`, because of
+# CVE-2026-109618 / CVE-2026-109619 (PHP2Shell, CVSS 9.2 each): two
+# use-after-frees in the PHP engine giving unauthenticated RCE. The trigger is a
+# `multipart/form-data` body that PHP parses BEFORE any application code runs,
+# so Laravel could not have blocked it, and PHP-FPM is affected — this image.
+#
+# Why pinned rather than floating: PHP published 8.4.27 on 2026-10-21 at 14:00
+# UTC and Docker published `8.4.27-fpm` at 15:40, but the floating `8.4-fpm`
+# tag still resolved to 8.4.26 hours later (both tags shared the digest
+# sha256:f5431b57…). So `docker pull php:8.4-fpm`, and `build --pull`, kept
+# fetching the VULNERABLE build while looking like they had worked.
+#
+# ⚠ This pin now OWNS the PHP version: nothing upgrades it on its own. Bump it
+# deliberately on each PHP security release, and once the floating tag has
+# caught up it is safe to go back to `php:8.4-fpm` — `deploy.yml` passes
+# `--pull`, which is what makes the floating form trustworthy again.
+FROM php:8.4.27-fpm AS base
 
 # --- System dependencies -----------------------------------------------------
 # Only what the PHP extensions below need at build time; cleaned afterwards to
