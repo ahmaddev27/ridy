@@ -6,23 +6,26 @@
 # Build context is the repository root; this Dockerfile lives in ./docker.
 # Production target DB is MySQL 8 (local dev uses sqlite — see README).
 
-# PINNED to an exact patch, not the floating `8.4-fpm`, because of
-# CVE-2026-109618 / CVE-2026-109619 (PHP2Shell, CVSS 9.2 each): two
-# use-after-frees in the PHP engine giving unauthenticated RCE. The trigger is a
-# `multipart/form-data` body that PHP parses BEFORE any application code runs,
-# so Laravel could not have blocked it, and PHP-FPM is affected — this image.
+# Floating minor, and that is deliberate — but it only works because
+# `deploy.yml` builds with `--pull`. Without that flag a deploy rebuilds on
+# whatever base this host already cached, so an upstream SECURITY patch never
+# lands and nothing in the output says so. That is not hypothetical: it is how
+# CVE-2026-109618 / CVE-2026-109619 (PHP2Shell, CVSS 9.2 each — two
+# use-after-frees in the PHP engine giving unauthenticated RCE) stayed live on
+# production for hours after 8.4.27 existed.
 #
-# Why pinned rather than floating: PHP published 8.4.27 on 2026-10-21 at 14:00
-# UTC and Docker published `8.4.27-fpm` at 15:40, but the floating `8.4-fpm`
-# tag still resolved to 8.4.26 hours later (both tags shared the digest
-# sha256:f5431b57…). So `docker pull php:8.4-fpm`, and `build --pull`, kept
-# fetching the VULNERABLE build while looking like they had worked.
+# An exact pin was tried during that incident and REVERTED, which is the part
+# worth remembering. Docker publishes a version tag's NAME before its platform
+# images: `php:8.4.27-fpm` was listed at 15:40 UTC with zero architectures, so
+# `FROM php:8.4.27-fpm` failed every build with "no match for platform in
+# manifest" while the floating tag was still serving the vulnerable 8.4.26.
+# Pinning to a tag the moment it is announced buys a broken deploy, not safety.
 #
-# ⚠ This pin now OWNS the PHP version: nothing upgrades it on its own. Bump it
-# deliberately on each PHP security release, and once the floating tag has
-# caught up it is safe to go back to `php:8.4-fpm` — `deploy.yml` passes
-# `--pull`, which is what makes the floating form trustworthy again.
-FROM php:8.4.27-fpm AS base
+# So: float the minor, let `--pull` fetch it, and verify the result with
+# `php -v` INSIDE the container — never from the image's build date. The 8.4.26
+# image was built on 21.10 at 00:31, hours after the flaw was public and hours
+# before the fix existed, and looked perfectly current.
+FROM php:8.4-fpm AS base
 
 # --- System dependencies -----------------------------------------------------
 # Only what the PHP extensions below need at build time; cleaned afterwards to
