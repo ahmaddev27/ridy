@@ -1,11 +1,30 @@
 # syntax=docker/dockerfile:1
 #
-# DASHCAM backend image (Laravel 13 / PHP 8.3, PHP-FPM).
-# Used by the `backend`, `horizon` and `scheduler` Compose services.
+# Reidey backend image (Laravel 13 / PHP 8.4, PHP-FPM).
+# Used by the `backend`, `queue`, `scheduler` and `reverb` Compose services.
 #
 # Build context is the repository root; this Dockerfile lives in ./docker.
 # Production target DB is MySQL 8 (local dev uses sqlite — see README).
 
+# Floating minor, and that is deliberate — but it only works because
+# `deploy.yml` builds with `--pull`. Without that flag a deploy rebuilds on
+# whatever base this host already cached, so an upstream SECURITY patch never
+# lands and nothing in the output says so. That is not hypothetical: it is how
+# CVE-2026-109618 / CVE-2026-109619 (PHP2Shell, CVSS 9.2 each — two
+# use-after-frees in the PHP engine giving unauthenticated RCE) stayed live on
+# production for hours after 8.4.27 existed.
+#
+# An exact pin was tried during that incident and REVERTED, which is the part
+# worth remembering. Docker publishes a version tag's NAME before its platform
+# images: `php:8.4.27-fpm` was listed at 15:40 UTC with zero architectures, so
+# `FROM php:8.4.27-fpm` failed every build with "no match for platform in
+# manifest" while the floating tag was still serving the vulnerable 8.4.26.
+# Pinning to a tag the moment it is announced buys a broken deploy, not safety.
+#
+# So: float the minor, let `--pull` fetch it, and verify the result with
+# `php -v` INSIDE the container — never from the image's build date. The 8.4.26
+# image was built on 21.10 at 00:31, hours after the flaw was public and hours
+# before the fix existed, and looked perfectly current.
 FROM php:8.4-fpm AS base
 
 # --- System dependencies -----------------------------------------------------

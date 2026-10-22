@@ -393,7 +393,13 @@ jobs:
             git archive -o "$BUILD_DIR.tar" "$TARGET_SHA"
             tar -xf "$BUILD_DIR.tar" -C "$BUILD_DIR"
             rm -f "$BUILD_DIR.tar"
-            $STAGED build $BUILT_SERVICES
+            # --pull: re-resolve every base image (php, node, …) against the
+            # registry instead of building on whatever this host happens to have
+            # cached. Without it a deploy produces a freshly-dated image on top of
+            # a stale base, so an upstream SECURITY patch never lands and nothing
+            # says so — which is exactly how CVE-2026-109618 / 109619 stayed live
+            # here after the fix was published (see docker/backend.Dockerfile).
+            $STAGED build --pull $BUILT_SERVICES
 
             # --- 6. Database: running, backed up, migrated by the NEW release --
             # A deploy never recreates or restarts MySQL: `--no-recreate` only
