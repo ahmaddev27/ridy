@@ -9,7 +9,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { ToastProvider } from "@/components/toast";
 import { registerOfferCategory, startPushRegistration } from "@/lib/push";
-import { OfferPopupHost, requestOfferPopup } from "@/components/offer-popup";
+import { dismissOfferPopup, OfferPopupHost, requestOfferPopup } from "@/components/offer-popup";
 import { markAlerted } from "@/lib/offer-alert";
 import { isMultiStop } from "@/lib/notification-channels";
 import { startLive, stopLive } from "@/lib/live";
@@ -141,13 +141,38 @@ type OfferPushData = {
   local?: string;
 };
 
-/** Notification taps already acted on in this process (survives re-renders). */
+/**
+ * Notification taps already acted on in this process.
+ *
+ * This exists for ONE case: a cold-start tap is delivered twice, by the listener
+ * and by `getLastNotificationResponseAsync`, milliseconds apart. It is not a
+ * record of "offers the driver has already opened" — so every entry expires, and
+ * the key carries the delivery time.
+ *
+ * Both matter. On iOS the notification identifier is the `apns-collapse-id`,
+ * which the backend sets to `offer-<id>`, so EVERY push about one offer (the
+ * first, a redelivery, the multi-stop follow-up) arrives under the same
+ * identifier. Keying on it alone made the second tap on that offer a permanent
+ * no-op for the rest of the process.
+ */
 const handledResponses = new Set<string>();
+
+/** How long one delivery stays deduped. Only the double-read has to fit in it. */
+const HANDLED_TTL_MS = 10_000;
+
 /** The tap that launched the app is read once per process, never replayed. */
 let coldStartChecked = false;
 
-/** Screens a queued offer must not be pushed on top of. */
-const PRE_APP_SEGMENTS = new Set(["splash", "onboarding", "language", "login"]);
+/**
+ * Screens a queued offer must not be pushed on top of.
+ *
+ * `language` is deliberately NOT here. It is reached from Settings by a
+ * signed-in driver as well as during first-run, and blocking on the segment name
+ * alone left a tap queued and unexecuted until the driver happened to leave the
+ * screen — then it jumped, late. The first-run case is already covered: the
+ * effect requires `driver`, which is null until sign-in.
+ */
+const PRE_APP_SEGMENTS = new Set(["splash", "onboarding", "login"]);
 
 /** Routes the user between auth screens and the app based on session state, and
  *  wires push registration + notification-tap navigation once signed in. */
@@ -212,9 +237,13 @@ function Gate() {
   const [pendingTick, setPendingTick] = useState(0);
   const handleResponse = useCallback((response: Notifications.NotificationResponse | null) => {
     if (!response) return;
-    const key = `${response.notification.request.identifier}:${response.actionIdentifier}`;
+    // The DELIVERY time is part of the key — see handledResponses. Without it,
+    // every push about one offer shares an identifier on iOS and only the first
+    // tap ever worked.
+    const key = `${response.notification.request.identifier}:${response.actionIdentifier}:${response.notification.date ?? ""}`;
     if (handledResponses.has(key)) return;
     handledResponses.add(key);
+    setTimeout(() => handledResponses.delete(key), HANDLED_TTL_MS);
     // Never replay this tap on a later read (re-login, JS reload).
     try {
       Notifications.clearLastNotificationResponse();
@@ -229,9 +258,8 @@ function Gate() {
     if (data.offer_id != null && data.local !== "1") {
       markAlerted(data.offer_id, isMultiStop(data.stops_count));
     }
-    // "Ablehnen" straight from the notification: the tap IS the decision, so the
-    // Default tap: only a numeric offer id — the payload is attacker-influenced,
-    // so never interpolate an arbitrary string into the route.
+    // Only a numeric offer id — the payload is attacker-influenced, so never
+    // interpolate an arbitrary string into the route.
     if (data.offer_id && /^\d+$/.test(String(data.offer_id))) {
       pendingOffer.current = String(data.offer_id);
       setPendingTick((n) => n + 1);
@@ -257,7 +285,14 @@ function Gate() {
     const seg = segments[0];
     if (!seg || PRE_APP_SEGMENTS.has(seg)) return;
     pendingOffer.current = null;
-    router.push(`/offer/${id}`);
+    // The pop-up is a native Modal mounted outside the navigator, so a push
+    // while it is up lands underneath it and the driver sees nothing change.
+    dismissOfferPopup();
+    // Already looking at an offer: swap it rather than stack. Tapping through a
+    // tray of fifty would otherwise build a fifty-deep pile of modals, and Back
+    // would walk the driver through every one of them.
+    if (seg === "offer") router.replace(`/offer/${id}`);
+    else router.push(`/offer/${id}`);
   }, [driver, segments, router, navState?.key, pendingTick]);
 
   // A suspended company: explain it instead of "no internet" / "invalid code".
