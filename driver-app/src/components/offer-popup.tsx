@@ -51,6 +51,24 @@ const handled = new Set<number>();
  *  cold start) wait here for it. */
 let queued: { offerId: number; reject: boolean } | null = null;
 let deliver: ((offerId: number, reject: boolean) => void) | null = null;
+/** Set by the host while it is mounted, so a notification tap can clear it. */
+let dismiss: (() => void) | null = null;
+
+/**
+ * Close the pop-up, if one is open, so a notification tap can navigate.
+ *
+ * The pop-up is a native `Modal` mounted OUTSIDE the navigator, and its backdrop
+ * deliberately does not dismiss on tap. Pushing `/offer/<id>` while it is up puts
+ * the screen UNDERNEATH it: the navigation really happened, the driver just never
+ * sees it, which is what "tapping the notification does nothing" actually was.
+ *
+ * Closing marks that offer settled, so it cannot re-open on the next lifecycle
+ * broadcast and cover the screen the driver just asked for. That is the right
+ * trade: the detail screen carries the same decision, with more of the ride on it.
+ */
+export function dismissOfferPopup(): void {
+  dismiss?.();
+}
 
 /**
  * Ask for the pop-up for one offer, optionally firing the decline immediately —
@@ -206,6 +224,7 @@ export function OfferPopupHost() {
   useEffect(() => {
     if (!driver || isOwner) return;
     deliver = (offerId, rejectNow) => void openById(offerId, rejectNow);
+    dismiss = close;
     if (queued) {
       const request = queued;
       queued = null;
@@ -213,8 +232,9 @@ export function OfferPopupHost() {
     }
     return () => {
       deliver = null;
+      dismiss = null;
     };
-  }, [driver, isOwner, openById]);
+  }, [driver, isOwner, openById, close]);
 
   // The live path: a `new` broadcast inlines everything the pop-up needs, so it
   // opens without a request. Anything else (a push, an older backend) resolves
