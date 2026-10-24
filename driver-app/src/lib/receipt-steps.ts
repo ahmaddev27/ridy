@@ -54,11 +54,16 @@ export function toWireAmount(input: string): string | null {
  *
  * A car wash has no litres and no cluster, so it has no fuel step at all —
  * showing one would invite numbers that mean nothing.
+ *
+ * A company may also switch the odometer step off. It defaults to ON, so an
+ * absent flag (older server) keeps the step; the range goes with it, being
+ * only ever collected inside that step.
  */
-export function stepsFor(category: string | null): ReceiptStep[] {
-  return category === FUEL_CATEGORY
+export function stepsFor(category: string | null, odometerRequired = true): ReceiptStep[] {
+  if (category !== FUEL_CATEGORY) return ['photo', 'details', 'confirm'];
+  return odometerRequired
     ? ['photo', 'details', 'fuel', 'odometer', 'confirm']
-    : ['photo', 'details', 'confirm'];
+    : ['photo', 'details', 'fuel', 'confirm'];
 }
 
 export type PhotoState = { hasPhoto: boolean; scanning: boolean };
@@ -179,8 +184,8 @@ export type FormState = {
  * disagree about what a valid receipt is. The fuel figures are checked only on
  * a refuel, exactly as `stepsFor` decides whether that step exists.
  */
-export function submitProblem(state: FormState): string | null {
-  for (const step of stepsFor(state.details.category)) {
+export function submitProblem(state: FormState, odometerRequired = true): string | null {
+  for (const step of stepsFor(state.details.category, odometerRequired)) {
     const problem = stepProblem(step, state);
     if (problem !== null) return problem;
   }

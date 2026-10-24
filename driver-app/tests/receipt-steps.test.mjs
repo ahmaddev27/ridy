@@ -173,3 +173,22 @@ test("a complete receipt is refused by nothing", () => {
     assert.equal(stepProblem(step, good), null, `step ${step} refused a complete receipt`);
   }
 });
+
+test("a company that switched the odometer off has a four-step refuel", () => {
+  assert.deepEqual(stepsFor("Tanken", false), ["photo", "details", "fuel", "confirm"]);
+  // The default is ON: an absent flag keeps today's five steps.
+  assert.deepEqual(stepsFor("Tanken", true), stepsFor("Tanken"));
+  // It changes nothing for a receipt that never had the step.
+  assert.deepEqual(stepsFor("Autowäsche", false), ["photo", "details", "confirm"]);
+});
+
+test("with the odometer off the send does not complain about a missing one", () => {
+  const noOdo = { ...good, odometer: { hasOdoPhoto: false, odometerKm: "" } };
+  assert.equal(submitProblem(noOdo, false), null);
+  // Still required when the company has not switched it off.
+  assert.equal(submitProblem(noOdo), "receipt.odoPhotoRequired");
+  assert.equal(submitProblem(noOdo, true), "receipt.odoPhotoRequired");
+  // The other steps are still enforced.
+  const bad = { ...noOdo, fuel: { ...goodFuel, litres: "x" } };
+  assert.equal(submitProblem(bad, false), "receipt.litresInvalid");
+});

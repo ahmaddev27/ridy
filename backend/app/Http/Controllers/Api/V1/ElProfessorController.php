@@ -221,8 +221,9 @@ class ElProfessorController extends Controller
     }
 
     /**
-     * The company's own El-Professor settings. One today: whether a driver may
-     * attach a receipt from the gallery rather than only from the camera.
+     * The company's own El-Professor settings: whether a driver may attach a
+     * receipt from the gallery rather than only from the camera, and whether the
+     * receipt flow asks for the odometer. Each key is optional and independent.
      *
      * It is a setting of the COMPANY, not of the platform: the platform's
      * switch decides whether this company has the integration at all, and this
@@ -233,11 +234,17 @@ class ElProfessorController extends Controller
     public function updateSettings(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'gallery_import' => ['required', 'boolean'],
+            'gallery_import' => ['sometimes', 'boolean'],
+            'odometer_required' => ['sometimes', 'boolean'],
         ]);
 
         $tenant = Tenant::query()->findOrFail($request->user()->tenant_id);
-        $tenant->setElprofessorGalleryImport((bool) $data['gallery_import']);
+        if (array_key_exists('gallery_import', $data)) {
+            $tenant->setElprofessorGalleryImport((bool) $data['gallery_import']);
+        }
+        if (array_key_exists('odometer_required', $data)) {
+            $tenant->setElprofessorOdometerRequired((bool) $data['odometer_required']);
+        }
 
         return response()->json(['data' => $tenant->fresh()->elprofessorConnection()]);
     }
