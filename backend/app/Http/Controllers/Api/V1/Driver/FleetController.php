@@ -196,6 +196,7 @@ class FleetController extends Controller
             // depending on which call ran last.
             'documents_enabled' => false,
             'gallery_import_enabled' => false,
+            'odometer_required' => false,
         ]]);
     }
 

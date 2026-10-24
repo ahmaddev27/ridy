@@ -342,6 +342,8 @@ class DriverAuthController extends Controller
             // Read only where documents are enabled; the app hides the whole
             // section otherwise, so this never stands on its own.
             'gallery_import_enabled' => $driver->tenant?->elprofessorGalleryImportEnabled() ?? false,
+            // Defaults to TRUE: an absent flag keeps the odometer step.
+            'odometer_required' => $driver->tenant?->elprofessorOdometerRequired() ?? true,
             // Whether this company declines offers on the dispatch panel. The app
             // registers the destructive Reject action on the offer notification
             // only when it is true, so a company with the feature off never shows
@@ -376,6 +378,7 @@ class DriverAuthController extends Controller
             // Profil row on the owner's phone.
             'documents_enabled' => false,
             'gallery_import_enabled' => false,
+            'odometer_required' => false,
             // Kept on the owner's profile only so both shapes match for the app's
             // single Profile type. An owner watches the fleet read-only and never
             // gets the decline pop-up or the notification action.

@@ -206,6 +206,11 @@ export type DriverProfile = {
    *  only from the camera? Absent on an older server, and absent reads as
    *  false - camera only is the safe reading of "we do not know". */
   gallery_import_enabled?: boolean;
+  /** The company's own setting: does the receipt flow ask for the odometer
+   *  (and the range with it)? **Absent means required** - the opposite of the
+   *  flags around it - so an older server keeps today's flow. Read it as
+   *  `!== false`, never `=== true`. */
+  odometer_required?: boolean;
   /** The company declines offers on the dispatch panel (per-company flag). */
   dispatch_reject_enabled?: boolean;
 };

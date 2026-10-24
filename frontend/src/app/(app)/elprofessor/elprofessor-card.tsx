@@ -14,6 +14,7 @@ import { latnLocale } from "@/lib/utils";
 import {
   getElProfessorConnection,
   setElProfessorGalleryImport,
+  setElProfessorOdometerRequired,
   issueElProfessorToken,
   revokeElProfessorToken,
   type ElProfessorToken,
@@ -30,6 +31,7 @@ export function ElProfessorCard() {
   const [busy, setBusy] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [savingGallery, setSavingGallery] = useState(false);
+  const [savingOdometer, setSavingOdometer] = useState(false);
 
   const failure = (e: unknown, fallbackKey: string) => {
     toast.error(e instanceof ApiError && e.status === 403 ? c("epForbidden") : c(fallbackKey), {
@@ -68,6 +70,22 @@ export function ElProfessorCard() {
       failure(e, "epGalleryFailed");
     } finally {
       setSavingGallery(false);
+    }
+  }
+
+  /** Turn the odometer step on or off for this company's drivers. */
+  async function toggleOdometer() {
+    if (!data) return;
+    const next = !data.odometer_required;
+    setSavingOdometer(true);
+    try {
+      await setElProfessorOdometerRequired(next);
+      toast.success(next ? c("epOdometerOnToast") : c("epOdometerOffToast"));
+      await refetch();
+    } catch (e) {
+      failure(e, "epOdometerFailed");
+    } finally {
+      setSavingOdometer(false);
     }
   }
 
@@ -203,6 +221,21 @@ export function ElProfessorCard() {
             onChange={() => void toggleGallery()}
             disabled={savingGallery}
             label={data.gallery_import ? c("epGalleryOff") : c("epGalleryOn")}
+          />
+        </div>
+      )}
+
+      {!loading && data?.enabled && (
+        <div className="mt-4 flex items-start justify-between gap-4 rounded-xl border border-line bg-surface-2 px-4 py-4">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-ink">{c("epOdometerTitle")}</p>
+            <p className="mt-1 text-sm text-ink-muted">{c("epOdometerBody")}</p>
+          </div>
+          <Switch
+            checked={data.odometer_required}
+            onChange={() => void toggleOdometer()}
+            disabled={savingOdometer}
+            label={data.odometer_required ? c("epOdometerOff") : c("epOdometerOn")}
           />
         </div>
       )}

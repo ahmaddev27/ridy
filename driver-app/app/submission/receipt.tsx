@@ -95,6 +95,9 @@ export default function ReceiptScreen() {
   // gallery picture can be any image on the phone. So the company decides,
   // and an older server that sends nothing here means camera only.
   const galleryAllowed = driver?.gallery_import_enabled === true;
+  // Defaults to required: only an explicit false drops the odometer step, so an
+  // older server that sends nothing keeps today's flow.
+  const odometerRequired = driver?.odometer_required !== false;
 
   const [photo, setPhoto] = useState<PickedPhoto | null>(null);
   const [busy, setBusy] = useState(false);
@@ -153,7 +156,7 @@ export default function ReceiptScreen() {
     odometer: { hasOdoPhoto: odoPhoto !== null, odometerKm },
   };
 
-  const steps = stepsFor(category);
+  const steps = stepsFor(category, odometerRequired);
   const stepIndex = Math.max(0, steps.indexOf(step));
   const blocker = stepProblem(step, formState);
 
@@ -328,7 +331,7 @@ export default function ReceiptScreen() {
     // The last wall, and it asks the SAME function the steps do. A second copy
     // of this list would drift the first time one of them changed, and the
     // driver would be refused on the final screen for a field two steps back.
-    const problem = submitProblem(formState);
+    const problem = submitProblem(formState, odometerRequired);
     if (problem !== null) {
       toast.show(t(problem));
       return;
@@ -363,8 +366,11 @@ export default function ReceiptScreen() {
         // Null on anything that is not fuel. The range is the fuel reading:
         // the gauge is a bar of lit blocks that nothing could read, and
         // `199 km left` is a figure a fleet manager can act on anyway.
-        odometer_km: category === "Tanken" ? odometerKm.trim() : null,
-        range_km: category === "Tanken" && rangeKm.trim() !== "" ? rangeKm.trim() : null,
+        // Both null when the company switched the step off: the range is only
+        // ever collected inside it.
+        odometer_km: category === "Tanken" && odometerRequired ? odometerKm.trim() : null,
+        range_km:
+          category === "Tanken" && odometerRequired && rangeKm.trim() !== "" ? rangeKm.trim() : null,
       });
       toast.show(t("receipt.sent"));
       router.back();
@@ -685,8 +691,12 @@ export default function ReceiptScreen() {
                 <>
                   <SummaryRow c={c} row={row} label={t("receipt.litres")} value={litres} />
                   <SummaryRow c={c} row={row} label={t("receipt.pricePerLitre")} value={pricePerLitre} />
-                  <SummaryRow c={c} row={row} label={t("receipt.odometer")} value={odometerKm} />
-                  <SummaryRow c={c} row={row} label={t("receipt.range")} value={rangeKm} />
+                  {odometerRequired && (
+                    <>
+                      <SummaryRow c={c} row={row} label={t("receipt.odometer")} value={odometerKm} />
+                      <SummaryRow c={c} row={row} label={t("receipt.range")} value={rangeKm} />
+                    </>
+                  )}
                 </>
               )}
             </View>

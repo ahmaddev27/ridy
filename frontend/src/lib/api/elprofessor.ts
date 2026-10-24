@@ -13,6 +13,9 @@ export type ElProfessorConnection = {
   /** The COMPANY's own switch: may its drivers attach a receipt from the
    *  gallery, or only from the camera? */
   gallery_import: boolean;
+  /** The COMPANY's own switch: does the receipt flow ask for the odometer
+   *  (and the range with it)? Defaults to TRUE on the server. */
+  odometer_required: boolean;
   connected: boolean;
   token_issued_at: string | null;
   first_used_at: string | null;
@@ -43,6 +46,21 @@ export async function setElProfessorGalleryImport(enabled: boolean): Promise<ElP
   const res = await apiFetch<{ data: ElProfessorConnection }>("/api/v1/elprofessor/settings", {
     method: "PATCH",
     body: { gallery_import: enabled },
+    withCsrf: true,
+  });
+  return res.data;
+}
+
+/**
+ * The company's own setting: does the receipt flow ask for the odometer?
+ *
+ * ON by default on the server - the opposite of the gallery - so existing
+ * companies and older apps keep today's flow.
+ */
+export async function setElProfessorOdometerRequired(required: boolean): Promise<ElProfessorConnection> {
+  const res = await apiFetch<{ data: ElProfessorConnection }>("/api/v1/elprofessor/settings", {
+    method: "PATCH",
+    body: { odometer_required: required },
     withCsrf: true,
   });
   return res.data;

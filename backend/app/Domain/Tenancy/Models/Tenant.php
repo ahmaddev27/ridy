@@ -122,6 +122,7 @@ class Tenant extends Model
         return [
             'enabled' => $this->elprofessorEnabled(),
             'gallery_import' => $this->elprofessorGalleryImportEnabled(),
+            'odometer_required' => $this->elprofessorOdometerRequired(),
             'connected' => $this->elprofessorEnabled()
                 && $revokedAt === null && $firstUsedAt !== null && $this->elprofessorTokens()->exists(),
             'token_issued_at' => $state['token_issued_at'] ?? null,
@@ -209,6 +210,22 @@ class Tenant extends Model
     public function setElprofessorGalleryImport(bool $enabled): void
     {
         $this->mergeElprofessorState(['gallery_import' => $enabled]);
+    }
+
+    /**
+     * Whether the receipt flow asks the driver for the odometer (and the range
+     * with it). **It defaults to TRUE** - the opposite of the other flags: absent
+     * must keep today's behaviour for every existing company and older app. Only
+     * an explicit `false` turns the step off.
+     */
+    public function elprofessorOdometerRequired(): bool
+    {
+        return ($this->settings['elprofessor']['odometer_required'] ?? true) !== false;
+    }
+
+    public function setElprofessorOdometerRequired(bool $required): void
+    {
+        $this->mergeElprofessorState(['odometer_required' => $required]);
     }
 
     /** Every `elprofessor` token held by a user of this company. */

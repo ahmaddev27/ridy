@@ -1827,4 +1827,71 @@ class ElProfessorConnectionTest extends TestCase
         $this->withHeaders($this->bearer($token))->getJson('/api/v1/vehicles')->assertStatus(403);
         $this->withHeaders($this->bearer($token))->postJson('/api/v1/vehicles')->assertStatus(403);
     }
+
+    public function test_the_driver_profile_requires_the_odometer_by_default(): void
+    {
+        // Absent means required: existing companies keep today's flow.
+        $this->connectCompany();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        $this->getJson('/api/v1/driver/me')
+            ->assertOk()
+            ->assertJsonPath('data.odometer_required', true);
+    }
+
+    public function test_the_settings_patch_flips_the_odometer_and_leaves_the_gallery_alone_and_back(): void
+    {
+        $this->openIntegration();
+        Sanctum::actingAs($this->manager, ['*']);
+
+        $this->patchJson('/api/v1/elprofessor/settings', ['gallery_import' => true])
+            ->assertOk()->assertJsonPath('data.gallery_import', true)
+            ->assertJsonPath('data.odometer_required', true);
+
+        $this->patchJson('/api/v1/elprofessor/settings', ['odometer_required' => false])
+            ->assertOk()->assertJsonPath('data.odometer_required', false)
+            ->assertJsonPath('data.gallery_import', true);
+
+        $this->patchJson('/api/v1/elprofessor/settings', ['gallery_import' => false])
+            ->assertOk()->assertJsonPath('data.gallery_import', false)
+            ->assertJsonPath('data.odometer_required', false);
+
+        $this->assertFalse($this->tenant->fresh()->elprofessorOdometerRequired());
+    }
+
+    public function test_a_company_that_switched_the_odometer_off_tells_its_drivers_so(): void
+    {
+        $this->connectCompany();
+        $tenant = $this->tenant->fresh();
+        $tenant->setElprofessorOdometerRequired(false);
+        $tenant->save();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        $this->getJson('/api/v1/driver/me')
+            ->assertOk()
+            ->assertJsonPath('data.odometer_required', false);
+    }
+
+    public function test_a_refuel_without_an_odometer_is_accepted(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $this->connectCompany();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        $this->postJson('/api/v1/driver/submissions', [
+            'subject' => 'receipt',
+            'receipt_date' => '2026-10-07',
+            'amount' => '41.47',
+            'category' => 'Tanken',
+            'payment_method' => 'bar',
+            'merchant_name' => 'ARAL Tankstelle',
+            'city' => 'Berlin',
+            'receipt_time' => '14:32',
+            'litres' => '41.47',
+            'price_per_litre' => '1.789',
+            'odometer_km' => null,
+            'range_km' => null,
+        ])->assertStatus(201);
+    }
 }
