@@ -16,14 +16,20 @@
  * hand. That guard is the whole of what replaced the evidence, and it should
  * not be quietly relaxed.
  *
- * ## Why the photo is still downscaled
+ * ## Nothing is typed (owner, 25.10.2026)
  *
- * Nothing is uploaded any more, so `post_max_size` no longer applies — but a
- * 12 MP photo is slower to recognise for no gain, and 1600px on the long edge
- * at quality 0.7 is what the rules were tuned against. `manipulateAsync` also
- * re-encodes, which drops the EXIF; that mattered when the file travelled and
- * is kept because a cached copy carrying the driver's home GPS is not
- * something to leave lying on a phone.
+ * Every field is read-only. The driver photographs; OCR reads; a photo that
+ * does not yield every required field is refused with a reason and retaken
+ * (`scan-quality.ts`). There is no manual entry and no send-anyway. Chips and
+ * the confirm tap are taps, not typing, and stay.
+ *
+ * ## The OCR is given the best image we have
+ *
+ * It used to read a 1600px-WIDE, JPEG-0.7 copy: downscaled, lossy, and
+ * upscaled when the source was narrower. See `ocr-image.ts` for the rule now
+ * (never enlarge, cap the true long edge at 4096, quality 0.95). The
+ * re-encode stays because it drops the EXIF of the cached copy, which would
+ * otherwise carry the driver's home GPS.
  *
  * ## The amount has exactly one shape on the wire
  *
@@ -56,6 +62,15 @@ import { t, isRTL } from "@/lib/i18n";
 // against the same fixtures in `tests/receipt-text-parse.test.mjs`.
 import { parseReceiptText, formatAmountDE, type OcrResult } from "@/lib/receipt-text-parse";
 import { rowsFromLines } from "@/lib/ocr-lines";
+import { ocrResizeFor, OCR_QUALITY } from "@/lib/ocr-image";
+import {
+  evaluateScan,
+  evaluateOdometer,
+  resolveReceiptTime,
+  captureClock,
+  type ImageSize,
+  type RequiredField,
+} from "@/lib/scan-quality";
 import {
   stepsFor,
   stepProblem,
@@ -71,9 +86,16 @@ import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
  *  so a free description takes its place rather than the word. */
 const CATEGORIES = ["Tanken", "Autowäsche", "Autozubehör", "Öl wechseln"] as const;
 
-/** 1600px long edge, quality 0.7: legible text, ~300 KB, no EXIF. */
-const MAX_EDGE = 1600;
-const QUALITY = 0.7;
+/** The picker's own idea of the shot's size, for the "too far away" test. */
+function odoSize(asset: { width?: number; height?: number }): ImageSize | null {
+  return asset.width && asset.height ? { width: asset.width, height: asset.height } : null;
+}
+
+/** What to tell the driver: the likely cause, then which fields were missed. */
+function retakeMessage(messageKey: string, missing: RequiredField[]): string {
+  const names = missing.map((f) => t(`receipt.${f}`)).join(", ");
+  return `${t(messageKey)}\n${t("receipt.retakeMissing", { fields: names })}`;
+}
 
 /** `YYYY-MM-DD` in the phone's own day, which is the day the driver means. */
 function today(): string {
@@ -141,12 +163,15 @@ export default function ReceiptScreen() {
 
   const [checkDate, setCheckDate] = useState(false);
   const [checkAmount, setCheckAmount] = useState(false);
+  // The last scan did not yield every required field. Blocks the photo step.
+  const [needsRetake, setNeedsRetake] = useState(false);
+  // The time shown is the photo's capture time, not one the receipt printed.
+  const [timeFromCapture, setTimeFromCapture] = useState(false);
 
-  /** Shrink and re-encode, which is also what strips the EXIF. */
   // One description of the form, asked by the step gate AND by the send, so
   // the two can never disagree about what a valid receipt is.
   const formState = {
-    photo: { hasPhoto: photo !== null, scanning },
+    photo: { hasPhoto: photo !== null, scanning, needsRetake },
     details: {
       amount, category, description, merchant, city, plz,
       receiptTime,
@@ -175,11 +200,16 @@ export default function ReceiptScreen() {
     else setStep(previous);
   };
 
-  const prepare = async (uri: string): Promise<PickedPhoto> => {
+  /**
+   * Re-encode for OCR at near-lossless quality, shrinking only a source whose
+   * true long edge exceeds the cap. The re-encode also strips the EXIF.
+   */
+  const prepare = async (asset: { uri: string; width?: number; height?: number }): Promise<PickedPhoto> => {
+    const resize = ocrResizeFor(asset.width, asset.height);
     const out = await ImageManipulator.manipulateAsync(
-      uri,
-      [{ resize: { width: MAX_EDGE } }],
-      { compress: QUALITY, format: ImageManipulator.SaveFormat.JPEG },
+      asset.uri,
+      resize ? [{ resize }] : [],
+      { compress: OCR_QUALITY, format: ImageManipulator.SaveFormat.JPEG },
     );
     return { uri: out.uri, name: "beleg.jpg", type: "image/jpeg" };
   };
@@ -195,10 +225,22 @@ export default function ReceiptScreen() {
    * to it — it is unconfirmed, which with no photo travelling is the only
    * difference left that anyone can act on.
    */
-  const scan = async (uri: string) => {
+  const scan = async (uri: string, size: ImageSize | null, exifStamp: unknown) => {
     setScanNote(null);
     setCheckDate(false);
     setCheckAmount(false);
+    setNeedsRetake(false);
+    // A previous photo's answers must not survive into this one: nothing can
+    // be typed, so a stale field would reach the company as if it were read.
+    setDate(today());
+    setAmount("");
+    setMerchant("");
+    setCity("");
+    setPlz("");
+    setReceiptTime("");
+    setTimeFromCapture(false);
+    setLitres("");
+    setPricePerLitre("");
     setScanning(true);
     try {
       // The engine's lines are NOT the receipt's rows: on a two-column till
@@ -206,12 +248,24 @@ export default function ReceiptScreen() {
       // "same line" rule in the parser then sees nothing. `rowsFromLines` puts
       // them back by where they sit on the page.
       const result = await TextRecognition.recognize(uri);
-      const text = rowsFromLines(result.blocks.flatMap((b) => b.lines)).join("\n");
-      if (text.trim() === "") {
-        setScanNote(t("receipt.scanNothing"));
-        return;
-      }
-      const r: OcrResult = parseReceiptText(text);
+      const lines = result.blocks.flatMap((b) => b.lines);
+      const text = rowsFromLines(lines).join("\n");
+      const r: OcrResult = text.trim() === "" ? {} : parseReceiptText(text);
+
+      // The PLZ is read with a score and the city beside it is a guess at a
+      // line of text; the server's table is authoritative and wins whenever
+      // it knows the PLZ. Offline or unknown, the OCR's own city stands.
+      const authoritative = r.postalCode ? await api.postalCity(r.postalCode) : null;
+      const resolvedCity = authoritative ?? r.city ?? "";
+
+      // A category this build does not offer is dropped rather than shown. With
+      // none read, fuel figures still say it is a refuel; with neither, the
+      // category is left for the driver's tap and the fuel fields are not
+      // demanded here (a car wash must not loop on "litres not read").
+      const parsed = (CATEGORIES as readonly string[]).includes(r.category ?? "") ? (r.category as string) : null;
+      const sawFuelFigures = r.litres !== undefined || r.pricePerLitre !== undefined;
+      const effective = parsed ?? (sawFuelFigures ? "Tanken" : null);
+      if (effective !== null) setCategory(effective);
 
       if (r.date) {
         setDate(r.date);
@@ -221,31 +275,42 @@ export default function ReceiptScreen() {
         setAmount(formatAmountDE(r.amount));
         setCheckAmount(r.amountReason?.startsWith("Unsicher") === true);
       }
-      // A category the rules read but this build does not offer is dropped
-      // rather than shown: the four are what the other side stores literally.
-      if (r.category && (CATEGORIES as readonly string[]).includes(r.category)) {
-        setCategory(r.category);
-      }
       if (r.postalCode) setPlz(r.postalCode);
       if (r.merchantName) setMerchant(r.merchantName);
-      if (r.city) setCity(r.city);
-      if (r.time) setReceiptTime(r.time);
+      if (resolvedCity) setCity(resolvedCity);
+      // A printed time wins; none printed means the capture time, labelled as
+      // such on screen. See `resolveReceiptTime` for why that is a proxy.
+      const when = resolveReceiptTime(r.time, captureClock(exifStamp, new Date()));
+      setReceiptTime(when.time);
+      setTimeFromCapture(when.fromCapture);
       // German decimals on screen, converted once on the way out.
       if (r.litres !== undefined) setLitres(r.litres.toFixed(2).replace(".", ","));
       if (r.pricePerLitre !== undefined) {
         setPricePerLitre(r.pricePerLitre.toFixed(3).replace(".", ","));
       }
 
-      // Naming the field that could not be read is the difference between a
-      // driver retaking the photo and a driver assuming the app is broken.
-      if (r.date === undefined && r.amount === undefined) {
-        setScanNote(t("receipt.scanNothing"));
-      } else if (r.amount === undefined) {
-        setScanNote(t("receipt.scanNoAmount"));
-      } else if (r.date === undefined) {
-        setScanNote(t("receipt.scanNoDate"));
+      // The gate. Every field the send requires must have been READ; a photo
+      // that missed any is retaken, and the message names what was missed and
+      // the most likely reason, so the next photo is not the same one.
+      const verdict = evaluateScan(
+        lines,
+        {
+          date: r.date,
+          amount: r.amount,
+          merchant: r.merchantName,
+          city: resolvedCity,
+          litres: r.litres,
+          pricePerLitre: r.pricePerLitre,
+          fuel: effective === "Tanken",
+        },
+        size,
+      );
+      if (!verdict.ok) {
+        setNeedsRetake(true);
+        setScanNote(retakeMessage(verdict.messageKey, verdict.missing));
       }
     } catch {
+      setNeedsRetake(true);
       setScanNote(t("receipt.scanFailed"));
     } finally {
       setScanning(false);
@@ -264,6 +329,9 @@ export default function ReceiptScreen() {
   const takeOdometer = async () => {
     setBusy(true);
     setOdoNote(null);
+    // A new photo starts from nothing: the previous reading must not outlive it.
+    setOdometerKm("");
+    setRangeKm("");
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
@@ -272,20 +340,24 @@ export default function ReceiptScreen() {
       }
       const result = await ImagePicker.launchCameraAsync({ quality: 1, exif: false });
       if (result.canceled || !result.assets?.[0]?.uri) return;
-      const prepared = await prepare(result.assets[0].uri);
+      const prepared = await prepare(result.assets[0]);
       setOdoPhoto(prepared);
       setOdoShot(prepared.uri);
 
       setOdoScanning(true);
       try {
         const recognised = await TextRecognition.recognize(prepared.uri);
-        const reading = readOdometer(recognised.blocks.flatMap((b) => b.lines));
+        const odoLines = recognised.blocks.flatMap((b) => b.lines);
+        const reading = readOdometer(odoLines);
+        const verdict = evaluateOdometer(odoLines, reading.odometerKm, odoSize(result.assets[0]));
         if (reading.odometerKm !== null) {
           setOdometerKm(String(reading.odometerKm));
         } else {
-          // Naming the miss is what sends a driver back for a sharper photo
-          // instead of leaving them to decide the app is broken.
-          setOdoNote(t("receipt.odoNotRead"));
+          // The rule abstained, and nothing can be typed, so abstaining means
+          // RETAKE: the photo is dropped, which makes the step refuse to
+          // advance (`odoPhotoRequired`) until a readable one is taken.
+          setOdoNote(verdict.ok ? t("receipt.odoNotRead") : `${t(verdict.messageKey)}\n${t("receipt.odoNotRead")}`);
+          setOdoPhoto(null);
         }
         if (reading.rangeKm !== null) setRangeKm(String(reading.rangeKm));
       } catch {
@@ -314,12 +386,12 @@ export default function ReceiptScreen() {
       }
       const result =
         from === "camera"
-          ? await ImagePicker.launchCameraAsync({ quality: 1, exif: false })
-          : await ImagePicker.launchImageLibraryAsync({ quality: 1, exif: false, mediaTypes: ["images"] });
+          ? await ImagePicker.launchCameraAsync({ quality: 1, exif: true })
+          : await ImagePicker.launchImageLibraryAsync({ quality: 1, exif: true, mediaTypes: ["images"] });
       if (result.canceled || !result.assets?.[0]?.uri) return;
-      const prepared = await prepare(result.assets[0].uri);
+      const prepared = await prepare(result.assets[0]);
       setPhoto(prepared);
-      await scan(prepared.uri);
+      await scan(prepared.uri, odoSize(result.assets[0]), result.assets[0].exif?.DateTimeOriginal);
     } catch {
       toast.show(t("receipt.photoFailed"));
     } finally {
@@ -467,7 +539,7 @@ export default function ReceiptScreen() {
               {t("receipt.photoStaysHere")}
             </Text>
             <Pressable
-              onPress={() => { setPhoto(null); setScanNote(null); setCheckDate(false); setCheckAmount(false); }}
+              onPress={() => { setPhoto(null); setScanNote(null); setCheckDate(false); setCheckAmount(false); setNeedsRetake(false); }}
               accessibilityRole="button"
               style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 6 }}
             >
@@ -486,7 +558,7 @@ export default function ReceiptScreen() {
 
         {/* Said once the read is done, so the driver knows the next screen is
             a check and not a form to fill from nothing. */}
-        {photo !== null && !scanning && (
+        {photo !== null && !scanning && !needsRetake && (
           <Text style={{ color: c.inkSubtle, fontSize: 12.5, textAlign: "center" }}>
             {t("receipt.photoRead")}
           </Text>
@@ -496,13 +568,12 @@ export default function ReceiptScreen() {
 
         {step === "details" && (
         <>
-        {/* Typing in a flagged field clears its flag: the value is then the
-            driver's own, and asking them to confirm what they just typed is
-            noise that teaches people to tap past the warning. */}
+        {/* Read-only: the values come from the photo. A flagged field is
+            cleared only by the confirm tap below it. */}
         <Field
           label={t("receipt.date")}
           value={date}
-          onChangeText={(v) => { setDate(v); setCheckDate(false); }}
+          editable={false}
           placeholder="2026-10-07"
           autoCapitalize="none"
         />
@@ -511,9 +582,8 @@ export default function ReceiptScreen() {
         <Field
           label={t("receipt.amount")}
           value={amount}
-          onChangeText={(v) => { setAmount(v); setCheckAmount(false); }}
+          editable={false}
           placeholder="41,47"
-          keyboardType="decimal-pad"
         />
         {checkAmount && <NeedsCheck c={c} row={row} onConfirm={() => setCheckAmount(false)} />}
 
@@ -522,19 +592,8 @@ export default function ReceiptScreen() {
           {CATEGORIES.map((item) => (
             <Chip key={item} c={c} label={item} active={category === item} onPress={() => { setCategory(item); }} />
           ))}
-          {/* `Other` is never stored as a word: choosing it clears the category
-              and the free text below becomes the Beleg's subject. */}
-          <Chip c={c} label={t("receipt.other")} active={category === null} onPress={() => setCategory(null)} />
+          {/* No "Other": it needs a typed subject, and nothing is typed. */}
         </View>
-
-        {category === null && (
-          <Field
-            label={t("receipt.description")}
-            value={description}
-            onChangeText={setDescription}
-            placeholder={t("receipt.descriptionHint")}
-          />
-        )}
 
         <SectionLabel>{t("receipt.payment")}</SectionLabel>
         <View style={{ flexDirection: "row", gap: 8 }}>
@@ -548,30 +607,31 @@ export default function ReceiptScreen() {
         <Field
           label={t("receipt.merchant")}
           value={merchant}
-          onChangeText={setMerchant}
+          editable={false}
           placeholder={t("receipt.merchantHint")}
         />
 
         <Field
           label={t("receipt.time")}
           value={receiptTime}
-          onChangeText={setReceiptTime}
+          editable={false}
           placeholder="14:32"
-          keyboardType="numbers-and-punctuation"
         />
+        {timeFromCapture && (
+          <Text style={{ color: c.inkSubtle, fontSize: 12.5 }}>{t("receipt.timeFromCapture")}</Text>
+        )}
 
         <Field
           label={t("receipt.plz")}
           value={plz}
-          onChangeText={setPlz}
+          editable={false}
           placeholder="10179"
-          keyboardType="number-pad"
         />
 
         <Field
           label={t("receipt.city")}
           value={city}
-          onChangeText={setCity}
+          editable={false}
           placeholder="Berlin"
         />
 
@@ -589,16 +649,14 @@ export default function ReceiptScreen() {
             <Field
               label={t("receipt.litres")}
               value={litres}
-              onChangeText={setLitres}
+              editable={false}
               placeholder="41,47"
-              keyboardType="decimal-pad"
             />
             <Field
               label={t("receipt.pricePerLitre")}
               value={pricePerLitre}
-              onChangeText={setPricePerLitre}
+              editable={false}
               placeholder="1,789"
-              keyboardType="decimal-pad"
             />
 
           </>
@@ -643,18 +701,16 @@ export default function ReceiptScreen() {
             <Field
               label={t("receipt.odometer")}
               value={odometerKm}
-              onChangeText={setOdometerKm}
+              editable={false}
               placeholder="25382"
-              keyboardType="number-pad"
             />
             {/* The range, not a gauge position: it is the only fuel figure on
                 the panel that is text, and it says something actionable. */}
             <Field
               label={t("receipt.range")}
               value={rangeKm}
-              onChangeText={setRangeKm}
+              editable={false}
               placeholder="277"
-              keyboardType="number-pad"
             />
           </>
         )}
@@ -684,7 +740,12 @@ export default function ReceiptScreen() {
                 value={method === "bar" ? t("receipt.cash") : t("receipt.transfer")}
               />
               <SummaryRow c={c} row={row} label={t("receipt.merchant")} value={merchant} />
-              <SummaryRow c={c} row={row} label={t("receipt.time")} value={receiptTime} />
+              <SummaryRow
+                c={c}
+                row={row}
+                label={timeFromCapture ? t("receipt.timeCaptured") : t("receipt.time")}
+                value={receiptTime}
+              />
               <SummaryRow c={c} row={row} label={t("receipt.city")} value={city} />
               <SummaryRow c={c} row={row} label={t("receipt.plz")} value={plz} />
               {category === "Tanken" && (
@@ -764,18 +825,18 @@ export default function ReceiptScreen() {
                 <Field
                   label={t("receipt.odometer")}
                   value={odometerKm}
-                  onChangeText={setOdometerKm}
+                  editable={false}
                   placeholder="25382"
-                  keyboardType="number-pad"
                 />
                 <Field
                   label={t("receipt.range")}
                   value={rangeKm}
-                  onChangeText={setRangeKm}
+                  editable={false}
                   placeholder="277"
-                  keyboardType="number-pad"
                 />
-                <PrimaryButton label={t("receipt.odoKeep")} onPress={() => setOdoShot(null)} />
+                {/* Nothing read means nothing to keep: with no typing, the only
+                    way forward is the retake below. */}
+                {odometerKm !== "" && <PrimaryButton label={t("receipt.odoKeep")} onPress={() => setOdoShot(null)} />}
                 {/* Retake throws the photo away with it: keeping a photo whose
                     figures were rejected is how the two drift apart. */}
                 <Pressable

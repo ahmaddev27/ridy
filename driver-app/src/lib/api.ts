@@ -516,6 +516,22 @@ export class ApiClient {
     return this.request<{ data: Vehicle[] }>("/api/v1/driver/vehicles");
   }
 
+  /**
+   * The authoritative town for a PLZ the receipt scan read, or null when the
+   * server does not know it or cannot be reached. Never throws: the caller
+   * falls back to the town the OCR read next to the PLZ.
+   */
+  async postalCity(plz: string): Promise<string | null> {
+    try {
+      const r = await this.request<{ data: { city: string } }>(`/api/v1/driver/postal-codes/${plz}`, {
+        timeoutMs: 4_000,
+      });
+      return r.data.city || null;
+    } catch {
+      return null;
+    }
+  }
+
   fleetMe() {
     return this.request<{ data: DriverProfile }>("/api/v1/driver/fleet/me");
   }
