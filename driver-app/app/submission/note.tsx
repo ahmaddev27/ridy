@@ -25,7 +25,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { ChevronLeft } from "@/components/icons";
 import { Text } from "@/components/typography";
-import { Field, PrimaryButton, SectionLabel } from "@/components/ui";
+import { DateField, TimeField } from "@/components/date-time-picker";
+import { PrimaryButton, SectionLabel } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -155,7 +156,10 @@ export default function NoteScreen() {
           }}
         />
 
-        <Field label={t("note.date")} value={date} onChangeText={setDate} placeholder="2026-10-07" autoCapitalize="none" />
+        {/* Picked, never typed. A driver filling a note on the move got
+            `2026-13-07` or `8:0` past the keyboard and only found out when the
+            send bounced; a calendar and an hour list cannot produce either. */}
+        <DateField label={t("note.date")} value={date} onChange={setDate} />
 
         <View style={{ flexDirection: "row", gap: 8 }}>
           <Chip c={c} label={t("note.fullDay")} active={fullDay} onPress={() => setFullDay(true)} />
@@ -165,10 +169,10 @@ export default function NoteScreen() {
         {!fullDay && (
           <View style={{ flexDirection: row, gap: 12 }}>
             <View style={{ flex: 1 }}>
-              <Field label={t("note.from")} value={from} onChangeText={setFrom} placeholder="08:00" keyboardType="numbers-and-punctuation" />
+              <TimeField label={t("note.from")} value={from} onChange={setFrom} />
             </View>
             <View style={{ flex: 1 }}>
-              <Field label={t("note.to")} value={to} onChangeText={setTo} placeholder="10:30" keyboardType="numbers-and-punctuation" />
+              <TimeField label={t("note.to")} value={to} onChange={setTo} />
             </View>
           </View>
         )}
