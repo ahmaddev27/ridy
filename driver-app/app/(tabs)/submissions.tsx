@@ -288,9 +288,9 @@ export default function SubmissionsScreen() {
  * card itself, not behind a tap: the amount and merchant of a receipt, the
  * kind and first lines of a note.
  *
- * No status and no rejection reason, on purpose: a submission is accepted on
- * arrival and the flow has neither (owner, 19.10.2026). The API still returns
- * both fields; the screen simply does not draw them.
+ * No status and no rejection reason ON THE CARD, on purpose: a submission is
+ * accepted on arrival and the list has neither (owner, 19.10.2026). Tapping the
+ * card opens the full detail, which does show both.
  *
  * Direction comes from `row`, never a hard-coded "row", so the badge and the
  * date swap sides in Arabic like the rest of the screen.
@@ -304,6 +304,7 @@ function SubmissionRow({
   row: "row" | "row-reverse";
   item: DriverSubmission;
 }) {
+  const router = useRouter();
   const isReceipt = item.subject === "receipt";
   const d = item.detail ?? {};
 
@@ -320,7 +321,11 @@ function SubmissionRow({
   const noteText = !isReceipt ? cleanText(d.note_text) : null;
 
   return (
-    <View style={{ ...cardStyle(c), padding: 14, gap: 6 }}>
+    <Pressable
+      onPress={() => router.push({ pathname: "/submission/[id]", params: { id: item.id } })}
+      accessibilityRole="button"
+      style={{ ...cardStyle(c), padding: 14, gap: 6 }}
+    >
       <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5, flexShrink: 1 }} numberOfLines={1}>
           {isReceipt ? t("subs.kind.receipt") : t("subs.kind.note")}
@@ -343,7 +348,7 @@ function SubmissionRow({
           {new Date(item.created_at).toLocaleDateString(intlLocale())}
         </Text>
       )}
-    </View>
+    </Pressable>
   );
 }
 

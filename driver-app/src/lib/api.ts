@@ -68,6 +68,22 @@ export type SubmissionDetail = {
   vehicle_plate?: string | null;
 };
 
+/**
+ * One submission in full, as `GET /driver/submissions/{id}` returns it. Every
+ * field is null when unknown, and the server whitelists them one by one.
+ */
+export type SubmissionFull = {
+  id: string;
+  subject: "receipt" | "note";
+  status: string;
+  decided_at: string | null;
+  reason: string | null;
+  created_at: string | null;
+  fields: Record<string, string | boolean | null>;
+  /** Receipts only. `available` is false when the file is gone from the server. */
+  document: { available: boolean; mime: string | null; bytes: number | null } | null;
+};
+
 /** Everything a receipt carries. The photo is separate: it is a file. */
 export type ReceiptDraft = {
   receipt_date: string;
@@ -456,6 +472,25 @@ export class ApiClient {
       method: "POST",
       body: JSON.stringify({ email }),
     });
+  }
+
+  /** One of this driver's submissions in full. 404 for anyone else's. */
+  submission(id: string) {
+    return this.request<{ data: SubmissionFull }>(`/api/v1/driver/submissions/${encodeURIComponent(id)}`);
+  }
+
+  /**
+   * Where to load a submission's photo from, as an `<Image source>`. The file
+   * is private and streamed behind the bearer token, so it cannot be a bare
+   * URL; the native image loader sends the header and streams the bytes to
+   * disk rather than through a JS string. Null without a session.
+   */
+  submissionDocumentSource(id: string): { uri: string; headers: Record<string, string> } | null {
+    if (!this.token) return null;
+    return {
+      uri: `${BASE}/api/v1/driver/submissions/${encodeURIComponent(id)}/document`,
+      headers: { Authorization: `Bearer ${this.token}`, Accept: "image/*" },
+    };
   }
 
   /**

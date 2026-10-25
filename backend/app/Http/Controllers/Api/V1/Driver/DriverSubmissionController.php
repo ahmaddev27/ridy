@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Api\V1\Driver;
 
 use App\Domain\Fleet\Models\ElProfessorSubmission;
 use App\Domain\Fleet\Models\Vehicle;
+use App\Domain\Fleet\SubmissionDetailPresenter;
 use App\Http\Controllers\Controller;
 use App\Jobs\RingElProfessor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * What a driver submits to their own company: a receipt with its photo, or a
@@ -131,6 +134,68 @@ class DriverSubmissionController extends Controller
                 'created_at' => $r->created_at?->toIso8601String(),
             ])->values(),
         ]);
+    }
+
+    /**
+     * One of this driver's own submissions, in full.
+     *
+     * The driver is a TERM IN THE QUERY, not a check after it: another driver's
+     * submission and one that does not exist are the same missing row, so the
+     * 404 is identical by construction and says nothing about which uuids
+     * exist. Same shape as `ElProfessorController::submission()`.
+     */
+    public function show(Request $request, SubmissionDetailPresenter $presenter, string $uuid): JsonResponse
+    {
+        if (! $this->connected($request)) {
+            return $this->notConnected();
+        }
+
+        $row = $this->ownSubmission($request, $uuid);
+
+        return $row === null
+            ? response()->json(['message' => 'Submission not found.'], 404)
+            : response()->json(['data' => $presenter->present($row)]);
+    }
+
+    /**
+     * The photo, STREAMED from the private disk behind the driver's token.
+     *
+     * Never a public or guessable URL: a Beleg is one fleet's business record.
+     * Streamed rather than base64 in JSON because a phone photo is megabytes
+     * and base64 adds a third, all of it held as one JS string before it can be
+     * drawn; the app's native image loader streams the bytes instead.
+     */
+    public function document(Request $request, string $uuid): StreamedResponse|JsonResponse
+    {
+        if (! $this->connected($request)) {
+            return $this->notConnected();
+        }
+
+        $row = $this->ownSubmission($request, $uuid);
+        $disk = Storage::disk(config('elprofessor.disk', 'local'));
+
+        if ($row === null || $row->document_path === null || ! $disk->exists($row->document_path)) {
+            return response()->json(['message' => 'Document not found.'], 404);
+        }
+
+        return $disk->response($row->document_path, null, [
+            'Content-Type' => $row->document_mime ?: 'application/octet-stream',
+            'Content-Disposition' => 'inline',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
+    private function ownSubmission(Request $request, string $uuid): ?ElProfessorSubmission
+    {
+        $driver = $request->user();
+
+        return ElProfessorSubmission::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $driver->tenant_id)
+            ->where('driver_id', $driver->id)
+            ->where('uuid', $uuid)
+            ->first();
     }
 
     /**

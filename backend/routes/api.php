@@ -172,6 +172,14 @@ Route::prefix('v1')->group(function () {
                 // company to review in El-Professor. The tenant and the
                 // driver come off the token, never off the request.
                 Route::get('submissions', [DriverSubmissionController::class, 'index']);
+                // One submission in full, and its photo. Both are scoped to the
+                // signed-in driver inside the query; the photo is streamed from
+                // the private disk behind the token, never linked.
+                Route::get('submissions/{uuid}', [DriverSubmissionController::class, 'show'])
+                    ->whereUuid('uuid');
+                Route::get('submissions/{uuid}/document', [DriverSubmissionController::class, 'document'])
+                    ->whereUuid('uuid')
+                    ->middleware('throttle:60,1,driver-submission-document');
                 // The fleet's plates for the note form's picker.
                 Route::get('vehicles', [DriverSubmissionController::class, 'vehicles']);
                 // The authoritative town for a PLZ the receipt scan read.

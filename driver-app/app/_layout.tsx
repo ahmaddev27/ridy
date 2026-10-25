@@ -323,6 +323,7 @@ function Gate() {
         <Stack.Screen name="submissions" />
         <Stack.Screen name="submission/receipt" />
         <Stack.Screen name="submission/note" />
+        <Stack.Screen name="submission/[id]" />
       </Stack>
       {/* The instant offer decision, floating over whatever screen is up. It is a
           Modal, so it sits outside the navigator on purpose: a pushed route would
