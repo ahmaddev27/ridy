@@ -49,6 +49,7 @@ use App\Http\Controllers\Api\V1\Driver\DriverDashboardController;
 use App\Http\Controllers\Api\V1\Driver\DriverDeviceController;
 use App\Http\Controllers\Api\V1\Driver\DriverOfferController;
 use App\Http\Controllers\Api\V1\Driver\DriverPasswordResetController;
+use App\Http\Controllers\Api\V1\Driver\DriverPostalCodeController;
 use App\Http\Controllers\Api\V1\Driver\DriverSubmissionController;
 use App\Http\Controllers\Api\V1\Driver\FleetController;
 use App\Http\Controllers\Api\V1\Driver\FleetDeviceController;
@@ -173,6 +174,10 @@ Route::prefix('v1')->group(function () {
                 Route::get('submissions', [DriverSubmissionController::class, 'index']);
                 // The fleet's plates for the note form's picker.
                 Route::get('vehicles', [DriverSubmissionController::class, 'vehicles']);
+                // The authoritative town for a PLZ the receipt scan read.
+                Route::get('postal-codes/{plz}', [DriverPostalCodeController::class, 'show'])
+                    ->where('plz', '[0-9]{5}')
+                    ->middleware('throttle:60,1,driver-postal-code');
                 Route::post('submissions', [DriverSubmissionController::class, 'store'])
                     ->middleware('throttle:30,1,driver-submissions');
 

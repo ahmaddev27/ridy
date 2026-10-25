@@ -66,7 +66,15 @@ export function stepsFor(category: string | null, odometerRequired = true): Rece
     : ['photo', 'details', 'fuel', 'confirm'];
 }
 
-export type PhotoState = { hasPhoto: boolean; scanning: boolean };
+export type PhotoState = {
+  hasPhoto: boolean;
+  scanning: boolean;
+  /**
+   * The scan did not yield every required field (`scan-quality.ts`). Optional
+   * so a caller that predates the gate reads as "not blocked".
+   */
+  needsRetake?: boolean;
+};
 
 /** Everything step 2 is responsible for. */
 export type DetailsState = {
@@ -109,6 +117,9 @@ export type OdometerState = {
 export function photoProblem(v: PhotoState): string | null {
   if (!v.hasPhoto) return 'receipt.photoRequired';
   if (v.scanning) return 'receipt.scanning';
+  // Nobody types a receipt any more, so a photo that did not yield the
+  // required fields cannot be completed by hand: it has to be taken again.
+  if (v.needsRetake === true) return 'receipt.retakeRequired';
   return null;
 }
 
