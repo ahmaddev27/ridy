@@ -126,7 +126,6 @@ class SubmissionArchiveAndFleetReportTest extends TestCase
 
         $this->getJson('/api/v1/driver/submissions')->assertOk()->assertJsonPath('data.0.id', $row->uuid);
         $this->getJson('/api/v1/driver/submissions/'.$row->uuid)->assertOk()->assertJsonPath('data.id', $row->uuid);
-        $this->get('/api/v1/driver/submissions/'.$row->uuid.'/document')->assertOk();
 
         $this->postJson('/api/v1/driver/submissions', [
             'subject' => 'receipt', 'receipt_date' => '2026-10-07', 'amount' => '41.47',
@@ -209,7 +208,7 @@ class SubmissionArchiveAndFleetReportTest extends TestCase
         $this->assertCount(1, $this->getJson('/api/v1/driver/fleet/submissions?page=2')->json('data'));
     }
 
-    public function test_an_owner_opens_one_in_full_and_its_photo(): void
+    public function test_an_owner_opens_one_in_full_with_the_photo_metadata_only(): void
     {
         Storage::fake('local');
         $owner = $this->owner($this->tenant, 'o@ya.de');
@@ -224,7 +223,6 @@ class SubmissionArchiveAndFleetReportTest extends TestCase
             ->assertJsonPath('data.id', $row->uuid)
             ->assertJsonPath('data.driver.name', 'Omar')
             ->assertJsonPath('data.document.available', true);
-        $this->get('/api/v1/driver/fleet/submissions/'.$row->uuid.'/document')->assertOk();
     }
 
     public function test_another_tenants_submission_is_the_same_404_as_an_unknown_uuid(): void
@@ -237,12 +235,10 @@ class SubmissionArchiveAndFleetReportTest extends TestCase
         ]);
 
         $this->actingAsOwner($owner);
-        foreach (['', '/document'] as $suffix) {
-            $foreign = $this->getJson('/api/v1/driver/fleet/submissions/'.$theirs->uuid.$suffix);
-            $unknown = $this->getJson('/api/v1/driver/fleet/submissions/'.Str::uuid().$suffix);
-            $foreign->assertNotFound();
-            $this->assertSame($unknown->getContent(), $foreign->getContent());
-        }
+        $foreign = $this->getJson('/api/v1/driver/fleet/submissions/'.$theirs->uuid);
+        $unknown = $this->getJson('/api/v1/driver/fleet/submissions/'.Str::uuid());
+        $foreign->assertNotFound();
+        $this->assertSame($unknown->getContent(), $foreign->getContent());
     }
 
     public function test_there_is_no_owner_write_path(): void

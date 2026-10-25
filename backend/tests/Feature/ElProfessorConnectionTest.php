@@ -727,29 +727,7 @@ class ElProfessorConnectionTest extends TestCase
         $this->assertNull($data['document']);
     }
 
-    public function test_the_photo_is_streamed_to_its_owner_only(): void
-    {
-        Storage::fake('local');
-        $this->connectCompany();
-        $mine = $this->driver($this->tenant, 'Omar');
-        $theirs = $this->driver($this->tenant, 'Samir');
-        $path = 'elprofessor/'.$this->tenant->id.'/photo.jpg';
-        Storage::disk('local')->put($path, 'jpeg-bytes');
-        $row = $this->submission($this->tenant, $mine, [
-            'document_path' => $path, 'document_mime' => 'image/jpeg', 'document_bytes' => 10,
-        ]);
-
-        $this->actingAsDriver($mine);
-        $ok = $this->get('/api/v1/driver/submissions/'.$row->uuid.'/document')->assertOk();
-        $this->assertSame('image/jpeg', $ok->headers->get('Content-Type'));
-        $this->assertStringContainsString('no-store', (string) $ok->headers->get('Cache-Control'));
-        $this->assertSame('jpeg-bytes', $ok->streamedContent());
-
-        $this->actingAsDriver($theirs);
-        $this->getJson('/api/v1/driver/submissions/'.$row->uuid.'/document')->assertStatus(404);
-    }
-
-    public function test_the_photo_route_needs_a_token_and_a_missing_file_is_a_404(): void
+    public function test_a_photo_the_disk_lost_reads_as_unavailable(): void
     {
         Storage::fake('local');
         $this->connectCompany();
@@ -758,11 +736,7 @@ class ElProfessorConnectionTest extends TestCase
             'document_path' => 'elprofessor/'.$this->tenant->id.'/gone.jpg', 'document_mime' => 'image/jpeg',
         ]);
 
-        $this->app['auth']->forgetGuards();
-        $this->getJson('/api/v1/driver/submissions/'.$row->uuid.'/document')->assertStatus(401);
-
         $this->actingAsDriver($driver);
-        $this->getJson('/api/v1/driver/submissions/'.$row->uuid.'/document')->assertStatus(404);
         $this->assertFalse($this->getJson('/api/v1/driver/submissions/'.$row->uuid)->json('data.document.available'));
     }
 

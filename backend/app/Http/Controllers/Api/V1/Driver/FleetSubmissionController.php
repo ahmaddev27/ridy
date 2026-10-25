@@ -4,13 +4,11 @@ namespace App\Http\Controllers\Api\V1\Driver;
 
 use App\Domain\Fleet\Models\ElProfessorSubmission;
 use App\Domain\Fleet\SubmissionDetailPresenter;
-use App\Domain\Fleet\SubmissionDocumentStreamer;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * What every driver of the owner's company has sent, READ-ONLY.
@@ -57,11 +55,6 @@ class FleetSubmissionController extends Controller
         return $row === null
             ? response()->json(['message' => 'Submission not found.'], 404)
             : response()->json(['data' => $presenter->present($row) + ['driver' => $this->sender($row)]]);
-    }
-
-    public function document(Request $request, SubmissionDocumentStreamer $streamer, string $uuid): StreamedResponse|JsonResponse
-    {
-        return $streamer->stream($this->tenantSubmissions($request)->where('uuid', $uuid)->first());
     }
 
     /** @return array{id: int, name: string}|null */

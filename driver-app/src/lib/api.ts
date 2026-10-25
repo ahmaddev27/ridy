@@ -491,20 +491,6 @@ export class ApiClient {
   }
 
   /**
-   * Where to load a submission's photo from, as an `<Image source>`. The file
-   * is private and streamed behind the bearer token, so it cannot be a bare
-   * URL; the native image loader sends the header and streams the bytes to
-   * disk rather than through a JS string. Null without a session.
-   */
-  submissionDocumentSource(id: string): { uri: string; headers: Record<string, string> } | null {
-    if (!this.token) return null;
-    return {
-      uri: `${BASE}/api/v1/driver/submissions/${encodeURIComponent(id)}/document`,
-      headers: { Authorization: `Bearer ${this.token}`, Accept: "image/*" },
-    };
-  }
-
-  /**
    * Passwordless sign-in step 2: exchange the code for a token. The response
    * branches on `is_owner`: a driver carries `driver`, a fleet owner/manager
    * carries `owner` (same profile shape).
@@ -532,15 +518,6 @@ export class ApiClient {
   /** Owner mode: one submission of the company in full. 404 for another company's. */
   fleetSubmission(id: string) {
     return this.request<{ data: SubmissionFull }>(`/api/v1/driver/fleet/submissions/${encodeURIComponent(id)}`);
-  }
-
-  /** Owner mode: where to load a submission's photo from. See `submissionDocumentSource`. */
-  fleetSubmissionDocumentSource(id: string): { uri: string; headers: Record<string, string> } | null {
-    if (!this.token) return null;
-    return {
-      uri: `${BASE}/api/v1/driver/fleet/submissions/${encodeURIComponent(id)}/document`,
-      headers: { Authorization: `Bearer ${this.token}`, Accept: "image/*" },
-    };
   }
 
   /** What this driver has sent their company, newest first, with the decision. */
