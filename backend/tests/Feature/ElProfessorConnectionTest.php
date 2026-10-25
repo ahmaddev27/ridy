@@ -637,6 +637,135 @@ class ElProfessorConnectionTest extends TestCase
         Queue::assertPushed(RingElProfessor::class);
     }
 
+    // ── One submission in full, and its photo ────────────────────────────────
+
+    public function test_a_driver_reads_the_full_detail_of_their_own_submission(): void
+    {
+        Storage::fake('local');
+        $this->connectCompany();
+        $driver = $this->driver($this->tenant, 'Omar');
+        $path = 'elprofessor/'.$this->tenant->id.'/own.jpg';
+        Storage::disk('local')->put($path, 'jpeg-bytes');
+        $row = $this->submission($this->tenant, $driver, [
+            'status' => ElProfessorSubmission::STATUS_REJECTED,
+            'decision_text' => 'Amount does not match',
+            'decided_at' => now(),
+            'document_path' => $path,
+            'document_mime' => 'image/jpeg',
+            'document_bytes' => 10,
+            'payload' => [
+                'receipt_date' => '2026-10-07', 'receipt_time' => '08:15', 'amount' => '41.47',
+                'category' => 'Tanken', 'merchant_name' => 'Aral', 'city' => 'Berlin',
+                'postal_code' => '10115', 'litres' => '30.50', 'price_per_litre' => '1.789',
+                'odometer_km' => '25382', 'range_km' => '410', 'payment_method' => 'bar',
+                'description' => 'Diesel',
+            ],
+        ]);
+        $this->actingAsDriver($driver);
+
+        $data = $this->getJson('/api/v1/driver/submissions/'.$row->uuid)->assertOk()->json('data');
+
+        $this->assertSame($row->uuid, $data['id']);
+        $this->assertSame('rejected', $data['status']);
+        $this->assertSame('Amount does not match', $data['reason']);
+        $this->assertNotNull($data['decided_at']);
+        $this->assertSame('10115', $data['fields']['plz']);
+        $this->assertSame('1.789', $data['fields']['price_per_litre']);
+        $this->assertSame('25382', $data['fields']['odometer_km']);
+        $this->assertSame(['available' => true, 'mime' => 'image/jpeg', 'bytes' => 10], $data['document']);
+    }
+
+    public function test_another_drivers_submission_is_a_404_identical_to_an_unknown_one(): void
+    {
+        $this->connectCompany();
+        $mine = $this->driver($this->tenant, 'Omar');
+        $theirs = $this->driver($this->tenant, 'Samir');
+        $row = $this->submission($this->tenant, $theirs);
+        $this->actingAsDriver($mine);
+
+        $foreign = $this->getJson('/api/v1/driver/submissions/'.$row->uuid);
+        $missing = $this->getJson('/api/v1/driver/submissions/'.Str::uuid());
+
+        $foreign->assertStatus(404);
+        $missing->assertStatus(404);
+        $this->assertSame($missing->getContent(), $foreign->getContent());
+    }
+
+    public function test_the_detail_whitelists_the_payload(): void
+    {
+        $this->connectCompany();
+        $driver = $this->driver($this->tenant, 'Omar');
+        $row = $this->submission($this->tenant, $driver, [
+            'payload' => ['amount' => '5.00', 'category' => 'Tanken', 'evil_junk_key' => 'leak-me', 'is_admin' => true],
+        ]);
+        $this->actingAsDriver($driver);
+
+        $response = $this->getJson('/api/v1/driver/submissions/'.$row->uuid)->assertOk();
+
+        $this->assertArrayNotHasKey('evil_junk_key', $response->json('data.fields'));
+        $this->assertStringNotContainsString('leak-me', $response->getContent());
+        $this->assertSame('5.00', $response->json('data.fields.amount'));
+    }
+
+    public function test_a_note_detail_carries_its_dates_and_no_document(): void
+    {
+        $this->connectCompany();
+        $driver = $this->driver($this->tenant, 'Omar');
+        $row = $this->submission($this->tenant, $driver, [
+            'subject' => 'note',
+            'payload' => [
+                'note_type' => 'sick', 'note_text' => 'Flu', 'start_date' => '2026-10-07',
+                'end_date' => '2026-10-09', 'is_full_day' => true,
+            ],
+        ]);
+        $this->actingAsDriver($driver);
+
+        $data = $this->getJson('/api/v1/driver/submissions/'.$row->uuid)->assertOk()->json('data');
+
+        $this->assertSame('2026-10-09', $data['fields']['end_date']);
+        $this->assertTrue($data['fields']['is_full_day']);
+        $this->assertNull($data['document']);
+    }
+
+    public function test_the_photo_is_streamed_to_its_owner_only(): void
+    {
+        Storage::fake('local');
+        $this->connectCompany();
+        $mine = $this->driver($this->tenant, 'Omar');
+        $theirs = $this->driver($this->tenant, 'Samir');
+        $path = 'elprofessor/'.$this->tenant->id.'/photo.jpg';
+        Storage::disk('local')->put($path, 'jpeg-bytes');
+        $row = $this->submission($this->tenant, $mine, [
+            'document_path' => $path, 'document_mime' => 'image/jpeg', 'document_bytes' => 10,
+        ]);
+
+        $this->actingAsDriver($mine);
+        $ok = $this->get('/api/v1/driver/submissions/'.$row->uuid.'/document')->assertOk();
+        $this->assertSame('image/jpeg', $ok->headers->get('Content-Type'));
+        $this->assertStringContainsString('no-store', (string) $ok->headers->get('Cache-Control'));
+        $this->assertSame('jpeg-bytes', $ok->streamedContent());
+
+        $this->actingAsDriver($theirs);
+        $this->getJson('/api/v1/driver/submissions/'.$row->uuid.'/document')->assertStatus(404);
+    }
+
+    public function test_the_photo_route_needs_a_token_and_a_missing_file_is_a_404(): void
+    {
+        Storage::fake('local');
+        $this->connectCompany();
+        $driver = $this->driver($this->tenant, 'Omar');
+        $row = $this->submission($this->tenant, $driver, [
+            'document_path' => 'elprofessor/'.$this->tenant->id.'/gone.jpg', 'document_mime' => 'image/jpeg',
+        ]);
+
+        $this->app['auth']->forgetGuards();
+        $this->getJson('/api/v1/driver/submissions/'.$row->uuid.'/document')->assertStatus(401);
+
+        $this->actingAsDriver($driver);
+        $this->getJson('/api/v1/driver/submissions/'.$row->uuid.'/document')->assertStatus(404);
+        $this->assertFalse($this->getJson('/api/v1/driver/submissions/'.$row->uuid)->json('data.document.available'));
+    }
+
     public function test_a_receipt_with_no_photo_is_accepted_and_still_rings(): void
     {
         // This test used to assert the opposite. The owner decided on
