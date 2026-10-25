@@ -70,3 +70,20 @@ export function instantLabel(iso: string | null | undefined, locale: string): st
   if (Number.isNaN(d.getTime())) return null;
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Berlin" }).format(d);
 }
+
+/**
+ * What a signed-in account may do on the Eingänge surface. Two meanings that
+ * used to be one flag: SENDING needs the company's live connection, VIEWING is
+ * the account's own history and survives a disconnect. An owner only ever
+ * views (the whole company's, read-only) and never sends.
+ */
+export function submissionAccess(
+  p: { is_owner?: boolean; documents_enabled?: boolean; documents_readable?: boolean } | null | undefined,
+): { canView: boolean; canSend: boolean; fleetWide: boolean } {
+  if (p?.is_owner === true) return { canView: true, canSend: false, fleetWide: true };
+  const canSend = p?.documents_enabled === true;
+  // `documents_enabled` implies viewing, so a server that predates
+  // `documents_readable` keeps working.
+  const canView = canSend || p?.documents_readable === true;
+  return { canView, canSend, fleetWide: false };
+}

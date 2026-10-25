@@ -7,6 +7,7 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Text } from "@/components/typography";
 import { t, useLocale, isRTL } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { submissionAccess } from "@/lib/submission-detail";
 import { useColors, isDarkPalette, type Palette } from "@/lib/theme";
 
 /** Lucide icon for each route (single outline cut; active state = color/stroke). */
@@ -191,7 +192,7 @@ export default function TabsLayout() {
   // the first: it says what we mean in the UI, so restoring that field to the
   // company's true connection state cannot quietly put the button back. A
   // submission goes UP from a driver to their company, and an owner has none.
-  const connected = driver?.documents_enabled === true && !isOwner;
+  const connected = submissionAccess(driver).canSend;
   const showFab = connected && barHeight > 0 && !pathname.startsWith("/submissions");
 
   return (

@@ -16,6 +16,7 @@ import {
 } from "@/components/icons";
 import { Text } from "@/components/typography";
 import { useAuth } from "@/lib/auth";
+import { submissionAccess } from "@/lib/submission-detail";
 import { t, isRTL, useLocale } from "@/lib/i18n";
 import { PRIVACY_URL, SUPPORT_EMAIL } from "@/lib/links";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
@@ -168,7 +169,7 @@ export default function ProfileScreen() {
               Never for an OWNER: a submission goes up from a driver to their
               company, and an owner has none above them. The server answers
               `documents_enabled: false` for them, and this says so too. */}
-          {driver?.documents_enabled && !isOwner ? (
+          {submissionAccess(driver).canView ? (
             <>
               <MenuRow
                 c={c}

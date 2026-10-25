@@ -1145,13 +1145,18 @@ class ElProfessorConnectionTest extends TestCase
         Queue::assertNotPushed(RingElProfessor::class);
     }
 
-    public function test_a_driver_of_an_unconnected_company_cannot_list_either(): void
+    private function aNote(): array
     {
-        // The list is refused too, so a stale screen says why rather than
-        // showing an empty list that reads as "you have sent nothing".
+        return ['subject' => 'note', 'note_type' => 'general', 'note_text' => 'x'];
+    }
+
+    public function test_a_driver_of_an_unconnected_company_cannot_send_a_note_either(): void
+    {
+        // SENDING is refused with a reason a stale screen can render. (The
+        // LIST is open since 25.10.2026: the archive outlives the connection.)
         $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
 
-        $this->getJson('/api/v1/driver/submissions')
+        $this->postJson('/api/v1/driver/submissions', $this->aNote())
             ->assertStatus(403)
             ->assertJsonPath('reason', 'not_connected');
     }
@@ -1166,7 +1171,7 @@ class ElProfessorConnectionTest extends TestCase
         $this->mint();
         $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
 
-        $this->getJson('/api/v1/driver/submissions')
+        $this->postJson('/api/v1/driver/submissions', $this->aNote())
             ->assertStatus(403)
             ->assertJsonPath('reason', 'not_connected');
     }
@@ -1206,7 +1211,7 @@ class ElProfessorConnectionTest extends TestCase
         $this->deleteJson('/api/v1/elprofessor/token')->assertOk();
 
         $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
-        $this->getJson('/api/v1/driver/submissions')
+        $this->postJson('/api/v1/driver/submissions', $this->aNote())
             ->assertStatus(403)
             ->assertJsonPath('reason', 'not_connected');
     }
@@ -1318,7 +1323,7 @@ class ElProfessorConnectionTest extends TestCase
         // The app hides the section on this field, and the door refuses too.
         $this->actingAsDriver($driver);
         $this->getJson('/api/v1/driver/me')->assertOk()->assertJsonPath('data.documents_enabled', false);
-        $this->getJson('/api/v1/driver/submissions')
+        $this->postJson('/api/v1/driver/submissions', $this->aNote())
             ->assertStatus(403)
             ->assertJsonPath('reason', 'not_connected');
     }

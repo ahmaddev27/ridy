@@ -24,6 +24,7 @@ import { ChevronLeft } from "@/components/icons";
 import { Text } from "@/components/typography";
 import { SectionLabel } from "@/components/ui";
 import { api, ApiError, type SubmissionFull } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { t, isRTL, intlLocale } from "@/lib/i18n";
 import {
   amountLabel,
@@ -133,10 +134,22 @@ function Rows({ c, row, group }: { c: Palette; row: "row" | "row-reverse"; group
 
 type PhotoState = "loading" | "ready" | "failed";
 
-function Photo({ c, id, attempt, onRetry }: { c: Palette; id: string; attempt: number; onRetry: () => void }) {
+function Photo({
+  c,
+  id,
+  fleetWide,
+  attempt,
+  onRetry,
+}: {
+  c: Palette;
+  id: string;
+  fleetWide: boolean;
+  attempt: number;
+  onRetry: () => void;
+}) {
   const [state, setState] = useState<PhotoState>("loading");
   // Rebuilt per attempt, so the retry is a fresh request and not a cached miss.
-  const source = api.submissionDocumentSource(id);
+  const source = fleetWide ? api.fleetSubmissionDocumentSource(id) : api.submissionDocumentSource(id);
 
   useEffect(() => setState("loading"), [attempt]);
 
@@ -177,6 +190,8 @@ export default function SubmissionDetailScreen() {
   const router = useRouter();
   const row = isRTL() ? "row-reverse" : "row";
   const { id } = useLocalSearchParams<{ id: string }>();
+  // An owner reads the company's submission through the read-only fleet route.
+  const { isOwner } = useAuth();
 
   const [item, setItem] = useState<SubmissionFull | null>(null);
   const [error, setError] = useState<"gone" | "failed" | null>(null);
@@ -185,12 +200,12 @@ export default function SubmissionDetailScreen() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      setItem((await api.submission(String(id))).data);
+      setItem((await (isOwner ? api.fleetSubmission(String(id)) : api.submission(String(id)))).data);
     } catch (e) {
       // 404 is the server's one answer for "not yours" and "not there".
       setError(e instanceof ApiError && e.status === 404 ? "gone" : "failed");
     }
-  }, [id]);
+  }, [id, isOwner]);
 
   useEffect(() => {
     void load();
@@ -242,6 +257,7 @@ export default function SubmissionDetailScreen() {
               group={{
                 title: t("subs.d.status"),
                 lines: lines([
+                  [t("subs.driver"), item.driver?.name ?? null],
                   [t("subs.d.status"), statusLabel(item.status)],
                   [t("subs.d.sent"), sent],
                   [t("subs.d.decided"), decided],
@@ -260,7 +276,7 @@ export default function SubmissionDetailScreen() {
                   <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("subs.d.photoPdf")}</Text>
                 )}
                 {doc.available && doc.mime !== "application/pdf" && (
-                  <Photo c={c} id={item.id} attempt={attempt} onRetry={() => setAttempt((n) => n + 1)} />
+                  <Photo c={c} id={item.id} fleetWide={isOwner} attempt={attempt} onRetry={() => setAttempt((n) => n + 1)} />
                 )}
               </View>
             )}

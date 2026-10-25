@@ -31,7 +31,7 @@ import { SectionLabel } from "@/components/ui";
 import { api, type DriverSubmission } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL, intlLocale } from "@/lib/i18n";
-import { amountLabel, cleanText } from "@/lib/submission-detail";
+import { amountLabel, cleanText, submissionAccess } from "@/lib/submission-detail";
 import { groupSubmissions, shortDay } from "@/lib/submission-groups";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
 
@@ -111,10 +111,16 @@ export default function SubmissionsScreen() {
   // message; this is what a deep link, a stale screen or a company that revoked
   // its token after the app loaded runs into. The endpoint refuses them too.
   const { driver } = useAuth();
-  const connected = driver?.documents_enabled === true;
+  // Sending needs the connection; viewing is the account's own history and
+  // outlives it. An owner only views, and sees the whole company's.
+  const { canSend: connected, canView, fleetWide } = submissionAccess(driver);
 
   const [rows, setRows] = useState<DriverSubmission[] | null>(null);
   const [failed, setFailed] = useState(false);
+  // Owner mode pages the company's list; a driver's own is one bounded read.
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   // The weeks a driver has opened. The newest one is open without being in
@@ -137,15 +143,36 @@ export default function SubmissionsScreen() {
   const load = useCallback(async () => {
     setFailed(false);
     try {
-      const r = await api.submissions();
-      setRows(r.data ?? []);
+      if (fleetWide) {
+        const r = await api.fleetSubmissions(1);
+        setRows(r.data ?? []);
+        setPage(1);
+        setHasMore(r.meta?.has_more === true);
+      } else {
+        const r = await api.submissions();
+        setRows(r.data ?? []);
+      }
     } catch {
       // An empty list would read as "you have sent nothing", which is the one
       // thing a failed read must not say to someone who sent something.
       setFailed(true);
       setRows(null);
     }
-  }, []);
+  }, [fleetWide]);
+
+  const loadMore = useCallback(async () => {
+    setLoadingMore(true);
+    try {
+      const r = await api.fleetSubmissions(page + 1);
+      setRows((prev) => [...(prev ?? []), ...(r.data ?? [])]);
+      setPage(page + 1);
+      setHasMore(r.meta?.has_more === true);
+    } catch {
+      // The rows already shown stay; the button is still there to try again.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [page]);
 
   useFocusEffect(
     useCallback(() => {
@@ -170,17 +197,25 @@ export default function SubmissionsScreen() {
         >
           <ChevronLeft size={24} color={c.ink} strokeWidth={1.8} style={isRTL() ? { transform: [{ scaleX: -1 }] } : undefined} />
         </Pressable>
-        <Text style={{ fontSize: 18, fontWeight: "700", color: c.ink }}>{t("subs.title")}</Text>
+        <Text style={{ fontSize: 18, fontWeight: "700", color: c.ink }}>
+          {fleetWide ? t("subs.fleetTitle") : t("subs.title")}
+        </Text>
       </View>
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 12 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.ink} />}
       >
-        {!connected && (
+        {/* Sending is off but the archive is open: say so, and that what was
+            sent is still here. Never in owner mode, which never sends. */}
+        {!connected && !fleetWide && (
           <View style={{ ...cardStyle(c), padding: 16, gap: 6 }}>
-            <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>{t("subs.notConnected")}</Text>
-            <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("subs.notConnectedBody")}</Text>
+            <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>
+              {canView ? t("subs.archiveOnly") : t("subs.notConnected")}
+            </Text>
+            <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>
+              {canView ? t("subs.archiveOnlyBody") : t("subs.notConnectedBody")}
+            </Text>
           </View>
         )}
 
@@ -203,7 +238,7 @@ export default function SubmissionsScreen() {
         </View>
         )}
 
-        <SectionLabel>{t("subs.mine")}</SectionLabel>
+        <SectionLabel>{fleetWide ? t("subs.fleetAll") : t("subs.mine")}</SectionLabel>
 
         {rows === null && !failed && (
           <View style={{ paddingVertical: 32, alignItems: "center" }}>
@@ -220,8 +255,12 @@ export default function SubmissionsScreen() {
 
         {rows !== null && rows.length === 0 && (
           <View style={{ ...cardStyle(c), padding: 16, gap: 6 }}>
-            <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>{t("subs.empty")}</Text>
-            <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("subs.emptyBody")}</Text>
+            <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5 }}>
+              {fleetWide ? t("subs.fleetEmpty") : connected ? t("subs.empty") : t("subs.emptyArchive")}
+            </Text>
+            <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>
+              {fleetWide ? t("subs.fleetEmptyBody") : connected ? t("subs.emptyBody") : t("subs.emptyArchiveBody")}
+            </Text>
           </View>
         )}
 
@@ -278,6 +317,21 @@ export default function SubmissionsScreen() {
             })}
           </View>
         ))}
+
+        {fleetWide && hasMore && (
+          <Pressable
+            onPress={() => void loadMore()}
+            disabled={loadingMore}
+            accessibilityRole="button"
+            style={{ ...cardStyle(c), padding: 14, alignItems: "center" }}
+          >
+            {loadingMore ? (
+              <ActivityIndicator color={c.ink} />
+            ) : (
+              <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14 }}>{t("subs.loadMore")}</Text>
+            )}
+          </Pressable>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -343,9 +397,11 @@ function SubmissionRow({
           {noteText}
         </Text>
       )}
-      {item.created_at && (
-        <Text style={{ color: c.inkSubtle, fontSize: 12.5 }}>
-          {new Date(item.created_at).toLocaleDateString(intlLocale())}
+      {(item.created_at || item.driver) && (
+        <Text style={{ color: c.inkSubtle, fontSize: 12.5 }} numberOfLines={1}>
+          {[item.driver?.name, item.created_at ? new Date(item.created_at).toLocaleDateString(intlLocale()) : null]
+            .filter(Boolean)
+            .join(" · ")}
         </Text>
       )}
     </Pressable>
