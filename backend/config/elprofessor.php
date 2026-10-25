@@ -47,4 +47,12 @@ return [
      * limit sits below it rather than relying on it.
      */
     'max_document_kb' => (int) env('ELPROFESSOR_MAX_DOCUMENT_KB', 8192),
+
+    /**
+     * How long a stored photo lives after El-Professor FETCHED it, in minutes.
+     * Then `elprofessor:prune-photos` deletes the file (the row, payload and
+     * byte count stay). If El-Professor's retry of a cut transfer turns out to
+     * need longer, raise it here (or ELPROFESSOR_PHOTO_RETENTION_MINUTES).
+     */
+    'photo_retention_minutes' => (int) env('ELPROFESSOR_PHOTO_RETENTION_MINUTES', 120),
 ];

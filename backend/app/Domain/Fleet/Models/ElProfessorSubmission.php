@@ -30,7 +30,13 @@ class ElProfessorSubmission extends Model
     /** Fetched, so a catch-up does not offer it again. */
     public const STATUS_TAKEN = 'taken';
 
-    /** What the company decided, which arrives at the status endpoint. */
+    /**
+     * NEVER SET. El-Professor has no accept/reject decision: everything sent is
+     * accepted, and `taken` is the final state (owner, 25.10.2026). Nothing
+     * writes these two and no callback route exists. They stay only so rows or
+     * code from before that decision still resolve; do not wire them up
+     * expecting them to mean something.
+     */
     public const STATUS_ACCEPTED = 'accepted';
 
     public const STATUS_REJECTED = 'rejected';

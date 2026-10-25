@@ -104,10 +104,14 @@ function noteGroups(f: SubmissionFull["fields"]): Group[] {
   ]);
 }
 
+/**
+ * El-Professor has no accept/reject decision: everything sent is accepted, so
+ * `taken` is FINAL and reads as delivered. `pending` only means it has not been
+ * collected yet. `accepted`/`rejected` are never set by the server; if one ever
+ * arrived it is not a verdict this screen renders.
+ */
 function statusLabel(status: string): string {
-  if (status === "accepted") return t("subs.status.accepted");
-  if (status === "rejected") return t("subs.status.rejected");
-  return t("subs.status.pending");
+  return status === "pending" ? t("subs.status.pending") : t("subs.status.taken");
 }
 
 function Rows({ c, row, group }: { c: Palette; row: "row" | "row-reverse"; group: Group }) {
@@ -158,9 +162,6 @@ export default function SubmissionDetailScreen() {
   const groups = item ? (item.subject === "receipt" ? receiptGroups(item.fields) : noteGroups(item.fields)) : [];
   const doc = item?.document;
   const sent = instantLabel(item?.created_at, intlLocale());
-  const decided = instantLabel(item?.decided_at, intlLocale());
-  const reason = cleanText(item?.reason);
-  const rejected = item?.status === "rejected";
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.canvas }} edges={["top"]}>
@@ -204,8 +205,6 @@ export default function SubmissionDetailScreen() {
                   [t("subs.driver"), item.driver?.name ?? null],
                   [t("subs.d.status"), statusLabel(item.status)],
                   [t("subs.d.sent"), sent],
-                  [t("subs.d.decided"), decided],
-                  [t("subs.reason"), rejected ? reason : null],
                 ]),
               }}
             />

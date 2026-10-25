@@ -101,6 +101,10 @@ Schedule::command('stations:sync')->weeklyOn(1, '04:00')->withoutOverlapping(120
 // Keep the dispatch network log (admin Network tab) to a 48h retention window.
 Schedule::command('network-logs:prune')->hourly()->withoutOverlapping(60);
 
+// Delete submission photos El-Professor fetched more than the retention window
+// ago (config elprofessor.photo_retention_minutes); rows and numbers stay.
+Schedule::command('elprofessor:prune-photos')->everyTenMinutes()->withoutOverlapping(10);
+
 // Keep geocode_cache bounded: expired MISSES (so a re-tryable address is asked
 // again) and hits stored more than a year ago. Nightly, off the busy hours.
 Schedule::command('geocode-cache:prune')->dailyAt('03:40')->withoutOverlapping(60);
