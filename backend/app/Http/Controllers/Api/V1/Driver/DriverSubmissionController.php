@@ -5,13 +5,11 @@ namespace App\Http\Controllers\Api\V1\Driver;
 use App\Domain\Fleet\Models\ElProfessorSubmission;
 use App\Domain\Fleet\Models\Vehicle;
 use App\Domain\Fleet\SubmissionDetailPresenter;
-use App\Domain\Fleet\SubmissionDocumentStreamer;
 use App\Http\Controllers\Controller;
 use App\Jobs\RingElProfessor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * What a driver submits to their own company: a receipt with its photo, or a
@@ -35,7 +33,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  *
  * ## Sending needs the connection; reading does not
  *
- * `index`, `show` and `document` stay open when the company disconnects: what
+ * `index` and `show` stay open when the company disconnects: what
  * a driver already sent is his own history (owner's decision, 25.10.2026).
  * `store` and `vehicles` (the note form's picker) still need it, so a
  * disconnected company can never be sent to.
@@ -145,19 +143,6 @@ class DriverSubmissionController extends Controller
         return $row === null
             ? response()->json(['message' => 'Submission not found.'], 404)
             : response()->json(['data' => $presenter->present($row)]);
-    }
-
-    /**
-     * The photo, STREAMED from the private disk behind the driver's token.
-     *
-     * Never a public or guessable URL: a Beleg is one fleet's business record.
-     * Streamed rather than base64 in JSON because a phone photo is megabytes
-     * and base64 adds a third, all of it held as one JS string before it can be
-     * drawn; the app's native image loader streams the bytes instead.
-     */
-    public function document(Request $request, SubmissionDocumentStreamer $streamer, string $uuid): StreamedResponse|JsonResponse
-    {
-        return $streamer->stream($this->ownSubmission($request, $uuid));
     }
 
     private function ownSubmission(Request $request, string $uuid): ?ElProfessorSubmission

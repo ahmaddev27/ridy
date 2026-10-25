@@ -1,6 +1,6 @@
 /**
  * One submission in full: everything the driver sent, what the company
- * decided, and the photo of the Beleg.
+ * decided, and whether a photo went with it.
  *
  * ## Empty is absent
  *
@@ -8,16 +8,14 @@
  * blank or a dash: most receipts are not fuel, and a fuel block of empty rows
  * on a car wash tells the driver nothing.
  *
- * ## The photo is fetched with the token, by the native image loader
+ * ## The photo is NOT shown here
  *
- * The file is private. `api.submissionDocumentSource` gives the loader the
- * bearer header, so the bytes stream to disk instead of through a base64 JS
- * string, and there is no URL that works without the session. It has a loading
- * and a failure state with a retry: on a weak connection a broken box would
- * read as "the receipt is gone".
+ * The owner decided (25.10.2026) that no image is displayed in the app. The
+ * screen only says whether a photo was attached and sent, from the `document`
+ * metadata; El-Professor reads the file through its own integration path.
  */
 import { useCallback, useEffect, useState } from "react";
-import { View, ScrollView, Pressable, Image, ActivityIndicator } from "react-native";
+import { View, ScrollView, Pressable, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft } from "@/components/icons";
@@ -106,10 +104,14 @@ function noteGroups(f: SubmissionFull["fields"]): Group[] {
   ]);
 }
 
+/**
+ * El-Professor has no accept/reject decision: everything sent is accepted, so
+ * `taken` is FINAL and reads as delivered. `pending` only means it has not been
+ * collected yet. `accepted`/`rejected` are never set by the server; if one ever
+ * arrived it is not a verdict this screen renders.
+ */
 function statusLabel(status: string): string {
-  if (status === "accepted") return t("subs.status.accepted");
-  if (status === "rejected") return t("subs.status.rejected");
-  return t("subs.status.pending");
+  return status === "pending" ? t("subs.status.pending") : t("subs.status.taken");
 }
 
 function Rows({ c, row, group }: { c: Palette; row: "row" | "row-reverse"; group: Group }) {
@@ -132,59 +134,6 @@ function Rows({ c, row, group }: { c: Palette; row: "row" | "row-reverse"; group
   );
 }
 
-type PhotoState = "loading" | "ready" | "failed";
-
-function Photo({
-  c,
-  id,
-  fleetWide,
-  attempt,
-  onRetry,
-}: {
-  c: Palette;
-  id: string;
-  fleetWide: boolean;
-  attempt: number;
-  onRetry: () => void;
-}) {
-  const [state, setState] = useState<PhotoState>("loading");
-  // Rebuilt per attempt, so the retry is a fresh request and not a cached miss.
-  const source = fleetWide ? api.fleetSubmissionDocumentSource(id) : api.submissionDocumentSource(id);
-
-  useEffect(() => setState("loading"), [attempt]);
-
-  if (source === null) return <Text style={{ color: c.danger }}>{t("subs.d.photoFailed")}</Text>;
-  return (
-    <View style={{ ...cardStyle(c), padding: 8, minHeight: 120, justifyContent: "center" }}>
-      {state !== "failed" && (
-        <Image
-          key={attempt}
-          source={source}
-          resizeMode="contain"
-          accessibilityLabel={t("subs.d.photo")}
-          onLoad={() => setState("ready")}
-          onError={() => setState("failed")}
-          style={{ width: "100%", aspectRatio: 3 / 4, opacity: state === "ready" ? 1 : 0 }}
-        />
-      )}
-      {state === "loading" && (
-        <View style={{ position: "absolute", alignSelf: "center", alignItems: "center", gap: 8 }}>
-          <ActivityIndicator color={c.ink} />
-          <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("subs.d.photoLoading")}</Text>
-        </View>
-      )}
-      {state === "failed" && (
-        <View style={{ alignItems: "center", gap: 10, padding: 12 }}>
-          <Text style={{ color: c.danger, fontWeight: "700", textAlign: "center" }}>{t("subs.d.photoFailed")}</Text>
-          <Pressable onPress={onRetry} accessibilityRole="button" hitSlop={8}>
-            <Text style={{ color: c.ink, fontWeight: "700", textDecorationLine: "underline" }}>{t("subs.d.retry")}</Text>
-          </Pressable>
-        </View>
-      )}
-    </View>
-  );
-}
-
 export default function SubmissionDetailScreen() {
   const c = useColors();
   const router = useRouter();
@@ -195,7 +144,6 @@ export default function SubmissionDetailScreen() {
 
   const [item, setItem] = useState<SubmissionFull | null>(null);
   const [error, setError] = useState<"gone" | "failed" | null>(null);
-  const [attempt, setAttempt] = useState(0);
 
   const load = useCallback(async () => {
     setError(null);
@@ -214,9 +162,6 @@ export default function SubmissionDetailScreen() {
   const groups = item ? (item.subject === "receipt" ? receiptGroups(item.fields) : noteGroups(item.fields)) : [];
   const doc = item?.document;
   const sent = instantLabel(item?.created_at, intlLocale());
-  const decided = instantLabel(item?.decided_at, intlLocale());
-  const reason = cleanText(item?.reason);
-  const rejected = item?.status === "rejected";
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.canvas }} edges={["top"]}>
@@ -260,8 +205,6 @@ export default function SubmissionDetailScreen() {
                   [t("subs.driver"), item.driver?.name ?? null],
                   [t("subs.d.status"), statusLabel(item.status)],
                   [t("subs.d.sent"), sent],
-                  [t("subs.d.decided"), decided],
-                  [t("subs.reason"), rejected ? reason : null],
                 ]),
               }}
             />
@@ -271,13 +214,9 @@ export default function SubmissionDetailScreen() {
             {item.subject === "receipt" && doc && (
               <View style={{ gap: 8 }}>
                 <SectionLabel>{t("subs.d.photo")}</SectionLabel>
-                {!doc.available && <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("subs.d.photoNone")}</Text>}
-                {doc.available && doc.mime === "application/pdf" && (
-                  <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("subs.d.photoPdf")}</Text>
-                )}
-                {doc.available && doc.mime !== "application/pdf" && (
-                  <Photo c={c} id={item.id} fleetWide={isOwner} attempt={attempt} onRetry={() => setAttempt((n) => n + 1)} />
-                )}
+                <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>
+                  {doc.available ? t("subs.d.photoSent") : t("subs.d.photoNone")}
+                </Text>
               </View>
             )}
           </>
