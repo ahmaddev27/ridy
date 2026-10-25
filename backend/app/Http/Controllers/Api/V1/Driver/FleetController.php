@@ -195,6 +195,7 @@ class FleetController extends Controller
             // login, and a disagreement would make the button appear or vanish
             // depending on which call ran last.
             'documents_enabled' => false,
+            'documents_readable' => false,
             'gallery_import_enabled' => false,
             'odometer_required' => false,
         ]]);

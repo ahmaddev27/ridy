@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Api\V1\Driver;
 use App\Domain\Fleet\Models\ElProfessorSubmission;
 use App\Domain\Fleet\Models\Vehicle;
 use App\Domain\Fleet\SubmissionDetailPresenter;
+use App\Domain\Fleet\SubmissionDocumentStreamer;
 use App\Http\Controllers\Controller;
 use App\Jobs\RingElProfessor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -32,6 +32,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * and a `Tanken` one changes their fuel ratio. So this validator's job is to
  * refuse what is obviously unusable — no photo, an amount that is not a number,
  * a date that is not a date — and not to be the authority.
+ *
+ * ## Sending needs the connection; reading does not
+ *
+ * `index`, `show` and `document` stay open when the company disconnects: what
+ * a driver already sent is his own history (owner's decision, 25.10.2026).
+ * `store` and `vehicles` (the note form's picker) still need it, so a
+ * disconnected company can never be sent to.
  *
  * ## A driver whose company is not connected cannot submit at all
  *
@@ -106,12 +113,8 @@ class DriverSubmissionController extends Controller
         ], 403);
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, SubmissionDetailPresenter $presenter): JsonResponse
     {
-        if (! $this->connected($request)) {
-            return $this->notConnected();
-        }
-
         $driver = $request->user();
 
         $rows = ElProfessorSubmission::query()
@@ -123,16 +126,7 @@ class DriverSubmissionController extends Controller
             ->get(['uuid', 'subject', 'status', 'decision_text', 'payload', 'created_at']);
 
         return response()->json([
-            'data' => $rows->map(fn (ElProfessorSubmission $r) => [
-                'id' => $r->uuid,
-                'subject' => $r->subject,
-                'status' => $r->status,
-                // The company's own words on a rejection. The driver has to see
-                // them, or the rejection is something they cannot act on.
-                'reason' => $r->decision_text,
-                'detail' => $this->detail($r),
-                'created_at' => $r->created_at?->toIso8601String(),
-            ])->values(),
+            'data' => $rows->map(fn (ElProfessorSubmission $r) => $presenter->row($r))->values(),
         ]);
     }
 
@@ -146,10 +140,6 @@ class DriverSubmissionController extends Controller
      */
     public function show(Request $request, SubmissionDetailPresenter $presenter, string $uuid): JsonResponse
     {
-        if (! $this->connected($request)) {
-            return $this->notConnected();
-        }
-
         $row = $this->ownSubmission($request, $uuid);
 
         return $row === null
@@ -165,25 +155,9 @@ class DriverSubmissionController extends Controller
      * and base64 adds a third, all of it held as one JS string before it can be
      * drawn; the app's native image loader streams the bytes instead.
      */
-    public function document(Request $request, string $uuid): StreamedResponse|JsonResponse
+    public function document(Request $request, SubmissionDocumentStreamer $streamer, string $uuid): StreamedResponse|JsonResponse
     {
-        if (! $this->connected($request)) {
-            return $this->notConnected();
-        }
-
-        $row = $this->ownSubmission($request, $uuid);
-        $disk = Storage::disk(config('elprofessor.disk', 'local'));
-
-        if ($row === null || $row->document_path === null || ! $disk->exists($row->document_path)) {
-            return response()->json(['message' => 'Document not found.'], 404);
-        }
-
-        return $disk->response($row->document_path, null, [
-            'Content-Type' => $row->document_mime ?: 'application/octet-stream',
-            'Content-Disposition' => 'inline',
-            'X-Content-Type-Options' => 'nosniff',
-            'Cache-Control' => 'private, no-store',
-        ]);
+        return $streamer->stream($this->ownSubmission($request, $uuid));
     }
 
     private function ownSubmission(Request $request, string $uuid): ?ElProfessorSubmission
@@ -196,40 +170,6 @@ class DriverSubmissionController extends Controller
             ->where('driver_id', $driver->id)
             ->where('uuid', $uuid)
             ->first();
-    }
-
-    /**
-     * A few of the driver's own figures, so two rows in their list can be told
-     * apart. A whitelist, not the payload: the payload also carries the odometer
-     * and the fuel readings, which the list has no use for, and a field added to
-     * it later must not reach this response by being there. It is the driver's
-     * own submission going back to the driver, so nothing here is new exposure.
-     *
-     * Every key is always present and null when unknown: rows sent by an older
-     * build, or a payload that lacks a field, must not break the app's reader.
-     *
-     * @return array<string, string|null>
-     */
-    private function detail(ElProfessorSubmission $r): array
-    {
-        $p = is_array($r->payload) ? $r->payload : [];
-        $text = fn (string $key): ?string => isset($p[$key]) && is_scalar($p[$key]) && trim((string) $p[$key]) !== ''
-            ? trim((string) $p[$key])
-            : null;
-
-        if ($r->subject === 'receipt') {
-            return [
-                'amount' => $text('amount'),
-                'category' => $text('category'),
-                'merchant_name' => $text('merchant_name'),
-            ];
-        }
-
-        return [
-            'note_type' => $text('note_type'),
-            'note_text' => $text('note_text'),
-            'vehicle_plate' => $text('vehicle_plate'),
-        ];
     }
 
     /**

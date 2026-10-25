@@ -56,6 +56,8 @@ export type DriverSubmission = {
    */
   detail?: SubmissionDetail | null;
   created_at: string | null;
+  /** Owner mode only: which driver sent it. Absent on a driver's own list. */
+  driver?: { id: number; name: string } | null;
 };
 
 /** What the list shows of a submission. Amounts are plain decimals with a dot. */
@@ -82,6 +84,8 @@ export type SubmissionFull = {
   fields: Record<string, string | boolean | null>;
   /** Receipts only. `available` is false when the file is gone from the server. */
   document: { available: boolean; mime: string | null; bytes: number | null } | null;
+  /** Owner mode only: which driver sent it. */
+  driver?: { id: number; name: string } | null;
 };
 
 /** Everything a receipt carries. The photo is separate: it is a file. */
@@ -218,6 +222,13 @@ export type DriverProfile = {
    * screen whose every call would be refused.
    */
   documents_enabled?: boolean;
+  /**
+   * MAY VIEW, as `documents_enabled` is MAY SEND. True while the company is
+   * connected, and also for a driver who has sent something once: his archive
+   * outlives the connection. Absent on an older server, where the app falls
+   * back to `documents_enabled` (see `submissionAccess`).
+   */
+  documents_readable?: boolean;
   /** The company's own setting: may a receipt come from the gallery, or
    *  only from the camera? Absent on an older server, and absent reads as
    *  false - camera only is the safe reading of "we do not know". */
@@ -509,6 +520,27 @@ export class ApiClient {
 
   me() {
     return this.request<{ data: DriverProfile }>("/api/v1/driver/me");
+  }
+
+  /** Owner mode, READ-ONLY: every driver's submissions of the company, newest first, one page at a time. */
+  fleetSubmissions(page = 1) {
+    return this.request<{ data: DriverSubmission[]; meta: { has_more: boolean; page: number } }>(
+      `/api/v1/driver/fleet/submissions?page=${page}`,
+    );
+  }
+
+  /** Owner mode: one submission of the company in full. 404 for another company's. */
+  fleetSubmission(id: string) {
+    return this.request<{ data: SubmissionFull }>(`/api/v1/driver/fleet/submissions/${encodeURIComponent(id)}`);
+  }
+
+  /** Owner mode: where to load a submission's photo from. See `submissionDocumentSource`. */
+  fleetSubmissionDocumentSource(id: string): { uri: string; headers: Record<string, string> } | null {
+    if (!this.token) return null;
+    return {
+      uri: `${BASE}/api/v1/driver/fleet/submissions/${encodeURIComponent(id)}/document`,
+      headers: { Authorization: `Bearer ${this.token}`, Accept: "image/*" },
+    };
   }
 
   /** What this driver has sent their company, newest first, with the decision. */

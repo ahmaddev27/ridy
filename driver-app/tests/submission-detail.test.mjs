@@ -52,3 +52,25 @@ test("an instant is shown in Berlin time with Latin digits", () => {
   assert.match(instantLabel("2026-10-07T06:15:00Z", "ar-u-nu-latn"), /08:15|8:15/);
   assert.equal(instantLabel("nope", "de-DE"), null);
 });
+
+const { submissionAccess } = await import("../src/lib/submission-detail.ts");
+
+test("a disconnected driver with history can view but not send", () => {
+  const a = submissionAccess({ documents_enabled: false, documents_readable: true });
+  assert.deepEqual(a, { canView: true, canSend: false, fleetWide: false });
+});
+
+test("a driver of a never-connected company with no history sees nothing", () => {
+  assert.deepEqual(submissionAccess({ documents_enabled: false, documents_readable: false }),
+    { canView: false, canSend: false, fleetWide: false });
+  assert.equal(submissionAccess(null).canView, false);
+});
+
+test("a server that predates documents_readable still lets a connected driver in", () => {
+  assert.deepEqual(submissionAccess({ documents_enabled: true }), { canView: true, canSend: true, fleetWide: false });
+});
+
+test("an owner views the whole company and never sends, whatever the flags say", () => {
+  assert.deepEqual(submissionAccess({ is_owner: true, documents_enabled: true, documents_readable: true }),
+    { canView: true, canSend: false, fleetWide: true });
+});

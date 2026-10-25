@@ -6,7 +6,8 @@ use App\Domain\Fleet\Models\ElProfessorSubmission;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * The full detail of one submission, as the driver who sent it sees it.
+ * The full detail of one submission, as the driver who sent it sees it (and,
+ * read-only, as the fleet owner does).
  *
  * ## A whitelist, field by field
  *
@@ -48,6 +49,49 @@ class SubmissionDetailPresenter
         'start_time' => 'start_time',
         'end_time' => 'end_time',
     ];
+
+    /**
+     * One row of a list: enough figures to tell two submissions apart, not the
+     * payload. A whitelist on purpose, so a field added to the payload later
+     * does not reach a list by being there. Every key is always present.
+     *
+     * @return array<string, mixed>
+     */
+    public function row(ElProfessorSubmission $r): array
+    {
+        return [
+            'id' => $r->uuid,
+            'subject' => $r->subject,
+            'status' => $r->status,
+            // The company's own words on a rejection.
+            'reason' => $r->decision_text,
+            'detail' => $this->summary($r),
+            'created_at' => $r->created_at?->toIso8601String(),
+        ];
+    }
+
+    /** @return array<string, string|null> */
+    private function summary(ElProfessorSubmission $r): array
+    {
+        $p = is_array($r->payload) ? $r->payload : [];
+        $text = fn (string $key): ?string => isset($p[$key]) && is_scalar($p[$key]) && trim((string) $p[$key]) !== ''
+            ? trim((string) $p[$key])
+            : null;
+
+        if ($r->subject === 'receipt') {
+            return [
+                'amount' => $text('amount'),
+                'category' => $text('category'),
+                'merchant_name' => $text('merchant_name'),
+            ];
+        }
+
+        return [
+            'note_type' => $text('note_type'),
+            'note_text' => $text('note_text'),
+            'vehicle_plate' => $text('vehicle_plate'),
+        ];
+    }
 
     /** @return array<string, mixed> */
     public function present(ElProfessorSubmission $row): array

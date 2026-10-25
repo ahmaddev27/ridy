@@ -53,6 +53,7 @@ use App\Http\Controllers\Api\V1\Driver\DriverPostalCodeController;
 use App\Http\Controllers\Api\V1\Driver\DriverSubmissionController;
 use App\Http\Controllers\Api\V1\Driver\FleetController;
 use App\Http\Controllers\Api\V1\Driver\FleetDeviceController;
+use App\Http\Controllers\Api\V1\Driver\FleetSubmissionController;
 use App\Http\Controllers\Api\V1\DriverController;
 use App\Http\Controllers\Api\V1\DriverInviteController;
 use App\Http\Controllers\Api\V1\DriverMetricController;
@@ -215,6 +216,13 @@ Route::prefix('v1')->group(function () {
             Route::get('offers', [FleetController::class, 'offers']);
             Route::get('offers/{offer}', [FleetController::class, 'showOffer']);
             Route::get('stats', [FleetController::class, 'stats']);
+            // Every driver's submissions, READ-ONLY. There is no owner write
+            // path: a submission goes up from a driver, and an owner has none above.
+            Route::get('submissions', [FleetSubmissionController::class, 'index']);
+            Route::get('submissions/{uuid}', [FleetSubmissionController::class, 'show'])->whereUuid('uuid');
+            Route::get('submissions/{uuid}/document', [FleetSubmissionController::class, 'document'])
+                ->whereUuid('uuid')
+                ->middleware('throttle:60,1,fleet-submission-document');
             // The owner's own push device (User token) — receives every driver's offers.
             Route::post('devices', [FleetDeviceController::class, 'store']);
             Route::delete('devices', [FleetDeviceController::class, 'destroy']);

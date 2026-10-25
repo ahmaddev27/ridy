@@ -9,6 +9,7 @@ use App\Domain\Auth\ReviewLogin;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Fleet\Models\ElProfessorSubmission;
 use App\Domain\Notifications\SendTemplatedMail;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
@@ -325,6 +326,15 @@ class DriverAuthController extends Controller
         ]);
     }
 
+    private function documentsReadable(Driver $driver): bool
+    {
+        return ($driver->tenant?->isElprofessorConnected() ?? false)
+            || ElProfessorSubmission::query()->withoutGlobalScopes()
+                ->where('tenant_id', $driver->tenant_id)
+                ->where('driver_id', $driver->id)
+                ->exists();
+    }
+
     /** @return array<string, mixed> */
     private function profile(Driver $driver): array
     {
@@ -338,7 +348,12 @@ class DriverAuthController extends Controller
             'company_name' => $driver->tenant?->name,
             'uber_linked' => $driver->uber_driver_uuid !== null,
             'is_owner' => false,
+            // MAY SEND: needs the live connection and stops when it ends.
             'documents_enabled' => $driver->tenant?->isElprofessorConnected() ?? false,
+            // MAY VIEW: the archive stays the driver's own after a disconnect, so
+            // this also holds for anyone who has sent something. A driver who
+            // never sent anything to a never-connected company sees nothing.
+            'documents_readable' => $this->documentsReadable($driver),
             // Read only where documents are enabled; the app hides the whole
             // section otherwise, so this never stands on its own.
             'gallery_import_enabled' => $driver->tenant?->elprofessorGalleryImportEnabled() ?? false,
@@ -377,6 +392,7 @@ class DriverAuthController extends Controller
             // company's true state here is what put the floating button and the
             // Profil row on the owner's phone.
             'documents_enabled' => false,
+            'documents_readable' => false,
             'gallery_import_enabled' => false,
             'odometer_required' => false,
             // Kept on the owner's profile only so both shapes match for the app's
