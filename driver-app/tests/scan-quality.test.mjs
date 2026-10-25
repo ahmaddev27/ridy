@@ -11,6 +11,8 @@ import assert from "node:assert/strict";
 const {
   evaluateScan,
   evaluateOdometer,
+  resolveReceiptTime,
+  captureClock,
   missingFields,
   causeOf,
   medianSkew,
@@ -24,7 +26,6 @@ const full = {
   date: "2026-10-07",
   amount: 41.47,
   merchant: "ARAL Tankstelle",
-  time: "14:32",
   city: "Berlin",
   litres: 23.1,
   pricePerLitre: 1.789,
@@ -49,7 +50,7 @@ test("a photo that yielded every required field passes", () => {
 });
 
 test("each required field missing blocks the photo, and is named", () => {
-  for (const field of ["date", "amount", "merchant", "time", "city", "litres", "pricePerLitre"]) {
+  for (const field of ["date", "amount", "merchant", "city", "litres", "pricePerLitre"]) {
     const facts = { ...full, [field]: undefined };
     const v = evaluateScan(goodLines, facts, { width: 3000, height: 4000 });
     assert.equal(v.ok, false, `${field} missing must block`);
@@ -110,7 +111,7 @@ test("mostly fragments read as dark or blurred", () => {
 test("when the cause cannot be told, the message is the generic one", () => {
   // Healthy size, flat, readable lines - but fields are missing. Guessing a
   // cause here would be wrong more often than right.
-  const v = evaluateScan(goodLines, { ...full, time: undefined }, { width: 3000, height: 4000 });
+  const v = evaluateScan(goodLines, { ...full, city: undefined }, { width: 3000, height: 4000 });
   assert.equal(v.cause, "generic");
   assert.equal(v.messageKey, "receipt.retakeGeneric");
 });
@@ -161,4 +162,25 @@ test("an oversized image is shrunk on its TRUE long edge", () => {
   // Unknown dimensions: leave it rather than guess a side.
   assert.equal(ocrResizeFor(undefined, undefined), null);
   assert.equal(ocrResizeFor(0, 9000), null);
+});
+
+test("a printed time wins over the capture time", () => {
+  assert.deepEqual(resolveReceiptTime("14:32", "09:05"), { time: "14:32", fromCapture: false });
+});
+
+test("no printed time yields the capture time, flagged, and does not block", () => {
+  for (const printed of [undefined, null, "", "  "]) {
+    assert.deepEqual(resolveReceiptTime(printed, "09:05"), { time: "09:05", fromCapture: true });
+  }
+  // The gate has no time field to miss: a receipt with everything else read passes.
+  assert.equal(evaluateScan(goodLines, full, { width: 3000, height: 4000 }).ok, true);
+  assert.equal(missingFields(full).includes("time"), false);
+});
+
+test("the capture time is the photo's EXIF clock, else the phone's", () => {
+  assert.equal(captureClock("2026:10:25 18:42:07", new Date(2026, 9, 25, 9, 5)), "18:42");
+  const now = new Date(2026, 9, 25, 9, 5);
+  assert.equal(captureClock(undefined, now), "09:05");
+  assert.equal(captureClock("garbage", now), "09:05");
+  assert.equal(captureClock("2026:10:25 25:99:00", now), "09:05");
 });

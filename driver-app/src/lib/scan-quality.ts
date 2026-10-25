@@ -12,8 +12,10 @@
  * ## What blocks
  *
  * Exactly the fields the app requires to send (`receipt-steps.ts`): date,
- * amount, merchant, city, time, and - on a refuel - litres and price per
+ * amount, merchant, city, and - on a refuel - litres and price per
  * litre. A photo advances only when every one of them was actually read. The
+ * time is NOT in this list: a receipt that prints none gets the moment the
+ * photo was taken (`resolveReceiptTime`), so it can never be missing. The
  * PLZ is not required; it is how the city is obtained (the screen asks the
  * server for the authoritative town of the PLZ it read, and passes that here).
  * The "Unsicher" flag on date/amount is NOT handled here: that is the
@@ -53,7 +55,6 @@ export type RequiredField =
   | 'date'
   | 'amount'
   | 'merchant'
-  | 'time'
   | 'city'
   | 'litres'
   | 'pricePerLitre';
@@ -69,7 +70,6 @@ export type ScanFacts = {
   date?: string | null;
   amount?: number | null;
   merchant?: string | null;
-  time?: string | null;
   city?: string | null;
   litres?: number | null;
   pricePerLitre?: number | null;
@@ -112,7 +112,6 @@ export function missingFields(f: ScanFacts): RequiredField[] {
   if (!has(f.date)) out.push('date');
   if (!hasNumber(f.amount)) out.push('amount');
   if (!has(f.merchant)) out.push('merchant');
-  if (!has(f.time)) out.push('time');
   if (!has(f.city)) out.push('city');
   if (f.fuel && !hasNumber(f.litres)) out.push('litres');
   if (f.fuel && !hasNumber(f.pricePerLitre)) out.push('pricePerLitre');
@@ -210,4 +209,42 @@ export function evaluateOdometer(
   if (odometerKm !== null) return { ok: true };
   const cause = causeOf(lines, image);
   return { ok: false, cause, messageKey: MESSAGE[cause], missing: [] };
+}
+
+/**
+ * The time of day for a receipt, and whether it is the receipt's own.
+ *
+ * A printed time always wins. Only when the parser read none - plenty of
+ * receipts (car washes, workshop invoices) simply do not print one, and no
+ * sharper photo can read what is not there - the moment the photo was taken
+ * stands in, so the receipt can be sent instead of looping on a retake.
+ *
+ * LIMITATION, on purpose and not a bug: this is a time-of-day PROXY on a date
+ * that is still parsed from the receipt. A receipt photographed days after the
+ * purchase carries a capture time that is not the purchase time. The date is
+ * the field that matters; the screen labels the value as the capture time so
+ * nobody comparing it with the Beleg mistakes it for a printed one. It has no
+ * confidence and is never marked `Unsicher`, which means something specific.
+ */
+export function resolveReceiptTime(
+  printed: string | null | undefined,
+  capture: string,
+): { time: string; fromCapture: boolean } {
+  if (has(printed)) return { time: (printed as string).trim(), fromCapture: false };
+  return { time: capture, fromCapture: true };
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/**
+ * `HH:MM` of the capture: the photo's own EXIF `DateTimeOriginal`
+ * (`YYYY:MM:DD HH:MM:SS`, the camera's wall clock) when it is a valid one,
+ * otherwise the phone's clock at `now` - the driver photographs at the till.
+ */
+export function captureClock(exifDateTime: unknown, now: Date): string {
+  if (typeof exifDateTime === 'string') {
+    const m = /^\d{4}[:\-]\d{2}[:\-]\d{2}[ T]([01]\d|2[0-3]):([0-5]\d)/.exec(exifDateTime.trim());
+    if (m) return `${m[1]}:${m[2]}`;
+  }
+  return `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
 }

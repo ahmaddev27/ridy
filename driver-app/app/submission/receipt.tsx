@@ -63,7 +63,14 @@ import { t, isRTL } from "@/lib/i18n";
 import { parseReceiptText, formatAmountDE, type OcrResult } from "@/lib/receipt-text-parse";
 import { rowsFromLines } from "@/lib/ocr-lines";
 import { ocrResizeFor, OCR_QUALITY } from "@/lib/ocr-image";
-import { evaluateScan, evaluateOdometer, type ImageSize, type RequiredField } from "@/lib/scan-quality";
+import {
+  evaluateScan,
+  evaluateOdometer,
+  resolveReceiptTime,
+  captureClock,
+  type ImageSize,
+  type RequiredField,
+} from "@/lib/scan-quality";
 import {
   stepsFor,
   stepProblem,
@@ -158,6 +165,8 @@ export default function ReceiptScreen() {
   const [checkAmount, setCheckAmount] = useState(false);
   // The last scan did not yield every required field. Blocks the photo step.
   const [needsRetake, setNeedsRetake] = useState(false);
+  // The time shown is the photo's capture time, not one the receipt printed.
+  const [timeFromCapture, setTimeFromCapture] = useState(false);
 
   // One description of the form, asked by the step gate AND by the send, so
   // the two can never disagree about what a valid receipt is.
@@ -216,7 +225,7 @@ export default function ReceiptScreen() {
    * to it — it is unconfirmed, which with no photo travelling is the only
    * difference left that anyone can act on.
    */
-  const scan = async (uri: string, size: ImageSize | null) => {
+  const scan = async (uri: string, size: ImageSize | null, exifStamp: unknown) => {
     setScanNote(null);
     setCheckDate(false);
     setCheckAmount(false);
@@ -229,6 +238,7 @@ export default function ReceiptScreen() {
     setCity("");
     setPlz("");
     setReceiptTime("");
+    setTimeFromCapture(false);
     setLitres("");
     setPricePerLitre("");
     setScanning(true);
@@ -268,7 +278,11 @@ export default function ReceiptScreen() {
       if (r.postalCode) setPlz(r.postalCode);
       if (r.merchantName) setMerchant(r.merchantName);
       if (resolvedCity) setCity(resolvedCity);
-      if (r.time) setReceiptTime(r.time);
+      // A printed time wins; none printed means the capture time, labelled as
+      // such on screen. See `resolveReceiptTime` for why that is a proxy.
+      const when = resolveReceiptTime(r.time, captureClock(exifStamp, new Date()));
+      setReceiptTime(when.time);
+      setTimeFromCapture(when.fromCapture);
       // German decimals on screen, converted once on the way out.
       if (r.litres !== undefined) setLitres(r.litres.toFixed(2).replace(".", ","));
       if (r.pricePerLitre !== undefined) {
@@ -284,7 +298,6 @@ export default function ReceiptScreen() {
           date: r.date,
           amount: r.amount,
           merchant: r.merchantName,
-          time: r.time,
           city: resolvedCity,
           litres: r.litres,
           pricePerLitre: r.pricePerLitre,
@@ -373,12 +386,12 @@ export default function ReceiptScreen() {
       }
       const result =
         from === "camera"
-          ? await ImagePicker.launchCameraAsync({ quality: 1, exif: false })
-          : await ImagePicker.launchImageLibraryAsync({ quality: 1, exif: false, mediaTypes: ["images"] });
+          ? await ImagePicker.launchCameraAsync({ quality: 1, exif: true })
+          : await ImagePicker.launchImageLibraryAsync({ quality: 1, exif: true, mediaTypes: ["images"] });
       if (result.canceled || !result.assets?.[0]?.uri) return;
       const prepared = await prepare(result.assets[0]);
       setPhoto(prepared);
-      await scan(prepared.uri, odoSize(result.assets[0]));
+      await scan(prepared.uri, odoSize(result.assets[0]), result.assets[0].exif?.DateTimeOriginal);
     } catch {
       toast.show(t("receipt.photoFailed"));
     } finally {
@@ -604,6 +617,9 @@ export default function ReceiptScreen() {
           editable={false}
           placeholder="14:32"
         />
+        {timeFromCapture && (
+          <Text style={{ color: c.inkSubtle, fontSize: 12.5 }}>{t("receipt.timeFromCapture")}</Text>
+        )}
 
         <Field
           label={t("receipt.plz")}
@@ -724,7 +740,12 @@ export default function ReceiptScreen() {
                 value={method === "bar" ? t("receipt.cash") : t("receipt.transfer")}
               />
               <SummaryRow c={c} row={row} label={t("receipt.merchant")} value={merchant} />
-              <SummaryRow c={c} row={row} label={t("receipt.time")} value={receiptTime} />
+              <SummaryRow
+                c={c}
+                row={row}
+                label={timeFromCapture ? t("receipt.timeCaptured") : t("receipt.time")}
+                value={receiptTime}
+              />
               <SummaryRow c={c} row={row} label={t("receipt.city")} value={city} />
               <SummaryRow c={c} row={row} label={t("receipt.plz")} value={plz} />
               {category === "Tanken" && (
