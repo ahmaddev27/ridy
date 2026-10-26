@@ -40,6 +40,11 @@ export function usePushHealth() {
     Linking.openSettings().catch(() => {});
   }, [health, refresh]);
 
-  const ok = !health || (health.granted && health.channelOk);
-  return { health, ok, fix, refresh };
+  // `soundOk === false` is the state this hook used to miss entirely: offers
+  // arrive and the driver hears nothing, while the banner said all was well.
+  // `null` means the platform did not answer — never nag on a guess.
+  const ok = !health || (health.granted && health.channelOk && health.soundOk !== false);
+  /** Everything is permitted, but the phone will deliver offers silently. */
+  const silent = !!health && health.granted && health.channelOk && health.soundOk === false;
+  return { health, ok, silent, fix, refresh };
 }

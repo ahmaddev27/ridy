@@ -48,11 +48,23 @@ export function StatusBanner({
   );
 }
 
-/** Stays visible while offers cannot ring (permission denied / channel muted). */
+/**
+ * Stays visible while offers cannot ring: permission denied, channel muted, or
+ * — the case this used to miss — permission granted with SOUND switched off.
+ * That last one is worth its own wording: "turn them on" is wrong advice when
+ * they are already on, and the driver would look in the wrong place.
+ */
 export function PushHealthBanner() {
-  const { ok, fix } = usePushHealth();
+  const { ok, silent, fix } = usePushHealth();
   if (ok) return null;
-  return <StatusBanner kind="push" message={t("push.off")} actionLabel={t("push.fix")} onAction={() => void fix()} />;
+  return (
+    <StatusBanner
+      kind="push"
+      message={silent ? t("push.silent") : t("push.off")}
+      actionLabel={t("push.fix")}
+      onAction={() => void fix()}
+    />
+  );
 }
 
 /** "Could not refresh — data may be outdated" with a retry. */

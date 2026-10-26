@@ -178,23 +178,53 @@ export type PushHealth = {
   canAskAgain: boolean;
   /** The offers channel exists and is loud enough to pop (Android). */
   channelOk: boolean;
+  /**
+   * The OS will let an offer make a SOUND.
+   *
+   * Permission is not one switch. iOS lets a driver keep "Allow Notifications"
+   * on and turn Sounds off underneath it, and Android lets a channel survive
+   * with its sound muted — in both cases offers arrive, silently, and the
+   * banner used to report everything healthy because only `allowsAlert` was
+   * read. A driver who cannot hear his offers has the same problem as one who
+   * never gets them, so it has to be visible.
+   *
+   * `null` when the platform does not say (older Android, or the OS returned
+   * nothing) — treated as fine, because a guess here would nag for a setting
+   * that may be perfectly correct.
+   */
+  soundOk: boolean | null;
+  /**
+   * iOS only: whether this app's notifications may be DISPLAYED on a CarPlay
+   * screen. Diagnostic, never a reason to nag — it is false for every app
+   * without Apple's CarPlay entitlement, which is the normal state here, and it
+   * says nothing about whether a sound plays through the car.
+   */
+  carPlayDisplay: boolean | null;
 };
 
 export async function getPushHealth(): Promise<PushHealth> {
   const perm = await Notifications.getPermissionsAsync();
   let channelOk = true;
+  let soundOk: boolean | null = null;
+  let carPlayDisplay: boolean | null = null;
   // Android < 8 (API 26) has no notification channels — expo returns null there,
   // so only the app-level permission decides whether offers can ring.
   if (Platform.OS === "android" && Number(Platform.Version) >= 26) {
     await ensureChannels().catch(() => {});
     const channel = await Notifications.getNotificationChannelAsync(OFFERS_CHANNEL).catch(() => null);
     channelOk = !!channel && channel.importance >= Notifications.AndroidImportance.HIGH;
+    // A channel keeps its own sound: the user can mute it and leave the app's
+    // permission untouched. `sound` is null on a muted channel.
+    soundOk = channel ? channel.sound != null : null;
   } else if (Platform.OS === "android") {
     channelOk = true;
   } else if (perm.granted && perm.ios) {
     channelOk = perm.ios.allowsAlert !== false;
+    // `false` means iOS will deliver silently; `null` means it did not say.
+    soundOk = perm.ios.allowsSound ?? null;
+    carPlayDisplay = perm.ios.allowsDisplayInCarPlay ?? null;
   }
-  return { granted: perm.granted, canAskAgain: perm.canAskAgain, channelOk };
+  return { granted: perm.granted, canAskAgain: perm.canAskAgain, channelOk, soundOk, carPlayDisplay };
 }
 
 /** Ask for notification permission when the OS still allows the prompt. */
