@@ -130,7 +130,12 @@ export default function SettingsScreen() {
             <NavRow
               icon={push.ok ? Bell : BellOff}
               label={t("settings.systemNotifications")}
-              value={push.health ? (push.ok ? t("settings.on") : t("settings.off")) : undefined}
+              // "Silent" is its own state, not "off": the permission IS on and
+              // the driver would otherwise go looking for a switch that is
+              // already correct. This is also the line to read in the car when
+              // offers arrive without a sound — it says what the OS reports,
+              // not what the app hopes.
+              value={push.health ? (push.silent ? t("settings.silent") : push.ok ? t("settings.on") : t("settings.off")) : undefined}
               valueColor={push.ok ? undefined : c.danger}
               onPress={() => void push.fix()}
               c={c}
