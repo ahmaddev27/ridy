@@ -2,6 +2,7 @@
 
 namespace App\Domain\Fleet\Models;
 
+use App\Domain\Auth\Webauthn\Concerns\HasWebauthnCredentials;
 use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Tenancy\Concerns\BelongsToTenant;
@@ -24,7 +25,7 @@ class Driver extends Authenticatable
      */
     public const LIVE_STALE_MINUTES = 10;
 
-    use BelongsToTenant, HasApiTokens, Notifiable;
+    use BelongsToTenant, HasApiTokens, HasWebauthnCredentials, Notifiable;
 
     /**
      * Substrings of Uber's raw `driverStatus` that mean the driver is NOT taking

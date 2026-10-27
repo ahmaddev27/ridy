@@ -2,6 +2,7 @@
 
 namespace App\Domain\Auth\Webauthn;
 
+use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Support\Str;
 
@@ -15,10 +16,19 @@ use Illuminate\Support\Str;
  * needs (docs/22 §4.6) and costs the dashboard nothing. `pull` is
  * delete-on-read: a ceremony is answered exactly once, so a captured answer
  * cannot be replayed — the same single-use rule as `OtpGuard::consume()`.
+ *
+ * "Exactly once" has to hold across processes too: the cache's own `pull` is a
+ * read followed by a delete, so two answers racing on the database store could
+ * both read before either deletes. The read-and-delete therefore runs under a
+ * per-ceremony atomic lock, and a second answer that finds the lock taken is
+ * refused outright — the honest client only ever answers once.
  */
 class ChallengeStore
 {
     private const KEY_PREFIX = 'webauthn:ceremony:';
+
+    /** Longer than any read-and-delete, far shorter than a ceremony. */
+    private const LOCK_SECONDS = 5;
 
     public function __construct(private readonly Cache $cache) {}
 
@@ -32,10 +42,22 @@ class ChallengeStore
         return $ceremonyId;
     }
 
-    /** The options JSON, once — null when unknown, expired or already answered. */
+    /** The options JSON, once — null when unknown, expired, already answered or being answered right now. */
     public function pull(string $ceremonyId): ?string
     {
-        $json = $this->cache->pull(self::KEY_PREFIX.$ceremonyId);
+        $key = self::KEY_PREFIX.$ceremonyId;
+        $store = $this->cache->getStore();
+
+        if (! $store instanceof LockProvider) {
+            // No atomic primitive on this store (none of ours): plain pull.
+            $json = $this->cache->pull($key);
+
+            return is_string($json) ? $json : null;
+        }
+
+        // Non-blocking: a concurrent answer to the same ceremony IS the replay
+        // this guards against, so the loser gets "gone", not a turn.
+        $json = $store->lock($key.':lock', self::LOCK_SECONDS)->get(fn () => $this->cache->pull($key));
 
         return is_string($json) ? $json : null;
     }

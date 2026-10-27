@@ -47,7 +47,9 @@ class CompanyDeleter
             $userIds = DB::table('users')->where('tenant_id', $tenantId)->pluck('id');
             $driverIds = DB::table('drivers')->where('tenant_id', $tenantId)->pluck('id');
 
-            // Polymorphic rows with no tenant_id: notifications, API tokens, roles.
+            // Polymorphic rows with no tenant_id: notifications, API tokens,
+            // passkeys, roles. (Query-builder deletes fire no model events, so
+            // the HasWebauthnCredentials cascade does not run here.)
             if ($userIds->isNotEmpty()) {
                 DB::table('notifications')
                     ->where('notifiable_type', User::class)
@@ -55,6 +57,9 @@ class CompanyDeleter
                 DB::table('personal_access_tokens')
                     ->where('tokenable_type', User::class)
                     ->whereIn('tokenable_id', $userIds)->delete();
+                DB::table('webauthn_credentials')
+                    ->where('authenticatable_type', User::class)
+                    ->whereIn('authenticatable_id', $userIds)->delete();
                 foreach (['model_has_roles', 'model_has_permissions'] as $key) {
                     DB::table(config("permission.table_names.{$key}", $key))
                         ->where('model_type', User::class)
@@ -66,6 +71,9 @@ class CompanyDeleter
                 DB::table('personal_access_tokens')
                     ->where('tokenable_type', Driver::class)
                     ->whereIn('tokenable_id', $driverIds)->delete();
+                DB::table('webauthn_credentials')
+                    ->where('authenticatable_type', Driver::class)
+                    ->whereIn('authenticatable_id', $driverIds)->delete();
             }
 
             foreach (['drivers', 'audit_logs', 'users'] as $table) {

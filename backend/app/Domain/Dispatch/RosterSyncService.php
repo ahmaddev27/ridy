@@ -240,6 +240,13 @@ class RosterSyncService
                 ->where('tokenable_type', $canonical->getMorphClass())
                 ->whereIn('tokenable_id', $extraIds)
                 ->update(['tokenable_id' => $canonical->id]);
+            // Same for the driver's passkeys: the row they hang on goes away, the
+            // person does not. (The query-builder delete below fires no model
+            // events, so the trait's cascade would not run — carry, don't orphan.)
+            DB::table('webauthn_credentials')
+                ->where('authenticatable_type', $canonical->getMorphClass())
+                ->whereIn('authenticatable_id', $extraIds)
+                ->update(['authenticatable_id' => $canonical->id]);
             DriverMetric::whereIn('driver_id', $extraIds)->delete();
             Driver::whereIn('id', $extraIds)->delete();
         });

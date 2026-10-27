@@ -6,8 +6,11 @@ use App\Domain\Auth\Webauthn\CeremonyVerifier;
 use App\Domain\Auth\Webauthn\Models\WebauthnCredential;
 use App\Domain\Auth\Webauthn\VerifiedRegistration;
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Tenancy\CompanyDeleter;
 use App\Domain\Tenancy\Models\Tenant;
+use App\Http\Controllers\Api\V1\Admin\ImpersonationController;
 use App\Models\User;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -235,5 +238,69 @@ class WebauthnRegistrationTest extends TestCase
         $credential = WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'driver-cred']);
 
         $this->assertTrue($credential->fresh()->authenticatable->is($driver));
+    }
+
+    public function test_passkey_management_is_refused_while_impersonating(): void
+    {
+        $user = $this->actingUser();
+        $this->fakeVerifiedRegistration('backdoor-cred');
+        WebauthnCredential::factory()->for($user, 'authenticatable')->create(['id' => 'mine']);
+
+        // A super-admin acting as this company: the dashboard's stateful (cookie)
+        // pipeline carries the impersonation marker in the session.
+        $this->withoutMiddleware(config('sanctum.middleware.validate_csrf_token', ValidateCsrfToken::class));
+        $acting = $this->withHeader('Referer', 'http://localhost')
+            ->withSession([ImpersonationController::KEY => 999]);
+
+        $acting->postJson('/api/v1/webauthn/register/options')
+            ->assertForbidden()->assertJsonPath('message', 'impersonation_forbidden');
+        $acting->postJson('/api/v1/webauthn/register', [
+            'ceremony_id' => 'whatever',
+            'credential' => ['id' => 'backdoor-cred', 'type' => 'public-key'],
+        ])->assertForbidden()->assertJsonPath('message', 'impersonation_forbidden');
+        $acting->deleteJson('/api/v1/webauthn/credentials/mine')
+            ->assertForbidden()->assertJsonPath('message', 'impersonation_forbidden');
+
+        $this->assertDatabaseMissing('webauthn_credentials', ['id' => 'backdoor-cred']);
+        $this->assertDatabaseHas('webauthn_credentials', ['id' => 'mine']);
+
+        // Reading changes nothing, so the list stays available to the admin.
+        $acting->getJson('/api/v1/webauthn/credentials')->assertOk()->assertJsonCount(1, 'data');
+    }
+
+    public function test_deleting_the_owner_deletes_its_credentials(): void
+    {
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE', 'activated_at' => now()]);
+        $user = User::create(['name' => 'Anna', 'email' => 'anna@acme.de', 'password' => bcrypt('x'), 'tenant_id' => $tenant->id]);
+        $driver = Driver::create(['tenant_id' => $tenant->id, 'name' => 'Driver One']);
+        WebauthnCredential::factory()->for($user, 'authenticatable')->create(['id' => 'user-cred']);
+        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'driver-cred']);
+
+        $user->delete();
+        $driver->delete();
+
+        // No foreign key can cascade a polymorphic row; the models do it themselves.
+        $this->assertDatabaseMissing('webauthn_credentials', ['id' => 'user-cred']);
+        $this->assertDatabaseMissing('webauthn_credentials', ['id' => 'driver-cred']);
+    }
+
+    public function test_deleting_a_company_deletes_its_members_credentials(): void
+    {
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE', 'activated_at' => now()]);
+        $user = User::create(['name' => 'Anna', 'email' => 'anna@acme.de', 'password' => bcrypt('x'), 'tenant_id' => $tenant->id]);
+        $driver = Driver::create(['tenant_id' => $tenant->id, 'name' => 'Driver One']);
+        WebauthnCredential::factory()->for($user, 'authenticatable')->create(['id' => 'user-cred']);
+        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'driver-cred']);
+
+        $other = User::create(['name' => 'Omar', 'email' => 'omar@other.de', 'password' => bcrypt('x')]);
+        WebauthnCredential::factory()->for($other, 'authenticatable')->create(['id' => 'other-cred']);
+
+        // The deleter works through the query builder (no model events), so it
+        // must take the polymorphic rows along itself.
+        app(CompanyDeleter::class)->delete($tenant);
+
+        $this->assertDatabaseMissing('webauthn_credentials', ['id' => 'user-cred']);
+        $this->assertDatabaseMissing('webauthn_credentials', ['id' => 'driver-cred']);
+        $this->assertDatabaseHas('webauthn_credentials', ['id' => 'other-cred']);
     }
 }

@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Domain\Auth\Webauthn\ChallengeStore;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class WebauthnChallengeStoreTest extends TestCase
@@ -34,6 +35,23 @@ class WebauthnChallengeStoreTest extends TestCase
 
         $this->travel(61)->seconds();
 
+        $this->assertNull($store->pull($ceremonyId));
+    }
+
+    public function test_a_ceremony_being_answered_elsewhere_yields_nothing(): void
+    {
+        $store = $this->app->make(ChallengeStore::class);
+        $ceremonyId = $store->put('{"challenge":"abc"}');
+
+        // Another process is mid read-and-delete on this ceremony: the cache's
+        // own pull is not atomic, so the second answer must lose outright.
+        $held = Cache::lock('webauthn:ceremony:'.$ceremonyId.':lock', 5);
+        $this->assertTrue($held->get());
+
+        $this->assertNull($store->pull($ceremonyId));
+
+        $held->release();
+        $this->assertSame('{"challenge":"abc"}', $store->pull($ceremonyId));
         $this->assertNull($store->pull($ceremonyId));
     }
 

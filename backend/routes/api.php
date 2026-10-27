@@ -261,11 +261,14 @@ Route::prefix('v1')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
         // The signed-in user's passkeys (docs/22): enrol, list, remove. Enrolment
-        // is never public, and a scoped token is kept out by `dashboard.only`.
-        Route::post('webauthn/register/options', [WebauthnCredentialController::class, 'registerOptions'])->middleware('throttle:webauthn-options');
-        Route::post('webauthn/register', [WebauthnCredentialController::class, 'register'])->middleware('throttle:webauthn-verify');
+        // is never public, a scoped token is kept out by `dashboard.only`, and
+        // nothing that changes how the account signs in is reachable while a
+        // super-admin is acting as the company (`not.impersonating`) — the list
+        // stays readable, it changes nothing.
+        Route::post('webauthn/register/options', [WebauthnCredentialController::class, 'registerOptions'])->middleware(['not.impersonating', 'throttle:webauthn-options']);
+        Route::post('webauthn/register', [WebauthnCredentialController::class, 'register'])->middleware(['not.impersonating', 'throttle:webauthn-verify']);
         Route::get('webauthn/credentials', [WebauthnCredentialController::class, 'index']);
-        Route::delete('webauthn/credentials/{credential}', [WebauthnCredentialController::class, 'destroy']);
+        Route::delete('webauthn/credentials/{credential}', [WebauthnCredentialController::class, 'destroy'])->middleware('not.impersonating');
         // Stop impersonating: mid-impersonation the caller is a manager, so this
         // lives outside the super-admin group (the session key gates it).
         Route::post('impersonate/stop', [ImpersonationController::class, 'stop']);
