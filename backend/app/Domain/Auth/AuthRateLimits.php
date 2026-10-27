@@ -55,6 +55,20 @@ class AuthRateLimits
         RateLimiter::for('ext-ingest', fn (Request $request) => Limit::perMinute(240)
             ->by('ext:'.self::principalKey($request)));
 
+        // Passkey ceremonies. Starting one parks a challenge in the cache for
+        // its TTL, so options are capped per principal (the signed-in user for
+        // enrolment, the client for the public sign-in). Verify is a credential
+        // check and gets the `credentials` shape: per client, plus per
+        // credential + client so a rotating pool cannot grind one passkey —
+        // and no credential-wide ceiling, which would let a stranger who knows
+        // a credential id lock its owner out.
+        RateLimiter::for('webauthn-options', fn (Request $request) => Limit::perMinute(30)
+            ->by('webauthn-options:'.self::principalKey($request)));
+
+        RateLimiter::for('webauthn-verify', fn (Request $request) => [
+            Limit::perMinute(10)->by('webauthn-verify:'.self::clientKey($request)),
+            ...self::perCredentialAndClient($request, Limit::perMinutes(15, 20)),
+        ]);
     }
 
     /**
@@ -100,6 +114,17 @@ class AuthRateLimits
         $email = self::email($request);
 
         return $email === null ? [] : [$limit->by('email-client:'.sha1($email.'|'.self::clientKey($request)))];
+    }
+
+    /** @return array<int, Limit> */
+    private static function perCredentialAndClient(Request $request, Limit $limit): array
+    {
+        $credentialId = $request->input('credential.id');
+        if (! is_string($credentialId) || $credentialId === '') {
+            return [];
+        }
+
+        return [$limit->by('credential-client:'.sha1($credentialId.'|'.self::clientKey($request)))];
     }
 
     /** Per token (or user / client) key for the authenticated ingest limits. */

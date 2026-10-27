@@ -131,6 +131,25 @@ class WebauthnRegistrationTest extends TestCase
         $this->postJson('/api/v1/webauthn/register', $payload)->assertUnprocessable();
     }
 
+    public function test_register_refuses_a_ceremony_started_by_another_account(): void
+    {
+        $this->actingUser();
+        $this->fakeVerifiedRegistration('stolen-cred');
+
+        // Anna starts a ceremony; Omar (same company, his own session) answers it.
+        $ceremonyId = $this->postJson('/api/v1/webauthn/register/options')->json('ceremony_id');
+
+        $omar = User::create(['name' => 'Omar', 'email' => 'omar@acme.de', 'password' => bcrypt('x')]);
+        Sanctum::actingAs($omar);
+
+        $this->postJson('/api/v1/webauthn/register', [
+            'ceremony_id' => $ceremonyId,
+            'credential' => ['id' => 'stolen-cred', 'type' => 'public-key'],
+        ])->assertUnprocessable()->assertJsonPath('errors.ceremony_id.0', 'ceremony_expired');
+
+        $this->assertDatabaseMissing('webauthn_credentials', ['id' => 'stolen-cred']);
+    }
+
     public function test_register_rejects_a_duplicate_credential_id(): void
     {
         $user = $this->actingUser();

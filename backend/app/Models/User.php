@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Domain\Auth\Webauthn\Models\WebauthnCredential;
 use App\Domain\Notifications\Models\UserPushToken;
 use App\Domain\Tenancy\Models\Tenant;
 use Database\Factories\UserFactory;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -56,5 +58,11 @@ class User extends Authenticatable
     public function pushTokens(): HasMany
     {
         return $this->hasMany(UserPushToken::class);
+    }
+
+    /** The passkeys registered on this account (docs/22). */
+    public function webauthnCredentials(): MorphMany
+    {
+        return $this->morphMany(WebauthnCredential::class, 'authenticatable');
     }
 }

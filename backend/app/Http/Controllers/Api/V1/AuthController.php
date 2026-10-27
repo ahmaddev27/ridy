@@ -3,13 +3,12 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Auth\PasswordCheck;
-use App\Domain\Billing\PaymentClaimService;
 use App\Http\Controllers\Api\V1\Admin\ImpersonationController;
+use App\Http\Controllers\Concerns\RespondsSuspendedLogin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\LoginRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
-use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -18,6 +17,8 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    use RespondsSuspendedLogin;
+
     public function login(LoginRequest $request): JsonResponse
     {
         $user = User::where('email', $request->string('email'))->first();
@@ -34,17 +35,9 @@ class AuthController extends Controller
         $user->load('tenant');
         $reason = $user->tenant?->stateReason();
         if ($reason !== null) {
-            // Safe to surface the company's payment reference here: this branch is
-            // reached only after the password check above, so the caller owns the
-            // account. Lets the "how to pay" screen show the reference pre-login.
-            return response()->json([
-                'message' => 'account_suspended',
-                'reason' => $reason,
-                'support_email' => Settings::get('support_email'),
-                'support_whatsapp' => Settings::get('support_whatsapp'),
-                'payment_reference' => $user->tenant->ensurePaymentReference(),
-                'payment_claim_pending' => app(PaymentClaimService::class)->hasPending($user->tenant),
-            ], 403);
+            // Reached only after the password check above, so the caller owns the
+            // account — the shared answer may carry the payment reference.
+            return $this->suspendedLoginResponse($user->tenant, $reason);
         }
 
         // Establish a session for the SPA cookie flow when a session is available.

@@ -73,6 +73,8 @@ use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\ResellerController;
 use App\Http\Controllers\Api\V1\SupplierCaptureController;
 use App\Http\Controllers\Api\V1\VehicleController;
+use App\Http\Controllers\Api\V1\WebauthnCredentialController;
+use App\Http\Controllers\Api\V1\WebauthnLoginController;
 use App\Http\Middleware\ResolveTenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
@@ -88,6 +90,12 @@ Route::prefix('v1')->group(function () {
 
     // Dashboard credential endpoint (super-admin/manager/reseller).
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:credentials');
+
+    // Passkey sign-in (docs/22): username-less, so the options name no account
+    // and every refusal reads the same. Own limiters: options park a challenge
+    // in the cache, verify is a credential check.
+    Route::post('webauthn/login/options', [WebauthnLoginController::class, 'options'])->middleware('throttle:webauthn-options');
+    Route::post('webauthn/login', [WebauthnLoginController::class, 'login'])->middleware('throttle:webauthn-verify');
 
     // Public force-update gate for the mobile driver app (checked on launch).
     Route::get('app/version', [AppVersionController::class, 'check'])->middleware('throttle:60,1,public-read');
@@ -252,6 +260,12 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'user.account', 'dashboard.only'])->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
+        // The signed-in user's passkeys (docs/22): enrol, list, remove. Enrolment
+        // is never public, and a scoped token is kept out by `dashboard.only`.
+        Route::post('webauthn/register/options', [WebauthnCredentialController::class, 'registerOptions'])->middleware('throttle:webauthn-options');
+        Route::post('webauthn/register', [WebauthnCredentialController::class, 'register'])->middleware('throttle:webauthn-verify');
+        Route::get('webauthn/credentials', [WebauthnCredentialController::class, 'index']);
+        Route::delete('webauthn/credentials/{credential}', [WebauthnCredentialController::class, 'destroy']);
         // Stop impersonating: mid-impersonation the caller is a manager, so this
         // lives outside the super-admin group (the session key gates it).
         Route::post('impersonate/stop', [ImpersonationController::class, 'stop']);

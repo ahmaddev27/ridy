@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Domain\Auth\AuthRateLimits;
 use App\Domain\Auth\BearerTokenGuard;
 use App\Domain\Auth\TokenLifecycle;
+use App\Domain\Auth\Webauthn\CeremonyVerifier;
+use App\Domain\Auth\Webauthn\WebauthnLibCeremonyVerifier;
 use App\Domain\Dispatch\DispatchActionService;
 use App\Domain\Notifications\Contracts\PushSender;
 use App\Domain\Notifications\Push\FcmPushSender;
@@ -55,6 +57,13 @@ class AppServiceProvider extends ServiceProvider
 
             return new FcmPushSender($auth, $projectId);
         });
+
+        // The passkey engine behind its one seam (docs/22). Tests bind a fake
+        // here; the ceremonies themselves are the engine's suite's business.
+        $this->app->bind(CeremonyVerifier::class, fn () => new WebauthnLibCeremonyVerifier(
+            rpId: (string) config('webauthn.rp_id'),
+            allowedOrigins: array_values((array) config('webauthn.origins', [])),
+        ));
     }
 
     /**
