@@ -26,13 +26,20 @@ export type SuspendedInfo = {
  * collapsible sections — "How to pay" (reference + bank QR + cash + an "I've paid"
  * button) open by default, and "Have a code?" (enter the activation code) — in the
  * order the company proceeds. "disabled"/"banned" only offer support contact.
+ *
+ * Both credentialed actions re-send the just-typed email+password to prove account
+ * ownership (the visitor is not signed in). After a passkey sign-in there is no
+ * typed password, so those actions give way to a "sign in with your password" hint
+ * (decision D8); the payment info and support contacts need no credentials and stay.
  */
 export function SuspendedScreen({
   info,
   onActivated,
+  onBackToLogin,
 }: {
   info: SuspendedInfo;
   onActivated: () => void;
+  onBackToLogin?: () => void;
 }) {
   const { t } = useI18n();
   const s = (k: string) => t(`suspended.${k}`);
@@ -42,6 +49,7 @@ export function SuspendedScreen({
   const [claimPending, setClaimPending] = useState(!!info.paymentClaimPending);
 
   const canActivate = info.reason === "expired" || info.reason === "inactive";
+  const hasCredentials = info.password !== "";
 
   async function activate(e: React.FormEvent) {
     e.preventDefault();
@@ -90,7 +98,7 @@ export function SuspendedScreen({
               <Clock className="h-4 w-4 text-ink-subtle" />
               {t("screens.codes.claimPendingLabel")}
             </div>
-          ) : (
+          ) : hasCredentials ? (
             <div className="rounded-xl border border-line bg-surface p-4">
               <Button onClick={confirmPayment} disabled={confirming} className="w-full">
                 {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
@@ -98,18 +106,33 @@ export function SuspendedScreen({
               </Button>
               <p className="mt-2 text-xs text-ink-subtle">{t("screens.codes.confirmPaymentHint")}</p>
             </div>
-          )}
+          ) : null}
 
-          <Section title={s("activateTitle")} icon={KeyRound} defaultOpen={false}>
-            <p className="text-xs text-ink-subtle">{s("activateHint")}</p>
-            <form onSubmit={activate} className="mt-3 space-y-3">
-              <OtpInput value={code} onChange={setCode} autoFocus={false} />
-              <Button type="submit" disabled={busy || code.length < 6} className="w-full">
-                {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-                {s("activateCta")}
-              </Button>
-            </form>
-          </Section>
+          {hasCredentials ? (
+            <Section title={s("activateTitle")} icon={KeyRound} defaultOpen={false}>
+              <p className="text-xs text-ink-subtle">{s("activateHint")}</p>
+              <form onSubmit={activate} className="mt-3 space-y-3">
+                <OtpInput value={code} onChange={setCode} autoFocus={false} />
+                <Button type="submit" disabled={busy || code.length < 6} className="w-full">
+                  {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {s("activateCta")}
+                </Button>
+              </form>
+            </Section>
+          ) : (
+            <div className="rounded-xl border border-line bg-surface p-4">
+              <p className="text-sm text-ink-muted">{s("passwordNeededHint")}</p>
+              {onBackToLogin && (
+                <button
+                  type="button"
+                  onClick={onBackToLogin}
+                  className="mt-3 w-full text-center text-xs font-medium text-ink-muted hover:text-ink"
+                >
+                  {s("backToLogin")}
+                </button>
+              )}
+            </div>
+          )}
         </>
       ) : (
         <p className="text-sm text-ink-muted">{s("contactHint")}</p>

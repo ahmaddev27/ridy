@@ -164,6 +164,7 @@ export default function LoginPage() {
             setSuspended(null);
             onSubmit(new Event("submit") as unknown as React.FormEvent);
           }}
+          onBackToLogin={() => setSuspended(null)}
         />
       ) : activateMode ? (
         <div className={CARD}>
