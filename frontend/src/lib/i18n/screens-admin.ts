@@ -191,6 +191,7 @@ const en = {
     passkeysEmpty: "No passkeys yet.", passkeyLoadError: "Couldn’t load your passkeys.", passkeyAddedOn: "Added {date}",
     passkeyAliasLabel: "Device name (optional)", passkeyAdd: "Add passkey", passkeyAdded: "Passkey added", passkeyAddFailed: "Couldn’t add the passkey",
     passkeyAlreadyRegistered: "This passkey is already registered.", passkeyUnsupported: "This browser doesn’t support passkeys.",
+    passkeyPasswordLabel: "Your password", passkeyPasswordHint: "For your security, confirm your account password to add a passkey.", passkeyPasswordWrong: "Incorrect password.",
     passkeyDelete: "Delete passkey", passkeyDeleteConfirm: "“{name}” will be removed. You will no longer be able to sign in with it.", passkeyDeleted: "Passkey deleted", passkeyDeleteFailed: "Couldn’t delete the passkey",
   },
   companies: {
@@ -504,6 +505,7 @@ const de: typeof en = {
     passkeysEmpty: "Noch keine Passkeys eingerichtet.", passkeyLoadError: "Passkeys konnten nicht geladen werden.", passkeyAddedOn: "Hinzugefügt am {date}",
     passkeyAliasLabel: "Gerätename (optional)", passkeyAdd: "Passkey hinzufügen", passkeyAdded: "Passkey hinzugefügt", passkeyAddFailed: "Passkey konnte nicht hinzugefügt werden",
     passkeyAlreadyRegistered: "Dieser Passkey ist bereits registriert.", passkeyUnsupported: "Dieser Browser unterstützt keine Passkeys.",
+    passkeyPasswordLabel: "Dein Passwort", passkeyPasswordHint: "Zur Sicherheit bestätigst du dein Kontopasswort, um einen Passkey hinzuzufügen.", passkeyPasswordWrong: "Falsches Passwort.",
     passkeyDelete: "Passkey löschen", passkeyDeleteConfirm: "„{name}“ wird entfernt. Du kannst dich damit danach nicht mehr anmelden.", passkeyDeleted: "Passkey gelöscht", passkeyDeleteFailed: "Passkey konnte nicht gelöscht werden",
   },
   companies: {
@@ -815,6 +817,7 @@ const ar: typeof en = {
     passkeysEmpty: "لا توجد مفاتيح مرور بعد.", passkeyLoadError: "تعذّر تحميل مفاتيح المرور.", passkeyAddedOn: "أُضيف في {date}",
     passkeyAliasLabel: "اسم الجهاز (اختياري)", passkeyAdd: "إضافة مفتاح مرور", passkeyAdded: "تمت إضافة مفتاح المرور", passkeyAddFailed: "تعذّرت إضافة مفتاح المرور",
     passkeyAlreadyRegistered: "مفتاح المرور هذا مسجّل مسبقاً.", passkeyUnsupported: "هذا المتصفح لا يدعم مفاتيح المرور.",
+    passkeyPasswordLabel: "كلمة المرور", passkeyPasswordHint: "لأمان حسابك، أكّد كلمة مرور الحساب لإضافة مفتاح مرور.", passkeyPasswordWrong: "كلمة المرور غير صحيحة.",
     passkeyDelete: "حذف مفتاح المرور", passkeyDeleteConfirm: "سيتم حذف «{name}». لن تتمكن من تسجيل الدخول به بعد ذلك.", passkeyDeleted: "تم حذف مفتاح المرور", passkeyDeleteFailed: "تعذّر حذف مفتاح المرور",
   },
   companies: {

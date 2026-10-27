@@ -34,11 +34,17 @@ export async function passkeyLogin(ceremonyId: string, credential: Authenticatio
   return res.data;
 }
 
-/** Start adding a passkey to the signed-in account. */
-export async function passkeyRegisterOptions(): Promise<PasskeyCeremony<PublicKeyCredentialCreationOptionsJSON>> {
+/**
+ * Start adding a passkey to the signed-in account. Enrolment is a step-up:
+ * the server re-checks the account password before handing out a ceremony,
+ * so a hijacked session cannot plant a credential that would outlive it.
+ */
+export async function passkeyRegisterOptions(
+  password: string,
+): Promise<PasskeyCeremony<PublicKeyCredentialCreationOptionsJSON>> {
   return apiFetch<PasskeyCeremony<PublicKeyCredentialCreationOptionsJSON>>("/api/v1/webauthn/register/options", {
     method: "POST",
-    body: {},
+    body: { password },
     withCsrf: true,
   });
 }

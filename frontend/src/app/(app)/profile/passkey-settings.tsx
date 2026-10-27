@@ -6,6 +6,7 @@ import { Fingerprint, Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useAsync } from "@/hooks/use-async";
 import { usePasskeySupport } from "@/hooks/use-passkey-support";
 import { ApiError } from "@/lib/api/client";
@@ -53,6 +54,11 @@ export function PasskeySettings() {
 
   // One localized sentence per failure — the browser's own error text is never shown.
   function addFailureText(e: unknown): string {
+    // The step-up check: a 422 naming the password field is a wrong password,
+    // not a duplicate credential.
+    if (e instanceof ApiError && e.status === 422 && e.errors?.password) {
+      return c("passkeyPasswordWrong");
+    }
     if (e instanceof PasskeyAlreadyRegisteredError || (e instanceof ApiError && e.status === 422)) {
       return c("passkeyAlreadyRegistered");
     }
@@ -60,11 +66,11 @@ export function PasskeySettings() {
     return transient ? apiErrorMessage(e, t) : t("errors.generic");
   }
 
-  /** Resolves true once the passkey is saved, so the form can clear its field. */
-  async function add(alias: string): Promise<boolean> {
+  /** Resolves true once the passkey is saved, so the form can clear its fields. */
+  async function add(alias: string, password: string): Promise<boolean> {
     setAdding(true);
     try {
-      const { ceremony_id, options } = await passkeyRegisterOptions();
+      const { ceremony_id, options } = await passkeyRegisterOptions(password);
       const credential = await createPasskey(options);
       await passkeyRegister({ ceremonyId: ceremony_id, alias: alias || undefined, credential });
       toast.success(c("passkeyAdded"));
@@ -211,16 +217,22 @@ function AddPasskeyForm({
 }: {
   supported: boolean | null;
   busy: boolean;
-  onAdd: (alias: string) => Promise<boolean>;
+  onAdd: (alias: string, password: string) => Promise<boolean>;
 }) {
   const { t } = useI18n();
   const c = (k: string) => t(`screens.profile.${k}`);
   const aliasId = useId();
+  const passwordId = useId();
   const [alias, setAlias] = useState("");
+  const [password, setPassword] = useState("");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (await onAdd(alias.trim())) setAlias("");
+    // On failure the password stays, so a typo is fixed instead of retyped.
+    if (await onAdd(alias.trim(), password)) {
+      setAlias("");
+      setPassword("");
+    }
   }
 
   return (
@@ -241,11 +253,25 @@ function AddPasskeyForm({
             className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line disabled:opacity-60"
           />
         </div>
-        <Button type="submit" disabled={supported !== true || busy}>
+        <div className="min-w-0 flex-1">
+          <label htmlFor={passwordId} className="mb-1 block text-sm font-medium text-ink">
+            {c("passkeyPasswordLabel")}
+          </label>
+          <PasswordInput
+            id={passwordId}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={supported !== true || busy}
+            autoComplete="current-password"
+            className="disabled:opacity-60"
+          />
+        </div>
+        <Button type="submit" disabled={supported !== true || busy || password === ""}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           {c("passkeyAdd")}
         </Button>
       </div>
+      <p className="text-xs text-ink-subtle">{c("passkeyPasswordHint")}</p>
       {supported === false && <p className="text-xs text-ink-subtle">{c("passkeyUnsupported")}</p>}
     </form>
   );
