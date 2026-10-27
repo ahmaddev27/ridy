@@ -186,7 +186,12 @@ const en = {
   },
   profile: {
     company: "Company", name: "Name", email: "Email", newPassword: "New password",
-    leaveEmpty: "Leave empty to keep current", tab_info: "Personal info", tab_password: "Password", tab_notifications: "Notifications", confirmPassword: "Confirm password", changePassword: "Change password", passwordChanged: "Password changed", mismatch: "Passwords do not match.", save: "Save", saved: "Saved", saveFailed: "Couldn’t save",
+    leaveEmpty: "Leave empty to keep current", tab_info: "Personal info", tab_password: "Password", tab_notifications: "Notifications", tab_passkeys: "Passkeys", confirmPassword: "Confirm password", changePassword: "Change password", passwordChanged: "Password changed", mismatch: "Passwords do not match.", save: "Save", saved: "Saved", saveFailed: "Couldn’t save",
+    passkeysTitle: "Passkeys", passkeysHint: "Sign in without a password, using your fingerprint, face or device PIN. Add one on each device you use.",
+    passkeysEmpty: "No passkeys yet.", passkeyLoadError: "Couldn’t load your passkeys.", passkeyAddedOn: "Added {date}",
+    passkeyAliasLabel: "Device name (optional)", passkeyAdd: "Add passkey", passkeyAdded: "Passkey added", passkeyAddFailed: "Couldn’t add the passkey",
+    passkeyAlreadyRegistered: "This passkey is already registered.", passkeyUnsupported: "This browser doesn’t support passkeys.",
+    passkeyDelete: "Delete passkey", passkeyDeleteConfirm: "“{name}” will be removed. You will no longer be able to sign in with it.", passkeyDeleted: "Passkey deleted", passkeyDeleteFailed: "Couldn’t delete the passkey",
   },
   companies: {
     newCompany: "New company",
@@ -494,7 +499,12 @@ const de: typeof en = {
   },
   profile: {
     company: "Firma", name: "Name", email: "E-Mail", newPassword: "Neues Passwort",
-    leaveEmpty: "Leer lassen, um beizubehalten", tab_info: "Persönliche Daten", tab_password: "Passwort", tab_notifications: "Benachrichtigungen", confirmPassword: "Passwort bestätigen", changePassword: "Passwort ändern", passwordChanged: "Passwort geändert", mismatch: "Passwörter stimmen nicht überein.", save: "Speichern", saved: "Gespeichert", saveFailed: "Speichern fehlgeschlagen",
+    leaveEmpty: "Leer lassen, um beizubehalten", tab_info: "Persönliche Daten", tab_password: "Passwort", tab_notifications: "Benachrichtigungen", tab_passkeys: "Passkeys", confirmPassword: "Passwort bestätigen", changePassword: "Passwort ändern", passwordChanged: "Passwort geändert", mismatch: "Passwörter stimmen nicht überein.", save: "Speichern", saved: "Gespeichert", saveFailed: "Speichern fehlgeschlagen",
+    passkeysTitle: "Passkeys", passkeysHint: "Melde dich ohne Passwort an — per Fingerabdruck, Gesichtserkennung oder Geräte-PIN. Richte auf jedem Gerät, das du nutzt, einen Passkey ein.",
+    passkeysEmpty: "Noch keine Passkeys eingerichtet.", passkeyLoadError: "Passkeys konnten nicht geladen werden.", passkeyAddedOn: "Hinzugefügt am {date}",
+    passkeyAliasLabel: "Gerätename (optional)", passkeyAdd: "Passkey hinzufügen", passkeyAdded: "Passkey hinzugefügt", passkeyAddFailed: "Passkey konnte nicht hinzugefügt werden",
+    passkeyAlreadyRegistered: "Dieser Passkey ist bereits registriert.", passkeyUnsupported: "Dieser Browser unterstützt keine Passkeys.",
+    passkeyDelete: "Passkey löschen", passkeyDeleteConfirm: "„{name}“ wird entfernt. Du kannst dich damit danach nicht mehr anmelden.", passkeyDeleted: "Passkey gelöscht", passkeyDeleteFailed: "Passkey konnte nicht gelöscht werden",
   },
   companies: {
     newCompany: "Neue Firma",
@@ -800,7 +810,12 @@ const ar: typeof en = {
   },
   profile: {
     company: "الشركة", name: "الاسم", email: "البريد", newPassword: "كلمة مرور جديدة",
-    leaveEmpty: "اتركها فاضية للإبقاء على الحالية", tab_info: "المعلومات الشخصية", tab_password: "كلمة المرور", tab_notifications: "الإشعارات", confirmPassword: "تأكيد كلمة المرور", changePassword: "تغيير كلمة المرور", passwordChanged: "تم تغيير كلمة المرور", mismatch: "كلمتا المرور غير متطابقتين.", save: "حفظ", saved: "تم الحفظ", saveFailed: "تعذّر الحفظ",
+    leaveEmpty: "اتركها فاضية للإبقاء على الحالية", tab_info: "المعلومات الشخصية", tab_password: "كلمة المرور", tab_notifications: "الإشعارات", tab_passkeys: "مفاتيح المرور", confirmPassword: "تأكيد كلمة المرور", changePassword: "تغيير كلمة المرور", passwordChanged: "تم تغيير كلمة المرور", mismatch: "كلمتا المرور غير متطابقتين.", save: "حفظ", saved: "تم الحفظ", saveFailed: "تعذّر الحفظ",
+    passkeysTitle: "مفاتيح المرور", passkeysHint: "سجّل الدخول بدون كلمة مرور — ببصمة الإصبع أو الوجه أو رمز PIN الخاص بجهازك. أضف مفتاحاً على كل جهاز تستخدمه.",
+    passkeysEmpty: "لا توجد مفاتيح مرور بعد.", passkeyLoadError: "تعذّر تحميل مفاتيح المرور.", passkeyAddedOn: "أُضيف في {date}",
+    passkeyAliasLabel: "اسم الجهاز (اختياري)", passkeyAdd: "إضافة مفتاح مرور", passkeyAdded: "تمت إضافة مفتاح المرور", passkeyAddFailed: "تعذّرت إضافة مفتاح المرور",
+    passkeyAlreadyRegistered: "مفتاح المرور هذا مسجّل مسبقاً.", passkeyUnsupported: "هذا المتصفح لا يدعم مفاتيح المرور.",
+    passkeyDelete: "حذف مفتاح المرور", passkeyDeleteConfirm: "سيتم حذف «{name}». لن تتمكن من تسجيل الدخول به بعد ذلك.", passkeyDeleted: "تم حذف مفتاح المرور", passkeyDeleteFailed: "تعذّر حذف مفتاح المرور",
   },
   companies: {
     newCompany: "شركة جديدة",

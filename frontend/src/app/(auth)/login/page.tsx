@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Fingerprint, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { login, fetchMe } from "@/lib/api/auth";
 import type { AuthUser } from "@/lib/api/auth";
@@ -12,6 +12,9 @@ import { ApiError } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n/context";
 import { apiErrorMessage } from "@/lib/api/error-message";
 import { activateCompany } from "@/lib/api/activation";
+import { passkeyLogin, passkeyLoginOptions } from "@/lib/api/webauthn";
+import { usePasskeySupport } from "@/hooks/use-passkey-support";
+import { PasskeyCancelledError, getPasskey } from "@/lib/webauthn";
 import { OtpInput } from "@/components/ui/otp-input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { SuspendedScreen, type SuspendedInfo } from "@/components/auth/suspended-screen";
@@ -41,6 +44,10 @@ export default function LoginPage() {
   const [suspended, setSuspended] = useState<SuspendedInfo | null>(null);
   const [activateMode, setActivateMode] = useState(false);
   const [code, setCode] = useState("");
+  // Not known until after hydration (the prerendered HTML can't tell), so the
+  // button only ever appears on browsers that can actually use it.
+  const passkeyAvailable = usePasskeySupport() === true;
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -81,6 +88,22 @@ export default function LoginPage() {
     }
   }
 
+  /** A suspended company (disabled/banned/expired) → the contact/activate screen.
+   *  False when the error is anything else. Shared by the password and passkey sign-ins. */
+  function showSuspended(err: unknown): boolean {
+    if (!(err instanceof ApiError && err.status === 403 && err.data?.reason)) return false;
+    setSuspended({
+      reason: err.data.reason as SuspendedInfo["reason"],
+      email,
+      password,
+      supportEmail: err.data.support_email as string | null,
+      supportWhatsapp: err.data.support_whatsapp as string | null,
+      paymentReference: (err.data.payment_reference as string | null) ?? null,
+      paymentClaimPending: !!err.data.payment_claim_pending,
+    });
+    return true;
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
@@ -89,17 +112,7 @@ export default function LoginPage() {
       // Super-admins land on the platform panel; managers on their dashboard.
       router.push(homeFor(u));
     } catch (err) {
-      // A suspended company (disabled/banned/expired) → the contact/activate screen.
-      if (err instanceof ApiError && err.status === 403 && err.data?.reason) {
-        setSuspended({
-          reason: err.data.reason as SuspendedInfo["reason"],
-          email,
-          password,
-          supportEmail: err.data.support_email as string | null,
-          supportWhatsapp: err.data.support_whatsapp as string | null,
-          paymentReference: (err.data.payment_reference as string | null) ?? null,
-          paymentClaimPending: !!err.data.payment_claim_pending,
-        });
+      if (showSuspended(err)) {
         setSubmitting(false);
         return;
       }
@@ -109,6 +122,26 @@ export default function LoginPage() {
           : apiErrorMessage(err, t);
       toast.error(t("login.failed"), { description: message });
       setSubmitting(false);
+    }
+  }
+
+  async function onPasskeySignIn() {
+    setPasskeyBusy(true);
+    try {
+      const { ceremony_id, options } = await passkeyLoginOptions();
+      const u = await passkeyLogin(ceremony_id, await getPasskey(options));
+      // Same landing as the password sign-in; stays busy until the navigation happens.
+      router.push(homeFor(u));
+    } catch (err) {
+      setPasskeyBusy(false);
+      // Dismissing the browser prompt is a choice, not an error.
+      if (err instanceof PasskeyCancelledError || showSuspended(err)) return;
+      // The backend rejects every bad passkey alike on purpose; only throttling
+      // and outages are worth telling apart from the generic message.
+      const transient = err instanceof ApiError && (err.status === 429 || err.status >= 500);
+      toast.error(t("login.failed"), {
+        description: transient ? apiErrorMessage(err, t) : t("login.passkeyFailed"),
+      });
     }
   }
 
@@ -194,7 +227,7 @@ export default function LoginPage() {
               />
               {t("login.remember")}
             </label>
-            <Button type="submit" className="w-full" disabled={submitting}>
+            <Button type="submit" className="w-full" disabled={submitting || passkeyBusy}>
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {submitting ? t("login.signingIn") : t("login.signIn")}
             </Button>
@@ -203,6 +236,26 @@ export default function LoginPage() {
               {t("suspended.haveCode")}
             </button>
           </form>
+
+          {passkeyAvailable && (
+            <>
+              <div className="my-5 flex items-center gap-3 text-xs text-ink-subtle">
+                <span className="h-px flex-1 bg-line" />
+                {t("login.or")}
+                <span className="h-px flex-1 bg-line" />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                onClick={onPasskeySignIn}
+                disabled={submitting || passkeyBusy}
+              >
+                {passkeyBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Fingerprint className="h-4 w-4" />}
+                {passkeyBusy ? t("login.signingIn") : t("login.passkeySignIn")}
+              </Button>
+            </>
+          )}
         </div>
       )}
 
