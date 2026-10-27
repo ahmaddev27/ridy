@@ -37,13 +37,20 @@ export function ExtensionBanner() {
     }
 
     window.addEventListener("message", onMessage);
-    window.postMessage({ source: "ridy-ext-ping" }, "*");
+    const ping = () => window.postMessage({ source: "ridy-ext-ping" }, "*");
+    ping();
+    // Re-ping so the banner reflects pairing live: it lives in the app layout and
+    // never remounts across navigation, so after the manager fixes pairing or
+    // reconnects on /connections a one-shot check would stay stale ("isn't paired
+    // yet") until a full page reload. A fresh "present/paired" reply flips it to ok.
+    const poll = setInterval(ping, 5000);
     const timer = setTimeout(() => {
       if (!answered) setState("missing");
     }, 2500);
 
     return () => {
       window.removeEventListener("message", onMessage);
+      clearInterval(poll);
       clearTimeout(timer);
     };
   }, [isManager]);
