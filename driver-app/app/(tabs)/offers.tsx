@@ -235,8 +235,6 @@ export default function OffersScreen() {
               <TextInput
                 value={search}
                 onChangeText={setSearch}
-                placeholder={t("offers.search")}
-                placeholderTextColor={c.inkSubtle}
                 style={{ flex: 1, color: c.ink, fontSize: 15, textAlign: align, writingDirection: isRTL() ? "rtl" : "ltr" }}
                 autoCapitalize="none"
               />

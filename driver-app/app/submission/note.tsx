@@ -139,8 +139,6 @@ export default function NoteScreen() {
         <TextInput
           value={text}
           onChangeText={setText}
-          placeholder={t("note.textHint")}
-          placeholderTextColor={c.inkFaint}
           multiline
           numberOfLines={5}
           style={{

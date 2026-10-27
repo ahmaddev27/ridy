@@ -574,7 +574,6 @@ export default function ReceiptScreen() {
           label={t("receipt.date")}
           value={date}
           editable={false}
-          placeholder="2026-10-07"
           autoCapitalize="none"
         />
         {checkDate && <NeedsCheck c={c} row={row} onConfirm={() => setCheckDate(false)} />}
@@ -583,7 +582,6 @@ export default function ReceiptScreen() {
           label={t("receipt.amount")}
           value={amount}
           editable={false}
-          placeholder="41,47"
         />
         {checkAmount && <NeedsCheck c={c} row={row} onConfirm={() => setCheckAmount(false)} />}
 
@@ -608,14 +606,12 @@ export default function ReceiptScreen() {
           label={t("receipt.merchant")}
           value={merchant}
           editable={false}
-          placeholder={t("receipt.merchantHint")}
         />
 
         <Field
           label={t("receipt.time")}
           value={receiptTime}
           editable={false}
-          placeholder="14:32"
         />
         {timeFromCapture && (
           <Text style={{ color: c.inkSubtle, fontSize: 12.5 }}>{t("receipt.timeFromCapture")}</Text>
@@ -625,14 +621,12 @@ export default function ReceiptScreen() {
           label={t("receipt.plz")}
           value={plz}
           editable={false}
-          placeholder="10179"
         />
 
         <Field
           label={t("receipt.city")}
           value={city}
           editable={false}
-          placeholder="Berlin"
         />
 
         </>
@@ -650,13 +644,11 @@ export default function ReceiptScreen() {
               label={t("receipt.litres")}
               value={litres}
               editable={false}
-              placeholder="41,47"
             />
             <Field
               label={t("receipt.pricePerLitre")}
               value={pricePerLitre}
               editable={false}
-              placeholder="1,789"
             />
 
           </>
@@ -702,7 +694,6 @@ export default function ReceiptScreen() {
               label={t("receipt.odometer")}
               value={odometerKm}
               editable={false}
-              placeholder="25382"
             />
             {/* The range, not a gauge position: it is the only fuel figure on
                 the panel that is text, and it says something actionable. */}
@@ -710,7 +701,6 @@ export default function ReceiptScreen() {
               label={t("receipt.range")}
               value={rangeKm}
               editable={false}
-              placeholder="277"
             />
           </>
         )}
@@ -826,13 +816,11 @@ export default function ReceiptScreen() {
                   label={t("receipt.odometer")}
                   value={odometerKm}
                   editable={false}
-                  placeholder="25382"
                 />
                 <Field
                   label={t("receipt.range")}
                   value={rangeKm}
                   editable={false}
-                  placeholder="277"
                 />
                 {/* Nothing read means nothing to keep: with no typing, the only
                     way forward is the retake below. */}

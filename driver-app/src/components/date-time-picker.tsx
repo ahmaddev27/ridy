@@ -114,7 +114,7 @@ export function DateField({ label, value, onChange }: { label: string; value: st
         c={c}
         label={label}
         display={value.trim() === "" ? "" : `${pad(selected.getDate())}.${pad(selected.getMonth() + 1)}.${selected.getFullYear()}`}
-        placeholder={t("cal.pickDate")}
+        placeholder=""
         onPress={() => {
           setCursor(new Date(selected.getFullYear(), selected.getMonth(), 1));
           setOpen(true);
@@ -241,7 +241,7 @@ export function TimeField({ label, value, onChange }: { label: string; value: st
 
   return (
     <>
-      <PickerField c={c} label={label} display={toTimeValue(hour, minute)} placeholder={t("cal.pickTime")} onPress={() => setOpen(true)} />
+      <PickerField c={c} label={label} display={toTimeValue(hour, minute)} placeholder="" onPress={() => setOpen(true)} />
 
       {open && (
         <Sheet c={c} title={label} onClose={() => setOpen(false)}>
