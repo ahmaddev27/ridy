@@ -203,5 +203,6 @@ class WebauthnLoginTest extends TestCase
     {
         $this->assertNotNull(RateLimiter::limiter('webauthn-options'));
         $this->assertNotNull(RateLimiter::limiter('webauthn-verify'));
+        $this->assertNotNull(RateLimiter::limiter('webauthn-stepup'));
     }
 }

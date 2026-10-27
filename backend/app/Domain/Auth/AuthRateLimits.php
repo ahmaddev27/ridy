@@ -69,6 +69,15 @@ class AuthRateLimits
             Limit::perMinute(10)->by('webauthn-verify:'.self::clientKey($request)),
             ...self::perCredentialAndClient($request, Limit::perMinutes(15, 20)),
         ]);
+
+        // The password step-up before a passkey enrolment (B2): an authenticated
+        // password oracle, so it gets the `credentials` budget — keyed on the
+        // ACCOUNT rather than an email, since here the session is the attacker's
+        // handle. Tighter than `webauthn-options`, which it replaces on that route.
+        RateLimiter::for('webauthn-stepup', fn (Request $request) => [
+            Limit::perMinute(10)->by('ip:'.self::clientKey($request)),
+            Limit::perMinutes(15, 20)->by('webauthn-stepup:'.self::principalKey($request)),
+        ]);
     }
 
     /**

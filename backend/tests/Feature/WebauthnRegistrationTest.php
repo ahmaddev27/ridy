@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Admin\ImpersonationController;
 use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -40,6 +41,15 @@ class WebauthnRegistrationTest extends TestCase
         Sanctum::actingAs($user);
 
         return $user;
+    }
+
+    /**
+     * Starts an enrolment the way the dashboard does: with the account password
+     * (B2 step-up). Every user these tests create signs in with 'password'.
+     */
+    private function startRegistration(string $password = 'password'): TestResponse
+    {
+        return $this->postJson('/api/v1/webauthn/register/options', ['password' => $password]);
     }
 
     private function fakeVerifiedRegistration(string $credentialId = 'cred-id-1'): void
@@ -72,14 +82,14 @@ class WebauthnRegistrationTest extends TestCase
 
     public function test_register_options_require_authentication(): void
     {
-        $this->postJson('/api/v1/webauthn/register/options')->assertUnauthorized();
+        $this->startRegistration()->assertUnauthorized();
     }
 
     public function test_register_options_return_a_resident_key_challenge(): void
     {
         $this->actingUser();
 
-        $response = $this->postJson('/api/v1/webauthn/register/options')->assertOk();
+        $response = $this->startRegistration()->assertOk();
 
         $response->assertJsonStructure(['ceremony_id', 'options' => ['challenge', 'rp', 'user', 'pubKeyCredParams']]);
         $this->assertSame('localhost', $response->json('options.rp.id'));
@@ -88,13 +98,31 @@ class WebauthnRegistrationTest extends TestCase
         $this->assertNotSame('', (string) $response->json('options.challenge'));
     }
 
+    public function test_register_options_require_the_account_password(): void
+    {
+        $this->actingUser();
+
+        // B2 step-up: a hijacked session alone must not be able to start an
+        // enrolment. The UI reads `errors.password` as "wrong password".
+        $this->postJson('/api/v1/webauthn/register/options')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['password']);
+
+        $this->startRegistration('not-the-password')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['password'])
+            ->assertJsonMissingPath('ceremony_id');
+
+        $this->startRegistration('password')->assertOk()->assertJsonStructure(['ceremony_id']);
+    }
+
     public function test_register_options_exclude_already_registered_credentials(): void
     {
         $user = $this->actingUser();
 
         WebauthnCredential::factory()->for($user, 'authenticatable')->create(['id' => 'existing-cred']);
 
-        $this->postJson('/api/v1/webauthn/register/options')
+        $this->startRegistration()
             ->assertOk()
             ->assertJsonPath('options.excludeCredentials.0.id', 'existing-cred');
     }
@@ -104,7 +132,7 @@ class WebauthnRegistrationTest extends TestCase
         $user = $this->actingUser();
         $this->fakeVerifiedRegistration('new-cred');
 
-        $ceremonyId = $this->postJson('/api/v1/webauthn/register/options')->json('ceremony_id');
+        $ceremonyId = $this->startRegistration()->json('ceremony_id');
 
         $this->postJson('/api/v1/webauthn/register', [
             'ceremony_id' => $ceremonyId,
@@ -125,7 +153,7 @@ class WebauthnRegistrationTest extends TestCase
         $this->actingUser();
         $this->fakeVerifiedRegistration('once-cred');
 
-        $ceremonyId = $this->postJson('/api/v1/webauthn/register/options')->json('ceremony_id');
+        $ceremonyId = $this->startRegistration()->json('ceremony_id');
         $payload = ['ceremony_id' => $ceremonyId, 'credential' => ['id' => 'once-cred', 'type' => 'public-key']];
 
         $this->postJson('/api/v1/webauthn/register', $payload)->assertCreated();
@@ -140,7 +168,7 @@ class WebauthnRegistrationTest extends TestCase
         $this->fakeVerifiedRegistration('stolen-cred');
 
         // Anna starts a ceremony; Omar (same company, his own session) answers it.
-        $ceremonyId = $this->postJson('/api/v1/webauthn/register/options')->json('ceremony_id');
+        $ceremonyId = $this->startRegistration()->json('ceremony_id');
 
         $omar = User::create(['name' => 'Omar', 'email' => 'omar@acme.de', 'password' => bcrypt('x')]);
         Sanctum::actingAs($omar);
@@ -160,7 +188,7 @@ class WebauthnRegistrationTest extends TestCase
 
         WebauthnCredential::factory()->for($user, 'authenticatable')->create(['id' => 'dup-cred']);
 
-        $ceremonyId = $this->postJson('/api/v1/webauthn/register/options')->json('ceremony_id');
+        $ceremonyId = $this->startRegistration()->json('ceremony_id');
 
         $this->postJson('/api/v1/webauthn/register', [
             'ceremony_id' => $ceremonyId,
@@ -225,7 +253,7 @@ class WebauthnRegistrationTest extends TestCase
         // The owner-app token (fleet:read) is confined by dashboard.only.
         Sanctum::actingAs($user, ['fleet:read']);
 
-        $this->postJson('/api/v1/webauthn/register/options')->assertForbidden();
+        $this->startRegistration()->assertForbidden();
         $this->getJson('/api/v1/webauthn/credentials')->assertForbidden();
     }
 
@@ -252,7 +280,7 @@ class WebauthnRegistrationTest extends TestCase
         $acting = $this->withHeader('Referer', 'http://localhost')
             ->withSession([ImpersonationController::KEY => 999]);
 
-        $acting->postJson('/api/v1/webauthn/register/options')
+        $acting->postJson('/api/v1/webauthn/register/options', ['password' => 'password'])
             ->assertForbidden()->assertJsonPath('message', 'impersonation_forbidden');
         $acting->postJson('/api/v1/webauthn/register', [
             'ceremony_id' => 'whatever',

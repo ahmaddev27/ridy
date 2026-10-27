@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Auth\Webauthn\PasskeyRegistrar;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\WebauthnRegisterOptionsRequest;
 use App\Http\Requests\Api\V1\WebauthnRegisterRequest;
 use App\Http\Resources\WebauthnCredentialResource;
 use Illuminate\Http\JsonResponse;
@@ -20,7 +21,8 @@ class WebauthnCredentialController extends Controller
 {
     public function __construct(private readonly PasskeyRegistrar $registrar) {}
 
-    public function registerOptions(Request $request): JsonResponse
+    /** The step-up: the request re-proves the account password before a ceremony is parked. */
+    public function registerOptions(WebauthnRegisterOptionsRequest $request): JsonResponse
     {
         return response()->json($this->registrar->start($request->user()));
     }

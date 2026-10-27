@@ -264,8 +264,9 @@ Route::prefix('v1')->group(function () {
         // is never public, a scoped token is kept out by `dashboard.only`, and
         // nothing that changes how the account signs in is reachable while a
         // super-admin is acting as the company (`not.impersonating`) — the list
-        // stays readable, it changes nothing.
-        Route::post('webauthn/register/options', [WebauthnCredentialController::class, 'registerOptions'])->middleware(['not.impersonating', 'throttle:webauthn-options']);
+        // stays readable, it changes nothing. Starting an enrolment re-checks the
+        // account password (B2 step-up), so it carries the credential budget.
+        Route::post('webauthn/register/options', [WebauthnCredentialController::class, 'registerOptions'])->middleware(['not.impersonating', 'throttle:webauthn-stepup']);
         Route::post('webauthn/register', [WebauthnCredentialController::class, 'register'])->middleware(['not.impersonating', 'throttle:webauthn-verify']);
         Route::get('webauthn/credentials', [WebauthnCredentialController::class, 'index']);
         Route::delete('webauthn/credentials/{credential}', [WebauthnCredentialController::class, 'destroy'])->middleware('not.impersonating');
