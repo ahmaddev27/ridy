@@ -20,13 +20,13 @@
  * `Unsicher` prefix to decide which field the driver must confirm by hand.
  * Rewording one is a behaviour change.
  *
- * ⚠ 27.10.2026: THIS copy moved ahead of El-Professor's. Added here, not yet
- * back-ported there: sale-time vs TSE-time separation (`tseTime`), the
- * columnar `Datum Zeit Bon` trailer (`bonNumber`), the station header split
- * (`street`/`stationName`/`operatorName`), the Summe-Netto and payment-line
- * guards, the Liter×Preis cross-check, and the two-space column boundary in
- * `normalizeOcrText`. Until the twin takes the same change with the JET
- * fixtures, the "must move together" contract above is a TODO, not a fact.
+ * ⚠ 27.10.2026, resolved the same day: this copy moved ahead (sale-time vs
+ * TSE-time separation, the columnar `Datum Zeit Bon` trailer, the station
+ * header split, the Summe-Netto and payment-line guards, the Liter×Preis
+ * cross-check, the two-space column boundary in `normalizeOcrText`), and
+ * El-Professor took the identical change with the JET fixtures the same day
+ * (`src/utils/receiptTextParse.ts`, branch work/receipt-extraction). The
+ * copies are level again.
  */
 
 export interface OcrResult {
