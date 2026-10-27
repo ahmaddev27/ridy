@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Auth\Webauthn\Models\WebauthnCredential;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\RosterSyncService;
@@ -165,6 +166,24 @@ class RosterSyncTest extends TestCase
             'id' => $tokenId,
             'tokenable_type' => $keep->getMorphClass(),
             'tokenable_id' => $keep->id,
+        ]);
+    }
+
+    public function test_dedupe_carries_the_drivers_passkey_to_the_canonical_row(): void
+    {
+        $keep = Driver::create(['tenant_id' => $this->tenant->id, 'name' => 'Old', 'uber_driver_uuid' => self::DRIVER_UUID, 'activated_at' => now()->subDay()]);
+        $dupe = Driver::create(['tenant_id' => $this->tenant->id, 'name' => 'Dupe', 'uber_driver_uuid' => self::DRIVER_UUID, 'activated_at' => now()]);
+        WebauthnCredential::factory()->for($dupe, 'authenticatable')->create(['id' => 'dupe-passkey']);
+
+        app(RosterSyncService::class)->sync($this->tenant->id, [$this->driver()]);
+
+        // The query-builder delete fires no model events, so the merge must carry
+        // the passkey itself — the person is the same, only their row changed.
+        $this->assertDatabaseMissing('drivers', ['id' => $dupe->id]);
+        $this->assertDatabaseHas('webauthn_credentials', [
+            'id' => 'dupe-passkey',
+            'authenticatable_type' => $keep->getMorphClass(),
+            'authenticatable_id' => $keep->id,
         ]);
     }
 

@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsureDriverTenantActive;
 use App\Http\Middleware\EnsureElProfessorEnabled;
 use App\Http\Middleware\EnsureFleetConnected;
 use App\Http\Middleware\EnsureFleetOwner;
+use App\Http\Middleware\EnsureNotImpersonating;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureUserAccount;
 use App\Http\Middleware\EnsureUserTenantActive;
@@ -63,6 +64,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'user.active' => EnsureUserTenantActive::class,
             'fleet.connected' => EnsureFleetConnected::class,
             'dashboard.only' => EnsureDashboardToken::class,
+            // Refuses credential changes while a super-admin acts as a company.
+            'not.impersonating' => EnsureNotImpersonating::class,
             'driver.account' => EnsureDriverAccount::class,
             'fleet.owner' => EnsureFleetOwner::class,
             // The platform's per-company switch for the El-Professor link.

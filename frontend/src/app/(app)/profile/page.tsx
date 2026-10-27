@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Save, User, KeyRound, Bell } from "lucide-react";
+import { Loader2, Save, User, KeyRound, Fingerprint, Bell } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -11,13 +11,14 @@ import { useI18n } from "@/lib/i18n/context";
 import { useAuth } from "@/components/auth/auth-provider";
 import { updateProfile } from "@/lib/api/auth";
 import { NotificationSettings } from "./notification-settings";
+import { PasskeySettings } from "./passkey-settings";
 
 export default function ProfilePage() {
   const { t } = useI18n();
   const c = (k: string) => t(`screens.profile.${k}`);
   const { user, refresh } = useAuth();
 
-  const [tab, setTab] = useState<"info" | "password" | "notifications">("info");
+  const [tab, setTab] = useState<"info" | "password" | "passkeys" | "notifications">("info");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -72,6 +73,7 @@ export default function ProfilePage() {
           {([
             { k: "info", icon: User },
             { k: "password", icon: KeyRound },
+            { k: "passkeys", icon: Fingerprint },
             { k: "notifications", icon: Bell },
           ] as const).map(({ k, icon: Icon }) => {
             const active = tab === k;
@@ -102,6 +104,8 @@ export default function ProfilePage() {
 
           {tab === "notifications" ? (
             <NotificationSettings />
+          ) : tab === "passkeys" ? (
+            <PasskeySettings />
           ) : tab === "info" ? (
             <>
               <div className="grid gap-3 sm:grid-cols-2">
