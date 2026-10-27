@@ -21,7 +21,9 @@ return new class extends Migration
             // raw bytes by spec, in practice 16–64; 510 chars is what laragear
             // sized it at and fits an InnoDB primary key under utf8mb4.
             $table->string('id', 510)->primary();
-            $table->morphs('authenticatable');
+            // Named: the auto-generated morph index name is 66 chars, past
+            // MySQL's 64-char identifier limit (sqlite in tests never minds).
+            $table->morphs('authenticatable', 'webauthn_credentials_authenticatable');
 
             // The opaque, stable per-account id the authenticator stores with the
             // credential (user.id in the ceremony). One per account, reused on
