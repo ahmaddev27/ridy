@@ -833,6 +833,128 @@ class ElProfessorConnectionTest extends TestCase
         $this->assertSame('14:32', $row->payload['receipt_time']);
     }
 
+    /** @return array<string, mixed> */
+    private function aSplitReceipt(array $over = []): array
+    {
+        return array_merge([
+            'subject' => 'receipt',
+            'receipt_date' => '2026-10-07',
+            'amount' => '41.47',
+            'category' => 'Tanken',
+            'station_name' => 'JET Tankstelle',
+            'operator_name' => 'Morten Jürgensmeier',
+            'street' => 'Eckeseyer Straße 113-115',
+            'receipt_number' => '004711',
+            'tse_time' => '14:32:07',
+        ], $over);
+    }
+
+    public function test_the_split_receipt_fields_land_in_the_payload_and_the_ocr_audit_in_its_columns(): void
+    {
+        Queue::fake();
+        $this->connectCompany();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+        $meta = [
+            'parser_version' => '2026.10.27',
+            'fields' => ['amount' => ['source' => 'ocr', 'confidence' => 0.97]],
+            'confirmations' => [['field' => 'plz', 'at' => '2026-10-27T10:00:00Z']],
+        ];
+
+        $body = $this->postJson('/api/v1/driver/submissions', $this->aSplitReceipt([
+            'ocr_text' => "JET\nBon 004711\nSumme 41,47",
+            'ocr_meta' => $meta,
+        ]))->assertStatus(201)->json('data');
+
+        $row = ElProfessorSubmission::withoutGlobalScopes()->firstWhere('uuid', $body['id']);
+        $this->assertSame('JET Tankstelle', $row->payload['station_name']);
+        $this->assertSame('Morten Jürgensmeier', $row->payload['operator_name']);
+        $this->assertSame('Eckeseyer Straße 113-115', $row->payload['street']);
+        $this->assertSame('004711', $row->payload['receipt_number']);
+        $this->assertSame('14:32:07', $row->payload['tse_time']);
+        $this->assertSame("JET\nBon 004711\nSumme 41,47", $row->ocr_text);
+        $this->assertSame($meta, $row->ocr_meta);
+        $this->assertArrayNotHasKey('ocr_text', $row->payload);
+        $this->assertArrayNotHasKey('ocr_meta', $row->payload);
+    }
+
+    public function test_the_ocr_audit_never_reaches_the_fetch_or_the_driver_archive(): void
+    {
+        Queue::fake();
+        $this->connectCompany();
+        $driver = $this->driver($this->tenant, 'Omar');
+        $this->actingAsDriver($driver);
+        $body = $this->postJson('/api/v1/driver/submissions', $this->aSplitReceipt([
+            'ocr_text' => 'RAW-OCR-MARKER',
+            'ocr_meta' => ['parser_version' => 'META-MARKER'],
+        ]))->assertStatus(201)->json('data');
+
+        $archive = $this->getJson('/api/v1/driver/submissions/'.$body['id'])->assertOk();
+        $this->assertStringNotContainsString('RAW-OCR-MARKER', $archive->getContent());
+        $this->assertStringNotContainsString('META-MARKER', $archive->getContent());
+
+        $row = ElProfessorSubmission::withoutGlobalScopes()->firstWhere('uuid', $body['id']);
+        $this->assertStringNotContainsString('RAW-OCR-MARKER', json_encode((array) $row->payload));
+        $this->assertStringNotContainsString('META-MARKER', json_encode((array) $row->payload));
+    }
+
+    public function test_the_old_receipt_shape_without_the_new_fields_is_still_accepted(): void
+    {
+        Queue::fake();
+        $this->connectCompany();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        $body = $this->postJson('/api/v1/driver/submissions', [
+            'subject' => 'receipt',
+            'receipt_date' => '2026-10-07',
+            'amount' => '41.47',
+            'category' => 'Tanken',
+        ])->assertStatus(201)->json('data');
+
+        $row = ElProfessorSubmission::withoutGlobalScopes()->firstWhere('uuid', $body['id']);
+        $this->assertNull($row->ocr_text);
+        $this->assertNull($row->ocr_meta);
+        $this->assertArrayNotHasKey('tse_time', $row->payload);
+    }
+
+    public function test_a_malformed_tse_time_or_an_overlong_receipt_number_is_refused(): void
+    {
+        Queue::fake();
+        $this->connectCompany();
+        $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
+
+        $this->postJson('/api/v1/driver/submissions', $this->aSplitReceipt(['tse_time' => '8:70:00']))
+            ->assertStatus(422)->assertJsonValidationErrors('tse_time');
+        $this->postJson('/api/v1/driver/submissions', $this->aSplitReceipt(['receipt_number' => str_repeat('1', 33)]))
+            ->assertStatus(422)->assertJsonValidationErrors('receipt_number');
+    }
+
+    public function test_the_detail_carries_the_split_fields_and_null_when_absent(): void
+    {
+        $this->connectCompany();
+        $driver = $this->driver($this->tenant, 'Omar');
+        $full = $this->submission($this->tenant, $driver, [
+            'payload' => [
+                'amount' => '41.47', 'station_name' => 'JET Tankstelle', 'operator_name' => 'Morten Jürgensmeier',
+                'street' => 'Eckeseyer Straße 113-115', 'receipt_number' => '004711', 'tse_time' => '14:32:07',
+            ],
+        ]);
+        $old = $this->submission($this->tenant, $driver, ['payload' => ['amount' => '5.00']]);
+        $this->actingAsDriver($driver);
+
+        $fields = $this->getJson('/api/v1/driver/submissions/'.$full->uuid)->assertOk()->json('data.fields');
+        $this->assertSame('JET Tankstelle', $fields['station_name']);
+        $this->assertSame('Morten Jürgensmeier', $fields['operator_name']);
+        $this->assertSame('Eckeseyer Straße 113-115', $fields['street']);
+        $this->assertSame('004711', $fields['receipt_number']);
+        $this->assertSame('14:32:07', $fields['tse_time']);
+
+        $oldFields = $this->getJson('/api/v1/driver/submissions/'.$old->uuid)->assertOk()->json('data.fields');
+        foreach (['station_name', 'operator_name', 'street', 'receipt_number', 'tse_time'] as $key) {
+            $this->assertArrayHasKey($key, $oldFields);
+            $this->assertNull($oldFields[$key]);
+        }
+    }
+
     public function test_a_bare_number_odometer_is_refused_rather_than_stored_as_one(): void
     {
         // This is the silent-loss case, and it is why the rule says `string`.

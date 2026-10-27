@@ -225,6 +225,21 @@ class DriverSubmissionController extends Controller
                 'merchant_name' => ['nullable', 'string', 'max:200'],
                 'city' => ['nullable', 'string', 'max:120'],
                 'receipt_time' => ['nullable', 'date_format:H:i'],
+                // The Beleg's header split into what it actually prints. Older
+                // apps send `merchant_name` alone, so all of these are optional.
+                'station_name' => ['nullable', 'string', 'max:120'],
+                'operator_name' => ['nullable', 'string', 'max:120'],
+                'street' => ['nullable', 'string', 'max:200'],
+                // The number printed on the receipt itself (beside `Bon` on a
+                // JET one), never an id of ours.
+                'receipt_number' => ['nullable', 'string', 'max:32'],
+                // The German fiscal (TSE) timestamp's time of day. It is NOT
+                // the sale time, which stays `receipt_time`, so it travels apart.
+                'tse_time' => ['nullable', 'date_format:H:i:s'],
+                // Audit only: stored in their own columns below, kept out of
+                // the payload that El-Professor fetches and the driver reads.
+                'ocr_text' => ['nullable', 'string', 'max:8000'],
+                'ocr_meta' => ['nullable', 'array'],
                 // Fuel only, and the app sends null on everything else. One
                 // shape on the wire, as with the amount: a plain decimal with
                 // a dot, two places for litres and three for the unit price.
@@ -302,7 +317,7 @@ class DriverSubmissionController extends Controller
 
         // An absent plate is sent as an absent field, never as null.
         $payload = collect($data)
-            ->except(['subject', 'document'])
+            ->except(['subject', 'document', 'ocr_text', 'ocr_meta'])
             ->reject(fn ($value, $key) => $key === 'vehicle_plate' && $value === null)
             ->all();
 
@@ -312,6 +327,8 @@ class DriverSubmissionController extends Controller
             'subject' => $subject,
             'status' => ElProfessorSubmission::STATUS_PENDING,
             'payload' => $payload,
+            'ocr_text' => $data['ocr_text'] ?? null,
+            'ocr_meta' => $data['ocr_meta'] ?? null,
             'document_path' => $path,
             'document_mime' => $mime,
             'document_bytes' => $bytes,

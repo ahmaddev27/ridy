@@ -104,6 +104,20 @@ export type ReceiptDraft = {
   city: string;
   /** `HH:MM` as printed on the Beleg, not when it was sent. */
   receipt_time: string;
+  /** The station's street and house number, read from the letterhead. */
+  street?: string | null;
+  /** The brand half of the letterhead ("JET Tankstelle") when the reader
+   *  could split it; the operator is the person after it. */
+  station_name?: string | null;
+  operator_name?: string | null;
+  /** The receipt's own printed number (`Bon`/`Beleg-Nr`), never an internal id. */
+  receipt_number?: string | null;
+  /** The fiscal TSE clock, `HH:MM:SS` — NOT the sale time, stored apart. */
+  tse_time?: string | null;
+  /** The raw OCR rows the figures were read from, for later review. */
+  ocr_text?: string | null;
+  /** Per-field provenance: source, confidence, reason, confirmation taps. */
+  ocr_meta?: Record<string, unknown> | null;
   /** Fuel only, and null on everything else. Plain decimals with a dot:
    *  two places for litres, three for the unit price. */
   litres: string | null;

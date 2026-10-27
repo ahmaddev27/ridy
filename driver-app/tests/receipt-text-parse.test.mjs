@@ -124,9 +124,156 @@ test("invoice over a thousand euros: date from a Belegdatum label", () => {
   assert.equal(parseReceiptText(BIG).date, "2026-02-15");
 });
 
-test('invoice over a thousand euros: reports the word "datum" as a receipt number', () => {
-  // Recorded, not endorsed. This line is what fails when it is fixed.
-  assert.equal(parseReceiptText(BIG).receiptNumber, "datum");
+test("invoice over a thousand euros: no receipt number rather than a word", () => {
+  // Fixed deliberately on 27.10.2026: `Beleg` now requires a word boundary, so
+  // `Belegdatum` no longer yields the word "datum" as a number. No number on
+  // this invoice means none is reported.
+  assert.equal(parseReceiptText(BIG).receiptNumber, undefined);
+});
+
+// ── The JET Hagen receipt, 20.10.2026 ────────────────────────────────────────
+//
+// A real receipt that exposed four misreadings at once (errors/ in the repo):
+// the TSE Anmeldezeit (08:46:19) was reported as the sale time instead of the
+// printed `Datum Zeit` 08:45; `Summe Netto` outscored `Summe` through the
+// position bonus and 34,52 was reported as the total with full confidence;
+// the printed Bon number (90521) was not read at all; and on a tilted photo
+// the city came out as "Hagen Tei.Nr." and the merchant as the street plus
+// the garbled name. Values asserted here are what the PAPER prints — the
+// fixture is the receipt, not the bug.
+
+/** The rows as printed: name, street, PLZ, contact block, items, totals,
+ *  TSE block, and the columnar `Datum Zeit Bon` trailer. */
+const JET = `JET Tankstelle Morten Jürgensmeier
+Eckeseyer Straße 113-115
+58089 Hagen
+Tel.Nr. 0 23 31- 2 24 88
+Fax.Nr.0 23 31-92 45 07
+Steuer-Nr. 321/5125/2808
+www.JET.de
+* 19,95 Liter #  08 *  EUR  41,08*A
+Super E10
+2,059 EUR / Liter
+Z-Summe  EUR  41,08
+19,00 % MWST. A  EUR  6,56
+Summe  EUR  41,08
+Bar Indoor  EUR  41,08
+19,00 % MWST. A  EUR  6,56
+Summe Netto  EUR  34,52
+POS S/N: NAMOS-4314-002
+TSE S/N: B81779BAB235100F610722F9D42C171
+Transaktionsnummer: 1142170
+Anmeldezeit (Start): 20.10.2026 08:46:19
+Anmeldezeit (Ende): 20.10.2026 08:46:19
+Signaturzähler: 2659248
+Datum  Zeit  Bon  POS KNo Schicht
+20.10.26  08:45  90521  02 0005  848
+Wir bedanken uns für Ihren Einkauf und w`;
+
+/** The same receipt as a tilted photo yields it: the first two rows merged
+ *  left-first, the PLZ row merged with the Tel row, OCR misreads kept. */
+const JET_TILTED = `Eckeseyer Straße 113-115  JET Tankstel le Morten Jtirgensmeier
+58089 Hagen  Tei.Nr. 0 23 31- 2 24 88
+Fax.Nr.0 23 31-92 45 07
+Steuer-Nr. 321/5125/2808
+www.JET.de
+* 19,95 Liter #  08 *  EUR  41,08*A
+Super E10
+2,059 EUR / Liter
+Z-Summe  EUR  41,08
+19,00 % MWST. A  EUR  6,56
+Summe  EUR  41,08
+Bar Indoor  EUR  41,08
+19,00 % MWST. A  EUR  6,56
+Summe Netto  EUR  34,52
+Transaktionsnummer: 1142170
+Anmeldezeit (Start): 20.10.2026 08:46:19
+Anmeldezeit (Ende): 20.10.2026 08:46:19
+Datum  Zeit  Bon  POS KNo Schicht
+20.10.26  08:45  90521  02 0005  848
+Wir bedanken uns für Ihren Einkauf und w`;
+
+test("JET: the printed sale time, not the TSE Anmeldezeit", () => {
+  const r = parseReceiptText(JET);
+  assert.equal(r.time, "08:45");
+  assert.equal(r.tseTime, "08:46:19");
+  assert.equal(r.date, "2026-10-20");
+});
+
+test("JET: the Summe, never the Summe Netto, the MWST or the tendered cash", () => {
+  assert.equal(parseReceiptText(JET).amount, 41.08);
+});
+
+test("JET: the printed Bon number from the columnar trailer", () => {
+  assert.equal(parseReceiptText(JET).bonNumber, "90521");
+});
+
+test("JET: station, operator and street as separate fields, umlauts intact", () => {
+  const r = parseReceiptText(JET);
+  assert.equal(r.merchantName, "JET Tankstelle Morten Jürgensmeier");
+  assert.equal(r.stationName, "JET Tankstelle");
+  assert.equal(r.operatorName, "Morten Jürgensmeier");
+  assert.equal(r.street, "Eckeseyer Straße 113-115");
+  assert.equal(r.postalCode, "58089");
+  assert.equal(r.city, "Hagen");
+});
+
+test("JET: fuel figures with the third decimal, and the product confirms the total", () => {
+  const r = parseReceiptText(JET);
+  assert.equal(r.litres, 19.95);
+  assert.equal(r.pricePerLitre, 2.059);
+  // 19,95 × 2,059 = 41,077 ≈ the printed 41,08, so the total is confirmed
+  // rather than flagged.
+  assert.equal(r.amountReason?.startsWith("Unsicher"), false);
+});
+
+test("JET tilted: the city is not the phone number", () => {
+  const r = parseReceiptText(JET_TILTED);
+  assert.equal(r.city, "Hagen");
+  assert.equal(r.postalCode, "58089");
+});
+
+test("JET tilted: the street does not contaminate the merchant", () => {
+  const r = parseReceiptText(JET_TILTED);
+  assert.equal(r.street, "Eckeseyer Straße 113-115");
+  assert.equal(r.merchantName?.includes("Straße"), false);
+  assert.equal(r.merchantName?.includes("113"), false);
+});
+
+test("JET tilted: sale time and total survive the tilt", () => {
+  const r = parseReceiptText(JET_TILTED);
+  assert.equal(r.time, "08:45");
+  assert.equal(r.amount, 41.08);
+});
+
+// ── Guard rails the JET case exposed, as their own minimal fixtures ─────────
+
+test("Summe Netto never beats a labelled total, whatever its position", () => {
+  const r = parseReceiptText(`Tankstelle Test
+Gesamtbetrag  EUR  50,00
+19,00 % MWST  EUR  7,98
+Summe Netto  EUR  42,02`);
+  assert.equal(r.amount, 50);
+});
+
+test("a total below litres times price is flagged for review, not replaced", () => {
+  // 30 l × 1,80 = 54,00, yet the only total line says 42,02: on a fuel
+  // receipt the total cannot undercut the fuel line alone, so the figure is
+  // kept (discounts exist) but marked for the driver to confirm.
+  const r = parseReceiptText(`Tankstelle Test
+Diesel
+30,00 Liter
+1,800 EUR / Liter
+Gesamtbetrag  EUR  42,02`);
+  assert.equal(r.amount, 42.02);
+  assert.equal(r.amountReason?.startsWith("Unsicher"), true);
+});
+
+test("ARAL fixture: street and station read from the header", () => {
+  const r = parseReceiptText(FUEL);
+  assert.equal(r.street, "Hauptstrasse 12");
+  assert.equal(r.stationName, "ARAL Tankstelle");
+  assert.equal(r.operatorName, undefined);
 });
 
 test("empty text answers an empty result rather than throwing", () => {

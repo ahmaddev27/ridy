@@ -49,12 +49,13 @@ class ElProfessorSubmission extends Model
 
     protected $fillable = [
         'tenant_id', 'driver_id', 'uuid', 'subject', 'status', 'payload',
-        'document_path', 'document_mime', 'document_bytes',
+        'ocr_text', 'ocr_meta', 'document_path', 'document_mime', 'document_bytes',
         'fetched_at', 'decided_at', 'decision_code', 'decision_text',
     ];
 
     protected $casts = [
         'payload' => 'array',
+        'ocr_meta' => 'array',
         'document_bytes' => 'integer',
         'fetched_at' => 'datetime',
         'decided_at' => 'datetime',

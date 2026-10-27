@@ -97,6 +97,61 @@ function retakeMessage(messageKey: string, missing: RequiredField[]): string {
   return `${t(messageKey)}\n${t("receipt.retakeMissing", { fields: names })}`;
 }
 
+/**
+ * The review trail that travels with the figures: which source each field's
+ * value came from, how sure the reader was, and when the driver vouched for a
+ * flagged one. With the photo staying on the phone this is what a reviewer
+ * has to judge a misreading by, so "confirmed" (the driver pressed the amber
+ * button on the value as read) is recorded distinctly from a value nobody
+ * questioned — and a manual CHANGE cannot occur here at all, because every
+ * field is read-only.
+ */
+function buildOcrMeta(
+  r: OcrResult | null,
+  opts: {
+    timeFromCapture: boolean;
+    cityFromPlz: boolean;
+    confirmedDateAt: string | null;
+    confirmedAmountAt: string | null;
+    fuel: boolean;
+    odometerSent: boolean;
+  },
+): Record<string, unknown> {
+  const field = (source: string, extra?: Record<string, unknown>) => ({ source, ...extra });
+  const fields: Record<string, unknown> = {
+    receipt_date: field("ocr", {
+      confidence: r?.dateConfidence ?? null,
+      reason: r?.dateReason ?? null,
+      ...(opts.confirmedDateAt !== null ? { confirmed_at: opts.confirmedDateAt } : {}),
+    }),
+    amount: field("ocr", {
+      confidence: r?.amountConfidence ?? null,
+      reason: r?.amountReason ?? null,
+      ...(opts.confirmedAmountAt !== null ? { confirmed_at: opts.confirmedAmountAt } : {}),
+    }),
+    receipt_time: field(opts.timeFromCapture ? "capture_clock" : "ocr"),
+    city: field(opts.cityFromPlz ? "plz_table" : "ocr"),
+    merchant_name: field("ocr"),
+    postal_code: field("ocr"),
+    street: field("ocr"),
+    station_name: field("ocr"),
+    operator_name: field("ocr"),
+    receipt_number: field("ocr"),
+    tse_time: field("ocr"),
+  };
+  if (opts.fuel) {
+    fields.litres = field("ocr");
+    fields.price_per_litre = field("ocr");
+  }
+  if (opts.odometerSent) {
+    // These two are READ FROM THE CLUSTER PHOTO, never from the receipt: a
+    // reviewer who sees them beside receipt fields needs that said.
+    fields.odometer_km = field("odometer_photo");
+    fields.range_km = field("odometer_photo");
+  }
+  return { parser: "receipt-text-parse 2026-10-27", fields };
+}
+
 /** `YYYY-MM-DD` in the phone's own day, which is the day the driver means. */
 function today(): string {
   const d = new Date();
@@ -139,6 +194,21 @@ export default function ReceiptScreen() {
   const [receiptTime, setReceiptTime] = useState("");
   const [litres, setLitres] = useState("");
   const [pricePerLitre, setPricePerLitre] = useState("");
+  // The letterhead beyond the one merchant line, and the receipt's own
+  // printed number. Read-only like everything else; empty when not printed.
+  const [street, setStreet] = useState("");
+  const [bonNumber, setBonNumber] = useState("");
+
+  // Audit material that now travels WITH the figures (owner, 27.10.2026):
+  // the raw rows the OCR produced, the parsed result they were read into,
+  // whether the city came from the server's PLZ table rather than the paper,
+  // and when the driver vouched for a flagged field. The photo still stays on
+  // the phone; this is the review trail that replaced it.
+  const [ocrText, setOcrText] = useState("");
+  const [lastScan, setLastScan] = useState<OcrResult | null>(null);
+  const [cityFromPlz, setCityFromPlz] = useState(false);
+  const [confirmedDateAt, setConfirmedDateAt] = useState<string | null>(null);
+  const [confirmedAmountAt, setConfirmedAmountAt] = useState<string | null>(null);
 
   // The odometer, required with a refuel. Its photo is read here and kept
   // here, exactly like the Beleg's: what travels is the two figures.
@@ -241,6 +311,13 @@ export default function ReceiptScreen() {
     setTimeFromCapture(false);
     setLitres("");
     setPricePerLitre("");
+    setStreet("");
+    setBonNumber("");
+    setOcrText("");
+    setLastScan(null);
+    setCityFromPlz(false);
+    setConfirmedDateAt(null);
+    setConfirmedAmountAt(null);
     setScanning(true);
     try {
       // The engine's lines are NOT the receipt's rows: on a two-column till
@@ -251,12 +328,15 @@ export default function ReceiptScreen() {
       const lines = result.blocks.flatMap((b) => b.lines);
       const text = rowsFromLines(lines).join("\n");
       const r: OcrResult = text.trim() === "" ? {} : parseReceiptText(text);
+      setOcrText(text);
+      setLastScan(r);
 
       // The PLZ is read with a score and the city beside it is a guess at a
       // line of text; the server's table is authoritative and wins whenever
       // it knows the PLZ. Offline or unknown, the OCR's own city stands.
       const authoritative = r.postalCode ? await api.postalCity(r.postalCode) : null;
       const resolvedCity = authoritative ?? r.city ?? "";
+      setCityFromPlz(typeof authoritative === "string" && authoritative.trim() !== "");
 
       // A category this build does not offer is dropped rather than shown. With
       // none read, fuel figures still say it is a refuel; with neither, the
@@ -278,6 +358,10 @@ export default function ReceiptScreen() {
       if (r.postalCode) setPlz(r.postalCode);
       if (r.merchantName) setMerchant(r.merchantName);
       if (resolvedCity) setCity(resolvedCity);
+      if (r.street) setStreet(r.street);
+      // The printed Bon wins; a labelled Beleg-Nr stands in when there is none.
+      const printedNo = r.bonNumber ?? r.receiptNumber;
+      if (printedNo) setBonNumber(printedNo);
       // A printed time wins; none printed means the capture time, labelled as
       // such on screen. See `resolveReceiptTime` for why that is a proxy.
       const when = resolveReceiptTime(r.time, captureClock(exifStamp, new Date()));
@@ -443,6 +527,22 @@ export default function ReceiptScreen() {
         odometer_km: category === "Tanken" && odometerRequired ? odometerKm.trim() : null,
         range_km:
           category === "Tanken" && odometerRequired && rangeKm.trim() !== "" ? rangeKm.trim() : null,
+        street: street.trim() || null,
+        station_name: lastScan?.stationName ?? null,
+        operator_name: lastScan?.operatorName ?? null,
+        receipt_number: bonNumber.trim() || null,
+        tse_time: lastScan?.tseTime ?? null,
+        // The review trail: the raw rows and, per field, where its value came
+        // from. The server keeps both OUTSIDE the business payload.
+        ocr_text: ocrText.trim() === "" ? null : ocrText.slice(0, 8000),
+        ocr_meta: buildOcrMeta(lastScan, {
+          timeFromCapture,
+          cityFromPlz,
+          confirmedDateAt,
+          confirmedAmountAt,
+          fuel: category === "Tanken",
+          odometerSent: category === "Tanken" && odometerRequired,
+        }),
       });
       toast.show(t("receipt.sent"));
       router.back();
@@ -576,14 +676,34 @@ export default function ReceiptScreen() {
           editable={false}
           autoCapitalize="none"
         />
-        {checkDate && <NeedsCheck c={c} row={row} onConfirm={() => setCheckDate(false)} />}
+        {checkDate && (
+          <NeedsCheck
+            c={c}
+            row={row}
+            onConfirm={() => {
+              setCheckDate(false);
+              // The tap is the audit trail: with no photo travelling, "who
+              // vouched for this figure, and when" is this timestamp.
+              setConfirmedDateAt(new Date().toISOString());
+            }}
+          />
+        )}
 
         <Field
           label={t("receipt.amount")}
           value={amount}
           editable={false}
         />
-        {checkAmount && <NeedsCheck c={c} row={row} onConfirm={() => setCheckAmount(false)} />}
+        {checkAmount && (
+          <NeedsCheck
+            c={c}
+            row={row}
+            onConfirm={() => {
+              setCheckAmount(false);
+              setConfirmedAmountAt(new Date().toISOString());
+            }}
+          />
+        )}
 
         <SectionLabel>{t("receipt.category")}</SectionLabel>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
@@ -607,6 +727,22 @@ export default function ReceiptScreen() {
           value={merchant}
           editable={false}
         />
+
+        {street !== "" && (
+          <Field
+            label={t("receipt.street")}
+            value={street}
+            editable={false}
+          />
+        )}
+
+        {bonNumber !== "" && (
+          <Field
+            label={t("receipt.bonNumber")}
+            value={bonNumber}
+            editable={false}
+          />
+        )}
 
         <Field
           label={t("receipt.time")}
@@ -736,8 +872,12 @@ export default function ReceiptScreen() {
                 label={timeFromCapture ? t("receipt.timeCaptured") : t("receipt.time")}
                 value={receiptTime}
               />
+              <SummaryRow c={c} row={row} label={t("receipt.street")} value={street} />
               <SummaryRow c={c} row={row} label={t("receipt.city")} value={city} />
               <SummaryRow c={c} row={row} label={t("receipt.plz")} value={plz} />
+              {bonNumber !== "" && (
+                <SummaryRow c={c} row={row} label={t("receipt.bonNumber")} value={bonNumber} />
+              )}
               {category === "Tanken" && (
                 <>
                   <SummaryRow c={c} row={row} label={t("receipt.litres")} value={litres} />

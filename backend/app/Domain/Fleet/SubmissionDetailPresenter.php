@@ -29,7 +29,14 @@ class SubmissionDetailPresenter
         'amount' => 'amount',
         'category' => 'category',
         'merchant_name' => 'merchant_name',
+        'station_name' => 'station_name',
+        'operator_name' => 'operator_name',
+        'street' => 'street',
         'city' => 'city',
+        // The receipt's own printed number, and the fiscal (TSE) time of day,
+        // which is not the sale time shown as `receipt_time`.
+        'receipt_number' => 'receipt_number',
+        'tse_time' => 'tse_time',
         // Stored as `postal_code` (the validator's name), shown as `plz`.
         'plz' => 'postal_code',
         'litres' => 'litres',
