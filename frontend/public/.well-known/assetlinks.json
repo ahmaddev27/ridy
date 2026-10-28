@@ -1,0 +1,16 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "de.reidey.app",
+      "sha256_cert_fingerprints": [
+        "42:03:7E:04:90:B7:B6:EB:41:9D:23:3D:DA:7C:85:E4:58:66:56:09:7D:8E:B2:EF:EC:48:A0:FB:57:F9:03:CA",
+        "34:E8:61:5A:FD:0A:57:96:F5:05:86:3A:2A:7B:0A:D6:C9:BB:59:C4:C5:11:E3:9A:AD:4C:05:82:A6:AE:67:8E"
+      ]
+    }
+  }
+]
