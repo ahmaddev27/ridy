@@ -152,9 +152,14 @@ async function reconcile() {
     // self-rotation never resets its seq and drops offers in the gap. Only a change the
     // primary's live jar can't match — a fresh browser re-link — restarts the streams.
     if (cookiesChanged && !versionChanged && wantedKeys.has(key) && !proxyChanged) {
-      const primaryFp = streams.get(streamKey(sessionId, config.ramenPaths[0]))?.cookieFp;
-      if (primaryFp !== undefined && fpNow === primaryFp) {
-        stream.cookieFp = fpNow; // adopt the primary's rotation; keep the live stream + its seq
+      const primary = streams.get(streamKey(sessionId, config.ramenPaths[0]));
+      if (primary !== undefined && primary.cookieFp !== undefined && fpNow === primary.cookieFp) {
+        // Adopt the primary's live cookie VALUES, not just its fingerprint: a
+        // secondary channel never polls Fleet Hub, so copying only the fingerprint
+        // left it presenting the cookies it was built with until the next browser
+        // capture, and its eventual 401/403 on a superseded value flagged the whole
+        // healthy session needs_relink. Keep the live stream + its seq.
+        stream.adoptJar(primary);
         continue;
       }
     }
