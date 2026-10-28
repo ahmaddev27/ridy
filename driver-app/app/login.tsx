@@ -8,7 +8,7 @@ import { PRIVACY_URL, IMPRINT_URL } from "@/lib/links";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
 import { useCooldown } from "@/lib/use-cooldown";
-import { PasskeyCancelledError, passkeysAvailable } from "@/lib/passkeys";
+import { PasskeyCancelledError, PasskeyNoneOnDeviceError, passkeysAvailable } from "@/lib/passkeys";
 import { Field, OtpInput, PrimaryButton, Logo } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { KeyRound, LogIn, Mail } from "@/components/icons";
@@ -61,7 +61,10 @@ export default function LoginScreen() {
     try {
       await signInWithPasskey();
     } catch (e) {
-      if (!(e instanceof PasskeyCancelledError)) toast.show(t("passkey.signInError"), "error");
+      if (e instanceof PasskeyCancelledError) return;
+      // No passkey on this device is a state, not a failure: point to the way in.
+      if (e instanceof PasskeyNoneOnDeviceError) toast.show(t("passkey.noneOnDevice"), "info");
+      else toast.show(t("passkey.signInError"), "error");
     } finally {
       setPasskeyBusy(false);
     }

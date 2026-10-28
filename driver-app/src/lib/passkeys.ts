@@ -54,6 +54,14 @@ export class PasskeyAlreadyRegisteredError extends Error {
   }
 }
 
+/** The device holds no passkey for this site — not a failure, just nothing to sign with. */
+export class PasskeyNoneOnDeviceError extends Error {
+  constructor() {
+    super("passkey_none_on_device");
+    this.name = "PasskeyNoneOnDeviceError";
+  }
+}
+
 /** Whether this device can run a passkey ceremony at all. Never throws. */
 export async function passkeysAvailable(): Promise<boolean> {
   try {
@@ -73,6 +81,7 @@ function toTypedError(e: unknown): unknown {
   const code = (e as { error?: unknown } | null)?.error;
   if (typeof code === "string" && CANCEL_CODES.has(code)) return new PasskeyCancelledError();
   if (code === "CredentialAlreadyExists") return new PasskeyAlreadyRegisteredError();
+  if (code === "NoCredentials") return new PasskeyNoneOnDeviceError();
   return e instanceof Error ? e : new Error(`passkey_failed:${typeof code === "string" ? code : "unknown"}`);
 }
 
