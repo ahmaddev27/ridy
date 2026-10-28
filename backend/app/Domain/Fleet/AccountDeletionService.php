@@ -33,6 +33,8 @@ class AccountDeletionService
         DB::transaction(function () use ($driver): void {
             DeviceToken::withoutGlobalScopes()->where('driver_id', $driver->id)->delete();
             $driver->tokens()->delete();
+            // The phone is cut off at once — a passkey would sign it straight back in.
+            $driver->webauthnCredentials()->delete();
             $this->audit($driver, $driver->tenant_id, 'driver');
         });
 

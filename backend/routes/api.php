@@ -52,6 +52,7 @@ use App\Http\Controllers\Api\V1\Driver\DriverOfferController;
 use App\Http\Controllers\Api\V1\Driver\DriverPasswordResetController;
 use App\Http\Controllers\Api\V1\Driver\DriverPostalCodeController;
 use App\Http\Controllers\Api\V1\Driver\DriverSubmissionController;
+use App\Http\Controllers\Api\V1\Driver\DriverWebauthnCredentialController;
 use App\Http\Controllers\Api\V1\Driver\FleetController;
 use App\Http\Controllers\Api\V1\Driver\FleetDeviceController;
 use App\Http\Controllers\Api\V1\Driver\FleetSubmissionController;
@@ -147,6 +148,13 @@ Route::prefix('v1')->group(function () {
         Route::post('login/request', [DriverAuthController::class, 'loginRequest'])->middleware('throttle:otp-send');
         Route::post('login/verify', [DriverAuthController::class, 'loginVerify'])->middleware('throttle:otp-verify');
 
+        // Passkey sign-in for drivers (docs/22 §4.6): username-less and cookie-less,
+        // the answer exchanged for the same token the code verify mints, behind the
+        // same suspended-company gate. The dashboard pair's named limiters, so the
+        // app is no side door around them. Drivers only — owner mode keeps the code.
+        Route::post('webauthn/login/options', [DriverAuthController::class, 'passkeyLoginOptions'])->middleware('throttle:webauthn-options');
+        Route::post('webauthn/login', [DriverAuthController::class, 'passkeyLogin'])->middleware('throttle:webauthn-verify');
+
         // In-app "forgot password" via an email OTP (mirrors the manager flow).
         Route::post('password/forgot', [DriverPasswordResetController::class, 'start'])->middleware('throttle:otp-send');
         Route::post('password/verify', [DriverPasswordResetController::class, 'verify'])->middleware('throttle:otp-verify');
@@ -164,6 +172,13 @@ Route::prefix('v1')->group(function () {
             Route::middleware('driver.active')->group(function () {
                 Route::get('me', [DriverAuthController::class, 'me']);
                 Route::patch('me', [DriverAuthController::class, 'update']);
+                // The driver's passkeys: enrol, list, remove — the dashboard shapes,
+                // without its password step-up (a driver has no password; this
+                // session came from a freshly emailed code).
+                Route::post('webauthn/register/options', [DriverWebauthnCredentialController::class, 'registerOptions'])->middleware('throttle:webauthn-options');
+                Route::post('webauthn/register', [DriverWebauthnCredentialController::class, 'register'])->middleware('throttle:webauthn-verify');
+                Route::get('webauthn/credentials', [DriverWebauthnCredentialController::class, 'index']);
+                Route::delete('webauthn/credentials/{credential}', [DriverWebauthnCredentialController::class, 'destroy']);
                 Route::post('devices', [DriverDeviceController::class, 'store']);
                 Route::delete('devices', [DriverDeviceController::class, 'destroy']);
                 Route::get('home', [DriverDashboardController::class, 'home']);

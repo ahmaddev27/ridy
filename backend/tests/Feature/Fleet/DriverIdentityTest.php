@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Fleet;
 
+use App\Domain\Auth\Webauthn\Models\WebauthnCredential;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\Models\DeviceToken;
@@ -46,22 +47,28 @@ class DriverIdentityTest extends TestCase
         $driver = $this->driver(['activated_at' => now()]);
         $driver->createToken('driver-app');
         DeviceToken::create(['driver_id' => $driver->id, 'token' => 'old-phone', 'tenant_id' => $this->tenant->id]);
+        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'old-phone-passkey']);
 
         $this->patchJson("/api/v1/drivers/{$driver->id}", ['email' => 'new@ya.de'])->assertOk();
 
         $this->assertSame('new@ya.de', $driver->fresh()->email);
         $this->assertSame(0, $driver->tokens()->count());
         $this->assertSame(0, DeviceToken::withoutGlobalScopes()->where('driver_id', $driver->id)->count());
+        // A passkey is a code-less sign-in: left alive it would keep the previous
+        // holder's phone on the account after the address moved on.
+        $this->assertDatabaseMissing('webauthn_credentials', ['id' => 'old-phone-passkey']);
     }
 
     public function test_re_saving_the_same_email_keeps_the_session(): void
     {
         $driver = $this->driver();
         $driver->createToken('driver-app');
+        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'same-phone-passkey']);
 
         $this->patchJson("/api/v1/drivers/{$driver->id}", ['email' => 'omar@ya.de'])->assertOk();
 
         $this->assertSame(1, $driver->tokens()->count());
+        $this->assertDatabaseHas('webauthn_credentials', ['id' => 'same-phone-passkey']);
     }
 
     public function test_a_driver_email_cannot_be_another_companys_dashboard_login(): void
