@@ -21,24 +21,25 @@ return [
     'rp_name' => env('WEBAUTHN_RP_NAME', 'Reidey'),
 
     /**
-     * The origins a ceremony may come from, comma-separated. Three kinds share
-     * the list (docs/22 §4.3):
+     * The origins a ceremony may come from. APP_URL's origin is ALWAYS in the
+     * list — it is the dashboard in production (same-origin) and what the iOS
+     * driver app asserts (the plain https://reidey.de) — and WEBAUTHN_ORIGINS
+     * ADDS to it, comma-separated, never replaces it (docs/22 §4.3):
      *
-     *   - the dashboard PAGE's origin, not the API's — production is same-origin
-     *     (APP_URL = https://reidey.de); in dev the dashboard runs on its own
-     *     port, so list it: WEBAUTHN_ORIGINS=http://localhost:3000
-     *   - the driver app on iOS, which asserts the plain web origin
-     *     https://reidey.de — covered by the production default;
-     *   - the driver app on Android, one `android:apk-key-hash:<base64url
-     *     SHA-256 of the signing cert>` entry PER signing certificate (Play
-     *     app-signing key, EAS keystore, debug key), matched verbatim by the
-     *     engine (≥ 5.3.3). The real hashes arrive with Phase 0 (§8); none are
-     *     committed here.
+     *   - in dev the dashboard runs on its own port, so list it:
+     *     WEBAUTHN_ORIGINS=http://localhost:3000
+     *   - the driver app on Android asserts one `android:apk-key-hash:<base64url
+     *     SHA-256 of the signing cert>` per signing certificate (Play app-signing
+     *     key, EAS keystore, debug key), matched verbatim by the engine
+     *     (≥ 5.3.3). The real hashes arrive with Phase 0 (§8); none are committed.
      */
-    'origins' => array_values(array_filter(array_map(
+    'origins' => array_values(array_unique(array_filter(array_map(
         'trim',
-        explode(',', (string) (env('WEBAUTHN_ORIGINS') ?: env('APP_URL', 'http://localhost'))),
-    ))),
+        [
+            ...explode(',', (string) env('WEBAUTHN_ORIGINS', '')),
+            (string) env('APP_URL', 'http://localhost'),
+        ],
+    )))),
 
     /**
      * How long a started ceremony waits for the browser's answer, in seconds.

@@ -130,6 +130,17 @@ class DriverAuthController extends Controller
     {
         $driver = $passkeys->authenticate($request->ceremonyId(), $request->credential(), Driver::class);
 
+        // The emailed code's identity rule, re-applied: the address on the row
+        // must still resolve to THIS driver. Were it meanwhile pointed at another
+        // company's owner/manager (resolveAppAccount hands such an address to the
+        // owner, unless the driver claimed it first), a passkey enrolled earlier
+        // must not keep capturing that owner's app sign-in. Same generic refusal
+        // as an unknown credential — nothing about the address is disclosed.
+        $resolved = filled($driver->email) ? $this->resolveAppAccount((string) $driver->email) : null;
+        if (! $resolved instanceof Driver || ! $resolved->is($driver)) {
+            throw PasskeyAuthenticator::refusal();
+        }
+
         $this->guardSuspendedTenant($driver->loadMissing('tenant')->tenant);
 
         return $this->completeSignIn($driver);

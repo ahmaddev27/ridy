@@ -203,9 +203,12 @@ class DriverController extends Controller
         // A NEW login address means a new person may hold the account (the phone
         // changed hands, a test login was re-pointed). Sign the previous holder out
         // everywhere and stop pushing offers to their devices; the new address
-        // signs in with its own one-time code.
+        // signs in with its own one-time code. Their passkeys go too: a passkey
+        // is a sign-in that needs no code, so left alive it would keep the
+        // previous holder's phone on the account after the address moved on.
         DB::transaction(function () use ($driver, $email) {
             $driver->tokens()->delete();
+            $driver->webauthnCredentials()->delete();
             DeviceToken::withoutGlobalScopes()->where('driver_id', $driver->id)->delete();
             $driver->forceFill(['email' => $email, 'invite_token' => null])->save();
         });

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Audit\Models\AuditLog;
+use App\Domain\Auth\Webauthn\Models\WebauthnCredential;
 use App\Domain\Fleet\AccountDeletionService;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\Models\DeviceToken;
@@ -54,8 +55,10 @@ class AccountDeletionRequestTest extends TestCase
         $token = $driver->createToken('driver-app')->plainTextToken;
         $driver->createToken('driver-app'); // a second phone
         $this->device(['driver_id' => $driver->id, 'token' => 'fcm-driver-1']);
+        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'driver-passkey']);
         $other = Driver::create(['tenant_id' => $this->tenant->id, 'name' => 'Ali', 'email' => 'ali@ya.de']);
         $this->device(['driver_id' => $other->id, 'token' => 'fcm-other']);
+        WebauthnCredential::factory()->for($other, 'authenticatable')->create(['id' => 'other-passkey']);
 
         $this->withToken($token)
             ->postJson('/api/v1/driver/account/deletion-request')
@@ -65,6 +68,9 @@ class AccountDeletionRequestTest extends TestCase
         $this->assertSame(0, $driver->tokens()->count(), 'every session of the driver is revoked');
         $this->assertFalse(DeviceToken::withoutGlobalScopes()->where('token', 'fcm-driver-1')->exists());
         $this->assertTrue(DeviceToken::withoutGlobalScopes()->where('token', 'fcm-other')->exists(), 'other drivers untouched');
+        // A passkey would sign the phone straight back in — cut off with the sessions.
+        $this->assertDatabaseMissing('webauthn_credentials', ['id' => 'driver-passkey']);
+        $this->assertDatabaseHas('webauthn_credentials', ['id' => 'other-passkey']);
         $this->assertTrue(AuditLog::where('action', AccountDeletionService::ACTION)
             ->where('subject_type', Driver::class)->where('subject_id', $driver->id)
             ->where('tenant_id', $this->tenant->id)->exists());

@@ -9,6 +9,7 @@ use App\Domain\Auth\Webauthn\WebauthnVerificationFailed;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Models\User;
+use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Sanctum\Sanctum;
@@ -230,6 +231,63 @@ class DriverWebauthnTest extends TestCase
             ->assertJsonPath('errors.ceremony_id.0', 'ceremony_expired');
 
         $this->assertDatabaseCount('personal_access_tokens', 1);
+    }
+
+    public function test_login_applies_the_codes_identity_rule_to_a_squatted_owner_address(): void
+    {
+        // B2: the row's address became another company's owner/manager login
+        // AFTER the driver was activated — the emailed code would hand that
+        // address to the owner (resolveAppAccount), so a passkey enrolled while
+        // the driver still owned it must not keep capturing the owner's sign-in.
+        $this->seed(RolePermissionSeeder::class);
+        $driver = $this->driver(['email' => 'boss@other.de', 'activated_at' => now()->subDays(2)]);
+        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'cred-squat']);
+
+        $other = Tenant::create(['name' => 'Other GmbH', 'country' => 'DE', 'status' => 'active', 'activated_at' => now()]);
+        $boss = User::create(['name' => 'Boss', 'email' => 'boss@other.de', 'password' => bcrypt('x'), 'tenant_id' => $other->id]);
+        $boss->assignRole('owner');
+        // The owner account predates the driver's activation: no prior claim.
+        $boss->forceFill(['created_at' => now()->subDays(5)])->saveQuietly();
+        $this->bindPassingVerifier();
+
+        $this->postJson('/api/v1/driver/webauthn/login', $this->loginPayload('cred-squat'))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['credential'])
+            ->assertJsonMissingPath('errors.email');
+
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_login_keeps_working_for_a_driver_who_claimed_the_address_first(): void
+    {
+        // The same dual-role person the code accepts: the driver account was
+        // activated before the owner account existed.
+        $this->seed(RolePermissionSeeder::class);
+        $driver = $this->driver(['email' => 'both@ya.de', 'activated_at' => now()->subDays(5)]);
+        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'cred-dual']);
+
+        $other = Tenant::create(['name' => 'Other GmbH', 'country' => 'DE', 'status' => 'active', 'activated_at' => now()]);
+        $boss = User::create(['name' => 'Both', 'email' => 'both@ya.de', 'password' => bcrypt('x'), 'tenant_id' => $other->id]);
+        $boss->assignRole('owner');
+        $this->bindPassingVerifier();
+
+        $this->postJson('/api/v1/driver/webauthn/login', $this->loginPayload('cred-dual'))
+            ->assertOk()
+            ->assertJsonPath('data.driver.id', $driver->id);
+    }
+
+    public function test_login_refuses_a_driver_whose_address_was_cleared(): void
+    {
+        // No address, no identity to resolve — and no code could sign them in either.
+        $driver = $this->driver(['email' => null, 'uber_email' => 'omar.uber@ya.de']);
+        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'cred-noemail']);
+        $this->bindPassingVerifier();
+
+        $this->postJson('/api/v1/driver/webauthn/login', $this->loginPayload('cred-noemail'))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['credential']);
+
+        $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 
     public function test_the_app_rides_the_dashboards_named_limiters(): void

@@ -76,7 +76,7 @@ class PasskeyAuthenticator
             ->first();
 
         if ($stored === null) {
-            throw $this->refused();
+            throw self::refusal();
         }
 
         try {
@@ -84,21 +84,24 @@ class PasskeyAuthenticator
         } catch (WebauthnVerificationFailed $e) {
             Log::info('webauthn.assertion_failed', ['credential_id' => $stored->id, 'reason' => $e->getMessage()]);
 
-            throw $this->refused();
+            throw self::refusal();
         }
 
         $stored->forceFill(['counter' => $counter, 'last_used_at' => now()])->save();
 
         $account = $stored->authenticatable;
         if (! $account instanceof $accountClass) {
-            throw $this->refused();
+            throw self::refusal();
         }
 
         return $account;
     }
 
-    /** The one generic refusal — the same words the password login uses. */
-    private function refused(): ValidationException
+    /**
+     * The one generic refusal — the same words the password login uses. Public
+     * so a caller's own post-assertion identity rule answers in the same voice.
+     */
+    public static function refusal(): ValidationException
     {
         return ValidationException::withMessages(['credential' => [__('auth.failed')]]);
     }
