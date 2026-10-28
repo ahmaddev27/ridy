@@ -608,6 +608,22 @@ export class RamenStream {
   }
 
   /**
+   * Take on another stream's live cookie jars (and its fingerprint). The supervisor
+   * calls this on a SECONDARY channel when its jar matches the PRIMARY's own rolling
+   * rotation: only the primary polls Fleet Hub and absorbs Uber's rotated identity
+   * cookies (absorbSupplierCookies), so without copying the VALUES across, a
+   * secondary keeps presenting the cookies it was built with until the next browser
+   * capture — and the moment Uber refuses that superseded value its 401/403 flags
+   * the whole (otherwise healthy) session needs_relink. Copying the values keeps
+   * every channel on the same fresh jar. Takes the values, not just the fingerprint.
+   */
+  adoptJar(source) {
+    this.jar = new Map(source.jar);
+    this.supplierJar = new Map(source.supplierJar);
+    this.cookieFp = source.cookieFp;
+  }
+
+  /**
    * Keep the session warm from the fleethub polls that already run 24/7. Uber
    * rotates the shared identity cookies (sid/csid/…) on these authenticated
    * responses; absorbing them keeps BOTH jars fresh, so the offer (RAMEN) session
