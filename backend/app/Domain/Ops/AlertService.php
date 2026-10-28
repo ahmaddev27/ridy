@@ -7,6 +7,8 @@ use App\Domain\Ops\Models\AlertIncident;
 use App\Support\RidyLog;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Log;
+use Sentry\Severity;
+use Sentry\State\Scope;
 use Throwable;
 
 /**
@@ -42,6 +44,7 @@ class AlertService
 
         $this->notify("🔴 ALERT: {$title}", $body ?: $title);
         RidyLog::event('alert.opened', ['key' => $key, 'kind' => $kind, 'title' => $title]);
+        $this->sentry(Severity::error(), "ALERT: {$title}", $kind, $key);
     }
 
     /** Resolve an open incident for $key (if any) and send an all-clear. */
@@ -55,6 +58,31 @@ class AlertService
         $open->forceFill(['resolved_at' => CarbonImmutable::now()])->save();
         $this->notify("✅ RESOLVED: {$open->title}", "Resolved: {$open->title}");
         RidyLog::event('alert.resolved', ['key' => $key, 'kind' => $open->kind]);
+        $this->sentry(Severity::info(), "RESOLVED: {$open->title}", $open->kind, $key);
+    }
+
+    /**
+     * Mirror the alert to Sentry — the ops channel the owner watches — on top of
+     * the email, so a broken fleet session surfaces within one check cycle (5 min)
+     * instead of waiting for someone to read ops mail. Fires once per incident, the
+     * same de-duped transition as the email. No-ops cleanly where Sentry is not
+     * configured (local/test), and a Sentry hiccup never breaks the alert flow.
+     */
+    private function sentry(Severity $level, string $title, string $kind, string $key): void
+    {
+        if (! app()->bound('sentry')) {
+            return;
+        }
+
+        try {
+            \Sentry\withScope(function (Scope $scope) use ($level, $title, $kind, $key): void {
+                $scope->setTag('alert.kind', $kind);
+                $scope->setTag('alert.key', $key);
+                \Sentry\captureMessage($title, $level);
+            });
+        } catch (Throwable $e) {
+            RidyLog::failure('alert.sentry_failed', ['key' => $key], $e);
+        }
     }
 
     /**
