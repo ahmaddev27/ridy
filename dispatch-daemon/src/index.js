@@ -3,7 +3,7 @@
 
 import { config } from "./config.js";
 import { inflight } from "./stream.js";
-import { streams, reconcileTick } from "./supervisor.js";
+import { streams, reconcileTick, nextPollDelay } from "./supervisor.js";
 import { startCommandLoop, stopCommandLoop } from "./commands.js";
 import { initSentry, captureException, flush } from "./sentry.js";
 
@@ -12,6 +12,21 @@ const SHUTDOWN_INFLIGHT_WAIT_MS = 4000;
 const SHUTDOWN_FLUSH_MS = 2000;
 
 let reconcileTimer;
+let polling = false;
+
+// Self-scheduling session poll. The delay ADAPTS: nextPollDelay() returns the
+// fast recovery interval while a company is down and the normal interval once
+// everyone is back — so a re-link lands in seconds without polling fast 24/7.
+// A plain setInterval could not change its own period, and would also let a slow
+// reconcile overlap the next tick.
+function scheduleNextReconcile() {
+  reconcileTimer = setTimeout(async () => {
+    if (!polling) return;
+    await reconcileTick();
+    if (polling) scheduleNextReconcile();
+  }, nextPollDelay());
+  reconcileTimer.unref?.();
+}
 
 async function main() {
   initSentry();
@@ -24,7 +39,8 @@ async function main() {
       : "no global proxy — companies without their own proxy_url connect directly (Uber blocks that)",
   );
   await reconcileTick();
-  reconcileTimer = setInterval(reconcileTick, config.sessionPollInterval);
+  polling = true;
+  scheduleNextReconcile();
   // AFTER the first reconcile, so the streams a command needs already exist: a
   // command claimed before its session's stream is up would only report
   // "no live stream" and burn one of its few attempts.
@@ -39,7 +55,8 @@ async function shutdown(signal) {
   if (shuttingDown) process.exit(1);
   shuttingDown = true;
   console.log(`\n${signal} received, stopping ${streams.size} stream(s)...`);
-  clearInterval(reconcileTimer);
+  polling = false;
+  clearTimeout(reconcileTimer);
   // Before the streams: the loop must stop asking for work it could no longer
   // execute, and a parked long-poll has to be released so it does not hold the
   // shutdown past Docker's stop grace period.

@@ -475,3 +475,21 @@ test("an idle fleet still posts a keepalive status row well inside the backend's
   assert.deepEqual(sent.at(-1), ["a"], "one unchanged row keeps the gate open");
   stream.stop();
 });
+
+test("adoptJar takes the source stream's live cookie VALUES, not just its fingerprint", () => {
+  const primary = newStream({ primary: true });
+  const secondary = new RamenStream(session(), "/ramenphx/events", { primary: false });
+  // The primary rotates its identity cookies the way a Fleet Hub keep-warm does.
+  primary.jar.set("sid", "rotated");
+  primary.supplierJar.set("sp-jwt-session", "fresh");
+  primary.cookieFp = "fp-after-rotation";
+
+  secondary.adoptJar(primary);
+
+  assert.equal(secondary.jar.get("sid"), "rotated", "secondary presents the fresh value, not its day-0 one");
+  assert.equal(secondary.supplierJar.get("sp-jwt-session"), "fresh");
+  assert.equal(secondary.cookieFp, "fp-after-rotation");
+  // A copy, not a shared reference: a later primary rotation must not mutate it.
+  primary.jar.set("sid", "newer");
+  assert.equal(secondary.jar.get("sid"), "rotated", "the jar is copied, not aliased");
+});
