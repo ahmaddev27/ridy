@@ -21,6 +21,25 @@ const SESSION_POLL_ALERT_AFTER = 5; // ~5 min at the 60s poll interval
 // doesn't fire every company's TLS handshakes through the proxies in one tick.
 const START_STAGGER_MS = 100;
 
+// Adaptive poll cadence. `lastActiveIds` is the set of session ids the previous
+// poll returned; `recovering` maps the id of a company that has since VANISHED
+// from the list (Uber rejected it → needs_relink, or it expired) to the moment
+// we stop watching it. While anything is being watched, nextPollDelay() asks the
+// loop to poll fast, so the manager's re-link is picked up in ~seconds instead of
+// up to a full sessionPollInterval. A company that never comes back is dropped
+// from the watch after recoveryPollWindow, so a permanent removal cannot keep the
+// fast poll running against the backend forever.
+let lastActiveIds = new Set();
+const recovering = new Map();
+
+/**
+ * Delay before the next session poll: the fast recovery interval while a dropped
+ * company is still being watched for its re-link, the normal interval otherwise.
+ */
+export function nextPollDelay() {
+  return recovering.size > 0 ? config.recoveryPollInterval : config.sessionPollInterval;
+}
+
 function streamKey(sessionId, path) {
   return `${sessionId}:${path}`;
 }
@@ -76,6 +95,18 @@ async function reconcile() {
   const { valid: sessions, invalidIds } = partitionSessions(
     (Array.isArray(rows) ? rows : []).map((s) => (s && typeof s === "object" ? { ...s, proxy_url: s.proxy_url || globalProxyUrl || "" } : s)),
   );
+
+  // Track which companies dropped out so the loop can poll fast until they return
+  // (see nextPollDelay). A company present now is no longer recovering; one that
+  // has outstayed recoveryPollWindow is given up on.
+  const now = Date.now();
+  const activeIds = new Set(sessions.map((s) => s.id));
+  for (const id of lastActiveIds) {
+    if (!activeIds.has(id) && !recovering.has(id)) recovering.set(id, now + config.recoveryPollWindow);
+  }
+  for (const id of activeIds) recovering.delete(id);
+  for (const [id, until] of recovering) if (now > until) recovering.delete(id);
+  lastActiveIds = activeIds;
 
   const wantedKeys = new Set(
     sessions.flatMap((s) => config.ramenPaths.map((p) => streamKey(s.id, p))),
