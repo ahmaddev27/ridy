@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, KeyboardAvoidingView, Platform, Pressable, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
@@ -8,8 +8,10 @@ import { PRIVACY_URL, IMPRINT_URL } from "@/lib/links";
 import { t, isRTL } from "@/lib/i18n";
 import { useColors } from "@/lib/theme";
 import { useCooldown } from "@/lib/use-cooldown";
+import { PasskeyCancelledError, PasskeyNoneOnDeviceError, passkeysAvailable } from "@/lib/passkeys";
 import { Field, OtpInput, PrimaryButton, Logo } from "@/components/ui";
-import { LogIn, Mail } from "@/components/icons";
+import { useToast } from "@/components/toast";
+import { KeyRound, LogIn, Mail } from "@/components/icons";
 
 type Step = "email" | "code";
 
@@ -29,7 +31,8 @@ function loginErrorKey(e: unknown, step: "send" | "verify"): string {
 }
 
 export default function LoginScreen() {
-  const { requestCode, verifyCode } = useAuth();
+  const { requestCode, verifyCode, signInWithPasskey } = useAuth();
+  const toast = useToast();
   const c = useColors();
   const align = isRTL() ? "right" : "left";
   const [step, setStep] = useState<Step>("email");
@@ -41,6 +44,31 @@ export default function LoginScreen() {
   // One code per minute: every successful send starts a 60s cooldown that gates
   // the resend button until it elapses.
   const resendCooldown = useCooldown(60);
+  const [passkeyReady, setPasskeyReady] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void passkeysAvailable().then((ok) => { if (alive) setPasskeyReady(ok); });
+    return () => { alive = false; };
+  }, []);
+
+  // A dismissed sheet is a choice: stay silent. Anything else gets one generic
+  // toast — the OTP flow right above is the fallback, so no detail is needed.
+  async function passkeySignIn() {
+    if (passkeyBusy) return;
+    setPasskeyBusy(true);
+    try {
+      await signInWithPasskey();
+    } catch (e) {
+      if (e instanceof PasskeyCancelledError) return;
+      // No passkey on this device is a state, not a failure: point to the way in.
+      if (e instanceof PasskeyNoneOnDeviceError) toast.show(t("passkey.noneOnDevice"), "info");
+      else toast.show(t("passkey.signInError"), "error");
+    } finally {
+      setPasskeyBusy(false);
+    }
+  }
 
   async function sendCode() {
     setLoading(true);
@@ -126,6 +154,17 @@ export default function LoginScreen() {
             <View style={{ marginTop: 8 }}>
               <PrimaryButton label={t("otp.send")} onPress={sendCode} loading={loading} icon={Mail} />
             </View>
+            {passkeyReady && (
+              <Pressable
+                onPress={() => void passkeySignIn()}
+                disabled={passkeyBusy}
+                accessibilityRole="button"
+                style={{ flexDirection: isRTL() ? "row-reverse" : "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 12, opacity: passkeyBusy ? 0.5 : 1 }}
+              >
+                <KeyRound size={18} color={c.inkMuted} strokeWidth={1.8} />
+                <Text style={{ color: c.inkMuted, fontSize: 14.5, fontWeight: "600" }}>{t("passkey.signIn")}</Text>
+              </Pressable>
+            )}
           </View>
         ) : (
           <View style={{ gap: 12 }}>

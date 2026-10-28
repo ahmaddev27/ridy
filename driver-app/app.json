@@ -14,6 +14,9 @@
       "supportsTablet": false,
       "bundleIdentifier": "de.reidey.driver",
       "googleServicesFile": "./GoogleService-Info.plist",
+      "associatedDomains": [
+        "webcredentials:reidey.de"
+      ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },

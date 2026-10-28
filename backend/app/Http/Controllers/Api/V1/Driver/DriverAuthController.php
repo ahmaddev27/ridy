@@ -6,6 +6,7 @@ use App\Domain\Audit\AuditLogger;
 use App\Domain\Auth\OtpGuard;
 use App\Domain\Auth\PasswordCheck;
 use App\Domain\Auth\ReviewLogin;
+use App\Domain\Auth\Webauthn\PasskeyAuthenticator;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Fleet\Models\Driver;
@@ -14,6 +15,7 @@ use App\Domain\Notifications\SendTemplatedMail;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureFleetOwner;
+use App\Http\Requests\Api\V1\WebauthnCeremonyRequest;
 use App\Models\User;
 use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
@@ -105,6 +107,43 @@ class DriverAuthController extends Controller
         $this->otp->consume($reset);
 
         return $this->completeSignIn($account);
+    }
+
+    /**
+     * Passkey sign-in, step 1 (public, docs/22 §4.6): the options name no
+     * account and list no credentials — the authenticator offers what it holds
+     * for the rpId. Cookie-less: the ceremony is parked in the cache under the
+     * one-time id the app echoes back.
+     */
+    public function passkeyLoginOptions(PasskeyAuthenticator $passkeys): JsonResponse
+    {
+        return response()->json($passkeys->start());
+    }
+
+    /**
+     * Passkey sign-in, step 2 (public): a verified assertion is exchanged for
+     * the very token `loginVerify` mints, behind the very same gate. Every
+     * refusal is the one generic 422; a dashboard user's credential reads as
+     * unknown here, so owner mode keeps its emailed code.
+     */
+    public function passkeyLogin(WebauthnCeremonyRequest $request, PasskeyAuthenticator $passkeys): JsonResponse
+    {
+        $driver = $passkeys->authenticate($request->ceremonyId(), $request->credential(), Driver::class);
+
+        // The emailed code's identity rule, re-applied: the address on the row
+        // must still resolve to THIS driver. Were it meanwhile pointed at another
+        // company's owner/manager (resolveAppAccount hands such an address to the
+        // owner, unless the driver claimed it first), a passkey enrolled earlier
+        // must not keep capturing that owner's app sign-in. Same generic refusal
+        // as an unknown credential — nothing about the address is disclosed.
+        $resolved = filled($driver->email) ? $this->resolveAppAccount((string) $driver->email) : null;
+        if (! $resolved instanceof Driver || ! $resolved->is($driver)) {
+            throw PasskeyAuthenticator::refusal();
+        }
+
+        $this->guardSuspendedTenant($driver->loadMissing('tenant')->tenant);
+
+        return $this->completeSignIn($driver);
     }
 
     /** Mint the app token for a verified account (owner read-only, or driver). */

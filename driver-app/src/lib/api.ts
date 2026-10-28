@@ -1,6 +1,12 @@
 import Constants from "expo-constants";
 import { Sentry } from "@/lib/sentry";
 import type { Vehicle } from "@/lib/note-rules";
+import type {
+  AuthenticationCredentialJSON,
+  CreationOptionsJSON,
+  RegistrationCredentialJSON,
+  RequestOptionsJSON,
+} from "@/lib/passkeys";
 
 /**
  * Where the app talks.
@@ -214,6 +220,22 @@ export type DispatchRejectResult = {
   status: "queued" | "duplicate" | "already_declined" | "refused" | string;
   reason?: string;
   command_id?: number;
+};
+
+/** A passkey this driver has registered. The server never returns key material. */
+export type DriverPasskey = {
+  /** Opaque server id: only ever echoed back. */
+  id: string | number;
+  alias: string | null;
+  created_at: string;
+};
+
+/** A server-started passkey ceremony: echo `ceremony_id` back with the OS's answer. */
+export type PasskeyCeremony<Options> = { ceremony_id: string; options: Options };
+
+/** The token + profile answer shared by the OTP and the passkey sign-in. */
+export type LoginSession = {
+  data: { token: string; is_owner: boolean; driver?: DriverProfile; owner?: DriverProfile };
 };
 
 export type DriverProfile = {
@@ -510,11 +532,51 @@ export class ApiClient {
    * carries `owner` (same profile shape).
    */
   loginVerify(email: string, otp: string) {
-    return this.request<{
-      data: { token: string; is_owner: boolean; driver?: DriverProfile; owner?: DriverProfile };
-    }>("/api/v1/driver/login/verify", {
+    return this.request<LoginSession>("/api/v1/driver/login/verify", {
       method: "POST",
       body: JSON.stringify({ email, otp }),
+    });
+  }
+
+  /** Passkey sign-in step 1 (public): the options the OS sheet is built from. */
+  passkeyLoginOptions() {
+    return this.request<PasskeyCeremony<RequestOptionsJSON>>("/api/v1/driver/webauthn/login/options", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  }
+
+  /** Passkey sign-in step 2: same answer as `loginVerify`. */
+  passkeyLogin(ceremonyId: string, credential: AuthenticationCredentialJSON) {
+    return this.request<LoginSession>("/api/v1/driver/webauthn/login", {
+      method: "POST",
+      body: JSON.stringify({ ceremony_id: ceremonyId, credential }),
+    });
+  }
+
+  /** Start adding a passkey to the signed-in driver. */
+  passkeyRegisterOptions() {
+    return this.request<PasskeyCeremony<CreationOptionsJSON>>("/api/v1/driver/webauthn/register/options", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  }
+
+  /** Finish adding a passkey; `alias` is an optional device name. */
+  passkeyRegister(ceremonyId: string, credential: RegistrationCredentialJSON, alias?: string) {
+    return this.request<{ data: DriverPasskey }>("/api/v1/driver/webauthn/register", {
+      method: "POST",
+      body: JSON.stringify({ ceremony_id: ceremonyId, alias, credential }),
+    });
+  }
+
+  passkeys() {
+    return this.request<{ data: DriverPasskey[] }>("/api/v1/driver/webauthn/credentials");
+  }
+
+  deletePasskey(id: DriverPasskey["id"]) {
+    return this.request<void>(`/api/v1/driver/webauthn/credentials/${encodeURIComponent(String(id))}`, {
+      method: "DELETE",
     });
   }
 

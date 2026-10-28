@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Domain\Auth\Webauthn\Concerns\HasWebauthnCredentials;
+use App\Domain\Auth\Webauthn\PasskeyHolder;
 use App\Domain\Notifications\Models\UserPushToken;
 use App\Domain\Tenancy\Models\Tenant;
 use Database\Factories\UserFactory;
@@ -19,7 +20,7 @@ use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['name', 'email', 'phone', 'password', 'tenant_id', 'locale', 'notification_prefs'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable
+class User extends Authenticatable implements PasskeyHolder
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasRoles, HasWebauthnCredentials, Notifiable;

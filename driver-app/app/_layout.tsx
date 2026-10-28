@@ -22,6 +22,7 @@ import { useOtaUpdates } from "@/lib/ota";
 import { UpdateGate } from "@/components/update-gate";
 import { OfflineScreen } from "@/components/offline-screen";
 import { SuspendedScreen } from "@/components/suspended-screen";
+import { PasskeyOffer } from "@/components/passkey-offer";
 import { initSentry, Sentry } from "@/lib/sentry";
 
 // Start crash/error reporting as early as possible (inert without a DSN).
@@ -318,6 +319,7 @@ function Gate() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="offer/[id]" options={{ presentation: "modal" }} />
         <Stack.Screen name="settings" options={{ presentation: "modal" }} />
+        <Stack.Screen name="passkeys" />
         {/* Belege & Notizen: a stack pushed from Profil, not a fifth tab —
             the four tabs are fixed and every driver sees all of them. */}
         <Stack.Screen name="submissions" />
@@ -329,6 +331,7 @@ function Gate() {
           Modal, so it sits outside the navigator on purpose: a pushed route would
           be something the driver has to navigate back out of. */}
       <OfferPopupHost />
+      <PasskeyOffer />
     </>
   );
 }

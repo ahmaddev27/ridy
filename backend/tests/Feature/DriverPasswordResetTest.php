@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Auth\Webauthn\Models\WebauthnCredential;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
@@ -32,6 +33,8 @@ class DriverPasswordResetTest extends TestCase
     {
         config(['app.env' => 'testing', 'services.otp_test_code' => '111111']);
         $driver = $this->driver();
+        $driver->createToken('driver-app');
+        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'maybe-the-attackers']);
 
         $this->postJson('/api/v1/driver/password/forgot', ['email' => 'basel@ya.de'])
             ->assertOk()->assertJsonPath('data.sent', true);
@@ -44,6 +47,10 @@ class DriverPasswordResetTest extends TestCase
         ])->assertOk()->assertJsonPath('data.reset', true);
 
         $this->assertTrue(Hash::check('newsecret1', $driver->fresh()->password));
+        // The reset is the eviction tool: sessions AND passkeys go, or an attacker
+        // who enrolled one on their own phone would walk straight back in.
+        $this->assertSame(0, $driver->tokens()->count());
+        $this->assertDatabaseMissing('webauthn_credentials', ['id' => 'maybe-the-attackers']);
     }
 
     public function test_unknown_email_still_returns_ok_without_disclosing(): void

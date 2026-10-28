@@ -135,6 +135,27 @@ class WebauthnLibCeremonyVerifierTest extends TestCase
         $this->verifier()->verifyAssertion(json_encode($options), ['id' => 'x', 'type' => 'public-key'], $this->storedCredential('h', 0));
     }
 
+    public function test_an_android_apk_key_hash_origin_is_matched_verbatim(): void
+    {
+        // The driver app on Android asserts no web origin but the hash of its
+        // signing certificate (docs/22 §4.3); the engine matches such an
+        // allow-list entry verbatim (≥ 5.3.3), so one entry per signing key in
+        // WEBAUTHN_ORIGINS is all the server needs. A throwaway hash here — the
+        // real ones arrive with Phase 0.
+        $androidOrigin = 'android:apk-key-hash:'.Base64UrlSafe::encodeUnpadded(random_bytes(32));
+        $options = $this->creationOptions('handle-abc');
+
+        $verified = (new WebauthnLibCeremonyVerifier(self::RP_ID, [self::ORIGIN, $androidOrigin]))
+            ->verifyRegistration(json_encode($options), $this->attestation($options, origin: $androidOrigin));
+
+        $this->assertSame($androidOrigin, $verified->origin);
+        $this->assertSame(self::RP_ID, $verified->rpId);
+
+        // The same answer against a list without it (the dashboard-only verifier): refused.
+        $this->expectException(WebauthnVerificationFailed::class);
+        $this->verifier()->verifyRegistration(json_encode($options), $this->attestation($options, origin: $androidOrigin));
+    }
+
     // --- the virtual authenticator -------------------------------------------------
 
     private function verifier(): WebauthnLibCeremonyVerifier

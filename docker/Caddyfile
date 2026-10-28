@@ -104,6 +104,16 @@ reidey.de {
 		file_server
 	}
 
+	# Apple's CDN refuses an apple-app-site-association served with the wrong
+	# Content-Type, and Next guesses application/octet-stream for the
+	# extensionless file (measured live 2026-10-28; docs/22 §4.4 named this
+	# exact fallback). The file itself still comes from frontend/public.
+	handle /.well-known/apple-app-site-association {
+		reverse_proxy frontend:3000 {
+			header_down Content-Type application/json
+		}
+	}
+
 	# Everything else is the Next.js dashboard.
 	handle {
 		reverse_proxy frontend:3000

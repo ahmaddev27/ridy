@@ -3,7 +3,6 @@
 namespace App\Domain\Auth\Webauthn;
 
 use App\Domain\Auth\Webauthn\Models\WebauthnCredential;
-use App\Models\User;
 use ParagonIE\ConstantTime\Base64UrlSafe;
 
 /**
@@ -25,7 +24,7 @@ class CeremonyOptions
      * @param  iterable<WebauthnCredential>  $exclude  the account's existing passkeys, so an authenticator that already holds one refuses a duplicate
      * @return array<string, mixed>
      */
-    public function creation(User $user, string $userHandle, iterable $exclude): array
+    public function creation(PasskeyHolder $account, string $userHandle, iterable $exclude): array
     {
         $excludeCredentials = [];
         foreach ($exclude as $credential) {
@@ -43,8 +42,8 @@ class CeremonyOptions
             ],
             'user' => [
                 'id' => Base64UrlSafe::encodeUnpadded($userHandle),
-                'name' => $user->email,
-                'displayName' => $user->name,
+                'name' => $account->passkeyAccountName(),
+                'displayName' => $account->passkeyDisplayName(),
             ],
             'challenge' => self::challenge(),
             'pubKeyCredParams' => array_map(

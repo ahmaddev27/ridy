@@ -19,7 +19,7 @@ use Illuminate\Http\Response;
  */
 class WebauthnCredentialController extends Controller
 {
-    public function __construct(private readonly PasskeyRegistrar $registrar) {}
+    public function __construct(protected readonly PasskeyRegistrar $registrar) {}
 
     /** The step-up: the request re-proves the account password before a ceremony is parked. */
     public function registerOptions(WebauthnRegisterOptionsRequest $request): JsonResponse

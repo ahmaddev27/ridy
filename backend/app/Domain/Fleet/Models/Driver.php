@@ -3,6 +3,7 @@
 namespace App\Domain\Fleet\Models;
 
 use App\Domain\Auth\Webauthn\Concerns\HasWebauthnCredentials;
+use App\Domain\Auth\Webauthn\PasskeyHolder;
 use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Tenancy\Concerns\BelongsToTenant;
@@ -17,7 +18,7 @@ use Laravel\Sanctum\HasApiTokens;
  * A fleet driver. Also the authenticatable identity for the mobile driver app
  * (email + password, issued a Sanctum bearer token) once invited by a manager.
  */
-class Driver extends Authenticatable
+class Driver extends Authenticatable implements PasskeyHolder
 {
     /**
      * A driver whose status hasn't synced within this many minutes is stale: off
@@ -84,6 +85,16 @@ class Driver extends Authenticatable
     public function isActivated(): bool
     {
         return $this->activated_at !== null;
+    }
+
+    /**
+     * WebAuthn `user.name`: the address the driver signs in with. A roster row
+     * that only has the Uber address falls back to it, and one with neither to
+     * a stable label — the authenticator needs a non-empty string either way.
+     */
+    public function passkeyAccountName(): string
+    {
+        return (string) ($this->email ?: $this->uber_email ?: 'driver-'.$this->getKey());
     }
 
     /** App onboarding state for the manager dashboard. */
