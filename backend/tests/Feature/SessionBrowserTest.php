@@ -144,6 +144,37 @@ class SessionBrowserTest extends TestCase
         $this->assertSame(1, UberFleetSession::withoutGlobalScopes()->where('tenant_id', $tenant->id)->count());
     }
 
+    public function test_wanted_lists_active_connected_companies_with_cookies_and_skips_lapsed(): void
+    {
+        $active = $this->tenant();
+        $this->service()->postJson("/api/v1/internal/session-browser/{$active->id}/capture", [
+            'uber_org_uuid' => self::ORG,
+            'cookies' => $this->jar('a'),
+            'supplier_cookies' => [['name' => 'sp-jwt-session', 'value' => 'x']],
+        ])->assertCreated();
+
+        // A lapsed company with an active session row must NOT be wanted.
+        $lapsed = $this->tenant(['subscription_ends_at' => now()->subDay()]);
+        UberFleetSession::withoutGlobalScopes()->create([
+            'tenant_id' => $lapsed->id,
+            'uber_org_uuid' => 'e91f8d43-0000-4000-8000-000000000000',
+            'cookies' => $this->jar('b'),
+            'status' => UberFleetSession::STATUS_ACTIVE,
+        ]);
+
+        $this->service()->getJson('/api/v1/internal/session-browser/wanted')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.tenant_id', $active->id)
+            ->assertJsonPath('data.0.uber_org_uuid', self::ORG)
+            ->assertJsonPath('data.0.cookies.0.name', 'sid');
+    }
+
+    public function test_wanted_requires_the_secret(): void
+    {
+        $this->getJson('/api/v1/internal/session-browser/wanted')->assertUnauthorized();
+    }
+
     public function test_admin_reads_the_session_browser_state(): void
     {
         $this->seed(RolePermissionSeeder::class);

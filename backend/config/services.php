@@ -94,12 +94,4 @@ return [
         'disk' => env('HOST_DISK_PATH', '/host/root'),
     ],
 
-    // Persistent session-browser service (uber-auth). The dashboard drives an
-    // interactive Uber sign-in through it; empty url/secret = the feature is off
-    // (the login endpoints answer 503 unavailable).
-    'uber_auth' => [
-        'url' => env('UBER_AUTH_URL'),
-        'secret' => env('UBER_AUTH_SECRET'),
-    ],
-
 ];

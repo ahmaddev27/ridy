@@ -28,6 +28,15 @@ async function backendPost(path, body) {
   return res.json().catch(() => ({}));
 }
 
+async function backendGet(path) {
+  const res = await fetch(`${config.apiBaseUrl}${path}`, {
+    headers: { Accept: "application/json", "X-Dispatch-Secret": config.dispatchSecret },
+  });
+  if (!res.ok) throw new Error(`backend ${path} -> ${res.status}`);
+  const body = await res.json().catch(() => ({}));
+  return Array.isArray(body?.data) ? body.data : [];
+}
+
 async function postCapture(companyKey, cap) {
   if (!cap.orgUuid || !Array.isArray(cap.cookies) || cap.cookies.length === 0) return;
   await backendPost(`/api/v1/internal/session-browser/${encodeURIComponent(companyKey)}/capture`, {
@@ -98,6 +107,7 @@ export async function resumeFromDisk() {
   }
   for (const file of files) {
     const companyKey = basename(file, ".json");
+    if (config.onlyTenants.length && !config.onlyTenants.includes(companyKey)) continue;
     try {
       if (manager.atCapacity()) {
         console.warn(`[persistent] resume stopped at capacity before ${companyKey}`);
@@ -118,10 +128,80 @@ export async function resumeFromDisk() {
   await pushStatus().catch(() => {});
 }
 
+// Each stored cookie is just {name,value} — the host scope was stripped on
+// capture — so re-attach it to the host it belongs to: the RAMEN jar to
+// vsdispatch, the supplier jar to fleethub. Playwright infers domain/path/secure
+// from the url.
+function toPlaywrightCookies(list, url) {
+  return (Array.isArray(list) ? list : [])
+    .filter((c) => c && typeof c.name === "string" && typeof c.value === "string")
+    .map((c) => ({ name: c.name, value: c.value, url }));
+}
+
+/**
+ * Open a real browser ALREADY logged in to Uber by injecting the session the
+ * company connected on Uber's OWN page (captured by the extension, stored by the
+ * backend). No password is ever handled here. renew() then navigates Fleet Hub:
+ * dead cookies flip it to needs_otp; a live session warms and feeds the daemon.
+ */
+async function seedFromSession(companyKey, { cookies, supplierCookies, orgUuid }) {
+  const browser = await launchBrowser();
+  const context = await newStealthContext(browser);
+  await context.addCookies([
+    ...toPlaywrightCookies(cookies, "https://vsdispatch.uber.com/"),
+    ...toPlaywrightCookies(supplierCookies, "https://fleethub.uber.com/"),
+  ]);
+  const page = await context.newPage();
+  page.setDefaultTimeout(config.stepTimeout);
+  await manager.adopt(companyKey, { browser, context, page, createdAt: Date.now() }, { orgUuid, cookies });
+  await manager.renew(companyKey);
+}
+
+/**
+ * Reconcile the live browsers with the backend's "wanted" list (active, connected
+ * companies): seed a browser for every one that doesn't have a live browser yet,
+ * and CLOSE the browser of any company that dropped out (subscription ended or it
+ * was disconnected). This is the whole lifecycle — create on connect, stop on
+ * lapse — with no manual step and no password. Never throws.
+ */
+export async function syncFromBackend() {
+  let wanted;
+  try {
+    wanted = await backendGet("/api/v1/internal/session-browser/wanted");
+  } catch (e) {
+    console.warn(`[persistent] wanted fetch failed: ${e?.message}`);
+    return;
+  }
+  const want = config.onlyTenants.length
+    ? wanted.filter((s) => config.onlyTenants.includes(String(s.tenant_id)))
+    : wanted;
+  const wantedKeys = new Set(want.map((s) => String(s.tenant_id)));
+
+  for (const s of want) {
+    const key = String(s.tenant_id);
+    if (manager.has(key) || manager.atCapacity()) continue;
+    try {
+      await seedFromSession(key, { cookies: s.cookies, supplierCookies: s.supplier_cookies, orgUuid: s.uber_org_uuid });
+      console.log(`[persistent] seeded ${key}: ${manager.get(key)?.state}`);
+    } catch (e) {
+      console.warn(`[persistent] seed ${key} failed: ${e?.message}`);
+    }
+  }
+
+  for (const key of manager.keys()) {
+    if (!wantedKeys.has(key)) {
+      console.log(`[persistent] ${key} no longer wanted — closing`);
+      await manager.remove(key);
+    }
+  }
+  await pushStatus().catch(() => {});
+}
+
 let loops = [];
 export function startLoops() {
   loops.push(setInterval(() => manager.tick().catch((e) => console.warn(`[persistent] tick: ${e?.message}`)), config.warmTickMs));
   loops.push(setInterval(() => pushStatus().catch((e) => console.warn(`[persistent] status: ${e?.message}`)), config.statusPushMs));
+  loops.push(setInterval(() => syncFromBackend().catch((e) => console.warn(`[persistent] sync: ${e?.message}`)), config.syncIntervalMs));
   for (const t of loops) t.unref?.();
 }
 

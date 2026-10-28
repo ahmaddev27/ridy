@@ -87,6 +87,15 @@ export class PersistentSessionManager {
     return this.sessions.get(companyKey) ?? null;
   }
 
+  has(companyKey) {
+    return this.sessions.has(companyKey);
+  }
+
+  /** The company keys currently held (any state). */
+  keys() {
+    return [...this.sessions.keys()];
+  }
+
   /**
    * Take over a freshly logged-in context (from browser.js) and keep it alive.
    * Replaces any previous entry for the company, closing its old context first.
