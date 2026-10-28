@@ -710,6 +710,47 @@ export async function getCompanySessionOutages(id: number): Promise<SessionOutag
   return res.data;
 }
 
+export type SessionBrowserState = "not_set_up" | "logging_in" | "active" | "needs_otp" | "down";
+
+/** The persistent per-company Uber session browser. Only `state` is guaranteed. */
+export type SessionBrowserStatus = {
+  state: SessionBrowserState;
+  last_login_at?: string | null;
+  last_capture_at?: string | null;
+  last_seen_at?: string | null;
+  hard_reauth_count?: number | null;
+  consecutive_errors?: number | null;
+  is_live?: boolean | null;
+};
+
+/** A company's persistent session-browser status. */
+export async function getCompanySessionBrowser(id: number): Promise<SessionBrowserStatus> {
+  const res = await apiFetch<{ data: SessionBrowserStatus }>(`${base}/${id}/session-browser`);
+  return res.data;
+}
+
+export type SessionBrowserLoginResult = { status: string; login_id?: string; message?: string };
+
+/** Start an interactive login that hands the browser to the persistent manager. */
+export async function startSessionBrowserLogin(id: number, email: string, password: string): Promise<SessionBrowserLoginResult> {
+  const res = await apiFetch<{ data: SessionBrowserLoginResult }>(`${base}/${id}/session-browser/login`, {
+    method: "POST",
+    body: { email, password },
+    withCsrf: true,
+  });
+  return res.data;
+}
+
+/** Relay the SMS/OTP code into a pending persistent-browser login. */
+export async function submitSessionBrowserMfa(id: number, loginId: string, code: string): Promise<SessionBrowserLoginResult> {
+  const res = await apiFetch<{ data: SessionBrowserLoginResult }>(`${base}/${id}/session-browser/login/mfa`, {
+    method: "POST",
+    body: { login_id: loginId, code },
+    withCsrf: true,
+  });
+  return res.data;
+}
+
 export async function deleteCompanySession(id: number): Promise<void> {
   await apiFetch(`${base}/${id}/session`, { method: "DELETE", withCsrf: true });
 }

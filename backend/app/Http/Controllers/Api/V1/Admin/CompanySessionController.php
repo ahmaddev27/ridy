@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Dispatch\FleetSessionService;
+use App\Domain\Dispatch\Models\SessionBrowser;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\SessionOutageTracker;
 use App\Domain\Tenancy\CompanyDataPurger;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Admin\CompanySessionResource;
+use App\Http\Resources\Admin\SessionBrowserResource;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -30,6 +32,16 @@ class CompanySessionController extends Controller
     public function outages(Tenant $tenant, SessionOutageTracker $tracker): JsonResponse
     {
         return response()->json(['data' => $tracker->summary($tenant->id)]);
+    }
+
+    /** Health of the company's persistent session browser; `not_set_up` until it first reports. */
+    public function sessionBrowser(Tenant $tenant): JsonResponse
+    {
+        $browser = SessionBrowser::where('tenant_id', $tenant->id)->first();
+
+        return response()->json([
+            'data' => $browser ? new SessionBrowserResource($browser) : ['state' => SessionBrowser::STATE_NOT_SET_UP],
+        ]);
     }
 
     /** Force the company to re-link (marks the session needs_relink). */

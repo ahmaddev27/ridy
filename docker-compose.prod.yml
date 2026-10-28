@@ -72,6 +72,12 @@ x-app-env: &app-env
   DB_USERNAME: ${DB_USERNAME}
   DB_PASSWORD: ${DB_PASSWORD}
   DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
+  # Persistent session-browser service (uber-auth). The backend calls it to drive
+  # an interactive login and reads nothing back directly — the browser pushes
+  # captures + status to the backend's internal endpoints (secret-guarded by
+  # DISPATCH_INGEST_SECRET). Empty until the "browser" profile is enabled.
+  UBER_AUTH_URL: ${UBER_AUTH_URL:-http://uber-auth:8791}
+  UBER_AUTH_SECRET: ${UBER_AUTH_SECRET:-}
   # FCM HTTP v1 (OAuth2 service-account) — used by FcmPushSender for driver + web
   # push. Point FCM_CREDENTIALS at the mounted service-account JSON. Without it the
   # app falls back to LogPushSender (pushes are only logged, not sent).
@@ -338,6 +344,37 @@ services:
       # Sentry error tracking for the daemon (empty = disabled).
       SENTRY_DSN: ${DAEMON_SENTRY_DSN:-}
 
+  # --- Persistent session browsers (opt-in via the "browser" profile) --------
+  # Keeps a real headless Chromium per company logged in to Uber 24/7, so Uber
+  # keeps reissuing the signed tokens the dispatch daemon cannot refresh. NOT
+  # started by a normal deploy (profile-gated) — enable only after a live
+  # validation on one consenting company (see docs/23). Each live context is
+  # heavy; size MAX_SESSIONS to this box's RAM, or run it on its own box.
+  uber-auth:
+    build:
+      context: .
+      dockerfile: ./docker/uber-auth.Dockerfile
+    profiles: ["browser"]
+    restart: unless-stopped
+    logging: *default-logging
+    # Chromium needs a larger /dev/shm than Docker's 64 MB default or it crashes.
+    shm_size: 1g
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      - backend
+    environment:
+      UBER_AUTH_SECRET: ${UBER_AUTH_SECRET:-}
+      DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
+      # Reaches the API through Caddy over the public HTTPS domain (hairpin),
+      # like the dispatch daemon.
+      RIDY_API_URL: https://${DOMAIN}
+      STATE_DIR: /state
+      NO_SANDBOX: "1"
+      MAX_SESSIONS: ${UBER_AUTH_MAX_SESSIONS:-20}
+    volumes:
+      # Saved per-company browser storage, so a restart resumes warm without OTP.
+      - uber_auth_state:/state
+
   # --- Self-hosted geocoding + routing (opt-in via the "geo" profile) --------
   # Removes the free public services' ~1 req/s rate limit so trip distances fill
   # instantly at scale. NOT started by a normal deploy (profile-gated); import
@@ -376,3 +413,4 @@ volumes:
   caddy_config:
   nominatim_data:
   osrm_data:
+  uber_auth_state:

@@ -67,10 +67,13 @@ async function typeOtp(page, code) {
 }
 
 /** Launch options that make an automated Chrome look like a normal one. */
-async function launchBrowser() {
+export async function launchBrowser() {
   const args = [
     "--disable-blink-features=AutomationControlled",
     "--disable-features=IsolateOrigins,site-per-process",
+    // In a container Chromium's sandbox usually can't start; the container is the
+    // isolation boundary. Off by default (NO_SANDBOX unset) for desktop safety.
+    ...(config.noSandbox ? ["--no-sandbox"] : []),
   ];
   // Prefer the real installed Chrome — far less likely to be flagged than the
   // bundled Chromium. Fall back to Chromium if Chrome is not present.
@@ -81,13 +84,15 @@ async function launchBrowser() {
   }
 }
 
-async function newStealthContext(browser) {
+export async function newStealthContext(browser, extra = {}) {
   const context = await browser.newContext({
     locale: "de-DE",
     timezoneId: "Europe/Berlin",
     viewport: { width: 1280, height: 800 },
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    // Extra context options (e.g. { storageState } when resuming a saved session).
+    ...extra,
   });
   // Hide the two most-checked automation tells.
   await context.addInitScript(() => {
@@ -170,11 +175,11 @@ export async function startLogin({ email, password }) {
   try {
     await page.goto(config.dashboardUrl, { waitUntil: "domcontentloaded" });
 
-    // Already authenticated (stored cookies) — nothing to do.
+    // Already authenticated (stored cookies). Keep the browser open so the
+    // persistent manager can adopt it; the caller closes it if it won't.
     if (!/auth\.uber|\/(auth|login|oauth)/i.test(page.url())) {
       const result = await captureResult(context, page);
-      await browser.close();
-      return { status: STATUS.SUCCESS, result };
+      return { status: STATUS.SUCCESS, result, session };
     }
 
     await identifierField(page).fill(email);
@@ -190,8 +195,8 @@ export async function startLogin({ email, password }) {
 
     if (step === "landed") {
       const result = await captureResult(context, page);
-      await browser.close();
-      return { status: STATUS.SUCCESS, result };
+      // Leave the browser open for the persistent manager to adopt.
+      return { status: STATUS.SUCCESS, result, session };
     }
     if (step === "otp") {
       return { status: STATUS.MFA_REQUIRED, session };
@@ -219,8 +224,8 @@ export async function submitMfa(session, code) {
     const step = await detectStep(page);
     if (step === "landed") {
       const result = await captureResult(context, page);
-      await browser.close();
-      return { status: STATUS.SUCCESS, result };
+      // Leave the browser open for the persistent manager to adopt.
+      return { status: STATUS.SUCCESS, result, session };
     }
     if (step === "otp") {
       // Still on the code step — wrong/expired code.
