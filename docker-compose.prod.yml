@@ -371,6 +371,9 @@ services:
       STATE_DIR: /state
       NO_SANDBOX: "1"
       MAX_SESSIONS: ${UBER_AUTH_MAX_SESSIONS:-20}
+      # Gradual rollout: comma-separated tenant ids to auto-seed a browser for;
+      # empty = every active company. Set e.g. to one id to pilot on one company.
+      ONLY_TENANTS: ${UBER_AUTH_ONLY_TENANTS:-}
     volumes:
       # Saved per-company browser storage, so a restart resumes warm without OTP.
       - uber_auth_state:/state

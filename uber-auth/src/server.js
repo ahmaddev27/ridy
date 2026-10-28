@@ -11,7 +11,7 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { startLogin, submitMfa, closeSession, STATUS } from "./browser.js";
-import { adoptLogin, statusList, resumeFromDisk, startLoops } from "./persistent.js";
+import { adoptLogin, statusList, resumeFromDisk, syncFromBackend, startLoops } from "./persistent.js";
 
 // loginId -> { session, companyKey, createdAt } awaiting an MFA code.
 const pending = new Map();
@@ -141,6 +141,9 @@ const server = createServer(async (req, res) => {
 server.listen(config.port, async () => {
   console.log(`Ridy uber-auth listening on :${config.port} (headful=${config.headful})`);
   startLoops();
-  // Bring saved sessions back after a restart so a deploy doesn't force a fresh OTP.
+  // Bring saved sessions back after a restart (fast, from disk), then reconcile
+  // with the backend: seed a browser for every active connected company that has
+  // none yet, from the session it connected on Uber — no password, no user step.
   await resumeFromDisk().catch((e) => console.warn(`[server] resume failed: ${e?.message}`));
+  await syncFromBackend().catch((e) => console.warn(`[server] initial sync failed: ${e?.message}`));
 });

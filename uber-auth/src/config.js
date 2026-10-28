@@ -45,4 +45,16 @@ export const config = {
   // Where each company's browser storage (cookies) is saved so a service restart
   // resumes warm without a fresh OTP, as long as the saved session is still valid.
   stateDir: process.env.STATE_DIR || "./state",
+
+  // How often to poll the backend for the companies that should have a live
+  // browser (active, connected sessions) and SEED a browser from the session the
+  // company already connected on Uber — no password, no extra user step — then
+  // close any browser whose company dropped out (subscription ended).
+  syncIntervalMs: Number(process.env.SYNC_INTERVAL_MS || 60000),
+  // Gradual rollout: restrict the auto-seed to these tenant ids (comma-separated);
+  // empty = every active company. e.g. ONLY_TENANTS=8 to start with one company.
+  onlyTenants: (process.env.ONLY_TENANTS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
 };

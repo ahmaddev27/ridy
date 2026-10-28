@@ -78,6 +78,36 @@ class SessionBrowserController extends Controller
         return response()->json(['data' => $session->only(['uber_org_uuid', 'status'])], 201);
     }
 
+    /**
+     * The companies the browser service should keep a browser warm for: every
+     * ACTIVE, usable Uber session whose company is still serviceable (not lapsed /
+     * banned / disabled), WITH the cookie jars to SEED a browser from — so the
+     * server browser is established from the session the company already connected
+     * on Uber's own page, with no password ever entered into Reidey. The service
+     * polls this and closes any browser whose company is no longer in the list
+     * (subscription ended), so the lifecycle follows the subscription automatically.
+     * Secret-guarded + internal like the daemon's sessions endpoint; cookies are
+     * decrypted here.
+     */
+    public function wanted(): JsonResponse
+    {
+        $sessions = UberFleetSession::withoutGlobalScopes()
+            ->with('tenant:id,status,banned_at,activated_at,subscription_ends_at')
+            ->where('status', UberFleetSession::STATUS_ACTIVE)
+            ->get()
+            ->filter(fn (UberFleetSession $s) => $s->isUsable()
+                && $s->tenant !== null
+                && $s->tenant->stateReason() === null)
+            ->map(fn (UberFleetSession $s) => [
+                'tenant_id' => (int) $s->tenant_id,
+                'uber_org_uuid' => $s->uber_org_uuid,
+                'cookies' => $s->cookies,
+                'supplier_cookies' => $s->supplier_cookies,
+            ])->values();
+
+        return response()->json(['data' => $sessions]);
+    }
+
     /** Same silent-capture guards as the extension's non-manual path. */
     private function blockedReason(Tenant $tenant, string $orgUuid): ?string
     {

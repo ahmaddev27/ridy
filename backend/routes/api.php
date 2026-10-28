@@ -25,7 +25,6 @@ use App\Http\Controllers\Api\V1\Admin\PaymentClaimController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\ProxyController;
 use App\Http\Controllers\Api\V1\Admin\QueueAdminController;
-use App\Http\Controllers\Api\V1\Admin\SessionBrowserLoginController;
 use App\Http\Controllers\Api\V1\Admin\SettingsController;
 use App\Http\Controllers\Api\V1\Admin\ShardController;
 use App\Http\Controllers\Api\V1\Admin\SubscriptionController;
@@ -272,6 +271,7 @@ Route::prefix('v1')->group(function () {
 
     // Internal - the persistent session-browser service (same shared secret).
     Route::middleware('dispatch.secret')->prefix('internal/session-browser')->group(function () {
+        Route::get('wanted', [SessionBrowserController::class, 'wanted']);
         Route::post('status', [SessionBrowserController::class, 'status']);
         Route::post('{tenant}/capture', [SessionBrowserController::class, 'capture']);
     });
@@ -537,10 +537,6 @@ Route::prefix('v1')->group(function () {
 
         Route::get('companies/{tenant}/session', [CompanySessionController::class, 'show']);
         Route::get('companies/{tenant}/session-browser', [CompanySessionController::class, 'sessionBrowser']);
-        // Drive the persistent browser's interactive Uber sign-in (password relayed
-        // once, never stored). Used for first setup and to recover a hard re-auth.
-        Route::post('companies/{tenant}/session-browser/login', [SessionBrowserLoginController::class, 'start']);
-        Route::post('companies/{tenant}/session-browser/login/mfa', [SessionBrowserLoginController::class, 'mfa']);
         Route::get('companies/{tenant}/session/outages', [CompanySessionController::class, 'outages']);
         Route::post('companies/{tenant}/session/relink', [CompanySessionController::class, 'forceRelink']);
         Route::delete('companies/{tenant}/session', [CompanySessionController::class, 'destroy']);
