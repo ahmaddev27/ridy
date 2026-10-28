@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AppState } from "react-native";
 import * as SecureStore from "expo-secure-store";
-import { api, ApiError, type DriverProfile, type SessionInvalidBody } from "./api";
+import { api, ApiError, type DriverProfile, type LoginSession, type SessionInvalidBody } from "./api";
+import { getPasskey } from "./passkeys";
 import { revokeLocalPush, unregisterForPush } from "./push";
 import { ensureFreshInstall } from "./install-guard";
 import { getLocale } from "./i18n";
@@ -46,6 +47,15 @@ type AuthState = {
   requestCode: (email: string) => Promise<void>;
   /** Passwordless sign-in step 2: verify the code and open the session. */
   verifyCode: (email: string, otp: string) => Promise<void>;
+  /**
+   * Passkey sign-in: runs the OS ceremony and opens the session. Throws
+   * `PasskeyCancelledError` when the driver dismisses the sheet.
+   */
+  signInWithPasskey: () => Promise<void>;
+  /** True right after an OTP sign-in by a driver: time to offer a passkey (once). */
+  passkeyOffer: boolean;
+  /** The offer was answered (added, later, or not possible) — stop showing it. */
+  closePasskeyOffer: () => void;
   updateProfile: (patch: { name?: string; locale?: string }) => Promise<void>;
   /** Request deletion of this account; the server revokes every session. */
   requestAccountDeletion: () => Promise<void>;
@@ -67,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [driver, setDriver] = useState<DriverProfile | null>(null);
   const [offline, setOffline] = useState(false);
   const [suspended, setSuspended] = useState<SuspendedInfo | null>(null);
+  const [passkeyOffer, setPasskeyOffer] = useState(false);
   const loggingOut = useRef(false);
 
   // Derive owner-ness from the profile itself — a SEPARATE isOwner state could
@@ -93,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.setOwner(false);
     setDriver(null);
     setOffline(false);
+    setPasskeyOffer(false);
     if (info) setSuspended(info);
     stopLive();
     // The server can no longer be told (dead token) — invalidate at FCM instead.
@@ -189,6 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [restore]);
 
   const clearSuspended = useCallback(() => setSuspended(null), []);
+  const closePasskeyOffer = useCallback(() => setPasskeyOffer(false), []);
 
   async function persist(token: string, d: DriverProfile, owner: boolean) {
     await SecureStore.setItemAsync(TOKEN_KEY, token);
@@ -201,15 +214,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await api.loginRequest(email);
   }
 
-  async function verifyCode(email: string, otp: string) {
-    let res: Awaited<ReturnType<typeof api.loginVerify>>;
-    try {
-      res = await api.loginVerify(email, otp);
-    } catch (e) {
-      const info = e instanceof ApiError && e.status === 403 ? suspendedFrom(e.body) : null;
-      if (info) setSuspended(info);
-      throw e;
-    }
+  /** The tail both sign-ins share: persist the session and backfill the language. */
+  async function completeLogin(res: LoginSession) {
     const owner = res.data?.is_owner === true;
     const profile = (owner ? res.data?.owner : res.data?.driver) as DriverProfile | undefined;
     if (!res.data?.token || !profile?.id) throw new ApiError(0, "invalid_response", null);
@@ -222,6 +228,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (profile.locale !== locale) {
       void (owner ? api.fleetUpdateProfile({ locale }) : api.updateProfile({ locale })).catch(() => {});
     }
+    return owner;
+  }
+
+  /** Run a sign-in request; a suspended company's 403 opens the suspension screen. */
+  async function signIn(request: () => Promise<LoginSession>): Promise<boolean> {
+    let res: LoginSession;
+    try {
+      res = await request();
+    } catch (e) {
+      const info = e instanceof ApiError && e.status === 403 ? suspendedFrom(e.body) : null;
+      if (info) setSuspended(info);
+      throw e;
+    }
+    return completeLogin(res);
+  }
+
+  async function verifyCode(email: string, otp: string) {
+    const owner = await signIn(() => api.loginVerify(email, otp));
+    // Passkeys are for the driver principal; owner mode keeps its OTP flow.
+    if (!owner) setPasskeyOffer(true);
+  }
+
+  async function signInWithPasskey() {
+    const { ceremony_id, options } = await api.passkeyLoginOptions();
+    const credential = await getPasskey(options);
+    await signIn(() => api.passkeyLogin(ceremony_id, credential));
   }
 
   async function updateProfile(patch: { name?: string; locale?: string }) {
@@ -274,6 +306,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         retry,
         requestCode,
         verifyCode,
+        signInWithPasskey,
+        passkeyOffer,
+        closePasskeyOffer,
         updateProfile,
         requestAccountDeletion,
         logout,

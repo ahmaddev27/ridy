@@ -29,6 +29,7 @@ export { default as Gauge } from "lucide-react-native/icons/gauge";
 export { default as Globe } from "lucide-react-native/icons/globe";
 export { default as Home } from "lucide-react-native/icons/house";
 export { default as Info } from "lucide-react-native/icons/info";
+export { default as KeyRound } from "lucide-react-native/icons/key-round";
 export { default as LifeBuoy } from "lucide-react-native/icons/life-buoy";
 export { default as LogIn } from "lucide-react-native/icons/log-in";
 export { default as LogOut } from "lucide-react-native/icons/log-out";

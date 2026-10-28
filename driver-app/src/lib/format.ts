@@ -68,6 +68,12 @@ export function dayLabel(iso: string | null | undefined): string {
   return new Date(iso).toLocaleDateString(TIME, { day: "2-digit", month: "2-digit" });
 }
 
+/** Full date ("02/09/2026"), Latin digits. */
+export function dateLabel(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString(TIME, { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 /**
  * Normalise Arabic-Indic (٠-٩) and Extended/Persian (۰-۹) digits to ASCII, so a
  * driver typing on an Arabic keyboard can still enter a numeric code.

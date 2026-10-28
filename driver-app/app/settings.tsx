@@ -17,6 +17,7 @@ import {
   FileText,
   Trash2,
   BatteryWarning,
+  KeyRound,
   type LucideIcon,
 } from "@/components/icons";
 import { Text } from "@/components/typography";
@@ -27,6 +28,7 @@ import { t, isRTL, useLocale } from "@/lib/i18n";
 import { useColors, radius, cardStyle, setThemeMode, useThemeMode, type Palette } from "@/lib/theme";
 import { loadPrefs, setPref as storePref, type PrefName, type Prefs } from "@/lib/prefs";
 import { usePushHealth } from "@/lib/use-push-health";
+import { passkeysAvailable } from "@/lib/passkeys";
 import { PRIVACY_URL, IMPRINT_URL, SUPPORT_EMAIL } from "@/lib/links";
 
 const LANG_NAMES: Record<string, string> = { de: "Deutsch", en: "English", ar: "العربية" };
@@ -49,6 +51,13 @@ export default function SettingsScreen() {
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [name, setName] = useState(driver?.name ?? "");
   const [saving, setSaving] = useState(false);
+  const [passkeys, setPasskeys] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void passkeysAvailable().then((ok) => { if (alive) setPasskeys(ok); });
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -190,6 +199,11 @@ export default function SettingsScreen() {
             <View style={{ gap: 10 }}>
               <Field label={t("settings.name")} value={name} onChangeText={setName} autoCapitalize="words" />
               <PrimaryButton label={t("settings.save")} onPress={save} loading={saving} disabled={!dirty} />
+              {passkeys && (
+                <View style={cardStyle(c)}>
+                  <NavRow icon={KeyRound} label={t("passkey.title")} onPress={() => router.push("/passkeys")} c={c} Chevron={Chevron} />
+                </View>
+              )}
             </View>
           </View>
         )}
