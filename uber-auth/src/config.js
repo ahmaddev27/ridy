@@ -1,14 +1,14 @@
-function required(name) {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing required env var: ${name}`);
-  return v;
-}
-
 export const config = {
   port: Number(process.env.UBER_AUTH_PORT || 8791),
 
-  // Shared secret; Laravel must send it as X-Auth-Secret.
-  secret: required("UBER_AUTH_SECRET"),
+  // Secret guarding the INBOUND endpoints (/login, /sessions, /health) via the
+  // X-Auth-Secret header. Optional: the auto-seed model pulls from the backend
+  // (guarded by DISPATCH_INGEST_SECRET) and uses NONE of these inbound endpoints,
+  // so the service runs fine without it — those endpoints then simply reject every
+  // caller. Set it only to use the dormant interactive /login or /health probe.
+  // Kept optional on purpose: the prod deploy rewrites .env from secrets, and a
+  // required value here would crash-loop the service whenever that secret is unset.
+  secret: process.env.UBER_AUTH_SECRET || "",
 
   // Uber fleet dispatch dashboard — sign-in lands here.
   dashboardUrl: process.env.UBER_DASHBOARD_URL || "https://vsdispatch.uber.com/",
