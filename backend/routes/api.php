@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\V1\Admin\PaymentClaimController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\ProxyController;
 use App\Http\Controllers\Api\V1\Admin\QueueAdminController;
+use App\Http\Controllers\Api\V1\Admin\SessionBrowserLoginController;
 use App\Http\Controllers\Api\V1\Admin\SettingsController;
 use App\Http\Controllers\Api\V1\Admin\ShardController;
 use App\Http\Controllers\Api\V1\Admin\SubscriptionController;
@@ -63,6 +64,7 @@ use App\Http\Controllers\Api\V1\ElProfessorController;
 use App\Http\Controllers\Api\V1\ExtensionController;
 use App\Http\Controllers\Api\V1\FleetSessionController;
 use App\Http\Controllers\Api\V1\HealthController;
+use App\Http\Controllers\Api\V1\Internal\SessionBrowserController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\NotificationPrefsController;
 use App\Http\Controllers\Api\V1\PasswordResetController;
@@ -266,6 +268,12 @@ Route::prefix('v1')->group(function () {
         // docker/php/php-fpm.d/zz-pools.conf and the matcher in docker/Caddyfile.
         Route::get('commands', [DispatchDaemonController::class, 'commands']);
         Route::post('commands/{command}/result', [DispatchDaemonController::class, 'commandResult']);
+    });
+
+    // Internal - the persistent session-browser service (same shared secret).
+    Route::middleware('dispatch.secret')->prefix('internal/session-browser')->group(function () {
+        Route::post('status', [SessionBrowserController::class, 'status']);
+        Route::post('{tenant}/capture', [SessionBrowserController::class, 'capture']);
     });
 
     // Session basics every authenticated user needs — including tenant-less ones
@@ -528,6 +536,11 @@ Route::prefix('v1')->group(function () {
         Route::delete('companies/{tenant}/subscription', [SubscriptionController::class, 'endSubscription']);
 
         Route::get('companies/{tenant}/session', [CompanySessionController::class, 'show']);
+        Route::get('companies/{tenant}/session-browser', [CompanySessionController::class, 'sessionBrowser']);
+        // Drive the persistent browser's interactive Uber sign-in (password relayed
+        // once, never stored). Used for first setup and to recover a hard re-auth.
+        Route::post('companies/{tenant}/session-browser/login', [SessionBrowserLoginController::class, 'start']);
+        Route::post('companies/{tenant}/session-browser/login/mfa', [SessionBrowserLoginController::class, 'mfa']);
         Route::get('companies/{tenant}/session/outages', [CompanySessionController::class, 'outages']);
         Route::post('companies/{tenant}/session/relink', [CompanySessionController::class, 'forceRelink']);
         Route::delete('companies/{tenant}/session', [CompanySessionController::class, 'destroy']);

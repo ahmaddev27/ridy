@@ -111,7 +111,7 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           fingerprint: ${{ secrets.SSH_HOST_FINGERPRINT }}
           # Pass secrets as env so they never appear in the script text/logs.
-          envs: DEPLOY_SHA,DEPLOY_EVENT,ALLOW_OLDER,REPO_URL,DOMAIN,APP_KEY,DB_PASSWORD,DB_ROOT_PASSWORD,DISPATCH_INGEST_SECRET,SUPERADMIN_PASSWORD,EXTENSION_ORIGIN,FCM_CREDENTIALS_JSON,FCM_PROJECT_ID,NOMINATIM_URL,OSRM_URL,ALERT_EMAIL,OTP_TEST_CODE,SENTRY_LARAVEL_DSN,NEXT_PUBLIC_SENTRY_DSN,DAEMON_SENTRY_DSN,NEXT_PUBLIC_MAP_TILE_URL,NEXT_PUBLIC_MAP_ATTRIBUTION,CSP_EXTRA_CONNECT,ELPROFESSOR_INTAKE_URL,ELPROFESSOR_ANON_KEY
+          envs: DEPLOY_SHA,DEPLOY_EVENT,ALLOW_OLDER,REPO_URL,DOMAIN,APP_KEY,DB_PASSWORD,DB_ROOT_PASSWORD,DISPATCH_INGEST_SECRET,SUPERADMIN_PASSWORD,EXTENSION_ORIGIN,FCM_CREDENTIALS_JSON,FCM_PROJECT_ID,NOMINATIM_URL,OSRM_URL,ALERT_EMAIL,OTP_TEST_CODE,SENTRY_LARAVEL_DSN,NEXT_PUBLIC_SENTRY_DSN,DAEMON_SENTRY_DSN,NEXT_PUBLIC_MAP_TILE_URL,NEXT_PUBLIC_MAP_ATTRIBUTION,CSP_EXTRA_CONNECT,ELPROFESSOR_INTAKE_URL,ELPROFESSOR_ANON_KEY,WEBAUTHN_ORIGINS
           # NO script_stop: it makes drone-ssh insert an exit-check line after every
           # script line, which breaks multi-line constructs (the `case` in on_exit())
           # → "syntax error near unexpected token ;" before anything runs. The script
@@ -337,10 +337,15 @@ jobs:
             # not this file, and it is reversed by clearing them.
             env_line ELPROFESSOR_INTAKE_URL "$ELPROFESSOR_INTAKE_URL"
             env_line ELPROFESSOR_ANON_KEY "$ELPROFESSOR_ANON_KEY"
+            # Passkeys (docs/22): extra WebAuthn origins — the android:apk-key-hash
+            # entries for the driver app. Written even when empty: an empty value
+            # makes the backend fall back to APP_URL alone, so the switch is the
+            # secret, not this file.
+            env_line WEBAUTHN_ORIGINS "$WEBAUTHN_ORIGINS"
 
             # Every key must be present exactly once: a value that swallowed a newline
             # would otherwise silently shift the rest of the file into garbage.
-            for key in DOMAIN SITE_ADDRESS APP_KEY SESSION_SECURE_COOKIE SESSION_SAME_SITE REVERB_APP_ID REVERB_APP_KEY REVERB_APP_SECRET DB_DATABASE DB_USERNAME DB_PASSWORD DB_ROOT_PASSWORD DISPATCH_INGEST_SECRET EXTENSION_ORIGIN FCM_CREDENTIALS FCM_PROJECT_ID ALERT_EMAIL OTP_TEST_CODE SENTRY_LARAVEL_DSN NEXT_PUBLIC_SENTRY_DSN DAEMON_SENTRY_DSN NOMINATIM_URL OSRM_URL NEXT_PUBLIC_MAP_TILE_URL NEXT_PUBLIC_MAP_ATTRIBUTION CSP_EXTRA_CONNECT ELPROFESSOR_INTAKE_URL ELPROFESSOR_ANON_KEY; do
+            for key in DOMAIN SITE_ADDRESS APP_KEY SESSION_SECURE_COOKIE SESSION_SAME_SITE REVERB_APP_ID REVERB_APP_KEY REVERB_APP_SECRET DB_DATABASE DB_USERNAME DB_PASSWORD DB_ROOT_PASSWORD DISPATCH_INGEST_SECRET EXTENSION_ORIGIN FCM_CREDENTIALS FCM_PROJECT_ID ALERT_EMAIL OTP_TEST_CODE SENTRY_LARAVEL_DSN NEXT_PUBLIC_SENTRY_DSN DAEMON_SENTRY_DSN NOMINATIM_URL OSRM_URL NEXT_PUBLIC_MAP_TILE_URL NEXT_PUBLIC_MAP_ATTRIBUTION CSP_EXTRA_CONNECT ELPROFESSOR_INTAKE_URL ELPROFESSOR_ANON_KEY WEBAUTHN_ORIGINS; do
               count=$(grep -c "^$key=" .env || true)
               if [ "$count" != "1" ]; then
                 echo "::error::.env is malformed: $key appears $count time(s)"; exit 1
@@ -551,3 +556,4 @@ jobs:
           # which is STAGING - so this deploy is a no-op until both are set.
           ELPROFESSOR_INTAKE_URL: ${{ secrets.ELPROFESSOR_INTAKE_URL }}
           ELPROFESSOR_ANON_KEY: ${{ secrets.ELPROFESSOR_ANON_KEY }}
+          WEBAUTHN_ORIGINS: ${{ secrets.WEBAUTHN_ORIGINS }}

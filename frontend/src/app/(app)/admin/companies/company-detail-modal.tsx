@@ -34,8 +34,13 @@ import {
   getCompanyVehicles,
   getCompanyNetwork,
   getCompanySession,
+  getCompanySessionBrowser,
+  startSessionBrowserLogin,
+  submitSessionBrowserMfa,
   getCompanySessionOutages,
   type CompanySession,
+  type SessionBrowserState,
+  type SessionBrowserStatus,
   type SessionOutageSummary,
   clearCompanyNetwork,
   type CompanyNetworkRow,
@@ -864,9 +869,167 @@ function SessionTab({
         </div>
       </Group>
 
+      <Group title={c("pbTitle")}>
+        <SessionBrowserCard id={id} company={company} />
+      </Group>
+
       <Group title={c("outagesTitle")}>
         <SessionOutages id={id} />
       </Group>
+    </div>
+  );
+}
+
+const BROWSER_BADGE: Record<SessionBrowserState, string> = {
+  active: "bg-success-bg text-success-fg",
+  needs_otp: "bg-warning-bg text-warning-fg",
+  logging_in: "bg-info-bg text-info-fg",
+  down: "bg-danger-bg text-danger-fg",
+  not_set_up: "bg-surface-2 text-ink-subtle",
+};
+
+/** Persistent session browser: state badge + last login/capture/seen, re-auth and error counters. */
+function SessionBrowserCard({ id, company }: { id: number; company: Company }) {
+  const { t, locale } = useI18n();
+  const c = (k: string) => t(`screens.companies.${k}`);
+  const [status, setStatus] = useState<SessionBrowserStatus | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getCompanySessionBrowser(id)
+      .then((s) => alive && setStatus(s))
+      .catch(() => alive && setStatus(null))
+      .finally(() => alive && setLoaded(true));
+    return () => {
+      alive = false;
+    };
+  }, [id, company]);
+
+  if (!loaded) return <Loader2 className="h-4 w-4 animate-spin text-ink-subtle" />;
+  if (!status) return <p className="text-sm text-ink-subtle">{c("pbUnavailable")}</p>;
+
+  const state: SessionBrowserState = status.state in BROWSER_BADGE ? status.state : "not_set_up";
+  const stamp = (iso?: string | null) => relTime(iso ?? null, locale, c("pbNever"));
+  const num = (n?: number | null) => (typeof n === "number" ? String(n) : "—");
+  const stale = state === "active" && status.is_live === false;
+  const rows: [string, string, boolean][] = [
+    [c("pbLastLogin"), stamp(status.last_login_at), false],
+    [c("pbLastCapture"), stamp(status.last_capture_at), false],
+    [c("pbLastSeen"), stamp(status.last_seen_at), false],
+    [c("pbHardReauth"), num(status.hard_reauth_count), false],
+    [c("pbErrors"), num(status.consecutive_errors), (status.consecutive_errors ?? 0) > 0],
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={"rounded-full px-2 py-0.5 text-xs font-semibold " + BROWSER_BADGE[state]}>{c(`pb_${state}`)}</span>
+        {stale && <span className="text-xs text-warning-fg">{c("pbStale")}</span>}
+      </div>
+      <p className="text-xs text-ink-subtle">{c("pbHint")}</p>
+      {state !== "not_set_up" && (
+        <div className="space-y-1.5">
+          {rows.map(([label, value, warn]) => (
+            <div key={label} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm">
+              <span className="font-medium text-ink">{label}</span>
+              <span className={"text-xs " + (warn ? "text-warning-fg" : "text-ink-subtle")}>{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {(state === "not_set_up" || state === "needs_otp") && (
+        <SessionBrowserConnect
+          id={id}
+          reauth={state === "needs_otp"}
+          onDone={() => {
+            getCompanySessionBrowser(id)
+              .then(setStatus)
+              .catch(() => setStatus(null));
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Sign a company's persistent server browser in to Uber: email + password, then
+ * the SMS/OTP code if Uber asks. The password is relayed to the browser service
+ * for a single sign-in and is never stored (see the note). Shown when the browser
+ * is not set up yet or Uber forced a re-auth (needs_otp).
+ */
+function SessionBrowserConnect({ id, reauth, onDone }: { id: number; reauth: boolean; onDone: () => void }) {
+  const { t } = useI18n();
+  const c = (k: string) => t(`screens.companies.${k}`);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginId, setLoginId] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const fieldClass = "w-full rounded-md border border-line bg-surface px-2 py-1 text-sm";
+
+  async function start() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await startSessionBrowserLogin(id, email, password);
+      if (r.status === "mfa_required" && r.login_id) setLoginId(r.login_id);
+      else if (r.status === "success") {
+        setDone(true);
+        onDone();
+      } else setErr(r.message || r.status);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitCode() {
+    if (!loginId) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await submitSessionBrowserMfa(id, loginId, code);
+      if (r.status === "success") {
+        setDone(true);
+        onDone();
+      } else if (r.status === "mfa_required") setErr(c("pbOtpWrong"));
+      else setErr(r.message || r.status);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done) return <p className="text-xs font-medium text-success-fg">{c("pbConnected")}</p>;
+
+  return (
+    <div className="space-y-2 rounded-lg border border-line bg-surface-2 px-3 py-3">
+      <p className="text-xs font-medium text-ink">{c(reauth ? "pbReauthTitle" : "pbConnectTitle")}</p>
+      {!loginId ? (
+        <>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={c("pbEmail")} autoComplete="off" className={fieldClass} />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={c("pbPassword")} autoComplete="new-password" className={fieldClass} />
+          <Button size="sm" onClick={start} disabled={busy || !email || !password}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />} {c("pbConnect")}
+          </Button>
+        </>
+      ) : (
+        <>
+          <input inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} placeholder={c("pbOtp")} autoComplete="one-time-code" className={fieldClass} />
+          <Button size="sm" onClick={submitCode} disabled={busy || !code}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} {c("pbSubmitCode")}
+          </Button>
+        </>
+      )}
+      {err && <p className="text-xs text-danger-fg">{err}</p>}
+      <p className="text-[11px] text-ink-subtle">{c("pbConnectNote")}</p>
     </div>
   );
 }

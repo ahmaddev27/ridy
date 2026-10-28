@@ -17,6 +17,9 @@ class FleetSessionOutage extends Model
 
     public const VIA_PAGE = 'page';
 
+    /** The persistent server-side session browser. Non-manual: never overwrites a fresher stored jar. */
+    public const VIA_BROWSER = 'browser';
+
     public $timestamps = false;
 
     protected $fillable = [

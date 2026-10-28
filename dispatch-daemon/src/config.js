@@ -155,6 +155,17 @@ export const config = {
   // How often to re-read the active session list from the backend (ms).
   sessionPollInterval: intEnv("SESSION_POLL_INTERVAL_MS", 60000, 5000),
 
+  // While a company we were streaming has dropped out (Uber rejected it →
+  // needs_relink, or it expired), poll the session list THIS fast instead of
+  // sessionPollInterval, so a manager's re-link is picked up in seconds rather
+  // than up to a full minute. Reverts to the normal interval the moment every
+  // dropped company is back.
+  recoveryPollInterval: intEnv("RECOVERY_POLL_INTERVAL_MS", 2500, 500),
+  // How long a vanished company stays on the fast poll before the daemon gives
+  // up on it, so a company removed for good can never fast-poll the backend
+  // forever. Default 15 min.
+  recoveryPollWindow: intEnv("RECOVERY_POLL_WINDOW_MS", 900000, 0),
+
   // Request deadlines (ms). Neither Node's fetch nor undici's has a default
   // timeout, so without these a hung TCP connection through a residential proxy
   // parks the promise forever: a stalled status poll freezes the adaptive chain
