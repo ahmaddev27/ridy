@@ -19,6 +19,27 @@
 
 ---
 
+## 📅 شغل (2026-10-28) — Passkeys للسائق (فرع `feat/passkeys-driver`، بلا دمج وبلا push): نصّ الباكند جاهز، التطبيق قيد البناء
+
+المرحلة الثانية من [docs/22-passkey-groundwork.md](./docs/22-passkey-groundwork.md) (§4.6): نفس طبقة الداشبورد بتخدم السائق — بلا تكرار.
+
+### ✅ اللي انعمل (الباكند)
+- واجهة `PasskeyHolder` بينفّذها `User` و`Driver`؛ الخدمات (`CeremonyOptions` / `PasskeyRegistrar` / `PasskeyAuthenticator`) صارت تاخد الهوية بدل الـ`User`، والدخول بيحدّد أي هوية بيسجّلها — credential تبع مدير على دخول التطبيق = رفض عام متل المجهول (وضع المالك بالتطبيق بيضل بالكود المرسَل).
+- مسارات عامة `POST /api/v1/driver/webauthn/login/options` + `/login`: بلا أي تلميح حسابات، فشل عام موحّد، نفس بوابة الشركة الموقوفة تبع `login/verify` ونفس شكل الردّ (`createToken('driver-app')` + بروفايل السائق)، على نفس limiters الداشبورد (`webauthn-options` / `webauthn-verify`) فما في باب جانبي.
+- إدارة خلف حارس السائق (`auth:driver + driver.account + driver.active`): `register/options` (بلا باسوورد — السائق ما عندو، وجلستو جاية من كود طازة) و`register` و`GET/DELETE credentials/{id}` بنفس أشكال الداشبورد.
+- `WEBAUTHN_ORIGINS` بتقبل `android:apk-key-hash:…` (مطابقة حرفية بالمحرّك، واحد لكل مفتاح توقيع) — موثّق بالـconfig و`.env.example` بقيمة placeholder، **بلا أي قيمة حقيقية**.
+- 16 تيست feature جديد (`DriverWebauthnTest`) + تيست محرّك حقيقي لأصل Android؛ pint نظيف؛ الـsuite كاملة 841 ناجح / 1 متخطّى.
+
+### ⏳ ناقص (مش بهالـcommit)
+- التطبيق (`driver-app/`) — جلسة تانية شغّالة عليه بنفس الـworktree.
+- Phase 0 (بقرارك): ملفات `.well-known` (assetlinks.json + AASA)، بصمات التوقيع الحقيقية من Play Console/EAS، وApple Team ID — وبعدها builds للمتجرين.
+
+### ❓ مطلوب منك
+- بصمات SHA-256 لمفاتيح التوقيع (Play app-signing + EAS keystore) وApple Team ID — بدونها ما في origin حقيقي ينضاف.
+- قرار الدمج بعد ما يخلص التطبيق.
+
+---
+
 ## 📅 شغل (2026-10-27) — Passkeys للداشبورد (فرع `feat/passkeys-dashboard`): العقد والواجهة **وطبقة السيرفر** جاهزين — الفرع قابل للدمج
 
 تنفيذ المرحلة الأولى من [docs/22-passkey-groundwork.md](./docs/22-passkey-groundwork.md) بعد قراراتك: المحرّك `web-auth/webauthn-lib ~5.3.3` + طبقة خفيفة بإيدنا (D1-A)، داشبورد أول (D2)، «تذكرني» دايماً مع passkey (D4)، والمفتاح العام مخزّن بلا تشفير.

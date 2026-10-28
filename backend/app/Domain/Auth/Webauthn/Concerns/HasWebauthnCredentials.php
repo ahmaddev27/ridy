@@ -29,4 +29,16 @@ trait HasWebauthnCredentials
     {
         return $this->morphMany(WebauthnCredential::class, 'authenticatable');
     }
+
+    /** WebAuthn `user.name`: the email by default; a model without one overrides this. */
+    public function passkeyAccountName(): string
+    {
+        return (string) ($this->email ?: $this->getKey());
+    }
+
+    /** WebAuthn `user.displayName`: the person's name, falling back to the account name. */
+    public function passkeyDisplayName(): string
+    {
+        return (string) ($this->name ?: $this->passkeyAccountName());
+    }
 }
