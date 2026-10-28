@@ -10,6 +10,7 @@
 !backend/
 !frontend/
 !dispatch-daemon/
+!uber-auth/
 !docker/php/
 
 # --- Never in any image ---------------------------------------------------------
