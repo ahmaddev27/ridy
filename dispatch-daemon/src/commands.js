@@ -12,7 +12,7 @@
 // minute late, and a slow session poll must never hold one up.
 
 import { config } from "./config.js";
-import { api } from "./api.js";
+import { api, isTransientConnect } from "./api.js";
 import { streams } from "./supervisor.js";
 import { captureThrottled } from "./sentry.js";
 import { jitter, nextThrottleDelay } from "./util.js";
@@ -126,7 +126,9 @@ async function report(commandId, result) {
     // Retrying here would hold the loop off the next command, which is already
     // racing a deadline; the backend expires an unanswered command on its own.
     console.error(`dispatch command ${commandId}: result not reported: ${e.message}`);
-    captureThrottled("command-result", e, { where: "command_result", commandId });
+    if (!isTransientConnect(e)) {
+      captureThrottled("command-result", e, { where: "command_result", commandId });
+    }
   }
 }
 
@@ -148,7 +150,12 @@ async function loop() {
         delay = jitter(backoffMs);
       }
       console.error(`dispatch command poll failed (${failures}): ${e.message}; retrying in ${delay}ms`);
-      captureThrottled("command-poll", e, { where: "command_poll", consecutiveFailures: failures });
+      // A deploy's Caddy-recreate blip refuses the long-poll for a few seconds;
+      // it self-heals on the next poll, so don't escalate transient blips to
+      // Sentry — only report a sustained, non-transient failure.
+      if (!isTransientConnect(e) || failures > LONG_POLL_FAIL_THRESHOLD) {
+        captureThrottled("command-poll", e, { where: "command_poll", consecutiveFailures: failures });
+      }
       if (!stopped) await sleep(delay);
       continue;
     }
