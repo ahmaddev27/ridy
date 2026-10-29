@@ -10,9 +10,58 @@ const headers = {
   "X-Shard-Id": config.shardId,
 };
 
+// Connection-level failures from a brief backend/Caddy outage. A deploy
+// force-recreates Caddy, and for a few seconds `reidey.de` falls back to the
+// public IP (the internal alias is gone) so the connection is REFUSED — seen in
+// Sentry as `connect ECONNREFUSED <public-ip>:443`. These self-heal, so call()
+// retries them and callers must not escalate them to Sentry. A request TIMEOUT
+// is deliberately excluded: the command long-poll is meant to hang, and a slow
+// backend is not a down one.
+const TRANSIENT_CONNECT_CODES = new Set([
+  "ECONNREFUSED", "ECONNRESET", "ECONNABORTED", "EPIPE",
+  "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH", "ETIMEDOUT",
+]);
+
+function connectErrorCode(error) {
+  const cause = error?.cause;
+  if (cause?.code) return cause.code;
+  // undici wraps multiple connect attempts (IPv6 + IPv4) in an AggregateError.
+  if (Array.isArray(cause?.errors)) {
+    return cause.errors.find((e) => e?.code)?.code;
+  }
+  return error?.code;
+}
+
+/** A brief backend/Caddy connection blip (deploy window) a retry heals — not a real failure. */
+export function isTransientConnect(error) {
+  if (error?.name === "TimeoutError" || error?.name === "AbortError") return false;
+  const code = connectErrorCode(error);
+  return code !== undefined && TRANSIENT_CONNECT_CODES.has(code);
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // `timeoutMs` is per call because the command long-poll is MEANT to hang: the
 // backend parks it until a command exists. Every other call keeps apiTimeout.
+// A refused connection (never reached the backend) is retried a couple of times
+// to ride over a deploy's Caddy-recreate window; a response with a status is a
+// real answer and is never retried here. Every internal endpoint is idempotent,
+// so a replayed POST is safe.
 async function call(method, path, body, timeoutMs = config.apiTimeout) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await callOnce(method, path, body, timeoutMs);
+    } catch (error) {
+      if (isTransientConnect(error) && attempt < 2) {
+        await sleep(250 * (attempt + 1));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
+async function callOnce(method, path, body, timeoutMs) {
   const res = await fetch(`${config.apiBaseUrl}/api/v1/internal/dispatch${path}`, {
     method,
     headers,

@@ -7,7 +7,7 @@ import { createHash, randomUUID } from "node:crypto";
 // effect when we call undici's own fetch.
 import { ProxyAgent, fetch } from "undici";
 import { config } from "./config.js";
-import { api, isStaleJar } from "./api.js";
+import { api, isStaleJar, isTransientConnect } from "./api.js";
 import { captureThrottled } from "./sentry.js";
 import {
   describeProxy,
@@ -699,7 +699,12 @@ export class RamenStream {
             return;
           }
           console.error(`[${this.tag()}] cookie refresh failed: ${e.message}`);
-          captureThrottled(`cookies:${this.session.id}`, e, { where: "cookie_refresh", sessionId: this.session.id });
+          // A deploy's brief Caddy-recreate blip (ECONNREFUSED) self-heals: the
+          // in-memory jar is fine and the next rotation re-persists it, so don't
+          // flag it to Sentry — only a real, non-transient failure is reported.
+          if (!isTransientConnect(e)) {
+            captureThrottled(`cookies:${this.session.id}`, e, { where: "cookie_refresh", sessionId: this.session.id });
+          }
         }
       } while (this.persistDirty);
     } finally {
