@@ -276,6 +276,89 @@ test("ARAL fixture: street and station read from the header", () => {
   assert.equal(r.operatorName, undefined);
 });
 
+// ── Station-header hygiene, 29.10.2026 ──────────────────────────────────────
+//
+// Four misreadings off one production screenshot: `Esso)` with a stray
+// bracket, `Sol ingen` as the city, `JET TANKSTELLE 318` with the branch
+// number glued into the name, and `JET Tankstel le …` where the OCR space
+// inside the station word defeated the split entirely. General rules, no
+// sample values hard-coded: the fixtures are shapes, not that screenshot.
+
+test("an unbalanced bracket around the name is stripped, the city is healed", () => {
+  const r = parseReceiptText(`Esso)
+Hauptstraße 5
+42651 Sol ingen
+Summe  EUR  20,00`);
+  assert.equal(r.merchantName, "Esso");
+  // "ingen" starts lowercase and is no connector word, so it continues the
+  // word before it. The PLZ stays untouched beside it.
+  assert.equal(r.city, "Solingen");
+  assert.equal(r.postalCode, "42651");
+});
+
+test("balanced brackets are part of the name and stay", () => {
+  const r = parseReceiptText(`Tank (24h) Center GmbH
+Industriestraße 2
+44787 Bochum
+Summe  EUR  15,00`);
+  assert.equal(r.merchantName, "Tank (24h) Center GmbH");
+});
+
+test("real multi-word cities are not glued together", () => {
+  const frankfurt = parseReceiptText(`Waschpark Mitte
+Mainzer Landstraße 50
+60311 Frankfurt am Main
+Summe  EUR  10,00`);
+  assert.equal(frankfurt.city, "Frankfurt am Main");
+  const bergisch = parseReceiptText(`Autohaus Nord
+Kölner Straße 100
+51465 Bergisch Gladbach
+Summe  EUR  12,00`);
+  assert.equal(bergisch.city, "Bergisch Gladbach");
+});
+
+test("JET tilted: the split station word is recognised, the operator kept as read", () => {
+  // `Tankstel le` is the OCR's space, not two words. The keyword itself is
+  // repaired — it is a recognised vocabulary word — but the operator's NAME
+  // is kept exactly as read (`Jtirgensmeier`): a person's spelling is never
+  // guessed without the paper.
+  const r = parseReceiptText(JET_TILTED);
+  assert.equal(r.stationName, "JET Tankstelle");
+  assert.equal(r.operatorName, "Morten Jtirgensmeier");
+});
+
+test("a branch number after the station word is its own field, not a name part", () => {
+  const r = parseReceiptText(`JET TANKSTELLE 318
+Kölner Str. 8
+42651 Solingen
+Summe  EUR  30,00`);
+  assert.equal(r.stationName, "JET TANKSTELLE");
+  assert.equal(r.stationNumber, "318");
+  // The full printed line survives untouched beside the split.
+  assert.equal(r.merchantName, "JET TANKSTELLE 318");
+  // A branch number before the operator leaves the operator intact.
+  const withOperator = parseReceiptText(`ARAL Station 77 Hans Meier
+Bahnhofstraße 1
+50667 Köln
+Summe  EUR  25,00`);
+  assert.equal(withOperator.stationName, "ARAL Station");
+  assert.equal(withOperator.stationNumber, "77");
+  assert.equal(withOperator.operatorName, "Hans Meier");
+});
+
+test("digits inside an ordinary merchant name are not a branch number", () => {
+  const r = parseReceiptText(`Autoteile 24 GmbH
+Bahnhofstraße 1
+50667 Köln
+Summe  EUR  9,99`);
+  assert.equal(r.merchantName, "Autoteile 24 GmbH");
+  assert.equal(r.stationNumber, undefined);
+});
+
+test("JET: no branch number is no field, not an empty one", () => {
+  assert.equal(parseReceiptText(JET).stationNumber, undefined);
+});
+
 test("empty text answers an empty result rather than throwing", () => {
   const r = parseReceiptText("");
   assert.equal(r.amount, undefined);

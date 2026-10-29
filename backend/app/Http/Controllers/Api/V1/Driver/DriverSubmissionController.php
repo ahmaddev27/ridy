@@ -229,6 +229,9 @@ class DriverSubmissionController extends Controller
                 // apps send `merchant_name` alone, so all of these are optional.
                 'station_name' => ['nullable', 'string', 'max:120'],
                 'operator_name' => ['nullable', 'string', 'max:120'],
+                // The branch number a chain prints after the station word
+                // ("JET TANKSTELLE 318") - its own datum, apart from the name.
+                'station_number' => ['nullable', 'string', 'max:16'],
                 'street' => ['nullable', 'string', 'max:200'],
                 // The number printed on the receipt itself (beside `Bon` on a
                 // JET one), never an id of ours.

@@ -31,6 +31,7 @@ class SubmissionDetailPresenter
         'merchant_name' => 'merchant_name',
         'station_name' => 'station_name',
         'operator_name' => 'operator_name',
+        'station_number' => 'station_number',
         'street' => 'street',
         'city' => 'city',
         // The receipt's own printed number, and the fiscal (TSE) time of day,

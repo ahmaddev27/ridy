@@ -136,6 +136,7 @@ function buildOcrMeta(
     street: field("ocr"),
     station_name: field("ocr"),
     operator_name: field("ocr"),
+    station_number: field("ocr"),
     receipt_number: field("ocr"),
     tse_time: field("ocr"),
   };
@@ -149,7 +150,7 @@ function buildOcrMeta(
     fields.odometer_km = field("odometer_photo");
     fields.range_km = field("odometer_photo");
   }
-  return { parser: "receipt-text-parse 2026-10-27", fields };
+  return { parser: "receipt-text-parse 2026-10-29", fields };
 }
 
 /** `YYYY-MM-DD` in the phone's own day, which is the day the driver means. */
@@ -530,6 +531,7 @@ export default function ReceiptScreen() {
         street: street.trim() || null,
         station_name: lastScan?.stationName ?? null,
         operator_name: lastScan?.operatorName ?? null,
+        station_number: lastScan?.stationNumber ?? null,
         receipt_number: bonNumber.trim() || null,
         tse_time: lastScan?.tseTime ?? null,
         // The review trail: the raw rows and, per field, where its value came

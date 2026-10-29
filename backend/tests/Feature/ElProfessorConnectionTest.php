@@ -843,6 +843,7 @@ class ElProfessorConnectionTest extends TestCase
             'category' => 'Tanken',
             'station_name' => 'JET Tankstelle',
             'operator_name' => 'Morten Jürgensmeier',
+            'station_number' => '318',
             'street' => 'Eckeseyer Straße 113-115',
             'receipt_number' => '004711',
             'tse_time' => '14:32:07',
@@ -868,6 +869,7 @@ class ElProfessorConnectionTest extends TestCase
         $row = ElProfessorSubmission::withoutGlobalScopes()->firstWhere('uuid', $body['id']);
         $this->assertSame('JET Tankstelle', $row->payload['station_name']);
         $this->assertSame('Morten Jürgensmeier', $row->payload['operator_name']);
+        $this->assertSame('318', $row->payload['station_number']);
         $this->assertSame('Eckeseyer Straße 113-115', $row->payload['street']);
         $this->assertSame('004711', $row->payload['receipt_number']);
         $this->assertSame('14:32:07', $row->payload['tse_time']);
@@ -935,6 +937,7 @@ class ElProfessorConnectionTest extends TestCase
         $full = $this->submission($this->tenant, $driver, [
             'payload' => [
                 'amount' => '41.47', 'station_name' => 'JET Tankstelle', 'operator_name' => 'Morten Jürgensmeier',
+                'station_number' => '318',
                 'street' => 'Eckeseyer Straße 113-115', 'receipt_number' => '004711', 'tse_time' => '14:32:07',
             ],
         ]);
@@ -944,12 +947,13 @@ class ElProfessorConnectionTest extends TestCase
         $fields = $this->getJson('/api/v1/driver/submissions/'.$full->uuid)->assertOk()->json('data.fields');
         $this->assertSame('JET Tankstelle', $fields['station_name']);
         $this->assertSame('Morten Jürgensmeier', $fields['operator_name']);
+        $this->assertSame('318', $fields['station_number']);
         $this->assertSame('Eckeseyer Straße 113-115', $fields['street']);
         $this->assertSame('004711', $fields['receipt_number']);
         $this->assertSame('14:32:07', $fields['tse_time']);
 
         $oldFields = $this->getJson('/api/v1/driver/submissions/'.$old->uuid)->assertOk()->json('data.fields');
-        foreach (['station_name', 'operator_name', 'street', 'receipt_number', 'tse_time'] as $key) {
+        foreach (['station_name', 'operator_name', 'station_number', 'street', 'receipt_number', 'tse_time'] as $key) {
             $this->assertArrayHasKey($key, $oldFields);
             $this->assertNull($oldFields[$key]);
         }

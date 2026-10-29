@@ -116,6 +116,8 @@ export type ReceiptDraft = {
    *  could split it; the operator is the person after it. */
   station_name?: string | null;
   operator_name?: string | null;
+  /** The branch number a chain prints after the station word ("…318"). */
+  station_number?: string | null;
   /** The receipt's own printed number (`Bon`/`Beleg-Nr`), never an internal id. */
   receipt_number?: string | null;
   /** The fiscal TSE clock, `HH:MM:SS` — NOT the sale time, stored apart. */
