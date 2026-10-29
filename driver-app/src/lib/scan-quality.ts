@@ -185,14 +185,26 @@ export function causeOf(lines: ScanLine[], image?: ImageSize | null): RetakeCaus
   return 'generic';
 }
 
+/** The two fields that live together on the receipt's tiniest row. */
+const FUEL_LINE_FIELDS: ReadonlyArray<RequiredField> = ['litres', 'pricePerLitre'];
+
 /**
  * The verdict for one scan. Blocks iff a required field is missing; the
  * clarity signals only pick the wording.
+ *
+ * One wording override (29.10.2026): when everything was read EXCEPT the
+ * fuel line, "the whole receipt in the frame" is the wrong advice — a long
+ * Shell/Aral receipt crammed whole into one frame is exactly what made that
+ * smallest row unreadable. The message then says the one useful thing:
+ * photograph the UPPER part up close; the marketing tail is not needed.
  */
 export function evaluateScan(lines: ScanLine[], facts: ScanFacts, image?: ImageSize | null): ScanVerdict {
   const missing = missingFields(facts);
   if (missing.length === 0) return { ok: true };
   const cause = causeOf(lines, image);
+  if (missing.every((f) => FUEL_LINE_FIELDS.includes(f))) {
+    return { ok: false, cause, messageKey: 'receipt.retakeFuelLine', missing };
+  }
   return { ok: false, cause, messageKey: MESSAGE[cause], missing };
 }
 

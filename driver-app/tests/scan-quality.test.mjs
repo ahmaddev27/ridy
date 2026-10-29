@@ -116,6 +116,38 @@ test("when the cause cannot be told, the message is the generic one", () => {
   assert.equal(v.messageKey, "receipt.retakeGeneric");
 });
 
+// The long-receipt case (29.10.2026): everything read EXCEPT the fuel line.
+// "The whole receipt in the frame" is then the advice that CAUSED the failure
+// — a long Shell/Aral receipt crammed whole into one frame is what made its
+// tiniest row unreadable — so the wording switches to "upper part, up close".
+
+test("only the fuel line missing says: upper part, up close", () => {
+  const v = evaluateScan(
+    goodLines,
+    { ...full, litres: undefined, pricePerLitre: undefined },
+    { width: 3000, height: 4000 },
+  );
+  assert.equal(v.ok, false);
+  assert.equal(v.messageKey, "receipt.retakeFuelLine");
+  assert.deepEqual(v.missing, ["litres", "pricePerLitre"]);
+});
+
+test("one fuel figure missing is still the fuel-line wording", () => {
+  const v = evaluateScan(goodLines, { ...full, pricePerLitre: undefined });
+  assert.equal(v.ok, false);
+  assert.equal(v.messageKey, "receipt.retakeFuelLine");
+});
+
+test("the amount missing too keeps the general wording", () => {
+  const v = evaluateScan(
+    goodLines,
+    { ...full, amount: undefined, litres: undefined, pricePerLitre: undefined },
+    { width: 3000, height: 4000 },
+  );
+  assert.equal(v.ok, false);
+  assert.notEqual(v.messageKey, "receipt.retakeFuelLine");
+});
+
 test("the signals choose the wording and never the verdict", () => {
   // Terrible signals, every field present: still passes.
   assert.equal(evaluateScan([], full).ok, true);

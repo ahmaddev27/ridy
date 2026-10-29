@@ -359,6 +359,102 @@ test("JET: no branch number is no field, not an empty one", () => {
   assert.equal(parseReceiptText(JET).stationNumber, undefined);
 });
 
+// ── The Shell Düsseldorf receipt, 29.10.2026 ────────────────────────────────
+//
+// A real long receipt (marketing tail, TSE block with `Start/Ende`, a labelled
+// `Obj.-Nr.`). What it pins: the printed sale stamp 15:47 beside the Beleg-Nr
+// wins over the TSE Start/Ende clock; the labelled object number is the
+// station's own number; and the thermal misread of the litre unit (`l` → `1`)
+// is readable when — and only when — the price-per-litre label anchors the
+// same line. Values are what the PAPER prints.
+
+const SHELL = `Shell Station
+Goller Tankstellen GmbH
+Niederrheinstr. 135
+40474 Düsseldorf
+Obj.-Nr.: 0000003708  Tel.: 0211/454791
+Fax.: 0211/459582
+Beleg-Nr. 3933/010/0002 28.09.2026 15:47
+*U00002 Super FuelSave E16  50,00 EUR *A*
+*Zp 02  21,94 l  2,279 EUR/l  *  *
+Gesamtbetrag  50,00 EUR
+gegeben  50,00 EUR
+Typ  Netto  MwSt  Brutto
+A:19,00%  42,02  7,98  50,00
+Legende der Steuernummer(n)
+# Gesellschaft  DE 811127597
+DIENSTAG IST WASCHTAG !!!
+Sparen Sie 1 EUR je Fahrzeugwäsche !!!
+POS:68007-0000003708-2 TSE-Beleg-Nr. 336123
+Signaturzähler: 359534
+Start/Ende: 28.09.2026 16:47:26 / 28.09.2026 16:47:51`;
+
+/** The same receipt with the litre unit and the price's `l` misread as `1` —
+ *  the classic thermal-paper OCR failure that used to block the send. */
+const SHELL_MISREAD = SHELL.replace(
+  "*Zp 02  21,94 l  2,279 EUR/l  *  *",
+  "*Zp 02  21,94 1  2,279 EUR/1  *  *",
+);
+
+test("Shell: the printed sale time, not the TSE Start/Ende clock", () => {
+  const r = parseReceiptText(SHELL);
+  assert.equal(r.date, "2026-09-28");
+  assert.equal(r.time, "15:47");
+  assert.equal(r.tseTime, "16:47:26");
+});
+
+test("Shell: the Gesamtbetrag, and the fuel figures confirm it", () => {
+  const r = parseReceiptText(SHELL);
+  assert.equal(r.amount, 50);
+  assert.equal(r.litres, 21.94);
+  assert.equal(r.pricePerLitre, 2.279);
+  // 21,94 × 2,279 = 50,00 — confirmed, not flagged.
+  assert.equal(r.amountReason?.startsWith("Unsicher"), false);
+});
+
+test("Shell: station, street, city, and the labelled Obj number", () => {
+  const r = parseReceiptText(SHELL);
+  assert.equal(r.stationName, "Shell Station");
+  assert.equal(r.street, "Niederrheinstr. 135");
+  assert.equal(r.postalCode, "40474");
+  assert.equal(r.city, "Düsseldorf");
+  assert.equal(r.stationNumber, "0000003708");
+  assert.equal(r.receiptNumber, "3933/010/0002");
+});
+
+test("Shell misread: the fuel line with l read as 1 still parses, anchored", () => {
+  const r = parseReceiptText(SHELL_MISREAD);
+  assert.equal(r.pricePerLitre, 2.279);
+  assert.equal(r.litres, 21.94);
+  assert.equal(r.amount, 50);
+});
+
+test("a bare digit is never litres without the price anchor on its line", () => {
+  // "1" after a number, no EUR/l anywhere: the misread rule must not fire.
+  const r = parseReceiptText(`Tankstelle Test
+Posten 23,50 1
+Gesamtbetrag  EUR  23,50`);
+  assert.equal(r.litres, undefined);
+});
+
+test("a labelled Tankstellen-Nr is the station number too", () => {
+  const r = parseReceiptText(`Aral Tankstelle
+Hauptstraße 1
+40627 Düsseldorf
+Tankstellen-Nr.: 0201099115
+Summe  EUR  20,00`);
+  assert.equal(r.stationNumber, "0201099115");
+});
+
+test("the number in the printed name wins over a labelled one", () => {
+  const r = parseReceiptText(`JET TANKSTELLE 318
+Kölner Str. 8
+42651 Solingen
+Tankstellen-Nr.: 999
+Summe  EUR  30,00`);
+  assert.equal(r.stationNumber, "318");
+});
+
 test("empty text answers an empty result rather than throwing", () => {
   const r = parseReceiptText("");
   assert.equal(r.amount, undefined);
