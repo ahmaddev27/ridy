@@ -74,7 +74,6 @@ export function createWarmDriver() {
         // Fleet Hub first: this is where sp-jwt-session (14d) rotates.
         await page.goto(FLEETHUB_URL, { waitUntil: "domcontentloaded", timeout: config.stepTimeout });
         if (AUTH_RE.test(page.url())) {
-          await this.snapshotReauth(entry, page).catch(() => {});
           return { ok: true, loggedOut: true };
         }
         await page.waitForTimeout(800);
@@ -82,7 +81,6 @@ export function createWarmDriver() {
         // Then the dispatch host so the RAMEN jar (jwt-session, 24h) stays fresh too.
         await page.goto(DISPATCH_URL, { waitUntil: "domcontentloaded", timeout: config.stepTimeout }).catch(() => {});
         if (AUTH_RE.test(page.url())) {
-          await this.snapshotReauth(entry, page).catch(() => {});
           return { ok: true, loggedOut: true };
         }
 
@@ -107,26 +105,6 @@ export function createWarmDriver() {
         };
       } catch (e) {
         return { ok: false, error: e?.message || "keepwarm_error" };
-      }
-    },
-
-    // Phase-0 recon: when Uber has signed the browser out (a hard re-auth), snapshot
-    // the re-auth screen once before flagging loggedOut — so we can see what the
-    // monthly challenge actually looks like (identifier step? passkey offered?)
-    // WITHOUT ever forcing it. Read-only, best-effort, never throws.
-    async snapshotReauth(entry, page) {
-      try {
-        await mkdir(config.stateDir, { recursive: true });
-        const safe = String(entry.companyKey).replace(/[^a-z0-9_-]/gi, "_");
-        const base = join(config.stateDir, `reauth-${safe}-${Date.now()}`);
-        await page.screenshot({ path: `${base}.png`, fullPage: true }).catch(() => {});
-        await writeFile(
-          `${base}.json`,
-          JSON.stringify({ at: new Date().toISOString(), url: page.url() }, null, 2),
-          "utf8",
-        );
-      } catch {
-        /* best-effort */
       }
     },
 
