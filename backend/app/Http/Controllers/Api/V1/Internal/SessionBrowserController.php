@@ -20,6 +20,9 @@ use Illuminate\Validation\Rule;
  */
 class SessionBrowserController extends Controller
 {
+    /** How long after the daemon loses a session the browser keeps trying to rescue it. */
+    private const RESCUE_HOURS = 6;
+
     /** Bulk health report: one row per company the service is responsible for. */
     public function status(Request $request): JsonResponse
     {
@@ -92,20 +95,58 @@ class SessionBrowserController extends Controller
     public function wanted(): JsonResponse
     {
         $sessions = UberFleetSession::withoutGlobalScopes()
-            ->with('tenant:id,status,banned_at,activated_at,subscription_ends_at')
-            ->where('status', UberFleetSession::STATUS_ACTIVE)
-            ->get()
-            ->filter(fn (UberFleetSession $s) => $s->isUsable()
-                && $s->tenant !== null
-                && $s->tenant->stateReason() === null)
+            ->with('tenant:id,status,banned_at,activated_at,subscription_ends_at,settings')
+            ->whereIn('status', [UberFleetSession::STATUS_ACTIVE, UberFleetSession::STATUS_NEEDS_RELINK])
+            ->get();
+        $rescuable = $this->rescuableSessionIds(
+            $sessions->where('status', UberFleetSession::STATUS_NEEDS_RELINK)->modelKeys(),
+        );
+
+        $rows = $sessions
+            ->filter(fn (UberFleetSession $s) => $s->tenant !== null
+                && $s->tenant->stateReason() === null
+                && ($s->isUsable() || (in_array($s->id, $rescuable, true) && ! $s->tenant->isAutolinkBlocked())))
             ->map(fn (UberFleetSession $s) => [
                 'tenant_id' => (int) $s->tenant_id,
                 'uber_org_uuid' => $s->uber_org_uuid,
                 'cookies' => $s->cookies,
                 'supplier_cookies' => $s->supplier_cookies,
+                // `needs_relink` asks the browser to RESCUE the session instead of
+                // being closed: re-mint the dispatch cookies in its logged-in context.
+                'status' => $s->status,
             ])->values();
 
-        return response()->json(['data' => $sessions]);
+        return response()->json(['data' => $rows]);
+    }
+
+    /**
+     * Sessions the DAEMON lost — Uber refused the offer stream — within the last
+     * RESCUE_HOURS. That is often only the dispatch token dying while the Uber
+     * account is still signed in (Fleet Hub keeps answering), which is exactly
+     * what a manager's relink repairs by loading the dispatch page in a signed-in
+     * browser; the server browser can do the same, with no credential. A relink
+     * an admin forced, or one the extension reported, is a human decision and is
+     * never undone this way.
+     *
+     * @param  array<int, int>  $sessionIds
+     * @return array<int, int>
+     */
+    private function rescuableSessionIds(array $sessionIds): array
+    {
+        if ($sessionIds === []) {
+            return [];
+        }
+
+        return FleetSessionOutage::query()
+            ->whereIn('uber_fleet_session_id', $sessionIds)
+            ->whereNull('ended_at')
+            ->where('cause', 'daemon')
+            ->where('started_at', '>=', CarbonImmutable::now()->subHours(self::RESCUE_HOURS))
+            ->pluck('uber_fleet_session_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /** Same silent-capture guards as the extension's non-manual path. */

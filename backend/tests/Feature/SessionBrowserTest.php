@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Dispatch\Models\FleetSessionOutage;
 use App\Domain\Dispatch\Models\SessionBrowser;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Tenancy\Models\Tenant;
@@ -10,6 +11,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -168,6 +170,63 @@ class SessionBrowserTest extends TestCase
             ->assertJsonPath('data.0.tenant_id', $active->id)
             ->assertJsonPath('data.0.uber_org_uuid', self::ORG)
             ->assertJsonPath('data.0.cookies.0.name', 'sid');
+    }
+
+    public function test_wanted_lists_a_session_the_daemon_just_lost_for_rescue_but_never_a_human_relink(): void
+    {
+        $lost = $this->brokenSession($this->tenant(), 'daemon', now()->subMinutes(10));
+        // An admin's forced relink and an extension report are human decisions.
+        $forced = $this->brokenSession($this->tenant(), 'admin', now()->subMinutes(10));
+        $reported = $this->brokenSession($this->tenant(), 'extension', now()->subMinutes(10));
+        // Past the rescue window: the browser stops trying and is closed.
+        $stale = $this->brokenSession($this->tenant(), 'daemon', now()->subHours(7));
+        // A company that blocked auto-linking would refuse the capture anyway.
+        $blocked = $this->brokenSession($this->tenant(['settings' => ['autolink_blocked' => true]]), 'daemon', now()->subMinutes(10));
+
+        $response = $this->service()->getJson('/api/v1/internal/session-browser/wanted')->assertOk();
+
+        $ids = collect($response->json('data'))->pluck('tenant_id')->all();
+        $this->assertSame([$lost->tenant_id], $ids);
+        $response->assertJsonPath('data.0.status', UberFleetSession::STATUS_NEEDS_RELINK);
+        $this->assertNotContains($forced->tenant_id, $ids);
+        $this->assertNotContains($reported->tenant_id, $ids);
+        $this->assertNotContains($stale->tenant_id, $ids);
+        $this->assertNotContains($blocked->tenant_id, $ids);
+    }
+
+    public function test_a_rescue_capture_reactivates_the_session_and_counts_as_a_browser_relink(): void
+    {
+        $tenant = $this->tenant();
+        $session = $this->brokenSession($tenant, 'daemon', now()->subMinutes(10), self::ORG);
+
+        $this->service()->postJson("/api/v1/internal/session-browser/{$tenant->id}/capture", [
+            'uber_org_uuid' => self::ORG,
+            'cookies' => $this->jar('fresh'),
+        ])->assertCreated();
+
+        $this->assertSame(UberFleetSession::STATUS_ACTIVE, $session->fresh()->status);
+        $outage = FleetSessionOutage::where('uber_fleet_session_id', $session->id)->sole();
+        $this->assertNull($outage->ended_at, 'the outage closes only once the stream actually delivers');
+        $this->assertSame(FleetSessionOutage::VIA_BROWSER, $outage->recovered_via);
+    }
+
+    /** A session the daemon (or a human) flagged, with its open outage. */
+    private function brokenSession(Tenant $tenant, string $cause, \DateTimeInterface $since, ?string $org = null): UberFleetSession
+    {
+        $session = UberFleetSession::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'uber_org_uuid' => $org ?? (string) Str::uuid(),
+            'cookies' => $this->jar('dead'),
+            'status' => UberFleetSession::STATUS_NEEDS_RELINK,
+        ]);
+        FleetSessionOutage::create([
+            'tenant_id' => $tenant->id,
+            'uber_fleet_session_id' => $session->id,
+            'started_at' => $since,
+            'cause' => $cause,
+        ]);
+
+        return $session;
     }
 
     public function test_wanted_requires_the_secret(): void

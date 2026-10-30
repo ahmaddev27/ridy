@@ -9,7 +9,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { ToastProvider } from "@/components/toast";
 import { registerOfferCategory, startPushRegistration } from "@/lib/push";
-import { dismissOfferPopup, OfferPopupHost, requestOfferPopup } from "@/components/offer-popup";
+import { OfferPopupHost, openOfferFromNotification } from "@/components/offer-popup";
 import { markAlerted } from "@/lib/offer-alert";
 import { isMultiStop } from "@/lib/notification-channels";
 import { startLive, stopLive } from "@/lib/live";
@@ -286,14 +286,15 @@ function Gate() {
     const seg = segments[0];
     if (!seg || PRE_APP_SEGMENTS.has(seg)) return;
     pendingOffer.current = null;
-    // The pop-up is a native Modal mounted outside the navigator, so a push
-    // while it is up lands underneath it and the driver sees nothing change.
-    dismissOfferPopup();
-    // Already looking at an offer: swap it rather than stack. Tapping through a
-    // tray of fifty would otherwise build a fifty-deep pile of modals, and Back
-    // would walk the driver through every one of them.
-    if (seg === "offer") router.replace(`/offer/${id}`);
-    else router.push(`/offer/${id}`);
+    // The decision while the offer still is one — the pop-up resolves that before
+    // anything navigates — and its detail screen otherwise.
+    openOfferFromNotification(Number(id), () => {
+      // Already looking at an offer: swap it rather than stack. Tapping through a
+      // tray of fifty would otherwise build a fifty-deep pile of modals, and Back
+      // would walk the driver through every one of them.
+      if (seg === "offer") router.replace(`/offer/${id}`);
+      else router.push(`/offer/${id}`);
+    });
   }, [driver, segments, router, navState?.key, pendingTick]);
 
   // A suspended company: explain it instead of "no internet" / "invalid code".
@@ -328,8 +329,9 @@ function Gate() {
         <Stack.Screen name="submission/[id]" />
       </Stack>
       {/* The instant offer decision, floating over whatever screen is up. It is a
-          Modal, so it sits outside the navigator on purpose: a pushed route would
-          be something the driver has to navigate back out of. */}
+          Modal (a full-window overlay on iOS), so it sits outside the navigator on
+          purpose: a pushed route would be something the driver has to navigate
+          back out of. */}
       <OfferPopupHost />
       <PasskeyOffer />
     </>

@@ -31,17 +31,25 @@ export const SESSION_STATE = {
 /** The states from which a periodic keep-warm should run. */
 const WARMABLE = new Set([SESSION_STATE.ACTIVE]);
 
+const fmtExp = (ms) => (typeof ms === "number" ? new Date(ms).toISOString().slice(0, 16) + "Z" : "?");
+
+/** Rescue mode applies until its post budget for the episode is spent. */
+const rescueActive = (entry) => !!entry.needsRescue && !entry.rescueGaveUp;
+
+/** Posts allowed per rescue episode: each one re-activates the backend session and can re-notify the manager. */
+const MAX_RESCUE_POSTS = 2;
+
 export class PersistentSessionManager {
   /**
    * @param {object}   deps
    * @param {object}   deps.driver   Playwright adapter:
    *   keepWarm(entry) -> Promise<{ ok:boolean, loggedOut?:boolean, cookies?, supplierCookies?, orgUuid?, tokenExpiries?:{ramen?:number|null, supplier?:number|null}, error?:string }>
    *   close(entry)    -> Promise<void>
-   * @param {function} deps.post     async (companyKey, {cookies, supplierCookies, orgUuid, tokenExpiries}) => void — forward a fresh capture to the backend.
+   * @param {function} deps.post     async (companyKey, {cookies, supplierCookies, orgUuid, tokenExpiries}) => "posted"|"skipped"|"blocked" — forward a fresh capture to the backend. Only "skipped"/"blocked" mean it was NOT accepted.
    * @param {function} [deps.notify] async (companyKey, reason) => void — alert the operator (e.g. needs_otp).
    * @param {function} [deps.now]    () => number ms (injected for tests).
-   * @param {number}   [deps.renewIntervalMs]   keep-warm cadence when nothing is near expiry (default 6h; well under jwt-session's 24h).
-   * @param {number}   [deps.renewBeforeExpiryMs] renew early when a token expires within this window (default 12h).
+   * @param {number}   [deps.renewIntervalMs]   keep-warm cadence (default 1h; well under jwt-session's 24h).
+   * @param {number}   [deps.rescueIntervalMs] cadence while the daemon flagged the company needs_relink (default 10 min).
    * @param {number}   [deps.maxSessions]       hard cap on concurrent live contexts on this box.
    * @param {number}   [deps.errorsBeforeDown]  consecutive keep-warm errors that flip a session to DOWN.
    * @param {function} [deps.log]
@@ -51,8 +59,8 @@ export class PersistentSessionManager {
     post,
     notify = async () => {},
     now = () => Date.now(),
-    renewIntervalMs = 6 * 60 * 60 * 1000,
-    renewBeforeExpiryMs = 12 * 60 * 60 * 1000,
+    renewIntervalMs = 60 * 60 * 1000,
+    rescueIntervalMs = 10 * 60 * 1000,
     maxSessions = 20,
     errorsBeforeDown = 3,
     log = () => {},
@@ -64,12 +72,14 @@ export class PersistentSessionManager {
     this.notify = notify;
     this.now = now;
     this.renewIntervalMs = renewIntervalMs;
-    this.renewBeforeExpiryMs = renewBeforeExpiryMs;
+    this.rescueIntervalMs = rescueIntervalMs;
     this.maxSessions = maxSessions;
     this.errorsBeforeDown = errorsBeforeDown;
     this.log = log;
     /** @type {Map<string, object>} companyKey -> entry */
     this.sessions = new Map();
+    /** @type {Map<string, number>} companyKey -> last time a dead entry was released for re-seed */
+    this.lastReviveAt = new Map();
   }
 
   /** How many live contexts are currently held (any state but DOWN/NOT_SET_UP). */
@@ -135,12 +145,10 @@ export class PersistentSessionManager {
     if (e) e.state = SESSION_STATE.LOGGING_IN;
   }
 
-  /** Whether a session is due for a keep-warm: by cadence, or because a token nears expiry. */
+  /** Whether a session is due for a keep-warm: strictly by cadence (hourly; 10 min in rescue mode). */
   isDue(entry, t = this.now()) {
-    if (!WARMABLE.has(entry.state)) return false;
-    if (t - entry.lastRenewAt >= this.renewIntervalMs) return true;
-    const exps = [entry.tokenExpiries.ramen, entry.tokenExpiries.supplier].filter((x) => typeof x === "number");
-    return exps.some((exp) => exp - t <= this.renewBeforeExpiryMs);
+    const interval = rescueActive(entry) ? this.rescueIntervalMs : this.renewIntervalMs;
+    return WARMABLE.has(entry.state) && t - entry.lastRenewAt >= interval;
   }
 
   /** Run one keep-warm for a single session. Resolves for every outcome; never throws. */
@@ -178,25 +186,72 @@ export class PersistentSessionManager {
       return;
     }
 
-    // Success: a fresh capture. Update the live jar + expiries and hand it to the backend.
+    // Success: refresh the live jar + expiries; only hand it to the backend when
+    // Uber actually reissued a signed token (an unchanged jar would restart the
+    // daemon's offer stream for nothing).
     entry.consecutiveErrors = 0;
+    const before = { ...entry.tokenExpiries };
     if (Array.isArray(r.cookies)) entry.cookies = r.cookies;
     if (Array.isArray(r.supplierCookies)) entry.supplierCookies = r.supplierCookies;
-    if (r.orgUuid) entry.orgUuid = r.orgUuid;
+    // A scraped org may fill a missing one, never replace a known one (an org change needs a manual Connect).
+    if (r.orgUuid && !entry.orgUuid) entry.orgUuid = r.orgUuid;
     if (r.tokenExpiries) {
       if ("ramen" in r.tokenExpiries) entry.tokenExpiries.ramen = r.tokenExpiries.ramen;
       if ("supplier" in r.tokenExpiries) entry.tokenExpiries.supplier = r.tokenExpiries.supplier;
     }
-    entry.lastCaptureAt = t;
+    if (rescueActive(entry)) return this.#rescue(companyKey, entry, r, t);
+    if (!this.#movedForward(before, entry.tokenExpiries)) {
+      this.log(`[${companyKey}] renewed: unchanged`);
+      return;
+    }
+    // Posted under the KNOWN org (above), so a page that never shows the org
+    // cannot get every capture refused as an org change.
+    const outcome = await this.#postCapture(companyKey, entry);
+    if (outcome === "posted") entry.lastCaptureAt = t;
+    const exps = entry.tokenExpiries;
+    this.log(
+      `[${companyKey}] renewed: ${outcome} (ramen exp ${fmtExp(before.ramen)} → ${fmtExp(exps.ramen)}, ` +
+        `supplier exp ${fmtExp(before.supplier)} → ${fmtExp(exps.supplier)})`,
+    );
+  }
+
+  /**
+   * Daemon flagged needs_relink: hand over the jar this browser just loaded the
+   * dispatch host with (a sign-out already went to NEEDS_OTP above), expiry moved
+   * or not — what a manager's relink does. Whether the dispatch page proved the
+   * org is logged, not required: it is not known to print it, and a wrong guess
+   * costs at most MAX_RESCUE_POSTS re-flags.
+   */
+  async #rescue(companyKey, entry, r, t) {
+    const outcome = await this.#postCapture(companyKey, entry);
+    if (outcome === "posted") entry.lastCaptureAt = t;
+    this.log(`[${companyKey}] rescue: ${outcome}${r.orgVerified ? " (org seen on the page)" : ""}`);
+    if (outcome !== "posted") return;
+    entry.rescuePosts = (entry.rescuePosts ?? 0) + 1;
+    if (entry.rescuePosts >= MAX_RESCUE_POSTS) {
+      entry.rescueGaveUp = true;
+      this.log(`[${companyKey}] rescue: giving up after ${MAX_RESCUE_POSTS} attempts — needs the manager`);
+    }
+  }
+
+  /** True when a signed token's expiry moved forward (or became known) since `before`. */
+  #movedForward(before, after) {
+    return ["ramen", "supplier"].some((k) => typeof after[k] === "number" && (typeof before[k] !== "number" || after[k] > before[k]));
+  }
+
+  /** Forward the jar; resolves "posted" | "skipped" | "blocked" | "failed", never throws. */
+  async #postCapture(companyKey, entry) {
     try {
-      await this.post(companyKey, {
+      const out = await this.post(companyKey, {
         orgUuid: entry.orgUuid,
         cookies: entry.cookies,
         supplierCookies: entry.supplierCookies,
         tokenExpiries: entry.tokenExpiries,
       });
+      return out === "skipped" || out === "blocked" ? out : "posted";
     } catch (e) {
       this.log(`[${companyKey}] post to backend failed: ${e?.message}`);
+      return "failed";
     }
   }
 
@@ -214,6 +269,37 @@ export class PersistentSessionManager {
     if (!entry) return;
     await this.#safeClose(entry);
     this.sessions.delete(companyKey);
+  }
+
+  /**
+   * Drop a DOWN / NEEDS_OTP entry so the caller can re-seed it from the backend's
+   * newest jar; at most once per `minGapMs` per company. Resolves the state it was
+   * in, or null when nothing was released.
+   */
+  async releaseIfDead(companyKey, minGapMs = 60 * 60 * 1000) {
+    const state = this.sessions.get(companyKey)?.state;
+    if (state !== SESSION_STATE.DOWN && state !== SESSION_STATE.NEEDS_OTP) return null;
+    const t = this.now();
+    if (t - (this.lastReviveAt.get(companyKey) ?? -Infinity) < minGapMs) return null;
+    this.lastReviveAt.set(companyKey, t);
+    await this.remove(companyKey);
+    return state;
+  }
+
+  /**
+   * Set the daemon's needs_relink flag for a held company. Returns true when a
+   * rescue episode just started (false -> true); leaving rescue resets the budget.
+   */
+  setRescue(companyKey, on) {
+    const entry = this.sessions.get(companyKey);
+    if (!entry) return false;
+    const started = on && !entry.needsRescue;
+    entry.needsRescue = on;
+    if (!on) {
+      entry.rescuePosts = 0;
+      entry.rescueGaveUp = false;
+    }
+    return started;
   }
 
   /** The per-company view the admin Session tab renders. No cookie values — status only. */

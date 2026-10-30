@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Modal, Pressable, View } from "react-native";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Modal, Platform, Pressable, View } from "react-native";
+import { FullWindowOverlay } from "react-native-screens";
 import { Text } from "@/components/typography";
 import { X } from "@/components/icons";
 import { CountdownLabel, CountdownRing, acceptWindow, deadlineOf } from "@/components/countdown";
@@ -36,6 +37,9 @@ const RING_STROKE = 8;
 const OUTCOME_CLOSE_MS = 4_000;
 /** How long an untouched pop-up may sit over the app after its window closed. */
 const IDLE_CLOSE_AFTER_DEADLINE_MS = 15_000;
+/** Coming to the foreground emits `resume` twice (the app, then the socket's
+ *  reconnect); one look for a waiting offer covers both. */
+const RESUME_CHECK_GAP_MS = 5_000;
 
 /** Where OUR request got to. Says nothing about the offer — see `statusLine`. */
 type Phase = "idle" | "sending" | "sent" | "failed";
@@ -47,37 +51,39 @@ type Phase = "idle" | "sending" | "sent" | "failed";
  */
 const handled = new Set<number>();
 
-/** Open requests that arrive before the host mounts (a notification action on a
- *  cold start) wait here for it. */
-let queued: { offerId: number; reject: boolean } | null = null;
-let deliver: ((offerId: number, reject: boolean) => void) | null = null;
-/** Set by the host while it is mounted, so a notification tap can clear it. */
-let dismiss: (() => void) | null = null;
+/** A notification tap: the decision if the offer still is one, else `showDetail`. */
+type TapRequest = { offerId: number; showDetail: () => void };
+
+/** A tap that arrives before the host mounts (a cold start) waits here for it. */
+let queuedTap: TapRequest | null = null;
+let deliverTap: ((request: TapRequest) => void) | null = null;
 
 /**
- * Close the pop-up, if one is open, so a notification tap can navigate.
+ * A notification tap: put the DECISION in front of the driver while the offer
+ * still is one, and only otherwise open its detail screen (`showDetail`).
  *
- * The pop-up is a native `Modal` mounted OUTSIDE the navigator, and its backdrop
- * deliberately does not dismiss on tap. Pushing `/offer/<id>` while it is up puts
- * the screen UNDERNEATH it: the navigation really happened, the driver just never
- * sees it, which is what "tapping the notification does nothing" actually was.
- *
- * Closing marks that offer settled, so it cannot re-open on the next lifecycle
- * broadcast and cover the screen the driver just asked for. That is the right
- * trade: the detail screen carries the same decision, with more of the ride on it.
+ * The detail screen has no decline — that lives here and nowhere else — so a tap
+ * that always went there left an iPhone driver with no way to decline at all: on
+ * iOS the banner IS how the app is reached while Uber holds the screen, and a
+ * suspended app never saw the broadcast that opens the pop-up. The tap resolves
+ * before anything navigates, because on iOS a modal screen presented AFTER the
+ * pop-up would cover it.
  */
-export function dismissOfferPopup(): void {
-  dismiss?.();
+export function openOfferFromNotification(offerId: number, showDetail: () => void): void {
+  const request = { offerId, showDetail };
+  if (deliverTap) deliverTap(request);
+  else queuedTap = request;
 }
 
 /**
- * Ask for the pop-up for one offer, optionally firing the decline immediately —
- * which is what the notification's "Ablehnen" button means: the tap WAS the
- * decision, the app only has to carry it out and show what came back.
+ * A pop-up is a decision: a still-pending offer inside its window that this
+ * driver could decline right now. `can_decline` is the server's own answer, so it
+ * is also the gate that carries the per-company flag all the way to the phone: a
+ * company with declines switched off must never start seeing a full-screen modal,
+ * and nobody should be shown a button whose only reply is "disabled".
  */
-export function requestOfferPopup(offerId: number, reject = false): void {
-  if (deliver) deliver(offerId, reject);
-  else queued = { offerId, reject };
+function isDecision(offer: Offer): boolean {
+  return offer.status === "pending" && isFreshOffer(offer) && offer.can_decline === true;
 }
 
 /** The bare broadcast payload as an `Offer`, so one model feeds every surface. */
@@ -116,12 +122,8 @@ export function OfferPopupHost() {
   // The live subscription must see the CURRENT open offer without being torn
   // down and rebuilt on every state change (which would drop events mid-window).
   const openId = useRef<number | null>(null);
-  // The offer itself, not just its id: the notification's Reject action needs the
-  // open offer to act on without re-fetching it inside the decision window.
-  const current = useRef<Offer | null>(null);
   useEffect(() => {
     openId.current = offer?.id ?? null;
-    current.current = offer;
   }, [offer]);
 
   /** Pull the server's own view over the bare payload: status, can_decline, and
@@ -161,8 +163,11 @@ export function OfferPopupHost() {
   );
 
   const open = useCallback(
-    (next: Offer, rejectNow: boolean) => {
+    (next: Offer) => {
       if (handled.has(next.id)) return;
+      // Claimed NOW, not when the effect catches up: an in-flight tap or resume
+      // check must see that the screen is taken.
+      openId.current = next.id;
       setOffer(next);
       setPhase("idle");
       setFailure(null);
@@ -171,43 +176,30 @@ export function OfferPopupHost() {
       // one that chimes, and the 2 s grace never lands mid-decision.
       alertOfferNow(next);
       void enrich(next.id);
-      if (rejectNow) void reject(next);
     },
-    [enrich, reject],
+    [enrich],
   );
 
-  /** Open for an offer we only know the id of (a push, or a notification action). */
+  /** Open for an offer we only know the id of (a push, a tap, a resume). Resolves
+   *  true when the decision is on screen. `stillWanted` is asked again once the
+   *  offer has arrived: the screen may have been claimed while it was in flight. */
   const openById = useCallback(
-    async (id: number, rejectNow: boolean) => {
-      if (handled.has(id)) return;
-      // Already on screen for this offer. Re-opening it would be pointless, but an
-      // explicit Reject from the notification must still FIRE — and this is the
-      // common case, not the edge one: the broadcast puts the pop-up up within
-      // milliseconds while the FCM push (and its buttons) lands a second or two
-      // later, so the driver is almost always tapping Ablehnen on a notification
-      // whose offer is already open. Dropping it here looked like a dead button.
-      if (openId.current === id) {
-        if (rejectNow && current.current) void reject(current.current);
-
-        return;
-      }
+    async (id: number, stillWanted: () => boolean = () => true): Promise<boolean> => {
+      if (handled.has(id)) return false;
+      if (openId.current === id) return true;
       try {
         const r = await api.offer(id);
-        // A pop-up is a decision: only a still-pending offer inside its window is
-        // one. Anything else belongs on the detail screen, not over the app.
-        if (r.data.status !== "pending" || !isFreshOffer(r.data)) return;
-        // And a decision needs an action to take. can_decline is the server's own
-        // answer to "could this driver decline this offer right now", so it is also
-        // the gate that carries the per-company flag all the way to the phone: a
-        // company with declines switched off must never start seeing a full-screen
-        // modal, and nobody should be shown a button whose only reply is "disabled".
-        if (r.data.can_decline !== true) return;
-        open(r.data, rejectNow);
+        // Anything that is not a decision belongs on the detail screen, not over the app.
+        if (!isDecision(r.data)) return false;
+        if (!stillWanted()) return openId.current === id;
+        open(r.data);
+        return true;
       } catch {
         /* gone, not ours, or offline — nothing to decide on */
+        return false;
       }
     },
-    [open, reject],
+    [open],
   );
 
   const close = useCallback(() => {
@@ -215,26 +207,61 @@ export function OfferPopupHost() {
     // Dismissed, declined or timed out: settled either way. Re-opening it on the
     // next lifecycle broadcast would be the app arguing with the driver.
     if (id !== null) handled.add(id);
+    openId.current = null;
     setOffer(null);
     setPhase("idle");
     setFailure(null);
   }, []);
 
-  // The notification-action path, including a tap that cold-started the app.
+  // Notification taps, including one that cold-started the app. Registered for an
+  // owner too, whose taps simply open the detail: they have nothing to decline.
+  const lastTap = useRef(0);
   useEffect(() => {
-    if (!driver || isOwner) return;
-    deliver = (offerId, rejectNow) => void openById(offerId, rejectNow);
-    dismiss = close;
-    if (queued) {
-      const request = queued;
-      queued = null;
-      void openById(request.offerId, request.reject);
+    if (!driver) return;
+    const handleTap = async ({ offerId, showDetail }: TapRequest) => {
+      if (isOwner) return showDetail();
+      // The pop-up already on screen for this offer IS what the driver tapped for.
+      if (openId.current === offerId) return;
+      // One for ANOTHER offer gives way, and counts as settled: the driver asked
+      // for this one.
+      if (openId.current !== null) close();
+      // Only the latest tap acts: a slower answer for an earlier one must not
+      // land on top of it.
+      const tap = ++lastTap.current;
+      const latest = () => tap === lastTap.current;
+      const opened = await openById(offerId, latest);
+      if (latest() && !opened) showDetail();
+    };
+    deliverTap = (request) => void handleTap(request);
+    if (queuedTap) {
+      const request = queuedTap;
+      queuedTap = null;
+      deliverTap(request);
     }
     return () => {
-      deliver = null;
-      dismiss = null;
+      deliverTap = null;
     };
   }, [driver, isOwner, openById, close]);
+
+  // A driver coming BACK to the app asks once whether an offer is still waiting
+  // for a decision. On an iPhone this is the normal way in: Uber holds the
+  // screen, a backgrounded app runs nothing, so the broadcast that opens the
+  // pop-up was never heard.
+  const lastResumeCheck = useRef(0);
+  const openWaiting = useCallback(async () => {
+    const now = Date.now();
+    if (openId.current !== null || now - lastResumeCheck.current < RESUME_CHECK_GAP_MS) return;
+    lastResumeCheck.current = now;
+    try {
+      const pending = (await api.home()).data.pending_offer;
+      if (!pending || pending.status !== "pending" || !isFreshOffer(pending)) return;
+      // Never displaces a decision that got on screen meanwhile (a tap, a broadcast).
+      const idle = () => openId.current === null;
+      if (idle()) await openById(pending.id, idle);
+    } catch {
+      /* offline — Home's own reload shows what there is */
+    }
+  }, [openById]);
 
   // The live path: a `new` broadcast inlines everything the pop-up needs, so it
   // opens without a request. Anything else (a push, an older backend) resolves
@@ -242,6 +269,10 @@ export function OfferPopupHost() {
   useEffect(() => {
     if (!driver || isOwner) return;
     return subscribeLive((event: LiveEvent) => {
+      if (event.reason === "resume") {
+        void openWaiting();
+        return;
+      }
       const id = event.offerId;
       if (id === undefined) return;
       // The open pop-up owns the screen: an event for it is new information
@@ -256,12 +287,12 @@ export function OfferPopupHost() {
       if (event.offerReason === "status") return;
       if (event.offer) {
         const next = offerFromPayload(id, event.offer);
-        if (isFreshOffer(next)) open(next, false);
+        if (isFreshOffer(next)) open(next);
         return;
       }
-      void openById(id, false);
+      void openById(id);
     });
-  }, [driver, isOwner, enrich, open, openById]);
+  }, [driver, isOwner, enrich, open, openById, openWaiting]);
 
   const status = offer?.status ?? "pending";
   const declined = offer?.dispatch_rejected_at != null;
@@ -331,7 +362,7 @@ export function OfferPopup({
   const showReject = canDecline && !declined && status === "pending";
 
   return (
-    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={onDismiss}>
+    <PopupSurface onDismiss={onDismiss}>
       {/* The backdrop does NOT dismiss on tap: this is a decision, not a sheet. */}
       <View style={{ flex: 1, backgroundColor: "rgba(4,5,5,0.72)", alignItems: "center", justifyContent: "center", padding: 16 }}>
         <View
@@ -406,6 +437,28 @@ export function OfferPopup({
           )}
         </View>
       </View>
+    </PopupSurface>
+  );
+}
+
+/**
+ * What the pop-up is drawn into.
+ *
+ * iOS cannot present a React Native `Modal` while a native modal screen is up:
+ * the offer detail and Settings are both `presentation: "modal"`, and UIKit
+ * silently refuses a second presentation from a controller that is already
+ * presenting — so on an iPhone the decision never appeared over the very screen
+ * a driver sits on after opening an offer. `FullWindowOverlay` draws into the
+ * window itself, above every presented screen. Android's `Modal` is a dialog that
+ * shows over anything, so Android keeps exactly what it had.
+ */
+function PopupSurface({ onDismiss, children }: { onDismiss: () => void; children: ReactNode }) {
+  if (Platform.OS === "ios") {
+    return <FullWindowOverlay unstable_accessibilityContainerViewIsModal>{children}</FullWindowOverlay>;
+  }
+  return (
+    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={onDismiss}>
+      {children}
     </Modal>
   );
 }

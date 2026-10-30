@@ -47,12 +47,12 @@ function statePath(companyKey) {
   return join(config.stateDir, `${String(companyKey).replace(/[^a-z0-9_-]/gi, "_")}.json`);
 }
 
-/** The logged-in fleet org uuid (= partnerUUID), read from the page like browser.js. */
+/** The logged-in fleet org uuid (= partnerUUID), ONLY from the CustomerGatewayUser pattern: a loose uuid would be a wrong org. */
 async function captureOrg(page) {
   try {
     return await page.evaluate(() => {
       const html = document.documentElement.innerHTML;
-      const m = html.match(/CustomerGatewayUser:([0-9a-f-]{36})/i) || html.match(/"uuid":"([0-9a-f-]{36})"/i);
+      const m = html.match(/CustomerGatewayUser:([0-9a-f-]{36})/i);
       return m ? m[1] : null;
     });
   } catch {
@@ -64,7 +64,7 @@ export function createWarmDriver() {
   return {
     /**
      * @param {{companyKey:string, handle:{browser:any, context:any, page:any}}} entry
-     * @returns {Promise<{ok:boolean, loggedOut?:boolean, cookies?, supplierCookies?, orgUuid?, tokenExpiries?, error?:string}>}
+     * @returns {Promise<{ok:boolean, loggedOut?:boolean, cookies?, supplierCookies?, orgUuid?, orgVerified?, tokenExpiries?, error?:string}>}
      */
     async keepWarm(entry) {
       const { context, page } = entry.handle || {};
@@ -98,6 +98,7 @@ export function createWarmDriver() {
           cookies: ramen,
           supplierCookies: supplier,
           orgUuid,
+          orgVerified: !!orgUuid && !!entry.orgUuid && orgUuid.toLowerCase() === String(entry.orgUuid).toLowerCase(),
           tokenExpiries: {
             ramen: jwtExpiryMs(cookieValue(ramen, "jwt-session")),
             supplier: jwtExpiryMs(cookieValue(supplier, "sp-jwt-session")),

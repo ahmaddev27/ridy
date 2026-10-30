@@ -37,13 +37,16 @@ async function backendGet(path) {
   return Array.isArray(body?.data) ? body.data : [];
 }
 
+/** Resolves "posted" | "skipped" (nothing to send) | "blocked" (backend refused it, 202). */
 async function postCapture(companyKey, cap) {
-  if (!cap.orgUuid || !Array.isArray(cap.cookies) || cap.cookies.length === 0) return;
-  await backendPost(`/api/v1/internal/session-browser/${encodeURIComponent(companyKey)}/capture`, {
+  if (!cap.orgUuid || !Array.isArray(cap.cookies) || cap.cookies.length === 0) return "skipped";
+  const res = await backendPost(`/api/v1/internal/session-browser/${encodeURIComponent(companyKey)}/capture`, {
     uber_org_uuid: cap.orgUuid,
     cookies: cap.cookies,
     supplier_cookies: cap.supplierCookies && cap.supplierCookies.length ? cap.supplierCookies : undefined,
   });
+  // The refusal arrives as 202 { data: { status: "blocked", reason } }.
+  return res?.data?.status === "blocked" ? "blocked" : "posted";
 }
 
 const manager = new PersistentSessionManager({
@@ -55,7 +58,6 @@ const manager = new PersistentSessionManager({
     await pushStatus().catch(() => {});
   },
   renewIntervalMs: config.warmIntervalMs,
-  renewBeforeExpiryMs: config.warmBeforeExpiryMs,
   maxSessions: config.maxSessions,
   log: (m) => console.log(`[persistent] ${m}`),
 });
@@ -144,7 +146,7 @@ function toPlaywrightCookies(list, url) {
  * backend). No password is ever handled here. renew() then navigates Fleet Hub:
  * dead cookies flip it to needs_otp; a live session warms and feeds the daemon.
  */
-async function seedFromSession(companyKey, { cookies, supplierCookies, orgUuid }) {
+async function seedFromSession(companyKey, { cookies, supplierCookies, orgUuid, needsRescue = false }) {
   const browser = await launchBrowser();
   const context = await newStealthContext(browser);
   await context.addCookies([
@@ -154,7 +156,14 @@ async function seedFromSession(companyKey, { cookies, supplierCookies, orgUuid }
   const page = await context.newPage();
   page.setDefaultTimeout(config.stepTimeout);
   await manager.adopt(companyKey, { browser, context, page, createdAt: Date.now() }, { orgUuid, cookies });
+  // Set before the first renew so a refused stored jar is never posted back unless the rescue rule passes.
+  manager.get(companyKey).needsRescue = needsRescue;
   await manager.renew(companyKey);
+}
+
+/** Track the daemon's needs_relink flag; the moment it turns on, run one renew right away. */
+async function syncRescue(key, rescue) {
+  if (manager.setRescue(key, rescue)) await manager.renew(key);
 }
 
 /**
@@ -179,10 +188,17 @@ export async function syncFromBackend() {
 
   for (const s of want) {
     const key = String(s.tenant_id);
-    if (manager.has(key) || manager.atCapacity()) continue;
+    // A dead browser of a still-wanted company is dropped (rate-limited) and re-seeded below.
+    const revivedFrom = await manager.releaseIfDead(key);
+    if (manager.has(key)) {
+      await syncRescue(key, s.status === "needs_relink");
+      continue;
+    }
+    if (manager.atCapacity()) continue;
     try {
-      await seedFromSession(key, { cookies: s.cookies, supplierCookies: s.supplier_cookies, orgUuid: s.uber_org_uuid });
-      console.log(`[persistent] seeded ${key}: ${manager.get(key)?.state}`);
+      await seedFromSession(key, { cookies: s.cookies, supplierCookies: s.supplier_cookies, orgUuid: s.uber_org_uuid, needsRescue: s.status === "needs_relink" });
+      const note = revivedFrom ? `revived ${key} from ${revivedFrom}` : `seeded ${key}`;
+      console.log(`[persistent] ${note}: ${manager.get(key)?.state}`);
     } catch (e) {
       console.warn(`[persistent] seed ${key} failed: ${e?.message}`);
     }
