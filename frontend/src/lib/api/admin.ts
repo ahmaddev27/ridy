@@ -693,7 +693,7 @@ export type SessionOutage = {
   ended_at: string | null;
   duration_seconds: number;
   cause: string;
-  recovered_via: "auto" | "manual" | "page" | null;
+  recovered_via: "auto" | "manual" | "page" | "browser" | null;
   relink_attempts: number;
 };
 
