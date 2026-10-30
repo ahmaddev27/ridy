@@ -309,6 +309,12 @@ jobs:
             env_line APP_KEY "$APP_KEY"
             env_line SESSION_SECURE_COOKIE "true"
             env_line SESSION_SAME_SITE "lax"
+            # The persistent session browser runs fleet-wide (owner, 30.10.2026).
+            # Compose reads this from .env, so every compose call of this deploy
+            # carries the profile: uber-auth is rebuilt and recreated with the
+            # rest instead of being orphaned on a stale image — its sessions
+            # resume from the state volume (resumeFromDisk) after the recreate.
+            env_line COMPOSE_PROFILES "browser"
             env_line REVERB_APP_ID "$REVERB_APP_ID"
             env_line REVERB_APP_KEY "$REVERB_APP_KEY"
             env_line REVERB_APP_SECRET "$REVERB_APP_SECRET"
