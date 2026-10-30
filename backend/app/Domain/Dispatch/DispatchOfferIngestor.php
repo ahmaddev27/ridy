@@ -28,8 +28,22 @@ class DispatchOfferIngestor
      * deadline across the whole batch ({@see self::batchDeadline()}), so N offers in
      * one RAMEN message can never stack N separate budgets and push the later
      * drivers out of Uber's ~5-second accept window.
+     *
+     * Small ON PURPOSE (was 2.5 s until 2026-10-31). The dispatch stream gives us a
+     * head-start — we see the offer before Uber forwards it to the driver — and the
+     * whole value of this product is the push landing in that gap. A 2.5 s pre-push
+     * geocode ate the head-start on any address not already in cache, so the offer
+     * arrived "at the same time as Uber" (owner-reported regression). At this budget
+     * a cache-warm street (the fleet's recurring ones — DB only, no HTTP) still rides
+     * in the push WITH its distance + €/km; anything that needs a Nominatim/OSRM call
+     * trips the deadline (`TripGeocoder::queryNominatim`/route guard on it), so the
+     * push goes out NOW and the metrics follow a moment later over the async
+     * {@see GeocodeOffer} job + its `OfferBroadcast('status')`. Tune with the real
+     * `dispatch_offers.notify_latency_ms` distribution. The async job runs UNBOUNDED,
+     * so nothing is lost — only moved off the critical path (as the dispatch-reject
+     * fast path already does entirely).
      */
-    public const GEOCODE_BUDGET_SECONDS = 2.5;
+    public const GEOCODE_BUDGET_SECONDS = 0.4;
 
     public function __construct(
         private TenantContext $context,
