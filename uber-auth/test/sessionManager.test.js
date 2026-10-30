@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { PersistentSessionManager, SESSION_STATE } from "../src/sessionManager.js";
+import { PersistentSessionManager, SESSION_STATE, jarFingerprint } from "../src/sessionManager.js";
 
 // A fake clock so "due" and expiry logic is deterministic.
 function clock(start = 1_000_000) {
@@ -12,12 +12,15 @@ function clock(start = 1_000_000) {
 // A scripted driver: each keepWarm() call shifts the next queued result.
 function fakeDriver(results = []) {
   const calls = [];
+  const optsSeen = [];
   const closed = [];
   return {
     calls,
+    optsSeen,
     closed,
-    async keepWarm(entry) {
+    async keepWarm(entry, opts) {
       calls.push(entry.companyKey);
+      optsSeen.push(opts);
       return results.length ? results.shift() : { ok: true, orgVerified: true, cookies: [{ name: "sid", value: "fresh" }] };
     },
     async close(entry) {
@@ -90,21 +93,36 @@ test("a near-expiry token never makes a session due early", async () => {
   assert.equal(driver.calls.length, 0);
 });
 
-test("posts only when a signed token expiry moved forward", async () => {
-  const driver = fakeDriver([
-    { ok: true, orgVerified: true, cookies: [{ name: "a", value: "1" }], tokenExpiries: { ramen: 5_000, supplier: 5_000 } },
-    { ok: true, orgVerified: true, cookies: [{ name: "a", value: "2" }], tokenExpiries: { ramen: 5_000, supplier: 5_000 } },
-    { ok: true, orgVerified: true, cookies: [{ name: "a", value: "3" }], tokenExpiries: { ramen: 9_000, supplier: 5_000 } },
-  ]);
+test("posts iff the captured jar differs from the injected backend jar", async () => {
+  const same = { ok: true, orgVerified: true, cookies: [{ name: "a", value: "1" }], supplierCookies: [{ name: "s", value: "1" }] };
+  const driver = fakeDriver([same, { ...same, cookies: [{ name: "a", value: "2" }] }, { ...same, cookies: [{ name: "a", value: "2" }] }]);
   const { m, posted, clk } = manager(driver, { renewIntervalMs: HOUR });
-  await m.adopt("acme", { id: 1 }, { tokenExpiries: { ramen: 5_000, supplier: 5_000 } });
+  await m.adopt("acme", { id: 1 }, { orgUuid: "org-1" });
+  m.setBackendJar("acme", { cookies: [{ name: "a", value: "1" }], supplierCookies: [{ name: "s", value: "1" }] });
   for (let i = 0; i < 3; i++) {
     clk.advance(HOUR);
     await m.tick();
   }
-  assert.equal(driver.calls.length, 3);
-  assert.equal(posted.length, 1, "only the renewal that moved ramen forward is posted");
-  assert.equal(posted[0].cap.cookies[0].value, "3");
+  assert.equal(posted.length, 1, "identical jar: no post; rotated jar: one post; then it is the new base");
+  assert.equal(posted[0].cap.cookies[0].value, "2");
+});
+
+test("jarFingerprint ignores order and tells RAMEN from supplier cookies", () => {
+  const a = [{ name: "x", value: "1" }, { name: "y", value: "2" }];
+  assert.equal(jarFingerprint(a, []), jarFingerprint([...a].reverse(), []));
+  assert.notEqual(jarFingerprint(a, []), jarFingerprint([], a));
+});
+
+test("keep-warm is told to inject the backend jar, except in rescue mode", async () => {
+  const driver = fakeDriver([warmResult(), warmResult()]);
+  const { m, clk } = manager(driver, { renewIntervalMs: HOUR, rescueIntervalMs: 1000 });
+  await m.adopt("acme", { id: 1 }, { orgUuid: "org-1" });
+  clk.advance(HOUR);
+  await m.tick();
+  m.setRescue("acme", true);
+  clk.advance(1000);
+  await m.tick();
+  assert.deepEqual(driver.optsSeen, [{ inject: true }, { inject: false }]);
 });
 
 test("a first-known expiry (previously null) counts as a renewal", async () => {
@@ -137,24 +155,60 @@ test("lastCaptureAt only advances after a post the backend accepted", async () =
   assert.ok(logs.some((l) => l.includes("renewed: skipped")) && logs.some((l) => l.includes("renewed: blocked")));
 });
 
-test("releaseIfDead frees DOWN and NEEDS_OTP entries, at most once per hour", async () => {
-  const { m, clk } = manager(fakeDriver());
+test("a NEEDS_OTP entry is revived only when the wanted jar differs from the one it was seeded with", async () => {
+  const { m } = manager(fakeDriver());
   await m.adopt("a", { id: 1 });
-  await m.adopt("b", { id: 2 });
-  assert.equal(await m.releaseIfDead("a"), null, "an active entry is never released");
-  m.get("a").state = SESSION_STATE.DOWN;
-  m.get("b").state = SESSION_STATE.NEEDS_OTP;
-  assert.equal(await m.releaseIfDead("a"), SESSION_STATE.DOWN);
-  assert.equal(await m.releaseIfDead("b"), SESSION_STATE.NEEDS_OTP);
+  m.setBackendJar("a", { cookies: [{ name: "c", value: "dead" }], supplierCookies: [] });
+  m.get("a").state = SESSION_STATE.NEEDS_OTP;
+  const dead = jarFingerprint([{ name: "c", value: "dead" }], []);
+  assert.equal(await m.releaseIfDead("a", dead), null, "same dead jar: never");
+  assert.equal(await m.releaseIfDead("a", null), null);
+  assert.equal(await m.releaseIfDead("a", jarFingerprint([{ name: "c", value: "relinked" }], [])), SESSION_STATE.NEEDS_OTP);
   assert.equal(m.has("a"), false);
-  // Re-seeded and died again within the hour: not released a second time.
-  await m.adopt("a", { id: 3 });
-  m.get("a").state = SESSION_STATE.DOWN;
-  clk.advance(59 * 60 * 1000);
-  assert.equal(await m.releaseIfDead("a"), null);
-  assert.equal(m.has("a"), true);
+});
+
+test("a NEEDS_OTP browser is re-seeded from a new jar at most every 5 minutes", async () => {
+  const { m, clk } = manager(fakeDriver());
+  const landOnLogin = async () => {
+    await m.adopt("a", { id: 1 });
+    m.setBackendJar("a", { cookies: [{ name: "c", value: "old" }], supplierCookies: [] });
+    m.get("a").state = SESSION_STATE.NEEDS_OTP;
+  };
+  await landOnLogin();
+  assert.equal(await m.releaseIfDead("a", jarFingerprint([{ name: "c", value: "rot-1" }], [])), SESSION_STATE.NEEDS_OTP);
+  await landOnLogin();
   clk.advance(60 * 1000);
-  assert.equal(await m.releaseIfDead("a"), SESSION_STATE.DOWN);
+  assert.equal(await m.releaseIfDead("a", jarFingerprint([{ name: "c", value: "rot-2" }], [])), null, "a rotation a minute later waits");
+  clk.advance(4 * 60 * 1000);
+  assert.equal(await m.releaseIfDead("a", jarFingerprint([{ name: "c", value: "rot-3" }], [])), SESSION_STATE.NEEDS_OTP);
+});
+
+test("an active entry is never released", async () => {
+  const { m } = manager(fakeDriver());
+  await m.adopt("a", { id: 1 });
+  assert.equal(await m.releaseIfDead("a", "whatever"), null);
+});
+
+test("a DOWN entry is revived at once, then backs off 1 -> 5 -> 15 min, and a post resets it", async () => {
+  const { m, clk } = manager(fakeDriver());
+  const dieAndTry = async (advanceMs) => {
+    if (!m.has("a")) await m.adopt("a", { id: 1 });
+    m.get("a").state = SESSION_STATE.DOWN;
+    clk.advance(advanceMs);
+    return m.releaseIfDead("a", "x");
+  };
+  assert.equal(await dieAndTry(0), SESSION_STATE.DOWN, "first: immediate");
+  assert.equal(await dieAndTry(30_000), null, "30 s < 1 min");
+  assert.equal(await dieAndTry(31_000), SESSION_STATE.DOWN, "61 s >= 1 min");
+  assert.equal(await dieAndTry(4 * 60_000), null, "4 min < 5 min");
+  assert.equal(await dieAndTry(61_000), SESSION_STATE.DOWN, "5 min reached");
+  assert.equal(await dieAndTry(14 * 60_000), null, "14 min < 15 min");
+  assert.equal(await dieAndTry(61_000), SESSION_STATE.DOWN, "15 min reached");
+  assert.equal(await dieAndTry(10 * 60_000), null, "the cap stays 15 min");
+  // A successful post resets the backoff.
+  await m.adopt("a", { id: 2 }, { orgUuid: "org-1" });
+  await m.renew("a"); // default fake result carries new cookies -> posted
+  assert.equal(await dieAndTry(1), SESSION_STATE.DOWN, "reset: immediate again");
 });
 
 test("Uber signing the browser out moves it to needs_otp, notifies, and does NOT post", async () => {

@@ -210,6 +210,26 @@ class SessionBrowserTest extends TestCase
         $this->assertSame(FleetSessionOutage::VIA_BROWSER, $outage->recovered_via);
     }
 
+    public function test_rescue_lists_only_the_companies_to_rescue_now_and_no_cookies(): void
+    {
+        $this->service()->getJson('/api/v1/internal/session-browser/rescue')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $lost = $this->brokenSession($this->tenant(), 'daemon', now()->subMinute());
+        $this->brokenSession($this->tenant(), 'admin', now()->subMinute());
+        $this->brokenSession($this->tenant(), 'daemon', now()->subHours(7));
+
+        $this->service()->getJson('/api/v1/internal/session-browser/rescue')
+            ->assertOk()
+            ->assertExactJson(['data' => [['tenant_id' => $lost->tenant_id]]]);
+    }
+
+    public function test_rescue_requires_the_secret(): void
+    {
+        $this->getJson('/api/v1/internal/session-browser/rescue')->assertUnauthorized();
+    }
+
     /** A session the daemon (or a human) flagged, with its open outage. */
     private function brokenSession(Tenant $tenant, string $cause, \DateTimeInterface $since, ?string $org = null): UberFleetSession
     {

@@ -11,6 +11,7 @@ use App\Http\Controllers\Controller;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 
 /**
@@ -22,6 +23,9 @@ class SessionBrowserController extends Controller
 {
     /** How long after the daemon loses a session the browser keeps trying to rescue it. */
     private const RESCUE_HOURS = 6;
+
+    /** What `serviceable()` and the autolink guard read from the company. */
+    private const TENANT_COLUMNS = 'tenant:id,status,banned_at,activated_at,subscription_ends_at,settings';
 
     /** Bulk health report: one row per company the service is responsible for. */
     public function status(Request $request): JsonResponse
@@ -94,18 +98,13 @@ class SessionBrowserController extends Controller
      */
     public function wanted(): JsonResponse
     {
-        $sessions = UberFleetSession::withoutGlobalScopes()
-            ->with('tenant:id,status,banned_at,activated_at,subscription_ends_at,settings')
-            ->whereIn('status', [UberFleetSession::STATUS_ACTIVE, UberFleetSession::STATUS_NEEDS_RELINK])
-            ->get();
-        $rescuable = $this->rescuableSessionIds(
-            $sessions->where('status', UberFleetSession::STATUS_NEEDS_RELINK)->modelKeys(),
-        );
+        $active = UberFleetSession::withoutGlobalScopes()
+            ->with(self::TENANT_COLUMNS)
+            ->where('status', UberFleetSession::STATUS_ACTIVE)
+            ->get()
+            ->filter(fn (UberFleetSession $s) => $s->isUsable() && $this->serviceable($s));
 
-        $rows = $sessions
-            ->filter(fn (UberFleetSession $s) => $s->tenant !== null
-                && $s->tenant->stateReason() === null
-                && ($s->isUsable() || (in_array($s->id, $rescuable, true) && ! $s->tenant->isAutolinkBlocked())))
+        $rows = $active->concat($this->rescuableSessions())
             ->map(fn (UberFleetSession $s) => [
                 'tenant_id' => (int) $s->tenant_id,
                 'uber_org_uuid' => $s->uber_org_uuid,
@@ -120,33 +119,62 @@ class SessionBrowserController extends Controller
     }
 
     /**
+     * The companies whose session the daemon has just lost, for the browser to
+     * rescue NOW. Polled every few seconds, so it carries ids only and costs one
+     * query on the usual empty answer — the jars come from `wanted` once there is
+     * something to do.
+     */
+    public function rescue(): JsonResponse
+    {
+        $rows = $this->rescuableSessions()
+            ->map(fn (UberFleetSession $s) => ['tenant_id' => (int) $s->tenant_id])
+            ->values();
+
+        return response()->json(['data' => $rows]);
+    }
+
+    /**
      * Sessions the DAEMON lost — Uber refused the offer stream — within the last
      * RESCUE_HOURS. That is often only the dispatch token dying while the Uber
      * account is still signed in (Fleet Hub keeps answering), which is exactly
      * what a manager's relink repairs by loading the dispatch page in a signed-in
      * browser; the server browser can do the same, with no credential. A relink
      * an admin forced, or one the extension reported, is a human decision and is
-     * never undone this way.
+     * never undone this way, and a company that blocked auto-linking would refuse
+     * the capture anyway.
      *
-     * @param  array<int, int>  $sessionIds
-     * @return array<int, int>
+     * @return Collection<int, UberFleetSession>
      */
-    private function rescuableSessionIds(array $sessionIds): array
+    private function rescuableSessions(): Collection
     {
-        if ($sessionIds === []) {
-            return [];
+        $broken = UberFleetSession::withoutGlobalScopes()
+            ->with(self::TENANT_COLUMNS)
+            ->where('status', UberFleetSession::STATUS_NEEDS_RELINK)
+            ->get();
+        if ($broken->isEmpty()) {
+            return $broken;
         }
 
-        return FleetSessionOutage::query()
-            ->whereIn('uber_fleet_session_id', $sessionIds)
+        $lostByDaemon = FleetSessionOutage::query()
+            ->whereIn('uber_fleet_session_id', $broken->modelKeys())
             ->whereNull('ended_at')
             ->where('cause', 'daemon')
             ->where('started_at', '>=', CarbonImmutable::now()->subHours(self::RESCUE_HOURS))
             ->pluck('uber_fleet_session_id')
             ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values()
             ->all();
+
+        return $broken
+            ->filter(fn (UberFleetSession $s) => in_array($s->id, $lostByDaemon, true)
+                && $this->serviceable($s)
+                && ! $s->tenant->isAutolinkBlocked())
+            ->values();
+    }
+
+    /** The company still exists and is not lapsed / banned / disabled. */
+    private function serviceable(UberFleetSession $session): bool
+    {
+        return $session->tenant !== null && $session->tenant->stateReason() === null;
     }
 
     /** Same silent-capture guards as the extension's non-manual path. */

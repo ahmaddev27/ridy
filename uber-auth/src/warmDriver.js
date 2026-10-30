@@ -16,6 +16,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { config } from "./config.js";
+import { scopeCookies } from "./cookieScope.js";
 
 const AUTH_RE = /auth\.uber|\/(auth|login|oauth)/i;
 const FLEETHUB_URL = "https://fleethub.uber.com/";
@@ -66,11 +67,21 @@ export function createWarmDriver() {
      * @param {{companyKey:string, handle:{browser:any, context:any, page:any}}} entry
      * @returns {Promise<{ok:boolean, loggedOut?:boolean, cookies?, supplierCookies?, orgUuid?, orgVerified?, tokenExpiries?, error?:string}>}
      */
-    async keepWarm(entry) {
+    async keepWarm(entry, { inject = true } = {}) {
       const { context, page } = entry.handle || {};
       if (!context || !page) return { ok: false, error: "no_context" };
 
       try {
+        // One cookie lineage: start from the newest jar the backend (= the daemon) holds,
+        // so the browser never rotates a stale fork. Not in rescue mode: there that jar is
+        // the one Uber just refused and must not overwrite the browser's own cookies.
+        // CLEARED first: a stored cookie is only {name,value}, so injecting it next to
+        // the browser's own `.uber.com` copy would send two values under one name.
+        // Clear + inject is exactly the seed path, which is the one proven live.
+        if (inject && entry.backendJar) {
+          await context.clearCookies();
+          await context.addCookies(scopeCookies(entry.backendJar.cookies, entry.backendJar.supplierCookies));
+        }
         // Fleet Hub first: this is where sp-jwt-session (14d) rotates.
         await page.goto(FLEETHUB_URL, { waitUntil: "domcontentloaded", timeout: config.stepTimeout });
         if (AUTH_RE.test(page.url())) {

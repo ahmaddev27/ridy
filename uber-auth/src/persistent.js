@@ -8,9 +8,10 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { config } from "./config.js";
-import { PersistentSessionManager, SESSION_STATE } from "./sessionManager.js";
+import { PersistentSessionManager, SESSION_STATE, jarFingerprint } from "./sessionManager.js";
 import { createWarmDriver } from "./warmDriver.js";
 import { launchBrowser, newStealthContext } from "./browser.js";
+import { scopeCookies } from "./cookieScope.js";
 
 const driver = createWarmDriver();
 
@@ -130,16 +131,6 @@ export async function resumeFromDisk() {
   await pushStatus().catch(() => {});
 }
 
-// Each stored cookie is just {name,value} — the host scope was stripped on
-// capture — so re-attach it to the host it belongs to: the RAMEN jar to
-// vsdispatch, the supplier jar to fleethub. Playwright infers domain/path/secure
-// from the url.
-function toPlaywrightCookies(list, url) {
-  return (Array.isArray(list) ? list : [])
-    .filter((c) => c && typeof c.name === "string" && typeof c.value === "string")
-    .map((c) => ({ name: c.name, value: c.value, url }));
-}
-
 /**
  * Open a real browser ALREADY logged in to Uber by injecting the session the
  * company connected on Uber's OWN page (captured by the extension, stored by the
@@ -149,15 +140,13 @@ function toPlaywrightCookies(list, url) {
 async function seedFromSession(companyKey, { cookies, supplierCookies, orgUuid, needsRescue = false }) {
   const browser = await launchBrowser();
   const context = await newStealthContext(browser);
-  await context.addCookies([
-    ...toPlaywrightCookies(cookies, "https://vsdispatch.uber.com/"),
-    ...toPlaywrightCookies(supplierCookies, "https://fleethub.uber.com/"),
-  ]);
+  await context.addCookies(scopeCookies(cookies, supplierCookies));
   const page = await context.newPage();
   page.setDefaultTimeout(config.stepTimeout);
   await manager.adopt(companyKey, { browser, context, page, createdAt: Date.now() }, { orgUuid, cookies });
   // Set before the first renew so a refused stored jar is never posted back unless the rescue rule passes.
   manager.get(companyKey).needsRescue = needsRescue;
+  manager.setBackendJar(companyKey, { cookies, supplierCookies });
   await manager.renew(companyKey);
 }
 
@@ -173,7 +162,17 @@ async function syncRescue(key, rescue) {
  * was disconnected). This is the whole lifecycle — create on connect, stop on
  * lapse — with no manual step and no password. Never throws.
  */
-export async function syncFromBackend() {
+export function syncFromBackend() {
+  // The 60 s loop and the rescue poll can overlap, and a rescue renew can take ~10 s.
+  syncInFlight ??= runSync().finally(() => {
+    syncInFlight = null;
+  });
+  return syncInFlight;
+}
+
+let syncInFlight = null;
+
+async function runSync() {
   let wanted;
   try {
     wanted = await backendGet("/api/v1/internal/session-browser/wanted");
@@ -188,9 +187,10 @@ export async function syncFromBackend() {
 
   for (const s of want) {
     const key = String(s.tenant_id);
-    // A dead browser of a still-wanted company is dropped (rate-limited) and re-seeded below.
-    const revivedFrom = await manager.releaseIfDead(key);
+    // A dead browser of a still-wanted company is dropped (immediately, then with backoff) and re-seeded below.
+    const revivedFrom = await manager.releaseIfDead(key, jarFingerprint(s.cookies, s.supplier_cookies));
     if (manager.has(key)) {
+      manager.setBackendJar(key, { cookies: s.cookies, supplierCookies: s.supplier_cookies });
       await syncRescue(key, s.status === "needs_relink");
       continue;
     }
@@ -213,11 +213,40 @@ export async function syncFromBackend() {
   await pushStatus().catch(() => {});
 }
 
+let lastRescueWarnAt = 0;
+const lastRescueTriggerAt = new Map();
+const RESCUE_RETRY_MS = 10 * 1000;
+
+/** Ask the backend which companies the daemon just flagged; sync at once if one still needs a rescue episode. */
+async function pollRescue() {
+  let rows;
+  try {
+    rows = await backendGet("/api/v1/internal/session-browser/rescue");
+  } catch (e) {
+    if (Date.now() - lastRescueWarnAt > 60 * 1000) {
+      lastRescueWarnAt = Date.now();
+      console.warn(`[persistent] rescue poll failed: ${e?.message}`);
+    }
+    return;
+  }
+  const now = Date.now();
+  const pending = rows.map((r) => String(r.tenant_id)).filter((key) => {
+    if (config.onlyTenants.length && !config.onlyTenants.includes(key)) return false;
+    if (manager.get(key)?.needsRescue) return false;
+    // A seed that keeps failing must not relaunch Chromium every poll.
+    return now - (lastRescueTriggerAt.get(key) ?? 0) >= RESCUE_RETRY_MS;
+  });
+  if (pending.length === 0) return;
+  for (const key of pending) lastRescueTriggerAt.set(key, now);
+  await syncFromBackend();
+}
+
 let loops = [];
 export function startLoops() {
   loops.push(setInterval(() => manager.tick().catch((e) => console.warn(`[persistent] tick: ${e?.message}`)), config.warmTickMs));
   loops.push(setInterval(() => pushStatus().catch((e) => console.warn(`[persistent] status: ${e?.message}`)), config.statusPushMs));
   loops.push(setInterval(() => syncFromBackend().catch((e) => console.warn(`[persistent] sync: ${e?.message}`)), config.syncIntervalMs));
+  loops.push(setInterval(() => pollRescue().catch((e) => console.warn(`[persistent] rescue: ${e?.message}`)), config.rescuePollMs));
   for (const t of loops) t.unref?.();
 }
 

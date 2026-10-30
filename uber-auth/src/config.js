@@ -37,6 +37,8 @@ export const config = {
   warmIntervalMs: Number(process.env.WARM_INTERVAL_MS || 60 * 60 * 1000),
   // How often the tick loop checks for due sessions, and how often status is pushed.
   warmTickMs: Number(process.env.WARM_TICK_MS || 5 * 60 * 1000),
+  // How often the backend is asked which companies the daemon just flagged needs_relink.
+  rescuePollMs: Number(process.env.RESCUE_POLL_MS || 3000),
   statusPushMs: Number(process.env.STATUS_PUSH_MS || 20 * 1000),
   // Hard cap on concurrent live contexts on this box (RAM guard).
   maxSessions: Number(process.env.MAX_SESSIONS || 20),

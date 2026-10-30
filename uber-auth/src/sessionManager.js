@@ -20,6 +20,17 @@
 // behind the injected `driver`, so the state machine is unit-tested without a real
 // browser or network.
 
+import { createHash } from "node:crypto";
+
+/** Order-independent digest of both jars' {name,value} pairs. */
+export function jarFingerprint(cookies, supplierCookies) {
+  const lines = [];
+  for (const [tag, list] of [["r", cookies], ["s", supplierCookies]]) {
+    for (const c of Array.isArray(list) ? list : []) lines.push(`${tag}:${c?.name}=${c?.value}`);
+  }
+  return createHash("sha256").update(lines.sort().join("\n")).digest("hex");
+}
+
 export const SESSION_STATE = {
   NOT_SET_UP: "not_set_up", // no login has ever been established
   LOGGING_IN: "logging_in", // an interactive login (or re-login) is in progress
@@ -38,6 +49,12 @@ const rescueActive = (entry) => !!entry.needsRescue && !entry.rescueGaveUp;
 
 /** Posts allowed per rescue episode: each one re-activates the backend session and can re-notify the manager. */
 const MAX_RESCUE_POSTS = 2;
+
+/** A company that dies again within REVIVE_RESET_MS of a revive waits these gaps (the last one repeats). */
+const REVIVE_BACKOFF_MS = [60 * 1000, 5 * 60 * 1000, 15 * 60 * 1000];
+const REVIVE_RESET_MS = 60 * 60 * 1000;
+/** A NEEDS_OTP browser is re-seeded from a NEW jar at most this often. */
+const NEEDS_OTP_REVIVE_GAP_MS = 5 * 60 * 1000;
 
 export class PersistentSessionManager {
   /**
@@ -78,8 +95,8 @@ export class PersistentSessionManager {
     this.log = log;
     /** @type {Map<string, object>} companyKey -> entry */
     this.sessions = new Map();
-    /** @type {Map<string, number>} companyKey -> last time a dead entry was released for re-seed */
-    this.lastReviveAt = new Map();
+    /** @type {Map<string, {at:number, count:number}>} companyKey -> last release time + consecutive quick releases */
+    this.revives = new Map();
   }
 
   /** How many live contexts are currently held (any state but DOWN/NOT_SET_UP). */
@@ -132,6 +149,8 @@ export class PersistentSessionManager {
       lastLoginAt: t,
       lastRenewAt: t,
       lastCaptureAt: t,
+      lastJarFp: jarFingerprint(cookies, supplierCookies),
+      backendJar: null,
       hardReauthCount: existing?.hardReauthCount ?? 0,
       consecutiveErrors: 0,
     });
@@ -157,7 +176,7 @@ export class PersistentSessionManager {
     if (!entry || !WARMABLE.has(entry.state)) return;
     let r;
     try {
-      r = await this.driver.keepWarm(entry);
+      r = await this.driver.keepWarm(entry, { inject: !rescueActive(entry) });
     } catch (e) {
       r = { ok: false, error: e?.message || "keepwarm_threw" };
     }
@@ -186,11 +205,12 @@ export class PersistentSessionManager {
       return;
     }
 
-    // Success: refresh the live jar + expiries; only hand it to the backend when
-    // Uber actually reissued a signed token (an unchanged jar would restart the
-    // daemon's offer stream for nothing).
+    // Success: the daemon's copy is superseded the moment Uber rotates anything
+    // during this visit, so post iff the captured jar differs from the one this
+    // browser started from (the injected backend jar, else the last posted one).
     entry.consecutiveErrors = 0;
     const before = { ...entry.tokenExpiries };
+    const startedFrom = this.#startingFingerprint(entry);
     if (Array.isArray(r.cookies)) entry.cookies = r.cookies;
     if (Array.isArray(r.supplierCookies)) entry.supplierCookies = r.supplierCookies;
     // A scraped org may fill a missing one, never replace a known one (an org change needs a manual Connect).
@@ -200,7 +220,7 @@ export class PersistentSessionManager {
       if ("supplier" in r.tokenExpiries) entry.tokenExpiries.supplier = r.tokenExpiries.supplier;
     }
     if (rescueActive(entry)) return this.#rescue(companyKey, entry, r, t);
-    if (!this.#movedForward(before, entry.tokenExpiries)) {
+    if (jarFingerprint(entry.cookies, entry.supplierCookies) === startedFrom) {
       this.log(`[${companyKey}] renewed: unchanged`);
       return;
     }
@@ -210,9 +230,15 @@ export class PersistentSessionManager {
     if (outcome === "posted") entry.lastCaptureAt = t;
     const exps = entry.tokenExpiries;
     this.log(
-      `[${companyKey}] renewed: ${outcome} (ramen exp ${fmtExp(before.ramen)} → ${fmtExp(exps.ramen)}, ` +
+      `[${companyKey}] renewed: ${outcome} (jar changed; ramen exp ${fmtExp(before.ramen)} → ${fmtExp(exps.ramen)}, ` +
         `supplier exp ${fmtExp(before.supplier)} → ${fmtExp(exps.supplier)})`,
     );
+  }
+
+  /** What the browser's jar is compared against: what was injected, else the last posted/seeded jar. */
+  #startingFingerprint(entry) {
+    const j = entry.backendJar;
+    return j ? jarFingerprint(j.cookies, j.supplierCookies) : entry.lastJarFp;
   }
 
   /**
@@ -234,11 +260,6 @@ export class PersistentSessionManager {
     }
   }
 
-  /** True when a signed token's expiry moved forward (or became known) since `before`. */
-  #movedForward(before, after) {
-    return ["ramen", "supplier"].some((k) => typeof after[k] === "number" && (typeof before[k] !== "number" || after[k] > before[k]));
-  }
-
   /** Forward the jar; resolves "posted" | "skipped" | "blocked" | "failed", never throws. */
   async #postCapture(companyKey, entry) {
     try {
@@ -248,11 +269,26 @@ export class PersistentSessionManager {
         supplierCookies: entry.supplierCookies,
         tokenExpiries: entry.tokenExpiries,
       });
-      return out === "skipped" || out === "blocked" ? out : "posted";
+      if (out === "skipped" || out === "blocked") return out;
+      this.#markPosted(companyKey, entry);
+      return "posted";
     } catch (e) {
       this.log(`[${companyKey}] post to backend failed: ${e?.message}`);
       return "failed";
     }
+  }
+
+  /** The backend now holds this jar: it is the new comparison base, and a healthy revive loop is over. */
+  #markPosted(companyKey, entry) {
+    entry.lastJarFp = jarFingerprint(entry.cookies, entry.supplierCookies);
+    entry.backendJar = { cookies: entry.cookies, supplierCookies: entry.supplierCookies };
+    this.revives.delete(companyKey);
+  }
+
+  /** Remember the newest jar the backend (= the daemon) holds, to inject before the next visit. */
+  setBackendJar(companyKey, { cookies, supplierCookies } = {}) {
+    const entry = this.sessions.get(companyKey);
+    if (entry) entry.backendJar = { cookies: cookies ?? [], supplierCookies: supplierCookies ?? [] };
   }
 
   /** Keep-warm every due session. Sequential on purpose: bounds peak CPU/RAM on the box. */
@@ -273,17 +309,40 @@ export class PersistentSessionManager {
 
   /**
    * Drop a DOWN / NEEDS_OTP entry so the caller can re-seed it from the backend's
-   * newest jar; at most once per `minGapMs` per company. Resolves the state it was
-   * in, or null when nothing was released.
+   * newest jar. Resolves the state it was in, or null when nothing was released.
+   *  - NEEDS_OTP: only when the wanted row's jar (`rowFingerprint`) differs from the
+   *    one this entry was seeded/last injected with. The same dead jar would only hit
+   *    Uber's login page again; a new one means a relink or a daemon rotation.
+   *  - DOWN (transient: network/Chromium): immediately the first time, then a
+   *    1 -> 5 -> 15 min backoff if it keeps dying; reset by a successful post or
+   *    an hour without a release.
    */
-  async releaseIfDead(companyKey, minGapMs = 60 * 60 * 1000) {
-    const state = this.sessions.get(companyKey)?.state;
-    if (state !== SESSION_STATE.DOWN && state !== SESSION_STATE.NEEDS_OTP) return null;
-    const t = this.now();
-    if (t - (this.lastReviveAt.get(companyKey) ?? -Infinity) < minGapMs) return null;
-    this.lastReviveAt.set(companyKey, t);
+  async releaseIfDead(companyKey, rowFingerprint = null) {
+    const entry = this.sessions.get(companyKey);
+    if (entry?.state === SESSION_STATE.NEEDS_OTP) {
+      if (!rowFingerprint || rowFingerprint === this.#startingFingerprint(entry)) return null;
+      // The daemon rotates its jar often; a browser that keeps landing on the login
+      // page with each new one must not relaunch Chromium on every rotation.
+      const last = this.revives.get(companyKey)?.at;
+      if (last !== undefined && this.now() - last < NEEDS_OTP_REVIVE_GAP_MS) return null;
+      this.revives.set(companyKey, { at: this.now(), count: 1 });
+    } else if (entry?.state !== SESSION_STATE.DOWN || !this.#downBackoffElapsed(companyKey)) {
+      return null;
+    }
+    const state = entry.state;
     await this.remove(companyKey);
     return state;
+  }
+
+  /** DOWN revive gate; records the release when it opens. */
+  #downBackoffElapsed(companyKey) {
+    const t = this.now();
+    let rec = this.revives.get(companyKey);
+    if (rec && t - rec.at >= REVIVE_RESET_MS) rec = undefined;
+    const wait = rec ? REVIVE_BACKOFF_MS[Math.min(rec.count - 1, REVIVE_BACKOFF_MS.length - 1)] : 0;
+    if (rec && t - rec.at < wait) return false;
+    this.revives.set(companyKey, { at: t, count: (rec?.count ?? 0) + 1 });
+    return true;
   }
 
   /**

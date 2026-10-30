@@ -272,6 +272,7 @@ Route::prefix('v1')->group(function () {
     // Internal - the persistent session-browser service (same shared secret).
     Route::middleware('dispatch.secret')->prefix('internal/session-browser')->group(function () {
         Route::get('wanted', [SessionBrowserController::class, 'wanted']);
+        Route::get('rescue', [SessionBrowserController::class, 'rescue']);
         Route::post('status', [SessionBrowserController::class, 'status']);
         Route::post('{tenant}/capture', [SessionBrowserController::class, 'capture']);
     });
