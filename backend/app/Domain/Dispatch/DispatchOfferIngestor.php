@@ -206,12 +206,17 @@ class DispatchOfferIngestor
 
         try {
             $sent = $this->notifier->notify($record, $fast);
+            // received_at (ingest start) → push handoff. The push is already out, so
+            // persisting this is off the critical path. Readable as a distribution in
+            // prod (dispatch_offers.notify_latency_ms), where RidyLog is a no-op.
+            $latencyMs = (int) round((microtime(true) - (float) $record->received_at->format('U.u')) * 1000);
+            rescue(fn () => DispatchOffer::whereKey($record->id)->update(['notify_latency_ms' => $latencyMs]), report: false);
             RidyLog::event('dispatch_offer.notified', [
                 'offer_id' => $record->id,
                 'driver_id' => $record->driver_id,
                 'devices' => $sent,
                 // Ingest → push latency: surfaces any queueing ahead of the push.
-                'latency_ms' => (int) round((microtime(true) - (float) $record->received_at->format('U.u')) * 1000),
+                'latency_ms' => $latencyMs,
             ]);
         } catch (Throwable $e) {
             // A failed driver push is a core-path failure, so it must reach Sentry and

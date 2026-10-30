@@ -1231,7 +1231,11 @@ export class RamenStream {
           job.attempts++;
           job.inFlight = true;
           const result = await api.ingest(job.offers, job.seq);
-          console.log(`[${this.tag()}] ingested ${job.offers.length} offer(s)${job.attempts > 1 ? ` (attempt ${job.attempts})` : ""}:`, result);
+          // Daemon leg: SSE receipt (enqueue) → backend accepted the POST. This is
+          // the part NOT covered by the backend's own received_at→push metric, so
+          // it is where a lost head-start over Uber would hide. One line per batch.
+          const legMs = Date.now() - job.enqueuedAt;
+          console.log(`[${this.tag()}] ingested ${job.offers.length} offer(s)${job.attempts > 1 ? ` (attempt ${job.attempts})` : ""} in ${legMs}ms:`, result);
           return;
         } catch (e) {
           error = e;
