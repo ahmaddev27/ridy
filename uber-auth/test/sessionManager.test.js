@@ -122,7 +122,7 @@ test("keep-warm is told to inject the backend jar, except in rescue mode", async
   m.setRescue("acme", true);
   clk.advance(1000);
   await m.tick();
-  assert.deepEqual(driver.optsSeen, [{ inject: true }, { inject: false }]);
+  assert.deepEqual(driver.optsSeen, [{ inject: true, rescue: false }, { inject: false, rescue: true }]);
 });
 
 test("a first-known expiry (previously null) counts as a renewal", async () => {

@@ -176,7 +176,8 @@ export class PersistentSessionManager {
     if (!entry || !WARMABLE.has(entry.state)) return;
     let r;
     try {
-      r = await this.driver.keepWarm(entry, { inject: !rescueActive(entry) });
+      const rescue = rescueActive(entry);
+      r = await this.driver.keepWarm(entry, { inject: !rescue, rescue });
     } catch (e) {
       r = { ok: false, error: e?.message || "keepwarm_threw" };
     }

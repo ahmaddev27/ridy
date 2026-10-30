@@ -67,7 +67,7 @@ export function createWarmDriver() {
      * @param {{companyKey:string, handle:{browser:any, context:any, page:any}}} entry
      * @returns {Promise<{ok:boolean, loggedOut?:boolean, cookies?, supplierCookies?, orgUuid?, orgVerified?, tokenExpiries?, error?:string}>}
      */
-    async keepWarm(entry, { inject = true } = {}) {
+    async keepWarm(entry, { inject = true, rescue = false } = {}) {
       const { context, page } = entry.handle || {};
       if (!context || !page) return { ok: false, error: "no_context" };
 
@@ -82,21 +82,29 @@ export function createWarmDriver() {
           await context.clearCookies();
           await context.addCookies(scopeCookies(entry.backendJar.cookies, entry.backendJar.supplierCookies));
         }
-        // Fleet Hub first: this is where sp-jwt-session (14d) rotates.
-        await page.goto(FLEETHUB_URL, { waitUntil: "domcontentloaded", timeout: config.stepTimeout });
-        if (AUTH_RE.test(page.url())) {
-          return { ok: true, loggedOut: true };
+        // A rescue needs ONLY the dispatch (RAMEN) jar back — the offer stream runs on
+        // it — so it skips Fleet Hub entirely: the driver waits on ONE page load, not
+        // two, which is the whole point of a rescue (every second is lost offers). The
+        // supplier jar keeps its stored value. A routine keep-warm still visits Fleet
+        // Hub first, where sp-jwt-session (14d) rotates.
+        if (!rescue) {
+          await page.goto(FLEETHUB_URL, { waitUntil: "domcontentloaded", timeout: config.stepTimeout });
+          if (AUTH_RE.test(page.url())) {
+            return { ok: true, loggedOut: true };
+          }
+          await page.waitForTimeout(800);
         }
-        await page.waitForTimeout(800);
 
-        // Then the dispatch host so the RAMEN jar (jwt-session, 24h) stays fresh too.
+        // The dispatch host so the RAMEN jar (jwt-session, 24h) stays fresh.
         await page.goto(DISPATCH_URL, { waitUntil: "domcontentloaded", timeout: config.stepTimeout }).catch(() => {});
         if (AUTH_RE.test(page.url())) {
           return { ok: true, loggedOut: true };
         }
 
         const ramen = (await context.cookies(RAMEN_COOKIE_URL)).map((c) => ({ name: c.name, value: c.value }));
-        const supplier = (await context.cookies(FLEETHUB_URL)).map((c) => ({ name: c.name, value: c.value }));
+        // A rescue did not refresh Fleet Hub, so it has nothing new to say about the
+        // supplier jar — omit it rather than post a stale copy the backend would refuse.
+        const supplier = rescue ? undefined : (await context.cookies(FLEETHUB_URL)).map((c) => ({ name: c.name, value: c.value }));
         if (ramen.length === 0) return { ok: false, error: "empty_jar" };
 
         const orgUuid = await captureOrg(page);
