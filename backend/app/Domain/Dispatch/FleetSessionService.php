@@ -287,10 +287,10 @@ class FleetSessionService
     {
         $this->recorder->session((int) $session->tenant_id, 'supplier_degraded', ['source' => $source]);
 
-        // Same manager prompt as a real relink, and this one STAYS deduped: the
-        // offer stream is untouched, so the fleet is still earning and a repeat
+        // Its own notice, not the relink one: that one says offers stopped, and here
+        // they have not. It STAYS deduped: the fleet is still earning, so a repeat
         // notice is noise. Only a real outage (above) announces itself every time.
-        $this->notifier->toTenant($session->tenant_id, 'session_needs_relink', ['company' => $this->companyName($session)], '/connections', dedupe: true);
+        $this->notifier->toTenant($session->tenant_id, 'session_supplier_degraded', ['company' => $this->companyName($session)], '/connections', dedupe: true);
     }
 
     private function companyName(UberFleetSession $session): string

@@ -120,7 +120,8 @@ const en = {
   notif: {
     session_connected: { title: "Uber connected", body: "{company} is now streaming offers." },
     session_restored: { title: "Uber reconnected", body: "{company}: offers are flowing again (after {minutes} min)." },
-    session_needs_relink: { title: "Reconnect Uber", body: "Your Uber session stopped — reconnect to keep receiving offers." },
+    session_needs_relink: { title: "Uber offers stopped", body: "{company}: offers are no longer arriving. Reconnect Uber now." },
+    session_supplier_degraded: { title: "Uber map limited", body: "{company}: driver status and the map are not updating. Offers still arrive. Reconnect Uber when convenient." },
     company_registered: { title: "New company", body: "{company} just signed up." },
     company_banned: { title: "Company locked out", body: "{company} was locked after too many wrong codes." },
     subscription_activated: { title: "Subscription active", body: "Your subscription is active for {days} days." },
@@ -289,7 +290,8 @@ const de: typeof en = {
   notif: {
     session_connected: { title: "Uber verbunden", body: "{company} streamt jetzt Angebote." },
     session_restored: { title: "Uber wieder verbunden", body: "{company}: Angebote kommen wieder an (nach {minutes} Min.)." },
-    session_needs_relink: { title: "Uber neu verbinden", body: "Deine Uber-Sitzung wurde beendet — verbinde neu, um weiter Angebote zu erhalten." },
+    session_needs_relink: { title: "Uber-Angebote gestoppt", body: "{company}: Es kommen keine Angebote mehr an. Bitte Uber jetzt neu verbinden." },
+    session_supplier_degraded: { title: "Uber-Karte eingeschränkt", body: "{company}: Fahrerstatus und Karte werden nicht aktualisiert. Angebote kommen weiter an. Bitte Uber bei Gelegenheit neu verbinden." },
     company_registered: { title: "Neue Firma", body: "{company} hat sich registriert." },
     company_banned: { title: "Firma gesperrt", body: "{company} wurde nach zu vielen falschen Codes gesperrt." },
     subscription_activated: { title: "Abo aktiv", body: "Dein Abo ist für {days} Tage aktiv." },
@@ -459,7 +461,8 @@ const ar: typeof en = {
   notif: {
     session_connected: { title: "تم ربط أوبر", body: "{company} صارت تستقبل العروض." },
     session_restored: { title: "رجع اتصال أوبر", body: "{company}: العروض رجعت توصل (بعد {minutes} دقيقة)." },
-    session_needs_relink: { title: "أعد ربط أوبر", body: "توقّفت جلسة أوبر — أعد الربط لتستمر العروض." },
+    session_needs_relink: { title: "توقفت عروض أوبر", body: "{company}: العروض لم تعد تصل. أعد ربط أوبر الآن." },
+    session_supplier_degraded: { title: "خريطة أوبر محدودة", body: "{company}: حالة السواقين والخريطة لا تتحدث. العروض ما زالت تصل. أعد ربط أوبر بأقرب وقت." },
     company_registered: { title: "شركة جديدة", body: "{company} سجّلت للتو." },
     company_banned: { title: "شركة محظورة", body: "{company} حُظرت بعد أكواد خاطئة كثيرة." },
     subscription_activated: { title: "الاشتراك فعّال", body: "اشتراكك فعّال لمدة {days} يوم." },

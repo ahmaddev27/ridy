@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Dispatch\Models\UberFleetSession;
+use App\Domain\Notifications\NotificationPushText;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use App\Models\User;
@@ -264,6 +265,62 @@ class FleetSessionTest extends TestCase
         $this->postJson('/api/v1/fleet-session/report-broken')->assertOk();
 
         $this->assertSame(1, $this->relinkNotices());
+    }
+
+    public function test_a_broken_offer_stream_tells_the_manager_that_offers_stopped(): void
+    {
+        // The relink notice is the offer-stream outage: the copy must say what the
+        // manager loses (offers), not the generic "the session needs renewing".
+        $this->activeSession();
+
+        Sanctum::actingAs($this->manager);
+        $this->postJson('/api/v1/fleet-session/report-broken')->assertOk();
+
+        $this->assertSame(1, $this->relinkNotices());
+        $copy = app(NotificationPushText::class)->for('session_needs_relink', ['company' => 'YA Mobility'], 'de');
+        $this->assertStringContainsString('Angebote', $copy['title'].' '.$copy['body']);
+        $this->assertStringContainsString('YA Mobility', $copy['body']);
+    }
+
+    public function test_a_fleet_hub_only_break_says_offers_keep_flowing_not_that_they_stopped(): void
+    {
+        // The daemon's offer stream is alive (fresh last_event_at), so a browser 403
+        // is only the Fleet Hub half: map and driver status degrade, offers do not.
+        // It gets its OWN notice — the old shared "reconnect to keep receiving
+        // offers" told the manager the opposite of what was happening.
+        UberFleetSession::withoutGlobalScopes()->create([
+            'tenant_id' => $this->tenant->id, 'uber_org_uuid' => self::ORG,
+            'cookies' => [['name' => 'sid', 'value' => 'v']],
+            'status' => UberFleetSession::STATUS_ACTIVE,
+            'last_event_at' => now()->subMinute(),
+        ]);
+
+        Sanctum::actingAs($this->manager);
+        $this->postJson('/api/v1/fleet-session/report-broken')->assertOk();
+
+        $this->assertSame(0, $this->relinkNotices(), 'a Fleet Hub break must not claim offers stopped');
+        $this->assertSame(1, $this->manager->notifications()->where('data->type', 'session_supplier_degraded')->count());
+        $copy = app(NotificationPushText::class)->for('session_supplier_degraded', ['company' => 'YA Mobility'], 'de');
+        $this->assertStringContainsString('Angebote', $copy['body']);
+        $this->assertStringContainsString('YA Mobility', $copy['body']);
+    }
+
+    public function test_the_fleet_hub_notice_stays_deduped_while_unread(): void
+    {
+        // Offers still flow, so a repeat notice is noise — unlike the offers outage,
+        // which must announce itself every time.
+        UberFleetSession::withoutGlobalScopes()->create([
+            'tenant_id' => $this->tenant->id, 'uber_org_uuid' => self::ORG,
+            'cookies' => [['name' => 'sid', 'value' => 'v']],
+            'status' => UberFleetSession::STATUS_ACTIVE,
+            'last_event_at' => now()->subMinute(),
+        ]);
+
+        Sanctum::actingAs($this->manager);
+        $this->postJson('/api/v1/fleet-session/report-broken')->assertOk();
+        $this->postJson('/api/v1/fleet-session/report-broken')->assertOk();
+
+        $this->assertSame(1, $this->manager->notifications()->where('data->type', 'session_supplier_degraded')->count());
     }
 
     /** An active session the daemon is not holding, so the browser's report counts. */

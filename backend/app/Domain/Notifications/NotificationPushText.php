@@ -16,10 +16,18 @@ class NotificationPushText
             'en' => ['Uber connected', '{company}: the Uber session is active.'],
             'ar' => ['تم ربط أوبر', '{company}: جلسة أوبر أصبحت نشطة.'],
         ],
+        // The offer stream is down: say what the manager is losing, so the notice
+        // reads as the emergency it is. Only markNeedsRelink sends this type.
         'session_needs_relink' => [
-            'de' => ['Uber erneut verbinden', '{company}: die Uber-Sitzung muss erneuert werden.'],
-            'en' => ['Reconnect Uber', '{company}: the Uber session needs relinking.'],
-            'ar' => ['أعد ربط أوبر', '{company}: جلسة أوبر تحتاج إعادة ربط.'],
+            'de' => ['Uber-Angebote gestoppt', '{company}: Es kommen keine Angebote mehr an. Bitte Uber jetzt neu verbinden.'],
+            'en' => ['Uber offers stopped', '{company}: offers are no longer arriving. Reconnect Uber now.'],
+            'ar' => ['توقفت عروض أوبر', '{company}: العروض لم تعد تصل. أعد ربط أوبر الآن.'],
+        ],
+        // Only the Fleet Hub half: map and driver status degrade, offers do not.
+        'session_supplier_degraded' => [
+            'de' => ['Uber-Karte eingeschränkt', '{company}: Fahrerstatus und Karte werden nicht aktualisiert. Angebote kommen weiter an. Bitte Uber bei Gelegenheit neu verbinden.'],
+            'en' => ['Uber map limited', '{company}: driver status and the map are not updating. Offers still arrive. Reconnect Uber when convenient.'],
+            'ar' => ['خريطة أوبر محدودة', '{company}: حالة السواقين والخريطة لا تتحدث. العروض ما زالت تصل. أعد ربط أوبر بأقرب وقت.'],
         ],
         'session_restored' => [
             'de' => ['Uber wieder verbunden', '{company}: Angebote kommen wieder an (nach {minutes} Min.).'],

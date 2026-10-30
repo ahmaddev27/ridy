@@ -37,6 +37,7 @@ class Notifier
     private const TYPE_CATEGORY = [
         'session_connected' => 'sessions',
         'session_needs_relink' => 'sessions',
+        'session_supplier_degraded' => 'sessions',
         'session_restored' => 'sessions',
         'company_registered' => 'platform',
         'company_banned' => 'platform',
