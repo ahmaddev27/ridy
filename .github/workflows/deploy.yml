@@ -137,7 +137,10 @@ jobs:
             # Long-running app services (caddy has no build). The daemon is handled
             # separately so an app-only deploy never restarts its Uber streams.
             APP_SERVICES="backend caddy frontend scheduler queue reverb"
-            BUILT_SERVICES="backend scheduler reverb queue frontend dispatch-daemon"
+            # uber-auth (the persistent session browser, profile "browser") is built and
+            # recreated like the daemon: only when its image changed, so an app-only
+            # deploy never reopens the companies' Uber browsers.
+            BUILT_SERVICES="backend scheduler reverb queue frontend dispatch-daemon uber-auth"
             PHASE="prepare"
             PREV_SHA=""
 
@@ -165,6 +168,7 @@ jobs:
               docker ps -aq --filter "name=_ridy-" | xargs -r docker rm -f || true
               $COMPOSE up -d --no-build --no-deps --force-recreate --renew-anon-volumes $APP_SERVICES || true
               $COMPOSE up -d --no-build --no-deps dispatch-daemon || true
+              $COMPOSE up -d --no-build --no-deps uber-auth || true
               sleep 10
               if curl -fsS --max-time 15 "https://$DOMAIN/api/v1/health" >/dev/null 2>&1; then
                 echo "::error::rolled back to $PREV_SHA and it answers. Migrations that already ran were NOT reversed — check: $COMPOSE exec backend php artisan migrate:status"
@@ -311,8 +315,10 @@ jobs:
             env_line SESSION_SAME_SITE "lax"
             # The persistent session browser runs fleet-wide (owner, 30.10.2026).
             # Compose reads this from .env, so every compose call of this deploy
-            # carries the profile: uber-auth is rebuilt and recreated with the
-            # rest instead of being orphaned on a stale image — its sessions
+            # carries the profile, so --remove-orphans never drops uber-auth. It is
+            # rebuilt and recreated because it is in BUILT_SERVICES (it was NOT until
+            # 30.10 late — every deploy left it on the 11:11 image) instead of being
+            # orphaned on a stale image — its sessions
             # resume from the state volume (resumeFromDisk) after the recreate.
             env_line COMPOSE_PROFILES "browser"
             env_line REVERB_APP_ID "$REVERB_APP_ID"
@@ -499,6 +505,7 @@ jobs:
             docker ps -aq --filter "name=_ridy-" | xargs -r docker rm -f || true
             $COMPOSE up -d --no-build --no-deps --force-recreate --renew-anon-volumes --remove-orphans $APP_SERVICES
             $COMPOSE up -d --no-build --no-deps dispatch-daemon
+            $COMPOSE up -d --no-build --no-deps uber-auth
 
             # Link public/storage so uploaded assets (invoice + email logos on the
             # public disk) are served at {APP_URL}/storage/... Needs root (public/).
