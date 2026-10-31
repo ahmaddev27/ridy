@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Ban, ChevronLeft, ChevronRight, MapPin, ArrowRight } from "lucide-react";
+import { useAuth } from "@/components/auth/auth-provider";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -28,6 +30,16 @@ export default function AutoDeclinePage() {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.autoDecline.${k}`);
   const num = latnLocale(locale);
+
+  // The whole page is gated on the company's feature flag (carried on the session,
+  // same as the sidebar). A company without it never sees this route — redirect
+  // the moment we know the flag is off, rather than render a "not enabled" shell.
+  const { user } = useAuth();
+  const router = useRouter();
+  const featureOff = user != null && user.tenant?.dispatch_reject_enabled !== true;
+  useEffect(() => {
+    if (featureOff) router.replace("/dashboard");
+  }, [featureOff, router]);
 
   const [overview, setOverview] = useState<AutoDeclineOverview | null>(null);
   const [offers, setOffers] = useState<EarlyDeclinedOffer[]>([]);
@@ -86,6 +98,10 @@ export default function AutoDeclinePage() {
   function reasonLabel(r: string | null): string {
     return r ? c(`reason_${r}`) : "—";
   }
+
+  // Company without the feature: render nothing while the redirect above takes it
+  // to the dashboard, so the page never flashes.
+  if (featureOff) return null;
 
   return (
     <div className="space-y-6">

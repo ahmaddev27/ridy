@@ -112,9 +112,16 @@ class Tenant extends Model
      * dispatch_reject; the engine also requires each driver's own opt-in. Absent =
      * off, and flipping it false makes the whole engine dormant (the kill switch).
      */
+    /**
+     * Auto-decline ("Early decline") rides ENTIRELY on dispatch-reject — there is
+     * no separate company flag. A driver's auto-decline is executed as a dispatch
+     * decline, so it cannot work without it; the feature is therefore available
+     * exactly when dispatch declines are on. Keying it here keeps the engine, the
+     * endpoints and the sidebar all gated on the one admin switch.
+     */
     public function autoDeclineFeatureEnabled(): bool
     {
-        return ($this->settings['auto_decline']['enabled'] ?? false) === true;
+        return $this->dispatchRejectEnabled();
     }
 
     /**

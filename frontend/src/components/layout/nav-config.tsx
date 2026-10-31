@@ -41,6 +41,12 @@ export type NavItem = {
    * behind `elprofessor.enabled` on the server, which is the wall.
    */
   requiresElProfessor?: boolean;
+  /**
+   * Show the item only while the company has dispatch declines switched on — the
+   * one admin switch behind the Early-decline page (auto-decline rides on it).
+   * Like `requiresElProfessor`, it hides a page; the server is the wall.
+   */
+  requiresDispatchReject?: boolean;
 };
 
 /**
@@ -66,7 +72,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "nav.dashboard", icon: LayoutDashboard },
       { href: "/offers", label: "nav.offers", icon: Radio },
-      { href: "/auto-decline", label: "nav.autoDecline", icon: Ban },
+      { href: "/auto-decline", label: "nav.autoDecline", icon: Ban, requiresDispatchReject: true },
       { href: "/notifications", label: "nav.notifications", icon: Bell },
     ],
   },

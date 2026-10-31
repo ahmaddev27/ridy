@@ -35,7 +35,7 @@ class AutoDeclineEndpointsTest extends TestCase
 
     private function enableFeature(): void
     {
-        $this->tenant->forceFill(['settings' => array_merge($this->tenant->settings ?? [], ['auto_decline' => ['enabled' => true]])])->save();
+        $this->tenant->forceFill(['settings' => array_merge($this->tenant->settings ?? [], ['dispatch_reject' => ['enabled' => true]])])->save();
     }
 
     private function payload(): array

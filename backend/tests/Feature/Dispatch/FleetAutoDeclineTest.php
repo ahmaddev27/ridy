@@ -31,7 +31,7 @@ class FleetAutoDeclineTest extends TestCase
         $this->tenant = Tenant::create([
             'name' => 'YA', 'country' => 'DE', 'status' => 'active',
             'activated_at' => now(), 'subscription_ends_at' => now()->addMonth(),
-            'settings' => ['auto_decline' => ['enabled' => true]],
+            'settings' => ['dispatch_reject' => ['enabled' => true]],
         ]);
         app(TenantContext::class)->set($this->tenant->id);
         $this->on = Driver::create(['name' => 'Anna', 'uber_driver_uuid' => 'd-1', 'auto_decline' => [
@@ -99,7 +99,7 @@ class FleetAutoDeclineTest extends TestCase
 
     public function test_other_tenants_data_is_never_visible(): void
     {
-        $other = Tenant::create(['name' => 'Other', 'country' => 'DE', 'settings' => ['auto_decline' => ['enabled' => true]]]);
+        $other = Tenant::create(['name' => 'Other', 'country' => 'DE', 'settings' => ['dispatch_reject' => ['enabled' => true]]]);
         $stranger = Driver::withoutGlobalScopes()->create([
             'tenant_id' => $other->id, 'name' => 'Zoe', 'uber_driver_uuid' => 'x-1',
             'auto_decline' => ['enabled' => true, 'rules' => []],

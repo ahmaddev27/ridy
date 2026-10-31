@@ -46,6 +46,7 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
             // The server refuses its routes anyway; this keeps the sidebar from
             // offering a door that answers 403.
             .filter((item) => !item.requiresElProfessor || user?.tenant?.elprofessor_enabled === true)
+            .filter((item) => !item.requiresDispatchReject || user?.tenant?.dispatch_reject_enabled === true)
             .map((item) => {
             // Active on the exact route or any nested route (e.g. a company
             // detail page under /admin/companies). Index routes match exactly so

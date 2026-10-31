@@ -24,6 +24,10 @@ class UserResource extends JsonResource
                 // The sidebar hides the page on it, so it travels with the
                 // session rather than costing a request on every render.
                 'elprofessor_enabled' => $this->tenant->elprofessorEnabled(),
+                // Dispatch-reject is the ONE switch behind both the manual decline
+                // and auto-decline ("Early decline"): the sidebar hides the
+                // Early-decline page unless it is on, so it travels with the session.
+                'dispatch_reject_enabled' => $this->tenant->dispatchRejectEnabled(),
             ] : null,
             'roles' => $this->getRoleNames(),
             'permissions' => $this->getAllPermissions()->pluck('name')->values(),
