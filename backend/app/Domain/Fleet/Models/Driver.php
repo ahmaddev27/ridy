@@ -44,7 +44,7 @@ class Driver extends Authenticatable implements PasskeyHolder
         'uber_driver_uuid', 'uber_email', 'uber_link_method',
         'uber_picture_url', 'uber_rating', 'uber_total_trips', 'uber_status', 'roster_synced_at', 'roster_removed_at',
         'online_status', 'went_offline_at', 'location_updated_at', 'status_synced_at',
-        'latitude', 'longitude', 'heading', 'trip_waypoints',
+        'latitude', 'longitude', 'heading', 'trip_waypoints', 'auto_decline',
         'email', 'password', 'locale', 'invite_token', 'invited_at', 'activated_at', 'last_login_at', 'offers_seen_at',
     ];
 
@@ -63,6 +63,7 @@ class Driver extends Authenticatable implements PasskeyHolder
         'longitude' => 'decimal:7',
         'heading' => 'decimal:2',
         'trip_waypoints' => 'array',
+        'auto_decline' => 'array',
         'is_online' => 'boolean',
         'engagement' => 'integer',
         'password' => 'hashed',
@@ -209,6 +210,22 @@ class Driver extends Authenticatable implements PasskeyHolder
         return $query
             ->whereNull('roster_removed_at')
             ->where(fn (Builder $q) => $q->whereNull('uber_status')->orWhere('uber_status', 'ONBOARDING_STATUS_ACTIVE'));
+    }
+
+    /**
+     * The driver switched auto-decline on for themselves (docs/25). This is only
+     * the DRIVER's own opt-in — the engine also requires the company's feature flag
+     * (Tenant::autoDeclineFeatureEnabled()) and canReject(); never the whole gate.
+     */
+    public function autoDeclineEnabled(): bool
+    {
+        return ($this->auto_decline['enabled'] ?? false) === true;
+    }
+
+    /** The driver's configured rules (each independently toggleable), or []. */
+    public function autoDeclineRules(): array
+    {
+        return is_array($this->auto_decline['rules'] ?? null) ? $this->auto_decline['rules'] : [];
     }
 
     protected static function booted(): void

@@ -107,6 +107,17 @@ class Tenant extends Model
     }
 
     /**
+     * This company has the auto-decline ("Early decline") feature on — docs/25.
+     * A decline needs a live dispatch session, so this is meaningful only alongside
+     * dispatch_reject; the engine also requires each driver's own opt-in. Absent =
+     * off, and flipping it false makes the whole engine dormant (the kill switch).
+     */
+    public function autoDeclineFeatureEnabled(): bool
+    {
+        return ($this->settings['auto_decline']['enabled'] ?? false) === true;
+    }
+
+    /**
      * The El-Professor link, as the dashboard card and the driver app both read it.
      * The single derivation: `connected` is true only while a token exists, is not
      * revoked, and El-Professor has actually pulled at least once.

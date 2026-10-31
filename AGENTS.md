@@ -30,14 +30,19 @@ then grep before writing. Reuse the existing service/helper — the backend is s
 - **Observe, don't control — with one carved-out exception.** The **only** write Reidey ever
   makes to Uber is a **dispatch-side decline of a still-pending offer** (`RejectOffers` on
   `vsdispatch.uber.com`, the org/dispatch session the daemon already holds), triggered by the
-  driver in the app or by a manager on the panel, and gated by the per-company flag
-  `tenants.settings['dispatch_reject']['enabled']` (absent = OFF). It declines **from the
-  dispatch panel**, which is the whole point: it does not count against the driver's Uber
-  acceptance rate. Nothing else: **never accept** (`AcceptOffers` is deliberately dormant —
-  no route, no UI), never start/end a trip, never message a rider, never auto-decide for the
-  driver. Acceptance stays **inferred from Uber driver status only** (`DriverStatusIngestor` +
-  `OfferLifecycle`); the decline is the one thing we command, and we record Uber's answer
-  rather than assume it. Do not reintroduce a timeline reconciler — it was tried and reverted.
+  driver in the app, by a manager on the panel, or **automatically by the driver's own pre-set
+  auto-decline rules** (docs/25 "Early decline": per-driver opt-in, company-gated by
+  `tenants.settings['auto_decline']['enabled']` on top of dispatch_reject), and gated by the
+  per-company flag `tenants.settings['dispatch_reject']['enabled']` (absent = OFF). It declines
+  **from the dispatch panel**, which is the whole point: it does not count against the driver's
+  Uber acceptance rate. Nothing else: **never accept** (`AcceptOffers` is deliberately dormant —
+  no route, no UI), never start/end a trip, never message a rider, and **never auto-ACCEPT or
+  otherwise act for the driver** — the one automated action is the rule-based *decline* above,
+  which executes the driver's OWN standing instruction, never a system choice to take or skip a
+  ride on its own judgment. Acceptance stays **inferred from Uber driver status only**
+  (`DriverStatusIngestor` + `OfferLifecycle`); the decline is the one thing we command, and we
+  record Uber's answer rather than assume it. Do not reintroduce a timeline reconciler — it was
+  tried and reverted.
 - **Time model:** timezone **Europe/Berlin**, week starts **Monday**, the Uber fleet-day
   starts at **04:00**. All stats/windows use fleet-days.
 - **Every offer push carries** distance + dropoff + €/km with the €-quality badge; geocode
