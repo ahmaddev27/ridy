@@ -207,6 +207,8 @@ export type Offer = {
   /** Set once Uber CONFIRMED a dispatch decline. Such an offer never reached the
    *  driver, so it counts in no acceptance figure of theirs. */
   dispatch_rejected_at?: string | null;
+  /** Which Early-decline rule fired (see AutoDeclineRuleKey); null for a manual decline. */
+  auto_decline_reason?: string | null;
 };
 
 /**
@@ -330,6 +332,30 @@ export type OffersQuery = {
   page?: number;
   /** Fleet-owner mode only: restrict the feed to a single driver. */
   driver_id?: number;
+};
+
+/** The driver's standing Early-decline rules (docs/25). Money is integer cents. */
+export type AutoDeclineRules = {
+  min_fare: { enabled: boolean; value_e2: number };
+  reject_cities: { enabled: boolean; cities: string[] };
+  max_pickup_distance: { enabled: boolean; km: number };
+  max_trip_distance: { enabled: boolean; km: number };
+};
+
+export type AutoDeclineConfig = {
+  /** The COMPANY has the feature; without it the tab is not shown at all. */
+  feature_enabled: boolean;
+  enabled: boolean;
+  rules: AutoDeclineRules;
+  available_cities: string[];
+};
+
+export type AutoDeclineHistoryQuery = {
+  reason?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  per_page?: number;
 };
 
 /** A tenant driver, for the fleet-owner offers picker. */
@@ -687,6 +713,26 @@ export class ApiClient {
       method: "DELETE",
       body: JSON.stringify({ token }),
     });
+  }
+
+  autoDecline() {
+    return this.request<{ data: AutoDeclineConfig }>("/api/v1/driver/auto-decline");
+  }
+
+  saveAutoDecline(body: { enabled: boolean; rules: AutoDeclineRules }) {
+    return this.request<{ data: AutoDeclineConfig }>("/api/v1/driver/auto-decline", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  }
+
+  autoDeclineHistory(params: AutoDeclineHistoryQuery = {}) {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") qs.set(key, String(value));
+    }
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return this.request<{ data: Offer[]; meta: PaginationMeta }>(`/api/v1/driver/auto-decline/history${suffix}`);
   }
 
   fleetStats(from?: string, to?: string) {

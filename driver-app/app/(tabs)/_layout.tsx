@@ -2,11 +2,12 @@ import { useState } from "react";
 import { Tabs, usePathname, useRouter } from "expo-router";
 import { View, Pressable, Platform, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Home, Package, BarChart3, User, FileText, type LucideIcon } from "@/components/icons";
+import { Home, Package, BarChart3, User, FileText, Ban, type LucideIcon } from "@/components/icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Text } from "@/components/typography";
 import { t, useLocale, isRTL } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { useAutoDeclineFeature } from "@/lib/auto-decline";
 import { submissionAccess } from "@/lib/submission-detail";
 import { useColors, isDarkPalette, type Palette } from "@/lib/theme";
 
@@ -19,6 +20,8 @@ function iconFor(routeName: string): LucideIcon {
       return BarChart3;
     case "submissions":
       return FileText;
+    case "auto-decline":
+      return Ban;
     case "profile":
       return User;
     default: // index / home
@@ -35,6 +38,8 @@ function iconFor(routeName: string): LucideIcon {
 function BottomBar({ state, descriptors, navigation, onHeight }: BottomTabBarProps & { onHeight: (h: number) => void }) {
   const c = useColors();
   const insets = useSafeAreaInsets();
+  const { driver, isOwner } = useAuth();
+  const autoDecline = useAutoDeclineFeature(driver?.id ?? null, isOwner);
 
   // Submissions is never one of these tabs any more. A tab is a PLACE; sending
   // a Beleg or a Notiz is an ACT, and an act sitting in a row of places reads
@@ -42,7 +47,8 @@ function BottomBar({ state, descriptors, navigation, onHeight }: BottomTabBarPro
   // is also why the bar is four tabs whether or not the company is connected —
   // the row no longer reflows when that switch is turned on.
   const routes = state.routes.filter(
-    (route: BottomTabBarProps["state"]["routes"][number]) => route.name !== "submissions",
+    (route: BottomTabBarProps["state"]["routes"][number]) =>
+      route.name !== "submissions" && (route.name !== "auto-decline" || autoDecline),
   );
 
   const dark = isDarkPalette(c);
@@ -208,6 +214,8 @@ export default function TabsLayout() {
         <Tabs.Screen name="statistics" options={{ title: t("tabs.statistics") }} />
         <Tabs.Screen name="offers" options={{ title: t("tabs.offers") }} />
         <Tabs.Screen name="submissions" options={{ title: t("tabs.submissions") }} />
+        {/* Early decline: drawn only when the company has the feature (see BottomBar). */}
+        <Tabs.Screen name="auto-decline" options={{ title: t("tabs.autoDecline") }} />
         <Tabs.Screen name="profile" options={{ title: t("tabs.profile") }} />
       </Tabs>
       {showFab ? <SubmissionsFab bottom={barHeight + 14} /> : null}
