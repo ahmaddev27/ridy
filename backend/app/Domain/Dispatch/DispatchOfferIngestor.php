@@ -50,6 +50,7 @@ class DispatchOfferIngestor
         private DispatchNotifier $notifier,
         private OfferLifecycle $lifecycle,
         private TripGeocoder $geocoder,
+        private DispatchAutoDecline $autoDecline,
     ) {}
 
     /** A geocode deadline (microtime) to share across every offer of one ingest request. */
@@ -160,6 +161,7 @@ class DispatchOfferIngestor
         // withheld. If this ever fires it is logged: an offer genuinely dispatched to
         // them means they are active again, in which case the next roster sync clears
         // roster_removed_at and the following offer notifies normally.
+        $autoDeclineReason = null;
         if ($driver !== null && $driver->roster_removed_at !== null) {
             Log::warning('dispatch_offer.removed_driver_skipped', [
                 'offer_id' => $record->id,
@@ -168,7 +170,10 @@ class DispatchOfferIngestor
                 'removed_at' => $driver->roster_removed_at->toIso8601String(),
             ]);
         } elseif ($driver !== null) {
-            $this->notifyDriver($record, $geocodeDeadline);
+            $autoDeclineReason = $this->autoDeclineIfMatched($record, $driver);
+            if ($autoDeclineReason === null) {
+                $this->notifyDriver($record, $geocodeDeadline);
+            }
         }
 
         // A driver holds one live offer at a time — Uber sends the next only once
@@ -189,6 +194,7 @@ class DispatchOfferIngestor
         $status = match (true) {
             $driver === null => 'unlinked_driver',
             $driver->roster_removed_at !== null => 'removed_driver',
+            $autoDeclineReason !== null => 'early_declined',
             default => 'routed',
         };
 
@@ -206,6 +212,35 @@ class DispatchOfferIngestor
             'offer_id' => $record->id,
             'driver_id' => $driver?->id,
         ];
+    }
+
+    /**
+     * Auto-decline ("Early decline", docs/25). If the offer matches one of the
+     * driver's own standing rules, queue the dispatch decline and SUPPRESS the push:
+     * the driver asked, in advance, never to be rung for this. Returns the rule that
+     * fired (stamped on the offer as `auto_decline_reason`) or null.
+     *
+     * Only suppresses when the decline was actually QUEUED. If it cannot be — the
+     * company has no live dispatch session, the window already closed — the normal
+     * push still goes out, so a matched rule can never silently swallow an offer and
+     * leave the driver with neither a notification nor a decline.
+     */
+    private function autoDeclineIfMatched(DispatchOffer $record, Driver $driver): ?string
+    {
+        $reason = $this->autoDecline->match($record, $driver);
+        if ($reason === null) {
+            return null;
+        }
+
+        $result = app(DispatchActionService::class)->requestReject($record, $driver);
+        $queued = in_array($result['status'] ?? '', ['queued', 'already_declined', 'duplicate'], true);
+        if (! $queued) {
+            return null;
+        }
+
+        $record->forceFill(['auto_decline_reason' => $reason])->save();
+
+        return $reason;
     }
 
     /**
