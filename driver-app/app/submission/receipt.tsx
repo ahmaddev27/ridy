@@ -39,7 +39,7 @@
  * accepts a comma from the keyboard (every German keyboard gives one) and
  * converts it once, here, before anything is sent.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { View, ScrollView, Pressable, Image, ActivityIndicator, Alert, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -63,6 +63,7 @@ import { t, isRTL } from "@/lib/i18n";
 import { parseReceiptText, formatAmountDE, type OcrResult } from "@/lib/receipt-text-parse";
 import { rowsFromLines } from "@/lib/ocr-lines";
 import { ocrResizeFor, OCR_QUALITY } from "@/lib/ocr-image";
+import { mergeVision, readWithVision, VISION_META_FIELD, type ReceiptFacts, type VisionKey } from "@/lib/receipt-vision";
 import {
   evaluateScan,
   evaluateOdometer,
@@ -115,6 +116,8 @@ function buildOcrMeta(
     confirmedAmountAt: string | null;
     fuel: boolean;
     odometerSent: boolean;
+    /** Fields the server's vision model supplied instead of ML Kit. */
+    visionKeys: VisionKey[];
   },
 ): Record<string, unknown> {
   const field = (source: string, extra?: Record<string, unknown>) => ({ source, ...extra });
@@ -150,7 +153,14 @@ function buildOcrMeta(
     fields.odometer_km = field("odometer_photo");
     fields.range_km = field("odometer_photo");
   }
-  return { parser: "receipt-text-parse 2026-10-29", fields };
+  // A field the vision fallback supplied says so: a reviewer weighing a value
+  // needs to know which reader produced it.
+  for (const key of opts.visionKeys) {
+    const name = VISION_META_FIELD[key];
+    fields[name] = { ...(fields[name] as Record<string, unknown> | undefined), source: "vision" };
+  }
+  const parser = "receipt-text-parse 2026-10-29";
+  return { parser: opts.visionKeys.length > 0 ? `${parser} + vision` : parser, fields };
 }
 
 /** `YYYY-MM-DD` in the phone's own day, which is the day the driver means. */
@@ -227,6 +237,13 @@ export default function ReceiptScreen() {
   // `scanNote` is the one line explaining why a form came back empty; without
   // it a failed read is indistinguishable from a receipt with nothing on it.
   const [scanning, setScanning] = useState(false);
+  // The slow second pass (server vision model) is running; `scanning` stays
+  // true meanwhile so the step cannot advance on half a read.
+  const [visionWaiting, setVisionWaiting] = useState(false);
+  const [visionKeys, setVisionKeys] = useState<VisionKey[]>([]);
+  // Bumped on every new scan and on photo removal: a stale vision answer for a
+  // photo that is gone must never land in the form.
+  const scanRun = useRef(0);
   const [scanNote, setScanNote] = useState<string | null>(null);
   // Which step is on screen. The list itself is derived, because a refuel has
   // a step a car wash does not — changing the category changes the flow.
@@ -319,6 +336,8 @@ export default function ReceiptScreen() {
     setCityFromPlz(false);
     setConfirmedDateAt(null);
     setConfirmedAmountAt(null);
+    setVisionKeys([]);
+    const run = ++scanRun.current;
     setScanning(true);
     try {
       // The engine's lines are NOT the receipt's rows: on a two-column till
@@ -377,7 +396,7 @@ export default function ReceiptScreen() {
       // The gate. Every field the send requires must have been READ; a photo
       // that missed any is retaken, and the message names what was missed and
       // the most likely reason, so the next photo is not the same one.
-      const verdict = evaluateScan(
+      let verdict = evaluateScan(
         lines,
         {
           date: r.date,
@@ -390,6 +409,60 @@ export default function ReceiptScreen() {
         },
         size,
       );
+
+      // Low confidence = the gate failed or a key field is only "Unsicher".
+      // Only then does the photo go to OUR server's vision model (deleted
+      // after parse); a clean on-device read never leaves the phone.
+      const flaggedDate = r.dateReason?.startsWith("Unsicher") === true;
+      const flaggedAmount = r.amountReason?.startsWith("Unsicher") === true;
+      if (!verdict.ok || flaggedDate || flaggedAmount) {
+        const mlFacts: ReceiptFacts = {
+          date: r.date, amount: r.amount, merchant: r.merchantName, city: resolvedCity || undefined,
+          plz: r.postalCode, street: r.street, litres: r.litres, pricePerLitre: r.pricePerLitre,
+          category: effective,
+        };
+        setVisionWaiting(true);
+        const vision = await readWithVision(uri, size, () => run === scanRun.current);
+        if (run !== scanRun.current) return; // photo removed or replaced meanwhile
+        if (vision !== null) {
+          const merged = mergeVision(mlFacts, vision);
+          const f = merged.facts;
+          if (f.date) setDate(f.date);
+          if (f.amount !== undefined) setAmount(formatAmountDE(f.amount));
+          if (f.merchant) setMerchant(f.merchant);
+          if (f.city) setCity(f.city);
+          if (f.plz) setPlz(f.plz);
+          if (f.street) setStreet(f.street);
+          if (f.receiptNumber) setBonNumber(f.receiptNumber);
+          if (f.litres !== undefined) setLitres(f.litres.toFixed(2).replace(".", ","));
+          if (f.pricePerLitre !== undefined) setPricePerLitre(f.pricePerLitre.toFixed(3).replace(".", ","));
+          if (f.category && (CATEGORIES as readonly string[]).includes(f.category)) setCategory(f.category);
+          if (merged.overridden.includes("time") && f.time && !r.time) {
+            setReceiptTime(f.time);
+            setTimeFromCapture(false);
+          }
+          if (merged.cityFromPlz) setCityFromPlz(true);
+          // Two readers that disagree on a date/amount: the driver confirms it.
+          const dateDiffers = merged.overridden.includes("date") && !merged.dateAgrees && (flaggedDate || r.date !== undefined);
+          const amountDiffers = merged.overridden.includes("amount") && !merged.amountAgrees && (flaggedAmount || r.amount !== undefined);
+          setCheckDate(merged.overridden.includes("date") ? dateDiffers : flaggedDate);
+          setCheckAmount(merged.overridden.includes("amount") ? amountDiffers : flaggedAmount);
+          setVisionKeys(merged.overridden);
+          verdict = evaluateScan(
+            lines,
+            {
+              date: f.date,
+              amount: f.amount,
+              merchant: f.merchant,
+              city: f.city,
+              litres: f.litres,
+              pricePerLitre: f.pricePerLitre,
+              fuel: (f.category ?? effective) === "Tanken",
+            },
+            size,
+          );
+        }
+      }
       if (!verdict.ok) {
         setNeedsRetake(true);
         setScanNote(retakeMessage(verdict.messageKey, verdict.missing));
@@ -398,7 +471,8 @@ export default function ReceiptScreen() {
       setNeedsRetake(true);
       setScanNote(t("receipt.scanFailed"));
     } finally {
-      setScanning(false);
+      setVisionWaiting(false);
+      if (run === scanRun.current) setScanning(false);
     }
   };
 
@@ -544,6 +618,7 @@ export default function ReceiptScreen() {
           confirmedAmountAt,
           fuel: category === "Tanken",
           odometerSent: category === "Tanken" && odometerRequired,
+          visionKeys,
         }),
       });
       toast.show(t("receipt.sent"));
@@ -629,7 +704,9 @@ export default function ReceiptScreen() {
             {scanning && (
               <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 8 }}>
                 <ActivityIndicator color={c.ink} />
-                <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>{t("receipt.scanning")}</Text>
+                <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>
+                  {visionWaiting ? t("receipt.scanningDeep") : t("receipt.scanning")}
+                </Text>
               </View>
             )}
             {!scanning && scanNote !== null && (
@@ -641,7 +718,7 @@ export default function ReceiptScreen() {
               {t("receipt.photoStaysHere")}
             </Text>
             <Pressable
-              onPress={() => { setPhoto(null); setScanNote(null); setCheckDate(false); setCheckAmount(false); setNeedsRetake(false); }}
+              onPress={() => { scanRun.current += 1; setScanning(false); setVisionWaiting(false); setPhoto(null); setScanNote(null); setCheckDate(false); setCheckAmount(false); setNeedsRetake(false); }}
               accessibilityRole="button"
               style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 6 }}
             >

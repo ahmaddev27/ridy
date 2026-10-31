@@ -82,6 +82,15 @@ return [
         'osrm_url' => trim((string) env('OSRM_URL')) ?: 'https://router.project-osrm.org',
     ],
 
+    // Self-hosted receipt vision (llama.cpp + Qwen2.5-VL, compose profile
+    // `vision`). Empty url = the feature is OFF and the driver app keeps its
+    // on-device ML Kit result. See docs/26-receipt-vision.md.
+    'receipt_vision' => [
+        'url' => rtrim(trim((string) env('RECEIPT_VISION_URL')), '/'),
+        'timeout' => (int) env('RECEIPT_VISION_TIMEOUT', 240),
+        'max_edge' => (int) env('RECEIPT_VISION_MAX_EDGE', 1000),
+    ],
+
     // Ops alerting: where operational alerts (broken session / down shard) are
     // emailed (queued). Every alert is also logged as 'ops.alert' on the default
     // channel, so with this empty the log line is the record.

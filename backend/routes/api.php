@@ -51,6 +51,7 @@ use App\Http\Controllers\Api\V1\Driver\DriverDeviceController;
 use App\Http\Controllers\Api\V1\Driver\DriverOfferController;
 use App\Http\Controllers\Api\V1\Driver\DriverPasswordResetController;
 use App\Http\Controllers\Api\V1\Driver\DriverPostalCodeController;
+use App\Http\Controllers\Api\V1\Driver\DriverReceiptVisionController;
 use App\Http\Controllers\Api\V1\Driver\DriverSubmissionController;
 use App\Http\Controllers\Api\V1\Driver\DriverWebauthnCredentialController;
 use App\Http\Controllers\Api\V1\Driver\FleetController;
@@ -212,6 +213,12 @@ Route::prefix('v1')->group(function () {
                 Route::get('postal-codes/{plz}', [DriverPostalCodeController::class, 'show'])
                     ->where('plz', '[0-9]{5}')
                     ->middleware('throttle:60,1,driver-postal-code');
+                // Low-confidence receipts only: upload -> 202 + id, then poll.
+                // The photo is parsed by our own model and deleted.
+                Route::post('receipt-vision', [DriverReceiptVisionController::class, 'store'])
+                    ->middleware('throttle:10,1,driver-receipt-vision');
+                Route::get('receipt-vision/{id}', [DriverReceiptVisionController::class, 'show'])
+                    ->whereUuid('id');
                 Route::post('submissions', [DriverSubmissionController::class, 'store'])
                     ->middleware('throttle:30,1,driver-submissions');
 
