@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Dispatch;
 
+use App\Domain\Dispatch\DispatchAutoDecline;
 use App\Domain\Dispatch\DispatchOfferIngestor;
 use App\Domain\Dispatch\Jobs\GeocodeOffer;
 use App\Domain\Dispatch\Models\DispatchOffer;
@@ -104,7 +105,7 @@ class OfferPushPathTest extends TestCase
 
     public function test_one_failing_offer_does_not_drop_the_rest_of_the_daemon_batch(): void
     {
-        $this->app->instance(DispatchOfferIngestor::class, new class(app(TenantContext::class), app(DispatchNotifier::class), app(OfferLifecycle::class), app(TripGeocoder::class)) extends DispatchOfferIngestor
+        $this->app->instance(DispatchOfferIngestor::class, new class(app(TenantContext::class), app(DispatchNotifier::class), app(OfferLifecycle::class), app(TripGeocoder::class), app(DispatchAutoDecline::class)) extends DispatchOfferIngestor
         {
             public function ingest(int $tenantId, array $offer, ?int $seq = null, ?float $geocodeDeadline = null): array
             {
@@ -143,13 +144,55 @@ class OfferPushPathTest extends TestCase
         $this->assertSame([], $this->spy->tokens, 'a removed driver must not be pushed');
     }
 
+    public function test_an_offer_below_the_drivers_fare_floor_is_auto_declined_and_never_pushed(): void
+    {
+        $tenant = Tenant::first();
+        $tenant->setDispatchRejectEnabled(true);
+        $tenant->forceFill(['settings' => array_merge($tenant->settings ?? [], ['auto_decline' => ['enabled' => true]])])->save();
+
+        Driver::where('uber_driver_uuid', self::DRIVER_UUID)->update([
+            'auto_decline' => ['enabled' => true, 'rules' => ['min_fare' => ['enabled' => true, 'value_e2' => 1000]]],
+        ]);
+
+        // The offer is €7.41, below the driver's €10.00 floor → Early-declined.
+        $this->ingest([$this->offer('o-cheap') + ['realOfferUUID' => 'real-cheap']])
+            ->assertOk()
+            ->assertJsonPath('data.early_declined', 1)
+            ->assertJsonPath('data.routed', 0);
+
+        $record = DispatchOffer::withoutGlobalScopes()->where('offer_uuid', 'o-cheap')->first();
+        $this->assertSame('min_fare', $record->auto_decline_reason, 'the firing rule is stamped');
+        $this->assertSame([], $this->spy->tokens, 'an auto-declined offer must never be pushed');
+    }
+
+    public function test_an_offer_above_the_fare_floor_is_pushed_normally(): void
+    {
+        $tenant = Tenant::first();
+        $tenant->setDispatchRejectEnabled(true);
+        $tenant->forceFill(['settings' => array_merge($tenant->settings ?? [], ['auto_decline' => ['enabled' => true]])])->save();
+
+        Driver::where('uber_driver_uuid', self::DRIVER_UUID)->update([
+            'auto_decline' => ['enabled' => true, 'rules' => ['min_fare' => ['enabled' => true, 'value_e2' => 500]]],
+        ]);
+
+        // €7.41 is ABOVE the €5.00 floor → no rule fires, the push goes out as usual.
+        $this->ingest([$this->offer('o-ok') + ['realOfferUUID' => 'real-ok']])
+            ->assertOk()
+            ->assertJsonPath('data.routed', 1)
+            ->assertJsonPath('data.early_declined', 0);
+
+        $record = DispatchOffer::withoutGlobalScopes()->where('offer_uuid', 'o-ok')->first();
+        $this->assertNull($record->auto_decline_reason);
+        $this->assertSame(['phone'], $this->spy->tokens);
+    }
+
     public function test_a_transient_db_failure_asks_the_daemon_to_retry_without_double_pushing(): void
     {
         $pdo = new \PDOException('SQLSTATE[HY000]: General error: 2006 MySQL server has gone away');
         $pdo->errorInfo = ['HY000', 2006, 'MySQL server has gone away'];
         $goneAway = new QueryException('mysql', 'insert into dispatch_offers ...', [], $pdo);
 
-        $ingestor = new class($goneAway, app(TenantContext::class), app(DispatchNotifier::class), app(OfferLifecycle::class), app(TripGeocoder::class)) extends DispatchOfferIngestor
+        $ingestor = new class($goneAway, app(TenantContext::class), app(DispatchNotifier::class), app(OfferLifecycle::class), app(TripGeocoder::class), app(DispatchAutoDecline::class)) extends DispatchOfferIngestor
         {
             public bool $failOnce = true;
 

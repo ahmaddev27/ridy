@@ -3,6 +3,7 @@
 namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DaemonShard;
+use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\OfferDispatchCommand;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use Illuminate\Support\Collection;
@@ -134,7 +135,7 @@ class DispatchCommandQueue
             return 0;
         }
 
-        return OfferDispatchCommand::withoutGlobalScopes()
+        $expired = OfferDispatchCommand::withoutGlobalScopes()
             ->whereIn('id', $ids)
             ->whereIn('status', $open)
             ->update([
@@ -142,6 +143,31 @@ class DispatchCommandQueue
                 'completed_at' => now(),
                 'updated_at' => now(),
             ]);
+
+        $this->recoverAutoDeclines($ids->all());
+
+        return $expired;
+    }
+
+    /**
+     * An auto-declined offer whose decline expired unsent had its push suppressed
+     * for nothing — send it belatedly ({@see AutoDeclineFallback}).
+     *
+     * @param  array<int, int>  $commandIds
+     */
+    private function recoverAutoDeclines(array $commandIds): void
+    {
+        $offerIds = OfferDispatchCommand::withoutGlobalScopes()
+            ->whereIn('id', $commandIds)
+            ->where('status', DispatchCommandStatus::Expired)
+            ->pluck('dispatch_offer_id');
+
+        DispatchOffer::withoutGlobalScopes()
+            ->whereIn('id', $offerIds)
+            ->whereNotNull('auto_decline_reason')
+            ->whereNull('auto_decline_failed_at')
+            ->get()
+            ->each(fn (DispatchOffer $offer) => app(AutoDeclineFallback::class)->recover($offer));
     }
 
     /**
