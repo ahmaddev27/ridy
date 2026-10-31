@@ -10,6 +10,7 @@
 export type { LucideIcon, LucideProps } from "lucide-react-native";
 
 export { default as AlertCircle } from "lucide-react-native/icons/circle-alert";
+export { default as Ban } from "lucide-react-native/icons/ban";
 export { default as BarChart3 } from "lucide-react-native/icons/chart-column";
 export { default as BatteryWarning } from "lucide-react-native/icons/battery-warning";
 export { default as Bell } from "lucide-react-native/icons/bell";
