@@ -171,6 +171,12 @@ class DispatchActionService
                 'offer_age_ms' => $command->latency_ms,
             ]);
 
+            // An auto-declined offer whose decline failed must not stay silent: its
+            // push was suppressed, so send it now (a no-op for any other offer).
+            if ($command->offer !== null) {
+                app(AutoDeclineFallback::class)->recover($command->offer->refresh());
+            }
+
             return;
         }
 
@@ -293,6 +299,10 @@ class DispatchActionService
             'status' => DispatchCommandStatus::Expired,
             'completed_at' => now(),
         ])->save();
+
+        if ($command->offer !== null) {
+            app(AutoDeclineFallback::class)->recover($command->offer);
+        }
     }
 
     /**

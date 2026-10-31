@@ -54,6 +54,7 @@ class DispatchOffer extends Model
         'rejected_at' => 'datetime',
         'canceled_at' => 'datetime',
         'dispatch_rejected_at' => 'datetime',
+        'auto_decline_failed_at' => 'datetime',
     ];
 
     public function driver(): BelongsTo

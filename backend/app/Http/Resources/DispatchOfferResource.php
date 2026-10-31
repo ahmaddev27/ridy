@@ -83,6 +83,9 @@ class DispatchOfferResource extends JsonResource
             // offer out of every acceptance-rate figure, so the UI can label it
             // "declined on the panel" rather than as the driver's own decline.
             'dispatch_rejected_at' => $this->dispatch_rejected_at?->toIso8601String(),
+            // Which standing rule of the driver's fired ("Early decline", docs/25);
+            // null for any offer that was not auto-declined.
+            'auto_decline_reason' => $this->auto_decline_reason,
         ];
     }
 

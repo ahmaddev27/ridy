@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\V1\DispatchLinkController;
 use App\Http\Controllers\Api\V1\DispatchOfferController;
 use App\Http\Controllers\Api\V1\Driver\AccountDeletionController;
 use App\Http\Controllers\Api\V1\Driver\DriverAuthController;
+use App\Http\Controllers\Api\V1\Driver\DriverAutoDeclineController;
 use App\Http\Controllers\Api\V1\Driver\DriverDashboardController;
 use App\Http\Controllers\Api\V1\Driver\DriverDeviceController;
 use App\Http\Controllers\Api\V1\Driver\DriverOfferController;
@@ -182,6 +183,10 @@ Route::prefix('v1')->group(function () {
                 Route::delete('devices', [DriverDeviceController::class, 'destroy']);
                 Route::get('home', [DriverDashboardController::class, 'home']);
                 Route::get('stats', [DriverDashboardController::class, 'stats']);
+                // "Early decline" (docs/25): the driver's own standing rules + history.
+                Route::get('auto-decline', [DriverAutoDeclineController::class, 'show']);
+                Route::put('auto-decline', [DriverAutoDeclineController::class, 'update']);
+                Route::get('auto-decline/history', [DriverAutoDeclineController::class, 'history']);
                 Route::get('offers', [DriverOfferController::class, 'index']);
                 Route::post('offers/seen', [DriverOfferController::class, 'markSeen']);
                 Route::get('offers/{offer}', [DriverOfferController::class, 'show']);
