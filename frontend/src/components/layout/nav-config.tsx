@@ -20,6 +20,7 @@ import {
   Activity,
   Megaphone,
   Inbox,
+  Ban,
   type LucideIcon,
 } from "lucide-react";
 import { ElProfessorIcon } from "@/components/brand/elprofessor-icon";
@@ -65,6 +66,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "nav.dashboard", icon: LayoutDashboard },
       { href: "/offers", label: "nav.offers", icon: Radio },
+      { href: "/auto-decline", label: "nav.autoDecline", icon: Ban },
       { href: "/notifications", label: "nav.notifications", icon: Bell },
     ],
   },

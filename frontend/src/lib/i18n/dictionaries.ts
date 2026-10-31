@@ -20,6 +20,7 @@ const en = {
   nav: {
     dashboard: "Dashboard",
     offers: "Offers",
+    autoDecline: "Early decline",
     connections: "Uber Connection",
     elprofessor: "El-Professor",
     map: "Live map", mySubscription: "Subscription",
@@ -190,6 +191,7 @@ const de: typeof en = {
   nav: {
     dashboard: "Übersicht",
     offers: "Angebote",
+    autoDecline: "Früh abgelehnt",
     connections: "Uber-Verbindung",
     elprofessor: "El-Professor",
     map: "Live-Karte", mySubscription: "Abonnement",
@@ -360,6 +362,7 @@ const ar: typeof en = {
   nav: {
     dashboard: "لوحة التحكّم",
     offers: "العروض",
+    autoDecline: "رفض مبكر",
     connections: "ربط أوبر",
     elprofessor: "El-Professor",
     map: "الخريطة الحية",
