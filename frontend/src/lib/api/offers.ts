@@ -60,6 +60,8 @@ export type DispatchOffer = {
   // right now (company flag, offer still pending, window open, attempts left).
   // Never recomputed here: a button the server would refuse must not be shown.
   can_decline: boolean;
+  // ISO time after which the server refuses the decline; null when not declinable.
+  decline_deadline?: string | null;
 };
 
 /**
