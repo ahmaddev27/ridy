@@ -24,7 +24,7 @@ class DispatchIngestController extends Controller
         $data = $request->validated();
 
         $seq = $data['seq'] ?? null;
-        $results = ['routed' => 0, 'unlinked_driver' => 0, 'duplicate' => 0, 'skipped_no_uuid' => 0, 'no_tenant' => 0, 'error' => 0];
+        $results = ['routed' => 0, 'unlinked_driver' => 0, 'removed_driver' => 0, 'duplicate' => 0, 'skipped_no_uuid' => 0, 'no_tenant' => 0, 'error' => 0];
 
         // ONE pre-push geocode budget for the whole batch: a second offer in the
         // same message must never wait out a fresh budget behind the first.

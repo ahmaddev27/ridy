@@ -125,6 +125,24 @@ class OfferPushPathTest extends TestCase
         $this->assertSame(['phone'], $this->spy->tokens);
     }
 
+    public function test_a_removed_driver_is_recorded_but_never_pushed(): void
+    {
+        // Uber dropped this driver from the company's roster.
+        Driver::where('uber_driver_uuid', self::DRIVER_UUID)->update(['roster_removed_at' => now()]);
+
+        $this->ingest([$this->offer('o-removed')])
+            ->assertOk()
+            ->assertJsonPath('data.removed_driver', 1)
+            ->assertJsonPath('data.routed', 0);
+
+        // The offer is still recorded and linked (its history stays with the
+        // company) — only the push is withheld.
+        $record = DispatchOffer::withoutGlobalScopes()->where('offer_uuid', 'o-removed')->first();
+        $this->assertNotNull($record);
+        $this->assertNotNull($record->driver_id);
+        $this->assertSame([], $this->spy->tokens, 'a removed driver must not be pushed');
+    }
+
     public function test_a_transient_db_failure_asks_the_daemon_to_retry_without_double_pushing(): void
     {
         $pdo = new \PDOException('SQLSTATE[HY000]: General error: 2006 MySQL server has gone away');

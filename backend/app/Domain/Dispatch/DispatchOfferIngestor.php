@@ -152,7 +152,22 @@ class DispatchOfferIngestor
         // Notify the driver FIRST: the ~5-second accept window makes the push the
         // time-critical step, so nothing optional (the supersede UPDATE, owner
         // fan-out, queue writes) may run ahead of it or be able to stop it.
-        if ($driver !== null) {
+        //
+        // Safety belt: a driver Uber dropped from the company's roster
+        // (roster_removed_at) is never pinged, even by a stray/replayed offer that
+        // somehow carries their UUID. The offer is still RECORDED (its history stays
+        // with the company, as removal intends) — only the push + broadcast are
+        // withheld. If this ever fires it is logged: an offer genuinely dispatched to
+        // them means they are active again, in which case the next roster sync clears
+        // roster_removed_at and the following offer notifies normally.
+        if ($driver !== null && $driver->roster_removed_at !== null) {
+            Log::warning('dispatch_offer.removed_driver_skipped', [
+                'offer_id' => $record->id,
+                'driver_id' => $driver->id,
+                'driver_uuid' => $driverUuid,
+                'removed_at' => $driver->roster_removed_at->toIso8601String(),
+            ]);
+        } elseif ($driver !== null) {
             $this->notifyDriver($record, $geocodeDeadline);
         }
 
@@ -171,7 +186,11 @@ class DispatchOfferIngestor
             }
         }
 
-        $status = $driver !== null ? 'routed' : 'unlinked_driver';
+        $status = match (true) {
+            $driver === null => 'unlinked_driver',
+            $driver->roster_removed_at !== null => 'removed_driver',
+            default => 'routed',
+        };
 
         // Test aid: every ingested offer with its full detail + routing result.
         RidyLog::event('dispatch_offer.ingested', [
