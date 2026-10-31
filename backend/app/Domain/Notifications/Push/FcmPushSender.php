@@ -222,6 +222,10 @@ class FcmPushSender implements PushSender, SendsPushInBulk
         // No `content-available`: the app declares no remote-notification background
         // mode, so it was a no-op that only muddied APNs' push-type inference.
         $aps = ['sound' => $soundFile];
+        if (config('services.fcm.critical_alerts') && self::isOfferPush($data)) {
+            // Needs Apple's critical-alerts entitlement; off by default (see config).
+            $aps['sound'] = ['critical' => 1, 'name' => $soundFile, 'volume' => 1.0];
+        }
         if (! empty($data['categoryId'])) {
             $aps['category'] = (string) $data['categoryId'];
         }
