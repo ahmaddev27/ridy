@@ -70,6 +70,39 @@ class AutoDeclineSettings
     }
 
     /**
+     * Fleet-wide history for the owner dashboard: every landed Early-declined offer of
+     * the CURRENT tenant (the tenant scope applies), optionally narrowed to one driver.
+     */
+    public function fleetHistory(?int $driverId, ?string $reason, mixed $from, mixed $to): Builder
+    {
+        return DispatchOffer::query()
+            ->whereNotNull('auto_decline_reason')
+            ->whereNull('auto_decline_failed_at')
+            ->when($driverId !== null, fn ($q) => $q->where('driver_id', $driverId))
+            ->when($reason !== null, fn ($q) => $q->where('auto_decline_reason', $reason))
+            ->when($from !== null, fn ($q) => $q->where('received_at', '>=', $from))
+            ->when($to !== null, fn ($q) => $q->where('received_at', '<', $to));
+    }
+
+    /**
+     * The current tenant's drivers that switched Early decline on, with their rules —
+     * read-only: the owner never edits a driver's rules.
+     *
+     * @return array<int, array{id: int, name: string, rules: array<string, array<string, mixed>>}>
+     */
+    public function enabledDrivers(): array
+    {
+        return Driver::query()
+            ->whereNotNull('auto_decline')
+            ->orderBy('name')
+            ->get(['id', 'name', 'auto_decline'])
+            ->filter(fn (Driver $d) => $d->autoDeclineEnabled())
+            ->map(fn (Driver $d) => ['id' => $d->id, 'name' => $d->name, 'rules' => $this->withDefaults($d->autoDeclineRules())])
+            ->values()
+            ->all();
+    }
+
+    /**
      * @param  array<string, mixed>  $rules
      * @return array<string, array<string, mixed>>
      */

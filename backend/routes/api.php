@@ -62,6 +62,7 @@ use App\Http\Controllers\Api\V1\DriverMetricController;
 use App\Http\Controllers\Api\V1\DriverPushController;
 use App\Http\Controllers\Api\V1\ElProfessorController;
 use App\Http\Controllers\Api\V1\ExtensionController;
+use App\Http\Controllers\Api\V1\FleetAutoDeclineController;
 use App\Http\Controllers\Api\V1\FleetSessionController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\Internal\SessionBrowserController;
@@ -359,6 +360,9 @@ Route::prefix('v1')->group(function () {
         Route::post('supplier/capture', [SupplierCaptureController::class, 'store'])->middleware(['throttle:ext-ingest', 'fleet.connected', 'can:connections.manage']);
 
         // Dispatch offers feed
+        // Early decline (docs/25), fleet-wide and READ-ONLY for the owner dashboard.
+        Route::get('auto-decline', [FleetAutoDeclineController::class, 'drivers'])->middleware('can:offers.view');
+        Route::get('auto-decline/history', [FleetAutoDeclineController::class, 'history'])->middleware('can:offers.view');
         Route::get('dispatch/offers', [DispatchOfferController::class, 'index'])->middleware('can:offers.view');
         Route::get('dispatch/offers/stats', [DispatchOfferController::class, 'stats'])->middleware('can:offers.view');
         Route::get('dispatch/offers/export', [DispatchOfferController::class, 'export'])->middleware('can:offers.view');
