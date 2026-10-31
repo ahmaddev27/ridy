@@ -15,6 +15,9 @@ class DispatchOfferResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $actions = app(DispatchActionService::class);
+        $canDecline = $actions->canReject($this->resource);
+
         return [
             'id' => $this->id,
             'offer_uuid' => $this->offer_uuid,
@@ -78,7 +81,12 @@ class DispatchOfferResource extends JsonResource
             // enforces ({@see DispatchActionService::canReject}), so the UI never
             // renders a button that fails on tap — it is the one answer that depends
             // on the company's switch, on a live daemon session and on a clock.
-            'can_decline' => app(DispatchActionService::class)->canReject($this->resource),
+            'can_decline' => $canDecline,
+            // The server's REAL cut-off for that decline (window + delivery grace,
+            // ~75s), so the dashboard can drop the button the moment it passes
+            // instead of leaving a stale one between Reverb refreshes. Only set
+            // while a decline is possible at all.
+            'decline_deadline' => $canDecline ? $actions->deliveryDeadline($this->resource)->toIso8601String() : null,
             // Set once Uber CONFIRMED the decline. Also the marker that keeps the
             // offer out of every acceptance-rate figure, so the UI can label it
             // "declined on the panel" rather than as the driver's own decline.

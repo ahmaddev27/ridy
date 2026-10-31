@@ -33,6 +33,7 @@ export function DeclineOfferButton({ offer }: { offer: DispatchOffer }) {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<Sent>(null);
   const age = useOfferAge(offer.received_at);
+  const pastDeadline = usePastDeadline(offer.decline_deadline ?? null);
 
   useEffect(() => {
     if (sent !== "waiting") return;
@@ -62,7 +63,7 @@ export function DeclineOfferButton({ offer }: { offer: DispatchOffer }) {
   // Uber took it: the status badge says so, so this control has nothing to add.
   if (offer.dispatch_rejected_at) return null;
 
-  const declinable = offer.status === "pending" && offer.can_decline === true;
+  const declinable = offer.status === "pending" && offer.can_decline === true && !pastDeadline;
   if (!declinable && sent === null) return null;
 
   if (busy || sent === "waiting") {
@@ -134,4 +135,23 @@ function useOfferAge(receivedAt: string | null): number | null {
   }, [receivedAt]);
 
   return age;
+}
+
+/**
+ * True once the clock passes the server's own decline deadline. `can_decline` is
+ * only as fresh as the last Reverb refresh, so without this the button lingers
+ * (and refuses on tap) after the real window has closed.
+ */
+function usePastDeadline(deadline: string | null): boolean {
+  const at = deadline ? new Date(deadline).getTime() : NaN;
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (Number.isNaN(at)) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [at]);
+
+  return !Number.isNaN(at) && now >= at;
 }
