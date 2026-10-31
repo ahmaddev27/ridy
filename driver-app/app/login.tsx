@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { View, KeyboardAvoidingView, Platform, Pressable, Linking } from "react-native";
+import { View, KeyboardAvoidingView, Platform, Pressable, Linking, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useAuth } from "@/lib/auth";
@@ -125,10 +125,15 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.canvas }} edges={["top"]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1, justifyContent: "center", padding: 16 }}
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+        {/* The form scrolls, so an open keyboard pushes the focused field (email or
+            the OTP boxes) into view instead of hiding it. flexGrow + center keeps it
+            vertically centred when the keyboard is closed. */}
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 16 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         {/* Brand — centered, prominent monogram over the wordmark */}
         <View style={{ alignItems: "center", gap: 14, marginBottom: 36 }}>
           <Logo size={72} />
@@ -192,19 +197,23 @@ export default function LoginScreen() {
           </View>
         )}
 
-        <View style={{ position: "absolute", bottom: 20, left: 16, right: 16, gap: 8, alignItems: "center" }}>
-          <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: "center", lineHeight: 19 }}>{t("signin.inviteNote")}</Text>
-          {/* Reachable before sign-in (App Review / Play policy, DDG §5). */}
-          <View style={{ flexDirection: "row", gap: 16 }}>
-            <Text accessibilityRole="link" onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})} style={{ color: c.inkMuted, fontSize: 12.5, fontWeight: "600" }}>
-              {t("settings.privacy")}
-            </Text>
-            <Text accessibilityRole="link" onPress={() => Linking.openURL(IMPRINT_URL).catch(() => {})} style={{ color: c.inkMuted, fontSize: 12.5, fontWeight: "600" }}>
-              {t("settings.imprint")}
-            </Text>
-          </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Pinned to the screen bottom — outside the scroll view and the KAV — so it
+          stays put and simply sits under the keyboard while the driver types. */}
+      <View style={{ position: "absolute", bottom: 20, left: 16, right: 16, gap: 8, alignItems: "center" }}>
+        <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: "center", lineHeight: 19 }}>{t("signin.inviteNote")}</Text>
+        {/* Reachable before sign-in (App Review / Play policy, DDG §5). */}
+        <View style={{ flexDirection: "row", gap: 16 }}>
+          <Text accessibilityRole="link" onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})} style={{ color: c.inkMuted, fontSize: 12.5, fontWeight: "600" }}>
+            {t("settings.privacy")}
+          </Text>
+          <Text accessibilityRole="link" onPress={() => Linking.openURL(IMPRINT_URL).catch(() => {})} style={{ color: c.inkMuted, fontSize: 12.5, fontWeight: "600" }}>
+            {t("settings.imprint")}
+          </Text>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
