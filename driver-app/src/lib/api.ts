@@ -154,6 +154,22 @@ export type NoteDraft = {
 /** A photo picked or taken, as React Native's fetch wants it in a FormData. */
 export type PickedPhoto = { uri: string; name: string; type: string };
 
+/** What the server's vision model read; every value is already sanitised, null = not read. */
+export type VisionFields = {
+  merchant_name: string | null;
+  street: string | null;
+  postal_code: string | null;
+  city: string | null;
+  city_from_plz: boolean;
+  date: string | null;
+  time: string | null;
+  amount: number | null;
+  litres: number | null;
+  price_per_litre: number | null;
+  category: string | null;
+  receipt_number: string | null;
+};
+
 /** Result of the launch-time force-update check. */
 export type AppVersionInfo = {
   update_required: boolean;
@@ -652,6 +668,32 @@ export class ApiClient {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Hand a hard-to-read receipt photo to OUR vision model (low-confidence
+   * fallback only). Acked at once with a job id; the photo is deleted
+   * server-side right after it is parsed. Rejects with 503 when the server
+   * has the feature switched off - the caller keeps the on-device result.
+   */
+  receiptVisionStart(photo: PickedPhoto) {
+    const form = new FormData();
+    form.append("image", photo as unknown as Blob);
+    return this.request<{ data: { id: string } }>("/api/v1/driver/receipt-vision", {
+      method: "POST",
+      body: form,
+      // Empty = let the runtime set multipart with its own boundary.
+      headers: { "Content-Type": "" },
+      timeoutMs: 45_000,
+    });
+  }
+
+  /** The state of a vision job: pending, done (with fields) or failed. 404 once expired. */
+  receiptVisionResult(id: string) {
+    return this.request<{ data: { status: "pending" | "done" | "failed"; fields?: VisionFields } }>(
+      `/api/v1/driver/receipt-vision/${encodeURIComponent(id)}`,
+      { timeoutMs: 10_000 },
+    );
   }
 
   fleetMe() {

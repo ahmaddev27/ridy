@@ -132,6 +132,9 @@ x-app-env: &app-env
   # sees the values and silently stays on public OSM. See docs/self-hosted-geo.md.
   NOMINATIM_URL: ${NOMINATIM_URL:-}
   OSRM_URL: ${OSRM_URL:-}
+  # Receipt vision fallback (docs/26-receipt-vision.md). Empty = off. Set
+  # RECEIPT_VISION_URL=http://receipt-vision:8080 and start `--profile vision`.
+  RECEIPT_VISION_URL: ${RECEIPT_VISION_URL:-}
 
 services:
   # --- Caddy — TLS edge + reverse proxy -------------------------------------
@@ -410,10 +413,35 @@ services:
       - osrm_data:/data
     # Internal only — reached by the backend as http://osrm:5000.
 
+  # --- Receipt vision (opt-in: `--profile vision`) ---------------------------
+  # Self-hosted Qwen2.5-VL-3B behind llama.cpp's OpenAI-compatible server. Reads
+  # the low-confidence receipts the phone's ML Kit cannot. The photo never leaves
+  # our infrastructure. Set RECEIPT_VISION_URL=http://receipt-vision:8080 in the
+  # root .env (GitHub secret) to switch the backend on; empty = feature off.
+  #   * --parallel 1 is REQUIRED: a split context starved the image tokens and
+  #     returned empty answers in validation.
+  #   * cpus/mem_limit cap it so a receipt inference can never starve the
+  #     offer-stream containers (the core product).
+  #   * No `ports:` - internal network only, reached as http://receipt-vision:8080.
+  #   * First start downloads ~2.5 GB into the named volume (then cached).
+  receipt-vision:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    profiles: ["vision"]
+    restart: unless-stopped
+    logging: *default-logging
+    command: >
+      -hf ggml-org/Qwen2.5-VL-3B-Instruct-GGUF:Q4_K_M
+      -c 8192 --parallel 1 -t 4 --host 0.0.0.0 --port 8080
+    cpus: 4
+    mem_limit: 8g
+    volumes:
+      - receipt_vision_cache:/root/.cache/llama.cpp
+
 volumes:
   dbdata:
   caddy_data:
   caddy_config:
   nominatim_data:
   osrm_data:
+  receipt_vision_cache:
   uber_auth_state:

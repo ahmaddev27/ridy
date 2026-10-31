@@ -83,6 +83,13 @@ export default function DatenschutzPage() {
             und Benachrichtigungen an die eigenen Fahrer sowie Auswertung des Flottenbetriebs. Diese
             Daten verarbeiten wir im Auftrag des Flottenbetreibers (siehe Ziffer 2).
           </p>
+          <p className="mt-2">
+            Belege (z. B. Tankbelege) liest die App zunächst auf dem Gerät aus. Lässt sich ein Beleg
+            dort nicht sicher lesen, wird das Foto automatisch an unseren eigenen Server übertragen
+            und dort von einem selbst betriebenen Bilderkennungsmodell ausgewertet. Das Foto
+            verlässt unsere Infrastruktur nicht, wird nicht an Dritte weitergegeben und unmittelbar
+            nach der Auswertung gelöscht; an den Flottenbetreiber gehen nur die ausgelesenen Angaben.
+          </p>
 
           <h3 className="mt-5 text-base font-semibold text-ink">Fahrgastdaten</h3>
           <p className="mt-2">
