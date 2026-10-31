@@ -63,6 +63,11 @@ return [
         'credentials' => env('FCM_CREDENTIALS'),
         // Firebase project id. Falls back to the one in the credentials file.
         'project_id' => env('FCM_PROJECT_ID'),
+        // iOS Critical Alerts (aps.sound.critical=1: plays through silent/Focus and
+        // is the only sound path guaranteed on CarPlay). Leave OFF until Apple has
+        // GRANTED com.apple.developer.usernotifications.critical-alerts AND the app
+        // was rebuilt with it — a critical sound without the entitlement is dropped.
+        'critical_alerts' => (bool) env('FCM_CRITICAL_ALERTS', false),
     ],
 
     // Trip geocoding + routing (TripGeocoder). Defaults to the free public
