@@ -102,6 +102,9 @@ class WebauthnLoginTest extends TestCase
         // pipeline), which is exactly how the dashboard calls this endpoint.
         $csrf = config('sanctum.middleware.validate_csrf_token', ValidateCsrfToken::class);
         $this->withoutMiddleware($csrf);
+        // Pin the stateful host to the Referer this test sends, so the SPA (cookie)
+        // pipeline runs regardless of a dev machine's SANCTUM_STATEFUL_DOMAINS.
+        config(['sanctum.stateful' => ['localhost']]);
 
         $response = $this->withHeader('Referer', 'http://localhost')
             ->postJson('/api/v1/webauthn/login', $this->loginPayload('cred-1'))

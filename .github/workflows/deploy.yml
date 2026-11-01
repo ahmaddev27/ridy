@@ -354,10 +354,21 @@ jobs:
             # makes the backend fall back to APP_URL alone, so the switch is the
             # secret, not this file.
             env_line WEBAUTHN_ORIGINS "$WEBAUTHN_ORIGINS"
+            # Passwordless Uber login (docs/27): global switch + per-company allowlist
+            # + cold first-connect flag + the inbound domain for the auto-OTP relay.
+            # Written even when empty = compose default (OFF / in.reidey.de), so the
+            # switch is the secret, not this file. REAL_CHROME and UBER_AUTH_ONLY_TENANTS
+            # are deliberately NOT written here: ONLY_TENANTS would orphan the live
+            # companies' persistent browser, and REAL_CHROME must be piloted separately.
+            env_line UBER_PASSWORDLESS_LOGIN "$UBER_PASSWORDLESS_LOGIN"
+            env_line UBER_PASSWORDLESS_TENANTS "$UBER_PASSWORDLESS_TENANTS"
+            env_line UBER_AUTH_PASSWORDLESS "$UBER_AUTH_PASSWORDLESS"
+            env_line UBER_AUTH_PASSWORDLESS_COLD "$UBER_AUTH_PASSWORDLESS_COLD"
+            env_line UBER_INBOUND_DOMAIN "$UBER_INBOUND_DOMAIN"
 
             # Every key must be present exactly once: a value that swallowed a newline
             # would otherwise silently shift the rest of the file into garbage.
-            for key in DOMAIN SITE_ADDRESS APP_KEY SESSION_SECURE_COOKIE SESSION_SAME_SITE REVERB_APP_ID REVERB_APP_KEY REVERB_APP_SECRET DB_DATABASE DB_USERNAME DB_PASSWORD DB_ROOT_PASSWORD DISPATCH_INGEST_SECRET EXTENSION_ORIGIN FCM_CREDENTIALS FCM_PROJECT_ID ALERT_EMAIL OTP_TEST_CODE SENTRY_LARAVEL_DSN NEXT_PUBLIC_SENTRY_DSN DAEMON_SENTRY_DSN NOMINATIM_URL OSRM_URL NEXT_PUBLIC_MAP_TILE_URL NEXT_PUBLIC_MAP_ATTRIBUTION CSP_EXTRA_CONNECT ELPROFESSOR_INTAKE_URL ELPROFESSOR_ANON_KEY WEBAUTHN_ORIGINS; do
+            for key in DOMAIN SITE_ADDRESS APP_KEY SESSION_SECURE_COOKIE SESSION_SAME_SITE REVERB_APP_ID REVERB_APP_KEY REVERB_APP_SECRET DB_DATABASE DB_USERNAME DB_PASSWORD DB_ROOT_PASSWORD DISPATCH_INGEST_SECRET EXTENSION_ORIGIN FCM_CREDENTIALS FCM_PROJECT_ID ALERT_EMAIL OTP_TEST_CODE SENTRY_LARAVEL_DSN NEXT_PUBLIC_SENTRY_DSN DAEMON_SENTRY_DSN NOMINATIM_URL OSRM_URL NEXT_PUBLIC_MAP_TILE_URL NEXT_PUBLIC_MAP_ATTRIBUTION CSP_EXTRA_CONNECT ELPROFESSOR_INTAKE_URL ELPROFESSOR_ANON_KEY WEBAUTHN_ORIGINS UBER_PASSWORDLESS_LOGIN UBER_PASSWORDLESS_TENANTS UBER_AUTH_PASSWORDLESS UBER_AUTH_PASSWORDLESS_COLD UBER_INBOUND_DOMAIN; do
               count=$(grep -c "^$key=" .env || true)
               if [ "$count" != "1" ]; then
                 echo "::error::.env is malformed: $key appears $count time(s)"; exit 1
@@ -570,3 +581,8 @@ jobs:
           ELPROFESSOR_INTAKE_URL: ${{ secrets.ELPROFESSOR_INTAKE_URL }}
           ELPROFESSOR_ANON_KEY: ${{ secrets.ELPROFESSOR_ANON_KEY }}
           WEBAUTHN_ORIGINS: ${{ secrets.WEBAUTHN_ORIGINS }}
+          UBER_PASSWORDLESS_LOGIN: ${{ secrets.UBER_PASSWORDLESS_LOGIN }}
+          UBER_PASSWORDLESS_TENANTS: ${{ secrets.UBER_PASSWORDLESS_TENANTS }}
+          UBER_AUTH_PASSWORDLESS: ${{ secrets.UBER_AUTH_PASSWORDLESS }}
+          UBER_AUTH_PASSWORDLESS_COLD: ${{ secrets.UBER_AUTH_PASSWORDLESS_COLD }}
+          UBER_INBOUND_DOMAIN: ${{ secrets.UBER_INBOUND_DOMAIN }}

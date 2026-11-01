@@ -277,6 +277,8 @@ class WebauthnRegistrationTest extends TestCase
         // A super-admin acting as this company: the dashboard's stateful (cookie)
         // pipeline carries the impersonation marker in the session.
         $this->withoutMiddleware(config('sanctum.middleware.validate_csrf_token', ValidateCsrfToken::class));
+        // Pin the stateful host to the Referer this test sends (env-independent).
+        config(['sanctum.stateful' => ['localhost']]);
         $acting = $this->withHeader('Referer', 'http://localhost')
             ->withSession([ImpersonationController::KEY => 999]);
 
