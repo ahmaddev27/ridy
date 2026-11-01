@@ -67,6 +67,28 @@ async function advance(page, trace = null) {
 }
 
 /**
+ * Enter the identifier the way a person would. Uber's v2 sign-in form is a React controlled
+ * input: a programmatic value (`fill`) sets the DOM value but not React's state, so clicking
+ * "Weiter" submits an empty identifier and the page never leaves the screen. Real per-character
+ * keystrokes update React's state; we then submit, and fall back to Enter if the click is
+ * swallowed. `[pwless-nav]` lines let this be tuned from the log.
+ */
+async function submitIdentifier(page, idField, email) {
+  await idField.click().catch(() => {});
+  await idField.fill("").catch(() => {}); // clear any partial / autofilled value
+  await idField.pressSequentially(email, { delay: 40 });
+  await page.waitForTimeout(400); // let the SPA validate and enable the submit
+  navLog(`identifier typed=${((await idField.inputValue().catch(() => "")) || "").length > 0 ? "yes" : "EMPTY"}`);
+  await advance(page, "identifier");
+  await page.waitForTimeout(800);
+  if (await isVisible(idField)) {
+    navLog("identifier still visible after click; pressing Enter");
+    await idField.press("Enter").catch(() => {});
+  }
+  navLog(`after identifier submit: url=${(page.url() || "").replace(/[?#].*$/, "")}`);
+}
+
+/**
  * Type an OTP into whatever shape Uber renders — a single field or a row of
  * one-char boxes. Focusing the first box and typing lets the boxes auto-advance.
  */
@@ -397,15 +419,14 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
     // otherwise Continue would send a code to / sign in a different remembered account.
     const idField = identifierField(page);
     if (await idField.waitFor({ state: "visible", timeout: 8000 }).then(() => true, () => false)) {
-      await idField.fill(email);
-      navLog(`identifier field filled=${((await idField.inputValue().catch(() => "")) || "").length > 0 ? "yes" : "EMPTY"}`);
+      await submitIdentifier(page, idField, email);
     } else if (!(await pageShowsAccount(page, email))) {
       await dumpScreen(page, "account_not_shown");
       await closeSession(session);
       return { status: STATUS.CHANNEL_UNAVAILABLE, message: "account_not_shown" };
+    } else {
+      await advance(page, "identifier");
     }
-    await advance(page, "identifier");
-    navLog(`after identifier advance: url=${(page.url() || "").replace(/[?#].*$/, "")}`);
 
     let step = await detectStep(page);
 
