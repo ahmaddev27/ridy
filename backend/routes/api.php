@@ -78,6 +78,7 @@ use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\ResellerController;
 use App\Http\Controllers\Api\V1\SupplierCaptureController;
 use App\Http\Controllers\Api\V1\UberLoginController;
+use App\Http\Controllers\Api\V1\UberLoginSettingsController;
 use App\Http\Controllers\Api\V1\VehicleController;
 use App\Http\Controllers\Api\V1\WebauthnCredentialController;
 use App\Http\Controllers\Api\V1\WebauthnLoginController;
@@ -393,6 +394,10 @@ Route::prefix('v1')->group(function () {
         // dashboard never reaches uber-auth, the backend relays.
         Route::middleware(['passwordless.enabled', 'can:connections.manage'])->prefix('uber-login')->group(function () {
             Route::get('status', [UberLoginController::class, 'status']);
+            // Variant B: options + the secret inbound address the company forwards Uber's code email to.
+            Route::get('settings', [UberLoginSettingsController::class, 'show']);
+            Route::put('settings', [UberLoginSettingsController::class, 'update'])->middleware('throttle:uber-login');
+            Route::post('inbound-address/rotate', [UberLoginSettingsController::class, 'rotateInboundAddress'])->middleware('throttle:uber-login');
             Route::post('start', [UberLoginController::class, 'start'])->middleware('throttle:uber-login');
             Route::post('code', [UberLoginController::class, 'code'])->middleware('throttle:uber-login-code');
             Route::post('cancel', [UberLoginController::class, 'cancel'])->middleware('throttle:uber-login-cancel');

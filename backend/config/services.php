@@ -94,6 +94,8 @@ return [
     // comma-separated allowlist of tenant ids for a gradual rollout (empty = no limit).
     'passwordless_login' => [
         'enabled' => filter_var(env('UBER_PASSWORDLESS_LOGIN', false), FILTER_VALIDATE_BOOL),
+        // Variant B: the subdomain whose MX points at us (Postfix pipes mail to inbound-mail:ingest).
+        'inbound_domain' => trim((string) env('UBER_INBOUND_DOMAIN')) ?: 'in.reidey.de',
         'tenants' => array_values(array_filter(array_map('trim', explode(',', (string) env('UBER_PASSWORDLESS_TENANTS'))))),
     ],
 

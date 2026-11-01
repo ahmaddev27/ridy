@@ -117,8 +117,19 @@ class Tenant extends Model
 
     public function setPasswordlessLoginEnabled(bool $enabled): void
     {
+        $this->mergePasswordlessLogin(['enabled' => $enabled]);
+    }
+
+    /**
+     * Merge keys into `settings.passwordless_login` (auto_code, auto_relogin,
+     * inbound_token_hash, email, ...). Only the hash of the inbound token is ever stored.
+     *
+     * @param  array<string, mixed>  $values
+     */
+    public function mergePasswordlessLogin(array $values): void
+    {
         $settings = $this->settings ?? [];
-        $settings['passwordless_login'] = array_merge($settings['passwordless_login'] ?? [], ['enabled' => $enabled]);
+        $settings['passwordless_login'] = array_merge($settings['passwordless_login'] ?? [], $values);
         $this->forceFill(['settings' => $settings])->save();
     }
 

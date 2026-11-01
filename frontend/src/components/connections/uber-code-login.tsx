@@ -6,6 +6,7 @@ import { KeyRound, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { OtpInput } from "@/components/ui/otp-input";
+import { UberAutoCodeSettings } from "@/components/connections/uber-auto-code-settings";
 import { useI18n } from "@/lib/i18n/context";
 import { apiErrorMessage } from "@/lib/api/error-message";
 import {
@@ -140,6 +141,7 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
               <div>
                 <p className="text-sm font-medium text-ink">{c("codeSentTitle")}</p>
                 <p className="mt-0.5 text-sm text-ink-muted">{c("codeSentHint")}</p>
+                {status?.mode === "auto" && <p className="mt-1 text-sm text-ink-muted">{c("codeAutoHint")}</p>}
               </div>
               <OtpInput value={code} onChange={setCode} length={CODE_LENGTH} autoFocus disabled={busy} />
               {wrongCode && (
@@ -189,6 +191,7 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
               </Button>
             </form>
           )}
+          {!waiting && !inFlight && !connected && <UberAutoCodeSettings />}
         </div>
       </div>
     </Card>

@@ -82,6 +82,8 @@ x-app-env: &app-env
   # also needs its own super-admin flag. TENANTS = optional rollout allowlist (ids).
   UBER_PASSWORDLESS_LOGIN: ${UBER_PASSWORDLESS_LOGIN:-}
   UBER_PASSWORDLESS_TENANTS: ${UBER_PASSWORDLESS_TENANTS:-}
+  # Variant B: the subdomain whose MX Postfix pipes into `php artisan inbound-mail:ingest`.
+  UBER_INBOUND_DOMAIN: ${UBER_INBOUND_DOMAIN:-in.reidey.de}
   # FCM HTTP v1 (OAuth2 service-account) — used by FcmPushSender for driver + web
   # push. Point FCM_CREDENTIALS at the mounted service-account JSON. Without it the
   # app falls back to LogPushSender (pushes are only logged, not sent).

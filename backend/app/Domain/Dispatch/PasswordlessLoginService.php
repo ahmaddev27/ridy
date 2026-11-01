@@ -39,6 +39,17 @@ class PasswordlessLoginService
 
     public const STATE_FAILED = 'failed';
 
+    public const MODE_MANUAL = 'manual';
+
+    public const MODE_AUTO = 'auto';
+
+    public const SOURCE_MANUAL = 'manual';
+
+    public const SOURCE_INBOUND = 'inbound';
+
+    /** Seconds an emailed code waits for the lock (start() may still be running). */
+    private const INBOUND_WAIT = 30;
+
     /** Wrong codes allowed inside one login before it is abandoned. */
     private const MAX_CODE_TRIES = 3;
 
@@ -56,6 +67,7 @@ class PasswordlessLoginService
         private readonly UberAuthClient $client,
         private readonly LoginAttemptStore $store,
         private readonly AuditLogger $audit,
+        private readonly PasswordlessLoginSettings $settings,
     ) {}
 
     /** @return array<string, mixed> */
@@ -72,7 +84,7 @@ class PasswordlessLoginService
     }
 
     /** @return array<string, mixed> */
-    public function start(Tenant $tenant, string $email): array
+    public function start(Tenant $tenant, string $email, string $mode = self::MODE_MANUAL): array
     {
         if (! $this->client->configured()) {
             return $this->failedView('unavailable');
@@ -86,13 +98,36 @@ class PasswordlessLoginService
             return $this->failedView('no_session');
         }
 
-        return $this->locked($tenant, self::START_LOCK, fn () => $this->begin($tenant, $email));
+        // The automatic mode needs the company's opt-in and its secret address; without them
+        // it is just the manual flow (the manager types the code).
+        $mode = $mode === self::MODE_AUTO && $this->settings->autoCodeEnabled($tenant) ? self::MODE_AUTO : self::MODE_MANUAL;
+
+        return $this->locked($tenant, self::START_LOCK, fn () => $this->begin($tenant, $email, $mode));
     }
 
     /** @return array<string, mixed> */
-    public function submitCode(Tenant $tenant, string $code): array
+    public function submitCode(Tenant $tenant, string $code, string $source = self::SOURCE_MANUAL): array
     {
-        return $this->locked($tenant, self::SUBMIT_LOCK, fn () => $this->relay($tenant, $code));
+        // An emailed code can arrive while start() still holds the lock: wait for it.
+        $wait = $source === self::SOURCE_INBOUND ? self::INBOUND_WAIT : 5;
+
+        return $this->locked($tenant, self::SUBMIT_LOCK, fn () => $this->relay($tenant, $code, $source), $wait);
+    }
+
+    /**
+     * The attempt an emailed code may still go to: automatic mode, still waiting for its
+     * code, and not already given its one automated try. Null = nothing pending.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function pendingAutoAttempt(Tenant $tenant): ?array
+    {
+        $record = $this->store->get($tenant->id);
+        $waiting = in_array($record['state'] ?? null, [self::STATE_STARTING, self::STATE_AWAITING_CODE], true);
+
+        return $record !== null && $waiting && ($record['mode'] ?? null) === self::MODE_AUTO && empty($record['auto_submitted'])
+            ? $record
+            : null;
     }
 
     /** @return array<string, mixed> */
@@ -107,7 +142,7 @@ class PasswordlessLoginService
     }
 
     /** @return array<string, mixed> */
-    private function begin(Tenant $tenant, string $email): array
+    private function begin(Tenant $tenant, string $email, string $mode): array
     {
         // One login per company: a second start replaces the first.
         $this->abandon($tenant, $this->store->get($tenant->id));
@@ -115,7 +150,8 @@ class PasswordlessLoginService
         $record = [
             'state' => self::STATE_STARTING,
             'login_id' => null,
-            'mode' => 'manual',
+            'mode' => $mode,
+            'auto_submitted' => false,
             'channel' => null,
             'started_at' => $startedAt->toIso8601String(),
             'expires_at' => $startedAt->addSeconds(LoginAttemptStore::ATTEMPT_TTL)->toIso8601String(),
@@ -123,7 +159,7 @@ class PasswordlessLoginService
         ];
         $this->store->put($tenant->id, $record, LoginAttemptStore::START_WINDOW);
         // No email (or anything derived from it) is kept: not in the cache record, not in the log.
-        $this->audit->log('uber_login.started', null, ['mode' => 'manual'], $tenant->id);
+        $this->audit->log('uber_login.started', null, ['mode' => $mode], $tenant->id);
 
         return $this->settleStart($tenant, $record, $this->client->startLogin($tenant, $email));
     }
@@ -151,11 +187,18 @@ class PasswordlessLoginService
     }
 
     /** @return array<string, mixed> */
-    private function relay(Tenant $tenant, string $code): array
+    private function relay(Tenant $tenant, string $code, string $source): array
     {
         $record = $this->store->get($tenant->id);
         if (($record['state'] ?? null) !== self::STATE_AWAITING_CODE || ! is_string($record['login_id'] ?? null)) {
             return $this->view($record);
+        }
+        if ($source === self::SOURCE_INBOUND) {
+            // Exactly one automated try per login, and only in automatic mode.
+            if (($record['mode'] ?? null) !== self::MODE_AUTO || ! empty($record['auto_submitted'])) {
+                return $this->view($record);
+            }
+            $record['auto_submitted'] = true;
         }
         $loginId = $record['login_id'];
         // Remaining lifetime, not a fresh one: this record must never outlive uber-auth's entry.
@@ -202,6 +245,8 @@ class PasswordlessLoginService
             return $this->fail($tenant, 'wrong_code');
         }
         $record['state'] = self::STATE_AWAITING_CODE;
+        // A wrong automated code hands the login to the manager, who types the real one.
+        $record['mode'] = self::MODE_MANUAL;
         $this->store->put($tenant->id, $record, $this->remainingTtl($record));
 
         return $this->view($record) + ['retry' => true];
@@ -218,7 +263,7 @@ class PasswordlessLoginService
             return $this->fail($tenant, 'capture_failed');
         }
         $this->store->put($tenant->id, ['state' => self::STATE_CONNECTED], LoginAttemptStore::RESULT_TTL);
-        $this->audit->log('uber_login.connected', null, ['mode' => 'manual'], $tenant->id);
+        $this->audit->log('uber_login.connected', null, ['mode' => $record['mode'] ?? self::MODE_MANUAL], $tenant->id);
 
         return $this->view($this->store->get($tenant->id));
     }
@@ -226,8 +271,9 @@ class PasswordlessLoginService
     /** @return array<string, mixed> */
     private function fail(Tenant $tenant, string $failure): array
     {
+        $mode = $this->store->get($tenant->id)['mode'] ?? self::MODE_MANUAL;
         $this->store->put($tenant->id, ['state' => self::STATE_FAILED, 'failure' => $failure], LoginAttemptStore::RESULT_TTL);
-        $this->audit->log('uber_login.failed', null, ['mode' => 'manual', 'failure' => $failure], $tenant->id);
+        $this->audit->log('uber_login.failed', null, ['mode' => $mode, 'failure' => $failure], $tenant->id);
 
         return $this->failedView($failure);
     }
@@ -300,7 +346,7 @@ class PasswordlessLoginService
     private function view(?array $record): array
     {
         $state = $record['state'] ?? self::STATE_IDLE;
-        $view = ['state' => $state, 'mode' => 'manual', 'channel' => $record['channel'] ?? null, 'expires_at' => $record['expires_at'] ?? null];
+        $view = ['state' => $state, 'mode' => $record['mode'] ?? self::MODE_MANUAL, 'channel' => $record['channel'] ?? null, 'expires_at' => $record['expires_at'] ?? null];
         if ($state === self::STATE_FAILED) {
             $view['failure'] = $record['failure'] ?? 'unavailable';
         }
@@ -324,10 +370,10 @@ class PasswordlessLoginService
      * @param  callable(): array<string, mixed>  $work
      * @return array<string, mixed>
      */
-    private function locked(Tenant $tenant, int $seconds, callable $work): array
+    private function locked(Tenant $tenant, int $seconds, callable $work, int $wait = 5): array
     {
         try {
-            return $this->store->lock($tenant->id, $seconds)->block(5, $work);
+            return $this->store->lock($tenant->id, $seconds)->block($wait, $work);
         } catch (LockTimeoutException) {
             return $this->view($this->store->get($tenant->id));
         }

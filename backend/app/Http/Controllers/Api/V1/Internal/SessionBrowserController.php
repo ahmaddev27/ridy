@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Internal;
 
+use App\Domain\Dispatch\AutoReloginService;
 use App\Domain\Dispatch\FleetSessionService;
 use App\Domain\Dispatch\Models\FleetSessionOutage;
 use App\Domain\Dispatch\Models\SessionBrowser;
@@ -47,8 +48,10 @@ class SessionBrowserController extends Controller
             if ($tenantId === null) {
                 continue;
             }
+            $previous = SessionBrowser::where('tenant_id', $tenantId)->value('state');
             $this->upsert($tenantId, $row);
             $updated++;
+            $this->maybeAutoRelogin($tenantId, $previous, $row['state']);
         }
 
         return response()->json(['data' => ['updated' => $updated]]);
@@ -194,6 +197,23 @@ class SessionBrowserController extends Controller
             ->exists();
 
         return $hasOtherOrg ? 'org_change_requires_connect' : null;
+    }
+
+    /**
+     * A company that has just dropped to needs_otp may opt into an automatic re-login
+     * (docs/27 variant B). Every gate lives in AutoReloginService (all off by default), and
+     * a failure there must never fail the browser service's status report.
+     */
+    private function maybeAutoRelogin(int $tenantId, mixed $previous, string $state): void
+    {
+        if ($state !== SessionBrowser::STATE_NEEDS_OTP || $previous === SessionBrowser::STATE_NEEDS_OTP) {
+            return;
+        }
+        try {
+            app(AutoReloginService::class)->onNeedsOtp($tenantId);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /** @param  array<string, mixed>  $row */
