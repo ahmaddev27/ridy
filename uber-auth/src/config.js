@@ -21,6 +21,10 @@ export const config = {
   // isolation boundary instead). Never set this on a shared desktop.
   noSandbox: process.env.NO_SANDBOX === "1",
 
+  // Pilot: genuine Google Chrome, headed under Xvfb (REAL_CHROME=1). Heavier per company
+  // than headless; unset = today's bundled headless Chromium.
+  realChrome: process.env.REAL_CHROME === "1",
+
   // Per-step wait budget (ms).
   stepTimeout: Number(process.env.UBER_AUTH_STEP_TIMEOUT || 30000),
 

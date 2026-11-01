@@ -172,6 +172,26 @@ class SessionBrowserTest extends TestCase
             ->assertJsonPath('data.0.cookies.0.name', 'sid');
     }
 
+    public function test_wanted_carries_the_company_proxy_url_or_null_without_one(): void
+    {
+        $proxied = $this->tenant(['proxy_url' => 'http://user:pw@10.0.0.1:8000']);
+        $direct = $this->tenant();
+        foreach ([$proxied, $direct] as $i => $t) {
+            UberFleetSession::withoutGlobalScopes()->create([
+                'tenant_id' => $t->id,
+                'uber_org_uuid' => self::ORG.$i,
+                'cookies' => $this->jar('p'.$i),
+                'status' => UberFleetSession::STATUS_ACTIVE,
+            ]);
+        }
+
+        $rows = collect($this->service()->getJson('/api/v1/internal/session-browser/wanted')->assertOk()->json('data'))
+            ->keyBy('tenant_id');
+
+        $this->assertSame('http://user:pw@10.0.0.1:8000', $rows[$proxied->id]['proxy_url']);
+        $this->assertNull($rows[$direct->id]['proxy_url']);
+    }
+
     public function test_wanted_lists_a_session_the_daemon_just_lost_for_rescue_but_never_a_human_relink(): void
     {
         $lost = $this->brokenSession($this->tenant(), 'daemon', now()->subMinutes(10));

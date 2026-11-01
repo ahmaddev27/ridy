@@ -19,6 +19,13 @@ RUN npm install --omit=dev
 # Chromium + its system libraries, matched to the installed Playwright.
 RUN npx playwright install --with-deps chromium
 
+# Real Google Chrome stable + Xvfb for the REAL_CHROME=1 pilot (headed Chrome on a
+# virtual display, genuine UA / WebGL). Unused unless that flag is set; the code
+# falls back to the bundled headless Chromium if either is missing.
+RUN npx playwright install --with-deps chrome \
+    && apt-get update && apt-get install -y --no-install-recommends xvfb xauth \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY uber-auth/src ./src
 
 ENV STATE_DIR=/state
@@ -28,4 +35,6 @@ ENV NO_SANDBOX=1
 VOLUME ["/state"]
 
 # node --env-file is not used here: the environment comes from docker-compose.
-CMD ["node", "src/server.js"]
+# With REAL_CHROME=1 (and xvfb-run present) run under a virtual display so DISPLAY is set
+# and Chrome can run headed; otherwise start exactly as before.
+CMD ["sh", "-c", "if [ \"$REAL_CHROME\" = \"1\" ] && command -v xvfb-run >/dev/null; then exec xvfb-run -a -s '-screen 0 1920x1200x24' node src/server.js; else exec node src/server.js; fi"]

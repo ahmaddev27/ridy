@@ -118,7 +118,7 @@ export async function resumeFromDisk() {
       }
       const state = JSON.parse(await readFile(join(config.stateDir, file), "utf8"));
       const browser = await launchBrowser();
-      const context = await newStealthContext(browser, { storageState: state });
+      const context = await newStealthContext(browser, { storageState: state }, null, companyKey);
       const page = await context.newPage();
       page.setDefaultTimeout(config.stepTimeout);
       await manager.adopt(companyKey, { browser, context, page, createdAt: Date.now() }, {});
@@ -137,9 +137,9 @@ export async function resumeFromDisk() {
  * backend). No password is ever handled here. renew() then navigates Fleet Hub:
  * dead cookies flip it to needs_otp; a live session warms and feeds the daemon.
  */
-async function seedFromSession(companyKey, { cookies, supplierCookies, orgUuid, needsRescue = false }) {
+async function seedFromSession(companyKey, { cookies, supplierCookies, orgUuid, needsRescue = false, proxyUrl = null }) {
   const browser = await launchBrowser();
-  const context = await newStealthContext(browser);
+  const context = await newStealthContext(browser, {}, proxyUrl, companyKey);
   await context.addCookies(scopeCookies(cookies, supplierCookies));
   const page = await context.newPage();
   page.setDefaultTimeout(config.stepTimeout);
@@ -196,7 +196,7 @@ async function runSync() {
     }
     if (manager.atCapacity()) continue;
     try {
-      await seedFromSession(key, { cookies: s.cookies, supplierCookies: s.supplier_cookies, orgUuid: s.uber_org_uuid, needsRescue: s.status === "needs_relink" });
+      await seedFromSession(key, { cookies: s.cookies, supplierCookies: s.supplier_cookies, orgUuid: s.uber_org_uuid, needsRescue: s.status === "needs_relink", proxyUrl: s.proxy_url });
       const note = revivedFrom ? `revived ${key} from ${revivedFrom}` : `seeded ${key}`;
       console.log(`[persistent] ${note}: ${manager.get(key)?.state}`);
     } catch (e) {
