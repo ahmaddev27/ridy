@@ -87,6 +87,41 @@ test("accountMatches: full email, masked email, and no false positive", () => {
   assert.equal(accountMatches("anything", "no-at-sign"), false);
 });
 
+const { navigatePastPasskey, NAV_MAX_HOPS, ANOTHER_WAY_RE, EMAIL_OPTION_RE } = await import("../src/browser.js");
+
+test("passkey nav: another-way then email option reaches otp", async () => {
+  const clicked = [];
+  const click = async (_p, re) => {
+    const label = re === EMAIL_OPTION_RE ? (clicked.length ? "Email" : null) : "Try another way";
+    if (label) clicked.push(label);
+    return label;
+  };
+  let settles = 0;
+  const settle = async () => (++settles === 2 ? "otp" : null);
+  assert.equal(await navigatePastPasskey({}, { click, settle }), "otp");
+  assert.deepEqual(clicked, ["Try another way", "Email"]);
+});
+
+test("passkey nav: no control found falls back to passkey", async () => {
+  assert.equal(await navigatePastPasskey({}, { click: async () => null, settle: async () => null }), "passkey");
+});
+
+test("passkey nav: bounded hops, then falls back", async () => {
+  let clicks = 0;
+  const click = async () => (++clicks, "x");
+  assert.equal(await navigatePastPasskey({}, { click, settle: async () => null }), "passkey");
+  assert.equal(clicks, NAV_MAX_HOPS);
+});
+
+test("passkey nav: Arkose after navigating is surfaced", async () => {
+  assert.equal(await navigatePastPasskey({}, { click: async () => "x", settle: async () => "arkose" }), "arkose");
+});
+
+test("selectors match EN/DE variants", () => {
+  for (const t of ["Try another way", "More options", "Andere Option", "Anders anmelden"]) assert.ok(ANOTHER_WAY_RE.test(t), t);
+  for (const t of ["Email", "Per E-Mail", "Code senden", "Send code"]) assert.ok(EMAIL_OPTION_RE.test(t), t);
+});
+
 test("a reused (persistent) browser is never closed by closeSession", async () => {
   let closed = 0;
   const browser = { close: async () => closed++ };

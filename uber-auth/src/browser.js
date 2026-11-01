@@ -220,6 +220,91 @@ export async function detectStep(page) {
   return "unknown";
 }
 
+// --- Passwordless: passkey -> code navigation -------------------------------------------
+// Uber offers a passkey first when the account has one, yet the SAME account can still get a
+// code through "try another way". All selectors are TEXT based (case-insensitive) and live here
+// so they are easy to tune from the `[pwless-nav]` log lines. Sign-in UI only: no Uber write.
+export const NAV_MAX_HOPS = 3;
+const NAV_CLICK_WAIT_MS = 3000; // how long a control may take to appear
+const NAV_SETTLE_MS = 5000; // how long a click may take to land on a recognisable step
+const NAV_CLICKABLE = 'button, a, [role="button"], [role="link"], [role="option"], [role="radio"], [role="menuitem"], li, label';
+
+export const ANOTHER_WAY_RE =
+  /try another way|another way|more options|other options|use another method|sign in another way|verify another way|use a code|sign in with a code|can['’]?t use|andere|anders anmelden|stattdessen|code/i;
+export const EMAIL_OPTION_RE =
+  /e-?mail|send code|get a code|verification code|code to your email|per e-?mail|code senden/i;
+
+const navLog = (m) => console.log(`[pwless-nav] ${m}`);
+
+/** First visible+enabled clickable whose text matches `re`; returns {el, text} or null. Never logs PII. */
+async function findControl(page, re) {
+  const deadline = Date.now() + NAV_CLICK_WAIT_MS;
+  do {
+    try {
+      const all = await page.locator(NAV_CLICKABLE).filter({ hasText: re }).all();
+      for (const el of all) {
+        if ((await isVisible(el)) && (await el.isEnabled().catch(() => false))) {
+          const text = ((await el.innerText().catch(() => "")) || "").replace(/\s+/g, " ").trim().slice(0, 60);
+          return { el, text };
+        }
+      }
+    } catch {
+      /* page mid-navigation: retry until the deadline */
+    }
+    await page.waitForTimeout(400);
+  } while (Date.now() < deadline);
+  return null;
+}
+
+/** Click the control; returns the (truncated) matched label, or null when none is clickable. */
+export async function clickControl(page, re) {
+  const found = await findControl(page, re);
+  if (!found) return null;
+  await found.el.click({ timeout: 3000 }).catch(() => {});
+  return found.text || "(no text)";
+}
+
+/** Poll briefly after a click for a decisive step; null = still on a passkey/unknown screen. */
+async function settleStep(page) {
+  const deadline = Date.now() + NAV_SETTLE_MS;
+  while (Date.now() < deadline) {
+    if (!/auth\.uber|\/(auth|login|oauth)/i.test(page.url())) return "landed";
+    if (await hasArkoseChallenge(page)) return "arkose";
+    if (await isVisible(otpField(page))) return "otp";
+    await page.waitForTimeout(400);
+  }
+  return null;
+}
+
+/**
+ * Starting on a passkey step, try to reach the code step (<= NAV_MAX_HOPS clicks).
+ * Each hop prefers the email/code option (we may already be on the method list), else opens
+ * the "another way" list. Returns the final step ('otp'|'landed'|'arkose'|'passkey').
+ * `ops` is injectable for tests.
+ */
+export async function navigatePastPasskey(page, ops = {}) {
+  const click = ops.click ?? clickControl;
+  const settle = ops.settle ?? settleStep;
+  navLog("step=passkey; trying to reach the code step");
+  for (let hop = 1; hop <= NAV_MAX_HOPS; hop++) {
+    let kind = "email-option";
+    let label = await click(page, EMAIL_OPTION_RE);
+    if (!label) {
+      kind = "another-way";
+      label = await click(page, ANOTHER_WAY_RE);
+    }
+    if (!label) {
+      navLog(`hop ${hop}: no email-option/another-way control found; falling back to passkey_unsupported`);
+      return "passkey";
+    }
+    const step = await settle(page);
+    navLog(`hop ${hop}: clicked ${kind} "${label}"; step after=${step ?? "passkey/unknown"}`);
+    if (step) return step;
+  }
+  navLog(`gave up after ${NAV_MAX_HOPS} hops; falling back to passkey_unsupported`);
+  return "passkey";
+}
+
 /** The logged-in fleet account's uuid (= partnerUUID / org). */
 async function captureOrgUuid(page) {
   return page.evaluate(() => {
@@ -312,6 +397,11 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
     }
     if (step === "otp") {
       return { status: STATUS.MFA_REQUIRED, session };
+    }
+    if (step === "passkey" && !password) {
+      step = await navigatePastPasskey(page);
+      if (step === "landed") return { status: STATUS.SUCCESS, result: await captureResult(context, page), session };
+      if (step === "otp") return { status: STATUS.MFA_REQUIRED, session };
     }
     if (step === "passkey") {
       await closeSession(session);
