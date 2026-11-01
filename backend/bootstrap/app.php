@@ -7,6 +7,7 @@ use App\Http\Middleware\EnsureElProfessorEnabled;
 use App\Http\Middleware\EnsureFleetConnected;
 use App\Http\Middleware\EnsureFleetOwner;
 use App\Http\Middleware\EnsureNotImpersonating;
+use App\Http\Middleware\EnsurePasswordlessLoginEnabled;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureUserAccount;
 use App\Http\Middleware\EnsureUserTenantActive;
@@ -70,6 +71,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'fleet.owner' => EnsureFleetOwner::class,
             // The platform's per-company switch for the El-Professor link.
             'elprofessor.enabled' => EnsureElProfessorEnabled::class,
+            // Passwordless Uber login: global switch + allowlist + company flag, else 404.
+            'passwordless.enabled' => EnsurePasswordlessLoginEnabled::class,
         ]);
 
         // SECURITY: route-model binding must resolve AFTER the tenant context is
@@ -82,6 +85,8 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // The Uber one-time code (passwordless login, docs/27) must never be flashed.
+        $exceptions->dontFlash(['code']);
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );

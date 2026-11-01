@@ -77,6 +77,7 @@ use App\Http\Controllers\Api\V1\PublicSupportController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\ResellerController;
 use App\Http\Controllers\Api\V1\SupplierCaptureController;
+use App\Http\Controllers\Api\V1\UberLoginController;
 use App\Http\Controllers\Api\V1\VehicleController;
 use App\Http\Controllers\Api\V1\WebauthnCredentialController;
 use App\Http\Controllers\Api\V1\WebauthnLoginController;
@@ -387,6 +388,16 @@ Route::prefix('v1')->group(function () {
         // Browser-extension pairing token (minted from the dashboard session)
         Route::post('extension/token', [ExtensionController::class, 'issueToken'])->middleware('can:connections.manage');
 
+        // Passwordless Uber login (docs/27, variant A: human OTP relay). Behind the
+        // global switch + allowlist + the company's own flag (404 otherwise); the
+        // dashboard never reaches uber-auth, the backend relays.
+        Route::middleware(['passwordless.enabled', 'can:connections.manage'])->prefix('uber-login')->group(function () {
+            Route::get('status', [UberLoginController::class, 'status']);
+            Route::post('start', [UberLoginController::class, 'start'])->middleware('throttle:uber-login');
+            Route::post('code', [UberLoginController::class, 'code'])->middleware('throttle:uber-login-code');
+            Route::post('cancel', [UberLoginController::class, 'cancel'])->middleware('throttle:uber-login');
+        });
+
         // El-Professor (payroll product) pulls the roster with a scoped token minted here.
         // Every El-Professor route, the company's own card included, is behind
         // the platform's switch: a company the operator has not opened cannot
@@ -529,6 +540,7 @@ Route::prefix('v1')->group(function () {
         // what we send to a third party should not ride along with a name change.
         // Flipping it off is the immediate kill switch and revokes nothing.
         Route::patch('companies/{tenant}/dispatch-reject', [CompanyController::class, 'setDispatchReject']);
+        Route::patch('companies/{tenant}/passwordless-login', [CompanyController::class, 'setPasswordlessLogin']);
 
         // Read-only drill-down into a company's fleet data (admin tabs).
         Route::get('companies/{tenant}/drivers', [CompanyDataController::class, 'drivers']);

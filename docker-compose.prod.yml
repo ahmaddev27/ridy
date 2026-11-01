@@ -78,6 +78,10 @@ x-app-env: &app-env
   # DISPATCH_INGEST_SECRET). Empty until the "browser" profile is enabled.
   UBER_AUTH_URL: ${UBER_AUTH_URL:-http://uber-auth:8791}
   UBER_AUTH_SECRET: ${UBER_AUTH_SECRET:-}
+  # Passwordless Uber login (docs/27). Global kill switch, OFF by default; a company
+  # also needs its own super-admin flag. TENANTS = optional rollout allowlist (ids).
+  UBER_PASSWORDLESS_LOGIN: ${UBER_PASSWORDLESS_LOGIN:-}
+  UBER_PASSWORDLESS_TENANTS: ${UBER_PASSWORDLESS_TENANTS:-}
   # FCM HTTP v1 (OAuth2 service-account) — used by FcmPushSender for driver + web
   # push. Point FCM_CREDENTIALS at the mounted service-account JSON. Without it the
   # app falls back to LogPushSender (pushes are only logged, not sent).
@@ -367,6 +371,8 @@ services:
       - backend
     environment:
       UBER_AUTH_SECRET: ${UBER_AUTH_SECRET:-}
+      # Passwordless sign-in (docs/27): accept /login/start without a password. OFF unless "1".
+      UBER_AUTH_PASSWORDLESS: ${UBER_AUTH_PASSWORDLESS:-}
       DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
       # Pilot: real Chrome headed under Xvfb (heavier RAM/CPU). Unset = headless Chromium.
       REAL_CHROME: ${REAL_CHROME:-}

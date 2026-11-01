@@ -107,6 +107,22 @@ class Tenant extends Model
     }
 
     /**
+     * The platform's per-company opt-in for the passwordless Uber login (docs/27).
+     * Absent = off. The global env switch lives in PasswordlessLoginSettings.
+     */
+    public function passwordlessLoginEnabled(): bool
+    {
+        return ($this->settings['passwordless_login']['enabled'] ?? false) === true;
+    }
+
+    public function setPasswordlessLoginEnabled(bool $enabled): void
+    {
+        $settings = $this->settings ?? [];
+        $settings['passwordless_login'] = array_merge($settings['passwordless_login'] ?? [], ['enabled' => $enabled]);
+        $this->forceFill(['settings' => $settings])->save();
+    }
+
+    /**
      * This company has the auto-decline ("Early decline") feature on — docs/25.
      * A decline needs a live dispatch session, so this is meaningful only alongside
      * dispatch_reject; the engine also requires each driver's own opt-in. Absent =

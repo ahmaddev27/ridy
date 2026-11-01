@@ -66,6 +66,8 @@ class CompanyResource extends JsonResource
             // PLATFORM's switch, opened per company by the operator — absent = off,
             // so every company that existed before the feature starts closed.
             'dispatch_reject_enabled' => $this->dispatchRejectEnabled(),
+            // Super-admin opt-in for the passwordless Uber login (docs/27); absent = off.
+            'passwordless_login_enabled' => $this->passwordlessLoginEnabled(),
 
             'session_status' => $session['status'] ?? null,
             'session_last_event_at' => $session['last_event_at'] ?? null,

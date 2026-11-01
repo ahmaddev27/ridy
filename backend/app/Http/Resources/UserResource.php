@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Domain\Dispatch\PasswordlessLoginSettings;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -28,6 +29,9 @@ class UserResource extends JsonResource
                 // and auto-decline ("Early decline"): the sidebar hides the
                 // Early-decline page unless it is on, so it travels with the session.
                 'dispatch_reject_enabled' => $this->tenant->dispatchRejectEnabled(),
+                // Passwordless Uber login (docs/27): the Connect page is hidden unless
+                // the global switch, the allowlist and the company flag all allow it.
+                'passwordless_login_enabled' => app(PasswordlessLoginSettings::class)->availableFor($this->tenant),
             ] : null,
             'roles' => $this->getRoleNames(),
             'permissions' => $this->getAllPermissions()->pluck('name')->values(),
