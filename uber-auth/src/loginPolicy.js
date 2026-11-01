@@ -3,6 +3,8 @@
 
 /** The persistent-manager state in which a running browser must never be disturbed. */
 const ACTIVE = "active";
+/** States holding a browser context worth re-authenticating (a retry stays in logging_in). */
+const RIDEABLE = new Set(["needs_otp", "logging_in"]);
 
 /**
  * Decide whether /login/start may proceed.
@@ -17,10 +19,13 @@ export function admitStart(body, { passwordless, stateOf }) {
     // Passwordless is opt-in and only ever for a known company (it feeds the persistent manager).
     if (!passwordless) return reject(422, { error: "email and password required" });
     if (!companyKey) return reject(422, { error: "company_key required" });
+    const state = stateOf(companyKey);
     // A healthy browser is feeding the daemon: a fresh login must not evict or stall it.
-    if (stateOf(companyKey) === ACTIVE) {
-      return reject(409, { status: "session_active", message: "session_active" });
-    }
+    if (state === ACTIVE) return reject(409, { status: "session_active", message: "session_active" });
+    // Warm re-auth only: there must be a known browser context to ride. A company that was
+    // never connected is a COLD login, which Uber's Arkose challenge reliably stops, so it
+    // goes through the extension instead (a human is present).
+    if (!RIDEABLE.has(state)) return reject(409, { status: "no_session", message: "no_session" });
   }
   return { ok: true, companyKey, password };
 }

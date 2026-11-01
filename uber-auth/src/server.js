@@ -11,7 +11,7 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { startLogin, submitMfa, closeSession, STATUS } from "./browser.js";
-import { adoptLogin, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp } from "./persistent.js";
+import { adoptLogin, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf } from "./persistent.js";
 import { admitStart, companyMatches } from "./loginPolicy.js";
 
 // loginId -> { session, companyKey, createdAt, passwordless } awaiting an MFA code.
@@ -110,6 +110,8 @@ async function handleStart(req, res) {
     password,
     proxyUrl: typeof body.proxy_url === "string" ? body.proxy_url : null,
     companyKey,
+    // Warm re-auth: ride the company's own browser (cookies + proxy already there).
+    reuse: passwordless ? handleOf(companyKey) : null,
   });
 
   if (outcome.status === STATUS.MFA_REQUIRED) {

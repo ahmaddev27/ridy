@@ -8,7 +8,7 @@ const on = (state = null) => ({ passwordless: true, stateOf: () => state });
 const off = { passwordless: false, stateOf: () => null };
 
 test("passwordless start needs only email + company_key", () => {
-  const r = admitStart({ email: "a@b.de", company_key: 7 }, on());
+  const r = admitStart({ email: "a@b.de", company_key: 7 }, on("needs_otp"));
   assert.deepEqual([r.ok, r.companyKey, r.password], [true, "7", null]);
 });
 
@@ -30,9 +30,17 @@ test("an ACTIVE session is never disturbed by a passwordless start", () => {
   assert.equal(r.body.status, "session_active");
 });
 
-test("needs_otp and unknown companies may start", () => {
+test("only a company with a warm context to ride (needs_otp / retry) may start", () => {
   assert.equal(admitStart({ email: "a@b.de", company_key: "7" }, on(SESSION_STATE.NEEDS_OTP)).ok, true);
-  assert.equal(admitStart({ email: "a@b.de", company_key: "7" }, on(null)).ok, true);
+  assert.equal(admitStart({ email: "a@b.de", company_key: "7" }, on(SESSION_STATE.LOGGING_IN)).ok, true);
+});
+
+test("a never-connected or dead company is a COLD login and is sent to the extension", () => {
+  for (const state of [null, SESSION_STATE.DOWN, SESSION_STATE.NOT_SET_UP]) {
+    const r = admitStart({ email: "a@b.de", company_key: "7" }, on(state));
+    assert.equal(r.ok, false);
+    assert.equal(r.body.status, "no_session");
+  }
 });
 
 test("the legacy password flow is unchanged by the active guard", () => {

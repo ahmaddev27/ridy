@@ -17,6 +17,7 @@ export const STATUS = {
   MFA_REQUIRED: "mfa_required",
   PASSKEY_UNSUPPORTED: "passkey_unsupported",
   BAD_CREDENTIALS: "bad_credentials",
+  BLOCKED: "blocked", // Uber's Arkose challenge: never solved, the manager is sent to the extension
   PASSWORD_REQUIRED: "password_required", // Uber asked for a password and we hold none
   CHANNEL_UNAVAILABLE: "channel_unavailable", // no code step reached (e.g. a chooser with no default)
   ERROR: "error",
@@ -157,13 +158,29 @@ async function hasPasskeyPrompt(page) {
 }
 
 /**
- * Poll the page until one of the known steps is reached or the budget runs out.
- * @returns {'landed'|'password'|'otp'|'passkey'|'unknown'}
+ * Uber's Arkose bot challenge ("Protecting your account" / "Start Puzzle"). We never
+ * solve or bypass it: seeing it ends the attempt and the manager is sent to the
+ * extension, where a human is present.
  */
-async function detectStep(page) {
+async function hasArkoseChallenge(page) {
+  try {
+    const text = page.getByText(/protecting your account|start puzzle|konto (wird )?gesch(ü|u)tzt|r(ä|a)tsel starten/i).first();
+    if (await text.isVisible()) return true;
+    return (await page.locator('iframe[src*="arkoselabs" i], iframe[src*="funcaptcha" i], [id*="arkose" i]').count()) > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Poll the page until one of the known steps is reached or the budget runs out.
+ * @returns {'landed'|'password'|'otp'|'passkey'|'arkose'|'unknown'}
+ */
+export async function detectStep(page) {
   const deadline = Date.now() + config.stepTimeout;
   while (Date.now() < deadline) {
     if (!/auth\.uber|\/(auth|login|oauth)/i.test(page.url())) return "landed";
+    if (await hasArkoseChallenge(page)) return "arkose";
     if (await isVisible(otpField(page))) return "otp";
     if (await isVisible(passwordField(page))) return "password";
     if (await hasPasskeyPrompt(page)) return "passkey";
@@ -205,13 +222,16 @@ async function captureResult(context, page) {
  * password step with no password to give, or a step we cannot recognise, ends
  * the attempt (password_required / channel_unavailable) rather than guessing.
  * `proxyUrl` is the company's residential proxy (the one the daemon uses).
+ *
+ * `reuse` = the company's persistent browser handle ({browser, context, page}): the
+ * WARM re-authentication path. It rides the browser that already holds the company's
+ * cookies and proxy (Uber shows "Welcome back", far less Arkose risk than a cold
+ * login), and is never closed on failure — only its page state is abandoned.
  */
-export async function startLogin({ email, password = null, proxyUrl = null, companyKey = null }) {
-  const browser = await launchBrowser();
-  const context = await newStealthContext(browser, {}, proxyUrl, companyKey);
-  const page = await context.newPage();
+export async function startLogin({ email, password = null, proxyUrl = null, companyKey = null, reuse = null }) {
+  const session = reuse ? Object.assign(reuse, { reused: true }) : await freshSession(proxyUrl, companyKey);
+  const { context, page } = session;
   page.setDefaultTimeout(config.stepTimeout);
-  const session = { browser, context, page, createdAt: Date.now() };
 
   try {
     await page.goto(config.dashboardUrl, { waitUntil: "domcontentloaded" });
@@ -223,14 +243,18 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
       return { status: STATUS.SUCCESS, result, session };
     }
 
-    await identifierField(page).fill(email);
+    // A remembered account ("Welcome back") may not ask for the identifier again.
+    const idField = identifierField(page);
+    if (await idField.waitFor({ state: "visible", timeout: 8000 }).then(() => true, () => false)) {
+      await idField.fill(email);
+    }
     await advance(page);
 
     let step = await detectStep(page);
 
     if (step === "password") {
       if (!password) {
-        await browser.close();
+        await closeSession(session);
         return { status: STATUS.PASSWORD_REQUIRED };
       }
       await passwordField(page).fill(password);
@@ -247,21 +271,32 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
       return { status: STATUS.MFA_REQUIRED, session };
     }
     if (step === "passkey") {
-      await browser.close();
+      await closeSession(session);
       return { status: STATUS.PASSKEY_UNSUPPORTED };
     }
+    if (step === "arkose") {
+      await closeSession(session);
+      return { status: STATUS.BLOCKED, message: "arkose" };
+    }
 
-    await browser.close();
+    await closeSession(session);
     return { status: password ? STATUS.BAD_CREDENTIALS : STATUS.CHANNEL_UNAVAILABLE };
   } catch (e) {
-    await browser.close().catch(() => {});
+    await closeSession(session).catch(() => {});
     return { status: STATUS.ERROR, message: e.message };
   }
 }
 
+async function freshSession(proxyUrl, companyKey) {
+  const browser = await launchBrowser();
+  const context = await newStealthContext(browser, {}, proxyUrl, companyKey);
+  const page = await context.newPage();
+  return { browser, context, page, createdAt: Date.now() };
+}
+
 /** Relay the MFA code into a held session and finish the login. */
 export async function submitMfa(session, code) {
-  const { browser, context, page } = session;
+  const { context, page } = session;
   try {
     await typeOtp(page, code);
     await advance(page);
@@ -277,14 +312,20 @@ export async function submitMfa(session, code) {
       return { status: STATUS.MFA_REQUIRED, retry: true };
     }
 
-    await browser.close();
+    await closeSession(session);
+    if (step === "arkose") return { status: STATUS.BLOCKED, message: "arkose" };
     return { status: STATUS.ERROR, message: `unexpected step: ${step}` };
   } catch (e) {
-    await browser.close().catch(() => {});
+    await closeSession(session).catch(() => {});
     return { status: STATUS.ERROR, message: e.message };
   }
 }
 
+/**
+ * Close a login session. A REUSED one is the company's persistent browser (warm
+ * re-auth): it is left running — closing it would take the whole company down.
+ */
 export async function closeSession(session) {
+  if (session?.reused) return;
   await session?.browser?.close().catch(() => {});
 }
