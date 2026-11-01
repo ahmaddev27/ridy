@@ -6,6 +6,11 @@
 
 import { chromium } from "playwright";
 import { config } from "./config.js";
+import { parseProxyUrl } from "./proxy.js";
+import { tenantScreen } from "./fingerprint.js";
+
+// Browsers launched as REAL Chrome (headed under Xvfb): they emit their own genuine UA.
+const realChrome = new WeakSet();
 
 export const STATUS = {
   SUCCESS: "success",
@@ -75,6 +80,8 @@ export async function launchBrowser() {
     // isolation boundary. Off by default (NO_SANDBOX unset) for desktop safety.
     ...(config.noSandbox ? ["--no-sandbox"] : []),
   ];
+  const real = await launchRealChrome(args);
+  if (real) return real;
   // Prefer the real installed Chrome — far less likely to be flagged than the
   // bundled Chromium. Fall back to Chromium if Chrome is not present.
   try {
@@ -84,16 +91,42 @@ export async function launchBrowser() {
   }
 }
 
-export async function newStealthContext(browser, extra = {}) {
-  const context = await browser.newContext({
+/**
+ * REAL_CHROME=1 pilot: genuine Chrome, HEADED under Xvfb (needs DISPLAY), so there is
+ * no HeadlessChrome / Linux-SwiftShader tell. Returns null on any shortfall (flag off,
+ * no display, Chrome missing) so the caller falls back to the bundled headless Chromium.
+ */
+async function launchRealChrome(args) {
+  if (!config.realChrome || !process.env.DISPLAY) return null;
+  try {
+    const browser = await chromium.launch({ headless: false, channel: "chrome", args });
+    realChrome.add(browser);
+    return browser;
+  } catch (e) {
+    console.warn(`[browser] real Chrome unavailable, using bundled Chromium: ${e?.message}`);
+    return null;
+  }
+}
+
+export async function newStealthContext(browser, extra = {}, proxyUrl = null, tenantKey = null) {
+  // The company's residential proxy (same one the daemon uses); none -> direct, as before.
+  const proxy = parseProxyUrl(proxyUrl);
+  const options = {
     locale: "de-DE",
     timezoneId: "Europe/Berlin",
     viewport: { width: 1280, height: 800 },
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
     // Extra context options (e.g. { storageState } when resuming a saved session).
+    ...(proxy ? { proxy } : {}),
     ...extra,
-  });
+  };
+  if (realChrome.has(browser)) {
+    // Let Chrome emit its own UA + matching sec-ch-ua; an override is what mismatches them.
+    delete options.userAgent;
+    if (tenantKey != null && !extra.viewport) Object.assign(options, tenantScreen(tenantKey));
+  }
+  const context = await browser.newContext(options);
   // Hide the two most-checked automation tells.
   await context.addInitScript(() => {
     Object.defineProperty(navigator, "webdriver", { get: () => undefined });

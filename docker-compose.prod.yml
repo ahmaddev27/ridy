@@ -368,6 +368,8 @@ services:
     environment:
       UBER_AUTH_SECRET: ${UBER_AUTH_SECRET:-}
       DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
+      # Pilot: real Chrome headed under Xvfb (heavier RAM/CPU). Unset = headless Chromium.
+      REAL_CHROME: ${REAL_CHROME:-}
       # Reaches the API through Caddy over the public HTTPS domain (hairpin),
       # like the dispatch daemon.
       RIDY_API_URL: https://${DOMAIN}

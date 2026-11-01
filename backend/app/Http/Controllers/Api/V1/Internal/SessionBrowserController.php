@@ -25,7 +25,7 @@ class SessionBrowserController extends Controller
     private const RESCUE_HOURS = 6;
 
     /** What `serviceable()` and the autolink guard read from the company. */
-    private const TENANT_COLUMNS = 'tenant:id,status,banned_at,activated_at,subscription_ends_at,settings';
+    private const TENANT_COLUMNS = 'tenant:id,status,banned_at,activated_at,subscription_ends_at,settings,proxy_url';
 
     /** Bulk health report: one row per company the service is responsible for. */
     public function status(Request $request): JsonResponse
@@ -110,6 +110,10 @@ class SessionBrowserController extends Controller
                 'uber_org_uuid' => $s->uber_org_uuid,
                 'cookies' => $s->cookies,
                 'supplier_cookies' => $s->supplier_cookies,
+                // The company's residential proxy: the SAME one the daemon uses
+                // (tenants.proxy_url), so the browser reaches Uber from that IP and not
+                // the VPS datacenter one. Null = none assigned; the browser goes direct.
+                'proxy_url' => $s->tenant?->getAttribute('proxy_url') ?: null,
                 // `needs_relink` asks the browser to RESCUE the session instead of
                 // being closed: re-mint the dispatch cookies in its logged-in context.
                 'status' => $s->status,
