@@ -136,6 +136,16 @@ class CompanyController extends Controller
         return response()->json(['data' => $this->detail($tenant->refresh())]);
     }
 
+    /** Super-admin opt-in/out of the passwordless Uber login (docs/27) for one company. */
+    public function setPasswordlessLogin(Request $request, Tenant $tenant): JsonResponse
+    {
+        $data = $request->validate(['enabled' => ['required', 'boolean']]);
+
+        $tenant->setPasswordlessLoginEnabled((bool) $data['enabled']);
+
+        return response()->json(['data' => $this->detail($tenant->refresh())]);
+    }
+
     public function show(Tenant $tenant): JsonResponse
     {
         $tenant->ensurePaymentReference(); // backfill for any company created before the feature

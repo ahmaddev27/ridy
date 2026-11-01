@@ -48,6 +48,16 @@ class AuthRateLimits
             ...self::perEmailAndClient($request, Limit::perHour(60)),
         ]);
 
+        // Passwordless Uber login (docs/27): start/cancel and the code relay, per
+        // company (the login is one-per-tenant) so a stranger cannot spend it.
+        RateLimiter::for('uber-login', fn (Request $request) => Limit::perMinute(5)
+            ->by('uber-login:'.($request->user()?->tenant_id ?? self::clientKey($request))));
+        // Its own bucket, so a flurry of starts can never leave a manager unable to cancel.
+        RateLimiter::for('uber-login-cancel', fn (Request $request) => Limit::perMinute(10)
+            ->by('uber-login-cancel:'.($request->user()?->tenant_id ?? self::clientKey($request))));
+        RateLimiter::for('uber-login-code', fn (Request $request) => Limit::perMinute(10)
+            ->by('uber-login-code:'.($request->user()?->tenant_id ?? self::clientKey($request))));
+
         // Browser-extension ingest (roster / statuses / metrics / vehicles /
         // capture). Generous: a real extension posts about once a minute. Offer
         // ingest (extension + daemon) is deliberately NOT throttled — it is the

@@ -82,6 +82,23 @@ return [
         'osrm_url' => trim((string) env('OSRM_URL')) ?: 'https://router.project-osrm.org',
     ],
 
+    // uber-auth: the session-browser service that drives Uber's sign-in. Only the
+    // backend holds its X-Auth-Secret; the dashboard never talks to it directly.
+    'uber_auth' => [
+        'url' => rtrim(trim((string) env('UBER_AUTH_URL')), '/'),
+        'secret' => (string) env('UBER_AUTH_SECRET'),
+    ],
+
+    // Passwordless Uber login (docs/27). `enabled` is the GLOBAL kill switch (OFF by
+    // default); a company also needs its own settings flag. `tenants` is an optional
+    // comma-separated allowlist of tenant ids for a gradual rollout (empty = no limit).
+    'passwordless_login' => [
+        'enabled' => filter_var(env('UBER_PASSWORDLESS_LOGIN', false), FILTER_VALIDATE_BOOL),
+        // Variant B: the subdomain whose MX points at us (Postfix pipes mail to inbound-mail:ingest).
+        'inbound_domain' => trim((string) env('UBER_INBOUND_DOMAIN')) ?: 'in.reidey.de',
+        'tenants' => array_values(array_filter(array_map('trim', explode(',', (string) env('UBER_PASSWORDLESS_TENANTS'))))),
+    ],
+
     // Self-hosted receipt vision (llama.cpp + Qwen2.5-VL, compose profile
     // `vision`). Empty url = the feature is OFF and the driver app keeps its
     // on-device ML Kit result. See docs/26-receipt-vision.md.

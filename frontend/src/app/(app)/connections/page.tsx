@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { useI18n } from "@/lib/i18n/context";
+import { useAuth } from "@/components/auth/auth-provider";
+import { UberCodeLogin } from "@/components/connections/uber-code-login";
 import { useAsync } from "@/hooks/use-async";
 import { getFleetSession, prepareReconnect } from "@/lib/api/fleet-session";
 import { issueExtensionToken } from "@/lib/api/extension";
@@ -14,6 +16,7 @@ import { LATEST_EXTENSION_VERSION, EXTENSION_STORE_URL, isExtensionOutdated } fr
 
 export default function ConnectionsPage() {
   const { t } = useI18n();
+  const { user } = useAuth();
   const { data, loading, refetch } = useAsync(getFleetSession);
 
   // True while we wait for the extension to capture the session in the Uber tab,
@@ -241,6 +244,11 @@ export default function ConnectionsPage() {
           </div>
         )}
       </Card>
+
+      {/* Passwordless sign-in (docs/27): only for companies the platform opened it for. */}
+      {user?.tenant?.passwordless_login_enabled === true && !connected && (
+        <UberCodeLogin onConnected={refetch} />
+      )}
     </div>
   );
 }
