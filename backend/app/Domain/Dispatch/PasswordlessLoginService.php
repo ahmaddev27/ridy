@@ -58,7 +58,7 @@ class PasswordlessLoginService
 
     private const SUBMIT_LOCK = 45;
 
-    private const UBER_AUTH_FAILURES = ['passkey_unsupported', 'blocked', 'channel_unavailable', 'password_required', 'session_active', 'no_session', 'capture_failed'];
+    private const UBER_AUTH_FAILURES = ['passkey_unsupported', 'blocked', 'channel_unavailable', 'password_required', 'session_active', 'no_session', 'no_proxy', 'capture_failed'];
 
     /** uber-auth answers that mean "still running", never "failed". */
     private const PENDING_STATUSES = ['pending', 'start_in_flight'];
@@ -96,6 +96,14 @@ class PasswordlessLoginService
         // Only reachable here because sessionIsActive() already refused any live session;
         // uber-auth enforces the same (and its own flag) before it ever launches a browser.
         $cold = ! $this->hasPriorContext($tenant);
+        if ($cold && ! (bool) config('services.passwordless_login.cold')) {
+            return $this->failedView('no_session');
+        }
+        // A cold login from the VPS datacenter IP is the Arkose-prone case and would tie the
+        // account to that IP: it only ever runs through the company's own residential proxy.
+        if ($cold && ! $this->hasValidProxy($tenant)) {
+            return $this->failedView('no_proxy');
+        }
 
         // The automatic mode needs the company's opt-in and its secret address; without them
         // it is just the manual flow (the manager types the code).
@@ -179,6 +187,7 @@ class PasswordlessLoginService
             'started_at' => $startedAt->toIso8601String(),
             'expires_at' => $startedAt->addSeconds(LoginAttemptStore::ATTEMPT_TTL)->toIso8601String(),
             'submits' => 0,
+            'cold' => $cold,
         ];
         $this->store->put($tenant->id, $record, LoginAttemptStore::START_WINDOW);
         // No email (or anything derived from it) is kept: not in the cache record, not in the log.
@@ -222,6 +231,13 @@ class PasswordlessLoginService
                 return $this->view($record);
             }
             $record['auto_submitted'] = true;
+        }
+        // A cold login may only ever fill an EMPTY slot. The extension (or auto-relink) can have
+        // connected the company since start(): then ours is abandoned, never forked onto it.
+        if (! empty($record['cold']) && $this->hasPriorContext($tenant)) {
+            $this->abandon($tenant, $record);
+
+            return $this->fail($tenant, 'session_active');
         }
         $loginId = $record['login_id'];
         // Remaining lifetime, not a fresh one: this record must never outlive uber-auth's entry.
@@ -354,6 +370,33 @@ class PasswordlessLoginService
     private function pendingView(array $record): array
     {
         return $this->view($record) + ['pending' => true];
+    }
+
+    /** Whether the connect page may offer the cold (email + code) first connect: flag on and nothing connected yet. */
+    public function coldConnectAvailable(?Tenant $tenant): bool
+    {
+        return $tenant !== null
+            && (bool) config('services.passwordless_login.cold')
+            && $this->settings->availableFor($tenant)
+            && ! $this->hasPriorContext($tenant);
+    }
+
+    /**
+     * Email + code is the company's primary connect path (the extension is neither offered nor
+     * nagged): passwordless is on AND either it has connected before (warm) or cold is available.
+     */
+    public function codeLoginIsPrimary(?Tenant $tenant): bool
+    {
+        return $tenant !== null && $this->settings->availableFor($tenant)
+            && ($this->hasPriorContext($tenant) || (bool) config('services.passwordless_login.cold'));
+    }
+
+    /** Mirrors uber-auth's parseProxyUrl: a usable http/https/socks5 proxy with a host. */
+    private function hasValidProxy(Tenant $tenant): bool
+    {
+        $parts = parse_url(trim((string) $tenant->getAttribute('proxy_url')));
+
+        return is_array($parts) && in_array($parts['scheme'] ?? '', ['http', 'https', 'socks5'], true) && ($parts['host'] ?? '') !== '';
     }
 
     /** The company has been connected before: a browser context or a stored Uber session exists. */

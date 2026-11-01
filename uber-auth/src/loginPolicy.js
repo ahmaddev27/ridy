@@ -1,6 +1,8 @@
 // Pure admission rules for /login/start and /login/mfa, kept out of server.js so they
 // are unit-tested without a socket or a browser.
 
+import { parseProxyUrl } from "./proxy.js";
+
 /** The persistent-manager state in which a running browser must never be disturbed. */
 const ACTIVE = "active";
 /** States holding a browser context worth re-authenticating (a retry stays in logging_in). */
@@ -26,14 +28,18 @@ export function admitStart(body, { passwordless, stateOf, coldEnabled = false })
     // Nothing to ride. A COLD first connect (fresh browser through the proxy) is allowed only
     // when explicitly enabled, asked for by the backend, and NOTHING is held for the company
     // (state null): never a dead/odd entry, never an active or logging-in one.
-    if (isColdEligible(body, state, coldEnabled)) return { ok: true, companyKey, password, cold: true };
+    if (wantsCold(body, state, coldEnabled)) {
+      // Never from the VPS datacenter IP: that is the Arkose-prone case and pins the account to it.
+      if (!parseProxyUrl(body.proxy_url)) return reject(409, { status: "no_proxy", message: "no_proxy" });
+      return { ok: true, companyKey, password, cold: true };
+    }
     return reject(409, { status: "no_session", message: "no_session" });
   }
   return { ok: true, companyKey, password, cold: false };
 }
 
-/** Cold connect: flag on, the caller says cold, and the manager holds nothing at all for the company. */
-export function isColdEligible(body, state, coldEnabled) {
+/** Cold connect asked for: flag on, the caller says cold, and the manager holds nothing at all for the company. */
+function wantsCold(body, state, coldEnabled) {
   return coldEnabled === true && body.cold === true && state == null;
 }
 

@@ -13,6 +13,7 @@ export type UberLoginFailure =
   | "unavailable"
   | "session_active"
   | "no_session"
+  | "no_proxy"
   | "capture_failed";
 
 export type UberLoginStatus = {

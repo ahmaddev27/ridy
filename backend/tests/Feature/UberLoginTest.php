@@ -6,6 +6,7 @@ use App\Domain\Audit\Models\AuditLog;
 use App\Domain\Dispatch\LoginAttemptStore;
 use App\Domain\Dispatch\Models\SessionBrowser;
 use App\Domain\Dispatch\Models\UberFleetSession;
+use App\Domain\Dispatch\PasswordlessLoginService;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use App\Models\User;
@@ -264,6 +265,8 @@ class UberLoginTest extends TestCase
     private function makeCold(): void
     {
         SessionBrowser::where('tenant_id', $this->tenant->id)->delete();
+        config(['services.passwordless_login.cold' => true]);
+        $this->tenant->update(['proxy_url' => 'http://u:p@proxy.test:8000']);
     }
 
     private function startBodies(): array
@@ -275,14 +278,65 @@ class UberLoginTest extends TestCase
     public function test_a_never_connected_company_gets_a_cold_start_not_no_session(): void
     {
         $this->makeCold();
-        $this->tenant->update(['proxy_url' => 'http://u:p@proxy.test:8000']);
         $this->fakeUber();
 
         $this->start()->assertStatus(202)->assertJsonPath('data.state', 'awaiting_code');
 
         Http::assertSent(fn (HttpRequest $r) => str_ends_with($r->url(), '/login/start')
             && $r['cold'] === true && $r['proxy_url'] === 'http://u:p@proxy.test:8000' && ! isset($r['password']));
-        $this->assertTrue(AuditLog::where('action', 'uber_login.started')->get()->contains(fn ($l) => ($l->metadata['cold'] ?? $l->context['cold'] ?? null) === true || str_contains($l->toJson(), '"cold":true')));
+        $this->assertTrue(AuditLog::where('action', 'uber_login.started')->get()->contains(fn ($l) => ($l->context['cold'] ?? null) === true));
+    }
+
+    public function test_a_cold_start_without_a_valid_proxy_is_refused_before_touching_uber(): void
+    {
+        $this->makeCold();
+        Http::fake();
+        foreach ([null, '', 'not a url', 'ftp://p.test:1'] as $bad) {
+            $this->tenant->forceFill(['proxy_url' => $bad])->save();
+            $this->start()->assertStatus(409)->assertJsonPath('data.failure', 'no_proxy');
+        }
+        Http::assertNothingSent();
+    }
+
+    public function test_a_cold_start_with_the_cold_flag_off_stays_no_session(): void
+    {
+        $this->makeCold();
+        config(['services.passwordless_login.cold' => false]);
+        Http::fake();
+
+        $this->start()->assertStatus(409)->assertJsonPath('data.failure', 'no_session');
+        Http::assertNothingSent();
+    }
+
+    public function test_a_session_appearing_during_a_cold_attempt_abandons_it_instead_of_forking(): void
+    {
+        $this->makeCold();
+        $this->fakeUber();
+        $this->start()->assertStatus(202);
+        // The extension connected the company while the code was pending.
+        UberFleetSession::withoutGlobalScopes()->create([
+            'tenant_id' => $this->tenant->id, 'uber_org_uuid' => '7b118561-0f8e-4816-a93f-d6e9c770cfd0',
+            'cookies' => [['name' => 'sid', 'value' => 'x']], 'status' => 'active',
+        ]);
+
+        $this->postJson('/api/v1/uber-login/code', ['code' => self::CODE])->assertStatus(409)->assertJsonPath('data.failure', 'session_active');
+
+        Http::assertNotSent(fn (HttpRequest $r) => str_ends_with($r->url(), '/login/mfa'));
+        Http::assertSent(fn (HttpRequest $r) => str_ends_with($r->url(), '/login/cancel'));
+    }
+
+    public function test_cold_connect_is_only_offered_when_flagged_and_nothing_is_connected(): void
+    {
+        $service = app(PasswordlessLoginService::class);
+        $this->makeCold();
+        $this->assertTrue($service->coldConnectAvailable($this->tenant));
+
+        config(['services.passwordless_login.cold' => false]);
+        $this->assertFalse($service->coldConnectAvailable($this->tenant));
+
+        config(['services.passwordless_login.cold' => true]);
+        SessionBrowser::create(['tenant_id' => $this->tenant->id, 'state' => 'needs_otp', 'last_seen_at' => now()]);
+        $this->assertFalse($service->coldConnectAvailable($this->tenant));
     }
 
     public function test_a_warm_start_is_not_flagged_cold(): void
@@ -334,7 +388,15 @@ class UberLoginTest extends TestCase
         $this->makeCold();
         $this->fakeUber();
         $this->start()->assertStatus(202);
-        SessionBrowser::create(['tenant_id' => $this->tenant->id, 'state' => 'active', 'last_seen_at' => now(), 'last_capture_at' => now()->addSecond()]);
+        $tenantId = $this->tenant->id;
+        // The capture lands DURING the relay (uber-auth posts it), not before it.
+        Http::fake([
+            '*/login/mfa' => function () use ($tenantId) {
+                SessionBrowser::create(['tenant_id' => $tenantId, 'state' => 'active', 'last_seen_at' => now(), 'last_capture_at' => now()->addSecond()]);
+
+                return Http::response(['status' => 'success', 'persistent' => true]);
+            },
+        ]);
 
         $this->postJson('/api/v1/uber-login/code', ['code' => self::CODE])->assertOk()->assertJsonPath('data.state', 'connected');
 

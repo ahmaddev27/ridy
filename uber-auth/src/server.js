@@ -11,7 +11,7 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { startLogin, submitMfa, closeSession, STATUS } from "./browser.js";
-import { adoptLogin, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf } from "./persistent.js";
+import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf } from "./persistent.js";
 import { admitStart, companyMatches, createStartGate } from "./loginPolicy.js";
 
 // loginId -> { session, companyKey, createdAt, passwordless } awaiting an MFA code.
@@ -93,6 +93,10 @@ async function onLoginSuccess(companyKey, outcome, res, cold = false) {
     await closeSession(outcome.session);
     return send(res, 409, { status: "session_active", message: "session_active" });
   }
+  if (cold && (await backendHasSession(companyKey))) {
+    await closeSession(outcome.session);
+    return send(res, 409, { status: "session_active", message: "session_active" });
+  }
   const adopted = await adoptOrClose(companyKey, outcome.session, outcome.result);
   if (!adopted) {
     markNeedsOtp(String(companyKey));
@@ -136,7 +140,26 @@ async function handleStart(req, res) {
   }
 }
 
-async function runStart(body, { companyKey, password, cold }, res) {
+// Cold browsers started but not yet visible in `pending`/the manager.
+let coldStarting = 0;
+
+/** Headed Chromes already spoken for: live sessions plus cold logins held or launching. */
+function coldSlotsTaken() {
+  return liveSessionCount() + coldStarting + [...pending.values()].filter((e) => e.cold).length;
+}
+
+async function runStart(body, admitted, res) {
+  if (admitted.cold !== true) return runStartNow(body, admitted, res);
+  if (coldSlotsTaken() >= config.maxSessions) return send(res, 503, { status: STATUS.ERROR, message: "at_capacity" });
+  coldStarting++;
+  try {
+    return await runStartNow(body, admitted, res);
+  } finally {
+    coldStarting--;
+  }
+}
+
+async function runStartNow(body, { companyKey, password, cold }, res) {
   const passwordless = !password;
   const outcome = await startLogin({
     email: body.email,

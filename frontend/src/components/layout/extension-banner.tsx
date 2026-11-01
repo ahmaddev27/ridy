@@ -22,7 +22,7 @@ export function ExtensionBanner() {
 
   const isManager = Boolean(user?.tenant);
   // A passwordless company connects with email + code and never needs the extension.
-  const passwordless = user?.tenant?.passwordless_login_enabled === true;
+  const passwordless = user?.tenant?.passwordless_primary === true;
 
   useEffect(() => {
     if (!isManager || passwordless) return;

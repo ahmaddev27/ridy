@@ -17,7 +17,7 @@ use Illuminate\Http\Request;
 class UberLoginController extends Controller
 {
     /** failure -> HTTP status; anything else is a normal 200 (the state says what happened). */
-    private const FAILURE_HTTP = ['session_active' => 409, 'no_session' => 409, 'unavailable' => 503];
+    private const FAILURE_HTTP = ['session_active' => 409, 'no_session' => 409, 'no_proxy' => 409, 'unavailable' => 503];
 
     public function __construct(
         private readonly PasswordlessLoginService $login,

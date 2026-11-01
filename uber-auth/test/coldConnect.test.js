@@ -5,7 +5,7 @@ import { admitStart, createStartGate } from "../src/loginPolicy.js";
 import { SESSION_STATE } from "../src/sessionManager.js";
 
 const policy = (state = null, coldEnabled = true) => ({ passwordless: true, stateOf: () => state, coldEnabled });
-const body = { email: "a@b.de", company_key: "7", cold: true };
+const body = { email: "a@b.de", company_key: "7", cold: true, proxy_url: "http://u:p@proxy.test:8000" };
 
 test("cold connect: flag on + backend says cold + nothing held -> admitted as cold", () => {
   const r = admitStart(body, policy());
@@ -39,4 +39,16 @@ test("the gate refuses a second concurrent cold start", () => {
   assert.equal(gate.enter("7").body.status, "start_in_flight");
   gate.leave("7");
   assert.equal(gate.enter("7").ok, true);
+});
+
+test("a cold start without a valid proxy is refused as no_proxy, never run from the datacenter IP", () => {
+  for (const proxy_url of [undefined, null, "", "nonsense", "ftp://p.test:1"]) {
+    const r = admitStart({ ...body, proxy_url }, policy());
+    assert.equal(r.ok, false);
+    assert.equal(r.body.status, "no_proxy");
+  }
+});
+
+test("no_proxy only applies to a cold request: an ACTIVE company still reads session_active", () => {
+  assert.equal(admitStart({ ...body, proxy_url: null }, policy(SESSION_STATE.ACTIVE)).body.status, "session_active");
 });

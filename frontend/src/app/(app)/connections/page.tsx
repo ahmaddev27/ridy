@@ -148,8 +148,9 @@ export default function ConnectionsPage() {
   }, [awaitingLink, data]);
 
   const connected = data?.status === "active";
-  // Passwordless company: email + code is THE connect path; the extension is not offered or nagged.
-  const passwordless = user?.tenant?.passwordless_login_enabled === true;
+  // Email + code is THE connect path (warm company, or cold with the cold flag on); the extension
+  // is then neither offered nor nagged. A never-connected company without cold keeps the extension.
+  const passwordless = user?.tenant?.passwordless_primary === true;
   const working = extBusy || awaitingLink;
 
   return (
@@ -213,6 +214,7 @@ export default function ConnectionsPage() {
               className="mt-6"
               onClick={connectViaExtension}
               disabled={working}
+              hidden={passwordless}
             >
               {working ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {c("reconnect")}

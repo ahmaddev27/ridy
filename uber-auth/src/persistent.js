@@ -93,6 +93,21 @@ export const sessionState = (companyKey) => manager.stateOf(companyKey);
 export const markLoggingIn = (companyKey) => manager.markLoggingIn(companyKey);
 export const handleOf = (companyKey) => manager.get(companyKey)?.handle ?? null;
 export const markNeedsOtp = (companyKey) => manager.markNeedsOtp(companyKey);
+export const liveSessionCount = () => manager.liveCount();
+
+/**
+ * Cross-process check for a COLD login: does the BACKEND already hold a live session for the
+ * company (the extension or an auto-relink may have connected it since the cold start)? The
+ * in-memory manager cannot see that. Fails CLOSED: if the backend cannot be asked, assume yes.
+ */
+export async function backendHasSession(companyKey) {
+  try {
+    const wanted = await backendGet("/api/v1/internal/session-browser/wanted");
+    return wanted.some((s) => String(s.tenant_id) === String(companyKey));
+  } catch {
+    return true;
+  }
+}
 
 export function statusList() {
   return manager.status();

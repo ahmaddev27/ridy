@@ -97,6 +97,8 @@ return [
         // Variant B: the subdomain whose MX points at us (Postfix pipes mail to inbound-mail:ingest).
         'inbound_domain' => trim((string) env('UBER_INBOUND_DOMAIN')) ?: 'in.reidey.de',
         'tenants' => array_values(array_filter(array_map('trim', explode(',', (string) env('UBER_PASSWORDLESS_TENANTS'))))),
+        // Cold first connect (no prior session): needs uber-auth's UBER_AUTH_PASSWORDLESS_COLD too. OFF by default.
+        'cold' => filter_var(env('UBER_PASSWORDLESS_COLD', false), FILTER_VALIDATE_BOOL),
     ],
 
     // Self-hosted receipt vision (llama.cpp + Qwen2.5-VL, compose profile
