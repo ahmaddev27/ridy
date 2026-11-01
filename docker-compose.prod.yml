@@ -82,6 +82,9 @@ x-app-env: &app-env
   # also needs its own super-admin flag. TENANTS = optional rollout allowlist (ids).
   UBER_PASSWORDLESS_LOGIN: ${UBER_PASSWORDLESS_LOGIN:-}
   UBER_PASSWORDLESS_TENANTS: ${UBER_PASSWORDLESS_TENANTS:-}
+  # Cold first-connect (no prior session): backend side of the flag. Needs uber-auth's
+  # UBER_AUTH_PASSWORDLESS_COLD too. OFF unless "1".
+  UBER_PASSWORDLESS_COLD: ${UBER_PASSWORDLESS_COLD:-}
   # Variant B: the subdomain whose MX Postfix pipes into `php artisan inbound-mail:ingest`.
   UBER_INBOUND_DOMAIN: ${UBER_INBOUND_DOMAIN:-in.reidey.de}
   # FCM HTTP v1 (OAuth2 service-account) — used by FcmPushSender for driver + web
@@ -375,6 +378,8 @@ services:
       UBER_AUTH_SECRET: ${UBER_AUTH_SECRET:-}
       # Passwordless sign-in (docs/27): accept /login/start without a password. OFF unless "1".
       UBER_AUTH_PASSWORDLESS: ${UBER_AUTH_PASSWORDLESS:-}
+      # Cold first-connect: allow a fresh-browser login for a never-connected company. OFF unless "1".
+      UBER_AUTH_PASSWORDLESS_COLD: ${UBER_AUTH_PASSWORDLESS_COLD:-}
       DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
       # Pilot: real Chrome headed under Xvfb (heavier RAM/CPU). Unset = headless Chromium.
       REAL_CHROME: ${REAL_CHROME:-}
