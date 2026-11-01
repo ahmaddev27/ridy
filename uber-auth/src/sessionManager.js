@@ -158,10 +158,28 @@ export class PersistentSessionManager {
     return this.sessions.get(companyKey);
   }
 
-  /** Mark that an interactive (re-)login is being driven for this company. */
+  /**
+   * Mark that an interactive (re-)login is being driven for this company. NEVER
+   * touches an ACTIVE session: LOGGING_IN is not warmable, so flipping a healthy
+   * browser would silently stop its keep-warm. Returns false when refused.
+   */
   markLoggingIn(companyKey) {
     const e = this.sessions.get(companyKey);
-    if (e) e.state = SESSION_STATE.LOGGING_IN;
+    if (!e) return true;
+    if (e.state === SESSION_STATE.ACTIVE) return false;
+    e.state = SESSION_STATE.LOGGING_IN;
+    return true;
+  }
+
+  /** A login that failed / was cancelled / timed out: back to waiting for the operator. Only undoes LOGGING_IN. */
+  markNeedsOtp(companyKey) {
+    const e = this.sessions.get(companyKey);
+    if (e && e.state === SESSION_STATE.LOGGING_IN) e.state = SESSION_STATE.NEEDS_OTP;
+  }
+
+  /** The state of a held company, or null when none is held. */
+  stateOf(companyKey) {
+    return this.sessions.get(companyKey)?.state ?? null;
   }
 
   /** Whether a session is due for a keep-warm: strictly by cadence (hourly; 10 min in rescue mode). */

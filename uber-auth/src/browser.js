@@ -17,6 +17,8 @@ export const STATUS = {
   MFA_REQUIRED: "mfa_required",
   PASSKEY_UNSUPPORTED: "passkey_unsupported",
   BAD_CREDENTIALS: "bad_credentials",
+  PASSWORD_REQUIRED: "password_required", // Uber asked for a password and we hold none
+  CHANNEL_UNAVAILABLE: "channel_unavailable", // no code step reached (e.g. a chooser with no default)
   ERROR: "error",
 };
 
@@ -197,10 +199,16 @@ async function captureResult(context, page) {
 /**
  * Begin a login. On MFA the returned session keeps the browser open for
  * submitMfa(); otherwise it is closed before returning.
+ *
+ * Passwordless (no `password`): after the email Uber sends a code on its DEFAULT
+ * channel and shows the code boxes; we never navigate a channel chooser. A
+ * password step with no password to give, or a step we cannot recognise, ends
+ * the attempt (password_required / channel_unavailable) rather than guessing.
+ * `proxyUrl` is the company's residential proxy (the one the daemon uses).
  */
-export async function startLogin({ email, password }) {
+export async function startLogin({ email, password = null, proxyUrl = null, companyKey = null }) {
   const browser = await launchBrowser();
-  const context = await newStealthContext(browser);
+  const context = await newStealthContext(browser, {}, proxyUrl, companyKey);
   const page = await context.newPage();
   page.setDefaultTimeout(config.stepTimeout);
   const session = { browser, context, page, createdAt: Date.now() };
@@ -221,6 +229,10 @@ export async function startLogin({ email, password }) {
     let step = await detectStep(page);
 
     if (step === "password") {
+      if (!password) {
+        await browser.close();
+        return { status: STATUS.PASSWORD_REQUIRED };
+      }
       await passwordField(page).fill(password);
       await advance(page);
       step = await detectStep(page);
@@ -240,7 +252,7 @@ export async function startLogin({ email, password }) {
     }
 
     await browser.close();
-    return { status: STATUS.BAD_CREDENTIALS };
+    return { status: password ? STATUS.BAD_CREDENTIALS : STATUS.CHANNEL_UNAVAILABLE };
   } catch (e) {
     await browser.close().catch(() => {});
     return { status: STATUS.ERROR, message: e.message };

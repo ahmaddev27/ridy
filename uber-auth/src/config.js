@@ -25,6 +25,10 @@ export const config = {
   // than headless; unset = today's bundled headless Chromium.
   realChrome: process.env.REAL_CHROME === "1",
 
+  // Passwordless sign-in (docs/27): /login/start accepts email + company_key with no
+  // password and relays the one-time code. OFF = the legacy password-required rule.
+  passwordless: ["1", "true"].includes(String(process.env.UBER_AUTH_PASSWORDLESS || "").toLowerCase()),
+
   // Per-step wait budget (ms).
   stepTimeout: Number(process.env.UBER_AUTH_STEP_TIMEOUT || 30000),
 

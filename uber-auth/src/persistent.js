@@ -87,6 +87,11 @@ export async function adoptLogin(companyKey, session, result) {
   await pushStatus().catch(() => {});
 }
 
+/** Passwordless-login hooks (server.js): the session state and the login-in-progress marker. */
+export const sessionState = (companyKey) => manager.stateOf(companyKey);
+export const markLoggingIn = (companyKey) => manager.markLoggingIn(companyKey);
+export const markNeedsOtp = (companyKey) => manager.markNeedsOtp(companyKey);
+
 export function statusList() {
   return manager.status();
 }
