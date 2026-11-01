@@ -11,18 +11,21 @@ class MimeParser
 {
     private const MAX_DEPTH = 5;
 
+    /** Never throws: malformed input yields whatever could be read (or an empty message). */
     public function parse(string $raw): ParsedEmail
     {
-        [$headers, $body] = $this->split($raw);
+        $headers = [];
         $parts = ['text' => '', 'html' => ''];
-        $this->collect($headers, $body, $parts, 0);
+        $subject = '';
+        try {
+            [$headers, $body] = $this->split($raw);
+            $this->collect($headers, $body, $parts, 0);
+            $subject = $this->decodeHeader($headers['subject'][0] ?? '');
+        } catch (\Throwable) {
+            // junk mail is the sender's problem, not an infrastructure failure
+        }
 
-        return new ParsedEmail(
-            $headers,
-            $this->decodeHeader($headers['subject'][0] ?? ''),
-            $parts['text'],
-            $parts['html'],
-        );
+        return new ParsedEmail($headers, $subject, $parts['text'], $parts['html']);
     }
 
     /** @return array{0: array<string, list<string>>, 1: string} */
@@ -118,12 +121,33 @@ class MimeParser
             default => $body,
         };
         $charset = strtolower($this->param($headers['content-type'][0] ?? '', 'charset'));
-        if ($charset !== '' && $charset !== 'utf-8' && $charset !== 'us-ascii') {
-            $converted = @mb_convert_encoding($decoded, 'UTF-8', $charset);
-            $decoded = is_string($converted) ? $converted : $decoded;
+        if ($charset !== '' && $charset !== 'utf-8' && $charset !== 'us-ascii' && $this->knownCharset($charset)) {
+            try {
+                $decoded = mb_convert_encoding($decoded, 'UTF-8', $charset);
+            } catch (\ValueError) {
+                // keep the bytes as they are
+            }
         }
 
         return $decoded;
+    }
+
+    /**
+     * An unrecognised charset must not make the whole message unreadable: PHP 8 throws a
+     * ValueError for it (the @ operator does not stop that), so it is checked up front.
+     */
+    private function knownCharset(string $charset): bool
+    {
+        static $known = null;
+        $known ??= array_map('strtolower', mb_list_encodings());
+        if (in_array($charset, $known, true)) {
+            return true;
+        }
+        try {
+            return mb_encoding_aliases($charset) !== [] || in_array(strtolower(mb_preferred_mime_name($charset) ?: ''), $known, true);
+        } catch (\ValueError) {
+            return false;
+        }
     }
 
     /** The bare media type when $name is null, else that parameter's value. */

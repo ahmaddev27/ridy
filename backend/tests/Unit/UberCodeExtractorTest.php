@@ -70,6 +70,39 @@ class UberCodeExtractorTest extends TestCase
         $this->assertSame('0033', $this->extract($this->mail("Do not\u{00AD} share:\u{034F} 0033")));
     }
 
+    public function test_a_stray_number_in_the_body_never_cancels_a_valid_subject_code(): void
+    {
+        $body = "Your Uber verification code expires in 10 minutes. Uber Technologies 2026, 10115 Berlin.\n"
+            ."To finish logging in, enter this verification code:\n\n0033\n";
+
+        $this->assertSame('0033', $this->extract($this->mail('Do not share: 0033', $body)));
+        // a year or postcode that is not the token right after the phrase is not a competing code
+        $this->assertSame('0033', $this->extract($this->mail('Do not share: 0033', 'Your verification code is below. 2026 Uber')));
+    }
+
+    public function test_a_footer_number_is_never_extracted_as_the_code(): void
+    {
+        $this->assertNull($this->extract($this->mail('Your Uber code', 'See our verification code help page. Uber Technologies 2026, 10115 Berlin.')));
+        $this->assertNull($this->extract($this->mail('Your Uber code', "Footer 2026\nenter this verification code via the app\n2026")));
+    }
+
+    public function test_only_the_token_directly_after_the_phrase_counts(): void
+    {
+        $this->assertSame('0457', $this->extract($this->mail('Your Uber code', "enter this verification code:\n\n\u{034F} 0457 \u{00AD}\nthen 2026")));
+        $this->assertNull($this->extract($this->mail('Your Uber code', 'enter this verification code, valid until 2026')));
+    }
+
+    public function test_a_flood_of_unclosed_script_tags_cannot_burn_cpu(): void
+    {
+        $html = '<p>enter this verification code: 0033</p>'.str_repeat('<script ', 40000);
+        $start = microtime(true);
+
+        $code = $this->extract($this->mail('Your Uber code', '', $html));
+
+        $this->assertLessThan(2.0, microtime(true) - $start);
+        $this->assertSame('0033', $code);
+    }
+
     public function test_ambiguous_mail_yields_null(): void
     {
         $two = "enter this verification code: 1111\nenter this verification code: 2222";

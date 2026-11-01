@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Console\Commands\IngestInboundMail;
 use App\Domain\Audit\Models\AuditLog;
 use App\Domain\Dispatch\AutoReloginService;
 use App\Domain\Dispatch\Inbound\InboundMailHandler;
+use App\Domain\Dispatch\Inbound\MimeParser;
 use App\Domain\Dispatch\Inbound\ReplayGuard;
+use App\Domain\Dispatch\LoginAttemptStore;
 use App\Domain\Dispatch\Models\SessionBrowser;
 use App\Domain\Dispatch\PasswordlessLoginSettings;
 use App\Domain\Tenancy\Models\Tenant;
@@ -13,13 +16,16 @@ use App\Domain\Tenancy\TenantContext;
 use App\Jobs\AutoReloginJob;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Testing\PendingCommand;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -256,9 +262,79 @@ class UberInboundMailTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    public function test_the_ingest_command_is_registered_and_exits_cleanly_on_empty_input(): void
+    /** The Postfix entry point with its STDIN replaced by $input. */
+    private function ingest(string $input, ?string $rcpt = null): PendingCommand
     {
-        $this->artisan('inbound-mail:ingest')->assertExitCode(0);
+        $command = new class($input) extends IngestInboundMail
+        {
+            public function __construct(private readonly string $stdin)
+            {
+                parent::__construct();
+            }
+
+            protected function readInput(): string
+            {
+                return $this->stdin;
+            }
+        };
+        $this->app->make(Kernel::class)->registerCommand($command);
+
+        return $this->artisan('inbound-mail:ingest', $rcpt === null ? [] : ['--rcpt' => $rcpt]);
+    }
+
+    public function test_the_ingest_command_exits_cleanly_on_empty_or_oversize_input(): void
+    {
+        $this->ingest('')->assertExitCode(0);
+        $this->ingest(str_repeat('x', 300000))->assertExitCode(0);
+    }
+
+    public function test_an_unknown_charset_is_dropped_or_read_never_tempfailed(): void
+    {
+        $this->fakeUber();
+        $this->startLogin();
+        $raw = str_replace('charset=UTF-8', 'charset=x-no-such-charset', $this->raw());
+
+        // The parser itself never throws on it...
+        $parsed = app(MimeParser::class)->parse($raw);
+        $this->assertStringContainsString('verification code', $parsed->text);
+        // ...and the Postfix command exits 0 (a retry storm is exit 75).
+        $this->ingest($raw, $this->address)->assertExitCode(0);
+        $this->assertTrue($this->mfaSent(), 'bytes were used as-is, so the ASCII code was still found');
+    }
+
+    public function test_garbage_input_is_dropped_with_exit_zero(): void
+    {
+        foreach (["\x00\xff\xfe not a mail", "Content-Type: multipart/mixed; boundary=\r\n\r\n--\r\n", "Content-Type: text/plain; charset=\r\n\r\nx", 'Subject: =?bogus?Q?x?='] as $junk) {
+            $this->ingest($junk, $this->address)->assertExitCode(0);
+            $this->ingest($junk)->assertExitCode(0);
+        }
+    }
+
+    public function test_a_wrong_recipient_is_rejected_before_the_body_is_parsed_and_without_a_log_line(): void
+    {
+        Log::spy();
+        $this->mock(MimeParser::class, fn ($mock) => $mock->shouldNotReceive('parse'));
+
+        $this->assertSame('unknown_address', app(InboundMailHandler::class)->handle($this->raw(), 'uber-'.str_repeat('z', 26).'@in.reidey.de'));
+        $this->assertSame('unknown_address', app(InboundMailHandler::class)->handle($this->raw(), 'bob@example.com'));
+
+        Log::shouldNotHaveReceived('info');
+    }
+
+    public function test_the_audit_row_exists_only_when_the_code_was_really_relayed(): void
+    {
+        // An automatic attempt whose uber-auth start has not returned a login_id yet:
+        // there is nothing to relay the code to, so nothing may be recorded as submitted.
+        app(LoginAttemptStore::class)->put($this->tenant->id, [
+            'state' => 'starting', 'login_id' => null, 'mode' => 'auto', 'auto_submitted' => false,
+            'started_at' => now('Europe/Berlin')->toIso8601String(), 'expires_at' => now()->addMinutes(5)->toIso8601String(), 'submits' => 0,
+        ]);
+        Http::fake();
+
+        $this->assertSame('not_relayed', $this->handler()->handle($this->raw(), $this->address));
+
+        Http::assertNothingSent();
+        $this->assertSame(0, AuditLog::where('action', 'uber_login.inbound')->count());
     }
 
     // --- automatic re-login -------------------------------------------------

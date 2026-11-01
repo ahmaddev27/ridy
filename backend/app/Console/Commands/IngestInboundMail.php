@@ -28,8 +28,12 @@ class IngestInboundMail extends Command
 
     public function handle(InboundMailHandler $handler): int
     {
-        $raw = stream_get_contents(STDIN, self::MAX_BYTES + 1);
-        if ($raw === false || $raw === '' || strlen($raw) > self::MAX_BYTES) {
+        // Ops requirement (Postfix): accept only recipients matching uber-[a-z0-9]{26}@in.reidey.de
+        // (smtpd_recipient_restrictions) so junk never reaches this command at all.
+        // Malformed content is dropped by the handler (it never throws on a bad message); only
+        // a genuine infrastructure failure (cache / database down) may exit 75 and be retried.
+        $raw = $this->readInput();
+        if ($raw === '' || strlen($raw) > self::MAX_BYTES) {
             return self::SUCCESS;
         }
         $rcpt = trim((string) $this->option('rcpt'));
@@ -44,5 +48,13 @@ class IngestInboundMail extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /** One message from STDIN, read no further than the size cap (+1 to detect an oversize one). */
+    protected function readInput(): string
+    {
+        $raw = stream_get_contents(STDIN, self::MAX_BYTES + 1);
+
+        return $raw === false ? '' : $raw;
     }
 }

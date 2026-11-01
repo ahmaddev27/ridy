@@ -45,16 +45,23 @@ class InboundMailHandler
 
     /**
      * @return string `submitted`, or the reason the message was dropped:
-     *                unknown_address | not_enabled | rate_limited | no_pending | stale | no_message_id | replay | no_code
+     *                unknown_address | not_enabled | rate_limited | no_pending | stale | no_message_id | replay | no_code | not_relayed
      */
     public function handle(string $raw, ?string $recipient = null): string
     {
+        // When the MTA names the recipient, a wrong address is rejected before the body is
+        // even parsed: junk mail costs one cheap lookup, no parsing, no log line.
+        $tenant = $recipient === null ? null : $this->tenantFor($recipient);
+        if ($recipient !== null && $tenant === null) {
+            return 'unknown_address';
+        }
+
         $mail = $this->parser->parse($raw);
         unset($raw);
 
-        $tenant = $this->tenantFor($recipient ?? $this->recipientFromHeaders($mail));
+        $tenant ??= $this->tenantFor($this->recipientFromHeaders($mail));
         if ($tenant === null) {
-            return $this->drop(null, 'unknown_address');
+            return 'unknown_address';
         }
         $reason = $this->rejection($tenant, $mail);
         if ($reason !== null) {
@@ -65,9 +72,16 @@ class InboundMailHandler
         if ($code === null) {
             return $this->drop($tenant, 'no_code');
         }
-        $this->audit->log('uber_login.inbound', null, ['outcome' => self::SUBMITTED, 'dkim' => $mail->hasUberDkimPass()], $tenant->id);
-        $this->login->submitCode($tenant, $code, PasswordlessLoginService::SOURCE_INBOUND);
-        unset($code, $mail);
+        $dkim = $mail->hasUberDkimPass();
+        unset($mail);
+        $relayed = $this->login->submitInboundCode($tenant, $code);
+        unset($code);
+
+        // Recorded only now, and only if the code really went to uber-auth.
+        if (! $relayed) {
+            return $this->drop($tenant, 'not_relayed');
+        }
+        $this->audit->log('uber_login.inbound', null, ['outcome' => self::SUBMITTED, 'dkim' => $dkim], $tenant->id);
 
         return self::SUBMITTED;
     }

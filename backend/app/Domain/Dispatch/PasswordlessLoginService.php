@@ -108,10 +108,34 @@ class PasswordlessLoginService
     /** @return array<string, mixed> */
     public function submitCode(Tenant $tenant, string $code, string $source = self::SOURCE_MANUAL): array
     {
+        $relayed = false;
+
+        return $this->submit($tenant, $code, $source, $relayed);
+    }
+
+    /**
+     * An emailed code (variant B). True only if it was really handed to uber-auth - false
+     * when there was nothing to relay it to (attempt gone, already tried, lock timeout), so
+     * the caller never records a submission that did not happen.
+     */
+    public function submitInboundCode(Tenant $tenant, string $code): bool
+    {
+        $relayed = false;
+        $this->submit($tenant, $code, self::SOURCE_INBOUND, $relayed);
+
+        return $relayed;
+    }
+
+    /** @return array<string, mixed> */
+    private function submit(Tenant $tenant, string $code, string $source, bool &$relayed): array
+    {
         // An emailed code can arrive while start() still holds the lock: wait for it.
         $wait = $source === self::SOURCE_INBOUND ? self::INBOUND_WAIT : 5;
 
-        return $this->locked($tenant, self::SUBMIT_LOCK, fn () => $this->relay($tenant, $code, $source), $wait);
+        // A closure (not fn): the flag must be shared by reference, arrow functions copy it.
+        return $this->locked($tenant, self::SUBMIT_LOCK, function () use ($tenant, $code, $source, &$relayed) {
+            return $this->relay($tenant, $code, $source, $relayed);
+        }, $wait);
     }
 
     /**
@@ -187,7 +211,7 @@ class PasswordlessLoginService
     }
 
     /** @return array<string, mixed> */
-    private function relay(Tenant $tenant, string $code, string $source): array
+    private function relay(Tenant $tenant, string $code, string $source, bool &$relayed): array
     {
         $record = $this->store->get($tenant->id);
         if (($record['state'] ?? null) !== self::STATE_AWAITING_CODE || ! is_string($record['login_id'] ?? null)) {
@@ -204,6 +228,7 @@ class PasswordlessLoginService
         // Remaining lifetime, not a fresh one: this record must never outlive uber-auth's entry.
         $this->store->put($tenant->id, ['state' => self::STATE_SUBMITTING] + $record, $this->remainingTtl($record));
 
+        $relayed = true;
         $answer = $this->client->submitMfa($tenant, $loginId, $code);
 
         return $this->settleCode($tenant, $record, $answer);
