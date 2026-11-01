@@ -238,6 +238,7 @@ active --(Uber يطرد الجلسة: renew فاشل)--> needs_otp --notify(need
 |---|---|---|---|
 | `UBER_PASSWORDLESS_LOGIN` (env، kill switch عام) | backend `config/services.php` | ops | false ← كل المسارات 404 + AutoReloginJob لا يعمل |
 | `UBER_AUTH_PASSWORDLESS` (env) | uber-auth | ops | false ← يبقى رفض password الحالي (422) |
+| `UBER_AUTH_PASSWORDLESS_COLD` (env) | uber-auth | ops | **Cold first connect**: false ← شركة بلا جلسة تُرفَض `no_session` (الإضافة). true ← `/login/start` مع `cold:true` وحالة الشركة فارغة تماماً (state=null) يُطلق `freshSession` عبر proxy الشركة (email→OTP، بلا password). لا يصل أبداً لشركة active/logging_in/down؛ Arkose يبقى `blocked`. يتطلب `UBER_AUTH_PASSWORDLESS` |
 | `tenants.settings['passwordless_login']['enabled']` | tenant | **super-admin** | بوابة الشركة (A) |
 | `…['auto_code']` + `…['inbound_token_hash']` | tenant | `connections.manage` (بعد `enabled`) | يمكّن B (استقبال) |
 | `…['auto_relogin']` | tenant | `connections.manage` | الإطلاق الآلي عند needs_otp |

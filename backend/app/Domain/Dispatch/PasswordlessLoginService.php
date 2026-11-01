@@ -92,17 +92,16 @@ class PasswordlessLoginService
         if ($this->sessionIsActive($tenant)) {
             return $this->failedView('session_active');
         }
-        // Warm re-auth only: a never-connected company is a cold login, which Uber's
-        // Arkose challenge reliably stops. Those connect through the extension.
-        if (! $this->hasPriorContext($tenant)) {
-            return $this->failedView('no_session');
-        }
+        // No prior context at all (no browser row, no stored session) = a COLD first connect.
+        // Only reachable here because sessionIsActive() already refused any live session;
+        // uber-auth enforces the same (and its own flag) before it ever launches a browser.
+        $cold = ! $this->hasPriorContext($tenant);
 
         // The automatic mode needs the company's opt-in and its secret address; without them
         // it is just the manual flow (the manager types the code).
         $mode = $mode === self::MODE_AUTO && $this->settings->autoCodeEnabled($tenant) ? self::MODE_AUTO : self::MODE_MANUAL;
 
-        return $this->locked($tenant, self::START_LOCK, fn () => $this->begin($tenant, $email, $mode));
+        return $this->locked($tenant, self::START_LOCK, fn () => $this->begin($tenant, $email, $mode, $cold));
     }
 
     /** @return array<string, mixed> */
@@ -166,7 +165,7 @@ class PasswordlessLoginService
     }
 
     /** @return array<string, mixed> */
-    private function begin(Tenant $tenant, string $email, string $mode): array
+    private function begin(Tenant $tenant, string $email, string $mode, bool $cold): array
     {
         // One login per company: a second start replaces the first.
         $this->abandon($tenant, $this->store->get($tenant->id));
@@ -183,9 +182,9 @@ class PasswordlessLoginService
         ];
         $this->store->put($tenant->id, $record, LoginAttemptStore::START_WINDOW);
         // No email (or anything derived from it) is kept: not in the cache record, not in the log.
-        $this->audit->log('uber_login.started', null, ['mode' => $mode], $tenant->id);
+        $this->audit->log('uber_login.started', null, ['mode' => $mode, 'cold' => $cold], $tenant->id);
 
-        return $this->settleStart($tenant, $record, $this->client->startLogin($tenant, $email));
+        return $this->settleStart($tenant, $record, $this->client->startLogin($tenant, $email, $cold));
     }
 
     /**

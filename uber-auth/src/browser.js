@@ -252,12 +252,18 @@ async function captureResult(context, page) {
  * the attempt (password_required / channel_unavailable) rather than guessing.
  * `proxyUrl` is the company's residential proxy (the one the daemon uses).
  *
+ * `cold` = first connect with no prior session: a fresh browser through the company's proxy
+ * (real Chrome when REAL_CHROME), the same email -> code steps. Arkose still ends it as `blocked`.
+ *
  * `reuse` = the company's persistent browser handle ({browser, context, page}): the
  * WARM re-authentication path. It rides the browser that already holds the company's
  * cookies and proxy (Uber shows "Welcome back", far less Arkose risk than a cold
  * login), and is never closed on failure — only its page state is abandoned.
  */
-export async function startLogin({ email, password = null, proxyUrl = null, companyKey = null, reuse = null }) {
+export async function startLogin({ email, password = null, proxyUrl = null, companyKey = null, reuse = null, cold = false }) {
+  // A passwordless login with nothing to ride and no explicit cold clearance never builds a
+  // browser: a stray fresh session must be unreachable (server.js admits cold only for an empty slot).
+  if (!password && !reuse && !cold) return { status: STATUS.ERROR, message: "no_session" };
   const session = reuse ? Object.assign(reuse, { reused: true }) : await freshSession(proxyUrl, companyKey);
   const { context, page } = session;
   page.setDefaultTimeout(config.stepTimeout);

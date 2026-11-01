@@ -148,6 +148,8 @@ export default function ConnectionsPage() {
   }, [awaitingLink, data]);
 
   const connected = data?.status === "active";
+  // Passwordless company: email + code is THE connect path; the extension is not offered or nagged.
+  const passwordless = user?.tenant?.passwordless_login_enabled === true;
   const working = extBusy || awaitingLink;
 
   return (
@@ -155,7 +157,7 @@ export default function ConnectionsPage() {
       <PageHeader title={c("title")} subtitle={c("subtitle")} />
 
       {/* Installed but outdated: a light, non-blocking nudge (kept trivial). */}
-      {extInstalled && isExtensionOutdated(extVersion) && (
+      {!passwordless && extInstalled && isExtensionOutdated(extVersion) && (
         <a
           href={EXTENSION_STORE_URL}
           target="_blank"
@@ -174,7 +176,7 @@ export default function ConnectionsPage() {
       {/* Session broke (e.g. the company changed their Uber password → cookies
           rejected). A distinct, prominent alert that drives the reconnect flow —
           so the manager knows offers stopped and exactly what to do. */}
-      {data?.status === "needs_relink" && (
+      {data?.status === "needs_relink" && !passwordless && (
         <div className="flex items-start gap-3 rounded-xl border border-line bg-danger-bg px-4 py-3 text-sm text-danger-fg">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="flex-1">
@@ -188,6 +190,10 @@ export default function ConnectionsPage() {
         </div>
       )}
 
+      {/* Passwordless company, not connected: the code card is the primary (only) connect path. */}
+      {passwordless && !connected && !loading && <UberCodeLogin onConnected={refetch} />}
+
+      {(!passwordless || connected) && (
       <Card className="p-8">
         {loading || extInstalled === null ? (
           <div className="flex items-center justify-center py-8 text-ink-muted">
@@ -244,10 +250,6 @@ export default function ConnectionsPage() {
           </div>
         )}
       </Card>
-
-      {/* Passwordless sign-in (docs/27): only for companies the platform opened it for. */}
-      {user?.tenant?.passwordless_login_enabled === true && !connected && (
-        <UberCodeLogin onConnected={refetch} />
       )}
     </div>
   );

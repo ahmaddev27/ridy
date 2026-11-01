@@ -21,9 +21,11 @@ export function ExtensionBanner() {
   const [dismissed, setDismissed] = useState(false);
 
   const isManager = Boolean(user?.tenant);
+  // A passwordless company connects with email + code and never needs the extension.
+  const passwordless = user?.tenant?.passwordless_login_enabled === true;
 
   useEffect(() => {
-    if (!isManager) return;
+    if (!isManager || passwordless) return;
     let answered = false;
 
     function onMessage(e: MessageEvent) {
@@ -53,9 +55,9 @@ export function ExtensionBanner() {
       clearInterval(poll);
       clearTimeout(timer);
     };
-  }, [isManager]);
+  }, [isManager, passwordless]);
 
-  if (!isManager || dismissed || state === "checking" || state === "ok") return null;
+  if (!isManager || passwordless || dismissed || state === "checking" || state === "ok") return null;
 
   const message = t(`extBanner.${state}`);
 
