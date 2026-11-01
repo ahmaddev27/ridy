@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\Cache;
  * memory for the same 5 minutes) and a restart should simply forget it.
  *
  * The record carries the uber-auth `login_id` (an internal secret that never leaves
- * the backend), a one-way hash of the email for comparison, and the lifecycle state.
- * It NEVER carries the one-time code.
+ * the backend) and the lifecycle state. It NEVER carries the one-time code, nor the
+ * email or anything derived from it.
  */
 class LoginAttemptStore
 {
@@ -48,12 +48,6 @@ class LoginAttemptStore
     public function lock(int $tenantId, int $seconds): Lock
     {
         return Cache::lock("uber_login:lock:{$tenantId}", $seconds);
-    }
-
-    /** Not reversible and not the email: only ever compared, never shown. */
-    public function hashEmail(string $email): string
-    {
-        return hash('sha256', mb_strtolower(trim($email)));
     }
 
     private function key(int $tenantId): string

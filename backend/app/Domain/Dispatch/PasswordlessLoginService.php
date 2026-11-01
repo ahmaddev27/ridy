@@ -47,7 +47,10 @@ class PasswordlessLoginService
 
     private const SUBMIT_LOCK = 45;
 
-    private const UBER_AUTH_FAILURES = ['passkey_unsupported', 'blocked', 'channel_unavailable', 'password_required', 'session_active', 'no_session'];
+    private const UBER_AUTH_FAILURES = ['passkey_unsupported', 'blocked', 'channel_unavailable', 'password_required', 'session_active', 'no_session', 'capture_failed'];
+
+    /** uber-auth answers that mean "still running", never "failed". */
+    private const PENDING_STATUSES = ['pending', 'start_in_flight'];
 
     public function __construct(
         private readonly UberAuthClient $client,
@@ -58,7 +61,14 @@ class PasswordlessLoginService
     /** @return array<string, mixed> */
     public function status(Tenant $tenant): array
     {
-        return $this->view($this->store->get($tenant->id));
+        $record = $this->store->get($tenant->id);
+        $inFlight = in_array($record['state'] ?? null, [self::STATE_STARTING, self::STATE_SUBMITTING], true);
+
+        // A timed-out start/submit may still have finished on uber-auth's side: a capture
+        // accepted since the attempt began is the proof, and settles the attempt.
+        return $inFlight && $this->captureLanded($tenant, $record)
+            ? $this->connected($tenant, $record)
+            : $this->view($record);
     }
 
     /** @return array<string, mixed> */
@@ -107,13 +117,13 @@ class PasswordlessLoginService
             'login_id' => null,
             'mode' => 'manual',
             'channel' => null,
-            'email_hash' => $this->store->hashEmail($email),
             'started_at' => $startedAt->toIso8601String(),
             'expires_at' => $startedAt->addSeconds(LoginAttemptStore::ATTEMPT_TTL)->toIso8601String(),
             'submits' => 0,
         ];
         $this->store->put($tenant->id, $record, LoginAttemptStore::START_WINDOW);
-        $this->audit->log('uber_login.started', null, ['mode' => 'manual', 'email' => substr($record['email_hash'], 0, 8)], $tenant->id);
+        // No email (or anything derived from it) is kept: not in the cache record, not in the log.
+        $this->audit->log('uber_login.started', null, ['mode' => 'manual'], $tenant->id);
 
         return $this->settleStart($tenant, $record, $this->client->startLogin($tenant, $email));
     }
@@ -133,7 +143,11 @@ class PasswordlessLoginService
             return $this->view($record);
         }
 
-        return $status === 'success' ? $this->connected($tenant) : $this->fail($tenant, $this->failureFor($answer));
+        if (in_array($status, self::PENDING_STATUSES, true)) {
+            return $this->pendingView($record);
+        }
+
+        return $status === 'success' ? $this->connected($tenant, $record) : $this->fail($tenant, $this->failureFor($answer));
     }
 
     /** @return array<string, mixed> */
@@ -144,7 +158,8 @@ class PasswordlessLoginService
             return $this->view($record);
         }
         $loginId = $record['login_id'];
-        $this->store->put($tenant->id, ['state' => self::STATE_SUBMITTING] + $record);
+        // Remaining lifetime, not a fresh one: this record must never outlive uber-auth's entry.
+        $this->store->put($tenant->id, ['state' => self::STATE_SUBMITTING] + $record, $this->remainingTtl($record));
 
         $answer = $this->client->submitMfa($tenant, $loginId, $code);
 
@@ -160,7 +175,12 @@ class PasswordlessLoginService
     {
         $status = $answer['status'] ?? 'error';
         if ($status === 'success') {
-            return $this->connected($tenant);
+            return $this->connected($tenant, $record);
+        }
+        if ($status === 'pending') {
+            // Timed out waiting: the code may or may not have been accepted. Stay in
+            // "submitting" (no second submit) until the record expires or the capture lands.
+            return $this->pendingView(['state' => self::STATE_SUBMITTING] + $record);
         }
         if ($status === 'mfa_required' && ($answer['retry'] ?? false) === true) {
             return $this->retryOrGiveUp($tenant, $record);
@@ -187,9 +207,16 @@ class PasswordlessLoginService
         return $this->view($record) + ['retry' => true];
     }
 
-    /** @return array<string, mixed> */
-    private function connected(Tenant $tenant): array
+    /**
+     * @param  array<string, mixed>  $record
+     * @return array<string, mixed>
+     */
+    private function connected(Tenant $tenant, array $record): array
     {
+        // uber-auth said success; only believe it if a fresh capture really landed since the start.
+        if (! $this->captureLanded($tenant, $record)) {
+            return $this->fail($tenant, 'capture_failed');
+        }
         $this->store->put($tenant->id, ['state' => self::STATE_CONNECTED], LoginAttemptStore::RESULT_TTL);
         $this->audit->log('uber_login.connected', null, ['mode' => 'manual'], $tenant->id);
 
@@ -233,6 +260,32 @@ class PasswordlessLoginService
         return $browser !== null && $browser->state === SessionBrowser::STATE_ACTIVE && $browser->isLive();
     }
 
+    /**
+     * The capture endpoint stamps SessionBrowser.last_capture_at synchronously, before
+     * uber-auth answers, so a capture accepted during this attempt is visible right now.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private function captureLanded(Tenant $tenant, array $record): bool
+    {
+        $startedAt = CarbonImmutable::parse((string) ($record['started_at'] ?? 'now'));
+        $last = SessionBrowser::where('tenant_id', $tenant->id)->value('last_capture_at');
+
+        return $last !== null && CarbonImmutable::parse($last)->greaterThanOrEqualTo($startedAt->subSecond());
+    }
+
+    /**
+     * Still waiting on uber-auth (timeout / start already running): not a failure, so the
+     * UI says wait-and-retry instead of racing a login that may still be in progress.
+     *
+     * @param  array<string, mixed>  $record
+     * @return array<string, mixed>
+     */
+    private function pendingView(array $record): array
+    {
+        return $this->view($record) + ['pending' => true];
+    }
+
     /** The company has been connected before: a browser context or a stored Uber session exists. */
     private function hasPriorContext(Tenant $tenant): bool
     {
@@ -264,7 +317,7 @@ class PasswordlessLoginService
     /** @param  array<string, mixed>  $record */
     private function remainingTtl(array $record): int
     {
-        return max(1, CarbonImmutable::parse((string) $record['expires_at'])->getTimestamp() - time());
+        return max(1, CarbonImmutable::parse((string) $record['expires_at'])->getTimestamp() - CarbonImmutable::now()->getTimestamp());
     }
 
     /**

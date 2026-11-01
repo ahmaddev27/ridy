@@ -3,6 +3,7 @@
 namespace App\Domain\Dispatch;
 
 use App\Domain\Tenancy\Models\Tenant;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -72,6 +73,14 @@ class UberAuthClient
             $json = $res->json();
 
             return is_array($json) ? $json : ['status' => 'error', 'message' => 'bad_response'];
+        } catch (ConnectionException $e) {
+            // A timeout is NOT a failure: uber-auth may still be driving the login (or have
+            // sent the code). Report it as pending so the caller waits instead of racing it.
+            if (stripos($e->getMessage(), 'timed out') !== false || stripos($e->getMessage(), 'error 28') !== false) {
+                return ['status' => 'pending'];
+            }
+
+            return ['status' => 'error', 'message' => 'browser_service_unreachable'];
         } catch (\Throwable) {
             // Deliberately no message: a transport error could echo the request.
             return ['status' => 'error', 'message' => 'browser_service_unreachable'];

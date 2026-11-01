@@ -11,6 +11,7 @@ use App\Domain\Tenancy\TenantContext;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
@@ -138,6 +139,7 @@ class UberLoginTest extends TestCase
     {
         $this->fakeUber();
         $this->start();
+        $this->landCapture();
 
         $this->postJson('/api/v1/uber-login/code', ['code' => self::CODE])
             ->assertOk()->assertJsonPath('data.state', 'connected');
@@ -151,6 +153,79 @@ class UberLoginTest extends TestCase
         $this->assertStringNotContainsString(self::CODE, AuditLog::all()->toJson());
         $this->assertStringNotContainsString('ops@acme.de', AuditLog::all()->toJson());
         $this->assertGreaterThan(0, AuditLog::where('action', 'uber_login.connected')->count());
+    }
+
+    /** The internal capture endpoint stamps this when uber-auth's post is accepted. */
+    private function landCapture(): void
+    {
+        SessionBrowser::where('tenant_id', $this->tenant->id)->update(['last_capture_at' => now()]);
+    }
+
+    public function test_connected_is_only_reported_after_a_capture_really_landed(): void
+    {
+        $this->fakeUber();
+        $this->start();
+
+        $this->postJson('/api/v1/uber-login/code', ['code' => self::CODE])
+            ->assertOk()->assertJsonPath('data.state', 'failed')->assertJsonPath('data.failure', 'capture_failed');
+        $this->assertSame(0, AuditLog::where('action', 'uber_login.connected')->count());
+    }
+
+    public function test_uber_auth_reporting_capture_failed_is_not_connected(): void
+    {
+        $this->fakeUber(mfa: ['status' => 'capture_failed', 'message' => 'blocked']);
+        $this->start();
+        $this->landCapture();
+
+        $this->postJson('/api/v1/uber-login/code', ['code' => self::CODE])
+            ->assertOk()->assertJsonPath('data.state', 'failed')->assertJsonPath('data.failure', 'capture_failed');
+    }
+
+    public function test_a_start_timeout_is_pending_not_failed_and_never_races(): void
+    {
+        Http::fake(['*/login/start' => fn () => throw new ConnectionException('cURL error 28: Operation timed out after 90001 milliseconds')]);
+
+        $this->start()->assertOk()
+            ->assertJsonPath('data.state', 'starting')->assertJsonPath('data.pending', true)
+            ->assertJsonMissingPath('data.failure');
+        $this->getJson('/api/v1/uber-login/status')->assertJsonPath('data.state', 'starting');
+    }
+
+    public function test_uber_auth_already_starting_is_pending_too(): void
+    {
+        $this->fakeUber(start: ['status' => 'start_in_flight']);
+
+        $this->start()->assertOk()->assertJsonPath('data.pending', true)->assertJsonMissingPath('data.failure');
+    }
+
+    public function test_a_code_timeout_stays_submitting_and_settles_when_the_capture_lands(): void
+    {
+        $this->fakeUber();
+        $this->start();
+        Http::fake(['*/login/mfa' => fn () => throw new ConnectionException('cURL error 28: Operation timed out')]);
+
+        $this->postJson('/api/v1/uber-login/code', ['code' => self::CODE])->assertOk()
+            ->assertJsonPath('data.state', 'submitting')->assertJsonPath('data.pending', true);
+        $this->assertStringNotContainsString(self::CODE, json_encode(Cache::get("uber_login:attempt:{$this->tenant->id}")));
+
+        $this->getJson('/api/v1/uber-login/status')->assertJsonPath('data.state', 'submitting');
+        $this->landCapture();
+        $this->getJson('/api/v1/uber-login/status')->assertJsonPath('data.state', 'connected');
+    }
+
+    public function test_the_submitting_record_never_outlives_the_login(): void
+    {
+        $this->fakeUber(mfa: ['status' => 'mfa_required', 'retry' => true]);
+        $this->start();
+        $this->travel(200)->seconds();
+
+        $this->postJson('/api/v1/uber-login/code', ['code' => self::CODE])->assertOk();
+
+        // The retry re-put used the REMAINING lifetime (290 - 200 s), not a fresh 290 s.
+        $this->travel(80)->seconds(); // 280 s after the start
+        $this->assertNotNull(Cache::get("uber_login:attempt:{$this->tenant->id}"));
+        $this->travel(15)->seconds(); // 295 s: gone, well before uber-auth's 300 s would matter
+        $this->assertNull(Cache::get("uber_login:attempt:{$this->tenant->id}"));
     }
 
     public function test_the_code_is_never_cached_while_awaiting_or_submitting(): void
@@ -276,6 +351,7 @@ class UberLoginTest extends TestCase
         $this->postJson('/api/v1/uber-login/start', ['email' => 'not-an-email'])->assertUnprocessable();
         $this->postJson('/api/v1/uber-login/code', ['code' => '12ab'])->assertUnprocessable();
         $this->postJson('/api/v1/uber-login/code', ['code' => '123'])->assertUnprocessable();
+        $this->postJson('/api/v1/uber-login/code', ['code' => '12345'])->assertUnprocessable();
         Http::assertNothingSent();
     }
 

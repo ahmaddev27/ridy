@@ -395,7 +395,7 @@ Route::prefix('v1')->group(function () {
             Route::get('status', [UberLoginController::class, 'status']);
             Route::post('start', [UberLoginController::class, 'start'])->middleware('throttle:uber-login');
             Route::post('code', [UberLoginController::class, 'code'])->middleware('throttle:uber-login-code');
-            Route::post('cancel', [UberLoginController::class, 'cancel'])->middleware('throttle:uber-login');
+            Route::post('cancel', [UberLoginController::class, 'cancel'])->middleware('throttle:uber-login-cancel');
         });
 
         // El-Professor (payroll product) pulls the roster with a scoped token minted here.

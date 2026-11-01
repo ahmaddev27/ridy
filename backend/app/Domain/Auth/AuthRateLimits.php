@@ -52,6 +52,9 @@ class AuthRateLimits
         // company (the login is one-per-tenant) so a stranger cannot spend it.
         RateLimiter::for('uber-login', fn (Request $request) => Limit::perMinute(5)
             ->by('uber-login:'.($request->user()?->tenant_id ?? self::clientKey($request))));
+        // Its own bucket, so a flurry of starts can never leave a manager unable to cancel.
+        RateLimiter::for('uber-login-cancel', fn (Request $request) => Limit::perMinute(10)
+            ->by('uber-login-cancel:'.($request->user()?->tenant_id ?? self::clientKey($request))));
         RateLimiter::for('uber-login-code', fn (Request $request) => Limit::perMinute(10)
             ->by('uber-login-code:'.($request->user()?->tenant_id ?? self::clientKey($request))));
 

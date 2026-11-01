@@ -37,7 +37,7 @@ class UberLoginController extends Controller
 
     public function code(Request $request): JsonResponse
     {
-        $data = $request->validate(['code' => ['required', 'string', 'regex:/^\d{4,8}$/']]);
+        $data = $request->validate(['code' => ['required', 'string', 'regex:/^\d{4}$/']]);
 
         return $this->respond($this->login->submitCode($request->user()->tenant, $data['code']));
     }

@@ -12,7 +12,8 @@ export type UberLoginFailure =
   | "wrong_code"
   | "unavailable"
   | "session_active"
-  | "no_session";
+  | "no_session"
+  | "capture_failed";
 
 export type UberLoginStatus = {
   state: UberLoginState;
@@ -22,6 +23,8 @@ export type UberLoginStatus = {
   failure?: UberLoginFailure;
   /** Set when the last code was rejected but the login is still open. */
   retry?: boolean;
+  /** Uber or the sign-in service is still working (timeout): wait, do not start again. */
+  pending?: boolean;
 };
 
 type Envelope = { data: UberLoginStatus };
