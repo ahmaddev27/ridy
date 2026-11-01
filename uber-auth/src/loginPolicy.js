@@ -30,6 +30,27 @@ export function admitStart(body, { passwordless, stateOf }) {
   return { ok: true, companyKey, password };
 }
 
+/**
+ * Per-company start gate. enter() is SYNCHRONOUS on purpose: called straight after
+ * admitStart() with no await in between, so no re-seed can turn the company ACTIVE in the
+ * gap. It refuses a second start while one is inside startLogin() (its pending login is not
+ * visible yet) and refuses when markLoggingIn() reports the session is ACTIVE.
+ */
+export function createStartGate({ markLoggingIn }) {
+  const inFlight = new Set();
+  return {
+    enter(companyKey) {
+      if (inFlight.has(companyKey)) return reject(409, { status: "start_in_flight", message: "start_in_flight" });
+      if (!markLoggingIn(companyKey)) return reject(409, { status: "session_active", message: "session_active" });
+      inFlight.add(companyKey);
+      return { ok: true };
+    },
+    leave(companyKey) {
+      inFlight.delete(companyKey);
+    },
+  };
+}
+
 /** /login/mfa: the code may only be relayed by the company that started the login. */
 export function companyMatches(entryCompanyKey, bodyCompanyKey) {
   if (entryCompanyKey == null) return true; // legacy one-shot login, never bound to a company

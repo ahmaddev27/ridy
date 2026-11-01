@@ -78,13 +78,14 @@ async function pushStatus() {
 
 /** Take over a context that just finished an interactive login (from server.js). */
 export async function adoptLogin(companyKey, session, result) {
-  await manager.adopt(companyKey, session, {
+  // Adopt, then immediately take a proper dual-jar (RAMEN + Fleet Hub) capture and push
+  // it. Resolves { captured, reason? }: false when the backend did not accept the capture.
+  const outcome = await manager.adoptAndCapture(companyKey, session, {
     orgUuid: result?.org_uuid ?? null,
     cookies: Array.isArray(result?.cookies) ? result.cookies : [],
   });
-  // Immediately take a proper dual-jar (RAMEN + Fleet Hub) capture and push it.
-  await manager.renew(companyKey).catch(() => {});
   await pushStatus().catch(() => {});
+  return outcome;
 }
 
 /** Passwordless-login hooks (server.js): the session state and the login-in-progress marker. */

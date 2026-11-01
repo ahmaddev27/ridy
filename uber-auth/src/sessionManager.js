@@ -159,6 +159,25 @@ export class PersistentSessionManager {
   }
 
   /**
+   * adopt() + an immediate dual-jar capture, PROVING the backend accepted it. adopt()
+   * stamps lastCaptureAt as if a capture had landed and renew() only posts when the jar
+   * changed, so both are reset here: afterwards `captured` is true only if renew() really
+   * got an accepted post (not blocked / skipped / failed, and not signed out again).
+   * @returns {Promise<{captured:boolean, reason?:string}>}
+   */
+  async adoptAndCapture(companyKey, handle, opts = {}) {
+    const entry = await this.adopt(companyKey, handle, opts);
+    entry.lastCaptureAt = null;
+    entry.lastJarFp = "";
+    entry.lastPostOutcome = null;
+    await this.renew(companyKey);
+    const after = this.sessions.get(companyKey);
+    if (after?.state === SESSION_STATE.ACTIVE && after.lastCaptureAt != null) return { captured: true };
+    const reason = after?.state !== SESSION_STATE.ACTIVE ? (after?.state ?? "gone") : (after.lastPostOutcome ?? "not_posted");
+    return { captured: false, reason };
+  }
+
+  /**
    * Mark that an interactive (re-)login is being driven for this company. NEVER
    * touches an ACTIVE session: LOGGING_IN is not warmable, so flipping a healthy
    * browser would silently stop its keep-warm. Returns false when refused.
@@ -288,12 +307,12 @@ export class PersistentSessionManager {
         supplierCookies: entry.supplierCookies,
         tokenExpiries: entry.tokenExpiries,
       });
-      if (out === "skipped" || out === "blocked") return out;
+      if (out === "skipped" || out === "blocked") return (entry.lastPostOutcome = out);
       this.#markPosted(companyKey, entry);
-      return "posted";
+      return (entry.lastPostOutcome = "posted");
     } catch (e) {
       this.log(`[${companyKey}] post to backend failed: ${e?.message}`);
-      return "failed";
+      return (entry.lastPostOutcome = "failed");
     }
   }
 

@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { startLogin, submitMfa, closeSession, STATUS } from "./browser.js";
 import { adoptLogin, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf } from "./persistent.js";
-import { admitStart, companyMatches } from "./loginPolicy.js";
+import { admitStart, companyMatches, createStartGate } from "./loginPolicy.js";
 
 // loginId -> { session, companyKey, createdAt, passwordless } awaiting an MFA code.
 const pending = new Map();
@@ -73,12 +73,11 @@ function readJson(req) {
 // adopt failure) the browser is closed so it never leaks. Returns true if adopted.
 async function adoptOrClose(companyKey, session, result) {
   try {
-    await adoptLogin(String(companyKey), session, result);
-    return true;
+    return await adoptLogin(String(companyKey), session, result);
   } catch (e) {
     await closeSession(session);
     console.warn(`[server] adopt ${companyKey} failed: ${e?.message}`);
-    return false;
+    return null;
   }
 }
 
@@ -89,10 +88,19 @@ async function onLoginSuccess(companyKey, outcome, res) {
     return send(res, 200, { status: STATUS.SUCCESS, ...outcome.result });
   }
   const adopted = await adoptOrClose(companyKey, outcome.session, outcome.result);
-  if (!adopted) markNeedsOtp(String(companyKey));
-  if (!adopted) return send(res, 503, { status: STATUS.ERROR, message: "at_capacity" });
+  if (!adopted) {
+    markNeedsOtp(String(companyKey));
+    return send(res, 503, { status: STATUS.ERROR, message: "at_capacity" });
+  }
+  // Success means the backend ACCEPTED the capture, not merely that Uber let us in.
+  if (!adopted.captured) {
+    return send(res, 200, { status: STATUS.CAPTURE_FAILED, message: adopted.reason ?? "not_posted" });
+  }
   return send(res, 200, { status: STATUS.SUCCESS, persistent: true, org_uuid: outcome.result?.org_uuid ?? null });
 }
+
+// Tracks /login/start calls currently inside startLogin(): dropPendingFor() cannot see them.
+const startGate = createStartGate({ markLoggingIn });
 
 async function handleStart(req, res) {
   const body = await readJson(req);
@@ -101,10 +109,29 @@ async function handleStart(req, res) {
   const { companyKey, password } = admitted;
   const passwordless = !password;
 
-  if (passwordless) {
+  if (!passwordless) return runStart(body, admitted, res);
+
+  // Everything up to markLoggingIn() is synchronous (no await between admitStart and here),
+  // so nothing can flip the company to ACTIVE in the gap: a login never touches a live session.
+  const entered = startGate.enter(companyKey);
+  if (!entered.ok) return send(res, entered.http, entered.body);
+  try {
     await dropPendingFor(companyKey);
-    markLoggingIn(companyKey);
+    // Re-check after the await: an ACTIVE session (re-seeded meanwhile) is never ridden.
+    if (sessionState(companyKey) === "active") {
+      return send(res, 409, { status: "session_active", message: "session_active" });
+    }
+    return await runStart(body, admitted, res);
+  } catch (e) {
+    markNeedsOtp(companyKey); // never leave the company stuck in logging_in
+    throw e;
+  } finally {
+    startGate.leave(companyKey);
   }
+}
+
+async function runStart(body, { companyKey, password }, res) {
+  const passwordless = !password;
   const outcome = await startLogin({
     email: body.email,
     password,

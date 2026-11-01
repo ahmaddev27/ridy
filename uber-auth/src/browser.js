@@ -17,6 +17,7 @@ export const STATUS = {
   MFA_REQUIRED: "mfa_required",
   PASSKEY_UNSUPPORTED: "passkey_unsupported",
   BAD_CREDENTIALS: "bad_credentials",
+  CAPTURE_FAILED: "capture_failed", // Uber let us in but the backend did not accept the capture
   BLOCKED: "blocked", // Uber's Arkose challenge: never solved, the manager is sent to the extension
   PASSWORD_REQUIRED: "password_required", // Uber asked for a password and we hold none
   CHANNEL_UNAVAILABLE: "channel_unavailable", // no code step reached (e.g. a chooser with no default)
@@ -138,6 +139,30 @@ export async function newStealthContext(browser, extra = {}, proxyUrl = null, te
   return context;
 }
 
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Does the page text show this email, in full or masked (j***@example.com)? A mask must
+ * keep the first character and the whole domain, so a different account never matches.
+ */
+export function accountMatches(pageText, email) {
+  const text = String(pageText ?? "").toLowerCase();
+  const wanted = String(email ?? "").trim().toLowerCase();
+  const at = wanted.indexOf("@");
+  if (!text || at < 1) return false;
+  if (text.includes(wanted)) return true;
+  const mask = new RegExp(`${escapeRe(wanted[0])}[*•·●.x\\u2022\\u25cf]{1,}[^\\s@]{0,20}@${escapeRe(wanted.slice(at + 1))}`);
+  return mask.test(text);
+}
+
+async function pageShowsAccount(page, email) {
+  try {
+    return accountMatches(await page.locator("body").innerText({ timeout: 3000 }), email);
+  } catch {
+    return false;
+  }
+}
+
 async function isVisible(locator) {
   try {
     return await locator.isVisible();
@@ -166,7 +191,11 @@ async function hasArkoseChallenge(page) {
   try {
     const text = page.getByText(/protecting your account|start puzzle|konto (wird )?gesch(ü|u)tzt|r(ä|a)tsel starten/i).first();
     if (await text.isVisible()) return true;
-    return (await page.locator('iframe[src*="arkoselabs" i], iframe[src*="funcaptcha" i], [id*="arkose" i]').count()) > 0;
+    // A preloaded but hidden Arkose frame is not a challenge: it must be visible and real-sized.
+    const frame = page.locator('iframe[src*="arkoselabs" i], iframe[src*="funcaptcha" i], [id*="arkose" i]').first();
+    if (!(await frame.isVisible())) return false;
+    const box = await frame.boundingBox();
+    return box != null && box.width >= 100 && box.height >= 100;
   } catch {
     return false;
   }
@@ -243,10 +272,15 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
       return { status: STATUS.SUCCESS, result, session };
     }
 
-    // A remembered account ("Welcome back") may not ask for the identifier again.
+    // A remembered account ("Welcome back") may not ask for the identifier again. Then we
+    // only continue if the page shows the SAME account (its email or a masked form of it);
+    // otherwise Continue would send a code to / sign in a different remembered account.
     const idField = identifierField(page);
     if (await idField.waitFor({ state: "visible", timeout: 8000 }).then(() => true, () => false)) {
       await idField.fill(email);
+    } else if (!(await pageShowsAccount(page, email))) {
+      await closeSession(session);
+      return { status: STATUS.CHANNEL_UNAVAILABLE, message: "account_not_shown" };
     }
     await advance(page);
 

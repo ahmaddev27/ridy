@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { admitStart, companyMatches } from "../src/loginPolicy.js";
+import { admitStart, companyMatches, createStartGate } from "../src/loginPolicy.js";
 import { PersistentSessionManager, SESSION_STATE } from "../src/sessionManager.js";
 
 const on = (state = null) => ({ passwordless: true, stateOf: () => state });
@@ -84,4 +84,53 @@ test("markLoggingIn / markNeedsOtp on an unheld company are harmless no-ops", ()
   assert.equal(m.markLoggingIn("9"), true);
   m.markNeedsOtp("9");
   assert.equal(m.stateOf("9"), null);
+});
+
+test("start gate: an ACTIVE company is refused synchronously and never marked logging_in", async () => {
+  const m = mgr();
+  await m.adopt("7", {}, { orgUuid: "o" });
+  const gate = createStartGate({ markLoggingIn: (k) => m.markLoggingIn(k) });
+  const r = gate.enter("7");
+  assert.equal(r.ok, false);
+  assert.equal(r.http, 409);
+  assert.equal(r.body.status, "session_active");
+  assert.equal(m.stateOf("7"), SESSION_STATE.ACTIVE);
+});
+
+test("start gate: a second start while one is in flight is refused until it leaves", async () => {
+  const m = mgr();
+  await m.adopt("7", {}, { orgUuid: "o" });
+  m.sessions.get("7").state = SESSION_STATE.NEEDS_OTP;
+  const gate = createStartGate({ markLoggingIn: (k) => m.markLoggingIn(k) });
+  assert.equal(gate.enter("7").ok, true);
+  assert.equal(gate.enter("7").body.status, "start_in_flight");
+  gate.leave("7");
+  assert.equal(gate.enter("7").ok, true);
+});
+
+function capturing(post, keepWarm = async () => ({ ok: true, orgVerified: true, cookies: [{ name: "sid", value: "fresh" }] })) {
+  return new PersistentSessionManager({ driver: { keepWarm }, post });
+}
+
+test("adoptAndCapture reports captured only when the backend accepted the post", async () => {
+  const posts = [];
+  const m = capturing(async (k) => (posts.push(k), "posted"));
+  const out = await m.adoptAndCapture("7", {}, { orgUuid: "o", cookies: [{ name: "sid", value: "fresh" }] });
+  assert.deepEqual(out, { captured: true });
+  assert.equal(posts.length, 1, "posted even though the jar equals the login jar");
+});
+
+test("adoptAndCapture: a blocked post is NOT a capture", async () => {
+  const m = capturing(async () => "blocked");
+  const out = await m.adoptAndCapture("7", {}, { orgUuid: "o", cookies: [{ name: "sid", value: "x" }] });
+  assert.deepEqual(out, { captured: false, reason: "blocked" });
+});
+
+test("adoptAndCapture: a failed keep-warm or a sign-out is NOT a capture", async () => {
+  const failing = capturing(async () => "posted", async () => ({ ok: false, error: "boom" }));
+  assert.equal((await failing.adoptAndCapture("7", {}, { orgUuid: "o", cookies: [] })).captured, false);
+
+  const signedOut = capturing(async () => "posted", async () => ({ loggedOut: true }));
+  const out = await signedOut.adoptAndCapture("7", {}, { orgUuid: "o", cookies: [] });
+  assert.deepEqual(out, { captured: false, reason: "needs_otp" });
 });
