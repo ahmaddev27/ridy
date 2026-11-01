@@ -52,11 +52,16 @@ function continueButton(page) {
 }
 
 /** Click the primary action, falling back to Enter (Uber often accepts either). */
-async function advance(page) {
+async function advance(page, trace = null) {
   const btn = continueButton(page);
   if (await isVisible(btn)) {
+    if (trace) {
+      const name = ((await btn.innerText().catch(() => "")) || "").replace(/\s+/g, " ").trim().slice(0, 40);
+      console.log(`[pwless-nav] advance(${trace}) clicking button "${name}"`);
+    }
     await btn.click().catch(() => page.keyboard.press("Enter"));
   } else {
+    if (trace) console.log(`[pwless-nav] advance(${trace}) no button visible; pressing Enter`);
     await page.keyboard.press("Enter");
   }
 }
@@ -393,12 +398,14 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
     const idField = identifierField(page);
     if (await idField.waitFor({ state: "visible", timeout: 8000 }).then(() => true, () => false)) {
       await idField.fill(email);
+      navLog(`identifier field filled=${((await idField.inputValue().catch(() => "")) || "").length > 0 ? "yes" : "EMPTY"}`);
     } else if (!(await pageShowsAccount(page, email))) {
       await dumpScreen(page, "account_not_shown");
       await closeSession(session);
       return { status: STATUS.CHANNEL_UNAVAILABLE, message: "account_not_shown" };
     }
-    await advance(page);
+    await advance(page, "identifier");
+    navLog(`after identifier advance: url=${(page.url() || "").replace(/[?#].*$/, "")}`);
 
     let step = await detectStep(page);
 
