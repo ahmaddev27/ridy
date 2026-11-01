@@ -180,6 +180,22 @@ PLZ مش بالجدول → centroid null → display فاضي · غير-لات�
 - **60% `geo_source=uber`** = بعد القبول، إحداثيات أوبر صحّحت العنوان (المرحلة 7).
 - المحطات نادرة (1.7%) بس حسّاسة (الحالة 4) — لهيك `StationResolver` + `fillBareStationCity`.
 
+## 2.6 أمثلة حقيقية input → output (من الإنتاج، معمّاة)
+
+العنوان الخام (من الشبكة) → اللي الجيوكودر حلّه (display + إحداثيات + ثقة + مصدر):
+
+| # | RAW (الخام) | RESOLVED (المحلول) | ملاحظة |
+|---|---|---|---|
+| exact + waypoints | `Junkersbusch, 53721 Siegburg-Stallberg` | `Viehtrift 23c, 53721 Siegburg` · `src=uber` | عنوان ناقص وقت العرض → **إحداثيات أوبر بعد القبول صحّحته** لشارع+رقم (المرحلة 7) |
+| street (مدينة إنجليزي) | `Oberländer Ufer, 50968 **Cologne**` | نفسه @(50.907,6.978) `street` | "Cologne" إنجليزي (أوبر ترجمت للراكب) — بينحلّ عادي |
+| street (POI بلا PLZ) | `Das Bordell Eros Center Köln` | `**50823** Das Bordell Eros Center Köln` | الجيوكودر لقى الـPLZ وأضافها للعرض |
+| street (بلا مدينة) | `Am Eifeltor 1` | @(50.888,6.924) `street` | ولا PLZ ولا مدينة → استعان بالـbias/الطرف المقابل |
+| approx (بلا مسافة) | `Kasernenstraße 39 → Neuer Zollhof 1` (عنوانين كاملين) | `approx` · **dist=—** | رحلة قصيرة جداً تحت العتبة → المسافة انرفضت (§2، `minTrustedDistance`) |
+| null (فشل) | `Obere Lichtenplatzer Straße 153, 42287 Wuppertal` (كامل!) | `@(,)` · `conf=null` | عنوان كامل بس الجيوكود فشل/انتهت المهلة → **بيتعاد بالخلفية** (المرحلة 4) |
+| station | `Köln Hauptbahnhof` | `Marzellenstraße, 50668 Köln` `exact` | **حلّ المحطة لشارعها الفعلي** (الحالة 4) |
+
+**الخلاصة من الأمثلة:** الجيوكودر بيتعامل مع فوضى حقيقية — مدن بلغات مختلفة، POIs بلا PLZ، عناوين بلا مدينة، ومحطات — ويحلّ أغلبها؛ الحالات الصعبة (approx/null) بتنحلّ لاحقاً من الـwaypoints أو تُعاد بالخلفية.
+
 ## 3. ⚠️ تباينات بين القواعد الموثّقة والكود (مهمة)
 
 1. **ما في `OfferBroadcast('status')` عند انتهاء الجيوكودينج.** `GeocodeOffer`/`TG::enrich`/`SyncTripFromWaypoints`
