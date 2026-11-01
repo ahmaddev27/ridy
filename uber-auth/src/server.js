@@ -11,7 +11,7 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { startLogin, submitMfa, closeSession, STATUS } from "./browser.js";
-import { adoptLogin, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf } from "./persistent.js";
+import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf } from "./persistent.js";
 import { admitStart, companyMatches, createStartGate } from "./loginPolicy.js";
 
 // loginId -> { session, companyKey, createdAt, passwordless } awaiting an MFA code.
@@ -81,11 +81,21 @@ async function adoptOrClose(companyKey, session, result) {
   }
 }
 
-async function onLoginSuccess(companyKey, outcome, res) {
+async function onLoginSuccess(companyKey, outcome, res, cold = false) {
   // No company_key: legacy one-shot — return the capture and close the browser.
   if (!companyKey) {
     await closeSession(outcome.session);
     return send(res, 200, { status: STATUS.SUCCESS, ...outcome.result });
+  }
+  // A cold login adopts only into an EMPTY slot: if a session appeared while the code was
+  // pending (re-seed / extension), ours is dropped - it must never replace a live one.
+  if (cold && sessionState(String(companyKey)) != null) {
+    await closeSession(outcome.session);
+    return send(res, 409, { status: "session_active", message: "session_active" });
+  }
+  if (cold && (await backendHasSession(companyKey))) {
+    await closeSession(outcome.session);
+    return send(res, 409, { status: "session_active", message: "session_active" });
   }
   const adopted = await adoptOrClose(companyKey, outcome.session, outcome.result);
   if (!adopted) {
@@ -104,7 +114,7 @@ const startGate = createStartGate({ markLoggingIn });
 
 async function handleStart(req, res) {
   const body = await readJson(req);
-  const admitted = admitStart(body, { passwordless: config.passwordless, stateOf: sessionState });
+  const admitted = admitStart(body, { passwordless: config.passwordless, stateOf: sessionState, coldEnabled: config.passwordlessCold });
   if (!admitted.ok) return send(res, admitted.http, admitted.body);
   const { companyKey, password } = admitted;
   const passwordless = !password;
@@ -118,7 +128,7 @@ async function handleStart(req, res) {
   try {
     await dropPendingFor(companyKey);
     // Re-check after the await: an ACTIVE session (re-seeded meanwhile) is never ridden.
-    if (sessionState(companyKey) === "active") {
+    if (sessionState(companyKey) === "active" || (admitted.cold && sessionState(companyKey) != null)) {
       return send(res, 409, { status: "session_active", message: "session_active" });
     }
     return await runStart(body, admitted, res);
@@ -130,7 +140,26 @@ async function handleStart(req, res) {
   }
 }
 
-async function runStart(body, { companyKey, password }, res) {
+// Cold browsers started but not yet visible in `pending`/the manager.
+let coldStarting = 0;
+
+/** Headed Chromes already spoken for: live sessions plus cold logins held or launching. */
+function coldSlotsTaken() {
+  return liveSessionCount() + coldStarting + [...pending.values()].filter((e) => e.cold).length;
+}
+
+async function runStart(body, admitted, res) {
+  if (admitted.cold !== true) return runStartNow(body, admitted, res);
+  if (coldSlotsTaken() >= config.maxSessions) return send(res, 503, { status: STATUS.ERROR, message: "at_capacity" });
+  coldStarting++;
+  try {
+    return await runStartNow(body, admitted, res);
+  } finally {
+    coldStarting--;
+  }
+}
+
+async function runStartNow(body, { companyKey, password, cold }, res) {
   const passwordless = !password;
   const outcome = await startLogin({
     email: body.email,
@@ -139,12 +168,14 @@ async function runStart(body, { companyKey, password }, res) {
     companyKey,
     // Warm re-auth: ride the company's own browser (cookies + proxy already there).
     reuse: passwordless ? handleOf(companyKey) : null,
+    // Cold first connect: no handle exists by construction (state null); a fresh browser is built.
+    cold: passwordless && cold === true,
   });
 
   if (outcome.status === STATUS.MFA_REQUIRED) {
     const loginId = randomUUID();
     const createdAt = Date.now();
-    pending.set(loginId, { session: outcome.session, companyKey, createdAt, passwordless });
+    pending.set(loginId, { session: outcome.session, companyKey, createdAt, passwordless, cold: cold === true });
     return send(res, 200, {
       status: STATUS.MFA_REQUIRED,
       login_id: loginId,
@@ -153,7 +184,7 @@ async function runStart(body, { companyKey, password }, res) {
     });
   }
   if (outcome.status === STATUS.SUCCESS) {
-    return onLoginSuccess(companyKey, outcome, res);
+    return onLoginSuccess(companyKey, outcome, res, cold === true);
   }
   if (passwordless) markNeedsOtp(companyKey);
   return send(res, 200, { status: outcome.status, message: outcome.message });
@@ -173,7 +204,7 @@ async function handleMfa(req, res) {
 
   if (outcome.status === STATUS.SUCCESS) {
     pending.delete(body.login_id);
-    return onLoginSuccess(entry.companyKey, outcome, res);
+    return onLoginSuccess(entry.companyKey, outcome, res, entry.cold === true);
   }
   if (outcome.retry) {
     return send(res, 200, { status: STATUS.MFA_REQUIRED, login_id: body.login_id, retry: true });

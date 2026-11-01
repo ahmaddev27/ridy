@@ -29,6 +29,11 @@ export const config = {
   // password and relays the one-time code. OFF = the legacy password-required rule.
   passwordless: ["1", "true"].includes(String(process.env.UBER_AUTH_PASSWORDLESS || "").toLowerCase()),
 
+  // Cold first connect (docs/27): additionally let a passwordless start for a company with NO
+  // held session launch a fresh browser through its proxy. Needs passwordless above. OFF = a
+  // never-connected company is still refused (no_session) and connects through the extension.
+  passwordlessCold: ["1", "true"].includes(String(process.env.UBER_AUTH_PASSWORDLESS_COLD || "").toLowerCase()),
+
   // Per-step wait budget (ms).
   stepTimeout: Number(process.env.UBER_AUTH_STEP_TIMEOUT || 30000),
 

@@ -1,6 +1,8 @@
 // Pure admission rules for /login/start and /login/mfa, kept out of server.js so they
 // are unit-tested without a socket or a browser.
 
+import { parseProxyUrl } from "./proxy.js";
+
 /** The persistent-manager state in which a running browser must never be disturbed. */
 const ACTIVE = "active";
 /** States holding a browser context worth re-authenticating (a retry stays in logging_in). */
@@ -8,9 +10,9 @@ const RIDEABLE = new Set(["needs_otp", "logging_in"]);
 
 /**
  * Decide whether /login/start may proceed.
- * @returns {{ok:true, companyKey:string|null, password:string|null}|{ok:false, http:number, body:object}}
+ * @returns {{ok:true, companyKey:string|null, password:string|null, cold?:boolean}|{ok:false, http:number, body:object}}
  */
-export function admitStart(body, { passwordless, stateOf }) {
+export function admitStart(body, { passwordless, stateOf, coldEnabled = false }) {
   const companyKey = body.company_key != null ? String(body.company_key) : null;
   const password = body.password ? String(body.password) : null;
 
@@ -22,12 +24,23 @@ export function admitStart(body, { passwordless, stateOf }) {
     const state = stateOf(companyKey);
     // A healthy browser is feeding the daemon: a fresh login must not evict or stall it.
     if (state === ACTIVE) return reject(409, { status: "session_active", message: "session_active" });
-    // Warm re-auth only: there must be a known browser context to ride. A company that was
-    // never connected is a COLD login, which Uber's Arkose challenge reliably stops, so it
-    // goes through the extension instead (a human is present).
-    if (!RIDEABLE.has(state)) return reject(409, { status: "no_session", message: "no_session" });
+    if (RIDEABLE.has(state)) return { ok: true, companyKey, password, cold: false };
+    // Nothing to ride. A COLD first connect (fresh browser through the proxy) is allowed only
+    // when explicitly enabled, asked for by the backend, and NOTHING is held for the company
+    // (state null): never a dead/odd entry, never an active or logging-in one.
+    if (wantsCold(body, state, coldEnabled)) {
+      // Never from the VPS datacenter IP: that is the Arkose-prone case and pins the account to it.
+      if (!parseProxyUrl(body.proxy_url)) return reject(409, { status: "no_proxy", message: "no_proxy" });
+      return { ok: true, companyKey, password, cold: true };
+    }
+    return reject(409, { status: "no_session", message: "no_session" });
   }
-  return { ok: true, companyKey, password };
+  return { ok: true, companyKey, password, cold: false };
+}
+
+/** Cold connect asked for: flag on, the caller says cold, and the manager holds nothing at all for the company. */
+function wantsCold(body, state, coldEnabled) {
+  return coldEnabled === true && body.cold === true && state == null;
 }
 
 /**

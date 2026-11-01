@@ -30,12 +30,14 @@ class UberAuthClient
      *
      * @return array<string, mixed>
      */
-    public function startLogin(Tenant $tenant, string $email): array
+    public function startLogin(Tenant $tenant, string $email, bool $cold = false): array
     {
         return $this->post('/login/start', [
             'email' => $email,
             'company_key' => (string) $tenant->id,
             'proxy_url' => $tenant->getAttribute('proxy_url') ?: null,
+            // First connect, nothing to ride: uber-auth opens a fresh browser through the proxy.
+            'cold' => $cold,
         ], timeout: 90);
     }
 
