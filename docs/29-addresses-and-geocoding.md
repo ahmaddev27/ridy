@@ -57,6 +57,20 @@ geo_confidence, geo_source, stops(JSON), stops_count, geo_synced_at, geo_attempt
 
 ---
 
+## 0.5 طبقة الشبكة — من وين يوصل العرض (RAMEN wire)
+
+قبل ما يصير `raw_payload`، العرض بيوصل عبر الشبكة هيك:
+
+- **النقل:** تيار **SSE** (long-poll) من `vsdispatch.uber.com` على قنوات RAMEN:
+  `/ramendca/events` و`/ramenphx/events` (`UBER_RAMEN_PATHS`؛ عميل أوبر بيفتح عدة قنوات إقليمية، الديمون بيبلع العروض). `dispatch-daemon/src/config.js:113,120`.
+- **شكل الـURL:** `{uberDispatchBase}{ramenPath}{path}?seq=N` (`stream.js:567`) — مؤشّر **`seq`** للاستئناف عند إعادة الاتصال (ما بيضيع عرض على إعادة الفتح).
+- **المصادقة:** jar كوكيز **RAMEN** (كوكيز vsdispatch)؛ `RamenStream` (`stream.js:213`).
+- **التدفق:** الديمون يقرا حدث SSE → يحوّل العروض للباكند `POST /ingest {offers, seq}` (`api.js:116`) → `DispatchOfferIngestor` = الـ`raw_payload` اللي شفته بالمرحلة 1.
+- **الكتابة الوحيدة** (القاعدة الذهبية #1): `RejectOffers` GraphQL mutation (`stream.js:182`) — رفض عرض معلّق من لوحة الديسباتش. (`AcceptOffers` موجود بس **خامل**، بلا مسار.)
+- ⚠️ **ملاحظة شبكية مهمة** (`config.js:128`): من **IP داتاسنتر، RAMEN بيرجّع 404** و`getDrivers=0` → **لازم مخرج سكني (بروكسي)**. نفس سبب إصرارنا على البروكسي بالدخول البارد (docs/27).
+
+لو بدك تشوف الـwire الخام حيّاً: افتح `vsdispatch.uber.com` بمتصفّح (مسجّل دخول) → DevTools → Network → فلتر `events`/`ramen` → التيار SSE → تبويب EventStream/Response = نفس حدث العرض قبل ما الديمون يحوّله.
+
 ## 1. المراحل بالترتيب (دورة حياة العنوان)
 
 ### المرحلة 1 — الدخول (Ingest)
