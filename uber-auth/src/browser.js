@@ -278,7 +278,13 @@ async function dumpScreen(page, where) {
     const title = redact(await page.title().catch(() => ""));
     const headings = uniq(await page.locator("h1, h2, [role=heading]").allInnerTexts().catch(() => []));
     const controls = uniq(await page.locator(NAV_CLICKABLE).allInnerTexts().catch(() => []));
+    const alerts = uniq(await page.locator('[role=alert], [aria-live], .error, [class*="error" i], [data-baseweb="form-control-error"]').allInnerTexts().catch(() => []));
+    const body = redact(await page.locator("body").innerText({ timeout: 2000 }).catch(() => "")).slice(0, 500);
+    const btnDisabled = await page.getByRole("button", { name: /^weiter$|continue|next/i }).first().isDisabled().catch(() => null);
     navLog(`screen @ ${where} url=${url} title=${JSON.stringify(title)} headings=${JSON.stringify(headings)} controls=${JSON.stringify(controls)}`);
+    navLog(`screen+ @ ${where} submitDisabled=${btnDisabled} alerts=${JSON.stringify(alerts)} body=${JSON.stringify(body)}`);
+    const shot = `/tmp/pwless-${where.replace(/[^a-z0-9]+/gi, "-")}.png`;
+    await page.screenshot({ path: shot, fullPage: false }).then(() => navLog(`screenshot=${shot}`)).catch((e) => navLog(`screenshot failed: ${e.message}`));
   } catch (e) {
     navLog(`dumpScreen failed @ ${where}: ${e.message}`);
   }
