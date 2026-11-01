@@ -217,6 +217,7 @@ export async function detectStep(page) {
     if (await hasPasskeyPrompt(page)) return "passkey";
     await page.waitForTimeout(500);
   }
+  await dumpScreen(page, "detectStep-unknown");
   return "unknown";
 }
 
@@ -235,6 +236,26 @@ export const EMAIL_OPTION_RE =
   /e-?mail|send code|get a code|verification code|code to your email|per e-?mail|code senden/i;
 
 const navLog = (m) => console.log(`[pwless-nav] ${m}`);
+
+/**
+ * Failure-path diagnostic: log the current screen's chrome (url, title, headings, control
+ * labels) so the text selectors above can be tuned from the log instead of guessed. Fires only
+ * when a step is not recognised. Never logs PII: emails and any run of digits are redacted.
+ */
+async function dumpScreen(page, where) {
+  const redact = (s) =>
+    (s || "").replace(/\s+/g, " ").trim().replace(/[\w.+-]+@[\w.-]+\.\w+/g, "<email>").replace(/\b\d{3,}\b/g, "<num>");
+  const uniq = (list) => [...new Set(list.map(redact).filter(Boolean))].slice(0, 25);
+  try {
+    const url = (page.url() || "").replace(/[?#].*$/, "");
+    const title = redact(await page.title().catch(() => ""));
+    const headings = uniq(await page.locator("h1, h2, [role=heading]").allInnerTexts().catch(() => []));
+    const controls = uniq(await page.locator(NAV_CLICKABLE).allInnerTexts().catch(() => []));
+    navLog(`screen @ ${where} url=${url} title=${JSON.stringify(title)} headings=${JSON.stringify(headings)} controls=${JSON.stringify(controls)}`);
+  } catch (e) {
+    navLog(`dumpScreen failed @ ${where}: ${e.message}`);
+  }
+}
 
 /** First visible+enabled clickable whose text matches `re`; returns {el, text} or null. Never logs PII. */
 async function findControl(page, re) {
@@ -373,6 +394,7 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
     if (await idField.waitFor({ state: "visible", timeout: 8000 }).then(() => true, () => false)) {
       await idField.fill(email);
     } else if (!(await pageShowsAccount(page, email))) {
+      await dumpScreen(page, "account_not_shown");
       await closeSession(session);
       return { status: STATUS.CHANNEL_UNAVAILABLE, message: "account_not_shown" };
     }
