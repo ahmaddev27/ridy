@@ -149,7 +149,9 @@ async function adoptRefused(companyKey, mode) {
   const guard = adoptGuard(mode, sessionState(String(companyKey)));
   if (guard.refuse) return true;
   if (guard.backend == null) return false;
-  return backendHasSession(companyKey, { activeOnly: guard.backend === "active" });
+  const backendHas = await backendHasSession(companyKey, { activeOnly: guard.backend === "active" });
+  // A browser seeded ACTIVE during the round-trip must not be clobbered by adopt().
+  return backendHas || adoptGuard(mode, sessionState(String(companyKey))).refuse;
 }
 
 // Tracks /login/start calls currently inside startLogin(): dropPendingFor() cannot see them.

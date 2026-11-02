@@ -186,14 +186,19 @@ export class PersistentSessionManager {
     const e = this.sessions.get(companyKey);
     if (!e) return true;
     if (e.state === SESSION_STATE.ACTIVE) return false;
+    // A DOWN entry's browser is already gone: remember it so an abandoned login puts it back to
+    // DOWN (auto-revivable by releaseIfDead) instead of stranding it in needs_otp.
+    e.preLoginDown = e.state === SESSION_STATE.DOWN;
     e.state = SESSION_STATE.LOGGING_IN;
     return true;
   }
 
-  /** A login that failed / was cancelled / timed out: back to waiting for the operator. Only undoes LOGGING_IN. */
+  /** A login that failed / was cancelled / timed out: back to waiting for the operator (or DOWN if it was). Only undoes LOGGING_IN. */
   markNeedsOtp(companyKey) {
     const e = this.sessions.get(companyKey);
-    if (e && e.state === SESSION_STATE.LOGGING_IN) e.state = SESSION_STATE.NEEDS_OTP;
+    if (!e || e.state !== SESSION_STATE.LOGGING_IN) return;
+    e.state = e.preLoginDown ? SESSION_STATE.DOWN : SESSION_STATE.NEEDS_OTP;
+    e.preLoginDown = false;
   }
 
   /** The state of a held company, or null when none is held. */

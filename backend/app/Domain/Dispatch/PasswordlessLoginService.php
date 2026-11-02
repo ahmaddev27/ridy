@@ -624,12 +624,24 @@ class PasswordlessLoginService
         return ! empty($record['cold']) && $this->hasPriorContext($tenant);
     }
 
-    /** A healthy browser is feeding the daemon; never start a login that could stall it. */
+    /**
+     * A healthy browser OR an active fleet session (what the daemon actually streams on) is feeding
+     * the daemon; never start a login that could stall it.
+     */
     private function sessionIsActive(Tenant $tenant): bool
     {
         $browser = SessionBrowser::where('tenant_id', $tenant->id)->first();
+        if ($browser !== null && $browser->state === SessionBrowser::STATE_ACTIVE && $browser->isLive()) {
+            return true;
+        }
 
-        return $browser !== null && $browser->state === SessionBrowser::STATE_ACTIVE && $browser->isLive();
+        $fleet = UberFleetSession::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->id)
+            ->where('status', UberFleetSession::STATUS_ACTIVE)
+            ->latest('id')
+            ->first();
+
+        return $fleet !== null && $fleet->isUsable();
     }
 
     /**

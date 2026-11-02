@@ -89,13 +89,15 @@ export function adoptMode({ cold, fresh }) {
  * What the capture of a finished login must check before it adopts into the company's slot.
  * `refuse` = drop it now (409 session_active); `backend` = also ask the backend, fail-closed:
  *   "any"    - cold: the backend must hold no session row at all;
- *   "active" - fresh with nothing held locally: the backend must hold no ACTIVE session.
+ *   "active" - fresh: the backend must hold no ACTIVE session, whatever the local state.
  * A fresh login replaces a DEAD session (needs_otp / down / logging_in) but NEVER an ACTIVE one.
  * @returns {{refuse:boolean, backend:null|"any"|"active"}}
  */
 export function adoptGuard(mode, localState) {
   if (mode === "cold") return { refuse: localState != null, backend: "any" };
-  if (mode === "fresh") return { refuse: localState === ACTIVE, backend: localState == null ? "active" : null };
+  // Fresh always asks the backend too: the daemon streams on UberFleetSession.status, which a
+  // dead local browser (needs_otp / down) says nothing about.
+  if (mode === "fresh") return { refuse: localState === ACTIVE, backend: "active" };
   return { refuse: false, backend: null };
 }
 

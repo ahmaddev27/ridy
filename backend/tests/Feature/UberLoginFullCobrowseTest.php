@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Dispatch\Models\SessionBrowser;
+use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
 use App\Models\User;
@@ -180,6 +181,18 @@ class UberLoginFullCobrowseTest extends TestCase
         $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.full_cobrowse_available', true);
 
         $browser->update(['state' => 'active', 'last_seen_at' => now()]);
+        $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.full_cobrowse_available', false);
+    }
+
+    public function test_an_active_fleet_session_blocks_the_window_even_when_the_browser_is_dead(): void
+    {
+        UberFleetSession::create(['tenant_id' => $this->tenant->id, 'uber_org_uuid' => 'o1', 'cookies' => [['name' => 'sid', 'value' => 'x']], 'status' => 'active']);
+        $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.full_cobrowse_available', false);
+
+        $browser = SessionBrowser::create(['tenant_id' => $this->tenant->id, 'state' => 'needs_otp', 'last_seen_at' => now()]);
+        $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.full_cobrowse_available', false);
+
+        $browser->update(['state' => 'down']);
         $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.full_cobrowse_available', false);
     }
 

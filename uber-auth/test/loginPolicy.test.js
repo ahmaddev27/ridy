@@ -86,6 +86,22 @@ test("markLoggingIn / markNeedsOtp on an unheld company are harmless no-ops", ()
   assert.equal(m.stateOf("9"), null);
 });
 
+test("a DOWN company that abandons a fresh re-link ends up DOWN again, not needs_otp", async () => {
+  const m = mgr();
+  await m.adopt("7", {}, { orgUuid: "o" });
+  m.sessions.get("7").state = SESSION_STATE.DOWN;
+  const gate = createStartGate({ markLoggingIn: (k) => m.markLoggingIn(k) });
+  assert.equal(gate.enter("7").ok, true);
+  assert.equal(m.stateOf("7"), SESSION_STATE.LOGGING_IN);
+  m.markNeedsOtp("7");
+  assert.equal(m.stateOf("7"), SESSION_STATE.DOWN);
+  // a needs_otp company still lands on needs_otp
+  m.sessions.get("7").state = SESSION_STATE.NEEDS_OTP;
+  m.markLoggingIn("7");
+  m.markNeedsOtp("7");
+  assert.equal(m.stateOf("7"), SESSION_STATE.NEEDS_OTP);
+});
+
 test("start gate: an ACTIVE company is refused synchronously and never marked logging_in", async () => {
   const m = mgr();
   await m.adopt("7", {}, { orgUuid: "o" });
@@ -189,9 +205,9 @@ test("adoptGuard: a fresh login replaces a dead session but never an active one"
   assert.equal(adoptMode({ fresh: true }), "fresh");
   assert.equal(adoptMode({}), null);
   for (const dead of [SESSION_STATE.NEEDS_OTP, SESSION_STATE.DOWN, SESSION_STATE.LOGGING_IN]) {
-    assert.deepEqual(adoptGuard("fresh", dead), { refuse: false, backend: null }, dead);
+    assert.deepEqual(adoptGuard("fresh", dead), { refuse: false, backend: "active" }, dead);
   }
-  assert.deepEqual(adoptGuard("fresh", SESSION_STATE.ACTIVE), { refuse: true, backend: null });
+  assert.deepEqual(adoptGuard("fresh", SESSION_STATE.ACTIVE), { refuse: true, backend: "active" });
   // Nothing held locally: the backend must be asked, and only an ACTIVE session blocks.
   assert.deepEqual(adoptGuard("fresh", null), { refuse: false, backend: "active" });
   // Cold stays strict: any held session refuses, an empty slot still asks the backend for any row.
