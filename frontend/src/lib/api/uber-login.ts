@@ -31,7 +31,7 @@ export type UberLoginStatus = {
   /** Uber or the sign-in service is still working (timeout): wait, do not start again. */
   pending?: boolean;
   /** Set while state is awaiting_challenge (docs/28). */
-  challenge?: "arkose";
+  challenge?: "arkose" | "human_login";
   /** A person can solve the puzzle through the live view. */
   cobrowse_available?: boolean;
 };
@@ -54,7 +54,8 @@ async function call(path: string, method: "GET" | "POST", body?: unknown): Promi
 }
 
 export const getUberLoginStatus = () => call("status", "GET");
-export const startUberLogin = (email: string) => call("start", "POST", { email });
+/** No email = full co-browse first login: the manager types everything into the streamed window. */
+export const startUberLogin = (email?: string) => call("start", "POST", email ? { email } : {});
 export const submitUberLoginCode = (code: string) => call("code", "POST", { code });
 export const cancelUberLogin = () => call("cancel", "POST");
 

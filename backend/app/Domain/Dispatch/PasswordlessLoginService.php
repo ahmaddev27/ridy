@@ -71,7 +71,7 @@ class PasswordlessLoginService
     /** De-dup key for the "automated navigation to the code step broke" ops incident. */
     private const NAV_ALERT_KEY = 'uber-pwless-nav';
 
-    private const UBER_AUTH_FAILURES = ['passkey_unsupported', 'blocked', 'channel_unavailable', 'password_required', 'session_active', 'no_session', 'no_proxy', 'capture_failed', 'wrong_code'];
+    private const UBER_AUTH_FAILURES = ['passkey_unsupported', 'blocked', 'channel_unavailable', 'password_required', 'session_active', 'no_session', 'no_proxy', 'capture_failed', 'wrong_code', 'full_login_unavailable'];
 
     /** uber-auth answers that mean "still running", never "failed". */
     private const PENDING_STATUSES = ['pending', 'start_in_flight'];
@@ -104,7 +104,7 @@ class PasswordlessLoginService
     }
 
     /** @return array<string, mixed> */
-    public function start(Tenant $tenant, string $email, string $mode = self::MODE_MANUAL, bool $interactive = true): array
+    public function start(Tenant $tenant, string $email = '', string $mode = self::MODE_MANUAL, bool $interactive = true): array
     {
         if (! $this->client->configured()) {
             return $this->failedView('unavailable');
@@ -132,7 +132,17 @@ class PasswordlessLoginService
         // Co-browse needs a human to solve the puzzle: an unattended (automatic) login never asks for it.
         $cobrowse = $interactive && $this->cobrowseEligible($tenant);
 
-        return $this->locked($tenant, self::START_LOCK, fn () => $this->begin($tenant, $email, $mode, $cold, $cobrowse));
+        // A cold first connect that can be co-browsed is a FULL login: the human drives Uber's
+        // whole sign-in in the stream and types email + code into Uber themselves, so neither
+        // ever reaches us (no email needed here, no code relay, always manual).
+        $full = $cold && $cobrowse;
+        if ($full) {
+            $mode = self::MODE_MANUAL;
+        } elseif ($email === '') {
+            return $this->failedView('unavailable');
+        }
+
+        return $this->locked($tenant, self::START_LOCK, fn () => $this->begin($tenant, $email, $mode, $cold, $cobrowse, $full));
     }
 
     /** @return array<string, mixed> */
@@ -196,7 +206,7 @@ class PasswordlessLoginService
     }
 
     /** @return array<string, mixed> */
-    private function begin(Tenant $tenant, string $email, string $mode, bool $cold, bool $cobrowse): array
+    private function begin(Tenant $tenant, string $email, string $mode, bool $cold, bool $cobrowse, bool $full = false): array
     {
         // One login per company: a second start replaces the first.
         $this->abandon($tenant, $this->store->get($tenant->id));
@@ -214,9 +224,17 @@ class PasswordlessLoginService
         ];
         $this->store->put($tenant->id, $record, LoginAttemptStore::START_WINDOW);
         // No email (or anything derived from it) is kept: not in the cache record, not in the log.
-        $this->audit->log('uber_login.started', null, ['mode' => $mode, 'cold' => $cold], $tenant->id);
+        $this->audit->log('uber_login.started', null, ['mode' => $mode, 'cold' => $cold, 'full' => $full], $tenant->id);
 
-        return $this->settleStart($tenant, $record, $this->client->startLogin($tenant, $email, $cold, $cobrowse));
+        $answer = $this->client->startLogin($tenant, $email, $cold, $cobrowse, $full);
+        if ($full && ($answer['status'] ?? null) === 'full_login_unavailable') {
+            // uber-auth refused the human-driven start (its own flags/eligibility): without an
+            // email there is no automated cold path to fall back to, so this is a clean failure.
+            return $email === '' ? $this->fail($tenant, 'full_login_unavailable') : $this->settleStart($tenant, $record, $this->client->startLogin($tenant, $email, $cold, $cobrowse));
+        }
+        $record['full'] = $full && ($answer['challenge'] ?? null) === 'human_login';
+
+        return $this->settleStart($tenant, $record, $answer);
     }
 
     /**
@@ -297,6 +315,8 @@ class PasswordlessLoginService
 
         return match (true) {
             in_array($status, ['challenge_required', ...self::PENDING_STATUSES], true) => $this->view($record),
+            // A full login never reaches the code relay: the human types the code into Uber itself.
+            $status === 'mfa_required' && ! empty($record['full']) => $this->challengeFailed($tenant, $record, $answer),
             $status === 'mfa_required' => $this->puzzleSolved($tenant, $record, $answer),
             $status === 'success' => $this->connected($tenant, $record),
             default => $this->challengeFailed($tenant, $record, $answer),
@@ -621,6 +641,12 @@ class PasswordlessLoginService
         return $this->view($record) + ['pending' => true];
     }
 
+    /** The first connect would be a full co-browse login (human drives Uber's whole sign-in, no email asked). */
+    public function fullCobrowseAvailable(?Tenant $tenant): bool
+    {
+        return $tenant !== null && $this->coldConnectAvailable($tenant) && $this->cobrowseEligible($tenant);
+    }
+
     /** Whether the connect page may offer the cold (email + code) first connect: flag on and nothing connected yet. */
     public function coldConnectAvailable(?Tenant $tenant): bool
     {
@@ -663,6 +689,10 @@ class PasswordlessLoginService
     {
         $state = $record['state'] ?? self::STATE_IDLE;
         $view = ['state' => $state, 'mode' => $record['mode'] ?? self::MODE_MANUAL, 'channel' => $record['channel'] ?? null, 'expires_at' => $record['expires_at'] ?? null];
+        // A full login's viewer opens straight away; `+` in withChallenge() keeps this over "arkose".
+        if ($state === self::STATE_AWAITING_CHALLENGE && ! empty($record['full'])) {
+            $view['challenge'] = 'human_login';
+        }
         if ($state === self::STATE_FAILED) {
             $view['failure'] = $record['failure'] ?? 'unavailable';
         }

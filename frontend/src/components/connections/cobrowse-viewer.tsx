@@ -27,10 +27,30 @@ function useCountdown(ttlSeconds: number, active: boolean): number {
   return left;
 }
 
+/** Editing keys uber-auth accepts (docs/28 §11.1). Anything else is a violation that closes the stream. */
+const NAMED_KEYS = new Set(["Backspace", "Tab", "Enter", "End", "Home", "ArrowLeft", "ArrowRight", "Delete"]);
+/** Upper bound of characters relayed from one IME/mobile input event (server limit is 120 msg/s). */
+const MAX_TEXT_PER_INPUT = 64;
+
+type KeyMessage = { t: "k"; c: string } | { t: "k"; n: string };
+
+/** Maps a keydown to exactly one of the two schema shapes, or null (send nothing). */
+function keyMessage(e: React.KeyboardEvent): KeyMessage | null {
+  // AltGr reports ctrl+alt on Windows but is how "@", "€", "\\" are typed on a German layout.
+  const altGr = e.getModifierState("AltGraph");
+  if ((e.ctrlKey || e.altKey || e.metaKey) && !altGr) return null;
+  if (NAMED_KEYS.has(e.key)) return { t: "k", n: e.key };
+  if (e.key.length === 1) return { t: "k", c: e.key };
+  return null;
+}
+
 /**
- * View-only live stream of the server-side browser (docs/28). Mouse only: it relays
- * move/down/up as coordinates normalised to [0,1] and registers NO keyboard listener —
- * the OTP is typed later in the normal card. Frames are painted and dropped; nothing is
+ * Live stream of the server-side browser (docs/28). Relays mouse move/down/up as
+ * coordinates normalised to [0,1] and, for the full co-browse login (§11), keystrokes:
+ * `{t:"k",c:"<one char>"}` or `{t:"k",n:"<Backspace|Tab|Enter|End|Home|ArrowLeft|ArrowRight|Delete>"}`.
+ * Keys are captured on a hidden input inside this component only (never document/window),
+ * so the dashboard's own fields are unaffected; the one-time code is typed straight into
+ * Uber and never passes through our UI state. Frames are painted and dropped; nothing is
  * stored or logged.
  */
 export function CobrowseViewer({
@@ -46,6 +66,7 @@ export function CobrowseViewer({
   const { t } = useI18n();
   const c = (k: string) => t(`screens.connections.${k}`);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const lastMoveRef = useRef(0);
   const onEndedRef = useRef(onEnded);
@@ -128,6 +149,32 @@ export function CobrowseViewer({
     ws.send(JSON.stringify({ t: "m", k: kind, x, y }));
   }
 
+  function sendKey(msg: KeyMessage) {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN && state === "live") ws.send(JSON.stringify(msg));
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.nativeEvent.isComposing) return;
+    const msg = keyMessage(e);
+    if (!msg) return; // off-schema: send nothing, let the browser do its own thing
+    e.preventDefault();
+    sendKey(msg);
+  }
+
+  // Mobile / IME text arrives as input events (keydown reports "Unidentified"); desktop keys
+  // are preventDefault-ed above so they never reach here twice.
+  function onInput(e: React.FormEvent<HTMLInputElement>) {
+    const native = e.nativeEvent as InputEvent;
+    if (!native.isComposing) {
+      Array.from(native.data ?? "")
+        .slice(0, MAX_TEXT_PER_INPUT)
+        .forEach((ch) => sendKey({ t: "k", c: ch }));
+      if (native.inputType === "deleteContentBackward") sendKey({ t: "k", n: "Backspace" });
+    }
+    if (!native.isComposing) e.currentTarget.value = "";
+  }
+
   const showCanvas = state === "live" || state === "connecting";
 
   return (
@@ -150,6 +197,21 @@ export function CobrowseViewer({
         )}
       </div>
       {showCanvas && (
+        <input
+          ref={inputRef}
+          type="text"
+          aria-label={c("cobrowseKeyboard")}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          onKeyDown={onKeyDown}
+          onInput={onInput}
+          onPaste={(e) => e.preventDefault()}
+          className="pointer-events-none absolute h-px w-px opacity-0"
+        />
+      )}
+      {showCanvas && (
         <canvas
           ref={canvasRef}
           role="img"
@@ -162,6 +224,7 @@ export function CobrowseViewer({
           onPointerMove={(e) => send("move", e)}
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
+            inputRef.current?.focus({ preventScroll: true });
             send("down", e);
           }}
           onPointerUp={(e) => send("up", e)}

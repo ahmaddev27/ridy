@@ -31,16 +31,17 @@ class UberLoginController extends Controller
 
     public function start(Request $request): JsonResponse
     {
+        $tenant = $request->user()->tenant;
+        // A full co-browse first connect asks for no email: the human types it into Uber themselves.
         $data = $request->validate([
-            'email' => ['required', 'email:rfc', 'max:255'],
+            'email' => [$this->login->fullCobrowseAvailable($tenant) ? 'nullable' : 'required', 'email:rfc', 'max:255'],
             'mode' => ['sometimes', 'in:manual,auto'],
         ]);
-        $tenant = $request->user()->tenant;
         // Automatic (emailed code) by default for a company that set it up; the service
         // falls back to manual when it is not actually available.
         $mode = $data['mode'] ?? ($this->settings->autoCodeEnabled($tenant) ? 'auto' : 'manual');
 
-        $result = $this->login->start($tenant, $data['email'], $mode);
+        $result = $this->login->start($tenant, $data['email'] ?? '', $mode);
 
         // 202 = accepted, waiting for the code; any other outcome is a plain answer.
         return $this->respond($result, in_array($result['state'], ['awaiting_code', 'awaiting_challenge'], true) ? 202 : 200);

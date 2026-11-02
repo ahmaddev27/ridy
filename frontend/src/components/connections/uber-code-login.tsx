@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { OtpInput } from "@/components/ui/otp-input";
 import { CobrowseViewer, type CobrowseEndReason } from "@/components/connections/cobrowse-viewer";
 import { useI18n } from "@/lib/i18n/context";
+import { useAuth } from "@/components/auth/auth-provider";
 import { apiErrorMessage } from "@/lib/api/error-message";
 import {
   cancelUberLogin,
@@ -62,6 +63,8 @@ function hasSwitchedChannel(previous: string | null | undefined, next: UberLogin
  */
 export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
   const { t, locale } = useI18n();
+  const { user } = useAuth();
+  const fullCobrowse = user?.tenant?.full_cobrowse_available === true;
   const c = (k: string) => t(`screens.connections.${k}`);
 
   const [status, setStatus] = useState<UberLoginStatus | null>(null);
@@ -77,6 +80,7 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
   const sentChannel = knownChannel(status?.channel);
   // Uber (or the sign-in service) is still working, e.g. after a timeout: never race it.
   const challenge = status?.state === "awaiting_challenge";
+  const humanLogin = challenge && status?.challenge === "human_login";
   const inFlight = status?.state === "starting" || status?.state === "submitting" || challenge;
   const remaining = useRemaining(status?.expires_at ?? null, waiting);
 
@@ -122,7 +126,15 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
   const onCobrowseEnded = (reason: CobrowseEndReason) => {
     if (reason !== "solved") return;
     setTicket(null);
-    getUberLoginStatus().then(setStatus).catch(() => {});
+    getUberLoginStatus()
+      .then((next) => {
+        setStatus(next);
+        if (next.state === "connected") {
+          toast.success(c("codeSuccess"));
+          onConnected();
+        }
+      })
+      .catch(() => {});
   };
 
   async function openPuzzle() {
@@ -132,6 +144,21 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
       setTicket(await openCobrowse());
     } catch {
       setCobrowseFailed(true); // 409 / 429 / 503 cobrowse_unavailable
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Full co-browse first login: start with no email, then open the window straight away.
+  async function startFull() {
+    setBusy(true);
+    setCobrowseFailed(false);
+    try {
+      const next = await startUberLogin();
+      setStatus(next);
+      if (next.challenge === "human_login" && next.cobrowse_available) setTicket(await openCobrowse());
+    } catch (e) {
+      toast.error(apiErrorMessage(e, t, locale));
     } finally {
       setBusy(false);
     }
@@ -197,7 +224,9 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-semibold text-ink">{c("codeTitle")}</h3>
-          {!waiting && !inFlight && !connected && <p className="mt-1 text-sm text-ink-muted">{c("codeHint")}</p>}
+          {!waiting && !inFlight && !connected && (
+            <p className="mt-1 text-sm text-ink-muted">{c(fullCobrowse ? "fullHint" : "codeHint")}</p>
+          )}
 
           {failure && (
             <p role="alert" className="mt-3 rounded-xl bg-danger-bg px-3 py-2 text-sm text-danger-fg">
@@ -211,10 +240,10 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
                 <CobrowseViewer ticket={ticket} onEnded={onCobrowseEnded} onClose={closePuzzle} />
               ) : status?.cobrowse_available && !cobrowseFailed ? (
                 <>
-                  <p className="text-sm text-ink-muted">{c("cobrowseHint")}</p>
+                  <p className="text-sm text-ink-muted">{c(humanLogin ? "fullResumeHint" : "cobrowseHint")}</p>
                   <Button onClick={openPuzzle} disabled={busy}>
                     {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                    {busy ? c("cobrowseOpening") : c("cobrowseOpen")}
+                    {busy ? c("cobrowseOpening") : c(humanLogin ? "fullOpen" : "cobrowseOpen")}
                   </Button>
                 </>
               ) : (
@@ -279,6 +308,13 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
             </div>
           ) : connected ? (
             <p className="mt-3 text-sm text-success-fg">{c("codeSuccess")}</p>
+          ) : fullCobrowse ? (
+            <div className="mt-4">
+              <Button onClick={startFull} disabled={busy}>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {busy ? c("codeStarting") : failure ? c("codeAgain") : c("fullStart")}
+              </Button>
+            </div>
           ) : (
             <form
               className="mt-4 flex flex-col gap-3 sm:flex-row"

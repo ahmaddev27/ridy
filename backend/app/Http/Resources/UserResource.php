@@ -37,6 +37,8 @@ class UserResource extends JsonResource
                 'cobrowse_enabled' => app(PasswordlessLoginSettings::class)->cobrowseEnabledFor($this->tenant),
                 'passwordless_primary' => app(PasswordlessLoginService::class)->codeLoginIsPrimary($this->tenant),
                 'cold_connect_available' => app(PasswordlessLoginService::class)->coldConnectAvailable($this->tenant),
+                // The cold connect is a full co-browse login: the human signs in inside the stream, no email asked.
+                'full_cobrowse_available' => app(PasswordlessLoginService::class)->fullCobrowseAvailable($this->tenant),
             ] : null,
             'roles' => $this->getRoleNames(),
             'permissions' => $this->getAllPermissions()->pluck('name')->values(),
