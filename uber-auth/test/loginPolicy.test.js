@@ -134,3 +134,21 @@ test("adoptAndCapture: a failed keep-warm or a sign-out is NOT a capture", async
   const out = await signedOut.adoptAndCapture("7", {}, { orgUuid: "o", cookies: [] });
   assert.deepEqual(out, { captured: false, reason: "needs_otp" });
 });
+
+test("a fullLogin start needs no email (the manager types it in the stream); others still do", () => {
+  const ctx = { passwordless: true, stateOf: () => null, coldEnabled: true };
+  const full = admitStart({ company_key: "7", full: true, cold: true, proxy_url: "http://u:p@h:8080" }, ctx);
+  assert.equal(full.ok, true);
+  assert.equal(full.cold, true);
+  // A non-full start with no email is still refused.
+  assert.equal(admitStart({ company_key: "7", cold: true, proxy_url: "http://u:p@h:8080" }, ctx).http, 422);
+});
+
+test("canFullLogin needs full + co-browse preconditions + a cold start", async () => {
+  const { canFullLogin } = await import("../src/loginPolicy.js");
+  assert.equal(canFullLogin({ full: true, cobrowseOk: true, cold: true }), true);
+  for (const k of ["full", "cobrowseOk", "cold"]) {
+    assert.equal(canFullLogin({ full: true, cobrowseOk: true, cold: true, [k]: false }), false, k);
+  }
+  assert.equal(canFullLogin({ full: undefined, cobrowseOk: true, cold: true }), false);
+});

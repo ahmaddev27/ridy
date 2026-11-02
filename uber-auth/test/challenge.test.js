@@ -45,6 +45,32 @@ test("Arkose + cobrowse flag -> challenge_required with the session kept open", 
   assert.ok(out.session, "browser/session must stay open for the stream");
 });
 
+test("full + cobrowse parks BEFORE the email step: challenge_required, session open, fullLogin marked", async () => {
+  let typed = false;
+  const page = fakePage({});
+  const origLocator = page.locator;
+  page.locator = (sel) => {
+    const l = origLocator(sel);
+    return { ...l, fill: async () => { typed = true; }, pressSequentially: async () => { typed = true; } };
+  };
+  const session = handle(page);
+  const out = await startLogin({ email: "a@b.de", reuse: session, cobrowse: true, full: true });
+  assert.equal(out.status, STATUS.CHALLENGE_REQUIRED);
+  assert.ok(out.session && out.session.fullLogin === true);
+  assert.equal(typed, false, "the identifier must not be typed automatically");
+});
+
+test("full WITHOUT cobrowse does not park (non-full flow unchanged)", async () => {
+  const out = await startLogin({ email: "a@b.de", reuse: handle(fakePage({ otp: true })), cobrowse: false, full: true });
+  assert.notEqual(out.session?.fullLogin, true);
+});
+
+test("full + cobrowse on an already-authenticated page is still SUCCESS", async () => {
+  const page = fakePage({ url: "https://supplier.uber.com/orgs/x" });
+  const out = await startLogin({ email: "a@b.de", reuse: { browser: {}, context: { cookies: async () => [] }, page: Object.assign(page, { evaluate: async () => null }) }, cobrowse: true, full: true });
+  assert.equal(out.status, STATUS.SUCCESS);
+});
+
 test("Arkose WITHOUT the flag is still blocked(arkose), unchanged", async () => {
   for (const cobrowse of [false, undefined]) {
     const out = await startLogin({ email: "a@b.de", reuse: handle(fakePage({ arkose: true })), cobrowse });

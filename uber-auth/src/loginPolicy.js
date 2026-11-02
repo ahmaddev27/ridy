@@ -16,7 +16,10 @@ export function admitStart(body, { passwordless, stateOf, coldEnabled = false })
   const companyKey = body.company_key != null ? String(body.company_key) : null;
   const password = body.password ? String(body.password) : null;
 
-  if (!body.email) return reject(422, { error: "email required" });
+  // A fullLogin start (docs/28 §11) has the manager type the email themselves inside the stream,
+  // so the backend sends none; every other start still requires it. Eligibility is re-checked in
+  // runStartNow (canFullLogin), which 409s a full start that is not a cold co-browse one.
+  if (!body.email && body.full !== true) return reject(422, { error: "email required" });
   if (!password) {
     // Passwordless is opt-in and only ever for a known company (it feeds the persistent manager).
     if (!passwordless) return reject(422, { error: "email and password required" });
@@ -50,6 +53,15 @@ function wantsCold(body, state, coldEnabled) {
  */
 export function canCobrowse({ requested, listening, secret, originsConfigured, proxyUrl, realChrome, display }) {
   return requested === true && !!listening && !!secret && !!originsConfigured && !!parseProxyUrl(proxyUrl) && realChrome === true && !!display;
+}
+
+/**
+ * fullLogin (docs/28 §11) = the manager drives the whole login in the stream. Admitted only when
+ * every co-browse precondition holds (`cobrowseOk` = canCobrowse) AND the start is a cold one
+ * (empty slot): a warm/riding session is never handed to a human-driven login.
+ */
+export function canFullLogin({ full, cobrowseOk, cold }) {
+  return full === true && cobrowseOk === true && cold === true;
 }
 
 /**

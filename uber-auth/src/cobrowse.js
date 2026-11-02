@@ -20,6 +20,7 @@ import { MAX_AUTH_BYTES, MAX_MSG_BYTES, auditLine, createRateLimiter, parseAuth,
 export const AUTH_WAIT_MS = 5000;
 export const IDLE_MS = 60_000;
 export const HARD_CAP_MS = 8 * 60_000;
+export const FULL_LOGIN_HARD_CAP_MS = 10 * 60_000; // a human types the email and the code (docs/28 §11.2)
 const WATCH_MS = 400;
 const IDLE_CHECK_MS = 5000;
 const BACKPRESSURE_BYTES = 1_000_000;
@@ -125,7 +126,11 @@ export function createCobrowse({ secret, allowedOrigins, max, findPending, openS
       try {
         const r = await tick(rec.entry.session);
         if (r === "failed") await end(rec, "error");
-        else if (r !== "challenge") await end(rec, "solved"); // left the challenge: stream closes BEFORE the OTP step
+        else if (rec.entry?.fullLogin) {
+          // fullLogin (docs/28 §11.2): the human is still working through email / method / OTP, so the
+          // stream stays open for every step; only a landed dashboard ends it.
+          if (r === "landed") await end(rec, "solved");
+        } else if (r !== "challenge") await end(rec, "solved"); // left the challenge: stream closes BEFORE the OTP step
       } catch {
         /* page mid-navigation: next tick */
       } finally {
@@ -133,7 +138,7 @@ export function createCobrowse({ secret, allowedOrigins, max, findPending, openS
       }
     }, WATCH_MS);
     rec.idleTimer = setInterval(() => now() - rec.lastInputAt > IDLE_MS && end(rec, "idle"), IDLE_CHECK_MS);
-    rec.capTimer = setTimeout(() => end(rec, "timeout"), HARD_CAP_MS);
+    rec.capTimer = setTimeout(() => end(rec, "timeout"), rec.entry?.fullLogin ? FULL_LOGIN_HARD_CAP_MS : HARD_CAP_MS);
     for (const t of [rec.watchTimer, rec.idleTimer, rec.capTimer]) t.unref?.();
   }
 

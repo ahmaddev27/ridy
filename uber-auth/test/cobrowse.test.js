@@ -339,6 +339,32 @@ test("ws: leaving the challenge ends the stream with 'solved' before anything el
   h.close();
 });
 
+test("ws: a fullLogin stream stays open through otp/password/passkey/channel_choice and ends only on landed", async () => {
+  const h = await harness({ fullLogin: true });
+  const c = await authed(h);
+  for (const step of ["otp", "password", "passkey", "channel_choice"]) {
+    h.setTick(step);
+    await new Promise((r) => setTimeout(r, 900));
+  }
+  assert.deepEqual(h.log.ended, []);
+  assert.equal(h.log.stopped, 0);
+  h.setTick("landed");
+  const closed = await c.closed;
+  assert.equal(closed.code, 1000);
+  assert.ok(c.messages.includes('{"t":"end","reason":"solved"}'));
+  assert.deepEqual(h.log.ended, ["solved"]);
+  h.close();
+});
+
+test("ws: a fullLogin stream still ends as an error on 'failed'", async () => {
+  const h = await harness({ fullLogin: true });
+  const c = await authed(h);
+  h.setTick("failed");
+  await c.closed;
+  assert.deepEqual(h.log.ended, ["error"]);
+  h.close();
+});
+
 test("ws: repeated Arkose failure ends the stream as an error", async () => {
   const h = await harness();
   const c = await authed(h);

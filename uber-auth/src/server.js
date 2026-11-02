@@ -12,8 +12,8 @@ import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { startLogin, submitMfa, closeSession, challengeTick, finishChallenge, STATUS } from "./browser.js";
 import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf } from "./persistent.js";
-import { admitStart, canCobrowse, companyMatches, createStartGate } from "./loginPolicy.js";
-import { createCobrowse, createCobrowseServer } from "./cobrowse.js";
+import { admitStart, canCobrowse, canFullLogin, companyMatches, createStartGate } from "./loginPolicy.js";
+import { createCobrowse, createCobrowseServer, FULL_LOGIN_HARD_CAP_MS } from "./cobrowse.js";
 import { openCdpStream } from "./cobrowseStream.js";
 import { loginHash } from "./cobrowseTicket.js";
 
@@ -42,11 +42,16 @@ setInterval(() => {
   for (const [id, entry] of pending) {
     if (entry.dead) {
       if (now - entry.deadAt > DEAD_KEEP_MS) pending.delete(id);
-    } else if (now - entry.createdAt > (entry.challenge ? config.challengeTtl : config.sessionTtl)) {
+    } else if (now - entry.createdAt > entryTtl(entry)) {
       expireEntry(id, entry);
     }
   }
 }, 30000);
+
+// A fullLogin entry must outlive its 10-min stream cap by a margin, so a page that lands near the
+// cap is still captured by the final /login/resume before the reaper drops it (docs/28 §11.2).
+const FULL_LOGIN_ENTRY_TTL = FULL_LOGIN_HARD_CAP_MS + 60_000;
+const entryTtl = (entry) => (entry.fullLogin ? FULL_LOGIN_ENTRY_TTL : entry.challenge ? config.challengeTtl : config.sessionTtl);
 
 function expireEntry(id, entry) {
   if (!entry.challenge) {
@@ -195,6 +200,21 @@ async function runStart(body, admitted, res) {
 
 async function runStartNow(body, { companyKey, password, cold }, res) {
   const passwordless = !password;
+  const cobrowseOk = canCobrowse({
+    requested: body.cobrowse === true,
+    listening: cobrowse != null,
+    secret: config.secret,
+    originsConfigured: config.cobrowseAllowedOrigins.length > 0,
+    proxyUrl: body.proxy_url,
+    realChrome: config.realChrome,
+    display: process.env.DISPLAY,
+  });
+  // fullLogin (docs/28 §11) = same preconditions as co-browse PLUS a cold start; never loosened.
+  const full = canFullLogin({ full: body.full, cobrowseOk, cold: passwordless && cold === true });
+  if (body.full === true && !full) {
+    if (passwordless) markNeedsOtp(companyKey);
+    return send(res, 409, { status: "full_login_unavailable", message: "full_login_unavailable" });
+  }
   const outcome = await startLogin({
     email: body.email,
     password,
@@ -204,22 +224,16 @@ async function runStartNow(body, { companyKey, password, cold }, res) {
     reuse: passwordless ? handleOf(companyKey) : null,
     // Cold first connect: no handle exists by construction (state null); a fresh browser is built.
     cold: passwordless && cold === true,
-    cobrowse: canCobrowse({
-      requested: body.cobrowse === true,
-      listening: cobrowse != null,
-      secret: config.secret,
-      originsConfigured: config.cobrowseAllowedOrigins.length > 0,
-      proxyUrl: body.proxy_url,
-      realChrome: config.realChrome,
-      display: process.env.DISPLAY,
-    }),
+    cobrowse: cobrowseOk,
+    full,
   });
 
   if (outcome.status === STATUS.CHALLENGE_REQUIRED) {
     const loginId = randomUUID();
     const createdAt = Date.now();
-    pending.set(loginId, { session: outcome.session, companyKey, createdAt, passwordless, cold: cold === true, challenge: true });
-    return send(res, 200, challengeBody(loginId, createdAt));
+    const fullLogin = full && outcome.session?.fullLogin === true;
+    pending.set(loginId, { session: outcome.session, companyKey, createdAt, passwordless, cold: cold === true, challenge: true, fullLogin });
+    return send(res, 200, challengeBody(loginId, createdAt, fullLogin));
   }
   if (outcome.status === STATUS.MFA_REQUIRED) {
     const loginId = randomUUID();
@@ -239,10 +253,10 @@ async function runStartNow(body, { companyKey, password, cold }, res) {
   return send(res, 200, { status: outcome.status, message: outcome.message });
 }
 
-const challengeBody = (loginId, createdAt) => ({
+const challengeBody = (loginId, createdAt, fullLogin = false) => ({
   status: STATUS.CHALLENGE_REQUIRED,
   login_id: loginId,
-  challenge: "arkose",
+  challenge: fullLogin ? "human_login" : "arkose",
   expires_at: new Date(createdAt + config.challengeTtl).toISOString(),
 });
 
@@ -271,6 +285,23 @@ async function awaitChallengeOutcome(entry) {
   return "challenge";
 }
 
+/**
+ * fullLogin long-poll (docs/28 §11): the human drives every step, so otp / password / passkey /
+ * channel_choice all mean "still in progress". Only landed (capture) or failed ends the wait; the
+ * code never passes through here and nothing is clicked on the page.
+ */
+async function awaitFullLoginOutcome(entry) {
+  const deadline = Date.now() + RESUME_WAIT_MS;
+  while (Date.now() < deadline) {
+    if (entry.dead) return "dead";
+    if (entry.landed) return "landed";
+    const step = await challengeTick(entry.session).catch(() => "challenge");
+    if (step === "landed" || step === "failed") return step;
+    await sleep(RESUME_POLL_MS);
+  }
+  return "challenge";
+}
+
 async function handleResume(req, res) {
   const body = await readJson(req);
   const loginId = body.login_id;
@@ -281,17 +312,17 @@ async function handleResume(req, res) {
   }
   if (entry.dead) return finishDead(loginId, entry, res);
   if (!entry.challenge) return send(res, 200, mfaBody(loginId, entry.createdAt)); // already past the puzzle
-  if (entry.resuming) return send(res, 200, challengeBody(loginId, entry.createdAt)); // one long-poll at a time
+  if (entry.resuming) return send(res, 200, challengeBody(loginId, entry.createdAt, entry.fullLogin)); // one long-poll at a time
 
   entry.resuming = true;
   try {
-    const step = await awaitChallengeOutcome(entry);
+    const step = await (entry.fullLogin ? awaitFullLoginOutcome(entry) : awaitChallengeOutcome(entry));
     if (step === "dead") return finishDead(loginId, entry, res);
     if (step === "failed") {
       await killChallenge(loginId, "challenge_failed");
       return finishDead(loginId, entry, res);
     }
-    if (step === "challenge") return send(res, 200, challengeBody(loginId, entry.createdAt));
+    if (step === "challenge") return send(res, 200, challengeBody(loginId, entry.createdAt, entry.fullLogin));
     return await leaveChallenge(loginId, entry, step, res);
   } finally {
     entry.resuming = false;
@@ -341,6 +372,7 @@ async function handleCobrowseClose(req, res) {
 async function onStreamEnd(rec, reason) {
   const outcome = { timeout: "challenge_timeout", idle: "challenge_timeout", error: "challenge_failed", violation: "cobrowse_violation" }[reason];
   if (outcome) return killChallenge(rec.loginId, outcome);
+  if (reason === "solved" && rec.entry?.fullLogin) rec.entry.landed = true; // /login/resume captures it
   if (reason !== "cancel") return;
   const entry = pending.get(rec.loginId);
   if (!entry) return;
@@ -352,7 +384,7 @@ async function onStreamEnd(rec, reason) {
 /** The challenge-state pending login a ticket's `lh` points at (the login_id itself never travels). */
 function findChallengePending(lh) {
   for (const [loginId, entry] of pending) {
-    if (entry.challenge && !entry.dead && loginHash(loginId) === lh) return { loginId, entry };
+    if (entry.challenge && !entry.dead && !entry.landed && loginHash(loginId) === lh) return { loginId, entry };
   }
   return null;
 }

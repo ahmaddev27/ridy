@@ -384,7 +384,9 @@ const navLog = (m) => console.log(`[pwless-nav] ${m}`);
  * labels) so the text selectors above can be tuned from the log instead of guessed. Fires only
  * when a step is not recognised. Never logs PII: emails and any run of digits are redacted.
  */
-async function dumpScreen(page, where) {
+async function dumpScreen(page, where, session = null) {
+  // A human-driven login may be mid-typing an email/OTP: no text trace, no screenshot (docs/28 §11.3).
+  if (session?.fullLogin) return;
   const redact = (s) =>
     (s || "").replace(/\s+/g, " ").trim().replace(/[\w.+-]+@[\w.-]+\.\w+/g, "<email>").replace(/\b\d{3,}\b/g, "<num>");
   const uniq = (list) => [...new Set(list.map(redact).filter(Boolean))].slice(0, 25);
@@ -565,7 +567,7 @@ async function captureResult(context, page) {
  * cookies and proxy (Uber shows "Welcome back", far less Arkose risk than a cold
  * login), and is never closed on failure — only its page state is abandoned.
  */
-export async function startLogin({ email, password = null, proxyUrl = null, companyKey = null, reuse = null, cold = false, cobrowse = false }) {
+export async function startLogin({ email, password = null, proxyUrl = null, companyKey = null, reuse = null, cold = false, cobrowse = false, full = false }) {
   // A passwordless login with nothing to ride and no explicit cold clearance never builds a
   // browser: a stray fresh session must be unreachable (server.js admits cold only for an empty slot).
   if (!password && !reuse && !cold) return { status: STATUS.NO_SESSION, message: "no_session" };
@@ -582,6 +584,13 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
     if (!/auth\.uber|\/(auth|login|oauth)/i.test(page.url())) {
       const result = await captureResult(context, page);
       return { status: STATUS.SUCCESS, result, session };
+    }
+
+    // fullLogin (docs/28 §11): the manager drives the WHOLE login in the stream, so nothing is
+    // typed or clicked here. Park on the auth page; the server only admits this for a cold start.
+    if (full && cobrowse) {
+      session.fullLogin = true;
+      return { status: STATUS.CHALLENGE_REQUIRED, session };
     }
 
     // A remembered account ("Welcome back") may not ask for the identifier again. Then we
