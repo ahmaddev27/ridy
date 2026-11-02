@@ -68,6 +68,8 @@ class CompanyResource extends JsonResource
             'dispatch_reject_enabled' => $this->dispatchRejectEnabled(),
             // Super-admin opt-in for the passwordless Uber login (docs/27); absent = off.
             'passwordless_login_enabled' => $this->passwordlessLoginEnabled(),
+            // Super-admin opt-in for co-browsing the Arkose puzzle (docs/28); absent = off.
+            'cobrowse_enabled' => $this->cobrowseEnabled(),
 
             'session_status' => $session['status'] ?? null,
             'session_last_event_at' => $session['last_event_at'] ?? null,

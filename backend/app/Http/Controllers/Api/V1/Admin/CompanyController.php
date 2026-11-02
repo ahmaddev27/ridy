@@ -146,6 +146,16 @@ class CompanyController extends Controller
         return response()->json(['data' => $this->detail($tenant->refresh())]);
     }
 
+    /** Super-admin opt-in/out of co-browsing Uber's Arkose puzzle (docs/28) for one company. */
+    public function setCobrowse(Request $request, Tenant $tenant): JsonResponse
+    {
+        $data = $request->validate(['enabled' => ['required', 'boolean']]);
+
+        $tenant->setCobrowseEnabled((bool) $data['enabled']);
+
+        return response()->json(['data' => $this->detail($tenant->refresh())]);
+    }
+
     public function show(Tenant $tenant): JsonResponse
     {
         $tenant->ensurePaymentReference(); // backfill for any company created before the feature

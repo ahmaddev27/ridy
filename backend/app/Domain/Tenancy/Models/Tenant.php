@@ -120,6 +120,17 @@ class Tenant extends Model
         $this->mergePasswordlessLogin(['enabled' => $enabled]);
     }
 
+    /** The platform's per-company opt-in for co-browsing Uber's Arkose puzzle (docs/28). Absent = off. */
+    public function cobrowseEnabled(): bool
+    {
+        return ($this->settings['passwordless_login']['cobrowse'] ?? false) === true;
+    }
+
+    public function setCobrowseEnabled(bool $enabled): void
+    {
+        $this->mergePasswordlessLogin(['cobrowse' => $enabled]);
+    }
+
     /**
      * Merge keys into `settings.passwordless_login` (auto_code, auto_relogin,
      * inbound_token_hash, email, ...). Only the hash of the inbound token is ever stored.

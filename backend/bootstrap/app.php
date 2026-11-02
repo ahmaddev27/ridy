@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureCobrowseEnabled;
 use App\Http\Middleware\EnsureDashboardToken;
 use App\Http\Middleware\EnsureDriverAccount;
 use App\Http\Middleware\EnsureDriverTenantActive;
@@ -73,6 +74,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'elprofessor.enabled' => EnsureElProfessorEnabled::class,
             // Passwordless Uber login: global switch + allowlist + company flag, else 404.
             'passwordless.enabled' => EnsurePasswordlessLoginEnabled::class,
+            // Co-browse of the Arkose puzzle (docs/28): global flag + company flag, else 404.
+            'cobrowse.enabled' => EnsureCobrowseEnabled::class,
         ]);
 
         // SECURITY: route-model binding must resolve AFTER the tenant context is
