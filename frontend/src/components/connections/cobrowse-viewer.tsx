@@ -79,6 +79,19 @@ export function CobrowseViewer({
     onEndedRef.current = onEnded;
   }, [onEnded]);
 
+  // Keep keyboard capture on our hidden input whenever the stream is live, so a key lands in the
+  // Uber field the manager clicked (the click is relayed, then the keystroke). Focus on going live
+  // and keep it from drifting away.
+  useEffect(() => {
+    if (state !== "live") return;
+    const focus = () => inputRef.current?.focus({ preventScroll: true });
+    focus();
+    const id = setInterval(() => {
+      if (document.activeElement !== inputRef.current) focus();
+    }, 1000);
+    return () => clearInterval(id);
+  }, [state]);
+
   useEffect(() => {
     let disposed = false;
     const ws = new WebSocket(ticket.ws_url);
@@ -182,63 +195,86 @@ export function CobrowseViewer({
   const showCanvas = state === "live" || state === "connecting";
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3 text-sm text-ink-muted">
-        <span className="flex items-center gap-2" role="status" aria-live="polite">
-          {state === "connecting" && (
-            <>
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> {c("cobrowseConnecting")}
-            </>
-          )}
-          {state === "live" && c("cobrowseLive")}
-          {state === "ended" && c(`cobrowseEnded_${reason ?? "error"}`)}
-          {state === "error" && c("cobrowseError")}
-        </span>
-        {showCanvas && (
-          <span className="shrink-0 text-xs text-ink-subtle" dir="ltr">
-            {c("cobrowseEnds").replace("{time}", formatRemaining(left))}
-          </span>
+    // A large, focused modal over the whole viewport: the small embedded card was unusable for a
+    // real sign-in. Refocus the hidden key-capture input on any press inside the modal.
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      onPointerDown={() => state === "live" && inputRef.current?.focus({ preventScroll: true })}
+    >
+      <div className="flex max-h-[94vh] w-full max-w-5xl flex-col gap-3 rounded-2xl border border-line-strong bg-surface p-4 shadow-2xl sm:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-semibold text-ink">{c("cobrowseTitle")}</h3>
+            <p className="flex items-center gap-2 text-sm text-ink-muted" role="status" aria-live="polite">
+              {state === "connecting" && (
+                <>
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> {c("cobrowseConnecting")}
+                </>
+              )}
+              {state === "live" && <span className="flex items-center gap-2"><span className="h-2 w-2 shrink-0 rounded-full bg-success-fg" />{c("cobrowseLive")}</span>}
+              {state === "ended" && c(`cobrowseEnded_${reason ?? "error"}`)}
+              {state === "error" && c("cobrowseError")}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            {showCanvas && (
+              <span className="text-xs text-ink-subtle" dir="ltr">
+                {c("cobrowseEnds").replace("{time}", formatRemaining(left))}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg px-2 py-1 text-sm text-ink-muted hover:bg-surface-2 hover:text-ink"
+            >
+              {c("cobrowseClose")}
+            </button>
+          </div>
+        </div>
+
+        {state === "live" && (
+          <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm text-ink-muted">{c("cobrowseTypeHint")}</p>
         )}
-      </div>
-      {showCanvas && (
-        <input
-          ref={inputRef}
-          type="text"
-          aria-label={c("cobrowseKeyboard")}
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          onKeyDown={onKeyDown}
-          onInput={onInput}
-          onPaste={(e) => e.preventDefault()}
-          className="pointer-events-none absolute h-px w-px opacity-0"
-        />
-      )}
-      {showCanvas && (
-        <canvas
-          ref={canvasRef}
-          role="img"
-          aria-label={c("cobrowseAlt")}
-          width={size.w}
-          height={size.h}
-          // Fit to width, but never taller than ~88vh: cap the width by the aspect ratio instead.
-          style={{ aspectRatio: `${size.w} / ${size.h}`, maxWidth: `min(100%, calc(88vh * ${size.w / size.h}))`, touchAction: "none" }}
-          className="mx-auto block h-auto w-full cursor-pointer rounded-xl border border-line-strong bg-surface-2 object-contain"
-          onPointerMove={(e) => send("move", e)}
-          onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
-            inputRef.current?.focus({ preventScroll: true });
-            send("down", e);
-          }}
-          onPointerUp={(e) => send("up", e)}
-          onContextMenu={(e) => e.preventDefault()}
-        />
-      )}
-      <div className="flex justify-center">
-        <button type="button" onClick={onClose} className="text-sm text-ink-muted underline underline-offset-2 hover:text-ink">
-          {c("cobrowseClose")}
-        </button>
+
+        {showCanvas && (
+          <input
+            ref={inputRef}
+            type="text"
+            aria-label={c("cobrowseKeyboard")}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            onKeyDown={onKeyDown}
+            onInput={onInput}
+            onPaste={(e) => e.preventDefault()}
+            className="pointer-events-none absolute h-px w-px opacity-0"
+          />
+        )}
+        {showCanvas && (
+          <canvas
+            ref={canvasRef}
+            role="img"
+            aria-label={c("cobrowseAlt")}
+            width={size.w}
+            height={size.h}
+            // Fill the modal, but never taller than the viewport: cap width by the aspect ratio.
+            style={{ aspectRatio: `${size.w} / ${size.h}`, maxWidth: `min(100%, calc(80vh * ${size.w / size.h}))`, touchAction: "none" }}
+            className="mx-auto block h-auto w-full cursor-pointer rounded-xl border border-line-strong bg-white object-contain"
+            onPointerMove={(e) => send("move", e)}
+            onPointerDown={(e) => {
+              // Focus our key-capture input BEFORE capturing the pointer (capturing first can swallow
+              // the focus), then relay the click so the Uber field under the cursor is focused too.
+              inputRef.current?.focus({ preventScroll: true });
+              e.currentTarget.setPointerCapture(e.pointerId);
+              send("down", e);
+            }}
+            onPointerUp={(e) => send("up", e)}
+            onContextMenu={(e) => e.preventDefault()}
+          />
+        )}
       </div>
     </div>
   );
