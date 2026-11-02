@@ -316,13 +316,16 @@ const DASHBOARD_HOST = (() => {
 // The known authenticated fleet surfaces: you cannot be on any of them unauthenticated (Uber
 // redirects to the sign-in host), so reaching one is a real landing — unlike www./help.uber.com.
 const DASHBOARD_HOSTS = /(^|\.)(vsdispatch|supplier|fleethub)\.uber\.com$/i;
-const onDashboard = (page) => {
+const hostOf = (page) => {
   try {
-    const host = new URL(page.url()).hostname.toLowerCase();
-    return host === DASHBOARD_HOST || DASHBOARD_HOSTS.test(host);
+    return new URL(page.url()).hostname.toLowerCase();
   } catch {
-    return false;
+    return null;
   }
+};
+const onDashboard = (page) => {
+  const host = hostOf(page);
+  return host !== null && (host === DASHBOARD_HOST || DASHBOARD_HOSTS.test(host));
 };
 const TRY_AGAIN_RE = /try again|erneut versuchen|versuchen sie es erneut|noch einmal versuchen/i;
 
@@ -342,6 +345,15 @@ async function showsTryAgain(page) {
 export async function challengeTick(session) {
   const state = (session.challenge ??= { retries: 0, retrying: false });
   const step = await probeStep(session.page);
+  if (session.fullLogin) {
+    // Diagnostic: trace where the human's login goes (HOST only — never the path/query, so no token
+    // leak), and whether we count it as a landing. One line per host change; tune the allowlist from it.
+    const host = hostOf(session.page);
+    if (host && host !== session._navHost) {
+      session._navHost = host;
+      navLog(`fullLogin: host=${host} step=${step ?? "none"} dashboard=${onDashboard(session.page)}`);
+    }
+  }
   if (step && step !== "arkose") {
     // Arkose mode: any step off the puzzle is terminal (the next phase takes over). Full mode: the
     // manager drives every page, so only a STABLE landing on the dispatch dashboard is a real
