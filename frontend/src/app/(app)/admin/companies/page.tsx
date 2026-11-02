@@ -15,7 +15,7 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Switch } from "@/components/ui/switch";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { listCompanies, deleteCompany, setCompanyActive, setCompanyElProfessor, setCompanyDispatchReject, setCompanyServerSync, setCompanyCobrowse, type Company } from "@/lib/api/admin";
+import { listCompanies, deleteCompany, setCompanyActive, setCompanyElProfessor, setCompanyDispatchReject, setCompanyCobrowse, type Company } from "@/lib/api/admin";
 import { apiErrorMessage } from "@/lib/api/error-message";
 
 type Filter = "all" | "linked" | "expired" | "banned";
@@ -94,8 +94,6 @@ export default function CompaniesPage() {
   // here so a refetch while the dialog is open cannot change which row it acts on.
   const [confirmDr, setConfirmDr] = useState<Company | null>(null);
   const [drBusy, setDrBusy] = useState(false);
-  // Optimistic server-sync state per company id, cleared once the request settles.
-  const [ssOverride, setSsOverride] = useState<Record<number, boolean>>({});
   const [cbOverride, setCbOverride] = useState<Record<number, boolean>>({});
 
   async function toggleActive(co: Company) {
@@ -167,26 +165,6 @@ export default function CompaniesPage() {
     } finally {
       setDrBusy(false);
       setConfirmDr(null);
-    }
-  }
-
-  /**
-   * One-click, no confirm: the sync only reads from Fleet Hub, so it is safe to
-   * flip either way. Optimistic through a local override; reverted on failure.
-   */
-  async function toggleServerSync(co: Company) {
-    const next = !(ssOverride[co.id] ?? co.server_sync_enabled);
-    setSsOverride((m) => ({ ...m, [co.id]: next }));
-    try {
-      await setCompanyServerSync(co.id, next);
-      await refetch();
-    } catch (e) {
-      toast.error(c("updateFailed"), { description: apiErrorMessage(e, t, locale) });
-    } finally {
-      setSsOverride((m) => {
-        const { [co.id]: _drop, ...rest } = m;
-        return rest;
-      });
     }
   }
 
@@ -283,7 +261,6 @@ export default function CompaniesPage() {
                   <th className="px-4 py-3 font-semibold">{c("colSession")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colElProfessor")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colDispatchReject")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colServerSync")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colCobrowse")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colDrivers")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colOffers")}</th>
@@ -372,14 +349,6 @@ export default function CompaniesPage() {
                         onChange={() => toggleDispatchReject(co)}
                         disabled={drBusy}
                         label={co.dispatch_reject_enabled ? c("drOff") : c("drOn")}
-                      />
-                    </td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <Switch
-                        checked={ssOverride[co.id] ?? co.server_sync_enabled}
-                        onChange={() => void toggleServerSync(co)}
-                        disabled={co.id in ssOverride}
-                        label={(ssOverride[co.id] ?? co.server_sync_enabled) ? c("ssOff") : c("ssOn")}
                       />
                     </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>

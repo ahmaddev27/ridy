@@ -554,7 +554,6 @@ Route::prefix('v1')->group(function () {
         Route::patch('companies/{tenant}/dispatch-reject', [CompanyController::class, 'setDispatchReject']);
         Route::patch('companies/{tenant}/passwordless-login', [CompanyController::class, 'setPasswordlessLogin']);
         Route::patch('companies/{tenant}/cobrowse', [CompanyController::class, 'setCobrowse']);
-        Route::patch('companies/{tenant}/server-sync', [CompanyController::class, 'setServerSync']);
 
         // Read-only drill-down into a company's fleet data (admin tabs).
         Route::get('companies/{tenant}/drivers', [CompanyDataController::class, 'drivers']);

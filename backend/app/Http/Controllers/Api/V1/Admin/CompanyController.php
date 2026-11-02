@@ -156,16 +156,6 @@ class CompanyController extends Controller
         return response()->json(['data' => $this->detail($tenant->refresh())]);
     }
 
-    /** Super-admin opt-in/out of the server-side Fleet Hub sync for one company. */
-    public function setServerSync(Request $request, Tenant $tenant): JsonResponse
-    {
-        $data = $request->validate(['enabled' => ['required', 'boolean']]);
-
-        $tenant->setServerSyncEnabled((bool) $data['enabled']);
-
-        return response()->json(['data' => $this->detail($tenant->refresh())]);
-    }
-
     public function show(Tenant $tenant): JsonResponse
     {
         $tenant->ensurePaymentReference(); // backfill for any company created before the feature

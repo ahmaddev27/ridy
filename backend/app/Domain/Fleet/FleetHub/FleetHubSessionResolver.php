@@ -68,7 +68,6 @@ class FleetHubSessionResolver
                 && $s->tenant->stateReason() === null
                 && is_string($s->tenant->proxy_url)
                 && $s->tenant->proxy_url !== ''
-                && $s->tenant->serverSyncEnabled()
                 && ($allow === [] || in_array((string) $s->tenant_id, $allow, true)))
             ->map(fn (UberFleetSession $s) => $s->tenant)
             ->values();
