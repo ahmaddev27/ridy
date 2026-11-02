@@ -218,7 +218,11 @@ async function hasPasskeyPrompt(page) {
  */
 async function hasArkoseChallenge(page) {
   try {
-    const text = page.getByText(/protecting your account|start puzzle|konto (wird )?gesch(ü|u)tzt|r(ä|a)tsel starten/i).first();
+    const text = page
+      .getByText(
+        /protecting your account|start puzzle|verify (you are|you'?re) (a )?human|konto (wird )?gesch(ü|u)tzt|schutz (ihres|deines) kontos|r(ä|a)tsel starten|echter mensch/i,
+      )
+      .first();
     if (await text.isVisible()) return true;
     // A preloaded but hidden Arkose frame is not a challenge: it must be visible and real-sized.
     const frame = page.locator('iframe[src*="arkoselabs" i], iframe[src*="funcaptcha" i], [id*="arkose" i]').first();
@@ -242,6 +246,14 @@ export async function detectStep(page) {
     if (await isVisible(otpField(page))) return "otp";
     if (await isVisible(passwordField(page))) return "password";
     if (await hasPasskeyPrompt(page)) return "passkey";
+    await page.waitForTimeout(500);
+  }
+  // Uber's risk-check interstitial ("Schutz Ihres Kontos" / "Rätsel starten") can render only
+  // after the step budget, once the identifier submit has been scored. Give it a brief last
+  // chance so a late Arkose is reported as `arkose` (-> backend `blocked`), not `unknown`.
+  const arkoseDeadline = Date.now() + 8000;
+  while (Date.now() < arkoseDeadline) {
+    if (await hasArkoseChallenge(page)) return "arkose";
     await page.waitForTimeout(500);
   }
   await dumpScreen(page, "detectStep-unknown");
