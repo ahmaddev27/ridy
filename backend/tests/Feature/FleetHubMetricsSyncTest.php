@@ -34,6 +34,7 @@ class FleetHubMetricsSyncTest extends TestCase
         $tenant = Tenant::create([
             'name' => 'Fleet', 'country' => 'DE', 'status' => 'active',
             'activated_at' => now(), 'subscription_ends_at' => now()->addMonth(),
+            'settings' => ['server_sync' => ['enabled' => true]],
         ]);
         $tenant->forceFill(['proxy_url' => 'http://user:pw@proxy.test:8080'])->save();
         UberFleetSession::withoutGlobalScopes()->create([

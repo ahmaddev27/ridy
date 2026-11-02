@@ -12,11 +12,15 @@ use App\Domain\Fleet\Models\Vehicle;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Jobs\SyncTenantEarnings;
 use App\Jobs\SyncTenantVehicles;
+use App\Models\User;
 use Carbon\CarbonImmutable;
+use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /** The server-side Fleet Hub pulls (earnings + vehicles) behind UBER_SERVER_SYNC. */
@@ -30,11 +34,12 @@ class FleetHubServerSyncTest extends TestCase
         config(['services.uber.server_sync' => true]);
     }
 
-    private function tenant(string $name = 'Fleet', bool $session = true, bool $proxy = true): Tenant
+    private function tenant(string $name = 'Fleet', bool $session = true, bool $proxy = true, bool $enabled = true): Tenant
     {
         $tenant = Tenant::create([
             'name' => $name, 'country' => 'DE', 'status' => 'active',
             'activated_at' => now(), 'subscription_ends_at' => now()->addMonth(),
+            'settings' => ['server_sync' => ['enabled' => $enabled]],
         ]);
         if ($proxy) {
             $tenant->forceFill(['proxy_url' => 'http://user:pw@proxy.test:8080'])->save();
@@ -192,6 +197,37 @@ class FleetHubServerSyncTest extends TestCase
         Queue::assertPushed(SyncTenantEarnings::class, 1);
         Queue::assertPushed(SyncTenantVehicles::class, 1);
         $this->assertSame([$good->id], app(FleetHubSessionResolver::class)->eligibleTenants()->pluck('id')->all());
+    }
+
+    public function test_only_companies_the_admin_enabled_are_eligible(): void
+    {
+        $on = $this->tenant('On');
+        $this->tenant('Off', enabled: false);
+
+        $this->assertSame([$on->id], app(FleetHubSessionResolver::class)->eligibleTenants()->pluck('id')->all());
+    }
+
+    public function test_super_admin_flips_the_flag_and_a_manager_is_forbidden(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $tenant = $this->tenant('Acme', enabled: false);
+
+        $manager = User::create(['name' => 'M', 'email' => 'm@acme.de', 'password' => Hash::make('password'), 'tenant_id' => $tenant->id]);
+        $manager->assignRole('fleet_manager');
+        Sanctum::actingAs($manager);
+        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/server-sync", ['enabled' => true])->assertForbidden();
+        $this->assertFalse($tenant->refresh()->serverSyncEnabled());
+
+        $admin = User::create(['name' => 'A', 'email' => 'a@reidey.de', 'password' => Hash::make('password')]);
+        $admin->assignRole('super_admin');
+        Sanctum::actingAs($admin);
+        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/server-sync", ['enabled' => true])
+            ->assertOk()->assertJsonPath('data.server_sync_enabled', true);
+        $this->assertTrue($tenant->refresh()->serverSyncEnabled());
+
+        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/server-sync", [])->assertStatus(422);
+        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/server-sync", ['enabled' => false])
+            ->assertOk()->assertJsonPath('data.server_sync_enabled', false);
     }
 
     public function test_one_tenants_crash_does_not_escape_the_job(): void

@@ -29,6 +29,8 @@ export type Company = {
   elprofessor_connected: boolean;
   /** The PLATFORM's switch for dispatch-side offer declines, set per company. */
   dispatch_reject_enabled: boolean;
+  /** The PLATFORM's switch for the server-side Fleet Hub sync, set per company. */
+  server_sync_enabled: boolean;
   users?: CompanyUser[] | null;
 };
 
@@ -643,6 +645,16 @@ export async function setCompanyElProfessor(id: number, enabled: boolean): Promi
  */
 export async function setCompanyDispatchReject(id: number, enabled: boolean): Promise<Company> {
   const res = await apiFetch<{ data: Company }>(`${base}/${id}/dispatch-reject`, {
+    method: "PATCH",
+    body: { enabled },
+    withCsrf: true,
+  });
+  return res.data;
+}
+
+/** Super-admin opt-in/out of the server-side Fleet Hub sync (earnings, vehicles, metrics) for one company. */
+export async function setCompanyServerSync(id: number, enabled: boolean): Promise<Company> {
+  const res = await apiFetch<{ data: Company }>(`${base}/${id}/server-sync`, {
     method: "PATCH",
     body: { enabled },
     withCsrf: true,

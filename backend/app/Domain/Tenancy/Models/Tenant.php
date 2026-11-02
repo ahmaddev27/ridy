@@ -131,6 +131,19 @@ class Tenant extends Model
         $this->mergePasswordlessLogin(['cobrowse' => $enabled]);
     }
 
+    /** The platform's per-company opt-in for the server-side Fleet Hub sync. Absent = off. */
+    public function serverSyncEnabled(): bool
+    {
+        return ($this->settings['server_sync']['enabled'] ?? false) === true;
+    }
+
+    public function setServerSyncEnabled(bool $enabled): void
+    {
+        $settings = $this->settings ?? [];
+        $settings['server_sync'] = array_merge($settings['server_sync'] ?? [], ['enabled' => $enabled]);
+        $this->forceFill(['settings' => $settings])->save();
+    }
+
     /**
      * Merge keys into `settings.passwordless_login` (auto_code, auto_relogin,
      * inbound_token_hash, email, ...). Only the hash of the inbound token is ever stored.
