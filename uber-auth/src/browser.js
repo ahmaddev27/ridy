@@ -248,8 +248,11 @@ async function hasArkoseChallenge(page) {
 async function hasChannelChoice(page) {
   try {
     return await page
+      // Only the method-chooser HEADING, never the bare "Weitere Optionen"/"More options" button:
+      // that button also sits on the OTP and identifier screens, so matching it made detectStep
+      // mis-read the OTP screen as `channel_choice` right after the code was submitted.
       .getByText(
-        /willkommen zur(ü|u)ck|welcome back|w(ä|a)hle eine andere|andere bestätigungs?methode|another (verification )?method|weitere optionen|more options/i,
+        /willkommen zur(ü|u)ck|welcome back|w(ä|a)hle eine andere|andere bestätigungs?methode|w(ä|a)hle eine (verifizierungs|bestätigungs)|another (verification )?method|choose (a|another) (verification )?method/i,
       )
       .first()
       .isVisible();
@@ -600,8 +603,14 @@ export async function submitMfa(session, code) {
     navLog("submitMfa: typing the code");
     await typeOtp(page, code);
     await advance(page, "otp");
-    const step = await detectStep(page);
+    let step = await detectStep(page);
     navLog(`submitMfa: step after the code = ${step}`);
+    // A chooser/passkey after the code (e.g. a wrong code bounced to "choose a method"): walk
+    // back to the code step rather than erroring, so the manager just re-enters a fresh code.
+    if (step === "channel_choice" || step === "passkey") {
+      step = await navigatePastPasskey(page);
+      navLog(`submitMfa: after re-navigation step = ${step}`);
+    }
     if (step === "landed") {
       const result = await captureResult(context, page);
       navLog("submitMfa: landed -> captured; SUCCESS");
