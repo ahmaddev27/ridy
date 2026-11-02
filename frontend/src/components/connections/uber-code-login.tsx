@@ -122,9 +122,11 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
     if (!challenge) setTicket(null);
   }, [challenge]);
 
-  // Back from the puzzle: re-read the status now (the flow continues to the code step).
-  const onCobrowseEnded = (reason: CobrowseEndReason) => {
-    if (reason !== "solved") return;
+  // Back from the stream: always re-read the REAL status, whatever reason the stream ended with.
+  // A full co-browse login can land + capture even when the stream closes non-"solved" (an Arkose
+  // retry/timeout), so trusting the stream reason would show a stale error on an already-connected
+  // login. The backend status is the source of truth.
+  const onCobrowseEnded = (_reason: CobrowseEndReason) => {
     setTicket(null);
     getUberLoginStatus()
       .then((next) => {
