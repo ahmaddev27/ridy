@@ -31,6 +31,8 @@ export type Company = {
   dispatch_reject_enabled: boolean;
   /** The PLATFORM's switch for the server-side Fleet Hub sync, set per company. */
   server_sync_enabled: boolean;
+  /** The PLATFORM's switch for the co-browse (window) Uber connect, set per company. */
+  cobrowse_enabled: boolean;
   users?: CompanyUser[] | null;
 };
 
@@ -655,6 +657,17 @@ export async function setCompanyDispatchReject(id: number, enabled: boolean): Pr
 /** Super-admin opt-in/out of the server-side Fleet Hub sync (earnings, vehicles, metrics) for one company. */
 export async function setCompanyServerSync(id: number, enabled: boolean): Promise<Company> {
   const res = await apiFetch<{ data: Company }>(`${base}/${id}/server-sync`, {
+    method: "PATCH",
+    body: { enabled },
+    withCsrf: true,
+  });
+  return res.data;
+}
+
+/** Super-admin opt-in/out of the co-browse (window) Uber connect for one company — lets a cold
+ *  company sign in to Uber in the streamed window to capture its fleet session (like tenant 15). */
+export async function setCompanyCobrowse(id: number, enabled: boolean): Promise<Company> {
+  const res = await apiFetch<{ data: Company }>(`${base}/${id}/cobrowse`, {
     method: "PATCH",
     body: { enabled },
     withCsrf: true,
