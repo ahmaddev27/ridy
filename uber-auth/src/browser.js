@@ -235,8 +235,27 @@ async function hasArkoseChallenge(page) {
 }
 
 /**
+ * Uber's "Welcome back" / verification-method chooser: it recognised the account (by email) and
+ * offers how to verify ("Weitere Optionen" -> "Wähle eine andere Bestätigungsmethode" -> E-Mail).
+ * The passwordless flow navigates it to the email code. Checked only when no code field is up yet,
+ * so it never shadows the actual `otp` step.
+ */
+async function hasChannelChoice(page) {
+  try {
+    return await page
+      .getByText(
+        /willkommen zur(ü|u)ck|welcome back|w(ä|a)hle eine andere|andere bestätigungs?methode|another (verification )?method|weitere optionen|more options/i,
+      )
+      .first()
+      .isVisible();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Poll the page until one of the known steps is reached or the budget runs out.
- * @returns {'landed'|'password'|'otp'|'passkey'|'arkose'|'unknown'}
+ * @returns {'landed'|'password'|'otp'|'passkey'|'channel_choice'|'arkose'|'unknown'}
  */
 export async function detectStep(page) {
   const deadline = Date.now() + config.stepTimeout;
@@ -246,6 +265,8 @@ export async function detectStep(page) {
     if (await isVisible(otpField(page))) return "otp";
     if (await isVisible(passwordField(page))) return "password";
     if (await hasPasskeyPrompt(page)) return "passkey";
+    // "Welcome back" + method chooser: checked AFTER otp/password/passkey so it never shadows them.
+    if (await hasChannelChoice(page)) return "channel_choice";
     await page.waitForTimeout(500);
   }
   // Uber's risk-check interstitial ("Schutz Ihres Kontos" / "Rätsel starten") can render only
@@ -269,8 +290,13 @@ const NAV_CLICK_WAIT_MS = 3000; // how long a control may take to appear
 const NAV_SETTLE_MS = 5000; // how long a click may take to land on a recognisable step
 const NAV_CLICKABLE = 'button, a, [role="button"], [role="link"], [role="option"], [role="radio"], [role="menuitem"], li, label';
 
+// "Open the method list" controls. Tuned from the live German UI ("Weitere Optionen" ->
+// "Wähle eine andere Bestätigungsmethode"). Deliberately NOT a bare `code`: that matched the
+// SMS button ("Code per Textnachricht versenden") and would have sent the code to a phone.
 export const ANOTHER_WAY_RE =
-  /try another way|another way|more options|other options|use another method|sign in another way|verify another way|use a code|sign in with a code|can['’]?t use|andere|anders anmelden|stattdessen|code/i;
+  /try another way|another way|more options|other options|weitere optionen|alle optionen( anzeigen)?|use another method|sign in another way|verify another way|use a code|sign in with a code|w(ä|a)hle eine andere|andere (option|bestätigungs?methode)|anders anmelden|stattdessen/i;
+// The email option within the method list ("E-Mail"). The adjacent "send code"/"code senden"
+// forms never match the German SMS/WhatsApp items, which put words between "Code" and "senden".
 export const EMAIL_OPTION_RE =
   /e-?mail|send code|get a code|verification code|code to your email|per e-?mail|code senden/i;
 
@@ -343,15 +369,15 @@ async function settleStep(page) {
 }
 
 /**
- * Starting on a passkey step, try to reach the code step (<= NAV_MAX_HOPS clicks).
- * Each hop prefers the email/code option (we may already be on the method list), else opens
- * the "another way" list. Returns the final step ('otp'|'landed'|'arkose'|'passkey').
- * `ops` is injectable for tests.
+ * From a passkey step OR a "Welcome back" method chooser, try to reach the email code step
+ * (<= NAV_MAX_HOPS clicks). Each hop prefers the email/code option (we may already be on the
+ * method list), else opens the "another way" list. Returns the final step
+ * ('otp'|'landed'|'arkose'|'passkey'). `ops` is injectable for tests.
  */
 export async function navigatePastPasskey(page, ops = {}) {
   const click = ops.click ?? clickControl;
   const settle = ops.settle ?? settleStep;
-  navLog("step=passkey; trying to reach the code step");
+  navLog("navigating to the email code step");
   for (let hop = 1; hop <= NAV_MAX_HOPS; hop++) {
     let kind = "email-option";
     let label = await click(page, EMAIL_OPTION_RE);
@@ -466,10 +492,16 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
     if (step === "otp") {
       return { status: STATUS.MFA_REQUIRED, session };
     }
-    if (step === "passkey" && !password) {
+    // "Welcome back" method chooser or a passkey-first account: navigate to the email code step.
+    if ((step === "channel_choice" || step === "passkey") && !password) {
       step = await navigatePastPasskey(page);
       if (step === "landed") return { status: STATUS.SUCCESS, result: await captureResult(context, page), session };
       if (step === "otp") return { status: STATUS.MFA_REQUIRED, session };
+      // Choosing a method can itself trigger Arkose -> hand off to blocked (co-browse fallback).
+      if (step === "arkose") {
+        await closeSession(session);
+        return { status: STATUS.BLOCKED, message: "arkose" };
+      }
     }
     if (step === "passkey") {
       await closeSession(session);
