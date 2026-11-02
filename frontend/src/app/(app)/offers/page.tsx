@@ -334,13 +334,18 @@ export default function OffersPage() {
           {/* Carried separately because the list still shows these rows while the
               other three figures exclude them — otherwise the counts look broken.
               The value is defaulted because frontend and backend ship separately:
-              an older API body would crash the render on a missing field. */}
-          <StatCard
-            icon={Ban}
-            label={c("statDispatchDeclined")}
-            value={(stats.dispatch_declined ?? 0).toLocaleString(latnLocale(locale))}
-            hint={c("statDispatchDeclinedHint")}
-          />
+              an older API body would crash the render on a missing field.
+              Only shown when the company has dispatch-reject on (the admin "UBER رفض"
+              switch): a company without it never declines from the panel, so the card
+              would always read 0 and only confuse. */}
+          {user?.tenant?.dispatch_reject_enabled && (
+            <StatCard
+              icon={Ban}
+              label={c("statDispatchDeclined")}
+              value={(stats.dispatch_declined ?? 0).toLocaleString(latnLocale(locale))}
+              hint={c("statDispatchDeclinedHint")}
+            />
+          )}
           <StatCard icon={Gauge} label={c("statRate")} value={`${stats.acceptance_rate}%`} tone={stats.acceptance_rate >= 50 ? "positive" : "default"} />
           <StatCard icon={Wallet} label={c("statEarnings")} value={formatMoney(stats.earnings, locale)} tone="positive" />
         </div>
