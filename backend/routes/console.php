@@ -69,6 +69,12 @@ Schedule::command('alerts:check')->everyFiveMinutes()->withoutOverlapping(10);
 // supplier.uber.com → fleethub.uber.com). Logs it to the admin Logs tab.
 Schedule::command('fleet:check-sync')->everyFiveMinutes()->withoutOverlapping(10);
 
+// Server-side Fleet Hub pulls (earnings every 5 min, vehicles hourly) so these no longer
+// depend on the extension. Global flag UBER_SERVER_SYNC, OFF by default: the commands
+// queue nothing until it is on. One queued job per company, jittered (see the commands).
+Schedule::command('fleet:sync-earnings')->everyFiveMinutes()->withoutOverlapping(10);
+Schedule::command('fleet:sync-vehicles')->hourly()->withoutOverlapping(10);
+
 // Detect a silently-stalled offer stream: sync is live and idle drivers are online,
 // yet no offers have arrived for a while (a RAMEN stream that stopped delivering
 // while the session still looks healthy). Observability only — logs to the admin tab.

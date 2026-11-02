@@ -51,6 +51,9 @@ return [
         // Uber renamed supplier.uber.com → fleethub.uber.com (Sep 2026); roster/status
         // now resolve on the new host. Override via UBER_SUPPLIER_BASE_URL.
         'supplier_base_url' => env('UBER_SUPPLIER_BASE_URL', 'https://fleethub.uber.com'),
+        // Server-side Fleet Hub pulls (earnings, vehicles) with the stored supplier jar,
+        // independent of the Chrome extension. OFF unless UBER_SERVER_SYNC is true.
+        'server_sync' => filter_var(env('UBER_SERVER_SYNC', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
     // A fixed OTP/activation code for testing (any environment). Leave empty in a

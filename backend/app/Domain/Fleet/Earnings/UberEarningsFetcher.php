@@ -3,25 +3,23 @@
 namespace App\Domain\Fleet\Earnings;
 
 use App\Domain\Dispatch\Models\UberFleetSession;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
+use App\Domain\Fleet\FleetHub\FleetHubClient;
 
 /**
  * Pulls getEarnerBreakdownsV2 from Fleet Hub with a company's stored supplier
  * jar, through that company's residential proxy (Uber blocks datacenter IPs).
  *
- * Read-only on purpose: Set-Cookie answers are NOT written back. The dispatch
- * daemon owns the jar and treats a jar that changed under it as a re-link,
- * tearing its stream down; its own 24/7 Fleet Hub polls keep the session warm.
+ * The request path (headers, proxy, auth-error mapping) lives in
+ * {@see FleetHubClient}, which is read-only: Set-Cookie answers are never
+ * written back to the jar the dispatch daemon owns.
  */
 class UberEarningsFetcher
 {
     public const MAX_PAGES = 50;
 
-    public const PAGE_TIMEOUT_SECONDS = 20;
-
     private const OPERATION = 'getEarnerBreakdownsV2';
+
+    public function __construct(private readonly FleetHubClient $client) {}
 
     /** The document the Fleet Hub page itself sends; transcribed from the owner's script. */
     public const QUERY = <<<'GRAPHQL'
@@ -97,34 +95,13 @@ GRAPHQL;
     /** @return array<string, mixed> */
     private function page(UberFleetSession $session, string $proxyUrl, int $startMs, int $endMs, ?string $token): array
     {
-        try {
-            $response = Http::withHeaders($this->headers($session))
-                ->withOptions(['proxy' => $proxyUrl])
-                ->timeout(self::PAGE_TIMEOUT_SECONDS)
-                ->acceptJson()
-                ->asJson()
-                ->post(rtrim((string) config('services.uber.supplier_base_url'), '/').'/graphql', [
-                    'operationName' => self::OPERATION,
-                    'query' => self::QUERY,
-                    'variables' => $this->variables($session, $startMs, $endMs, $token),
-                ]);
-        } catch (ConnectionException) {
-            throw new UberEarningsException('uber_unreachable', 'Fleet Hub did not answer.');
-        }
-
-        if (in_array($response->status(), [401, 403], true)) {
-            throw new UberEarningsException('uber_session_rejected', 'Fleet Hub refused the stored session.', 409);
-        }
-        if (! $response->successful()) {
-            throw new UberEarningsException('uber_error', 'Fleet Hub answered '.$response->status().'.');
-        }
-
-        $json = $response->json();
-        if (! is_array($json) || ! empty($json['errors'])) {
-            throw new UberEarningsException('uber_graphql_error', 'Fleet Hub returned a GraphQL error.');
-        }
-
-        return $json;
+        return $this->client->query(
+            $session,
+            $proxyUrl,
+            self::OPERATION,
+            self::QUERY,
+            $this->variables($session, $startMs, $endMs, $token),
+        );
     }
 
     /** @return array<string, mixed> */
@@ -151,27 +128,6 @@ GRAPHQL;
             // start. Null is a second coercion fault in the same request.
             'pageOptions' => ['pageSize' => 10, 'pageToken' => $token ?? ''],
             'excludeAdjustmentItems' => true,
-        ];
-    }
-
-    /** @return array<string, string> */
-    private function headers(UberFleetSession $session): array
-    {
-        $cookie = collect($session->supplier_cookies ?? [])
-            ->filter(fn ($c) => is_array($c) && isset($c['name'], $c['value']))
-            ->map(fn ($c) => $c['name'].'='.$c['value'])
-            ->implode('; ');
-
-        return [
-            'accept-language' => 'de-DE,de;q=0.9',
-            'x-uber-locale' => 'de-DE',
-            'x-uber-client-name' => 'vs_dispatch',
-            'x-uber-client-session' => (string) Str::uuid(),
-            'x-uber-client-version' => '1.0.0',
-            'x-uber-device' => 'web',
-            'x-uber-device-id' => 'vs_dispatch-'.Str::uuid(),
-            'x-csrf-token' => 'x',
-            'cookie' => $cookie,
         ];
     }
 }

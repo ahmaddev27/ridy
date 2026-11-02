@@ -2,7 +2,7 @@
 
 namespace App\Domain\Fleet\Earnings;
 
-use App\Domain\Dispatch\Models\UberFleetSession;
+use App\Domain\Fleet\FleetHub\FleetHubSessionResolver;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
 use Carbon\CarbonImmutable;
@@ -33,7 +33,22 @@ class EarningsReport
     public function __construct(
         private readonly UberEarningsFetcher $fetcher,
         private readonly EarningsClassifier $classifier,
+        private readonly FleetHubSessionResolver $sessions,
     ) {}
+
+    /**
+     * Uber's operating-day window for two Berlin calendar dates, as epoch ms.
+     * setTime (not addHours) keeps 04:00 on the two daylight-saving nights.
+     *
+     * @return array{0: int, 1: int}
+     */
+    public static function windowMs(CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        return [
+            $from->startOfDay()->setTime(self::UBER_OPERATING_DAY_START_HOUR, 0)->getTimestampMs(),
+            $to->addDay()->startOfDay()->setTime(self::UBER_OPERATING_DAY_START_HOUR, 0)->getTimestampMs(),
+        ];
+    }
 
     /**
      * @return array{from: string, to: string, currency: string, drivers: list<array<string, mixed>>, unmatched: int, unmatched_list: list<array<string, mixed>>}
@@ -42,29 +57,14 @@ class EarningsReport
      */
     public function forTenant(Tenant $tenant, CarbonImmutable $from, CarbonImmutable $to): array
     {
-        $session = UberFleetSession::withoutGlobalScopes()
-            ->where('tenant_id', $tenant->id)
-            ->where('status', UberFleetSession::STATUS_ACTIVE)
-            ->whereNotNull('uber_org_uuid')
-            ->latest('id')
-            ->first();
-        if ($session === null || ! $session->isUsable() || empty($session->supplier_cookies)) {
-            throw new UberEarningsException('no_uber_session', 'No usable Uber session is connected.', 409);
-        }
-
-        $proxy = $tenant->proxy_url;
-        if (! is_string($proxy) || $proxy === '') {
-            // No datacenter fallback: Uber blocks those addresses.
-            throw new UberEarningsException('no_proxy', 'This company has no residential proxy assigned.', 409);
-        }
+        [$session, $proxy] = $this->sessions->forTenant($tenant);
 
         // `from` and `to` are Berlin calendar dates, but the window is NOT
         // midnight to midnight: it is Uber's operating days. It starts at
         // `from` 04:00 and ends at 04:00 on the day AFTER `to`, so `to`'s
         // operating day is whole. setTime (not addHours) keeps 04:00 on the
         // two daylight-saving nights.
-        $startMs = $from->startOfDay()->setTime(self::UBER_OPERATING_DAY_START_HOUR, 0)->getTimestampMs();
-        $endMs = $to->addDay()->startOfDay()->setTime(self::UBER_OPERATING_DAY_START_HOUR, 0)->getTimestampMs();
+        [$startMs, $endMs] = self::windowMs($from, $to);
 
         $earners = $this->fetcher->fetch($session, $proxy, $startMs, $endMs);
 
