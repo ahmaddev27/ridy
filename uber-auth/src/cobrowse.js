@@ -19,6 +19,9 @@ import { MAX_AUTH_BYTES, MAX_MSG_BYTES, auditLine, createRateLimiter, parseAuth,
 
 export const AUTH_WAIT_MS = 5000;
 export const IDLE_MS = 60_000;
+// A human login has no input while the manager leaves to fetch the code from their mailbox/phone,
+// so a 60s idle would kill it mid-flow; give it room (still bounded by the 10-min hard cap).
+export const FULL_LOGIN_IDLE_MS = 5 * 60_000;
 export const HARD_CAP_MS = 8 * 60_000;
 export const FULL_LOGIN_HARD_CAP_MS = 10 * 60_000; // a human types the email and the code (docs/28 §11.2)
 const WATCH_MS = 400;
@@ -137,7 +140,8 @@ export function createCobrowse({ secret, allowedOrigins, max, findPending, openS
         busy = false;
       }
     }, WATCH_MS);
-    rec.idleTimer = setInterval(() => now() - rec.lastInputAt > IDLE_MS && end(rec, "idle"), IDLE_CHECK_MS);
+    const idleMs = rec.entry?.fullLogin ? FULL_LOGIN_IDLE_MS : IDLE_MS;
+    rec.idleTimer = setInterval(() => now() - rec.lastInputAt > idleMs && end(rec, "idle"), IDLE_CHECK_MS);
     rec.capTimer = setTimeout(() => end(rec, "timeout"), rec.entry?.fullLogin ? FULL_LOGIN_HARD_CAP_MS : HARD_CAP_MS);
     for (const t of [rec.watchTimer, rec.idleTimer, rec.capTimer]) t.unref?.();
   }

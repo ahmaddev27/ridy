@@ -169,6 +169,10 @@ export function CobrowseViewer({
     if (!native.isComposing) {
       Array.from(native.data ?? "")
         .slice(0, MAX_TEXT_PER_INPUT)
+        // Only what the server's parseKey accepts: one BMP code unit, not a control char. An emoji
+        // (astral, length 2) or a stray control from an IME would be an off-schema violation that
+        // closes the stream, so drop it here instead of sending it.
+        .filter((ch) => ch.length === 1 && ch.charCodeAt(0) >= 0x20 && ch.charCodeAt(0) !== 0x7f)
         .forEach((ch) => sendKey({ t: "k", c: ch }));
       if (native.inputType === "deleteContentBackward") sendKey({ t: "k", n: "Backspace" });
     }

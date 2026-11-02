@@ -50,7 +50,7 @@ export function parseMouse(text) {
 export const KEY_NAMES = new Map([
   ["Backspace", { key: "Backspace", code: "Backspace", vk: 8 }],
   ["Tab", { key: "Tab", code: "Tab", vk: 9 }],
-  ["Enter", { key: "Enter", code: "Enter", vk: 13 }],
+  ["Enter", { key: "Enter", code: "Enter", vk: 13, text: "\r" }],
   ["End", { key: "End", code: "End", vk: 35 }],
   ["Home", { key: "Home", code: "Home", vk: 36 }],
   ["ArrowLeft", { key: "ArrowLeft", code: "ArrowLeft", vk: 37 }],

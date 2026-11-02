@@ -301,6 +301,29 @@ export async function probeStep(page) {
 
 // --- Co-browse: a human solves Arkose in THIS browser (docs/28) ---------------------------
 export const CHALLENGE_MAX_RETRIES = 3;
+
+// The authenticated surface a human-driven full login must actually reach (the dispatch panel we
+// navigated to). In full mode the manager roams real Uber pages, and probeStep reads ANY non-auth
+// URL as "landed" — so a stray click to uber.com/help, or a transient redirect host, would end the
+// stream and capture an unauthenticated browser. A real landing is on THIS host, and stable.
+const DASHBOARD_HOST = (() => {
+  try {
+    return new URL(config.dashboardUrl).hostname.toLowerCase();
+  } catch {
+    return "vsdispatch.uber.com";
+  }
+})();
+// The known authenticated fleet surfaces: you cannot be on any of them unauthenticated (Uber
+// redirects to the sign-in host), so reaching one is a real landing — unlike www./help.uber.com.
+const DASHBOARD_HOSTS = /(^|\.)(vsdispatch|supplier|fleethub)\.uber\.com$/i;
+const onDashboard = (page) => {
+  try {
+    const host = new URL(page.url()).hostname.toLowerCase();
+    return host === DASHBOARD_HOST || DASHBOARD_HOSTS.test(host);
+  } catch {
+    return false;
+  }
+};
 const TRY_AGAIN_RE = /try again|erneut versuchen|versuchen sie es erneut|noch einmal versuchen/i;
 
 /** "Try again" can render inside the cross-origin Arkose frame, so every frame is searched. */
@@ -319,7 +342,19 @@ async function showsTryAgain(page) {
 export async function challengeTick(session) {
   const state = (session.challenge ??= { retries: 0, retrying: false });
   const step = await probeStep(session.page);
-  if (step && step !== "arkose") return step;
+  if (step && step !== "arkose") {
+    // Arkose mode: any step off the puzzle is terminal (the next phase takes over). Full mode: the
+    // manager drives every page, so only a STABLE landing on the dispatch dashboard is a real
+    // success; an otp/password/passkey step, or a stray non-dashboard page, means keep streaming.
+    if (!session.fullLogin) return step;
+    if (step === "landed" && onDashboard(session.page)) {
+      session.landedTicks = (session.landedTicks ?? 0) + 1;
+      return session.landedTicks >= 2 ? "landed" : "challenge";
+    }
+    session.landedTicks = 0;
+    return "challenge";
+  }
+  if (session.fullLogin) session.landedTicks = 0;
   const retrying = await showsTryAgain(session.page);
   if (retrying && !state.retrying) state.retries++;
   state.retrying = retrying;

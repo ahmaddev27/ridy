@@ -83,6 +83,22 @@ test("the flag does not change non-Arkose outcomes", async () => {
   assert.equal(out.status, STATUS.MFA_REQUIRED);
 });
 
+test("challengeTick fullLogin: a stray non-dashboard page is NOT a landing", async () => {
+  const session = { page: fakePage({ url: "https://www.uber.com/de/help" }), fullLogin: true };
+  assert.equal(await challengeTick(session), "challenge");
+  assert.equal(await challengeTick(session), "challenge");
+});
+
+test("challengeTick fullLogin: otp/password steps keep streaming (the human types the code)", async () => {
+  assert.equal(await challengeTick({ page: fakePage({ otp: true }), fullLogin: true }), "challenge");
+});
+
+test("challengeTick fullLogin: only a STABLE landing on a fleet dashboard ends it", async () => {
+  const session = { page: fakePage({ url: "https://vsdispatch.uber.com/" }), fullLogin: true };
+  assert.equal(await challengeTick(session), "challenge"); // 1st tick debounced
+  assert.equal(await challengeTick(session), "landed"); // 2nd consecutive tick
+});
+
 test("canCobrowse needs every precondition", () => {
   const ok = { requested: true, listening: true, secret: "s", originsConfigured: true, proxyUrl: "http://u:p@h:8080", realChrome: true, display: ":99" };
   assert.equal(canCobrowse(ok), true);

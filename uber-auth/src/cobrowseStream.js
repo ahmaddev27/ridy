@@ -57,7 +57,9 @@ export async function openCdpStream({ session, sendFrame, onViolation }) {
         cdp.send("Input.dispatchKeyEvent", { type: "keyUp", ...extra }).catch(() => {});
       };
       if (k.kind === "char") return press({ text: k.c, key: k.c });
-      press({ key: k.key, code: k.code, windowsVirtualKeyCode: k.vk, nativeVirtualKeyCode: k.vk });
+      // A named key carries `text` only for Enter ("\r"), so it actually submits a form the way a
+      // real Enter keypress does; the others (Backspace/arrows/…) are intentionally text-less.
+      press({ key: k.key, code: k.code, windowsVirtualKeyCode: k.vk, nativeVirtualKeyCode: k.vk, ...(k.text ? { text: k.text } : {}) });
     },
     async stop() {
       guards.detach();
