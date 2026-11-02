@@ -87,6 +87,12 @@ x-app-env: &app-env
   UBER_PASSWORDLESS_COLD: ${UBER_PASSWORDLESS_COLD:-}
   # Variant B: the subdomain whose MX Postfix pipes into `php artisan inbound-mail:ingest`.
   UBER_INBOUND_DOMAIN: ${UBER_INBOUND_DOMAIN:-in.reidey.de}
+  # Co-browse (docs/28): backend global kill switch, OFF by default; a company also needs its
+  # own super-admin flag. WS_URL is where the viewer connects (Caddy /cobrowse/* -> uber-auth);
+  # SESSION_TTL (s) matches uber-auth's 8-min hard cap.
+  UBER_COBROWSE_ENABLED: ${UBER_COBROWSE_ENABLED:-}
+  COBROWSE_WS_URL: ${COBROWSE_WS_URL:-wss://reidey.de/cobrowse/ws}
+  COBROWSE_SESSION_TTL: ${COBROWSE_SESSION_TTL:-480}
   # FCM HTTP v1 (OAuth2 service-account) — used by FcmPushSender for driver + web
   # push. Point FCM_CREDENTIALS at the mounted service-account JSON. Without it the
   # app falls back to LogPushSender (pushes are only logged, not sent).

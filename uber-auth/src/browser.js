@@ -376,8 +376,13 @@ async function dumpScreen(page, where) {
     const btnDisabled = await page.getByRole("button", { name: /^weiter$|continue|next/i }).first().isDisabled().catch(() => null);
     navLog(`screen @ ${where} url=${url} title=${JSON.stringify(title)} headings=${JSON.stringify(headings)} controls=${JSON.stringify(controls)}`);
     navLog(`screen+ @ ${where} submitDisabled=${btnDisabled} alerts=${JSON.stringify(alerts)} body=${JSON.stringify(body)}`);
-    const shot = `/tmp/pwless-${where.replace(/[^a-z0-9]+/gi, "-")}.png`;
-    await page.screenshot({ path: shot, fullPage: false }).then(() => navLog(`screenshot=${shot}`)).catch((e) => navLog(`screenshot failed: ${e.message}`));
+    // The screenshot is the one thing that writes to disk; keep it behind PWLESS_DEBUG so
+    // production never leaves a login-page image in /tmp. The redacted text lines above are enough
+    // to diagnose a selector miss; set PWLESS_DEBUG=1 for the live selector-tuning loop.
+    if (process.env.PWLESS_DEBUG === "1") {
+      const shot = `/tmp/pwless-${where.replace(/[^a-z0-9]+/gi, "-")}.png`;
+      await page.screenshot({ path: shot, fullPage: false }).then(() => navLog(`screenshot=${shot}`)).catch((e) => navLog(`screenshot failed: ${e.message}`));
+    }
   } catch (e) {
     navLog(`dumpScreen failed @ ${where}: ${e.message}`);
   }
