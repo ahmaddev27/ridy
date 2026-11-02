@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { useState } from "react";
 import { Car, RefreshCw, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +10,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { listVehicles } from "@/lib/api/vehicles";
-import { fetchVehiclesViaExtension } from "@/lib/extension";
 
 export default function VehiclesPage() {
   const { t } = useI18n();
@@ -19,38 +17,12 @@ export default function VehiclesPage() {
   const { data, loading, refetch } = useAsync(listVehicles, { refetchInterval: 30000 });
   const vehicles = data ?? [];
   const [syncing, setSyncing] = useState(false);
-  const didAutoSync = useRef(false);
 
-  // Stale-while-revalidate: silently pull fresh vehicles from Uber on open,
-  // throttled to at most once every few minutes.
-  useEffect(() => {
-    if (didAutoSync.current) return;
-    didAutoSync.current = true;
-    const KEY = "vehicles-autosync-at";
-    const last = Number(localStorage.getItem(KEY) || 0);
-    if (Date.now() - last > 5 * 60 * 1000) {
-      localStorage.setItem(KEY, String(Date.now()));
-      fetchVehiclesViaExtension()
-        .then((res) => {
-          if (res?.ok) refetch();
-        })
-        .catch(() => {});
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+  // Vehicles are synced server-side; the button just re-reads the backend.
   async function sync() {
     setSyncing(true);
     try {
-      const res = await fetchVehiclesViaExtension();
-      if (!res) {
-        toast.error(v("syncNoExtension"));
-      } else if (res.ok) {
-        toast.success(v("syncOk"), { description: `${res.synced ?? 0}` });
-        await refetch();
-      } else {
-        toast.error(v("syncFailed"), { description: res.reason });
-      }
+      await refetch();
     } finally {
       setSyncing(false);
     }

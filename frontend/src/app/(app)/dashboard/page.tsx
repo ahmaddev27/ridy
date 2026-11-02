@@ -34,28 +34,8 @@ export default function DashboardPage() {
 
   const k = (key: string) => t(`screens.dashboard.${key}`);
 
-  // Ask the extension to refresh the fleet earnings roll-up (replays
-  // getSupplierBreakdownV2 — no Uber tab needed), then reload the summary once it
-  // lands. Do it on open AND on an interval while the page is open, so the fleet
-  // card stays current on its own instead of only refreshing when the manager
-  // reopens the dashboard. Earnings are cumulative daily totals, so a few minutes
-  // is plenty fresh and light on Uber.
-  useEffect(() => {
-    function onDone(e: MessageEvent) {
-      if (e.source === window && (e.data as { source?: string })?.source === "ridy-fleet-earnings-done") {
-        setTimeout(() => void refetch({ silent: true }), 400);
-      }
-    }
-    const requestEarnings = () => window.postMessage({ source: "ridy-fetch-fleet-earnings" }, "*");
-    window.addEventListener("message", onDone);
-    requestEarnings();
-    const id = setInterval(requestEarnings, 180_000); // every 3 min while open
-    return () => {
-      window.removeEventListener("message", onDone);
-      clearInterval(id);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Fleet earnings are synced server-side into FleetMetric; the summary poll
+  // above already reads them, so no browser-side trigger is needed.
 
   return (
     <div className="space-y-6">
