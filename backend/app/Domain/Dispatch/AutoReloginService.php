@@ -52,7 +52,7 @@ class AutoReloginService
         if ($this->login->pendingAutoAttempt($tenant) !== null) {
             return; // an automatic login is already waiting for its code
         }
-        $result = $this->login->start($tenant, $email, PasswordlessLoginService::MODE_AUTO);
+        $result = $this->login->start($tenant, $email, PasswordlessLoginService::MODE_AUTO, interactive: false);
         Log::info('uber_login.auto_relogin', ['tenant_id' => $tenantId, 'state' => $result['state'] ?? null, 'failure' => $result['failure'] ?? null]);
     }
 

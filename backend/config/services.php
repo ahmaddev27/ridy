@@ -99,6 +99,13 @@ return [
         'tenants' => array_values(array_filter(array_map('trim', explode(',', (string) env('UBER_PASSWORDLESS_TENANTS'))))),
         // Cold first connect (no prior session): needs uber-auth's UBER_AUTH_PASSWORDLESS_COLD too. OFF by default.
         'cold' => filter_var(env('UBER_PASSWORDLESS_COLD', false), FILTER_VALIDATE_BOOL),
+        // Co-browse the Arkose puzzle inside the server browser (docs/28). GLOBAL switch, OFF by
+        // default; a company also needs its own `settings.passwordless_login.cobrowse` flag.
+        'cobrowse' => filter_var(env('UBER_COBROWSE_ENABLED', false), FILTER_VALIDATE_BOOL),
+        // Public wss:// url of uber-auth's stream listener; empty = derived from APP_URL (/cobrowse/ws).
+        'cobrowse_ws_url' => trim((string) env('COBROWSE_WS_URL')),
+        // Hard cap of one stream session in seconds (uber-auth enforces it; shown to the user).
+        'cobrowse_session_ttl' => (int) env('COBROWSE_SESSION_TTL', 480),
     ],
 
     // Self-hosted receipt vision (llama.cpp + Qwen2.5-VL, compose profile

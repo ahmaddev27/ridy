@@ -77,6 +77,7 @@ use App\Http\Controllers\Api\V1\PublicSupportController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\ResellerController;
 use App\Http\Controllers\Api\V1\SupplierCaptureController;
+use App\Http\Controllers\Api\V1\UberLoginCobrowseController;
 use App\Http\Controllers\Api\V1\UberLoginController;
 use App\Http\Controllers\Api\V1\UberLoginSettingsController;
 use App\Http\Controllers\Api\V1\VehicleController;
@@ -401,6 +402,12 @@ Route::prefix('v1')->group(function () {
             Route::post('start', [UberLoginController::class, 'start'])->middleware('throttle:uber-login');
             Route::post('code', [UberLoginController::class, 'code'])->middleware('throttle:uber-login-code');
             Route::post('cancel', [UberLoginController::class, 'cancel'])->middleware('throttle:uber-login-cancel');
+
+            // Co-browse the Arkose puzzle (docs/28): a one-minute stream ticket / stop the stream.
+            Route::middleware('cobrowse.enabled')->prefix('cobrowse')->group(function () {
+                Route::post('/', [UberLoginCobrowseController::class, 'open'])->middleware('throttle:uber-login-cobrowse');
+                Route::delete('/', [UberLoginCobrowseController::class, 'close'])->middleware('throttle:uber-login-cancel');
+            });
         });
 
         // El-Professor (payroll product) pulls the roster with a scoped token minted here.
@@ -546,6 +553,7 @@ Route::prefix('v1')->group(function () {
         // Flipping it off is the immediate kill switch and revokes nothing.
         Route::patch('companies/{tenant}/dispatch-reject', [CompanyController::class, 'setDispatchReject']);
         Route::patch('companies/{tenant}/passwordless-login', [CompanyController::class, 'setPasswordlessLogin']);
+        Route::patch('companies/{tenant}/cobrowse', [CompanyController::class, 'setCobrowse']);
 
         // Read-only drill-down into a company's fleet data (admin tabs).
         Route::get('companies/{tenant}/drivers', [CompanyDataController::class, 'drivers']);

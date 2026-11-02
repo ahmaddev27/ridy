@@ -43,7 +43,7 @@ class UberLoginController extends Controller
         $result = $this->login->start($tenant, $data['email'], $mode);
 
         // 202 = accepted, waiting for the code; any other outcome is a plain answer.
-        return $this->respond($result, $result['state'] === 'awaiting_code' ? 202 : 200);
+        return $this->respond($result, in_array($result['state'], ['awaiting_code', 'awaiting_challenge'], true) ? 202 : 200);
     }
 
     public function code(Request $request): JsonResponse

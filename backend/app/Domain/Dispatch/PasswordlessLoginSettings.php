@@ -31,6 +31,19 @@ class PasswordlessLoginSettings
         return $this->allowlisted($tenant) && $tenant->passwordlessLoginEnabled();
     }
 
+    /**
+     * Co-browse for Uber's Arkose puzzle (docs/28): the global UBER_COBROWSE_ENABLED, the
+     * super-admin's per-company flag, and the passwordless login itself. All default OFF.
+     * (A valid proxy is checked by the login service; REAL_CHROME is uber-auth's to gate.)
+     */
+    public function cobrowseEnabledFor(?Tenant $tenant): bool
+    {
+        return $tenant !== null
+            && (bool) config('services.passwordless_login.cobrowse')
+            && $this->availableFor($tenant)
+            && $tenant->cobrowseEnabled();
+    }
+
     public function inboundConfigured(Tenant $tenant): bool
     {
         return (string) $this->get($tenant, 'inbound_token_hash') !== '';

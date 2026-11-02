@@ -19,6 +19,16 @@ class LoginAttemptStore
     /** A little shorter than uber-auth's 300 s, so we never hold a dead login_id. */
     public const ATTEMPT_TTL = 290;
 
+    /**
+     * While Uber's Arkose puzzle is being solved in the co-browse stream (docs/28 §3.3),
+     * the attempt lives up to 10 minutes: an explicit change to docs/27's 290. Once the
+     * code is requested the normal ATTEMPT_TTL starts over.
+     */
+    public const CHALLENGE_TTL = 590;
+
+    /** Attempt `phase` while the puzzle is open. */
+    public const PHASE_CHALLENGE = 'challenge';
+
     /** The "starting" marker must outlive the (up to 90 s) uber-auth start call. */
     public const START_WINDOW = 100;
 

@@ -34,6 +34,7 @@ class UserResource extends JsonResource
                 // the global switch, the allowlist and the company flag all allow it.
                 'passwordless_login_enabled' => app(PasswordlessLoginSettings::class)->availableFor($this->tenant),
                 // A never-connected company can connect cold (email + code) only when the cold flag is on.
+                'cobrowse_enabled' => app(PasswordlessLoginSettings::class)->cobrowseEnabledFor($this->tenant),
                 'passwordless_primary' => app(PasswordlessLoginService::class)->codeLoginIsPrimary($this->tenant),
                 'cold_connect_available' => app(PasswordlessLoginService::class)->coldConnectAvailable($this->tenant),
             ] : null,

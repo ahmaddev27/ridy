@@ -24,7 +24,7 @@ class SentryScrubber
         'cf-connecting-ip', 'x-forwarded-for', 'x-real-ip',
     ];
 
-    private const SENSITIVE_KEY = '/pass|otp|code|token|secret|cookie|session|proxy|authorization|value/i';
+    private const SENSITIVE_KEY = '/pass|otp|code|token|ticket|secret|cookie|session|proxy|authorization|value/i';
 
     /** Wire the scrubber in unless an explicit Sentry config already sets these. */
     public static function configure(): void
