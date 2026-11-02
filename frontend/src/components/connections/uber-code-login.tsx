@@ -7,7 +7,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { OtpInput } from "@/components/ui/otp-input";
 import { CobrowseViewer, type CobrowseEndReason } from "@/components/connections/cobrowse-viewer";
-import { UberAutoCodeSettings } from "@/components/connections/uber-auto-code-settings";
 import { useI18n } from "@/lib/i18n/context";
 import { apiErrorMessage } from "@/lib/api/error-message";
 import {
@@ -250,7 +249,6 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
               </Button>
             </form>
           )}
-          {!waiting && !inFlight && !connected && <UberAutoCodeSettings />}
         </div>
       </div>
     </Card>

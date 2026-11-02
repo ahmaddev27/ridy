@@ -47,7 +47,10 @@ function identifierField(page) {
 function continueButton(page) {
   return page
     .getByRole("button", {
-      name: /continue|next|further|weiter|sign in|log ?in|anmelden|verify|bestätigen|absenden|submit/i,
+      // \bweiter\b matches the "Weiter" submit button but NOT "Weitere Optionen" (More options):
+      // on the OTP screen advance() was clicking "Weitere Optionen" (it starts with "Weiter"),
+      // navigating away instead of submitting the code, so a correct code read as wrong.
+      name: /continue|next|further|\bweiter\b|sign in|log ?in|anmelden|verify|bestätigen|absenden|submit/i,
     })
     .first();
 }
