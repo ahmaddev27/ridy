@@ -128,7 +128,10 @@ class Tenant extends Model
 
     public function setCobrowseEnabled(bool $enabled): void
     {
-        $this->mergePasswordlessLogin(['cobrowse' => $enabled]);
+        // Co-browse connect only works when passwordless login is on for the company too
+        // (PasswordlessLoginSettings::availableFor), so turning the one admin toggle ON enables
+        // both; turning it OFF only drops co-browse and leaves any email+OTP passwordless intact.
+        $this->mergePasswordlessLogin($enabled ? ['enabled' => true, 'cobrowse' => true] : ['cobrowse' => false]);
     }
 
     /**
