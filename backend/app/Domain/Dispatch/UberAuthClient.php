@@ -67,11 +67,14 @@ class UberAuthClient
     /** @return array<string, mixed> */
     public function submitMfa(Tenant $tenant, string $loginId, string $code): array
     {
+        // 50s, not 30: uber-auth's post-code detectStep budget is ~38s (stepTimeout 30 + the 8s
+        // arkose last-chance). At 30 the backend aborted mid-submit, so the attempt hung in
+        // `submitting` while uber-auth was still polling. The window must exceed detectStep.
         return $this->post('/login/mfa', [
             'login_id' => $loginId,
             'code' => $code,
             'company_key' => (string) $tenant->id,
-        ], timeout: 30);
+        ], timeout: 50);
     }
 
     /** @return array<string, mixed> */

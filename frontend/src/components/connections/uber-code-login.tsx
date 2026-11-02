@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { KeyRound, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { OtpInput } from "@/components/ui/otp-input";
 import { CobrowseViewer, type CobrowseEndReason } from "@/components/connections/cobrowse-viewer";
-import { UberAutoCodeSettings } from "@/components/connections/uber-auto-code-settings";
 import { useI18n } from "@/lib/i18n/context";
 import { apiErrorMessage } from "@/lib/api/error-message";
 import {
@@ -149,6 +148,18 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
   const submit = () => run(() => submitUberLoginCode(code));
   const cancel = () => run(cancelUberLogin).then(() => setEmail(""));
 
+  // Auto-submit as soon as all 4 digits are entered — no "confirm" click. Guarded so one code
+  // is sent once; the ref resets when the boxes clear (a retry) so the next code fires too.
+  const autoSubmitted = useRef("");
+  useEffect(() => {
+    if (code.length === 0) autoSubmitted.current = "";
+    else if (waiting && !busy && code.length === CODE_LENGTH && autoSubmitted.current !== code) {
+      autoSubmitted.current = code;
+      submit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, busy, waiting]);
+
   const failure: UberLoginFailure | undefined = status?.state === "failed" ? status.failure : undefined;
   const connected = status?.state === "connected";
 
@@ -250,7 +261,6 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
               </Button>
             </form>
           )}
-          {!waiting && !inFlight && !connected && <UberAutoCodeSettings />}
         </div>
       </div>
     </Card>
