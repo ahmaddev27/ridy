@@ -19,7 +19,7 @@ function fakePage({ url = "https://auth.uber.com/login", texts = [], frame = nul
     },
     fill: async (v) => calls.filled.push(v),
     pressSequentially: async (v) => calls.filled.push(v),
-    inputValue: async () => calls.filled[calls.filled.length - 1] ?? "",
+    inputValue: async () => calls.filled.at(-1) ?? "",
     press: async () => calls.advanced++,
     innerText: async () => body,
     click: async () => calls.advanced++,

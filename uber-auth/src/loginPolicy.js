@@ -44,6 +44,15 @@ function wantsCold(body, state, coldEnabled) {
 }
 
 /**
+ * Co-browse preconditions (docs/28 §6), checked before an Arkose challenge may keep the browser
+ * open: the backend asked for it, the listener + ticket key + origin list exist, the company has its
+ * residential proxy, and the browser is real headed Chrome (never a datacenter-IP / headless stream).
+ */
+export function canCobrowse({ requested, listening, secret, originsConfigured, proxyUrl, realChrome, display }) {
+  return requested === true && !!listening && !!secret && !!originsConfigured && !!parseProxyUrl(proxyUrl) && realChrome === true && !!display;
+}
+
+/**
  * Per-company start gate. enter() is SYNCHRONOUS on purpose: called straight after
  * admitStart() with no await in between, so no re-seed can turn the company ACTIVE in the
  * gap. It refuses a second start while one is inside startLogin() (its pending login is not

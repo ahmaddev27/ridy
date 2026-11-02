@@ -23,6 +23,7 @@ export const STATUS = {
   CHANNEL_UNAVAILABLE: "channel_unavailable", // no code step reached (e.g. a chooser with no default)
   NO_SESSION: "no_session", // a passwordless start with nothing to ride and no cold clearance
   NO_PROXY: "no_proxy", // a cold login needs the company's residential proxy
+  CHALLENGE_REQUIRED: "challenge_required", // Arkose shown and co-browse is on: the browser stays open for a human
   ERROR: "error",
 };
 
@@ -260,13 +261,8 @@ async function hasChannelChoice(page) {
 export async function detectStep(page) {
   const deadline = Date.now() + config.stepTimeout;
   while (Date.now() < deadline) {
-    if (!/auth\.uber|\/(auth|login|oauth)/i.test(page.url())) return "landed";
-    if (await hasArkoseChallenge(page)) return "arkose";
-    if (await isVisible(otpField(page))) return "otp";
-    if (await isVisible(passwordField(page))) return "password";
-    if (await hasPasskeyPrompt(page)) return "passkey";
-    // "Welcome back" + method chooser: checked AFTER otp/password/passkey so it never shadows them.
-    if (await hasChannelChoice(page)) return "channel_choice";
+    const step = await probeStep(page);
+    if (step) return step;
     await page.waitForTimeout(500);
   }
   // Uber's risk-check interstitial ("Schutz Ihres Kontos" / "Rätsel starten") can render only
@@ -279,6 +275,65 @@ export async function detectStep(page) {
   }
   await dumpScreen(page, "detectStep-unknown");
   return "unknown";
+}
+
+/** One non-blocking look at the page: the step it shows, or null when nothing is recognised yet. */
+export async function probeStep(page) {
+  if (!/auth\.uber|\/(auth|login|oauth)/i.test(page.url())) return "landed";
+  if (await hasArkoseChallenge(page)) return "arkose";
+  if (await isVisible(otpField(page))) return "otp";
+  if (await isVisible(passwordField(page))) return "password";
+  if (await hasPasskeyPrompt(page)) return "passkey";
+  // After arkose/otp/password/passkey so it never shadows them; arkose above guards the challenge.
+  if (await hasChannelChoice(page)) return "channel_choice";
+  return null;
+}
+
+// --- Co-browse: a human solves Arkose in THIS browser (docs/28) ---------------------------
+export const CHALLENGE_MAX_RETRIES = 3;
+const TRY_AGAIN_RE = /try again|erneut versuchen|versuchen sie es erneut|noch einmal versuchen/i;
+
+/** "Try again" can render inside the cross-origin Arkose frame, so every frame is searched. */
+async function showsTryAgain(page) {
+  const frames = page.frames?.() ?? [page];
+  for (const f of frames) if (await isVisible(f.getByText(TRY_AGAIN_RE).first())) return true;
+  return false;
+}
+
+/**
+ * One tick of a login parked on the Arkose puzzle (shared by the stream watcher and /login/resume).
+ * @returns {Promise<'challenge'|'failed'|'landed'|'otp'|'password'|'passkey'>}
+ *   'challenge' = still on the puzzle (or between rounds); 'failed' = Arkose re-rendered it
+ *   CHALLENGE_MAX_RETRIES times; anything else = the step we reached after leaving the challenge.
+ */
+export async function challengeTick(session) {
+  const state = (session.challenge ??= { retries: 0, retrying: false });
+  const step = await probeStep(session.page);
+  if (step && step !== "arkose") return step;
+  const retrying = await showsTryAgain(session.page);
+  if (retrying && !state.retrying) state.retries++;
+  state.retrying = retrying;
+  return state.retries >= CHALLENGE_MAX_RETRIES ? "failed" : "challenge";
+}
+
+/**
+ * The puzzle was left for `step`: continue exactly as startLogin would have. The stream is already
+ * closed by now, so the code step is reached with nothing watching it.
+ */
+export async function finishChallenge(session, step) {
+  const { context, page } = session;
+  try {
+    if (step === "passkey" || step === "channel_choice") step = await navigatePastPasskey(page);
+    if (step === "landed") return { status: STATUS.SUCCESS, result: await captureResult(context, page), session };
+    if (step === "otp") return { status: STATUS.MFA_REQUIRED, session };
+    if (step === "arkose") return { status: STATUS.CHALLENGE_REQUIRED, session };
+    await closeSession(session);
+    if (step === "passkey") return { status: STATUS.PASSKEY_UNSUPPORTED };
+    return { status: step === "password" ? STATUS.PASSWORD_REQUIRED : STATUS.CHANNEL_UNAVAILABLE };
+  } catch (e) {
+    await closeSession(session).catch(() => {});
+    return { status: STATUS.ERROR, message: e.message };
+  }
 }
 
 // --- Passwordless: passkey -> code navigation -------------------------------------------
@@ -422,6 +477,9 @@ async function captureResult(context, page) {
 }
 
 /**
+ * `cobrowse` = the server already verified the co-browse preconditions (docs/28 §6). Only then
+ * does an Arkose challenge return `challenge_required` (session kept open) instead of `blocked`.
+ *
  * Begin a login. On MFA the returned session keeps the browser open for
  * submitMfa(); otherwise it is closed before returning.
  *
@@ -439,7 +497,7 @@ async function captureResult(context, page) {
  * cookies and proxy (Uber shows "Welcome back", far less Arkose risk than a cold
  * login), and is never closed on failure — only its page state is abandoned.
  */
-export async function startLogin({ email, password = null, proxyUrl = null, companyKey = null, reuse = null, cold = false }) {
+export async function startLogin({ email, password = null, proxyUrl = null, companyKey = null, reuse = null, cold = false, cobrowse = false }) {
   // A passwordless login with nothing to ride and no explicit cold clearance never builds a
   // browser: a stray fresh session must be unreachable (server.js admits cold only for an empty slot).
   if (!password && !reuse && !cold) return { status: STATUS.NO_SESSION, message: "no_session" };
@@ -497,17 +555,16 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
       step = await navigatePastPasskey(page);
       if (step === "landed") return { status: STATUS.SUCCESS, result: await captureResult(context, page), session };
       if (step === "otp") return { status: STATUS.MFA_REQUIRED, session };
-      // Choosing a method can itself trigger Arkose -> hand off to blocked (co-browse fallback).
-      if (step === "arkose") {
-        await closeSession(session);
-        return { status: STATUS.BLOCKED, message: "arkose" };
-      }
+      // If choosing a method itself triggers Arkose, fall through to the arkose handler below,
+      // which keeps the browser open for co-browse when enabled (instead of closing to `blocked`).
     }
     if (step === "passkey") {
       await closeSession(session);
       return { status: STATUS.PASSKEY_UNSUPPORTED };
     }
     if (step === "arkose") {
+      // Co-browse (docs/28): keep the browser open so the manager can solve the puzzle themselves.
+      if (cobrowse) return { status: STATUS.CHALLENGE_REQUIRED, session };
       await closeSession(session);
       return { status: STATUS.BLOCKED, message: "arkose" };
     }
