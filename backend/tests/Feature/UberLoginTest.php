@@ -253,6 +253,27 @@ class UberLoginTest extends TestCase
         $this->getJson('/api/v1/uber-login/status')->assertJsonPath('data.failure', 'wrong_code');
     }
 
+    public function test_a_channel_switch_is_a_continuation_and_surfaces_the_new_channel(): void
+    {
+        $this->fakeUber(start: ['status' => 'mfa_required', 'login_id' => 'LID-1', 'channel' => 'sms'], mfa: ['status' => 'mfa_required', 'retry' => true, 'switched' => true, 'channel' => 'whatsapp']);
+        $this->start()->assertJsonPath('data.channel', 'sms');
+
+        foreach (['1111', '2222', '3333', '4444'] as $code) {
+            $this->postJson('/api/v1/uber-login/code', ['code' => $code])
+                ->assertOk()->assertJsonPath('data.state', 'awaiting_code')->assertJsonPath('data.channel', 'whatsapp')->assertJsonPath('data.retry', true);
+        }
+        $this->getJson('/api/v1/uber-login/status')->assertJsonPath('data.channel', 'whatsapp')->assertJsonPath('data.state', 'awaiting_code');
+    }
+
+    public function test_exhausted_channels_fail_the_attempt_as_wrong_code(): void
+    {
+        $this->fakeUber(mfa: ['status' => 'wrong_code', 'message' => 'channels_exhausted']);
+        $this->start();
+
+        $this->postJson('/api/v1/uber-login/code', ['code' => self::CODE])
+            ->assertOk()->assertJsonPath('data.state', 'failed')->assertJsonPath('data.failure', 'wrong_code');
+    }
+
     public function test_an_active_persistent_session_is_never_disturbed(): void
     {
         SessionBrowser::where('tenant_id', $this->tenant->id)->update(['state' => 'active', 'last_seen_at' => now()]);

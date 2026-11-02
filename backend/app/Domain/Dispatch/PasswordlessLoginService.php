@@ -67,7 +67,7 @@ class PasswordlessLoginService
     /** Tickets one puzzle may be opened with (the viewer can drop and reconnect). */
     private const MAX_TICKETS = 3;
 
-    private const UBER_AUTH_FAILURES = ['passkey_unsupported', 'blocked', 'channel_unavailable', 'password_required', 'session_active', 'no_session', 'no_proxy', 'capture_failed'];
+    private const UBER_AUTH_FAILURES = ['passkey_unsupported', 'blocked', 'channel_unavailable', 'password_required', 'session_active', 'no_session', 'no_proxy', 'capture_failed', 'wrong_code'];
 
     /** uber-auth answers that mean "still running", never "failed". */
     private const PENDING_STATUSES = ['pending', 'start_in_flight'];
@@ -470,7 +470,7 @@ class PasswordlessLoginService
             return $this->pendingView(['state' => self::STATE_SUBMITTING] + $record);
         }
         if ($status === 'mfa_required' && ($answer['retry'] ?? false) === true) {
-            return $this->retryOrGiveUp($tenant, $record);
+            return $this->retryOrGiveUp($tenant, $record, $answer);
         }
 
         return $this->fail($tenant, $this->failureFor($answer));
@@ -478,11 +478,18 @@ class PasswordlessLoginService
 
     /**
      * @param  array<string, mixed>  $record
+     * @param  array<string, mixed>  $answer
      * @return array<string, mixed>
      */
-    private function retryOrGiveUp(Tenant $tenant, array $record): array
+    private function retryOrGiveUp(Tenant $tenant, array $record, array $answer = []): array
     {
-        $record['submits'] = (int) ($record['submits'] ?? 0) + 1;
+        // uber-auth moved to the next code channel by itself: a fresh code is on its way, so this
+        // is a continuation, not a wrong code. Only a same-channel rejection burns a try.
+        $switched = ($answer['switched'] ?? false) === true;
+        if (is_string($answer['channel'] ?? null)) {
+            $record['channel'] = $answer['channel'];
+        }
+        $record['submits'] = (int) ($record['submits'] ?? 0) + ($switched ? 0 : 1);
         if ($record['submits'] >= self::MAX_CODE_TRIES) {
             $this->abandon($tenant, $record);
 

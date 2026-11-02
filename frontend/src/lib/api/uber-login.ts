@@ -22,6 +22,7 @@ export type UberLoginFailure =
 export type UberLoginStatus = {
   state: UberLoginState;
   mode: "manual" | "auto";
+  /** Where the code was sent: "email" | "sms" | "whatsapp" | "call" | "unknown" (null before a code exists). */
   channel: string | null;
   expires_at: string | null;
   failure?: UberLoginFailure;

@@ -40,6 +40,20 @@ function useRemaining(expiresAt: string | null, active: boolean): number | null 
   return active && expiresAt ? new Date(expiresAt).getTime() - now : null;
 }
 
+const KNOWN_CHANNELS = ["email", "sms", "whatsapp", "call"];
+
+/** A known channel name, or null when the backend does not know where the code went. */
+function knownChannel(channel: string | null | undefined): string | null {
+  return channel && KNOWN_CHANNELS.includes(channel) ? channel : null;
+}
+
+/** The code was rejected and the flow moved on to a different channel (status.channel changed). */
+function hasSwitchedChannel(previous: string | null | undefined, next: UberLoginStatus): boolean {
+  const before = knownChannel(previous);
+  const after = knownChannel(next.channel);
+  return next.state === "awaiting_code" && before !== null && after !== null && before !== after;
+}
+
 /**
  * Passwordless Uber sign-in, human OTP relay (docs/27 variant A): the manager enters
  * the Uber account email, Uber sends a code, the manager types it here. The backend
@@ -55,10 +69,12 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [wrongCode, setWrongCode] = useState(false);
+  const [channelSwitched, setChannelSwitched] = useState(false);
   const [ticket, setTicket] = useState<CobrowseTicket | null>(null);
   const [cobrowseFailed, setCobrowseFailed] = useState(false);
 
   const waiting = status?.state === "awaiting_code";
+  const sentChannel = knownChannel(status?.channel);
   // Uber (or the sign-in service) is still working, e.g. after a timeout: never race it.
   const challenge = status?.state === "awaiting_challenge";
   const inFlight = status?.state === "starting" || status?.state === "submitting" || challenge;
@@ -130,6 +146,7 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
     setBusy(true);
     try {
       const next = await action();
+      setChannelSwitched(hasSwitchedChannel(status?.channel, next));
       setStatus(next);
       setWrongCode(next.retry === true);
       if (next.retry || next.state !== "awaiting_code") setCode("");
@@ -209,8 +226,17 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
           ) : waiting ? (
             <div className="mt-4 space-y-4">
               <div>
-                <p className="text-sm font-medium text-ink">{c("codeSentTitle")}</p>
-                <p className="mt-0.5 text-sm text-ink-muted">{c("codeSentHint")}</p>
+                <p className="text-sm font-medium text-ink">
+                  {sentChannel ? c(`codeSentTitle_${sentChannel}`) : c("codeSentTitle")}
+                </p>
+                <p className="mt-0.5 text-sm text-ink-muted">
+                  {sentChannel ? c(`codeSentHint_${sentChannel}`) : c("codeSentHint")}
+                </p>
+                {channelSwitched && sentChannel && (
+                  <p role="status" className="mt-1 text-sm text-warning-fg">
+                    {c("codeSwitched").replace("{channel}", c(`codeChannel_${sentChannel}`))}
+                  </p>
+                )}
                 {status?.mode === "auto" && <p className="mt-1 text-sm text-ink-muted">{c("codeAutoHint")}</p>}
               </div>
               <OtpInput value={code} onChange={setCode} length={CODE_LENGTH} autoFocus disabled={busy} />
