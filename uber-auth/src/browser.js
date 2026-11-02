@@ -96,6 +96,7 @@ async function submitIdentifier(page, idField, email) {
 async function typeOtp(page, code) {
   const boxes = page.locator('input[autocomplete="one-time-code"], input[inputmode="numeric"], input[maxlength="1"]');
   const count = await boxes.count().catch(() => 0);
+  navLog(`typeOtp: ${count} box(es), code length ${code.length}`);
 
   if (count > 1) {
     await boxes.first().click();
@@ -593,17 +594,20 @@ async function freshSession(proxyUrl, companyKey) {
 export async function submitMfa(session, code) {
   const { context, page } = session;
   try {
+    navLog("submitMfa: typing the code");
     await typeOtp(page, code);
-    await advance(page);
-
+    await advance(page, "otp");
     const step = await detectStep(page);
+    navLog(`submitMfa: step after the code = ${step}`);
     if (step === "landed") {
       const result = await captureResult(context, page);
+      navLog("submitMfa: landed -> captured; SUCCESS");
       // Leave the browser open for the persistent manager to adopt.
       return { status: STATUS.SUCCESS, result, session };
     }
     if (step === "otp") {
       // Still on the code step — wrong/expired code.
+      navLog("submitMfa: still on otp -> wrong/expired code (retry)");
       return { status: STATUS.MFA_REQUIRED, retry: true };
     }
 
@@ -611,6 +615,7 @@ export async function submitMfa(session, code) {
     if (step === "arkose") return { status: STATUS.BLOCKED, message: "arkose" };
     return { status: STATUS.ERROR, message: `unexpected step: ${step}` };
   } catch (e) {
+    navLog(`submitMfa: threw ${e.message}`);
     await closeSession(session).catch(() => {});
     return { status: STATUS.ERROR, message: e.message };
   }

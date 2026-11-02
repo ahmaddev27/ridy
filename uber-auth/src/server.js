@@ -368,7 +368,9 @@ async function handleMfa(req, res) {
   if (entry.challenge) return send(res, 409, { status: STATUS.CHALLENGE_REQUIRED, message: "challenge_pending" });
   if (!body.code) return send(res, 422, { error: "code required" });
 
+  console.log(`[pwless-nav] handleMfa: relaying code for login ${String(body.login_id).slice(0, 8)} (company ${entry.companyKey})`);
   const outcome = await submitMfa(entry.session, String(body.code));
+  console.log(`[pwless-nav] handleMfa: submitMfa -> ${outcome.status}${outcome.retry ? " (retry)" : ""}${outcome.message ? " " + outcome.message : ""}`);
 
   if (outcome.status === STATUS.SUCCESS) {
     pending.delete(body.login_id);
