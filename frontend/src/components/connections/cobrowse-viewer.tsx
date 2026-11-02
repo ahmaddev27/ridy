@@ -203,7 +203,7 @@ export function CobrowseViewer({
       aria-modal="true"
       onPointerDown={() => state === "live" && inputRef.current?.focus({ preventScroll: true })}
     >
-      <div className="flex max-h-[94vh] w-full max-w-5xl flex-col gap-3 rounded-2xl border border-line-strong bg-surface p-4 shadow-2xl sm:p-5">
+      <div className="flex max-h-[96vh] w-full max-w-7xl flex-col gap-3 rounded-2xl border border-line-strong bg-surface p-4 shadow-2xl sm:p-5">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h3 className="truncate text-base font-semibold text-ink">{c("cobrowseTitle")}</h3>
