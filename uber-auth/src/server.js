@@ -179,7 +179,7 @@ async function runStartNow(body, { companyKey, password, cold }, res) {
     return send(res, 200, {
       status: STATUS.MFA_REQUIRED,
       login_id: loginId,
-      channel: "unknown",
+      channel: outcome.channel ?? "unknown",
       expires_at: new Date(createdAt + config.sessionTtl).toISOString(),
     });
   }
@@ -207,7 +207,7 @@ async function handleMfa(req, res) {
     return onLoginSuccess(entry.companyKey, outcome, res, entry.cold === true);
   }
   if (outcome.retry) {
-    return send(res, 200, { status: STATUS.MFA_REQUIRED, login_id: body.login_id, retry: true });
+    return send(res, 200, { status: STATUS.MFA_REQUIRED, login_id: body.login_id, retry: true, channel: outcome.channel ?? "unknown", switched: outcome.switched === true });
   }
   pending.delete(body.login_id);
   releaseLogin(entry);

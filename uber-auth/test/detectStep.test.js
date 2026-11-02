@@ -19,6 +19,7 @@ function fakePage({ url = "https://auth.uber.com/login", texts = [], frame = nul
     },
     fill: async (v) => calls.filled.push(v),
     innerText: async () => body,
+    inputValue: async () => "x",
     click: async () => calls.advanced++,
   });
   const page = {
@@ -87,34 +88,90 @@ test("accountMatches: full email, masked email, and no false positive", () => {
   assert.equal(accountMatches("anything", "no-at-sign"), false);
 });
 
-const { navigatePastPasskey, NAV_MAX_HOPS, ANOTHER_WAY_RE, EMAIL_OPTION_RE } = await import("../src/browser.js");
+const { navigatePastPasskey, reachCodeStep, selectChannel, CHANNELS, NEVER_CLICK_RE, NAV_MAX_HOPS, ANOTHER_WAY_RE, EMAIL_OPTION_RE } =
+  await import("../src/browser.js");
 
-test("passkey nav: another-way then email option reaches otp", async () => {
+// A chooser: `labels` are always visible; `menu` labels appear after "Weitere Optionen" is clicked.
+function chooser({ labels = [], menu = [] } = {}) {
   const clicked = [];
+  let open = false;
   const click = async (_p, re) => {
-    const label = re === EMAIL_OPTION_RE ? (clicked.length ? "Email" : null) : "Try another way";
-    if (label) clicked.push(label);
-    return label;
+    const visible = open ? [...labels, ...menu] : labels;
+    const hit = visible.find((l) => re.test(l) && !NEVER_CLICK_RE.test(l));
+    if (!hit && re === ANOTHER_WAY_RE && !open && menu.length) {
+      open = true;
+      clicked.push("MENU");
+      return "Weitere Optionen";
+    }
+    if (hit) clicked.push(hit);
+    return hit ?? null;
   };
-  let settles = 0;
-  const settle = async () => (++settles === 2 ? "otp" : null);
-  assert.equal(await navigatePastPasskey({}, { click, settle }), "otp");
-  assert.deepEqual(clicked, ["Try another way", "Email"]);
+  return { click, clicked };
+}
+
+test("channels: SMS is tried first, then WhatsApp, then e-mail", async () => {
+  const c = chooser({ labels: ["Weiter mit Google", "E-Mail", "WhatsApp", "SMS mit Anmeldecode senden"] });
+  const tried = new Set();
+  assert.equal(await selectChannel({}, tried, { click: c.click }), "sms");
+  tried.add("sms");
+  assert.equal(await selectChannel({}, tried, { click: c.click }), "whatsapp");
+  tried.add("whatsapp");
+  assert.equal(await selectChannel({}, tried, { click: c.click }), "email");
+});
+
+test("channels: Google and passkey are never clicked", async () => {
+  const c = chooser({ labels: ["Weiter mit Google", "Passkey verwenden"] });
+  assert.equal(await selectChannel({}, new Set(), { click: c.click }), null);
+  assert.deepEqual(c.clicked, []);
+  assert.equal(CHANNELS.some((ch) => ch.re.test("Weiter mit Google")), false);
+});
+
+test("channels: options hidden behind 'Weitere Optionen' are revealed lazily", async () => {
+  const c = chooser({ labels: [], menu: ["SMS mit Anmeldecode senden"] });
+  assert.equal(await selectChannel({}, new Set(), { click: c.click }), "sms");
+  assert.deepEqual(c.clicked, ["MENU", "SMS mit Anmeldecode senden"]);
+});
+
+test("passkey nav: first channel reaches otp with its name, no extra probing", async () => {
+  const c = chooser({ labels: ["SMS mit Anmeldecode senden", "E-Mail"] });
+  const tried = new Set();
+  const out = await navigatePastPasskey({}, { click: c.click, settle: async () => "otp", tried });
+  assert.deepEqual(out, { step: "otp", channel: "sms" });
+  assert.deepEqual(c.clicked, ["SMS mit Anmeldecode senden"]);
+});
+
+test("channel switch on reject: next untried channel, SMS not repeated", async () => {
+  const c = chooser({ labels: ["SMS mit Anmeldecode senden", "WhatsApp", "E-Mail"] });
+  const out = await reachCodeStep({}, new Set(["sms"]), { click: c.click, settle: async () => "otp" });
+  assert.deepEqual(out, { step: "otp", channel: "whatsapp" });
+});
+
+test("exhaustion: every channel tried -> passkey (terminal), nothing clicked", async () => {
+  const c = chooser({ labels: ["SMS", "WhatsApp", "E-Mail", "Weiter mit Google"] });
+  const out = await reachCodeStep({}, new Set(["sms", "whatsapp", "email", "call"]), { click: c.click, settle: async () => "otp" });
+  assert.equal(out.step, "passkey");
+  assert.deepEqual(c.clicked, []);
 });
 
 test("passkey nav: no control found falls back to passkey", async () => {
-  assert.equal(await navigatePastPasskey({}, { click: async () => null, settle: async () => null }), "passkey");
+  assert.equal((await navigatePastPasskey({}, { click: async () => null, settle: async () => null })).step, "passkey");
 });
 
 test("passkey nav: bounded hops, then falls back", async () => {
-  let clicks = 0;
-  const click = async () => (++clicks, "x");
-  assert.equal(await navigatePastPasskey({}, { click, settle: async () => null }), "passkey");
-  assert.equal(clicks, NAV_MAX_HOPS);
+  let n = 0;
+  const names = ["SMS", "WhatsApp", "E-Mail", "Anruf"];
+  const click = async (_p, re) => {
+    const hit = names.find((l) => re.test(l));
+    return hit && ++n ? hit : null;
+  };
+  const out = await navigatePastPasskey({}, { click, settle: async () => null });
+  assert.equal(out.step, "passkey");
+  assert.ok(n <= NAV_MAX_HOPS);
 });
 
 test("passkey nav: Arkose after navigating is surfaced", async () => {
-  assert.equal(await navigatePastPasskey({}, { click: async () => "x", settle: async () => "arkose" }), "arkose");
+  const c = chooser({ labels: ["SMS"] });
+  assert.equal((await navigatePastPasskey({}, { click: c.click, settle: async () => "arkose" })).step, "arkose");
 });
 
 test("selectors match EN/DE variants", () => {
