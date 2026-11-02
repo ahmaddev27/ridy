@@ -164,6 +164,15 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
   const start = () => run(() => startUberLogin(email.trim()));
   const submit = () => run(() => submitUberLoginCode(code));
   const cancel = () => run(cancelUberLogin).then(() => setEmail(""));
+  // "Try again": drop the stuck/slow attempt and ask Uber for a FRESH code with the same email,
+  // in one tap. With no email in hand (e.g. after a page reload) fall back to the cancelled state
+  // so the form reappears for a new address.
+  const restart = () =>
+    run(async () => {
+      const cancelled = await cancelUberLogin();
+      const addr = email.trim();
+      return addr ? startUberLogin(addr) : cancelled;
+    });
 
   // Auto-submit as soon as all 4 digits are entered — no "confirm" click. Guarded so one code
   // is sent once; the ref resets when the boxes clear (a retry) so the next code fires too.
@@ -220,9 +229,14 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
               )}
             </div>
           ) : inFlight ? (
-            <p className="mt-3 flex items-center gap-2 text-sm text-ink-muted">
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> {c("codePending")}
-            </p>
+            <div className="mt-3 space-y-3">
+              <p className="flex items-center gap-2 text-sm text-ink-muted">
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> {c("codePending")}
+              </p>
+              <Button variant="secondary" onClick={restart} disabled={busy}>
+                {c("codeAgain")}
+              </Button>
+            </div>
           ) : waiting ? (
             <div className="mt-4 space-y-4">
               <div>
@@ -250,10 +264,13 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
                   {c("codeExpires").replace("{time}", formatRemaining(remaining))}
                 </p>
               )}
-              <div className="flex justify-center gap-2">
+              <div className="flex flex-wrap justify-center gap-2">
                 <Button onClick={submit} disabled={busy || code.length !== CODE_LENGTH}>
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   {busy ? c("codeVerifying") : c("codeVerify")}
+                </Button>
+                <Button variant="secondary" onClick={restart} disabled={busy}>
+                  {c("codeAgain")}
                 </Button>
                 <Button variant="secondary" onClick={cancel} disabled={busy}>
                   {c("codeCancel")}

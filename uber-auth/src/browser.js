@@ -291,9 +291,11 @@ export async function probeStep(page) {
   if (await hasArkoseChallenge(page)) return "arkose";
   if (await isVisible(otpField(page))) return "otp";
   if (await isVisible(passwordField(page))) return "password";
-  if (await hasPasskeyPrompt(page)) return "passkey";
-  // After arkose/otp/password/passkey so it never shadows them; arkose above guards the challenge.
+  // The method chooser ("Willkommen zurück" / "Wähle eine andere …") BEFORE passkey: it offers a
+  // Passkey button among the code methods, which must NOT be read as a passkey-only prompt (that
+  // sent the flow down the passkey path and picked the wrong channel instead of email-first).
   if (await hasChannelChoice(page)) return "channel_choice";
+  if (await hasPasskeyPrompt(page)) return "passkey";
   return null;
 }
 
@@ -460,12 +462,13 @@ async function settleStep(page, ms = NAV_SETTLE_MS) {
  */
 export async function selectChannel(page, tried, ops = {}) {
   const click = ops.click ?? clickControl;
-  for (let pass = 0; pass < 2; pass++) {
-    for (const ch of CHANNELS) {
-      if (tried.has(ch.name)) continue;
-      if (await click(page, ch.re, pass ? NAV_CLICK_WAIT_MS : 0)) return ch.name;
-    }
-    if (pass === 0 && !(await click(page, ANOTHER_WAY_RE, 0))) return null;
+  // Reveal the full method list FIRST ("Weitere Optionen"/"Alle Optionen"), so a higher-priority
+  // channel like email — often hidden behind that expander on the "Welcome back" screen — is not
+  // skipped for a visible lower one (whatsapp/sms). No-op when there is nothing to expand.
+  await click(page, ANOTHER_WAY_RE, 0);
+  for (const ch of CHANNELS) {
+    if (tried.has(ch.name)) continue;
+    if (await click(page, ch.re, NAV_CLICK_WAIT_MS)) return ch.name;
   }
   return null;
 }
