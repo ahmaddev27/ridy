@@ -35,6 +35,8 @@ ENV NO_SANDBOX=1
 VOLUME ["/state"]
 
 # node --env-file is not used here: the environment comes from docker-compose.
-# With REAL_CHROME=1 (and xvfb-run present) run under a virtual display so DISPLAY is set
-# and Chrome can run headed; otherwise start exactly as before.
-CMD ["sh", "-c", "if [ \"$REAL_CHROME\" = \"1\" ] && command -v xvfb-run >/dev/null; then exec xvfb-run -a -s '-screen 0 1920x1200x24' node src/server.js; else exec node src/server.js; fi"]
+# With REAL_CHROME=1 start a background Xvfb and export DISPLAY, then exec node directly.
+# (xvfb-run was tried and dropped: wrapping a long-running server double-buffered its stdout —
+# docker logs stayed empty — and mishandled the process under docker; an explicit Xvfb + exec
+# keeps logs flowing and the signal/lifecycle clean. Verified booting + serving under Xvfb.)
+CMD ["sh", "-c", "if [ \"$REAL_CHROME\" = \"1\" ]; then Xvfb :99 -screen 0 1920x1200x24 >/tmp/xvfb.log 2>&1 & export DISPLAY=:99; fi; exec node src/server.js"]

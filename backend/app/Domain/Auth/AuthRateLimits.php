@@ -55,6 +55,9 @@ class AuthRateLimits
         // Its own bucket, so a flurry of starts can never leave a manager unable to cancel.
         RateLimiter::for('uber-login-cancel', fn (Request $request) => Limit::perMinute(10)
             ->by('uber-login-cancel:'.($request->user()?->tenant_id ?? self::clientKey($request))));
+        // A puzzle stream is expensive (a JPEG screencast per session): 3 tickets an hour per company (docs/28 §4).
+        RateLimiter::for('uber-login-cobrowse', fn (Request $request) => Limit::perHour(3)
+            ->by('uber-login-cobrowse:'.($request->user()?->tenant_id ?? self::clientKey($request))));
         RateLimiter::for('uber-login-code', fn (Request $request) => Limit::perMinute(10)
             ->by('uber-login-code:'.($request->user()?->tenant_id ?? self::clientKey($request))));
 

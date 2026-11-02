@@ -23,6 +23,7 @@ export const STATUS = {
   CHANNEL_UNAVAILABLE: "channel_unavailable", // no code step reached (e.g. a chooser with no default)
   NO_SESSION: "no_session", // a passwordless start with nothing to ride and no cold clearance
   NO_PROXY: "no_proxy", // a cold login needs the company's residential proxy
+  CHALLENGE_REQUIRED: "challenge_required", // Arkose shown and co-browse is on: the browser stays open for a human
   ERROR: "error",
 };
 
@@ -64,6 +65,28 @@ async function advance(page, trace = null) {
     if (trace) console.log(`[pwless-nav] advance(${trace}) no button visible; pressing Enter`);
     await page.keyboard.press("Enter");
   }
+}
+
+/**
+ * Enter the identifier the way a person would. Uber's v2 sign-in form is a React controlled
+ * input: a programmatic value (`fill`) sets the DOM value but not React's state, so clicking
+ * "Weiter" submits an empty identifier and the page never leaves the screen. Real per-character
+ * keystrokes update React's state; we then submit, and fall back to Enter if the click is
+ * swallowed. `[pwless-nav]` lines let this be tuned from the log.
+ */
+async function submitIdentifier(page, idField, email) {
+  await idField.click().catch(() => {});
+  await idField.fill("").catch(() => {}); // clear any partial / autofilled value
+  await idField.pressSequentially(email, { delay: 40 });
+  await page.waitForTimeout(400); // let the SPA validate and enable the submit
+  navLog(`identifier typed=${((await idField.inputValue().catch(() => "")) || "").length > 0 ? "yes" : "EMPTY"}`);
+  await advance(page, "identifier");
+  await page.waitForTimeout(800);
+  if (await isVisible(idField)) {
+    navLog("identifier still visible after click; pressing Enter");
+    await idField.press("Enter").catch(() => {});
+  }
+  navLog(`after identifier submit: url=${(page.url() || "").replace(/[?#].*$/, "")}`);
 }
 
 /**
@@ -196,7 +219,11 @@ async function hasPasskeyPrompt(page) {
  */
 async function hasArkoseChallenge(page) {
   try {
-    const text = page.getByText(/protecting your account|start puzzle|konto (wird )?gesch(ü|u)tzt|r(ä|a)tsel starten/i).first();
+    const text = page
+      .getByText(
+        /protecting your account|start puzzle|verify (you are|you'?re) (a )?human|konto (wird )?gesch(ü|u)tzt|schutz (ihres|deines) kontos|r(ä|a)tsel starten|echter mensch/i,
+      )
+      .first();
     if (await text.isVisible()) return true;
     // A preloaded but hidden Arkose frame is not a challenge: it must be visible and real-sized.
     const frame = page.locator('iframe[src*="arkoselabs" i], iframe[src*="funcaptcha" i], [id*="arkose" i]').first();
@@ -209,21 +236,104 @@ async function hasArkoseChallenge(page) {
 }
 
 /**
+ * Uber's "Welcome back" / verification-method chooser: it recognised the account (by email) and
+ * offers how to verify ("Weitere Optionen" -> "Wähle eine andere Bestätigungsmethode" -> E-Mail).
+ * The passwordless flow navigates it to the email code. Checked only when no code field is up yet,
+ * so it never shadows the actual `otp` step.
+ */
+async function hasChannelChoice(page) {
+  try {
+    return await page
+      .getByText(
+        /willkommen zur(ü|u)ck|welcome back|w(ä|a)hle eine andere|andere bestätigungs?methode|another (verification )?method|weitere optionen|more options/i,
+      )
+      .first()
+      .isVisible();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Poll the page until one of the known steps is reached or the budget runs out.
- * @returns {'landed'|'password'|'otp'|'passkey'|'arkose'|'unknown'}
+ * @returns {'landed'|'password'|'otp'|'passkey'|'channel_choice'|'arkose'|'unknown'}
  */
 export async function detectStep(page) {
   const deadline = Date.now() + config.stepTimeout;
   while (Date.now() < deadline) {
-    if (!/auth\.uber|\/(auth|login|oauth)/i.test(page.url())) return "landed";
+    const step = await probeStep(page);
+    if (step) return step;
+    await page.waitForTimeout(500);
+  }
+  // Uber's risk-check interstitial ("Schutz Ihres Kontos" / "Rätsel starten") can render only
+  // after the step budget, once the identifier submit has been scored. Give it a brief last
+  // chance so a late Arkose is reported as `arkose` (-> backend `blocked`), not `unknown`.
+  const arkoseDeadline = Date.now() + 8000;
+  while (Date.now() < arkoseDeadline) {
     if (await hasArkoseChallenge(page)) return "arkose";
-    if (await isVisible(otpField(page))) return "otp";
-    if (await isVisible(passwordField(page))) return "password";
-    if (await hasPasskeyPrompt(page)) return "passkey";
     await page.waitForTimeout(500);
   }
   await dumpScreen(page, "detectStep-unknown");
   return "unknown";
+}
+
+/** One non-blocking look at the page: the step it shows, or null when nothing is recognised yet. */
+export async function probeStep(page) {
+  if (!/auth\.uber|\/(auth|login|oauth)/i.test(page.url())) return "landed";
+  if (await hasArkoseChallenge(page)) return "arkose";
+  if (await isVisible(otpField(page))) return "otp";
+  if (await isVisible(passwordField(page))) return "password";
+  if (await hasPasskeyPrompt(page)) return "passkey";
+  // After arkose/otp/password/passkey so it never shadows them; arkose above guards the challenge.
+  if (await hasChannelChoice(page)) return "channel_choice";
+  return null;
+}
+
+// --- Co-browse: a human solves Arkose in THIS browser (docs/28) ---------------------------
+export const CHALLENGE_MAX_RETRIES = 3;
+const TRY_AGAIN_RE = /try again|erneut versuchen|versuchen sie es erneut|noch einmal versuchen/i;
+
+/** "Try again" can render inside the cross-origin Arkose frame, so every frame is searched. */
+async function showsTryAgain(page) {
+  const frames = page.frames?.() ?? [page];
+  for (const f of frames) if (await isVisible(f.getByText(TRY_AGAIN_RE).first())) return true;
+  return false;
+}
+
+/**
+ * One tick of a login parked on the Arkose puzzle (shared by the stream watcher and /login/resume).
+ * @returns {Promise<'challenge'|'failed'|'landed'|'otp'|'password'|'passkey'>}
+ *   'challenge' = still on the puzzle (or between rounds); 'failed' = Arkose re-rendered it
+ *   CHALLENGE_MAX_RETRIES times; anything else = the step we reached after leaving the challenge.
+ */
+export async function challengeTick(session) {
+  const state = (session.challenge ??= { retries: 0, retrying: false });
+  const step = await probeStep(session.page);
+  if (step && step !== "arkose") return step;
+  const retrying = await showsTryAgain(session.page);
+  if (retrying && !state.retrying) state.retries++;
+  state.retrying = retrying;
+  return state.retries >= CHALLENGE_MAX_RETRIES ? "failed" : "challenge";
+}
+
+/**
+ * The puzzle was left for `step`: continue exactly as startLogin would have. The stream is already
+ * closed by now, so the code step is reached with nothing watching it.
+ */
+export async function finishChallenge(session, step) {
+  const { context, page } = session;
+  try {
+    if (step === "passkey" || step === "channel_choice") step = await navigatePastPasskey(page);
+    if (step === "landed") return { status: STATUS.SUCCESS, result: await captureResult(context, page), session };
+    if (step === "otp") return { status: STATUS.MFA_REQUIRED, session };
+    if (step === "arkose") return { status: STATUS.CHALLENGE_REQUIRED, session };
+    await closeSession(session);
+    if (step === "passkey") return { status: STATUS.PASSKEY_UNSUPPORTED };
+    return { status: step === "password" ? STATUS.PASSWORD_REQUIRED : STATUS.CHANNEL_UNAVAILABLE };
+  } catch (e) {
+    await closeSession(session).catch(() => {});
+    return { status: STATUS.ERROR, message: e.message };
+  }
 }
 
 // --- Passwordless: passkey -> code navigation -------------------------------------------
@@ -235,8 +345,13 @@ const NAV_CLICK_WAIT_MS = 3000; // how long a control may take to appear
 const NAV_SETTLE_MS = 5000; // how long a click may take to land on a recognisable step
 const NAV_CLICKABLE = 'button, a, [role="button"], [role="link"], [role="option"], [role="radio"], [role="menuitem"], li, label';
 
+// "Open the method list" controls. Tuned from the live German UI ("Weitere Optionen" ->
+// "Wähle eine andere Bestätigungsmethode"). Deliberately NOT a bare `code`: that matched the
+// SMS button ("Code per Textnachricht versenden") and would have sent the code to a phone.
 export const ANOTHER_WAY_RE =
-  /try another way|another way|more options|other options|use another method|sign in another way|verify another way|use a code|sign in with a code|can['’]?t use|andere|anders anmelden|stattdessen|code/i;
+  /try another way|another way|more options|other options|weitere optionen|alle optionen( anzeigen)?|use another method|sign in another way|verify another way|use a code|sign in with a code|w(ä|a)hle eine andere|andere (option|bestätigungs?methode)|anders anmelden|stattdessen/i;
+// The email option within the method list ("E-Mail"). The adjacent "send code"/"code senden"
+// forms never match the German SMS/WhatsApp items, which put words between "Code" and "senden".
 export const EMAIL_OPTION_RE =
   /e-?mail|send code|get a code|verification code|code to your email|per e-?mail|code senden/i;
 
@@ -256,7 +371,18 @@ async function dumpScreen(page, where) {
     const title = redact(await page.title().catch(() => ""));
     const headings = uniq(await page.locator("h1, h2, [role=heading]").allInnerTexts().catch(() => []));
     const controls = uniq(await page.locator(NAV_CLICKABLE).allInnerTexts().catch(() => []));
+    const alerts = uniq(await page.locator('[role=alert], [aria-live], .error, [class*="error" i], [data-baseweb="form-control-error"]').allInnerTexts().catch(() => []));
+    const body = redact(await page.locator("body").innerText({ timeout: 2000 }).catch(() => "")).slice(0, 500);
+    const btnDisabled = await page.getByRole("button", { name: /^weiter$|continue|next/i }).first().isDisabled().catch(() => null);
     navLog(`screen @ ${where} url=${url} title=${JSON.stringify(title)} headings=${JSON.stringify(headings)} controls=${JSON.stringify(controls)}`);
+    navLog(`screen+ @ ${where} submitDisabled=${btnDisabled} alerts=${JSON.stringify(alerts)} body=${JSON.stringify(body)}`);
+    // The screenshot is the one thing that writes to disk; keep it behind PWLESS_DEBUG so
+    // production never leaves a login-page image in /tmp. The redacted text lines above are enough
+    // to diagnose a selector miss; set PWLESS_DEBUG=1 for the live selector-tuning loop.
+    if (process.env.PWLESS_DEBUG === "1") {
+      const shot = `/tmp/pwless-${where.replace(/[^a-z0-9]+/gi, "-")}.png`;
+      await page.screenshot({ path: shot, fullPage: false }).then(() => navLog(`screenshot=${shot}`)).catch((e) => navLog(`screenshot failed: ${e.message}`));
+    }
   } catch (e) {
     navLog(`dumpScreen failed @ ${where}: ${e.message}`);
   }
@@ -303,15 +429,15 @@ async function settleStep(page) {
 }
 
 /**
- * Starting on a passkey step, try to reach the code step (<= NAV_MAX_HOPS clicks).
- * Each hop prefers the email/code option (we may already be on the method list), else opens
- * the "another way" list. Returns the final step ('otp'|'landed'|'arkose'|'passkey').
- * `ops` is injectable for tests.
+ * From a passkey step OR a "Welcome back" method chooser, try to reach the email code step
+ * (<= NAV_MAX_HOPS clicks). Each hop prefers the email/code option (we may already be on the
+ * method list), else opens the "another way" list. Returns the final step
+ * ('otp'|'landed'|'arkose'|'passkey'). `ops` is injectable for tests.
  */
 export async function navigatePastPasskey(page, ops = {}) {
   const click = ops.click ?? clickControl;
   const settle = ops.settle ?? settleStep;
-  navLog("step=passkey; trying to reach the code step");
+  navLog("navigating to the email code step");
   for (let hop = 1; hop <= NAV_MAX_HOPS; hop++) {
     let kind = "email-option";
     let label = await click(page, EMAIL_OPTION_RE);
@@ -356,6 +482,9 @@ async function captureResult(context, page) {
 }
 
 /**
+ * `cobrowse` = the server already verified the co-browse preconditions (docs/28 §6). Only then
+ * does an Arkose challenge return `challenge_required` (session kept open) instead of `blocked`.
+ *
  * Begin a login. On MFA the returned session keeps the browser open for
  * submitMfa(); otherwise it is closed before returning.
  *
@@ -373,7 +502,7 @@ async function captureResult(context, page) {
  * cookies and proxy (Uber shows "Welcome back", far less Arkose risk than a cold
  * login), and is never closed on failure — only its page state is abandoned.
  */
-export async function startLogin({ email, password = null, proxyUrl = null, companyKey = null, reuse = null, cold = false }) {
+export async function startLogin({ email, password = null, proxyUrl = null, companyKey = null, reuse = null, cold = false, cobrowse = false }) {
   // A passwordless login with nothing to ride and no explicit cold clearance never builds a
   // browser: a stray fresh session must be unreachable (server.js admits cold only for an empty slot).
   if (!password && !reuse && !cold) return { status: STATUS.NO_SESSION, message: "no_session" };
@@ -397,15 +526,14 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
     // otherwise Continue would send a code to / sign in a different remembered account.
     const idField = identifierField(page);
     if (await idField.waitFor({ state: "visible", timeout: 8000 }).then(() => true, () => false)) {
-      await idField.fill(email);
-      navLog(`identifier field filled=${((await idField.inputValue().catch(() => "")) || "").length > 0 ? "yes" : "EMPTY"}`);
+      await submitIdentifier(page, idField, email);
     } else if (!(await pageShowsAccount(page, email))) {
       await dumpScreen(page, "account_not_shown");
       await closeSession(session);
       return { status: STATUS.CHANNEL_UNAVAILABLE, message: "account_not_shown" };
+    } else {
+      await advance(page, "identifier");
     }
-    await advance(page, "identifier");
-    navLog(`after identifier advance: url=${(page.url() || "").replace(/[?#].*$/, "")}`);
 
     let step = await detectStep(page);
 
@@ -427,16 +555,21 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
     if (step === "otp") {
       return { status: STATUS.MFA_REQUIRED, session };
     }
-    if (step === "passkey" && !password) {
+    // "Welcome back" method chooser or a passkey-first account: navigate to the email code step.
+    if ((step === "channel_choice" || step === "passkey") && !password) {
       step = await navigatePastPasskey(page);
       if (step === "landed") return { status: STATUS.SUCCESS, result: await captureResult(context, page), session };
       if (step === "otp") return { status: STATUS.MFA_REQUIRED, session };
+      // If choosing a method itself triggers Arkose, fall through to the arkose handler below,
+      // which keeps the browser open for co-browse when enabled (instead of closing to `blocked`).
     }
     if (step === "passkey") {
       await closeSession(session);
       return { status: STATUS.PASSKEY_UNSUPPORTED };
     }
     if (step === "arkose") {
+      // Co-browse (docs/28): keep the browser open so the manager can solve the puzzle themselves.
+      if (cobrowse) return { status: STATUS.CHALLENGE_REQUIRED, session };
       await closeSession(session);
       return { status: STATUS.BLOCKED, message: "arkose" };
     }

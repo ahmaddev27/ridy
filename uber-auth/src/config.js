@@ -70,4 +70,19 @@ export const config = {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean),
+
+  // --- Co-browse Arkose (docs/28) --------------------------------------------------
+  // Second, PUBLIC-facing listener that serves only the WebSocket upgrade on /cobrowse/ws
+  // (Caddy proxies /cobrowse/* to it). 0 / unset = co-browse disabled: an Arkose challenge then
+  // ends the login as blocked(arkose), exactly as before. The internal /login/* listener is separate.
+  cobrowsePort: Number(process.env.COBROWSE_PORT || 0),
+  // Global cap on concurrent screencast viewers (one per company on top of this).
+  cobrowseMax: Number(process.env.COBROWSE_MAX || 3),
+  // Origins allowed to open the stream (the dashboard origin). Empty = nobody can connect.
+  cobrowseAllowedOrigins: (process.env.COBROWSE_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+  // A login waiting on the Arkose puzzle is held this long (ms) before it is abandoned (10 min cap).
+  challengeTtl: Number(process.env.UBER_AUTH_CHALLENGE_TTL || 600000),
 };

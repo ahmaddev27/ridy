@@ -35,6 +35,9 @@ class PasswordlessLoginService
 
     public const STATE_SUBMITTING = 'submitting';
 
+    /** The Arkose puzzle is open and waits for the manager to solve it in the co-browse stream (docs/28). */
+    public const STATE_AWAITING_CHALLENGE = 'awaiting_challenge';
+
     public const STATE_CONNECTED = 'connected';
 
     public const STATE_FAILED = 'failed';
@@ -58,6 +61,12 @@ class PasswordlessLoginService
 
     private const SUBMIT_LOCK = 45;
 
+    /** Covers one resume long-poll (4 s) with margin; a second status poll skips instead of queueing. */
+    private const RESUME_LOCK = 10;
+
+    /** Tickets one puzzle may be opened with (the viewer can drop and reconnect). */
+    private const MAX_TICKETS = 3;
+
     private const UBER_AUTH_FAILURES = ['passkey_unsupported', 'blocked', 'channel_unavailable', 'password_required', 'session_active', 'no_session', 'no_proxy', 'capture_failed'];
 
     /** uber-auth answers that mean "still running", never "failed". */
@@ -68,6 +77,7 @@ class PasswordlessLoginService
         private readonly LoginAttemptStore $store,
         private readonly AuditLogger $audit,
         private readonly PasswordlessLoginSettings $settings,
+        private readonly CobrowseTicketSigner $signer,
     ) {}
 
     /** @return array<string, mixed> */
@@ -78,13 +88,18 @@ class PasswordlessLoginService
 
         // A timed-out start/submit may still have finished on uber-auth's side: a capture
         // accepted since the attempt began is the proof, and settles the attempt.
-        return $inFlight && $this->captureLanded($tenant, $record)
-            ? $this->connected($tenant, $record)
+        if ($inFlight && $this->captureLanded($tenant, $record)) {
+            return $this->connected($tenant, $record);
+        }
+
+        // The puzzle outcome is polled from here (docs/28 §3.3): no queue job needed.
+        return ($record['state'] ?? null) === self::STATE_AWAITING_CHALLENGE
+            ? $this->withChallenge($tenant, $this->resume($tenant))
             : $this->view($record);
     }
 
     /** @return array<string, mixed> */
-    public function start(Tenant $tenant, string $email, string $mode = self::MODE_MANUAL): array
+    public function start(Tenant $tenant, string $email, string $mode = self::MODE_MANUAL, bool $interactive = true): array
     {
         if (! $this->client->configured()) {
             return $this->failedView('unavailable');
@@ -109,7 +124,10 @@ class PasswordlessLoginService
         // it is just the manual flow (the manager types the code).
         $mode = $mode === self::MODE_AUTO && $this->settings->autoCodeEnabled($tenant) ? self::MODE_AUTO : self::MODE_MANUAL;
 
-        return $this->locked($tenant, self::START_LOCK, fn () => $this->begin($tenant, $email, $mode, $cold));
+        // Co-browse needs a human to solve the puzzle: an unattended (automatic) login never asks for it.
+        $cobrowse = $interactive && $this->cobrowseEligible($tenant);
+
+        return $this->locked($tenant, self::START_LOCK, fn () => $this->begin($tenant, $email, $mode, $cold, $cobrowse));
     }
 
     /** @return array<string, mixed> */
@@ -173,7 +191,7 @@ class PasswordlessLoginService
     }
 
     /** @return array<string, mixed> */
-    private function begin(Tenant $tenant, string $email, string $mode, bool $cold): array
+    private function begin(Tenant $tenant, string $email, string $mode, bool $cold, bool $cobrowse): array
     {
         // One login per company: a second start replaces the first.
         $this->abandon($tenant, $this->store->get($tenant->id));
@@ -193,7 +211,7 @@ class PasswordlessLoginService
         // No email (or anything derived from it) is kept: not in the cache record, not in the log.
         $this->audit->log('uber_login.started', null, ['mode' => $mode, 'cold' => $cold], $tenant->id);
 
-        return $this->settleStart($tenant, $record, $this->client->startLogin($tenant, $email, $cold));
+        return $this->settleStart($tenant, $record, $this->client->startLogin($tenant, $email, $cold, $cobrowse));
     }
 
     /**
@@ -211,11 +229,197 @@ class PasswordlessLoginService
             return $this->view($record);
         }
 
+        if ($status === 'challenge_required' && is_string($answer['login_id'] ?? null)) {
+            return $this->enterChallenge($tenant, $record, $answer['login_id']);
+        }
+
         if (in_array($status, self::PENDING_STATUSES, true)) {
             return $this->pendingView($record);
         }
 
         return $status === 'success' ? $this->connected($tenant, $record) : $this->fail($tenant, $this->failureFor($answer));
+    }
+
+    /**
+     * uber-auth kept the browser open on Uber's Arkose puzzle. The record keeps the internal
+     * login_id (needed to sign tickets) and lives up to CHALLENGE_TTL; it is never serialised.
+     *
+     * @param  array<string, mixed>  $record
+     * @return array<string, mixed>
+     */
+    private function enterChallenge(Tenant $tenant, array $record, string $loginId): array
+    {
+        if (! $this->cobrowseEligible($tenant)) {
+            $this->abandon($tenant, ['login_id' => $loginId]);
+
+            return $this->fail($tenant, 'blocked');
+        }
+        $expires = CarbonImmutable::parse((string) $record['started_at'])->addSeconds(LoginAttemptStore::CHALLENGE_TTL);
+        $record = [
+            'state' => self::STATE_AWAITING_CHALLENGE,
+            'phase' => LoginAttemptStore::PHASE_CHALLENGE,
+            'login_id' => $loginId,
+            'tickets' => 0,
+            'expires_at' => $expires->toIso8601String(),
+        ] + $record;
+        $this->store->put($tenant->id, $record, $this->remainingTtl($record));
+
+        return $this->withChallenge($tenant, $this->view($record));
+    }
+
+    /** @return array<string, mixed> */
+    private function resume(Tenant $tenant): array
+    {
+        return $this->locked($tenant, self::RESUME_LOCK, function () use ($tenant) {
+            $record = $this->store->get($tenant->id);
+            if (($record['state'] ?? null) !== self::STATE_AWAITING_CHALLENGE || ! is_string($record['login_id'] ?? null)) {
+                return $this->view($record);
+            }
+
+            return $this->settleResume($tenant, $record, $this->client->resume($tenant, $record['login_id']));
+        }, 0);
+    }
+
+    /**
+     * @param  array<string, mixed>  $record
+     * @param  array<string, mixed>  $answer
+     * @return array<string, mixed>
+     */
+    private function settleResume(Tenant $tenant, array $record, array $answer): array
+    {
+        $status = $answer['status'] ?? 'error';
+
+        return match (true) {
+            in_array($status, ['challenge_required', ...self::PENDING_STATUSES], true) => $this->view($record),
+            $status === 'mfa_required' => $this->puzzleSolved($tenant, $record, $answer),
+            $status === 'success' => $this->connected($tenant, $record),
+            default => $this->challengeFailed($tenant, $record, $answer),
+        };
+    }
+
+    /**
+     * The puzzle is solved and Uber sent the code: from here on it is exactly docs/27 A/B,
+     * with the normal 5-minute code window starting over.
+     *
+     * @param  array<string, mixed>  $record
+     * @param  array<string, mixed>  $answer
+     * @return array<string, mixed>
+     */
+    private function puzzleSolved(Tenant $tenant, array $record, array $answer): array
+    {
+        $record = array_diff_key($record, array_flip(['phase', 'tickets', 'cobrowse_sid']));
+        $record = [
+            'state' => self::STATE_AWAITING_CODE,
+            'login_id' => is_string($answer['login_id'] ?? null) ? $answer['login_id'] : $record['login_id'],
+            'channel' => $answer['channel'] ?? 'unknown',
+            'expires_at' => CarbonImmutable::now('Europe/Berlin')->addSeconds(LoginAttemptStore::ATTEMPT_TTL)->toIso8601String(),
+        ] + $record;
+        $this->store->put($tenant->id, $record, LoginAttemptStore::ATTEMPT_TTL);
+        $this->audit->log('uber_login.challenge_solved', null, ['mode' => $record['mode'] ?? self::MODE_MANUAL], $tenant->id);
+
+        return $this->view($record);
+    }
+
+    /**
+     * @param  array<string, mixed>  $record
+     * @param  array<string, mixed>  $answer
+     * @return array<string, mixed>
+     */
+    private function challengeFailed(Tenant $tenant, array $record, array $answer): array
+    {
+        $this->abandon($tenant, $record);
+
+        return $this->fail($tenant, $this->challengeFailureFor($answer));
+    }
+
+    /** @param  array<string, mixed>  $answer */
+    private function challengeFailureFor(array $answer): string
+    {
+        $status = (string) ($answer['status'] ?? 'error');
+        if (in_array($status, ['challenge_timeout', 'challenge_failed', 'blocked', 'passkey_unsupported'], true)) {
+            return $status;
+        }
+
+        return ($answer['message'] ?? null) === 'unknown or expired login_id' ? 'challenge_timeout' : 'cobrowse_unavailable';
+    }
+
+    /**
+     * Sign a one-minute stream ticket for the open puzzle. Returns `ticket` + `expires_at`,
+     * or `error`: unavailable (flags / proxy / uber-auth) | not_in_challenge | too_many | busy.
+     *
+     * @return array<string, mixed>
+     */
+    public function mintCobrowseTicket(Tenant $tenant, ?int $userId): array
+    {
+        if (! $this->client->configured() || ! $this->cobrowseEligible($tenant)) {
+            return ['error' => 'unavailable'];
+        }
+        try {
+            return $this->store->lock($tenant->id, self::RESUME_LOCK)->block(5, fn () => $this->mint($tenant, $userId));
+        } catch (LockTimeoutException) {
+            return ['error' => 'busy'];
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function mint(Tenant $tenant, ?int $userId): array
+    {
+        $record = $this->store->get($tenant->id);
+        if (($record['state'] ?? null) !== self::STATE_AWAITING_CHALLENGE || ! is_string($record['login_id'] ?? null)) {
+            return ['error' => 'not_in_challenge'];
+        }
+        if ((int) ($record['tickets'] ?? 0) >= self::MAX_TICKETS) {
+            return ['error' => 'too_many'];
+        }
+        $minted = $this->signer->mint((string) $tenant->id, $record['login_id'], $userId);
+        $record['tickets'] = (int) ($record['tickets'] ?? 0) + 1;
+        $record['cobrowse_sid'] = $minted['sid'];
+        $this->store->put($tenant->id, $record, $this->remainingTtl($record));
+        // Event + tenant + user only: never a frame, coordinate or screenshot (docs/28 §4).
+        $this->audit->log('cobrowse.ticket_minted', null, ['tickets' => $record['tickets']], $tenant->id);
+
+        return ['ticket' => $minted['ticket'], 'expires_at' => CarbonImmutable::createFromTimestamp($minted['expires_at'], 'Europe/Berlin')->toIso8601String()];
+    }
+
+    /**
+     * Stop the stream and abandon the puzzle (uber-auth closes the browser and returns the
+     * company to needs_otp). Idempotent; outside a puzzle it changes nothing.
+     *
+     * @return array<string, mixed>
+     */
+    public function cancelCobrowse(Tenant $tenant): array
+    {
+        return $this->locked($tenant, self::SUBMIT_LOCK, function () use ($tenant) {
+            $record = $this->store->get($tenant->id);
+            if (($record['state'] ?? null) !== self::STATE_AWAITING_CHALLENGE) {
+                return $this->view($record);
+            }
+            if (is_string($record['login_id'] ?? null)) {
+                $this->client->closeCobrowse($tenant, $record['login_id']);
+            }
+            $this->abandon($tenant, $record);
+            $this->store->forget($tenant->id);
+            $this->audit->log('cobrowse.cancelled', null, [], $tenant->id);
+
+            return $this->view(null);
+        });
+    }
+
+    /** The co-browse stream may be offered: all flags on and the company has a usable residential proxy (docs/28 §6). */
+    public function cobrowseEligible(Tenant $tenant): bool
+    {
+        return $this->settings->cobrowseEnabledFor($tenant) && $this->hasValidProxy($tenant);
+    }
+
+    /**
+     * @param  array<string, mixed>  $view
+     * @return array<string, mixed>
+     */
+    private function withChallenge(Tenant $tenant, array $view): array
+    {
+        return ($view['state'] ?? null) === self::STATE_AWAITING_CHALLENGE
+            ? $view + ['challenge' => 'arkose', 'cobrowse_available' => $this->cobrowseEligible($tenant)]
+            : $view;
     }
 
     /** @return array<string, mixed> */

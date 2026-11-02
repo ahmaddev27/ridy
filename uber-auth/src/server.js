@@ -10,12 +10,24 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
-import { startLogin, submitMfa, closeSession, STATUS } from "./browser.js";
+import { startLogin, submitMfa, closeSession, challengeTick, finishChallenge, STATUS } from "./browser.js";
 import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf } from "./persistent.js";
-import { admitStart, companyMatches, createStartGate } from "./loginPolicy.js";
+import { admitStart, canCobrowse, companyMatches, createStartGate } from "./loginPolicy.js";
+import { createCobrowse, createCobrowseServer } from "./cobrowse.js";
+import { openCdpStream } from "./cobrowseStream.js";
+import { loginHash } from "./cobrowseTicket.js";
 
-// loginId -> { session, companyKey, createdAt, passwordless } awaiting an MFA code.
+// loginId -> { session, companyKey, createdAt, passwordless } awaiting an MFA code, or (when
+// `challenge` is set) parked on the Arkose puzzle for a human to solve via co-browse (docs/28).
+// A challenge that ended badly keeps its entry as a tombstone (`dead` = the outcome /login/resume
+// reports once) for DEAD_KEEP_MS.
 const pending = new Map();
+const DEAD_KEEP_MS = 120_000;
+const RESUME_WAIT_MS = 25_000;
+const RESUME_POLL_MS = 700;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// The co-browse stream controller; stays null (feature off) unless COBROWSE_PORT + UBER_AUTH_SECRET are set.
+let cobrowse = null;
 
 // A passwordless attempt that ends without a capture hands the company back to
 // needs_otp (markNeedsOtp only undoes LOGGING_IN, so it can never touch an active one).
@@ -28,16 +40,38 @@ function releaseLogin(entry) {
 setInterval(() => {
   const now = Date.now();
   for (const [id, entry] of pending) {
-    if (now - entry.createdAt > config.sessionTtl) {
-      closeSession(entry.session);
-      pending.delete(id);
-      releaseLogin(entry);
+    if (entry.dead) {
+      if (now - entry.deadAt > DEAD_KEEP_MS) pending.delete(id);
+    } else if (now - entry.createdAt > (entry.challenge ? config.challengeTtl : config.sessionTtl)) {
+      expireEntry(id, entry);
     }
   }
 }, 30000);
 
+function expireEntry(id, entry) {
+  if (!entry.challenge) {
+    closeSession(entry.session);
+    pending.delete(id);
+    releaseLogin(entry);
+    return;
+  }
+  cobrowse?.closeCompany(entry.companyKey, "timeout"); // its onEnd kills the login; this covers "no viewer"
+  killChallenge(id, "challenge_timeout");
+}
+
+/** A challenge that cannot succeed: close the browser, free the company, remember WHY for /login/resume. */
+async function killChallenge(loginId, outcome) {
+  const entry = pending.get(loginId);
+  if (!entry || entry.dead) return;
+  entry.dead = outcome;
+  entry.deadAt = Date.now();
+  await closeSession(entry.session);
+  releaseLogin(entry);
+}
+
 /** One pending login per company: a new start replaces (and closes) the old one. */
 async function dropPendingFor(companyKey) {
+  await cobrowse?.closeCompany(companyKey, "cancel");
   for (const [id, entry] of pending) {
     if (entry.companyKey === companyKey) {
       pending.delete(id);
@@ -145,7 +179,7 @@ let coldStarting = 0;
 
 /** Headed Chromes already spoken for: live sessions plus cold logins held or launching. */
 function coldSlotsTaken() {
-  return liveSessionCount() + coldStarting + [...pending.values()].filter((e) => e.cold).length;
+  return liveSessionCount() + coldStarting + [...pending.values()].filter((e) => e.cold && !e.dead).length;
 }
 
 async function runStart(body, admitted, res) {
@@ -170,8 +204,23 @@ async function runStartNow(body, { companyKey, password, cold }, res) {
     reuse: passwordless ? handleOf(companyKey) : null,
     // Cold first connect: no handle exists by construction (state null); a fresh browser is built.
     cold: passwordless && cold === true,
+    cobrowse: canCobrowse({
+      requested: body.cobrowse === true,
+      listening: cobrowse != null,
+      secret: config.secret,
+      originsConfigured: config.cobrowseAllowedOrigins.length > 0,
+      proxyUrl: body.proxy_url,
+      realChrome: config.realChrome,
+      display: process.env.DISPLAY,
+    }),
   });
 
+  if (outcome.status === STATUS.CHALLENGE_REQUIRED) {
+    const loginId = randomUUID();
+    const createdAt = Date.now();
+    pending.set(loginId, { session: outcome.session, companyKey, createdAt, passwordless, cold: cold === true, challenge: true });
+    return send(res, 200, challengeBody(loginId, createdAt));
+  }
   if (outcome.status === STATUS.MFA_REQUIRED) {
     const loginId = randomUUID();
     const createdAt = Date.now();
@@ -190,14 +239,133 @@ async function runStartNow(body, { companyKey, password, cold }, res) {
   return send(res, 200, { status: outcome.status, message: outcome.message });
 }
 
-// The code is read, forwarded to the page and dropped: it is never logged, stored or echoed.
-async function handleMfa(req, res) {
+const challengeBody = (loginId, createdAt) => ({
+  status: STATUS.CHALLENGE_REQUIRED,
+  login_id: loginId,
+  challenge: "arkose",
+  expires_at: new Date(createdAt + config.challengeTtl).toISOString(),
+});
+
+const mfaBody = (loginId, createdAt) => ({
+  status: STATUS.MFA_REQUIRED,
+  login_id: loginId,
+  channel: "unknown",
+  expires_at: new Date(createdAt + config.sessionTtl).toISOString(),
+});
+
+/** How a parked challenge that ended badly is reported to /login/resume (docs/28 §3.2). */
+function deadBody(outcome) {
+  if (outcome === "challenge_timeout" || outcome === "challenge_failed") return { status: outcome };
+  return { status: STATUS.BLOCKED, message: outcome };
+}
+
+/** Wait (long-poll) until the puzzle is left, failed, killed, or the budget is spent. */
+async function awaitChallengeOutcome(entry) {
+  const deadline = Date.now() + RESUME_WAIT_MS;
+  while (Date.now() < deadline) {
+    if (entry.dead) return "dead";
+    const step = await challengeTick(entry.session).catch(() => "challenge");
+    if (step !== "challenge") return step;
+    await sleep(RESUME_POLL_MS);
+  }
+  return "challenge";
+}
+
+async function handleResume(req, res) {
   const body = await readJson(req);
-  const entry = body.login_id ? pending.get(body.login_id) : null;
+  const loginId = body.login_id;
+  const entry = loginId ? pending.get(loginId) : null;
   if (!entry) return send(res, 404, { status: STATUS.ERROR, message: "unknown or expired login_id" });
   if (!companyMatches(entry.companyKey, body.company_key)) {
     return send(res, 403, { status: STATUS.ERROR, message: "company_mismatch" });
   }
+  if (entry.dead) return finishDead(loginId, entry, res);
+  if (!entry.challenge) return send(res, 200, mfaBody(loginId, entry.createdAt)); // already past the puzzle
+  if (entry.resuming) return send(res, 200, challengeBody(loginId, entry.createdAt)); // one long-poll at a time
+
+  entry.resuming = true;
+  try {
+    const step = await awaitChallengeOutcome(entry);
+    if (step === "dead") return finishDead(loginId, entry, res);
+    if (step === "failed") {
+      await killChallenge(loginId, "challenge_failed");
+      return finishDead(loginId, entry, res);
+    }
+    if (step === "challenge") return send(res, 200, challengeBody(loginId, entry.createdAt));
+    return await leaveChallenge(loginId, entry, step, res);
+  } finally {
+    entry.resuming = false;
+  }
+}
+
+function finishDead(loginId, entry, res) {
+  pending.delete(loginId);
+  return send(res, 200, deadBody(entry.dead));
+}
+
+/** The puzzle was solved: close the stream FIRST, then continue to the code step / capture. */
+async function leaveChallenge(loginId, entry, step, res) {
+  await cobrowse?.closeCompany(entry.companyKey, "solved");
+  const outcome = await finishChallenge(entry.session, step);
+  if (outcome.status === STATUS.SUCCESS) {
+    pending.delete(loginId);
+    return onLoginSuccess(entry.companyKey, outcome, res, entry.cold === true);
+  }
+  if (outcome.status === STATUS.MFA_REQUIRED) {
+    entry.challenge = false; // the OTP window (sessionTtl) starts now, not at the start of the puzzle
+    entry.createdAt = Date.now();
+    return send(res, 200, mfaBody(loginId, entry.createdAt));
+  }
+  if (outcome.status === STATUS.CHALLENGE_REQUIRED) return send(res, 200, challengeBody(loginId, entry.createdAt));
+  pending.delete(loginId);
+  releaseLogin(entry);
+  if (outcome.status === STATUS.PASSKEY_UNSUPPORTED) return send(res, 200, { status: outcome.status });
+  return send(res, 200, { status: STATUS.BLOCKED, message: outcome.message ?? outcome.status });
+}
+
+// Backend force-close (docs/28 §3.2): ends the live stream and cancels the parked login.
+async function handleCobrowseClose(req, res) {
+  const body = await readJson(req);
+  if (body.company_key == null) return send(res, 422, { error: "company_key required" });
+  const closed = (await cobrowse?.closeCompany(body.company_key, "cancel")) ?? false;
+  const entry = body.login_id ? pending.get(body.login_id) : null;
+  if (entry && !entry.dead && entry.challenge && companyMatches(entry.companyKey, body.company_key)) {
+    await closeSession(entry.session);
+    pending.delete(body.login_id);
+    releaseLogin(entry);
+  }
+  return send(res, 200, { status: "closed", stream_closed: closed });
+}
+
+/** A stream ended: the login-side consequence (docs/28 §2.5). solved / viewer_closed change nothing. */
+async function onStreamEnd(rec, reason) {
+  const outcome = { timeout: "challenge_timeout", idle: "challenge_timeout", error: "challenge_failed", violation: "cobrowse_violation" }[reason];
+  if (outcome) return killChallenge(rec.loginId, outcome);
+  if (reason !== "cancel") return;
+  const entry = pending.get(rec.loginId);
+  if (!entry) return;
+  pending.delete(rec.loginId);
+  await closeSession(entry.session);
+  releaseLogin(entry);
+}
+
+/** The challenge-state pending login a ticket's `lh` points at (the login_id itself never travels). */
+function findChallengePending(lh) {
+  for (const [loginId, entry] of pending) {
+    if (entry.challenge && !entry.dead && loginHash(loginId) === lh) return { loginId, entry };
+  }
+  return null;
+}
+
+// The code is read, forwarded to the page and dropped: it is never logged, stored or echoed.
+async function handleMfa(req, res) {
+  const body = await readJson(req);
+  const entry = body.login_id ? pending.get(body.login_id) : null;
+  if (!entry || entry.dead) return send(res, 404, { status: STATUS.ERROR, message: "unknown or expired login_id" });
+  if (!companyMatches(entry.companyKey, body.company_key)) {
+    return send(res, 403, { status: STATUS.ERROR, message: "company_mismatch" });
+  }
+  if (entry.challenge) return send(res, 409, { status: STATUS.CHALLENGE_REQUIRED, message: "challenge_pending" });
   if (!body.code) return send(res, 422, { error: "code required" });
 
   const outcome = await submitMfa(entry.session, String(body.code));
@@ -233,6 +401,8 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/login/start") return await handleStart(req, res);
     if (req.method === "POST" && req.url === "/login/mfa") return await handleMfa(req, res);
     if (req.method === "POST" && req.url === "/login/cancel") return await handleCancel(req, res);
+    if (req.method === "POST" && req.url === "/login/resume") return await handleResume(req, res);
+    if (req.method === "POST" && req.url === "/cobrowse/close") return await handleCobrowseClose(req, res);
     if (req.method === "GET" && req.url === "/sessions") return send(res, 200, { data: statusList() });
     if (req.method === "GET" && req.url === "/health") return send(res, 200, { status: "ok", pending: pending.size, live: statusList().length });
     return send(res, 404, { error: "not found" });
@@ -240,6 +410,23 @@ const server = createServer(async (req, res) => {
     return send(res, 500, { error: e.message });
   }
 });
+
+// Second listener (docs/28 §2.4): WebSocket upgrade on /cobrowse/ws only. It exists only when the
+// feature is configured; otherwise an Arkose challenge stays blocked(arkose) as before.
+if (config.cobrowsePort && config.secret && config.cobrowseAllowedOrigins.length) {
+  cobrowse = createCobrowse({
+    secret: config.secret,
+    allowedOrigins: config.cobrowseAllowedOrigins,
+    max: config.cobrowseMax,
+    findPending: findChallengePending,
+    openStream: openCdpStream,
+    tick: challengeTick,
+    onEnd: onStreamEnd,
+  });
+  createCobrowseServer(cobrowse).listen(config.cobrowsePort, () =>
+    console.log(`Ridy uber-auth co-browse WS on :${config.cobrowsePort} (max=${config.cobrowseMax})`),
+  );
+}
 
 server.listen(config.port, async () => {
   console.log(`Ridy uber-auth listening on :${config.port} (headful=${config.headful})`);

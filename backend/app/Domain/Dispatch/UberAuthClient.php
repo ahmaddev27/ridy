@@ -30,7 +30,7 @@ class UberAuthClient
      *
      * @return array<string, mixed>
      */
-    public function startLogin(Tenant $tenant, string $email, bool $cold = false): array
+    public function startLogin(Tenant $tenant, string $email, bool $cold = false, bool $cobrowse = false): array
     {
         return $this->post('/login/start', [
             'email' => $email,
@@ -38,7 +38,30 @@ class UberAuthClient
             'proxy_url' => $tenant->getAttribute('proxy_url') ?: null,
             // First connect, nothing to ride: uber-auth opens a fresh browser through the proxy.
             'cold' => $cold,
-        ], timeout: 90);
+        ] + ($cobrowse ? ['cobrowse' => true] : []), timeout: 90);
+    }
+
+    /**
+     * Long-poll for the puzzle outcome (docs/28 §3.2). uber-auth waits up to 25 s; we cap
+     * the call short so a status poll never pins a worker (a timeout reads as `pending`).
+     *
+     * @return array<string, mixed>
+     */
+    public function resume(Tenant $tenant, string $loginId): array
+    {
+        return $this->post('/login/resume', [
+            'login_id' => $loginId,
+            'company_key' => (string) $tenant->id,
+        ], timeout: 4);
+    }
+
+    /** Stop the co-browse stream (the login itself is cancelled separately). @return array<string, mixed> */
+    public function closeCobrowse(Tenant $tenant, ?string $loginId = null): array
+    {
+        return $this->post('/cobrowse/close', array_filter([
+            'company_key' => (string) $tenant->id,
+            'login_id' => $loginId,
+        ], fn ($v) => $v !== null), timeout: 15);
     }
 
     /** @return array<string, mixed> */
