@@ -121,8 +121,10 @@ test("passkey nav: Arkose after navigating is surfaced", async () => {
 });
 
 test("selectors match EN/DE variants", () => {
-  for (const t of ["Try another way", "More options", "Andere Option", "Anders anmelden"]) assert.ok(ANOTHER_WAY_RE.test(t), t);
-  for (const t of ["Email", "Per E-Mail", "Code senden", "Send code"]) assert.ok(EMAIL_OPTION_RE.test(t), t);
+  for (const t of ["Try another way", "More options", "Weitere Optionen", "Andere Option", "Anders anmelden"]) assert.ok(ANOTHER_WAY_RE.test(t), t);
+  for (const t of ["Email", "E-Mail", "Per E-Mail"]) assert.ok(EMAIL_OPTION_RE.test(t), t);
+  // The email option must NOT catch the SMS/WhatsApp ones (they also "send a code").
+  for (const t of ["SMS mit Anmeldecode senden", "Code über WhatsApp senden"]) assert.ok(!EMAIL_OPTION_RE.test(t), t);
 });
 
 test("a reused (persistent) browser is never closed by closeSession", async () => {

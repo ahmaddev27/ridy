@@ -359,8 +359,11 @@ export const ANOTHER_WAY_RE =
   /try another way|another way|more options|other options|weitere optionen|alle optionen( anzeigen)?|use another method|sign in another way|verify another way|use a code|sign in with a code|w(ä|a)hle eine andere|andere (option|bestätigungs?methode)|anders anmelden|stattdessen/i;
 // The email option within the method list ("E-Mail"). The adjacent "send code"/"code senden"
 // forms never match the German SMS/WhatsApp items, which put words between "Code" and "senden".
+// EMAIL ONLY. It must never match the SMS option ("SMS mit Anmeldecode senden" contains
+// "code senden"), so the generic "send code / code senden / get a code" forms are gone — those
+// pick SMS on the method chooser. Match the literal E-Mail entry and "code … per/über E-Mail".
 export const EMAIL_OPTION_RE =
-  /e-?mail|send code|get a code|verification code|code to your email|per e-?mail|code senden/i;
+  /\be-?mail\b|per e-?mail|code (über|via|to your|an deine) e-?mail|e-?mail senden/i;
 
 const navLog = (m) => console.log(`[pwless-nav] ${m}`);
 
@@ -608,6 +611,7 @@ export async function submitMfa(session, code) {
     // A chooser/passkey after the code (e.g. a wrong code bounced to "choose a method"): walk
     // back to the code step rather than erroring, so the manager just re-enters a fresh code.
     if (step === "channel_choice" || step === "passkey") {
+      await dumpScreen(page, "submitMfa-after-code"); // what Uber showed (likely a wrong-code bounce)
       step = await navigatePastPasskey(page);
       navLog(`submitMfa: after re-navigation step = ${step}`);
     }
