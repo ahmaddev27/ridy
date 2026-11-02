@@ -1,18 +1,24 @@
 import type { ReactNode } from "react";
-import { Manrope, Inter_Tight, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { GazaBanner, Navbar } from "./_components/navbar";
 import { SiteFooter } from "./_components/site-footer";
 
-const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", adjustFontFallback: false });
-const interTight = Inter_Tight({
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
-  variable: "--font-heading",
+const manrope = localFont({
+  src: [{ path: "../fonts/manrope-latin-var.woff2", weight: "200 800", style: "normal" }],
+  variable: "--font-manrope",
+  display: "swap",
+  adjustFontFallback: false,
 });
-const jetBrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
+// Inter Tight / JetBrains Mono are variable fonts: one file covers every weight.
+const interTight = localFont({
+  src: [{ path: "../fonts/inter-tight-latin-var.woff2", weight: "100 900", style: "normal" }],
+  variable: "--font-heading",
+  display: "swap",
+});
+const jetBrainsMono = localFont({
+  src: [{ path: "../fonts/jetbrains-mono-latin-var.woff2", weight: "100 800", style: "normal" }],
   variable: "--font-mono-mkt",
+  display: "swap",
 });
 
 export default function MarketingLayout({ children }: { children: ReactNode }) {

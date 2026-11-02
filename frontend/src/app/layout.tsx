@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Manrope, Tajawal } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n/context";
 import { ThemeProvider } from "@/lib/theme/context";
@@ -15,12 +15,22 @@ const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(t===
 // adjustFontFallback:false stops next/font from injecting a system fallback into the
 // CSS variable — that fallback (no unicode-range) otherwise swallows Arabic glyphs
 // before they can fall through to Tajawal, breaking Arabic text.
-const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", adjustFontFallback: false });
+// Fonts are vendored in ./fonts so the build never needs the network.
+const manrope = localFont({
+  src: [{ path: "./fonts/manrope-latin-var.woff2", weight: "200 800", style: "normal" }],
+  variable: "--font-manrope",
+  display: "swap",
+  adjustFontFallback: false,
+});
 // Arabic UI font — applied via CSS when the document is in Arabic/RTL.
-const tajawal = Tajawal({
-  subsets: ["arabic"],
-  weight: ["400", "500", "700"],
+const tajawal = localFont({
+  src: [
+    { path: "./fonts/tajawal-arabic-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/tajawal-arabic-500.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/tajawal-arabic-700.woff2", weight: "700", style: "normal" },
+  ],
   variable: "--font-tajawal",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
