@@ -114,6 +114,16 @@ reidey.de {
 		}
 	}
 
+	# Co-browse (docs/28): a manager solves an Arkose puzzle inside the server's own
+	# login browser, streamed over a WebSocket. ONLY /cobrowse/ws upgrades; uber-auth
+	# checks the Origin and a signed, one-use, company-bound ticket before accepting,
+	# and relays mouse-only input. This is a SEPARATE uber-auth listener (:8792); the
+	# internal /login/* port (:8791, X-Auth-Secret) is never exposed. Caddy upgrades to
+	# WS automatically. Same-origin wss://reidey.de is already in the connect-src CSP.
+	handle /cobrowse/* {
+		reverse_proxy uber-auth:8792
+	}
+
 	# Everything else is the Next.js dashboard.
 	handle {
 		reverse_proxy frontend:3000

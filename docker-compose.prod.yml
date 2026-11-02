@@ -392,6 +392,15 @@ services:
       # Gradual rollout: comma-separated tenant ids to auto-seed a browser for;
       # empty = every active company. Set e.g. to one id to pilot on one company.
       ONLY_TENANTS: ${UBER_AUTH_ONLY_TENANTS:-}
+      # Co-browse (docs/28): a SECOND listener on COBROWSE_PORT, reached ONLY through
+      # Caddy /cobrowse/* (no host port here). The internal /login/* port stays internal.
+      # The listener is inert until the backend's UBER_COBROWSE_ENABLED + per-company flag
+      # are on (it never issues a ticket otherwise), so running it by default is safe.
+      # ALLOWED_ORIGINS must equal the exact dashboard origin or every WS upgrade is 403'd.
+      COBROWSE_PORT: ${COBROWSE_PORT:-8792}
+      COBROWSE_MAX: ${COBROWSE_MAX:-3}
+      COBROWSE_ALLOWED_ORIGINS: ${COBROWSE_ALLOWED_ORIGINS:-https://reidey.de}
+      UBER_AUTH_CHALLENGE_TTL: ${UBER_AUTH_CHALLENGE_TTL:-600000}
     volumes:
       # Saved per-company browser storage, so a restart resumes warm without OTP.
       - uber_auth_state:/state
