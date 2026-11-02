@@ -100,10 +100,10 @@ export const liveSessionCount = () => manager.liveCount();
  * company (the extension or an auto-relink may have connected it since the cold start)? The
  * in-memory manager cannot see that. Fails CLOSED: if the backend cannot be asked, assume yes.
  */
-export async function backendHasSession(companyKey) {
+export async function backendHasSession(companyKey, { activeOnly = false } = {}) {
   try {
     const wanted = await backendGet("/api/v1/internal/session-browser/wanted");
-    return wanted.some((s) => String(s.tenant_id) === String(companyKey));
+    return wanted.some((s) => String(s.tenant_id) === String(companyKey) && (!activeOnly || s.status === "active"));
   } catch {
     return true;
   }

@@ -132,10 +132,11 @@ class PasswordlessLoginService
         // Co-browse needs a human to solve the puzzle: an unattended (automatic) login never asks for it.
         $cobrowse = $interactive && $this->cobrowseEligible($tenant);
 
-        // A cold first connect that can be co-browsed is a FULL login: the human drives Uber's
-        // whole sign-in in the stream and types email + code into Uber themselves, so neither
-        // ever reaches us (no email needed here, no code relay, always manual).
-        $full = $cold && $cobrowse;
+        // Any connect that can be co-browsed (cold OR a warm-dead session; an ACTIVE one was
+        // refused above) is a FULL login: the human drives Uber's whole sign-in in the stream
+        // and types email + code into Uber themselves, so neither ever reaches us (no email
+        // needed here, no code relay, always manual).
+        $full = $cobrowse;
         if ($full) {
             $mode = self::MODE_MANUAL;
         } elseif ($email === '') {
@@ -464,7 +465,7 @@ class PasswordlessLoginService
         }
         // A cold login may only ever fill an EMPTY slot. The extension (or auto-relink) can have
         // connected the company since start(): then ours is abandoned, never forked onto it.
-        if (! empty($record['cold']) && $this->hasPriorContext($tenant)) {
+        if ($this->sessionAppearedSinceStart($tenant, $record)) {
             $this->abandon($tenant, $record);
 
             return $this->fail($tenant, 'session_active');
@@ -607,6 +608,22 @@ class PasswordlessLoginService
         return ($answer['message'] ?? null) === 'unknown or expired login_id' ? 'code_timeout' : 'unavailable';
     }
 
+    /**
+     * Did a session show up that this attempt must not touch? A full (co-browse) login replaces a
+     * DEAD session by design, so only an ACTIVE one aborts it; an automated cold login still
+     * requires the slot to be empty.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private function sessionAppearedSinceStart(Tenant $tenant, array $record): bool
+    {
+        if (! empty($record['full'])) {
+            return $this->sessionIsActive($tenant);
+        }
+
+        return ! empty($record['cold']) && $this->hasPriorContext($tenant);
+    }
+
     /** A healthy browser is feeding the daemon; never start a login that could stall it. */
     private function sessionIsActive(Tenant $tenant): bool
     {
@@ -641,10 +658,18 @@ class PasswordlessLoginService
         return $this->view($record) + ['pending' => true];
     }
 
-    /** The first connect would be a full co-browse login (human drives Uber's whole sign-in, no email asked). */
+    /**
+     * A connect / re-link would be a full co-browse login (human drives Uber's whole sign-in, no
+     * email asked): the company is cold (cold flag on) or has a prior, NOT-active session, and
+     * is co-browse eligible. A company with a live session is never offered it.
+     */
     public function fullCobrowseAvailable(?Tenant $tenant): bool
     {
-        return $tenant !== null && $this->coldConnectAvailable($tenant) && $this->cobrowseEligible($tenant);
+        if ($tenant === null || ! $this->cobrowseEligible($tenant) || $this->sessionIsActive($tenant)) {
+            return false;
+        }
+
+        return $this->hasPriorContext($tenant) || $this->coldConnectAvailable($tenant);
     }
 
     /** Whether the connect page may offer the cold (email + code) first connect: flag on and nothing connected yet. */

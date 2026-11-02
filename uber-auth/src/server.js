@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { startLogin, submitMfa, closeSession, challengeTick, finishChallenge, STATUS } from "./browser.js";
 import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf } from "./persistent.js";
-import { admitStart, canCobrowse, canFullLogin, companyMatches, createStartGate } from "./loginPolicy.js";
+import { admitStart, adoptGuard, adoptMode, canCobrowse, canFullLogin, companyMatches, createStartGate } from "./loginPolicy.js";
 import { createCobrowse, createCobrowseServer, FULL_LOGIN_HARD_CAP_MS } from "./cobrowse.js";
 import { openCdpStream } from "./cobrowseStream.js";
 import { loginHash } from "./cobrowseTicket.js";
@@ -120,19 +120,16 @@ async function adoptOrClose(companyKey, session, result) {
   }
 }
 
-async function onLoginSuccess(companyKey, outcome, res, cold = false) {
+async function onLoginSuccess(companyKey, outcome, res, mode = null) {
   // No company_key: legacy one-shot — return the capture and close the browser.
   if (!companyKey) {
     await closeSession(outcome.session);
     return send(res, 200, { status: STATUS.SUCCESS, ...outcome.result });
   }
-  // A cold login adopts only into an EMPTY slot: if a session appeared while the code was
-  // pending (re-seed / extension), ours is dropped - it must never replace a live one.
-  if (cold && sessionState(String(companyKey)) != null) {
-    await closeSession(outcome.session);
-    return send(res, 409, { status: "session_active", message: "session_active" });
-  }
-  if (cold && (await backendHasSession(companyKey))) {
+  // A cold login adopts only into an EMPTY slot; a fresh (warm-dead) one may replace a dead
+  // session but never an ACTIVE one. If a live session appeared while the login was pending
+  // (re-seed / extension), ours is dropped - it must never replace a live one.
+  if (await adoptRefused(companyKey, mode)) {
     await closeSession(outcome.session);
     return send(res, 409, { status: "session_active", message: "session_active" });
   }
@@ -146,6 +143,13 @@ async function onLoginSuccess(companyKey, outcome, res, cold = false) {
     return send(res, 200, { status: STATUS.CAPTURE_FAILED, message: adopted.reason ?? "not_posted" });
   }
   return send(res, 200, { status: STATUS.SUCCESS, persistent: true, org_uuid: outcome.result?.org_uuid ?? null });
+}
+
+async function adoptRefused(companyKey, mode) {
+  const guard = adoptGuard(mode, sessionState(String(companyKey)));
+  if (guard.refuse) return true;
+  if (guard.backend == null) return false;
+  return backendHasSession(companyKey, { activeOnly: guard.backend === "active" });
 }
 
 // Tracks /login/start calls currently inside startLogin(): dropPendingFor() cannot see them.
@@ -182,14 +186,19 @@ async function handleStart(req, res) {
 // Cold browsers started but not yet visible in `pending`/the manager.
 let coldStarting = 0;
 
-/** Headed Chromes already spoken for: live sessions plus cold logins held or launching. */
-function coldSlotsTaken() {
-  return liveSessionCount() + coldStarting + [...pending.values()].filter((e) => e.cold && !e.dead).length;
+/**
+ * Headed Chromes already spoken for: live sessions plus fresh-browser logins held or launching.
+ * The company's own dead/logging-in entry is not counted: its browser is replaced, not added to.
+ */
+function coldSlotsTaken(companyKey) {
+  const own = ["needs_otp", "logging_in"].includes(sessionState(companyKey)) ? 1 : 0;
+  const held = [...pending.values()].filter((e) => (e.cold || e.fresh) && !e.dead).length;
+  return liveSessionCount() - own + coldStarting + held;
 }
 
 async function runStart(body, admitted, res) {
-  if (admitted.cold !== true) return runStartNow(body, admitted, res);
-  if (coldSlotsTaken() >= config.maxSessions) return send(res, 503, { status: STATUS.ERROR, message: "at_capacity" });
+  if (admitted.cold !== true && admitted.fresh !== true) return runStartNow(body, admitted, res);
+  if (coldSlotsTaken(admitted.companyKey) >= config.maxSessions) return send(res, 503, { status: STATUS.ERROR, message: "at_capacity" });
   coldStarting++;
   try {
     return await runStartNow(body, admitted, res);
@@ -198,8 +207,10 @@ async function runStart(body, admitted, res) {
   }
 }
 
-async function runStartNow(body, { companyKey, password, cold }, res) {
+async function runStartNow(body, { companyKey, password, cold, fresh }, res) {
   const passwordless = !password;
+  // Cold or warm-dead full login: a FRESH browser through the proxy, never the held one.
+  const freshBrowser = passwordless && (cold === true || fresh === true);
   const cobrowseOk = canCobrowse({
     requested: body.cobrowse === true,
     listening: cobrowse != null,
@@ -209,8 +220,8 @@ async function runStartNow(body, { companyKey, password, cold }, res) {
     realChrome: config.realChrome,
     display: process.env.DISPLAY,
   });
-  // fullLogin (docs/28 §11) = same preconditions as co-browse PLUS a cold start; never loosened.
-  const full = canFullLogin({ full: body.full, cobrowseOk, cold: passwordless && cold === true });
+  // fullLogin (docs/28 §11) = same preconditions as co-browse PLUS a fresh-browser start; never loosened.
+  const full = canFullLogin({ full: body.full, cobrowseOk, fresh: freshBrowser });
   if (body.full === true && !full) {
     if (passwordless) markNeedsOtp(companyKey);
     return send(res, 409, { status: "full_login_unavailable", message: "full_login_unavailable" });
@@ -221,9 +232,10 @@ async function runStartNow(body, { companyKey, password, cold }, res) {
     proxyUrl: typeof body.proxy_url === "string" ? body.proxy_url : null,
     companyKey,
     // Warm re-auth: ride the company's own browser (cookies + proxy already there).
-    reuse: passwordless ? handleOf(companyKey) : null,
-    // Cold first connect: no handle exists by construction (state null); a fresh browser is built.
-    cold: passwordless && cold === true,
+    reuse: passwordless && !freshBrowser ? handleOf(companyKey) : null,
+    // Cold first connect or a full login over a dead session: a fresh browser is built (the dead
+    // one stays untouched until a successful capture replaces it).
+    cold: freshBrowser,
     cobrowse: cobrowseOk,
     full,
   });
@@ -232,13 +244,13 @@ async function runStartNow(body, { companyKey, password, cold }, res) {
     const loginId = randomUUID();
     const createdAt = Date.now();
     const fullLogin = full && outcome.session?.fullLogin === true;
-    pending.set(loginId, { session: outcome.session, companyKey, createdAt, passwordless, cold: cold === true, challenge: true, fullLogin });
+    pending.set(loginId, { session: outcome.session, companyKey, createdAt, passwordless, cold: cold === true, fresh: fresh === true, challenge: true, fullLogin });
     return send(res, 200, challengeBody(loginId, createdAt, fullLogin));
   }
   if (outcome.status === STATUS.MFA_REQUIRED) {
     const loginId = randomUUID();
     const createdAt = Date.now();
-    pending.set(loginId, { session: outcome.session, companyKey, createdAt, passwordless, cold: cold === true });
+    pending.set(loginId, { session: outcome.session, companyKey, createdAt, passwordless, cold: cold === true, fresh: fresh === true });
     return send(res, 200, {
       status: STATUS.MFA_REQUIRED,
       login_id: loginId,
@@ -247,7 +259,7 @@ async function runStartNow(body, { companyKey, password, cold }, res) {
     });
   }
   if (outcome.status === STATUS.SUCCESS) {
-    return onLoginSuccess(companyKey, outcome, res, cold === true);
+    return onLoginSuccess(companyKey, outcome, res, adoptMode({ cold, fresh }));
   }
   if (passwordless) markNeedsOtp(companyKey);
   return send(res, 200, { status: outcome.status, message: outcome.message });
@@ -340,7 +352,7 @@ async function leaveChallenge(loginId, entry, step, res) {
   const outcome = await finishChallenge(entry.session, step);
   if (outcome.status === STATUS.SUCCESS) {
     pending.delete(loginId);
-    return onLoginSuccess(entry.companyKey, outcome, res, entry.cold === true);
+    return onLoginSuccess(entry.companyKey, outcome, res, adoptMode(entry));
   }
   if (outcome.status === STATUS.MFA_REQUIRED) {
     entry.challenge = false; // the OTP window (sessionTtl) starts now, not at the start of the puzzle
@@ -406,7 +418,7 @@ async function handleMfa(req, res) {
 
   if (outcome.status === STATUS.SUCCESS) {
     pending.delete(body.login_id);
-    return onLoginSuccess(entry.companyKey, outcome, res, entry.cold === true);
+    return onLoginSuccess(entry.companyKey, outcome, res, adoptMode(entry));
   }
   if (outcome.retry) {
     return send(res, 200, { status: STATUS.MFA_REQUIRED, login_id: body.login_id, retry: true, channel: outcome.channel ?? "unknown", switched: outcome.switched === true });

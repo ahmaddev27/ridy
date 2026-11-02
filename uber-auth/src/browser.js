@@ -634,7 +634,8 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
     }
 
     // fullLogin (docs/28 §11): the manager drives the WHOLE login in the stream, so nothing is
-    // typed or clicked here. Park on the auth page; the server only admits this for a cold start.
+    // typed or clicked here. Park on the auth page; the server only admits this on a FRESH browser
+    // (cold, or replacing a dead session), never the held one: `cold` here means "build a fresh browser".
     if (full && cobrowse) {
       session.fullLogin = true;
       return { status: STATUS.CHALLENGE_REQUIRED, session };

@@ -144,11 +144,73 @@ test("a fullLogin start needs no email (the manager types it in the stream); oth
   assert.equal(admitStart({ company_key: "7", cold: true, proxy_url: "http://u:p@h:8080" }, ctx).http, 422);
 });
 
-test("canFullLogin needs full + co-browse preconditions + a cold start", async () => {
+test("canFullLogin needs full + co-browse preconditions + a fresh-browser start", async () => {
   const { canFullLogin } = await import("../src/loginPolicy.js");
-  assert.equal(canFullLogin({ full: true, cobrowseOk: true, cold: true }), true);
-  for (const k of ["full", "cobrowseOk", "cold"]) {
-    assert.equal(canFullLogin({ full: true, cobrowseOk: true, cold: true, [k]: false }), false, k);
+  assert.equal(canFullLogin({ full: true, cobrowseOk: true, fresh: true }), true);
+  for (const k of ["full", "cobrowseOk", "fresh"]) {
+    assert.equal(canFullLogin({ full: true, cobrowseOk: true, fresh: true, [k]: false }), false, k);
   }
-  assert.equal(canFullLogin({ full: undefined, cobrowseOk: true, cold: true }), false);
+  assert.equal(canFullLogin({ full: undefined, cobrowseOk: true, fresh: true }), false);
+});
+
+const PROXY = "http://u:p@h:8080";
+const fullBody = { company_key: "7", full: true, proxy_url: PROXY };
+
+test("a full start for a warm-dead company (needs_otp / down / logging_in / nothing held) builds a FRESH browser", () => {
+  for (const state of [SESSION_STATE.NEEDS_OTP, SESSION_STATE.DOWN, SESSION_STATE.LOGGING_IN, null]) {
+    const r = admitStart(fullBody, { ...on(state), coldEnabled: false });
+    assert.deepEqual([r.ok, r.fresh, r.cold], [true, true, false], String(state));
+  }
+});
+
+test("a full start is refused for an ACTIVE session, cold flag or not", () => {
+  for (const coldEnabled of [true, false]) {
+    const r = admitStart({ ...fullBody, cold: true }, { ...on(SESSION_STATE.ACTIVE), coldEnabled });
+    assert.deepEqual([r.ok, r.http, r.body.status], [false, 409, "session_active"]);
+  }
+});
+
+test("a full start needs the proxy, and a claimed COLD one still needs the cold flag", () => {
+  assert.equal(admitStart({ company_key: "7", full: true }, on(SESSION_STATE.NEEDS_OTP)).body.status, "no_proxy");
+  assert.equal(admitStart({ ...fullBody, cold: true }, { ...on(null), coldEnabled: false }).body.status, "no_session");
+  const cold = admitStart({ ...fullBody, cold: true }, { ...on(null), coldEnabled: true });
+  assert.deepEqual([cold.ok, cold.cold, cold.fresh], [true, true, true]);
+});
+
+test("a non-full start is unchanged: a dead company is never given a fresh browser", () => {
+  const r = admitStart({ email: "a@b.de", company_key: "7", proxy_url: PROXY }, { ...on(SESSION_STATE.DOWN), coldEnabled: true });
+  assert.equal(r.ok, false);
+  assert.equal(r.body.status, "no_session");
+});
+
+test("adoptGuard: a fresh login replaces a dead session but never an active one", async () => {
+  const { adoptGuard, adoptMode } = await import("../src/loginPolicy.js");
+  assert.equal(adoptMode({ cold: true, fresh: true }), "cold");
+  assert.equal(adoptMode({ fresh: true }), "fresh");
+  assert.equal(adoptMode({}), null);
+  for (const dead of [SESSION_STATE.NEEDS_OTP, SESSION_STATE.DOWN, SESSION_STATE.LOGGING_IN]) {
+    assert.deepEqual(adoptGuard("fresh", dead), { refuse: false, backend: null }, dead);
+  }
+  assert.deepEqual(adoptGuard("fresh", SESSION_STATE.ACTIVE), { refuse: true, backend: null });
+  // Nothing held locally: the backend must be asked, and only an ACTIVE session blocks.
+  assert.deepEqual(adoptGuard("fresh", null), { refuse: false, backend: "active" });
+  // Cold stays strict: any held session refuses, an empty slot still asks the backend for any row.
+  assert.equal(adoptGuard("cold", SESSION_STATE.NEEDS_OTP).refuse, true);
+  assert.deepEqual(adoptGuard("cold", null), { refuse: false, backend: "any" });
+  assert.deepEqual(adoptGuard(null, SESSION_STATE.ACTIVE), { refuse: false, backend: null });
+});
+
+test("adoptAndCapture replaces a dead (needs_otp) entry and closes its old browser", async () => {
+  const closed = [];
+  const m = new PersistentSessionManager({
+    driver: { keepWarm: async () => ({ ok: true, orgVerified: true, cookies: [{ name: "sid", value: "fresh" }] }), close: async (e) => closed.push(e.handle) },
+    post: async () => "posted",
+  });
+  const dead = { id: "dead" };
+  await m.adopt("7", dead, { orgUuid: "o" });
+  m.sessions.get("7").state = SESSION_STATE.NEEDS_OTP;
+  const out = await m.adoptAndCapture("7", { id: "fresh" }, { orgUuid: "o", cookies: [{ name: "sid", value: "fresh" }] });
+  assert.deepEqual(out, { captured: true });
+  assert.equal(m.stateOf("7"), SESSION_STATE.ACTIVE);
+  assert.deepEqual(closed, [dead]);
 });

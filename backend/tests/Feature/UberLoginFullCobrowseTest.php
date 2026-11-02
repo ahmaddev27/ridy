@@ -169,11 +169,46 @@ class UberLoginFullCobrowseTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_me_exposes_full_cobrowse_only_for_a_cold_cobrowse_company(): void
+    public function test_me_exposes_full_cobrowse_for_cold_and_warm_dead_but_never_active(): void
     {
         $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.full_cobrowse_available', true);
 
-        SessionBrowser::create(['tenant_id' => $this->tenant->id, 'state' => 'needs_otp', 'last_seen_at' => now()]);
+        $browser = SessionBrowser::create(['tenant_id' => $this->tenant->id, 'state' => 'needs_otp', 'last_seen_at' => now()]);
+        $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.full_cobrowse_available', true);
+
+        $browser->update(['state' => 'down']);
+        $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.full_cobrowse_available', true);
+
+        $browser->update(['state' => 'active', 'last_seen_at' => now()]);
         $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.full_cobrowse_available', false);
+    }
+
+    public function test_a_warm_dead_company_without_the_cobrowse_flag_gets_no_window(): void
+    {
+        $other = $this->makeTenant('Plain', false);
+        SessionBrowser::create(['tenant_id' => $other->id, 'state' => 'needs_otp', 'last_seen_at' => now()]);
+        Sanctum::actingAs($this->makeUser($other));
+
+        $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.full_cobrowse_available', false);
+    }
+
+    public function test_a_warm_dead_company_starts_a_full_login_that_is_not_cold(): void
+    {
+        SessionBrowser::create(['tenant_id' => $this->tenant->id, 'state' => 'needs_otp', 'last_seen_at' => now()]);
+        $this->fakeFull();
+
+        $this->postJson('/api/v1/uber-login/start', [])->assertStatus(202)
+            ->assertJsonPath('data.challenge', 'human_login');
+        Http::assertSent(fn (HttpRequest $r) => str_ends_with($r->url(), '/login/start')
+            && $r['full'] === true && $r['cobrowse'] === true && $r['cold'] === false);
+    }
+
+    public function test_an_active_company_is_refused_and_uber_auth_is_never_called(): void
+    {
+        SessionBrowser::create(['tenant_id' => $this->tenant->id, 'state' => 'active', 'last_seen_at' => now()]);
+        Http::fake();
+
+        $this->postJson('/api/v1/uber-login/start', ['email' => 'ops@acme.de'])->assertStatus(409)->assertJsonPath('data.failure', 'session_active');
+        Http::assertNothingSent();
     }
 }
