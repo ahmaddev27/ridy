@@ -6,14 +6,18 @@ import { KeyRound, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { OtpInput } from "@/components/ui/otp-input";
+import { CobrowseViewer, type CobrowseEndReason } from "@/components/connections/cobrowse-viewer";
 import { UberAutoCodeSettings } from "@/components/connections/uber-auto-code-settings";
 import { useI18n } from "@/lib/i18n/context";
 import { apiErrorMessage } from "@/lib/api/error-message";
 import {
   cancelUberLogin,
+  closeCobrowse,
   getUberLoginStatus,
+  openCobrowse,
   startUberLogin,
   submitUberLoginCode,
+  type CobrowseTicket,
   type UberLoginFailure,
   type UberLoginStatus,
 } from "@/lib/api/uber-login";
@@ -52,10 +56,13 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [wrongCode, setWrongCode] = useState(false);
+  const [ticket, setTicket] = useState<CobrowseTicket | null>(null);
+  const [cobrowseFailed, setCobrowseFailed] = useState(false);
 
   const waiting = status?.state === "awaiting_code";
   // Uber (or the sign-in service) is still working, e.g. after a timeout: never race it.
-  const inFlight = status?.state === "starting" || status?.state === "submitting";
+  const challenge = status?.state === "awaiting_challenge";
+  const inFlight = status?.state === "starting" || status?.state === "submitting" || challenge;
   const remaining = useRemaining(status?.expires_at ?? null, waiting);
 
   // While in flight, just watch: it settles to connected, or expires back to idle.
@@ -90,6 +97,35 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
       setCode("");
     }
   }, [waiting, remaining]);
+
+  // Leaving the challenge step (solved, failed, cancelled) always tears the viewer down.
+  useEffect(() => {
+    if (!challenge) setTicket(null);
+  }, [challenge]);
+
+  // Back from the puzzle: re-read the status now (the flow continues to the code step).
+  const onCobrowseEnded = (reason: CobrowseEndReason) => {
+    if (reason !== "solved") return;
+    setTicket(null);
+    getUberLoginStatus().then(setStatus).catch(() => {});
+  };
+
+  async function openPuzzle() {
+    setBusy(true);
+    setCobrowseFailed(false);
+    try {
+      setTicket(await openCobrowse());
+    } catch {
+      setCobrowseFailed(true); // 409 / 429 / 503 cobrowse_unavailable
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function closePuzzle() {
+    setTicket(null);
+    void closeCobrowse().catch(() => {});
+  }
 
   async function run(action: () => Promise<UberLoginStatus>) {
     setBusy(true);
@@ -132,7 +168,30 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
             </p>
           )}
 
-          {inFlight ? (
+          {challenge ? (
+            <div className="mt-3 space-y-3">
+              {ticket ? (
+                <CobrowseViewer ticket={ticket} onEnded={onCobrowseEnded} onClose={closePuzzle} />
+              ) : status?.cobrowse_available && !cobrowseFailed ? (
+                <>
+                  <p className="text-sm text-ink-muted">{c("cobrowseHint")}</p>
+                  <Button onClick={openPuzzle} disabled={busy}>
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {busy ? c("cobrowseOpening") : c("cobrowseOpen")}
+                  </Button>
+                </>
+              ) : (
+                <p role="alert" className="rounded-xl bg-danger-bg px-3 py-2 text-sm text-danger-fg">
+                  {c("codeFail_cobrowse_unavailable")}
+                </p>
+              )}
+              {!ticket && (
+                <Button variant="secondary" onClick={cancel} disabled={busy}>
+                  {c("codeCancel")}
+                </Button>
+              )}
+            </div>
+          ) : inFlight ? (
             <p className="mt-3 flex items-center gap-2 text-sm text-ink-muted">
               <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> {c("codePending")}
             </p>

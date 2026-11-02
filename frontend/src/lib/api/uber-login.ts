@@ -1,7 +1,7 @@
 import { ApiError, apiFetch } from "./client";
 
 /** What the backend reports for the company's current passwordless Uber login (docs/27). */
-export type UberLoginState = "idle" | "starting" | "awaiting_code" | "submitting" | "connected" | "failed";
+export type UberLoginState = "idle" | "starting" | "awaiting_code" | "awaiting_challenge" | "submitting" | "connected" | "failed";
 
 export type UberLoginFailure =
   | "passkey_unsupported"
@@ -14,7 +14,10 @@ export type UberLoginFailure =
   | "session_active"
   | "no_session"
   | "no_proxy"
-  | "capture_failed";
+  | "capture_failed"
+  | "challenge_timeout"
+  | "challenge_failed"
+  | "cobrowse_unavailable";
 
 export type UberLoginStatus = {
   state: UberLoginState;
@@ -26,6 +29,10 @@ export type UberLoginStatus = {
   retry?: boolean;
   /** Uber or the sign-in service is still working (timeout): wait, do not start again. */
   pending?: boolean;
+  /** Set while state is awaiting_challenge (docs/28). */
+  challenge?: "arkose";
+  /** A person can solve the puzzle through the live view. */
+  cobrowse_available?: boolean;
 };
 
 type Envelope = { data: UberLoginStatus };
@@ -75,4 +82,21 @@ export async function rotateUberInboundAddress(): Promise<string> {
     withCsrf: true,
   });
   return res.data.inbound_address;
+}
+
+/** Co-browse ticket (docs/28 section 8): the viewer connects to ws_url and sends the ticket first. */
+export type CobrowseTicket = {
+  ws_url: string;
+  ticket: string;
+  expires_at: string;
+  viewport: { w: number; h: number };
+  session_ttl: number;
+};
+
+export async function openCobrowse(): Promise<CobrowseTicket> {
+  return (await apiFetch<{ data: CobrowseTicket }>("/api/v1/uber-login/cobrowse", { method: "POST", withCsrf: true })).data;
+}
+
+export async function closeCobrowse(): Promise<void> {
+  await apiFetch("/api/v1/uber-login/cobrowse", { method: "DELETE", withCsrf: true });
 }
