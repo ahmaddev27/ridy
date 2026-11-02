@@ -18,6 +18,7 @@ function fakePage({ url = "https://auth.uber.com/login", texts = [], frame = nul
       if (!visible) throw new Error("timeout");
     },
     fill: async (v) => calls.filled.push(v),
+    inputValue: async () => calls.filled.at(-1) ?? "",
     innerText: async () => body,
     click: async () => calls.advanced++,
   });
