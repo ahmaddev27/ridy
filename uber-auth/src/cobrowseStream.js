@@ -2,9 +2,10 @@
 // holds the Arkose puzzle) out, mouse events in. Productionised from the Spike 0 mechanics.
 //
 // Scope is deliberately narrow: the CDP session is attached to the Page only (never Target.*,
-// Browser.*, Network.*), the only command we ever send is Page.start/stopScreencast,
-// Page.screencastFrameAck and Input.dispatchMouseEvent, and nothing the client sends can reach
-// Page.navigate or Runtime.evaluate. Frames are forwarded and forgotten: never logged or stored.
+// Browser.*, Network.*), the only commands we ever send are Page.start/stopScreencast,
+// Page.screencastFrameAck, Input.dispatchMouseEvent and — in fullLogin mode only (docs/28 §11) —
+// Input.dispatchKeyEvent for a whitelisted key or a single character. Nothing the client sends can
+// reach Page.navigate or Runtime.evaluate. Frames are forwarded and forgotten: never logged/stored.
 
 import { isAllowedNavUrl, toViewportPx } from "./cobrowseGuard.js";
 
@@ -46,6 +47,17 @@ export async function openCdpStream({ session, sendFrame, onViolation }) {
       const button = kind === "move" && !buttons ? "none" : "left";
       const params = { type: MOUSE_TYPE[kind], x: px, y: py, button, buttons, clickCount: kind === "move" ? 0 : 1 };
       cdp.send("Input.dispatchMouseEvent", params).catch(() => {});
+    },
+    // fullLogin mode only (docs/28 §11): one parsed keystroke -> a keyDown+keyUp pair. A character
+    // carries `text` (so React controlled inputs update); a named key carries the virtual-key code.
+    // The caller only reaches this when the stream is in fullLogin mode; never in Arkose mode.
+    key(k) {
+      const press = (extra) => {
+        cdp.send("Input.dispatchKeyEvent", { type: "keyDown", ...extra }).catch(() => {});
+        cdp.send("Input.dispatchKeyEvent", { type: "keyUp", ...extra }).catch(() => {});
+      };
+      if (k.kind === "char") return press({ text: k.c, key: k.c });
+      press({ key: k.key, code: k.code, windowsVirtualKeyCode: k.vk, nativeVirtualKeyCode: k.vk });
     },
     async stop() {
       guards.detach();

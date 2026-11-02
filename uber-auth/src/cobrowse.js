@@ -2,8 +2,9 @@
 // a WebSocket upgrade on /cobrowse/ws; every other request is a 404. The internal /login/* listener
 // (X-Auth-Secret) is a different server on a different port.
 //
-// Protocol (frozen in docs/28 §8):
-//   client -> server  text  {t:"auth",ticket}  (first, <=5s)  then  {t:"m",k,x,y}  mouse only
+// Protocol (frozen in docs/28 §8, extended for fullLogin in §11):
+//   client -> server  text  {t:"auth",ticket}  (first, <=5s)  then  {t:"m",k,x,y}  (mouse)
+//                           and, for a fullLogin stream only, {t:"k",c} | {t:"k",n}  (keyboard)
 //   server -> client  text  {t:"hello",w,h} | {t:"end",reason}      binary = one JPEG frame
 // Close codes: 4401 auth refused, 4409 viewer/company already live, 4429 capacity,
 //              1008 protocol violation (off-schema / oversize / too fast / binary), 1000 normal end.
@@ -14,7 +15,7 @@
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { createJtiStore, deriveKey, loginHash, verifyTicket } from "./cobrowseTicket.js";
-import { MAX_AUTH_BYTES, MAX_MSG_BYTES, auditLine, createRateLimiter, parseAuth, parseMouse } from "./cobrowseGuard.js";
+import { MAX_AUTH_BYTES, MAX_MSG_BYTES, auditLine, createRateLimiter, parseAuth, parseKey, parseMouse } from "./cobrowseGuard.js";
 
 export const AUTH_WAIT_MS = 5000;
 export const IDLE_MS = 60_000;
@@ -79,6 +80,9 @@ export function createCobrowse({ secret, allowedOrigins, max, findPending, openS
   function open(ws, payload, found) {
     const rec = {
       ws, sid: payload.sid, uid: payload.uid, companyKey: String(payload.tid), loginId: found.loginId, entry: found.entry,
+      // Keyboard relay is admitted ONLY for a fullLogin stream (docs/28 §11). In Arkose mode this is
+      // false, so any keystroke stays off-schema and closes the socket exactly as before.
+      keyboard: !!found.entry?.fullLogin,
       startedAt: now(), lastInputAt: now(), frames: 0, ended: false, stream: null,
     };
     bySid.set(rec.sid, rec);
@@ -157,9 +161,19 @@ export function createCobrowse({ secret, allowedOrigins, max, findPending, openS
       }
       if (!limiter.allow() || data.length > MAX_MSG_BYTES) return violate(ws, rec, end);
       const m = parseMouse(text);
-      if (!m) return violate(ws, rec, end);
-      rec.lastInputAt = now();
-      rec.stream?.mouse(m.k, m.x, m.y);
+      if (m) {
+        rec.lastInputAt = now();
+        return void rec.stream?.mouse(m.k, m.x, m.y);
+      }
+      // Keyboard is accepted only for a fullLogin stream; in Arkose mode it falls through to violate.
+      if (rec.keyboard) {
+        const k = parseKey(text);
+        if (k) {
+          rec.lastInputAt = now();
+          return void rec.stream?.key(k);
+        }
+      }
+      return violate(ws, rec, end);
     });
   }
 

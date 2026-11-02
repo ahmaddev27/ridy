@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import WebSocket from "ws";
 import { createJtiStore, deriveKey, loginHash, signTicket, verifyTicket } from "../src/cobrowseTicket.js";
-import { auditLine, createRateLimiter, isAllowedNavUrl, parseAuth, parseMouse, toViewportPx } from "../src/cobrowseGuard.js";
+import { auditLine, createRateLimiter, isAllowedNavUrl, parseAuth, parseKey, parseMouse, toViewportPx } from "../src/cobrowseGuard.js";
 import { createCobrowse, createCobrowseServer } from "../src/cobrowse.js";
 
 const SECRET = "test-secret";
@@ -85,6 +85,30 @@ test("guard: only the two fixed client messages parse", () => {
   ]) assert.equal(parseMouse(bad), null, bad);
 });
 
+test("guard: keyboard (fullLogin) parses a printable char and a whitelisted key only", () => {
+  assert.deepEqual(parseKey('{"t":"k","c":"a"}'), { kind: "char", c: "a" });
+  assert.deepEqual(parseKey('{"t":"k","c":"@"}'), { kind: "char", c: "@" });
+  assert.deepEqual(parseKey('{"t":"k","c":"ä"}'), { kind: "char", c: "ä" });
+  const bs = parseKey('{"t":"k","n":"Backspace"}');
+  assert.equal(bs.kind, "key");
+  assert.equal(bs.name, "Backspace");
+  assert.equal(bs.vk, 8);
+  for (const bad of [
+    '{"t":"k","c":"ab"}', // more than one char
+    '{"t":"k","c":""}', // empty
+    '{"t":"k","c":"\\u0003"}', // a control char (Ctrl-C)
+    '{"t":"k","c":"\\u007f"}', // DEL
+    '{"t":"k","n":"Control"}', // modifier, not whitelisted
+    '{"t":"k","n":"F5"}', // function key, not whitelisted
+    '{"t":"k","n":"a"}', // not a named key
+    '{"t":"k","c":"a","n":"Enter"}', // extra key
+    '{"t":"k","c":"a","ctrl":true}', // smuggled modifier
+    '{"t":"k"}', // nothing to type
+    '{"t":"key","c":"a"}', // wrong type tag
+    '{"t":"m","k":"down","x":0,"y":0}', // a mouse message is not a key
+  ]) assert.equal(parseKey(bad), null, bad);
+});
+
 test("guard: normalised coordinates clamp to the viewport", () => {
   assert.deepEqual(toViewportPx(0, 0, 1280, 800), { px: 0, py: 0 });
   assert.deepEqual(toViewportPx(1, 1, 1280, 800), { px: 1279, py: 799 });
@@ -111,9 +135,9 @@ test("audit: only whitelisted fields can ever be logged", () => {
 });
 
 // --- websocket integration (no browser: stream + tick are injected) ---------------------
-async function harness({ max = 3, entryCompany = "7" } = {}) {
-  const log = { mouse: [], ended: [], audit: [], stopped: 0, opened: 0 };
-  const entry = { companyKey: entryCompany, session: {}, challenge: true };
+async function harness({ max = 3, entryCompany = "7", fullLogin = false } = {}) {
+  const log = { mouse: [], keys: [], ended: [], audit: [], stopped: 0, opened: 0 };
+  const entry = { companyKey: entryCompany, session: {}, challenge: true, fullLogin };
   let tickResult = "challenge";
   const cobrowse = createCobrowse({
     secret: SECRET,
@@ -122,7 +146,7 @@ async function harness({ max = 3, entryCompany = "7" } = {}) {
     findPending: (lh) => (lh === loginHash("login-1") ? { loginId: "login-1", entry } : null),
     openStream: async () => {
       log.opened++;
-      return { w: 1280, h: 800, start: async () => {}, mouse: (k, x, y) => log.mouse.push([k, x, y]), stop: async () => { log.stopped++; } };
+      return { w: 1280, h: 800, start: async () => {}, mouse: (k, x, y) => log.mouse.push([k, x, y]), key: (k) => log.keys.push(k), stop: async () => { log.stopped++; } };
     },
     tick: async () => tickResult,
     onEnd: async (_rec, reason) => log.ended.push(reason),
@@ -167,6 +191,43 @@ test("ws: a good ticket opens the stream, relays mouse, and says hello", async (
   await new Promise((r) => setTimeout(r, 40));
   assert.equal(h.log.stopped, 1);
   assert.ok(h.log.audit.some((l) => l.includes("cobrowse.opened")) && h.log.audit.some((l) => l.includes("cobrowse.closed")));
+  h.close();
+});
+
+test("ws: a fullLogin stream relays whitelisted keystrokes to the page", async () => {
+  const h = await harness({ fullLogin: true });
+  const c = await authed(h);
+  c.ws.send('{"t":"k","c":"a"}');
+  c.ws.send('{"t":"k","n":"Enter"}');
+  await new Promise((r) => setTimeout(r, 40));
+  assert.equal(h.log.keys.length, 2);
+  assert.deepEqual(h.log.keys[0], { kind: "char", c: "a" });
+  assert.equal(h.log.keys[1].kind, "key");
+  assert.equal(h.log.keys[1].name, "Enter");
+  assert.equal(h.log.ended.length, 0); // still live
+  c.ws.close();
+  h.close();
+});
+
+test("ws: a fullLogin stream still rejects a non-whitelisted key as a violation", async () => {
+  const h = await harness({ fullLogin: true });
+  const c = await authed(h);
+  c.ws.send('{"t":"k","n":"Control"}');
+  await c.closed;
+  await new Promise((r) => setTimeout(r, 40));
+  assert.deepEqual(h.log.ended, ["violation"]);
+  assert.equal(h.log.keys.length, 0);
+  h.close();
+});
+
+test("ws: an Arkose (non-fullLogin) stream rejects ALL keyboard input as a violation", async () => {
+  const h = await harness(); // fullLogin defaults to false
+  const c = await authed(h);
+  c.ws.send('{"t":"k","c":"a"}');
+  await c.closed;
+  await new Promise((r) => setTimeout(r, 40));
+  assert.deepEqual(h.log.ended, ["violation"]);
+  assert.equal(h.log.keys.length, 0);
   h.close();
 });
 
