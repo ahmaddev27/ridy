@@ -344,3 +344,29 @@ test("rescue stops after 2 posts per episode, and a recovery resets the budget",
   await m.tick();
   assert.equal(posted.length, 3);
 });
+
+test("forceDrop closes even an ACTIVE entry, forgets it, and leaves the company re-adoptable", async () => {
+  const driver = fakeDriver();
+  const { m } = manager(driver);
+  await m.adopt("acme", { id: 1 });
+  assert.equal(await m.forceDrop("acme"), SESSION_STATE.ACTIVE);
+  assert.deepEqual(driver.closed, ["acme"]);
+  assert.equal(m.has("acme"), false);
+  assert.equal(m.stateOf("acme"), null);
+  await m.adopt("acme", { id: 2 });
+  assert.equal(m.stateOf("acme"), SESSION_STATE.ACTIVE);
+});
+
+test("forceDrop is a no-op when nothing is held", async () => {
+  const driver = fakeDriver();
+  const { m } = manager(driver);
+  assert.equal(await m.forceDrop("ghost"), null);
+  assert.deepEqual(driver.closed, []);
+});
+
+test("releaseIfDead still never touches an ACTIVE entry (forceDrop is the only path)", async () => {
+  const { m } = manager(fakeDriver());
+  await m.adopt("acme", { id: 1 });
+  assert.equal(await m.releaseIfDead("acme", "other-fp"), null);
+  assert.equal(m.has("acme"), true);
+});

@@ -351,6 +351,22 @@ export class PersistentSessionManager {
   }
 
   /**
+   * Admin-forced disconnect: close the company's browser in ANY state (ACTIVE included) and forget
+   * it, so it is no longer warm, no longer "active", and a fresh login/seed can adopt the company
+   * again. The ONE deliberate exception to "never auto-touch an active browser": callers must be
+   * the authenticated admin path only. Resolves the state the entry was in, or null if none held.
+   */
+  async forceDrop(companyKey) {
+    const entry = this.sessions.get(companyKey);
+    if (!entry) return null;
+    const previous = entry.state;
+    await this.remove(companyKey);
+    this.revives.delete(companyKey);
+    this.log(`[${companyKey}] force-dropped by admin (was ${previous})`);
+    return previous;
+  }
+
+  /**
    * Drop a DOWN / NEEDS_OTP entry so the caller can re-seed it from the backend's
    * newest jar. Resolves the state it was in, or null when nothing was released.
    *  - NEEDS_OTP: only when the wanted row's jar (`rowFingerprint`) differs from the

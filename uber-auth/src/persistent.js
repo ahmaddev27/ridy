@@ -5,11 +5,11 @@
 // every company). server.js calls adoptLogin() on a successful sign-in and reads
 // statusList() for /sessions; the tick + status loops run for the process lifetime.
 
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, unlink } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { config } from "./config.js";
 import { PersistentSessionManager, SESSION_STATE, jarFingerprint } from "./sessionManager.js";
-import { createWarmDriver } from "./warmDriver.js";
+import { createWarmDriver, statePath as driverStatePath } from "./warmDriver.js";
 import { launchBrowser, newStealthContext } from "./browser.js";
 import { scopeCookies } from "./cookieScope.js";
 
@@ -93,6 +93,15 @@ export const sessionState = (companyKey) => manager.stateOf(companyKey);
 export const markLoggingIn = (companyKey) => manager.markLoggingIn(companyKey);
 export const handleOf = (companyKey) => manager.get(companyKey)?.handle ?? null;
 export const markNeedsOtp = (companyKey) => manager.markNeedsOtp(companyKey);
+/**
+ * Admin force re-link: stop the company's browser whatever its state and delete its saved
+ * state file (so a restart does not resurrect the dead session). Resolves the new state.
+ */
+export async function forceDrop(companyKey) {
+  await manager.forceDrop(String(companyKey));
+  await unlink(driverStatePath(companyKey)).catch(() => {});
+  return SESSION_STATE.NOT_SET_UP;
+}
 export const liveSessionCount = () => manager.liveCount();
 
 /**

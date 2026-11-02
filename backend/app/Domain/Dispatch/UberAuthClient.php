@@ -88,6 +88,17 @@ class UberAuthClient
     }
 
     /**
+     * Admin force re-link only: stop the company's persistent browser even when it is ACTIVE.
+     * Answers {ok:true,state} on success, {status:'error'|'pending'} otherwise.
+     *
+     * @return array<string, mixed>
+     */
+    public function dropSession(Tenant $tenant): array
+    {
+        return $this->post('/session/drop', ['company_key' => (string) $tenant->id], timeout: 15);
+    }
+
+    /**
      * @param  array<string, mixed>  $body
      * @return array<string, mixed>
      */
