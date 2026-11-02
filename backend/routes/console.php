@@ -73,6 +73,7 @@ Schedule::command('fleet:check-sync')->everyFiveMinutes()->withoutOverlapping(10
 // depend on the extension. Global flag UBER_SERVER_SYNC, OFF by default: the commands
 // queue nothing until it is on. One queued job per company, jittered (see the commands).
 Schedule::command('fleet:sync-earnings')->everyFiveMinutes()->withoutOverlapping(10);
+Schedule::command('fleet:sync-metrics')->everyFifteenMinutes()->withoutOverlapping(20);
 Schedule::command('fleet:sync-vehicles')->hourly()->withoutOverlapping(10);
 
 // Detect a silently-stalled offer stream: sync is live and idle drivers are online,

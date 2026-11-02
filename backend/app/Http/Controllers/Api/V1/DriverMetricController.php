@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\SupplierNetworkRecorder;
+use App\Domain\Fleet\DriverMetricWriter;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\DriverMetric;
 use App\Http\Controllers\Concerns\AuthorizesTenantResource;
 use App\Http\Controllers\Controller;
-use App\Support\EpochTime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,7 +21,7 @@ class DriverMetricController extends Controller
     use AuthorizesTenantResource;
 
     /** Upsert a driver's metrics for a window (posted by the extension). */
-    public function store(Request $request, SupplierNetworkRecorder $recorder): JsonResponse
+    public function store(Request $request, SupplierNetworkRecorder $recorder, DriverMetricWriter $writer): JsonResponse
     {
         $data = $request->validate([
             'driver_uuid' => ['required', 'string'],
@@ -44,25 +44,7 @@ class DriverMetricController extends Controller
 
         $recorder->metric((int) $driver->tenant_id, $data, $driver->name);
 
-        $metric = DriverMetric::updateOrCreate(
-            [
-                'driver_id' => $driver->id,
-                // Berlin wall-clock like every other column, not Carbon's UTC.
-                'period_start' => EpochTime::fromMs($data['period_start']),
-                'period_end' => EpochTime::fromMs($data['period_end']),
-            ],
-            [
-                'tenant_id' => $driver->tenant_id,
-                'earnings' => $data['earnings'] ?? null,
-                'earnings_label' => $data['earnings_label'] ?? null,
-                'trips' => $data['trips'] ?? null,
-                'hours_online' => $data['hours_online'] ?? null,
-                'hours_on_trip' => $data['hours_on_trip'] ?? null,
-                'acceptance_rate' => $data['acceptance_rate'] ?? null,
-                'cancellation_rate' => $data['cancellation_rate'] ?? null,
-                'synced_at' => now(),
-            ],
-        );
+        $metric = $writer->write($driver, $data);
 
         return response()->json(['data' => $metric]);
     }

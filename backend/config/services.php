@@ -54,6 +54,8 @@ return [
         // Server-side Fleet Hub pulls (earnings, vehicles) with the stored supplier jar,
         // independent of the Chrome extension. OFF unless UBER_SERVER_SYNC is true.
         'server_sync' => filter_var(env('UBER_SERVER_SYNC', false), FILTER_VALIDATE_BOOLEAN),
+        // Pause between per-driver GetEarnerMetrics calls (ms), far below any rate limit.
+        'metrics_delay_ms' => (int) env('UBER_METRICS_DELAY_MS', 400),
     ],
 
     // A fixed OTP/activation code for testing (any environment). Leave empty in a

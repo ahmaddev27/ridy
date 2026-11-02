@@ -5,6 +5,7 @@ namespace App\Domain\Fleet\FleetHub;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Fleet\Earnings\UberEarningsException;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -31,17 +32,53 @@ class FleetHubClient
      */
     public function query(UberFleetSession $session, string $proxyUrl, string $operation, string $document, array $variables): array
     {
+        $response = $this->send($session, $proxyUrl, '/graphql', [
+            'operationName' => $operation,
+            'query' => $document,
+            'variables' => $variables,
+        ]);
+
+        $json = $response->json();
+        if (! is_array($json) || ! empty($json['errors'])) {
+            throw new UberEarningsException('uber_graphql_error', 'Fleet Hub returned a GraphQL error.');
+        }
+
+        return $json;
+    }
+
+    /**
+     * A REST POST on Fleet Hub (e.g. /api/GetEarnerMetrics), same auth, proxy,
+     * timeout and 401/403 mapping as {@see query()}.
+     *
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed> the decoded JSON body
+     *
+     * @throws UberEarningsException
+     */
+    public function post(UberFleetSession $session, string $proxyUrl, string $path, array $body): array
+    {
+        $json = $this->send($session, $proxyUrl, $path, $body)->json();
+        if (! is_array($json)) {
+            throw new UberEarningsException('unexpected_response', 'Fleet Hub answered with a non-JSON body.');
+        }
+
+        return $json;
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     *
+     * @throws UberEarningsException
+     */
+    private function send(UberFleetSession $session, string $proxyUrl, string $path, array $body): Response
+    {
         try {
             $response = Http::withHeaders($this->headers($session))
                 ->withOptions(['proxy' => $proxyUrl])
                 ->timeout(self::TIMEOUT_SECONDS)
                 ->acceptJson()
                 ->asJson()
-                ->post(rtrim((string) config('services.uber.supplier_base_url'), '/').'/graphql', [
-                    'operationName' => $operation,
-                    'query' => $document,
-                    'variables' => $variables,
-                ]);
+                ->post(rtrim((string) config('services.uber.supplier_base_url'), '/').$path, $body);
         } catch (ConnectionException) {
             throw new UberEarningsException('uber_unreachable', 'Fleet Hub did not answer.');
         }
@@ -53,12 +90,7 @@ class FleetHubClient
             throw new UberEarningsException('uber_error', 'Fleet Hub answered '.$response->status().'.');
         }
 
-        $json = $response->json();
-        if (! is_array($json) || ! empty($json['errors'])) {
-            throw new UberEarningsException('uber_graphql_error', 'Fleet Hub returned a GraphQL error.');
-        }
-
-        return $json;
+        return $response;
     }
 
     /** @return array<string, string> */
