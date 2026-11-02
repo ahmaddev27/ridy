@@ -314,3 +314,11 @@ active --(Uber يطرد الجلسة: renew فاشل)--> needs_otp --notify(need
 5. ملف `proxy` في #266: تأكيد اسم الدالة/الإعداد الذي يُعاد استخدامه في `browser.js::startLogin`.
 6. مساعد تأكيد Gmail forwarding: هل نبنيه الآن أم دليل يدوي؟ (مقترح: دليل يدوي أولاً).
 7. تعارض لحظي: دخول جديد يفتح جلسة أوبر ثانية قد يطرد الجلسة الحالية للمتصفح الدائم — يُختبر في P1.
+
+---
+
+## 12. تعدد قنوات التحقق (SMS ثم WhatsApp ثم Email) — انحراف عن §3
+- uber-auth يختار أول قناة كود (SMS أولاً) بدل Email فقط، ولا يضغط Google/Passkey أبداً. القناة تُعاد في `channel` (sms|whatsapp|email|call|unknown).
+- التبديل **كسول**: فقط عند رفض الكود وعودة أوبر لصفحة الخيارات؛ `submitMfa` يرسل كوداً جديداً عبر القناة التالية ويرجع `mfa_required {retry, channel, switched:true}`. لا أثر على المسار الناجح.
+- الباك-إند: `switched` لا يستهلك `MAX_CODE_TRIES` (يُحتسب الرفض على نفس القناة فقط)؛ `channel` يظهر في `GET /uber-login/status`. استنفاد القنوات = `wrong_code` (ثم مسار الإضافة).
+- بعد إرسال الكود: `settleAfterSubmit` بسقف 8ث (بدل detectStep ~38ث). النصوص تقريبية (de/en) وتُضبط من سجل `[pwless-nav]`.

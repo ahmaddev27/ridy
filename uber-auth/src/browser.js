@@ -24,6 +24,7 @@ export const STATUS = {
   NO_SESSION: "no_session", // a passwordless start with nothing to ride and no cold clearance
   NO_PROXY: "no_proxy", // a cold login needs the company's residential proxy
   CHALLENGE_REQUIRED: "challenge_required", // Arkose shown and co-browse is on: the browser stays open for a human
+  WRONG_CODE: "wrong_code", // every code channel tried, none accepted
   ERROR: "error",
 };
 
@@ -248,8 +249,11 @@ async function hasArkoseChallenge(page) {
 async function hasChannelChoice(page) {
   try {
     return await page
+      // Only the method-chooser HEADING, never the bare "Weitere Optionen"/"More options" button:
+      // that button also sits on the OTP and identifier screens, so matching it mis-read the OTP
+      // screen as `channel_choice` right after the code was submitted.
       .getByText(
-        /willkommen zur(ü|u)ck|welcome back|w(ä|a)hle eine andere|andere bestätigungs?methode|another (verification )?method|weitere optionen|more options/i,
+        /willkommen zur(ü|u)ck|welcome back|w(ä|a)hle eine andere|andere bestätigungs?methode|w(ä|a)hle eine (verifizierungs|bestätigungs)|another (verification )?method|choose (a|another) (verification )?method/i,
       )
       .first()
       .isVisible();
@@ -344,9 +348,12 @@ export async function finishChallenge(session, step) {
 // Uber offers a passkey first when the account has one, yet the SAME account can still get a
 // code through "try another way". All selectors are TEXT based (case-insensitive) and live here
 // so they are easy to tune from the `[pwless-nav]` log lines. Sign-in UI only: no Uber write.
-export const NAV_MAX_HOPS = 3;
-const NAV_CLICK_WAIT_MS = 3000; // how long a control may take to appear
-const NAV_SETTLE_MS = 5000; // how long a click may take to land on a recognisable step
+export const NAV_MAX_HOPS = 4; // channel attempts per navigation (sms, whatsapp, email, call)
+const NAV_CLICK_WAIT_MS = 1200; // how long a control may take to appear
+const NAV_SETTLE_MS = 1200; // how long a menu-opening click may take to land on a step
+const NAV_CODE_WAIT_MS = 6000; // a channel click sends a code: allow Uber time to render the boxes (polls fast, returns early)
+const SUBMIT_SETTLE_MS = 8000; // after typing a code (replaces the ~38s detectStep): landed/chooser/arkose exit at once; only a genuine same-channel wrong code waits this out
+const POLL_MS = 200;
 const NAV_CLICKABLE = 'button, a, [role="button"], [role="link"], [role="option"], [role="radio"], [role="menuitem"], li, label';
 
 // "Open the method list" controls. Tuned from the live German UI ("Weitere Optionen" ->
@@ -354,10 +361,19 @@ const NAV_CLICKABLE = 'button, a, [role="button"], [role="link"], [role="option"
 // SMS button ("Code per Textnachricht versenden") and would have sent the code to a phone.
 export const ANOTHER_WAY_RE =
   /try another way|another way|more options|other options|weitere optionen|alle optionen( anzeigen)?|use another method|sign in another way|verify another way|use a code|sign in with a code|w(ä|a)hle eine andere|andere (option|bestätigungs?methode)|anders anmelden|stattdessen/i;
-// The email option within the method list ("E-Mail"). The adjacent "send code"/"code senden"
-// forms never match the German SMS/WhatsApp items, which put words between "Code" and "senden".
-export const EMAIL_OPTION_RE =
-  /e-?mail|send code|get a code|verification code|code to your email|per e-?mail|code senden/i;
+// Email only: a bare "code senden" also matched the SMS item ("SMS mit Anmeldecode senden").
+export const EMAIL_OPTION_RE = /e-?mail/i;
+
+// Code channels in the order we try them: EMAIL first (the manager has the mailbox, and the auto
+// email-forward needs it); SMS / WhatsApp / call are automatic fallbacks when a code is rejected.
+// Google / passkey / social buttons are NEVER code channels (OAuth is not a code).
+export const CHANNELS = [
+  { name: "email", re: EMAIL_OPTION_RE },
+  { name: "sms", re: /sms|text message|textnachricht|anmeldecode.*senden/i },
+  { name: "whatsapp", re: /whatsapp/i },
+  { name: "call", re: /anruf|phone call|call me|voice/i },
+];
+export const NEVER_CLICK_RE = /google|passkey|apple|facebook|sicherheitsschl/i;
 
 const navLog = (m) => console.log(`[pwless-nav] ${m}`);
 
@@ -392,73 +408,113 @@ async function dumpScreen(page, where) {
   }
 }
 
-/** First visible+enabled clickable whose text matches `re`; returns {el, text} or null. Never logs PII. */
-async function findControl(page, re) {
-  const deadline = Date.now() + NAV_CLICK_WAIT_MS;
+/**
+ * Shortest-text visible+enabled clickable matching `re` (the leaf control, not a container
+ * that happens to hold several options). Controls naming Google/passkey are never returned.
+ * Polls fast for `waitMs`; waitMs 0 = a single look. Never logs PII.
+ */
+async function findControl(page, re, waitMs = NAV_CLICK_WAIT_MS) {
+  const deadline = Date.now() + waitMs;
   do {
     try {
-      const all = await page.locator(NAV_CLICKABLE).filter({ hasText: re }).all();
-      for (const el of all) {
-        if ((await isVisible(el)) && (await el.isEnabled().catch(() => false))) {
-          const text = ((await el.innerText().catch(() => "")) || "").replace(/\s+/g, " ").trim().slice(0, 60);
-          return { el, text };
-        }
+      let best = null;
+      for (const el of await page.locator(NAV_CLICKABLE).filter({ hasText: re }).all()) {
+        if (!(await isVisible(el)) || !(await el.isEnabled().catch(() => false))) continue;
+        const text = ((await el.innerText().catch(() => "")) || "").replace(/\s+/g, " ").trim().slice(0, 60);
+        if (NEVER_CLICK_RE.test(text)) continue;
+        if (!best || text.length < best.text.length) best = { el, text };
       }
+      if (best) return best;
     } catch {
       /* page mid-navigation: retry until the deadline */
     }
-    await page.waitForTimeout(400);
+    if (Date.now() < deadline) await page.waitForTimeout(POLL_MS);
   } while (Date.now() < deadline);
   return null;
 }
 
 /** Click the control; returns the (truncated) matched label, or null when none is clickable. */
-export async function clickControl(page, re) {
-  const found = await findControl(page, re);
+export async function clickControl(page, re, waitMs = NAV_CLICK_WAIT_MS) {
+  const found = await findControl(page, re, waitMs);
   if (!found) return null;
   await found.el.click({ timeout: 3000 }).catch(() => {});
   return found.text || "(no text)";
 }
 
-/** Poll briefly after a click for a decisive step; null = still on a passkey/unknown screen. */
-async function settleStep(page) {
-  const deadline = Date.now() + NAV_SETTLE_MS;
+/** Poll briefly after a click for a decisive step; null = still on a passkey/chooser/unknown screen. */
+async function settleStep(page, ms = NAV_SETTLE_MS) {
+  const deadline = Date.now() + ms;
   while (Date.now() < deadline) {
     if (!/auth\.uber|\/(auth|login|oauth)/i.test(page.url())) return "landed";
     if (await hasArkoseChallenge(page)) return "arkose";
     if (await isVisible(otpField(page))) return "otp";
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(POLL_MS);
   }
   return null;
 }
 
 /**
- * From a passkey step OR a "Welcome back" method chooser, try to reach the email code step
- * (<= NAV_MAX_HOPS clicks). Each hop prefers the email/code option (we may already be on the
- * method list), else opens the "another way" list. Returns the final step
- * ('otp'|'landed'|'arkose'|'passkey'). `ops` is injectable for tests.
+ * Click the first UNTRIED code channel (CHANNELS order). If none is visible, open the
+ * "more options" menu once and look again at once (no settle wait for a menu).
+ * Returns the channel name or null. `ops.click(page, re, waitMs)` is injectable.
  */
-export async function navigatePastPasskey(page, ops = {}) {
+export async function selectChannel(page, tried, ops = {}) {
   const click = ops.click ?? clickControl;
-  const settle = ops.settle ?? settleStep;
-  navLog("navigating to the email code step");
-  for (let hop = 1; hop <= NAV_MAX_HOPS; hop++) {
-    let kind = "email-option";
-    let label = await click(page, EMAIL_OPTION_RE);
-    if (!label) {
-      kind = "another-way";
-      label = await click(page, ANOTHER_WAY_RE);
+  for (let pass = 0; pass < 2; pass++) {
+    for (const ch of CHANNELS) {
+      if (tried.has(ch.name)) continue;
+      if (await click(page, ch.re, pass ? NAV_CLICK_WAIT_MS : 0)) return ch.name;
     }
-    if (!label) {
-      navLog(`hop ${hop}: no email-option/another-way control found; falling back to passkey_unsupported`);
-      return "passkey";
-    }
-    const step = await settle(page);
-    navLog(`hop ${hop}: clicked ${kind} "${label}"; step after=${step ?? "passkey/unknown"}`);
-    if (step) return step;
+    if (pass === 0 && !(await click(page, ANOTHER_WAY_RE, 0))) return null;
   }
-  navLog(`gave up after ${NAV_MAX_HOPS} hops; falling back to passkey_unsupported`);
-  return "passkey";
+  return null;
+}
+
+/**
+ * From a method chooser, send a code via the next untried channel and wait for the code
+ * step. Adds every attempted channel to `tried`. Returns {step, channel}; step is
+ * 'otp'|'landed'|'arkose' or 'passkey' when no channel is left / none reached the code step.
+ */
+export async function reachCodeStep(page, tried, ops = {}) {
+  const settle = ops.settle ?? settleStep;
+  for (let hop = 1; hop <= NAV_MAX_HOPS; hop++) {
+    const channel = await selectChannel(page, tried, ops);
+    if (!channel) {
+      navLog(`hop ${hop}: no untried code channel found (tried=${[...tried].join(",") || "-"})`);
+      return { step: "passkey", channel: null };
+    }
+    tried.add(channel);
+    const step = await settle(page, NAV_CODE_WAIT_MS);
+    navLog(`hop ${hop}: channel=${channel}; step after=${step ?? "none"}`);
+    if (step) return { step, channel };
+  }
+  return { step: "passkey", channel: null };
+}
+
+/** Passkey/chooser start: reach the code step. Returns {step, channel}. */
+export async function navigatePastPasskey(page, ops = {}) {
+  navLog("step=passkey; trying to reach the code step");
+  return reachCodeStep(page, ops.tried ?? new Set(), ops);
+}
+
+/** A rejected code lands on the chooser: its heading, or a code-channel button, with no code boxes. */
+async function showsChannelOptions(page) {
+  if (await isVisible(otpField(page))) return false;
+  if (await hasChannelChoice(page)) return true;
+  for (const ch of CHANNELS) if (await findControl(page, ch.re, 0)) return true;
+  return false;
+}
+
+/** After submitting a code: 'landed'|'arkose'|'chooser' (code rejected)|'otp' (still on boxes)|null. */
+async function settleAfterSubmit(page, ms = SUBMIT_SETTLE_MS) {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    if (!/auth\.uber|\/(auth|login|oauth)/i.test(page.url())) return "landed";
+    if (await hasArkoseChallenge(page)) return "arkose";
+    if (await showsChannelOptions(page)) return "chooser";
+    await page.waitForTimeout(POLL_MS);
+  }
+  return (await isVisible(otpField(page))) ? "otp" : null;
 }
 
 /** The logged-in fleet account's uuid (= partnerUUID / org). */
@@ -557,13 +613,18 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
       return { status: STATUS.SUCCESS, result, session };
     }
     if (step === "otp") {
-      return { status: STATUS.MFA_REQUIRED, session };
+      session.channelsTried = new Set(); // Uber's default channel is unknown to us
+      session.channel = "unknown";
+      return { status: STATUS.MFA_REQUIRED, session, channel: "unknown" };
     }
-    // "Welcome back" method chooser or a passkey-first account: navigate to the email code step.
     if ((step === "channel_choice" || step === "passkey") && !password) {
-      step = await navigatePastPasskey(page);
+      const reached = await navigatePastPasskey(page, { tried: (session.channelsTried = new Set()) });
+      step = reached.step;
       if (step === "landed") return { status: STATUS.SUCCESS, result: await captureResult(context, page), session };
-      if (step === "otp") return { status: STATUS.MFA_REQUIRED, session };
+      if (step === "otp") {
+        session.channel = reached.channel;
+        return { status: STATUS.MFA_REQUIRED, session, channel: reached.channel };
+      }
       // If choosing a method itself triggers Arkose, fall through to the arkose handler below,
       // which keeps the browser open for co-browse when enabled (instead of closing to `blocked`).
     }
@@ -600,28 +661,44 @@ export async function submitMfa(session, code) {
     navLog("submitMfa: typing the code");
     await typeOtp(page, code);
     await advance(page, "otp");
-    const step = await detectStep(page);
-    navLog(`submitMfa: step after the code = ${step}`);
-    if (step === "landed") {
-      const result = await captureResult(context, page);
-      navLog("submitMfa: landed -> captured; SUCCESS");
-      // Leave the browser open for the persistent manager to adopt.
-      return { status: STATUS.SUCCESS, result, session };
-    }
-    if (step === "otp") {
-      // Still on the code step — wrong/expired code.
-      navLog("submitMfa: still on otp -> wrong/expired code (retry)");
-      return { status: STATUS.MFA_REQUIRED, retry: true };
-    }
 
-    await closeSession(session);
-    if (step === "arkose") return { status: STATUS.BLOCKED, message: "arkose" };
-    return { status: STATUS.ERROR, message: `unexpected step: ${step}` };
+    const step = await settleAfterSubmit(page);
+    if (step === "chooser") return await nextChannel(session);
+    return await finishSubmit(session, step);
   } catch (e) {
     navLog(`submitMfa: threw ${e.message}`);
     await closeSession(session).catch(() => {});
     return { status: STATUS.ERROR, message: e.message };
   }
+}
+
+async function finishSubmit(session, step) {
+  if (step === "landed") {
+    // Leave the browser open for the persistent manager to adopt.
+    return { status: STATUS.SUCCESS, result: await captureResult(session.context, session.page), session };
+  }
+  if (step === "otp") {
+    // Still on the code boxes: a genuine wrong code on the same channel.
+    return { status: STATUS.MFA_REQUIRED, retry: true, channel: session.channel ?? "unknown" };
+  }
+  await closeSession(session);
+  if (step === "arkose") return { status: STATUS.BLOCKED, message: "arkose" };
+  return { status: STATUS.ERROR, message: `unexpected step: ${step}` };
+}
+
+/** The code was rejected and Uber is back on the chooser: lazily try the next untried channel. */
+async function nextChannel(session) {
+  const tried = (session.channelsTried ??= new Set());
+  if (session.channel && session.channel !== "unknown") tried.add(session.channel);
+  navLog(`code rejected; tried=${[...tried].join(",")}; switching channel`);
+  const { step, channel } = await reachCodeStep(session.page, tried);
+  if (step === "otp") {
+    session.channel = channel;
+    return { status: STATUS.MFA_REQUIRED, retry: true, channel, switched: true };
+  }
+  if (step === "landed" || step === "arkose") return finishSubmit(session, step);
+  await closeSession(session);
+  return { status: STATUS.WRONG_CODE, message: "channels_exhausted" };
 }
 
 /**
