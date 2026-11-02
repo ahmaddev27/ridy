@@ -689,11 +689,42 @@ async function finishSubmit(session, step) {
   return { status: STATUS.ERROR, message: `unexpected step: ${step}` };
 }
 
-/** The code was rejected and Uber is back on the chooser: lazily try the next untried channel. */
+/**
+ * Code attempts allowed on ONE channel (initial send + resends) before falling through to the
+ * next. A single mistyped or expired code is a typo, not a dead channel, so we resend on the SAME
+ * channel and let the user try again; only then move on (email -> sms -> whatsapp -> call). The
+ * backend caps the TOTAL same-channel tries (MAX_CODE_TRIES) independently.
+ */
+const MAX_ATTEMPTS_PER_CHANNEL = 2;
+
+/** Every code channel except `keep` — forces reachCodeStep to resend on the SAME channel. */
+const channelsExcept = (keep) => new Set(CHANNELS.map((c) => c.name).filter((n) => n !== keep));
+
+/**
+ * A rejected code lands back on the method chooser. Resend on the SAME channel first (one wrong
+ * code must not burn the whole login); only after MAX_ATTEMPTS_PER_CHANNEL on it switch to the next
+ * untried channel. A same-channel resend returns a plain retry (the backend counts it as a user
+ * try); a switch is flagged `switched` so the backend does not and tells the user where the new
+ * code went.
+ */
 async function nextChannel(session) {
   const tried = (session.channelsTried ??= new Set());
-  if (session.channel && session.channel !== "unknown") tried.add(session.channel);
-  navLog(`code rejected; tried=${[...tried].join(",")}; switching channel`);
+  const attempts = (session.channelAttempts ??= {});
+  const cur = session.channel && session.channel !== "unknown" ? session.channel : null;
+
+  if (cur) {
+    attempts[cur] = (attempts[cur] ?? 0) + 1;
+    if (attempts[cur] < MAX_ATTEMPTS_PER_CHANNEL) {
+      navLog(`code rejected on ${cur}; resending a fresh code on the same channel (resend #${attempts[cur]})`);
+      const resent = await reachCodeStep(session.page, channelsExcept(cur));
+      if (resent.step === "otp") return { status: STATUS.MFA_REQUIRED, retry: true, channel: cur };
+      if (resent.step === "landed" || resent.step === "arkose") return finishSubmit(session, resent.step);
+      // The same channel no longer renders a code step — fall through and switch.
+    }
+    tried.add(cur);
+  }
+
+  navLog(`switching channel; tried=${[...tried].join(",") || "-"}`);
   const { step, channel } = await reachCodeStep(session.page, tried);
   if (step === "otp") {
     session.channel = channel;
