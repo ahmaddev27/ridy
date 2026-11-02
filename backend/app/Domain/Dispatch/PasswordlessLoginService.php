@@ -5,6 +5,7 @@ namespace App\Domain\Dispatch;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Dispatch\Models\SessionBrowser;
 use App\Domain\Dispatch\Models\UberFleetSession;
+use App\Domain\Ops\AlertService;
 use App\Domain\Tenancy\Models\Tenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -67,6 +68,9 @@ class PasswordlessLoginService
     /** Tickets one puzzle may be opened with (the viewer can drop and reconnect). */
     private const MAX_TICKETS = 3;
 
+    /** De-dup key for the "automated navigation to the code step broke" ops incident. */
+    private const NAV_ALERT_KEY = 'uber-pwless-nav';
+
     private const UBER_AUTH_FAILURES = ['passkey_unsupported', 'blocked', 'channel_unavailable', 'password_required', 'session_active', 'no_session', 'no_proxy', 'capture_failed', 'wrong_code'];
 
     /** uber-auth answers that mean "still running", never "failed". */
@@ -78,6 +82,7 @@ class PasswordlessLoginService
         private readonly AuditLogger $audit,
         private readonly PasswordlessLoginSettings $settings,
         private readonly CobrowseTicketSigner $signer,
+        private readonly AlertService $alerts,
     ) {}
 
     /** @return array<string, mixed> */
@@ -222,6 +227,7 @@ class PasswordlessLoginService
     private function settleStart(Tenant $tenant, array $record, array $answer): array
     {
         $status = $answer['status'] ?? 'error';
+        $this->trackNavHealth($status);
         if ($status === 'mfa_required' && is_string($answer['login_id'] ?? null)) {
             $record = ['state' => self::STATE_AWAITING_CODE, 'login_id' => $answer['login_id'], 'channel' => $answer['channel'] ?? 'unknown'] + $record;
             $this->store->put($tenant->id, $record);
@@ -535,6 +541,38 @@ class PasswordlessLoginService
         $loginId = $record['login_id'] ?? null;
         if (is_string($loginId) && $loginId !== '') {
             $this->client->cancel($tenant, $loginId);
+        }
+    }
+
+    /**
+     * The automated walk from the email to the code step is the fragile part: if Uber changes
+     * the sign-in UI, wording or language, detectStep stops recognising the page and the start
+     * ends `channel_unavailable`. Raise an ops incident the first time that happens — it means
+     * the selectors/texts in uber-auth/src/browser.js need updating — and clear it the moment a
+     * start reads the page again (reaches the code step, the Arkose puzzle, a passkey or signs in).
+     * Co-browse and the manual code relay are unaffected either way, so this is "needs attention",
+     * not an outage. Inconclusive outcomes (pending, uber-auth unreachable) leave the incident as-is.
+     */
+    private function trackNavHealth(string $status): void
+    {
+        if ($status === 'channel_unavailable') {
+            $this->alerts->open(
+                self::NAV_ALERT_KEY,
+                'uber_pwless_nav',
+                'Uber passwordless login: automated navigation failed',
+                "uber-auth reached Uber's sign-in but could not find the expected code or method step "
+                .'(detectStep returned unknown). Uber has most likely changed the login UI, wording or '
+                .'language, so the automated email→code path no longer completes on its own. Update the '
+                .'selectors/texts in uber-auth/src/browser.js (detectStep / selectChannel / reachCodeStep). '
+                .'Co-browse and the manual code relay still work in the meantime.'
+            );
+
+            return;
+        }
+
+        // Reached and read the page (code step, Arkose, passkey, or signed in): navigation is healthy.
+        if (in_array($status, ['mfa_required', 'challenge_required', 'success', 'blocked', 'passkey_unsupported', 'bad_credentials'], true)) {
+            $this->alerts->resolve(self::NAV_ALERT_KEY);
         }
     }
 
