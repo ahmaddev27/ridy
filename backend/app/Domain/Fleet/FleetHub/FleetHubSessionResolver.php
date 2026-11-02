@@ -51,6 +51,10 @@ class FleetHubSessionResolver
      */
     public function eligibleTenants(): Collection
     {
+        // Optional allowlist for a gradual rollout: validate the server-side sync on one
+        // company before letting it run fleet-wide (empty = every eligible company).
+        $allow = (array) config('services.uber.server_sync_tenants', []);
+
         return UberFleetSession::withoutGlobalScopes()
             ->with('tenant')
             ->where('status', UberFleetSession::STATUS_ACTIVE)
@@ -63,7 +67,8 @@ class FleetHubSessionResolver
                 && $s->tenant !== null
                 && $s->tenant->stateReason() === null
                 && is_string($s->tenant->proxy_url)
-                && $s->tenant->proxy_url !== '')
+                && $s->tenant->proxy_url !== ''
+                && ($allow === [] || in_array((string) $s->tenant_id, $allow, true)))
             ->map(fn (UberFleetSession $s) => $s->tenant)
             ->values();
     }
