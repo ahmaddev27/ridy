@@ -629,6 +629,13 @@ export async function submitMfa(session, code) {
 
     await closeSession(session);
     if (step === "arkose") return { status: STATUS.BLOCKED, message: "arkose" };
+    // A wrong/expired code bounces the account to the "Welcome back" chooser (Google/SMS, no more
+    // e-mail) — one-shot, unrecoverable in this session. Report it cleanly so the manager just
+    // starts a fresh connect for a new code, instead of a raw "unexpected step" error.
+    if (step === "channel_choice" || step === "passkey") {
+      navLog("submitMfa: code rejected, session degraded to the chooser -> wrong_code");
+      return { status: STATUS.BAD_CREDENTIALS, message: "wrong_code" };
+    }
     return { status: STATUS.ERROR, message: `unexpected step: ${step}` };
   } catch (e) {
     navLog(`submitMfa: threw ${e.message}`);
