@@ -1,6 +1,8 @@
 # 25 — Auto-decline rules ("Early decline" / رفض مبكر)
 
-**Status:** design, approved by owner 2026-10-31. Build in phases; pilot on ONE company.
+**Status:** built + live (phases 1–4). Admin-control layer added 2026-11-03 — the company
+admin enables/disables it per driver and edits each driver's criteria (see the HANDOFF
+change log). Pilot on ONE company.
 
 A driver sets standing rules (min fare, cities, distance). When a matching offer
 arrives, Reidey declines it from the dispatch panel **automatically** — within
@@ -50,10 +52,14 @@ opt-in. Update AGENTS.md in the same change that lands the engine.
 
 ## Data model
 
-- `tenants.settings['auto_decline']['enabled']` (bool) — the COMPANY has the feature
-  (mirrors `dispatch_reject`). Absent = off. Implies `dispatch_reject.enabled`
-  (a decline needs a live dispatch session).
-- `drivers.auto_decline` (JSON, nullable) — the driver's own config:
+- **Company gate:** there is NO separate `auto_decline` company flag — the feature rides
+  on `tenants.settings['dispatch_reject']['enabled']` (unified 2026-10-31;
+  `Tenant::autoDeclineFeatureEnabled()` returns `dispatchRejectEnabled()`).
+- `drivers.auto_decline` (JSON, nullable) — per-driver config. **Two-level switch since
+  2026-11-03:** `admin_enabled` (the company admin's per-driver gate; absent/off locks the
+  driver out — they cannot self-enable) sits above `enabled` (the driver's own switch /
+  opt-out, effective only while admin-allowed). Effective-active =
+  `dispatch_reject AND admin_enabled AND enabled`. Shape:
   ```json
   {
     "enabled": true,
