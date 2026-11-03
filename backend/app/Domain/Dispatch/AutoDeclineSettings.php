@@ -67,12 +67,17 @@ class AutoDeclineSettings
      */
     public function adminUpdate(Driver $driver, array $data): array
     {
-        $adminEnabled = $driver->adminAutoDeclineEnabled();
+        $wasAdminEnabled = $driver->adminAutoDeclineEnabled();
+        $adminEnabled = $wasAdminEnabled;
         $enabled = $driver->autoDeclineEnabled();
 
         if (array_key_exists('admin_enabled', $data)) {
             $adminEnabled = (bool) $data['admin_enabled'];
-            $enabled = $adminEnabled ? true : $enabled;
+            // Activate only on a fresh switch-on (false -> true). A repeated `true` must NOT
+            // override a driver who has since opted out — only the admin's actual turn-on does.
+            if ($adminEnabled && ! $wasAdminEnabled) {
+                $enabled = true;
+            }
         }
 
         $this->store($driver, [
@@ -163,8 +168,9 @@ class AutoDeclineSettings
     }
 
     /**
-     * The current tenant's drivers that switched Early decline on, with their rules —
-     * read-only: the owner never edits a driver's rules.
+     * The current tenant's drivers that are ACTIVELY Early-declining (admin-allowed AND
+     * switched on), with their rules — read-only legacy list. A driver the admin has
+     * revoked (admin_enabled off) never fires, so it is excluded even if `enabled` stayed on.
      *
      * @return array<int, array{id: int, name: string, rules: array<string, array<string, mixed>>}>
      */
@@ -174,7 +180,7 @@ class AutoDeclineSettings
             ->whereNotNull('auto_decline')
             ->orderBy('name')
             ->get(['id', 'name', 'auto_decline'])
-            ->filter(fn (Driver $d) => $d->autoDeclineEnabled())
+            ->filter(fn (Driver $d) => $d->autoDeclineActive())
             ->map(fn (Driver $d) => ['id' => $d->id, 'name' => $d->name, 'rules' => $this->withDefaults($d->autoDeclineRules())])
             ->values()
             ->all();
