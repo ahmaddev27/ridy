@@ -47,15 +47,19 @@ class PasskeyAuthenticator
      * @template T of PasskeyHolder
      *
      * @param  array<string, mixed>  $credential  the client's answer, `toJSON()` shape
-     * @param  class-string<T>  $accountClass  the ONE identity this sign-in resolves; a credential of any other reads as unknown
+     * @param  class-string<T>|array<int, class-string<T>>  $accountClasses  the identities this sign-in may resolve; a credential of any other reads as unknown
+     * @param  PasskeyScope  $scope  the front door: only a credential enrolled for it matches (no default, on purpose)
      * @return T
      *
      * @throws ValidationException `ceremony_expired` | the generic refusal
      */
-    public function authenticate(string $ceremonyId, array $credential, string $accountClass): PasskeyHolder
+    public function authenticate(string $ceremonyId, array $credential, string|array $accountClasses, PasskeyScope $scope): PasskeyHolder
     {
-        if (! is_subclass_of($accountClass, PasskeyHolder::class)) {
-            throw new InvalidArgumentException("{$accountClass} cannot hold passkeys.");
+        $accountClasses = (array) $accountClasses;
+        foreach ($accountClasses as $accountClass) {
+            if (! is_subclass_of($accountClass, PasskeyHolder::class)) {
+                throw new InvalidArgumentException("{$accountClass} cannot hold passkeys.");
+            }
         }
 
         $optionsJson = $this->challenges->pull($ceremonyId);
@@ -72,7 +76,8 @@ class PasskeyAuthenticator
         $stored = WebauthnCredential::query()
             ->enabled()
             ->whereKey((string) ($credential['id'] ?? ''))
-            ->where('authenticatable_type', (new $accountClass)->getMorphClass())
+            ->where('scope', $scope->value)
+            ->whereIn('authenticatable_type', array_map(fn (string $class): string => (new $class)->getMorphClass(), $accountClasses))
             ->first();
 
         if ($stored === null) {
@@ -90,11 +95,23 @@ class PasskeyAuthenticator
         $stored->forceFill(['counter' => $counter, 'last_used_at' => now()])->save();
 
         $account = $stored->authenticatable;
-        if (! $account instanceof $accountClass) {
+        if (! $this->isAllowed($account, $accountClasses)) {
             throw self::refusal();
         }
 
         return $account;
+    }
+
+    /** @param  array<int, class-string>  $accountClasses */
+    private function isAllowed(?object $account, array $accountClasses): bool
+    {
+        foreach ($accountClasses as $class) {
+            if ($account instanceof $class) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

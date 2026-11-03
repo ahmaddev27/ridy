@@ -2,6 +2,7 @@
 
 namespace App\Domain\Auth\Webauthn\Models;
 
+use App\Domain\Auth\Webauthn\PasskeyScope;
 use Database\Factories\WebauthnCredentialFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -29,7 +30,7 @@ class WebauthnCredential extends Model
 
     protected $fillable = [
         'id', 'authenticatable_type', 'authenticatable_id', 'user_handle', 'counter', 'rp_id', 'origin',
-        'transports', 'aaguid', 'public_key', 'attestation_format', 'alias', 'last_used_at', 'disabled_at',
+        'transports', 'aaguid', 'public_key', 'attestation_format', 'alias', 'last_used_at', 'disabled_at', 'scope',
     ];
 
     protected $hidden = ['public_key', 'user_handle'];
@@ -39,6 +40,7 @@ class WebauthnCredential extends Model
         'transports' => 'array',
         'last_used_at' => 'datetime',
         'disabled_at' => 'datetime',
+        'scope' => PasskeyScope::class,
     ];
 
     public function authenticatable(): MorphTo

@@ -3,6 +3,7 @@
 namespace App\Domain\Auth\Webauthn\Concerns;
 
 use App\Domain\Auth\Webauthn\Models\WebauthnCredential;
+use App\Domain\Auth\Webauthn\PasskeyScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
@@ -28,6 +29,12 @@ trait HasWebauthnCredentials
     public function webauthnCredentials(): MorphMany
     {
         return $this->morphMany(WebauthnCredential::class, 'authenticatable');
+    }
+
+    /** Only the passkeys that open one front door (dashboard or app). */
+    public function webauthnCredentialsIn(PasskeyScope $scope): MorphMany
+    {
+        return $this->webauthnCredentials()->where('scope', $scope->value);
     }
 
     /** WebAuthn `user.name`: the email by default; a model without one overrides this. */

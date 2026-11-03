@@ -8,10 +8,11 @@ import { enrolPasskey } from "@/lib/passkey-enrol";
 import { useToast } from "@/components/toast";
 import { t } from "@/lib/i18n";
 
-// Per driver, not per device: on a shared phone each driver gets their own
-// one-time offer instead of inheriting someone else's answer.
-function dismissedKey(driverId: number | string): string {
-  return `passkey_offer_dismissed_${driverId}`;
+// Per principal, not per device: on a shared phone each driver/owner gets their
+// own one-time offer. The principal letter keeps a driver id and an owner (User)
+// id from colliding.
+function dismissedKey(id: number | string, isOwner: boolean): string {
+  return `passkey_offer_dismissed_${isOwner ? "o" : "d"}_${id}`;
 }
 
 /** Whether the one-time offer should be made: supported, never answered, none yet. */
@@ -28,7 +29,7 @@ async function shouldOffer(key: string): Promise<boolean> {
  * it never nags; Settings stays the place to add one later.
  */
 export function PasskeyOffer() {
-  const { passkeyOffer, closePasskeyOffer, driver } = useAuth();
+  const { passkeyOffer, closePasskeyOffer, driver, isOwner } = useAuth();
   const driverId = driver?.id;
   const toast = useToast();
   // The toast api is a fresh object per render: keep the effect keyed on the
@@ -38,7 +39,7 @@ export function PasskeyOffer() {
 
   useEffect(() => {
     if (!passkeyOffer || driverId == null) return;
-    const key = dismissedKey(driverId);
+    const key = dismissedKey(driverId, isOwner);
 
     async function enrol() {
       try {
@@ -63,7 +64,7 @@ export function PasskeyOffer() {
     }
 
     void offer();
-  }, [passkeyOffer, closePasskeyOffer, driverId]);
+  }, [passkeyOffer, closePasskeyOffer, driverId, isOwner]);
 
   return null;
 }

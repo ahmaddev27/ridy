@@ -59,6 +59,10 @@ class EnsureDashboardToken
             'POST api/v1/driver/fleet/devices',
             'DELETE api/v1/driver/fleet/devices',
             'POST api/v1/driver/fleet/account/deletion-request',
+            // The owner's app passkeys: enrol (two steps) and remove. The list is a GET.
+            'POST api/v1/driver/fleet/webauthn/register/options',
+            'POST api/v1/driver/fleet/webauthn/register',
+            'DELETE api/v1/driver/fleet/webauthn/credentials/{credential}',
         ],
         // El-Professor's pull: the roster read and the fleet whoami that lets it
         // check the token belongs to the fleet the operator named. Two exact
