@@ -920,3 +920,42 @@ html[data-glass="on"] .ui-table thead th { background: var(--surface-3); }
 .ui-table td:last-child { padding-inline-end: 18px; }
 .ui-table .r { text-align: end; }
 .ui-table .c { text-align: center; }
+
+/* ================================================================== *
+ * GLASS REDESIGN (issue #282) — Phase 5: auth shell glass card.
+ *
+ * Same mechanism as Phases 1–2: UNLAYERED rules scoped to html[data-glass="on"]
+ * so they win over the auth markup's Tailwind utilities without !important, and
+ * flag off is byte-for-byte the legacy auth look. Ported 1:1 from the prototype's
+ * auth CSS (`.auth` transparent over the ambient field; `.auth-form .inner` a
+ * translucent glass card — white edge + inner highlight + glass shadow, NO
+ * backdrop-filter since it is a content card). The form column loses its opaque
+ * surface + seam shadow so the ambient shows behind the floating card; the brand
+ * aside (its own column) is untouched. The card uses var(--surface) so the
+ * prefers-reduced-transparency / prefers-contrast fallbacks already make it solid
+ * for AA. Login/OTP/passkey markup, handlers and i18n keys are unchanged; only
+ * these hook classes were added to auth-layout.tsx.
+ * ================================================================== */
+html[data-glass="on"] .auth-shell,
+html[data-glass="on"] .auth-main { background: transparent; }
+html[data-glass="on"] .auth-main { box-shadow: none; }
+html[data-glass="on"] .auth-card {
+  padding: 32px;
+  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  border-radius: 26px;
+  box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--glass-shadow);
+}
+
+/* Driver invitation landing (/driver/activate) — a standalone public page whose
+ * centred panel is a raw div, not the shared Card primitive, so it needs its own
+ * hook to become the prototype's glass content card (translucent pane + white edge
+ * + inner highlight + glass shadow, NO backdrop-filter). The global ambient field
+ * (body::before) already shows behind it via the glass canvas. Flag-off keeps the
+ * legacy border-line + shadow-sm untouched. Keeps the markup's rounded-2xl radius
+ * and p-8; only the border colour and shadow are upgraded under the flag. */
+html[data-glass="on"] .driver-activate-card {
+  background: var(--surface);
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--glass-shadow);
+}

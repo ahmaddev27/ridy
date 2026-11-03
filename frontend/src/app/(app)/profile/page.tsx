@@ -169,7 +169,7 @@ function Field({
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
           autoComplete="off"
-          className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
+          className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
         />
       )}
     </div>

@@ -114,7 +114,7 @@ export function CodesLedger({ fetchCodes, exportCodes, showCollector = false, on
           <select
             value={status}
             onChange={(e) => onFilterChange(setStatus)(e.target.value as CodeStatus | "")}
-            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
+            className="ui-field rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink"
           >
             <option value="">{c("allStatuses")}</option>
             <option value="pending">{c("st_pending")}</option>
