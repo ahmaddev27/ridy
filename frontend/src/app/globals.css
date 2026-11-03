@@ -686,6 +686,106 @@ html[data-glass="on"] body::after {
   }
 }
 
+/* ================================================================== *
+ * GLASS REDESIGN (issue #278) — Phase 1: app shell.
+ *
+ * These rules are UNLAYERED on purpose (not inside @layer components): the
+ * shell markup carries Tailwind utilities like `bg-surface/80`, and unlayered
+ * rules win over the utilities layer regardless of specificity, so the glass
+ * recipe actually takes. They are still fully scoped to html[data-glass="on"],
+ * so with the flag off the shell is byte-for-byte the legacy look. Values are
+ * copied 1:1 from the owner-approved prototype's shell CSS (floating glass
+ * sidebar, sticky glass topbar, glass menus/drawer, blurred scrim, dark toast,
+ * semantic-token banners). Max two persistent blurred layers: sidebar + topbar.
+ * ================================================================== */
+
+/* Floating glass sidebar — persistent blurred layer 1 of 2. The app reveals it
+   from `lg` (1024px); only the look changes here, never the breakpoint/behaviour. */
+html[data-glass="on"] .app-sidebar {
+  margin: 10px;
+  height: calc(100dvh - 20px);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-2xl);
+  background: var(--glass-sheet);
+  box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--glass-shadow);
+  backdrop-filter: blur(22px) saturate(160%);
+}
+
+/* Nav items: translucent hover + frosted-white active chip with a primary icon. */
+html[data-glass="on"] .app-nav-item { border: 1px solid transparent; }
+html[data-glass="on"] .app-nav-item:hover { background: rgb(255 255 255 / 0.5); color: var(--ink); }
+html[data-glass="on"].dark .app-nav-item:hover { background: rgb(255 255 255 / 0.05); }
+html[data-glass="on"] .app-nav-item[data-active] {
+  background: rgb(255 255 255 / 0.82); color: var(--ink);
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-hi), 0 0 0 1px var(--line), 0 6px 16px -10px rgb(4 60 44 / 0.4);
+}
+html[data-glass="on"].dark .app-nav-item[data-active] {
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: var(--glass-hi), 0 0 0 1px var(--line);
+}
+html[data-glass="on"] .app-nav-item[data-active] svg { color: var(--primary); }
+
+/* Sticky glass topbar — persistent blurred layer 2 of 2. */
+html[data-glass="on"] .app-topbar {
+  background: color-mix(in srgb, var(--surface-solid) 52%, transparent);
+  backdrop-filter: blur(18px) saturate(170%);
+  border-bottom: 1px solid var(--line);
+}
+
+/* Mobile nav drawer (transient overlay): strong glass panel + blurred scrim. */
+html[data-glass="on"] .app-drawer-scrim {
+  background: var(--glass-scrim);
+  backdrop-filter: blur(6px) saturate(120%);
+}
+html[data-glass="on"] .app-drawer {
+  background: var(--glass-strong);
+  border-inline-end: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(28px) saturate(180%);
+}
+
+/* Menus / popovers (user menu, notifications bell) — strong glass, blur 26px. */
+html[data-glass="on"] .app-menu {
+  background: var(--glass-strong);
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--shadow-lg);
+  backdrop-filter: blur(26px) saturate(180%);
+}
+
+/* Banners on semantic tokens — soft tinted glass with an inset top highlight. */
+html[data-glass="on"] .app-banner {
+  margin: 14px 24px 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-lg);
+}
+html[data-glass="on"] .app-banner--warning {
+  background: color-mix(in srgb, var(--warning-bg) 78%, transparent);
+  color: var(--warning-fg);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5);
+}
+html[data-glass="on"] .app-banner--danger {
+  background: color-mix(in srgb, var(--danger-bg) 82%, transparent);
+  color: var(--danger-fg);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4);
+}
+/* Banner action button → secondary glass so it reads on the tinted surface. */
+html[data-glass="on"] .app-banner__btn {
+  background: var(--surface-solid); color: var(--ink);
+  border: 1px solid var(--line); box-shadow: var(--glass-hi);
+}
+html[data-glass="on"] .app-banner__btn:hover { background: var(--surface-2); }
+
+/* Toast — one dark glass surface with an emerald icon (prototype). ThemedToaster
+   adds this class and turns richColors off only while the flag is on. */
+html[data-glass="on"] .app-toast {
+  background: rgb(14 22 19 / 0.84);
+  color: #e9f2ee;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  backdrop-filter: blur(16px) saturate(160%);
+}
+html[data-glass="on"] .app-toast [data-icon] { color: var(--focus); }
+
 /* Fallbacks: solid surfaces, no blur, no grain. Opt-in by user preference
    (reduced transparency / more contrast) or when the browser can't blur. */
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
@@ -694,7 +794,13 @@ html[data-glass="on"] body::after {
   html[data-glass="on"] .glass-panel,
   html[data-glass="on"] .glass-topbar,
   html[data-glass="on"] .glass-scrim,
-  html[data-glass="on"] .glass-toast { backdrop-filter: none; }
+  html[data-glass="on"] .glass-toast,
+  html[data-glass="on"] .app-sidebar,
+  html[data-glass="on"] .app-topbar,
+  html[data-glass="on"] .app-drawer,
+  html[data-glass="on"] .app-drawer-scrim,
+  html[data-glass="on"] .app-menu,
+  html[data-glass="on"] .app-toast { backdrop-filter: none; }
   html[data-glass="on"] body::after { display: none; }
 }
 @media (prefers-contrast: more) {
