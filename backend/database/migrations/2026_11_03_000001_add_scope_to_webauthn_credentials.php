@@ -27,6 +27,15 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Before the scope column disappears, drop the app-scoped passkeys that belong to a
+        // dashboard User (the owner app passkeys). Without the column, scope-unaware code
+        // would accept them at the dashboard login — an app->dashboard escalation on rollback.
+        // Drivers keep theirs; they only ever sign into the app anyway.
+        DB::table('webauthn_credentials')
+            ->where('scope', 'app')
+            ->where('authenticatable_type', '!=', (new Driver)->getMorphClass())
+            ->delete();
+
         Schema::table('webauthn_credentials', function (Blueprint $table) {
             $table->dropIndex(['scope']);
             $table->dropColumn('scope');
