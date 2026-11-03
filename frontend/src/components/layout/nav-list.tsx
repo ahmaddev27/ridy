@@ -35,12 +35,10 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
   });
 
   return (
-    <nav className="flex-1 space-y-7 overflow-y-auto px-4 py-6 text-sm">
+    <>
       {groups.map((group) => (
-        <div key={group.title} className="space-y-1">
-          <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
-            {t(group.title)}
-          </p>
+        <nav key={group.title} className="nav-group" aria-label={t(group.title)}>
+          <div className="nav-label">{t(group.title)}</div>
           {group.items
             // A page the platform has not opened for this company is not shown.
             // The server refuses its routes anyway; this keeps the sidebar from
@@ -48,51 +46,41 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
             .filter((item) => !item.requiresElProfessor || user?.tenant?.elprofessor_enabled === true)
             .filter((item) => !item.requiresDispatchReject || user?.tenant?.dispatch_reject_enabled === true)
             .map((item) => {
-            // Active on the exact route or any nested route (e.g. a company
-            // detail page under /admin/companies). Index routes match exactly so
-            // they don't light up for their siblings' sub-pages.
-            const isIndex = item.href === "/admin" || item.href === "/dashboard";
-            const active =
-              pathname === item.href || (!isIndex && pathname.startsWith(item.href + "/"));
-            const Icon = item.icon;
-            // Live counts on the Inbox + Payment-requests links; others keep any static badge.
-            const liveCount =
-              item.href === "/admin/inbox" && unread > 0
-                ? unread
-                : item.href === "/admin/payment-requests" && pendingClaims > 0
-                  ? pendingClaims
-                  : null;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onNavigate}
-                data-active={active ? "true" : undefined}
-                className={cn(
-                  "app-nav-item flex items-center justify-between rounded-xl px-3 py-2.5 font-medium transition-colors",
-                  active
-                    ? "bg-primary text-primary-ink shadow-sm dark:bg-surface-2 dark:text-ink dark:ring-1 dark:ring-inset dark:ring-line-strong dark:shadow-none"
-                    : "text-ink-muted hover:bg-surface-2",
-                )}
-              >
-                <span className="flex items-center gap-3">
-                  <Icon className="h-4 w-4" />
-                  {t(item.label)}
-                </span>
-                {liveCount ? (
-                  <span className="min-w-5 rounded-full bg-primary px-1.5 py-0.5 text-center text-[10px] font-bold text-primary-ink">
-                    {liveCount}
-                  </span>
-                ) : item.badge ? (
-                  <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-semibold text-ink">
-                    {item.badge}
-                  </span>
-                ) : null}
-              </Link>
-            );
-          })}
-        </div>
+              // Active on the exact route or any nested route (e.g. a company
+              // detail page under /admin/companies). Index routes match exactly so
+              // they don't light up for their siblings' sub-pages.
+              const isIndex = item.href === "/admin" || item.href === "/dashboard";
+              const active = pathname === item.href || (!isIndex && pathname.startsWith(item.href + "/"));
+              const Icon = item.icon;
+              const label = t(item.label);
+              // Live counts on the Inbox + Payment-requests links; others keep any static badge.
+              const liveCount =
+                item.href === "/admin/inbox" && unread > 0
+                  ? unread
+                  : item.href === "/admin/payment-requests" && pendingClaims > 0
+                    ? pendingClaims
+                    : null;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  data-tip={label}
+                  className={cn("nav-item", active && "active")}
+                  aria-current={active ? "page" : undefined}
+                >
+                  <Icon />
+                  <span className="truncate label">{label}</span>
+                  {liveCount ? (
+                    <span className="count hot">{liveCount}</span>
+                  ) : item.badge ? (
+                    <span className="count">{item.badge}</span>
+                  ) : null}
+                </Link>
+              );
+            })}
+        </nav>
       ))}
-    </nav>
+    </>
   );
 }

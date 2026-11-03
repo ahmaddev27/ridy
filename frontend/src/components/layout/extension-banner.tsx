@@ -64,17 +64,14 @@ export function ExtensionBanner() {
   const message = t(`extBanner.${state}`);
 
   return (
-    <div className="app-banner app-banner--warning flex items-center gap-3 px-4 py-2 text-sm">
-      <AlertTriangle className="h-4 w-4 shrink-0" />
-      <span className="flex-1">{message}</span>
-      <Link
-        href="/connections"
-        className="app-banner__btn rounded-lg px-3 py-1 text-xs font-semibold"
-      >
+    <div className="banner warning">
+      <AlertTriangle />
+      <span className="grow">{message}</span>
+      <Link href="/connections" className="btn btn-secondary btn-sm">
         {t("extBanner.action")}
       </Link>
-      <button onClick={() => setDismissed(true)} className="rounded p-1 text-warning-fg hover:bg-warning-bg" aria-label={t("common.dismiss")}>
-        <X className="h-4 w-4" />
+      <button type="button" onClick={() => setDismissed(true)} className="icon-btn" aria-label={t("common.dismiss")}>
+        <X />
       </button>
     </div>
   );

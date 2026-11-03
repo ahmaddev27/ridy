@@ -309,6 +309,7 @@ driverUber: { title: "From Uber", hint: "Performance metrics as reported by Uber
   },
   dashboard: {
     onlineTitle: "Online drivers", online: "Online", onTrip: "On trip", onlineNone: "No drivers online right now.", refresh: "Refresh",
+    greeting: "Hello, {name}", fleetDayLine: "{date} · Fleet day since 04:00", viewOffers: "View offers", fullscreen: "Full screen", mapSub: "{n} drivers active", statOnlineFoot: "of {n} drivers", statOffersFoot: "since 04:00", statDriversFoot: "from Uber", fleetSynced: "Synced {date}",
     subTitle: "Subscription", subActive: "Active", subInactive: "Needs activation", subDaysLeft: "{n} days left", subDaysShort: "days left", subActivated: "Activated", subEnds: "Renews / ends", redeemCode: "Enter code", subQueued: "in queue · starts",
     statDrivers: "Drivers", statOnline: "Online now", statVehicles: "Vehicles", offersTrend: "Offers · last 7 days",
     statLinked: "Linked to Uber",
@@ -627,6 +628,7 @@ driverUber: { title: "Von Uber", hint: "Leistungskennzahlen, wie Uber sie für d
   },
   dashboard: {
     onlineTitle: "Fahrer online", online: "Online", onTrip: "Auf Fahrt", onlineNone: "Gerade sind keine Fahrer online.", refresh: "Aktualisieren",
+    greeting: "Guten Tag, {name}", fleetDayLine: "{date} · Flottentag seit 04:00 Uhr", viewOffers: "Angebote ansehen", fullscreen: "Vollbild", mapSub: "{n} Fahrer aktiv", statOnlineFoot: "von {n} Fahrern", statOffersFoot: "seit 04:00 Uhr", statDriversFoot: "aus Uber", fleetSynced: "Synchronisiert {date}",
     subTitle: "Abonnement", subActive: "Aktiv", subInactive: "Aktivierung nötig", subDaysLeft: "{n} Tage übrig", subDaysShort: "Tage übrig", subActivated: "Aktiviert", subEnds: "Verlängert / endet", redeemCode: "Code eingeben", subQueued: "in Warteschlange · ab",
     statDrivers: "Fahrer", statOnline: "Jetzt online", statVehicles: "Fahrzeuge", offersTrend: "Angebote · letzte 7 Tage",
     statLinked: "Mit Uber verknüpft",
@@ -943,6 +945,7 @@ driverUber: { title: "من أوبر", hint: "مقاييس الأداء كما ي
   },
   dashboard: {
     onlineTitle: "السائقين أونلاين", online: "أونلاين", onTrip: "على رحلة", onlineNone: "ما في سائقين أونلاين حالياً.", refresh: "تحديث",
+    greeting: "أهلاً، {name}", fleetDayLine: "{date} · يوم الأسطول من 04:00", viewOffers: "عرض العروض", fullscreen: "ملء الشاشة", mapSub: "{n} سائق نشط", statOnlineFoot: "من {n} سائق", statOffersFoot: "منذ 04:00", statDriversFoot: "من أوبر", fleetSynced: "تمت المزامنة {date}",
     subTitle: "الاشتراك", subActive: "نشط", subInactive: "يحتاج تفعيل", subDaysLeft: "باقي {n} يوم", subDaysShort: "يوم باقي", subActivated: "تاريخ التفعيل", subEnds: "التجديد / الانتهاء", redeemCode: "إدخال كود", subQueued: "بالانتظار · يبدأ",
     statDrivers: "السائقون", statOnline: "أونلاين الآن", statVehicles: "المركبات", offersTrend: "العروض · آخر 7 أيام",
     statLinked: "مربوطون بأوبر",
