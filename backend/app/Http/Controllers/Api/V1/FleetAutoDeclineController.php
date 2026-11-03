@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dispatch\AutoDeclineSettings;
+use App\Domain\Fleet\Models\Driver;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\FleetUpdateAutoDeclineRequest;
 use App\Http\Requests\FleetDayRange;
 use App\Http\Resources\DispatchOfferResource;
 use Illuminate\Http\JsonResponse;
@@ -12,8 +14,9 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Validation\Rule;
 
 /**
- * The owner dashboard's READ-ONLY view of Early decline (docs/25): which drivers use
- * it with which rules, and the fleet's Early-declined offers. No write path exists.
+ * The owner dashboard's view of Early decline (docs/25): which drivers use it with
+ * which rules, the fleet's Early-declined offers, and the admin's per-driver permission
+ * and rule control (the driver still owns their own on/off switch).
  */
 class FleetAutoDeclineController extends Controller
 {
@@ -27,6 +30,17 @@ class FleetAutoDeclineController extends Controller
             'feature_enabled' => $tenant?->autoDeclineFeatureEnabled() === true,
             'drivers' => $this->settings->enabledDrivers(),
         ]]);
+    }
+
+    public function driversWithState(Request $request): JsonResponse
+    {
+        return response()->json(['data' => $this->settings->allDriversWithState($request->user()->tenant)]);
+    }
+
+    /** `{driver}` binds through the tenant scope, so another tenant's driver is a 404. */
+    public function update(FleetUpdateAutoDeclineRequest $request, Driver $driver): JsonResponse
+    {
+        return response()->json(['data' => $this->settings->adminUpdate($driver, $request->validated())]);
     }
 
     public function history(Request $request): AnonymousResourceCollection

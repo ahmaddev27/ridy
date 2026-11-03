@@ -151,7 +151,7 @@ class OfferPushPathTest extends TestCase
         $tenant->forceFill(['settings' => array_merge($tenant->settings ?? [], ['auto_decline' => ['enabled' => true]])])->save();
 
         Driver::where('uber_driver_uuid', self::DRIVER_UUID)->update([
-            'auto_decline' => ['enabled' => true, 'rules' => ['min_fare' => ['enabled' => true, 'value_e2' => 1000]]],
+            'auto_decline' => ['admin_enabled' => true, 'enabled' => true, 'rules' => ['min_fare' => ['enabled' => true, 'value_e2' => 1000]]],
         ]);
 
         // The offer is €7.41, below the driver's €10.00 floor → Early-declined.
@@ -172,7 +172,7 @@ class OfferPushPathTest extends TestCase
         $tenant->forceFill(['settings' => array_merge($tenant->settings ?? [], ['auto_decline' => ['enabled' => true]])])->save();
 
         Driver::where('uber_driver_uuid', self::DRIVER_UUID)->update([
-            'auto_decline' => ['enabled' => true, 'rules' => ['min_fare' => ['enabled' => true, 'value_e2' => 500]]],
+            'auto_decline' => ['admin_enabled' => true, 'enabled' => true, 'rules' => ['min_fare' => ['enabled' => true, 'value_e2' => 500]]],
         ]);
 
         // €7.41 is ABOVE the €5.00 floor → no rule fires, the push goes out as usual.

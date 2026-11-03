@@ -361,6 +361,8 @@ export type AutoDeclineRules = {
 export type AutoDeclineConfig = {
   /** The COMPANY has the feature; without it the tab is not shown at all. */
   feature_enabled: boolean;
+  /** The company admin turned it on for THIS driver; false locks the master switch off. */
+  admin_enabled: boolean;
   enabled: boolean;
   rules: AutoDeclineRules;
   available_cities: string[];
