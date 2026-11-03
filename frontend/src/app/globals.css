@@ -34,6 +34,23 @@
   --warning-bg: #fffbeb; --warning-fg: #b45309; --warning-ring: #d97706;
   --info-bg: #eff6ff; --info-fg: #1d4ed8; --info-ring: #2563eb;
   --accent-bg: #f5f3ff; --accent-fg: #6d28d9; --accent-ring: #7c3aed;
+
+  /* Glass-redesign token names (epic #276). Legacy-compatible defaults so the
+     new utilities resolve sanely with the flag OFF; the real values live in the
+     html[data-glass="on"] block at the bottom of this file. */
+  --surface-solid: var(--surface);
+  --surface-3: #e8e8e5;
+  --primary-hover: #047857;
+  --primary-soft: #ecfdf5;
+  --primary-soft-ink: #047857;
+  --focus: #10b981;
+  --success-dot: var(--success-ring);
+  --danger-dot: var(--danger-ring);
+  --warning-dot: var(--warning-ring);
+  --info-dot: var(--info-ring);
+  --accent-dot: var(--accent-ring);
+  --neutral-bg: #f1f1ef; --neutral-fg: #5a616e; --neutral-dot: #8b909b;
+  --c1: #059669; --c2: #2563eb; --c3: #d97706; --c4: #7c3aed; --c5: #8b909b;
 }
 
 .dark {
@@ -55,6 +72,13 @@
   --warning-bg: #2c210a; --warning-fg: #fcd34d; --warning-ring: #d97706;
   --info-bg: #11213b; --info-fg: #93c5fd; --info-ring: #2563eb;
   --accent-bg: #201a38; --accent-fg: #c4b5fd; --accent-ring: #7c3aed;
+
+  --surface-3: #292e36;
+  --primary-hover: #34d399;
+  --primary-soft: #052e26;
+  --primary-soft-ink: #6ee7b7;
+  --neutral-bg: #20242b; --neutral-fg: #a2a8b3; --neutral-dot: #6b7280;
+  --c1: #10b981; --c2: #60a5fa; --c3: #f59e0b; --c4: #a78bfa; --c5: #6b7280;
 }
 
 @theme inline {
@@ -69,6 +93,26 @@
   --color-primary: var(--primary);
   --color-primary-ink: var(--primary-ink);
   --color-overlay: var(--overlay);
+
+  --color-surface-solid: var(--surface-solid);
+  --color-surface-3: var(--surface-3);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-ink: var(--primary-soft-ink);
+  --color-focus: var(--focus);
+  --color-success-dot: var(--success-dot);
+  --color-danger-dot: var(--danger-dot);
+  --color-warning-dot: var(--warning-dot);
+  --color-info-dot: var(--info-dot);
+  --color-accent-dot: var(--accent-dot);
+  --color-neutral-bg: var(--neutral-bg);
+  --color-neutral-fg: var(--neutral-fg);
+  --color-neutral-dot: var(--neutral-dot);
+  --color-c1: var(--c1);
+  --color-c2: var(--c2);
+  --color-c3: var(--c3);
+  --color-c4: var(--c4);
+  --color-c5: var(--c5);
 
   --color-success-bg: var(--success-bg);
   --color-success-fg: var(--success-fg);
@@ -429,3 +473,235 @@ html[lang="ar"] body,
 .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: var(--surface) !important; }
 .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--surface) !important; }
 .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--surface) !important; }
+
+/* ================================================================== *
+ * GLASS REDESIGN (epic #276 / issue #277) — Phase 0 foundation.
+ *
+ * Everything below is scoped to html[data-glass="on"] and is OFF by default:
+ * with the flag absent the legacy look is untouched. The flag is set before
+ * paint by the inline script in layout.tsx (?glass=1 / ?glass=0 + localStorage).
+ * Values are copied 1:1 from the owner-approved prototype ("Reidey prototype
+ * V2": base token set + glass layer). The app keeps its class-based `.dark`.
+ * Specificity: html[data-glass] (0,1,1) beats :root/.dark (0,1,0).
+ * ================================================================== */
+html[data-glass="on"] {
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-ar: var(--font-plex-ar), var(--font-geist), ui-sans-serif, sans-serif;
+
+  --canvas: #e8efec;
+  --surface: rgb(255 255 255 / 0.62);
+  --surface-solid: #f7faf9;
+  --surface-2: rgb(17 25 22 / 0.035);
+  --surface-3: rgb(17 25 22 / 0.06);
+  --ink: #111916;
+  --ink-muted: #4f5b56;
+  --ink-subtle: #5d6964;
+  --line: rgb(17 25 22 / 0.08);
+  --line-strong: rgb(17 25 22 / 0.15);
+  --primary: #047857;
+  --primary-hover: #065f46;
+  --primary-ink: #ffffff;
+  --primary-soft: #e2f3eb;
+  --primary-soft-ink: #05603f;
+  --focus: #10b981;
+  --overlay: rgb(9 15 13 / 0.42);
+
+  --success-bg: #e6f5ee; --success-fg: #05603f; --success-dot: #12a272;
+  --danger-bg: #fdecec;  --danger-fg: #a8231b;  --danger-dot: #e5484d;
+  --warning-bg: #fcf2df; --warning-fg: #8a4b06;  --warning-dot: #d99a26;
+  --info-bg: #e8f0fc;    --info-fg: #1c55b3;    --info-dot: #3b82f6;
+  --accent-bg: #efedfa;  --accent-fg: #5440ad;  --accent-dot: #8b7cf0;
+  --neutral-bg: #eef1f0; --neutral-fg: #4f5b56; --neutral-dot: #98a39e;
+  /* legacy -ring names stay as aliases of the new -dot tokens */
+  --success-ring: var(--success-dot);
+  --danger-ring: var(--danger-dot);
+  --warning-ring: var(--warning-dot);
+  --info-ring: var(--info-dot);
+  --accent-ring: var(--accent-dot);
+
+  --c1: #0e9f6e; --c2: #2f6fd6; --c3: #e0892b; --c4: #8b7cf0; --c5: #98a39e;
+  --c1-soft: rgb(14 159 110 / 0.14);
+
+  --shadow-xs: 0 1px 2px rgb(17 25 22 / 0.05);
+  --shadow-sm: 0 1px 2px rgb(17 25 22 / 0.04), 0 2px 8px -2px rgb(17 25 22 / 0.06);
+  --shadow-md: 0 10px 30px -14px rgb(17 25 22 / 0.22), 0 2px 6px -2px rgb(17 25 22 / 0.06);
+  --shadow-lg: 0 30px 70px -24px rgb(17 25 22 / 0.38), 0 6px 16px -6px rgb(17 25 22 / 0.1);
+
+  --r-xs: 6px; --r-sm: 8px; --r-md: 10px; --r-lg: 14px; --r-xl: 18px; --r-2xl: 22px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --sidebar-w: 264px;
+
+  --glass-edge: rgb(255 255 255 / 0.78);
+  --glass-hi: inset 0 1px 0 rgb(255 255 255 / 0.9);
+  --glass-sheet: rgb(255 255 255 / 0.34);
+  --glass-strong: rgb(249 252 251 / 0.8);
+  --glass-shadow: 0 1px 1px rgb(4 60 44 / 0.04), 0 12px 32px -20px rgb(4 60 44 / 0.3);
+  --amb-1: rgb(16 185 129 / 0.3);
+  --amb-2: rgb(45 212 191 / 0.22);
+  --amb-3: rgb(56 189 248 / 0.16);
+  --amb-4: rgb(132 204 22 / 0.1);
+  --grain: 0.035;
+  --glass-scrim: rgb(9 15 13 / 0.2);
+}
+
+html[data-glass="on"].dark {
+  --canvas: #050a08;
+  --surface: rgb(255 255 255 / 0.045);
+  --surface-solid: #111715;
+  --surface-2: rgb(255 255 255 / 0.04);
+  --surface-3: rgb(255 255 255 / 0.07);
+  --ink: #e5ebe8;
+  --ink-muted: #a3afaa;
+  /* prototype value is #87938e; lightened to #93a09a so it reaches AA (4.65:1)
+     over the strongest emerald ambient glow (tests/contrast.test.mjs). */
+  --ink-subtle: #93a09a;
+  --line: rgb(255 255 255 / 0.08);
+  --line-strong: rgb(255 255 255 / 0.15);
+  --primary: #34d399;
+  --primary-hover: #6ee7b7;
+  --primary-ink: #04261a;
+  --primary-soft: #0f2a20;
+  --primary-soft-ink: #74e3b8;
+  --focus: #34d399;
+  --overlay: rgb(0 0 0 / 0.6);
+
+  --success-bg: #0e2a1f; --success-fg: #74e3b8; --success-dot: #2fbf8a;
+  --danger-bg: #331416;  --danger-fg: #ffa39e;  --danger-dot: #f0616a;
+  --warning-bg: #2e220c; --warning-fg: #f5c46b; --warning-dot: #e2a336;
+  --info-bg: #10203a;    --info-fg: #9cc2fb;    --info-dot: #5b9cf6;
+  --accent-bg: #1f1a38;  --accent-fg: #c3b8fb;  --accent-dot: #9b8df3;
+  --neutral-bg: #1d2522; --neutral-fg: #a3afaa; --neutral-dot: #6f7b76;
+
+  --c1: #2fbf8a; --c2: #5b9cf6; --c3: #f0a24a; --c4: #9b8df3; --c5: #6f7b76;
+  --c1-soft: rgb(47 191 138 / 0.16);
+
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35), 0 2px 8px -2px rgb(0 0 0 / 0.35);
+  --shadow-md: 0 12px 30px -12px rgb(0 0 0 / 0.6);
+  --shadow-lg: 0 30px 70px -20px rgb(0 0 0 / 0.75);
+
+  --glass-edge: rgb(255 255 255 / 0.09);
+  --glass-hi: inset 0 1px 0 rgb(255 255 255 / 0.07);
+  --glass-sheet: rgb(255 255 255 / 0.025);
+  --glass-strong: rgb(14 20 18 / 0.8);
+  --glass-shadow: 0 1px 1px rgb(0 0 0 / 0.3), 0 16px 36px -20px rgb(0 0 0 / 0.75);
+  --amb-1: rgb(16 185 129 / 0.22);
+  --amb-2: rgb(20 184 166 / 0.14);
+  --amb-3: rgb(56 189 248 / 0.09);
+  --amb-4: rgb(16 185 129 / 0.06);
+  --grain: 0.05;
+  --glass-scrim: rgb(0 0 0 / 0.45);
+}
+
+/* Fonts: Latin = Geist, Arabic/RTL = IBM Plex Sans Arabic. The Plex face is
+   vendored as its Arabic subset only, so digits and Latin text in ar fall
+   through to Geist and always stay Latin (product rule). */
+html[data-glass="on"] body { font-family: var(--font-sans); }
+html[data-glass="on"][lang="ar"] body,
+html[data-glass="on"][dir="rtl"] body,
+html[data-glass="on"] [dir="rtl"] body {
+  font-family: var(--font-ar);
+}
+html[data-glass="on"] .mono { font-family: var(--font-mono); }
+
+/* Ambient field + grain: fixed pseudo-elements behind everything, so scrolling
+   never repaints them. Marketing pages paint their own opaque background. */
+html[data-glass="on"] { background: var(--canvas); }
+html[data-glass="on"] body { background: transparent; isolation: isolate; }
+html[data-glass="on"] body::before,
+html[data-glass="on"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+html[data-glass="on"] body::before {
+  z-index: -2;
+  background:
+    radial-gradient(42% 38% at 6% 4%, var(--amb-1), transparent 72%),
+    radial-gradient(36% 36% at 94% 18%, var(--amb-2), transparent 72%),
+    radial-gradient(44% 40% at 72% 98%, var(--amb-3), transparent 72%),
+    radial-gradient(30% 30% at 20% 80%, var(--amb-4), transparent 72%);
+}
+html[data-glass="on"] body::after {
+  z-index: -1;
+  opacity: var(--grain);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* ------------------------------------------------------------------ *
+ * GlassPanel primitive (components/ui/glass-panel.tsx).
+ * Base = the legacy Card look, so the component is a drop-in with the flag
+ * off. Lives in @layer components so Tailwind utilities passed via className
+ * still win. Real blur ONLY on fixed/sticky layers (sheet/strong); `card`
+ * is a translucent pane with edge + highlight and NO backdrop-filter.
+ * ------------------------------------------------------------------ */
+@layer components {
+  .glass-panel {
+    border-radius: 1rem;
+    border: 1px solid var(--line);
+    background-color: var(--surface);
+    box-shadow: 0 2px 10px -2px rgba(30, 34, 43, 0.06);
+  }
+  html[data-glass="on"] .glass-panel {
+    border-radius: var(--r-xl);
+    border-color: var(--glass-edge);
+  }
+  html[data-glass="on"] .glass-panel--card {
+    background-color: var(--surface);
+    box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--glass-shadow);
+  }
+  html[data-glass="on"] .glass-panel--sheet {
+    border-radius: var(--r-2xl);
+    background-color: var(--glass-sheet);
+    box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--glass-shadow);
+    backdrop-filter: blur(22px) saturate(160%);
+  }
+  html[data-glass="on"] .glass-panel--strong {
+    border-radius: var(--r-2xl);
+    background-color: var(--glass-strong);
+    box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--shadow-lg);
+    backdrop-filter: blur(26px) saturate(180%);
+  }
+  html[data-glass="on"] .glass-panel--solid {
+    background-color: var(--surface-solid);
+    box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--shadow-sm);
+  }
+  /* Sticky top bar recipe, modal scrim and toast, for the shell phase to adopt. */
+  html[data-glass="on"] .glass-topbar {
+    background-color: color-mix(in srgb, var(--surface-solid) 52%, transparent);
+    backdrop-filter: blur(18px) saturate(170%);
+    border-bottom: 1px solid var(--line);
+  }
+  html[data-glass="on"] .glass-scrim {
+    background-color: var(--glass-scrim);
+    backdrop-filter: blur(6px) saturate(120%);
+  }
+  html[data-glass="on"] .glass-toast {
+    background-color: rgb(14 22 19 / 0.84);
+    color: #e9f2ee;
+    border: 1px solid rgb(255 255 255 / 0.1);
+    backdrop-filter: blur(16px) saturate(160%);
+  }
+}
+
+/* Fallbacks: solid surfaces, no blur, no grain. Opt-in by user preference
+   (reduced transparency / more contrast) or when the browser can't blur. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  html[data-glass="on"] { --surface: #ffffff; --glass-sheet: #f8fbfa; --glass-strong: #ffffff; }
+  html[data-glass="on"].dark { --surface: #121816; --glass-sheet: #0e1412; --glass-strong: #151c19; }
+  html[data-glass="on"] .glass-panel,
+  html[data-glass="on"] .glass-topbar,
+  html[data-glass="on"] .glass-scrim,
+  html[data-glass="on"] .glass-toast { backdrop-filter: none; }
+  html[data-glass="on"] body::after { display: none; }
+}
+@media (prefers-contrast: more) {
+  html[data-glass="on"] { --line: rgb(17 25 22 / 0.25); --line-strong: rgb(17 25 22 / 0.45); }
+  html[data-glass="on"].dark { --line: rgb(255 255 255 / 0.28); --line-strong: rgb(255 255 255 / 0.5); }
+}
+@supports not (backdrop-filter: blur(1px)) {
+  html[data-glass="on"] { --surface: #ffffff; --glass-sheet: #f8fbfa; --glass-strong: #ffffff; }
+  html[data-glass="on"].dark { --surface: #121816; --glass-sheet: #0e1412; --glass-strong: #151c19; }
+}

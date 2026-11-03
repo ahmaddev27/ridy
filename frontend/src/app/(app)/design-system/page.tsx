@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { notFound } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Inbox } from "lucide-react";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { GlassPanel, type GlassVariant } from "@/components/ui/glass-panel";
 import { useI18n } from "@/lib/i18n/context";
 
 const swatches: [string, string, string][] = [
@@ -51,6 +52,8 @@ function DesignSystemGallery() {
       <PageHeader
         tkey="designSystem"
       />
+
+      <GlassTestBed />
 
       {/* Colors */}
       <Section title={t("screens.designSystem.colorTokens")}>
@@ -244,4 +247,123 @@ function Alert({
     error: "border-rose-200 bg-danger-bg text-rose-800",
   }[tone];
   return <div className={`rounded-lg border p-3 ${styles}`}>{children}</div>;
+}
+
+// ---------------------------------------------------------------------------
+// Glass redesign test bed (epic #276, Phase 0). Dev-only like the rest of this
+// page. Toggle the rollout flag here (or with ?glass=1 / ?glass=0) to compare
+// legacy vs glass; the flag is OFF for everyone by default.
+// ---------------------------------------------------------------------------
+const TOKEN_GROUPS: { label: string; tokens: string[] }[] = [
+  { label: "Surfaces", tokens: ["canvas", "surface", "surface-solid", "surface-2", "surface-3"] },
+  { label: "Ink", tokens: ["ink", "ink-muted", "ink-subtle", "line", "line-strong"] },
+  { label: "Brand", tokens: ["primary", "primary-hover", "primary-soft", "primary-soft-ink", "focus"] },
+  { label: "Success / Danger", tokens: ["success-bg", "success-fg", "success-dot", "danger-bg", "danger-fg", "danger-dot"] },
+  { label: "Warning / Info", tokens: ["warning-bg", "warning-fg", "warning-dot", "info-bg", "info-fg", "info-dot"] },
+  { label: "Accent / Neutral", tokens: ["accent-bg", "accent-fg", "accent-dot", "neutral-bg", "neutral-fg", "neutral-dot"] },
+  { label: "Charts", tokens: ["c1", "c2", "c3", "c4", "c5"] },
+];
+
+const GLASS_VARIANTS: [GlassVariant, string][] = [
+  ["card", "card: translucent, edge + highlight, no blur"],
+  ["sheet", "sheet: blur(22px) saturate(160%)"],
+  ["strong", "strong: blur(26px) saturate(180%)"],
+  ["solid", "solid: dense data, opaque"],
+];
+
+const RADII = ["xs", "sm", "md", "lg", "xl", "2xl"];
+
+function GlassFlagToggle() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    setOn(document.documentElement.dataset.glass === "on");
+  }, []);
+  const flip = () => {
+    const next = !on;
+    if (next) {
+      document.documentElement.setAttribute("data-glass", "on");
+      localStorage.setItem("glass", "on");
+    } else {
+      document.documentElement.removeAttribute("data-glass");
+      localStorage.removeItem("glass");
+    }
+    setOn(next);
+  };
+  return (
+    <Button variant={on ? "primary" : "secondary"} onClick={flip}>
+      {on ? "Glass: ON (click to turn off)" : "Glass: OFF (click to preview)"}
+    </Button>
+  );
+}
+
+function GlassTestBed() {
+  return (
+    <Section title="Glass redesign (epic #276, Phase 0)">
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <GlassFlagToggle />
+          <span className="text-xs text-ink-subtle">
+            Rollout flag html[data-glass=&quot;on&quot;], default OFF. Also ?glass=1 / ?glass=0.
+          </span>
+        </div>
+
+        <div className="space-y-3">
+          {TOKEN_GROUPS.map((g) => (
+            <div key={g.label}>
+              <p className="mb-1 text-xs font-medium text-ink-muted">{g.label}</p>
+              <div className="flex flex-wrap gap-2">
+                {g.tokens.map((tk) => (
+                  <div key={tk} className="w-24">
+                    <div
+                      className="h-9 rounded-lg border border-line-strong"
+                      style={{ background: `var(--${tk})` }}
+                    />
+                    <p className="mt-1 truncate text-[10px] text-ink-subtle">--{tk}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-medium text-ink-muted">GlassPanel variants (over the ambient field)</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {GLASS_VARIANTS.map(([variant, label]) => (
+              <GlassPanel key={variant} variant={variant} className="p-4">
+                <p className="text-sm font-semibold text-ink">{variant}</p>
+                <p className="mt-1 text-xs text-ink-muted">{label}</p>
+                <p className="mt-2 text-xs text-ink-subtle tabular-nums">1.234,56 € · 12,4 km</p>
+              </GlassPanel>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div>
+            <p className="mb-2 text-xs font-medium text-ink-muted">Fonts</p>
+            <p className="font-sans text-lg">Geist: Fahrer, Fahrzeuge 0123456789 €</p>
+            <p className="mono text-sm">Geist Mono: DE-AB 1234 · 0123456789</p>
+            <p className="text-lg" lang="ar" dir="rtl" style={{ fontFamily: "var(--font-ar)" }}>
+              IBM Plex Sans Arabic: السائقون والمركبات 0123456789 € 12.5 km
+            </p>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-medium text-ink-muted">Radii</p>
+            <div className="flex flex-wrap gap-2">
+              {RADII.map((r) => (
+                <div
+                  key={r}
+                  className="flex h-12 w-14 items-center justify-center border border-line-strong bg-surface-2 text-[10px] text-ink-muted"
+                  style={{ borderRadius: `var(--r-${r}, 8px)` }}
+                >
+                  {r}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Section>
+  );
 }

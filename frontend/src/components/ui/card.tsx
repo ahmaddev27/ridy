@@ -1,3 +1,4 @@
+import { GlassPanel } from "@/components/ui/glass-panel";
 import { cn } from "@/lib/utils";
 
 export function Card({
@@ -7,18 +8,8 @@ export function Card({
   className?: string;
   children: React.ReactNode;
 }) {
-  return (
-    <div
-      className={cn(
-        // Softer radius + a very subtle tinted shadow so cards feel elevated on
-        // the warm canvas without a hard border (Metronic-style surfaces).
-        "rounded-2xl border border-line bg-surface shadow-[0_2px_10px_-2px_rgba(30,34,43,0.06)]",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
+  // Legacy look by default; becomes a glass pane under html[data-glass="on"].
+  return <GlassPanel variant="card" className={className}>{children}</GlassPanel>;
 }
 
 export function StatCard({
