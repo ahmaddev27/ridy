@@ -75,6 +75,17 @@ class FleetOwnerScopeTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_owner_token_reaches_only_the_whitelisted_passkey_routes(): void
+    {
+        $auth = $this->bearer($this->user('fleet_manager'), ['fleet:read']);
+
+        $this->postJson('/api/v1/driver/fleet/webauthn/register/options', [], $auth)->assertOk();
+        $this->getJson('/api/v1/driver/fleet/webauthn/credentials', $auth)->assertOk();
+        // The dashboard's own passkey routes stay closed to the owner token.
+        $this->deleteJson('/api/v1/webauthn/credentials/x', [], $auth)->assertForbidden();
+        $this->postJson('/api/v1/webauthn/register/options', ['password' => 'secret123'], $auth)->assertForbidden();
+    }
+
     public function test_a_user_without_an_owner_role_is_signed_out_with_a_401(): void
     {
         $viewer = $this->user('viewer', 'viewer@ya.de');

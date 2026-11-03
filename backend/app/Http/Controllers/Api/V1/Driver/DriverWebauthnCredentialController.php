@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Driver;
 
+use App\Domain\Auth\Webauthn\PasskeyScope;
 use App\Http\Controllers\Api\V1\WebauthnCredentialController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,8 +17,13 @@ use Illuminate\Http\Request;
  */
 class DriverWebauthnCredentialController extends WebauthnCredentialController
 {
+    protected function scope(): PasskeyScope
+    {
+        return PasskeyScope::App;
+    }
+
     public function registerOptions(Request $request): JsonResponse
     {
-        return response()->json($this->registrar->start($request->user()));
+        return response()->json($this->registrar->start($request->user(), $this->scope()));
     }
 }

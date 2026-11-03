@@ -600,9 +600,14 @@ export class ApiClient {
     });
   }
 
-  /** Start adding a passkey to the signed-in driver. */
+  /** Owner (User token) passkeys live under /driver/fleet; drivers keep /driver. */
+  private passkeyBase(): string {
+    return this.owner ? "/api/v1/driver/fleet/webauthn" : "/api/v1/driver/webauthn";
+  }
+
+  /** Start adding a passkey to the signed-in driver or owner. */
   passkeyRegisterOptions() {
-    return this.request<PasskeyCeremony<CreationOptionsJSON>>("/api/v1/driver/webauthn/register/options", {
+    return this.request<PasskeyCeremony<CreationOptionsJSON>>(`${this.passkeyBase()}/register/options`, {
       method: "POST",
       body: JSON.stringify({}),
     });
@@ -610,18 +615,18 @@ export class ApiClient {
 
   /** Finish adding a passkey; `alias` is an optional device name. */
   passkeyRegister(ceremonyId: string, credential: RegistrationCredentialJSON, alias?: string) {
-    return this.request<{ data: DriverPasskey }>("/api/v1/driver/webauthn/register", {
+    return this.request<{ data: DriverPasskey }>(`${this.passkeyBase()}/register`, {
       method: "POST",
       body: JSON.stringify({ ceremony_id: ceremonyId, alias, credential }),
     });
   }
 
   passkeys() {
-    return this.request<{ data: DriverPasskey[] }>("/api/v1/driver/webauthn/credentials");
+    return this.request<{ data: DriverPasskey[] }>(`${this.passkeyBase()}/credentials`);
   }
 
   deletePasskey(id: DriverPasskey["id"]) {
-    return this.request<void>(`/api/v1/driver/webauthn/credentials/${encodeURIComponent(String(id))}`, {
+    return this.request<void>(`${this.passkeyBase()}/credentials/${encodeURIComponent(String(id))}`, {
       method: "DELETE",
     });
   }

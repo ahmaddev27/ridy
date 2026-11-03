@@ -125,7 +125,7 @@ class DriverWebauthnTest extends TestCase
     public function test_login_mints_the_app_token_in_the_code_verify_shape(): void
     {
         $driver = $this->driver();
-        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'cred-1', 'counter' => 42]);
+        WebauthnCredential::factory()->app()->for($driver, 'authenticatable')->create(['id' => 'cred-1', 'counter' => 42]);
         $this->bindPassingVerifier();
 
         $response = $this->postJson('/api/v1/driver/webauthn/login', $this->loginPayload('cred-1'))
@@ -173,7 +173,7 @@ class DriverWebauthnTest extends TestCase
     public function test_login_rejects_a_disabled_credential(): void
     {
         $driver = $this->driver();
-        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'cred-off', 'disabled_at' => now()]);
+        WebauthnCredential::factory()->app()->for($driver, 'authenticatable')->create(['id' => 'cred-off', 'disabled_at' => now()]);
         $this->bindPassingVerifier();
 
         $this->postJson('/api/v1/driver/webauthn/login', $this->loginPayload('cred-off'))
@@ -186,7 +186,7 @@ class DriverWebauthnTest extends TestCase
     public function test_login_is_blocked_for_a_suspended_company(): void
     {
         $driver = $this->driver(['tenant_id' => $this->suspendedTenant()->id]);
-        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'cred-susp', 'counter' => 3]);
+        WebauthnCredential::factory()->app()->for($driver, 'authenticatable')->create(['id' => 'cred-susp', 'counter' => 3]);
         $this->bindPassingVerifier();
 
         // Mirrors loginVerify's gate, in the app's own suspended shape (no
@@ -206,7 +206,7 @@ class DriverWebauthnTest extends TestCase
     public function test_a_failed_assertion_reads_the_same_as_an_unknown_credential(): void
     {
         $driver = $this->driver();
-        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'cred-bad', 'counter' => 7]);
+        WebauthnCredential::factory()->app()->for($driver, 'authenticatable')->create(['id' => 'cred-bad', 'counter' => 7]);
         $this->bindFailingVerifier();
 
         $this->postJson('/api/v1/driver/webauthn/login', $this->loginPayload('cred-bad'))
@@ -220,7 +220,7 @@ class DriverWebauthnTest extends TestCase
     public function test_a_ceremony_is_single_use(): void
     {
         $driver = $this->driver();
-        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'cred-replay']);
+        WebauthnCredential::factory()->app()->for($driver, 'authenticatable')->create(['id' => 'cred-replay']);
         $this->bindPassingVerifier();
 
         $payload = $this->loginPayload('cred-replay');
@@ -241,7 +241,7 @@ class DriverWebauthnTest extends TestCase
         // the driver still owned it must not keep capturing the owner's sign-in.
         $this->seed(RolePermissionSeeder::class);
         $driver = $this->driver(['email' => 'boss@other.de', 'activated_at' => now()->subDays(2)]);
-        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'cred-squat']);
+        WebauthnCredential::factory()->app()->for($driver, 'authenticatable')->create(['id' => 'cred-squat']);
 
         $other = Tenant::create(['name' => 'Other GmbH', 'country' => 'DE', 'status' => 'active', 'activated_at' => now()]);
         $boss = User::create(['name' => 'Boss', 'email' => 'boss@other.de', 'password' => bcrypt('x'), 'tenant_id' => $other->id]);
@@ -264,7 +264,7 @@ class DriverWebauthnTest extends TestCase
         // activated before the owner account existed.
         $this->seed(RolePermissionSeeder::class);
         $driver = $this->driver(['email' => 'both@ya.de', 'activated_at' => now()->subDays(5)]);
-        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'cred-dual']);
+        WebauthnCredential::factory()->app()->for($driver, 'authenticatable')->create(['id' => 'cred-dual']);
 
         $other = Tenant::create(['name' => 'Other GmbH', 'country' => 'DE', 'status' => 'active', 'activated_at' => now()]);
         $boss = User::create(['name' => 'Both', 'email' => 'both@ya.de', 'password' => bcrypt('x'), 'tenant_id' => $other->id]);
@@ -280,7 +280,7 @@ class DriverWebauthnTest extends TestCase
     {
         // No address, no identity to resolve — and no code could sign them in either.
         $driver = $this->driver(['email' => null, 'uber_email' => 'omar.uber@ya.de']);
-        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'cred-noemail']);
+        WebauthnCredential::factory()->app()->for($driver, 'authenticatable')->create(['id' => 'cred-noemail']);
         $this->bindPassingVerifier();
 
         $this->postJson('/api/v1/driver/webauthn/login', $this->loginPayload('cred-noemail'))
@@ -379,10 +379,10 @@ class DriverWebauthnTest extends TestCase
     public function test_credentials_index_and_delete_are_scoped_to_the_driver(): void
     {
         $mine = $this->driver();
-        WebauthnCredential::factory()->for($mine, 'authenticatable')->create(['id' => 'mine', 'alias' => 'Mein Handy']);
+        WebauthnCredential::factory()->app()->for($mine, 'authenticatable')->create(['id' => 'mine', 'alias' => 'Mein Handy']);
 
         $other = $this->driver(['name' => 'Sami', 'email' => 'sami@ya.de']);
-        WebauthnCredential::factory()->for($other, 'authenticatable')->create(['id' => 'theirs']);
+        WebauthnCredential::factory()->app()->for($other, 'authenticatable')->create(['id' => 'theirs']);
 
         // A dashboard user's row with a colliding owner id must never surface either.
         $user = User::create(['name' => 'Anna', 'email' => 'anna@ya.de', 'password' => bcrypt('x'), 'tenant_id' => $this->tenant->id]);
@@ -412,7 +412,7 @@ class DriverWebauthnTest extends TestCase
     public function test_management_is_blocked_for_a_suspended_company(): void
     {
         $driver = $this->driver(['tenant_id' => $this->suspendedTenant()->id]);
-        WebauthnCredential::factory()->for($driver, 'authenticatable')->create(['id' => 'mine']);
+        WebauthnCredential::factory()->app()->for($driver, 'authenticatable')->create(['id' => 'mine']);
         Sanctum::actingAs($driver, guard: 'driver');
 
         // `driver.active`, like every other app route: the company lapsed, the app stops.
