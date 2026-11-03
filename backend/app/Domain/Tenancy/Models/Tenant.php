@@ -126,6 +126,34 @@ class Tenant extends Model
         return ($this->settings['passwordless_login']['cobrowse'] ?? false) === true;
     }
 
+    /**
+     * Whether the company is migrated off the browser extension (docs/30): it connects via
+     * co-browse and its Uber data is pulled server-side, so the dashboard neither uses nor
+     * nags the extension. The one admin co-browse toggle is the single switch.
+     */
+    public function onNewSystem(): bool
+    {
+        return $this->cobrowseEnabled();
+    }
+
+    /**
+     * Whether the dashboard should actually RETIRE the extension for this company: it is on
+     * the new system AND server-side sync is enabled for it (the global UBER_SERVER_SYNC
+     * switch + the optional UBER_SERVER_SYNC_TENANTS allowlist). This keeps the UI from
+     * dropping the extension while the company still has no server data source for its
+     * earnings/vehicles/metrics (roster + presence come from the daemon regardless).
+     */
+    public function extensionRetired(): bool
+    {
+        if (! $this->onNewSystem() || ! (bool) config('services.uber.server_sync')) {
+            return false;
+        }
+
+        $allow = array_map('strval', (array) config('services.uber.server_sync_tenants', []));
+
+        return $allow === [] || in_array((string) $this->id, $allow, true);
+    }
+
     public function setCobrowseEnabled(bool $enabled): void
     {
         // Co-browse connect only works when passwordless login is on for the company too

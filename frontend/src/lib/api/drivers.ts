@@ -64,6 +64,11 @@ export type DriverMetric = {
   trips: number | null;
   distance_km: number | null;
   breakdown: Record<string, number> | null;
+  // Server-synced Uber performance metrics (Laravel decimal casts arrive as strings).
+  hours_online?: number | string | null;
+  hours_on_trip?: number | string | null;
+  acceptance_rate?: number | string | null;
+  cancellation_rate?: number | string | null;
   synced_at: string | null;
 };
 

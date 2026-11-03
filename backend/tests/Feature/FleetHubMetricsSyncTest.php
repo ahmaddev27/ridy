@@ -35,6 +35,7 @@ class FleetHubMetricsSyncTest extends TestCase
             'name' => 'Fleet', 'country' => 'DE', 'status' => 'active',
             'activated_at' => now(), 'subscription_ends_at' => now()->addMonth(),
         ]);
+        $tenant->setCobrowseEnabled(true);
         $tenant->forceFill(['proxy_url' => 'http://user:pw@proxy.test:8080'])->save();
         UberFleetSession::withoutGlobalScopes()->create([
             'tenant_id' => $tenant->id, 'uber_org_uuid' => 'org-1',

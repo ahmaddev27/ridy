@@ -30,12 +30,13 @@ class FleetHubServerSyncTest extends TestCase
         config(['services.uber.server_sync' => true]);
     }
 
-    private function tenant(string $name = 'Fleet', bool $session = true, bool $proxy = true): Tenant
+    private function tenant(string $name = 'Fleet', bool $session = true, bool $proxy = true, bool $migrated = true): Tenant
     {
         $tenant = Tenant::create([
             'name' => $name, 'country' => 'DE', 'status' => 'active',
             'activated_at' => now(), 'subscription_ends_at' => now()->addMonth(),
         ]);
+        $tenant->setCobrowseEnabled($migrated);
         if ($proxy) {
             $tenant->forceFill(['proxy_url' => 'http://user:pw@proxy.test:8080'])->save();
         }
@@ -181,6 +182,7 @@ class FleetHubServerSyncTest extends TestCase
         $good = $this->tenant('Good');
         $this->tenant('NoSession', session: false);
         $this->tenant('NoProxy', proxy: false);
+        $this->tenant('NotMigrated', migrated: false);
         $noJar = $this->tenant('NoJar');
         UberFleetSession::withoutGlobalScopes()->where('tenant_id', $noJar->id)->update(['supplier_cookies' => null]);
         $lapsed = $this->tenant('Lapsed');

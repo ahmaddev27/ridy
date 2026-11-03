@@ -65,6 +65,7 @@ class FleetHubSessionResolver
             ->filter(fn (UberFleetSession $s) => $s->isUsable()
                 && ! empty($s->supplier_cookies)
                 && $s->tenant !== null
+                && $s->tenant->onNewSystem()
                 && $s->tenant->stateReason() === null
                 && is_string($s->tenant->proxy_url)
                 && $s->tenant->proxy_url !== ''

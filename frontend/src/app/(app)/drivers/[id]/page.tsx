@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -43,6 +44,29 @@ function uberPeriod(m: DriverMetric, loc: string): string {
   return `${fmt(m.period_start)} – ${fmt(m.period_end)}`;
 }
 
+function numOrNull(v: number | string | null | undefined): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function hasUberPerformance(m: DriverMetric): boolean {
+  return [m.hours_online, m.hours_on_trip, m.acceptance_rate, m.cancellation_rate].some((v) => numOrNull(v) !== null);
+}
+
+function hoursLabel(v: number | string | null | undefined, loc: string): string {
+  const n = numOrNull(v);
+  return n === null ? "—" : `${formatNumber(Math.round(n * 10) / 10, loc)} h`;
+}
+
+/** Uber may send a 0-1 fraction or a 0-100 percentage; normalise to a percentage. */
+function pctLabel(v: number | string | null | undefined, loc: string): string {
+  const n = numOrNull(v);
+  if (n === null) return "—";
+  const pct = n <= 1 ? n * 100 : n;
+  return `${formatNumber(Math.round(pct * 10) / 10, loc)}%`;
+}
+
 function statusLabel(driver: Driver, d: (k: string) => string): { text: string; tone: string } {
   const s = (driver.online_status ?? "").toUpperCase();
   if (s.includes("ON_TRIP")) return { text: d("onTrip"), tone: "text-success-fg" };
@@ -53,6 +77,8 @@ function statusLabel(driver: Driver, d: (k: string) => string): { text: string; 
 
 export default function DriverProfilePage() {
   const { t, locale } = useI18n();
+  const { user } = useAuth();
+  const extensionRetired = user?.tenant?.extension_retired === true;
   const d = (k: string) => t(`screens.drivers.${k}`);
   const o = (k: string) => t(`screens.offers.${k}`);
   const params = useParams<{ id: string }>();
@@ -111,7 +137,7 @@ export default function DriverProfilePage() {
     };
   }, [id, win.fromDate, win.toDate]);
 
-  // Uber's OFFICIAL earnings (captured from the Fleet Earnings page). We show the
+  // Uber's OFFICIAL earnings (synced server-side from Uber). We show the
   // most recent captured window, regardless of the selected preset, since Uber's
   // period is whatever the manager last viewed on Uber.
   useEffect(() => {
@@ -124,12 +150,13 @@ export default function DriverProfilePage() {
     };
   }, [id]);
 
-  // On open, ask the extension to refresh this driver's Uber earnings on demand
-  // (replays getEarnerBreakdownsV2 → backend), so earnings are current without the
-  // manager reopening the Uber tab.
+  // Extension companies: on open, ask the extension to refresh this driver's Uber
+  // earnings on demand (replays getEarnerBreakdownsV2 → backend), so earnings are
+  // current without the manager reopening the Uber tab. Migrated companies are
+  // synced server-side.
   useEffect(() => {
     const uuid = driver?.uber_driver_uuid;
-    if (!uuid) return;
+    if (!uuid || extensionRetired) return;
     function onDone(e: MessageEvent) {
       if (e.source !== window || (e.data as { source?: string })?.source !== "ridy-driver-uber-done") return;
       const d = e.data as { breakdown?: boolean };
@@ -138,7 +165,7 @@ export default function DriverProfilePage() {
     window.addEventListener("message", onDone);
     window.postMessage({ source: "ridy-fetch-driver-uber", driverUuid: uuid }, "*");
     return () => window.removeEventListener("message", onDone);
-  }, [driver?.uber_driver_uuid, id]);
+  }, [driver?.uber_driver_uuid, id, extensionRetired]);
 
   // This driver's own captured offers for the selected window.
   useEffect(() => {
@@ -498,6 +525,21 @@ export default function DriverProfilePage() {
             <Card className="p-5">
               <h4 className="text-sm font-semibold text-ink">{d("uberData")}</h4>
               <p className="mt-2 text-sm text-ink-subtle">{d("metricsUnavailable")}</p>
+            </Card>
+          )}
+
+          {/* Uber-sourced performance metrics (server-synced) — distinct from the
+              acceptance rate Reidey computes itself from offers, below. */}
+          {uber && hasUberPerformance(uber) && (
+            <Card className="p-5">
+              <h4 className="text-sm font-semibold text-ink">{t("screens.driverUber.title")}</h4>
+              <p className="mb-3 mt-0.5 text-xs text-ink-subtle">{t("screens.driverUber.hint")}</p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <MiniStat label={t("screens.driverUber.hoursOnline")} value={hoursLabel(uber.hours_online, locale)} />
+                <MiniStat label={t("screens.driverUber.hoursOnTrip")} value={hoursLabel(uber.hours_on_trip, locale)} />
+                <MiniStat label={t("screens.driverUber.acceptance")} value={pctLabel(uber.acceptance_rate, locale)} />
+                <MiniStat label={t("screens.driverUber.cancellation")} value={pctLabel(uber.cancellation_rate, locale)} />
+              </div>
             </Card>
           )}
 

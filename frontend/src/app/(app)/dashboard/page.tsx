@@ -34,13 +34,13 @@ export default function DashboardPage() {
 
   const k = (key: string) => t(`screens.dashboard.${key}`);
 
-  // Ask the extension to refresh the fleet earnings roll-up (replays
-  // getSupplierBreakdownV2 — no Uber tab needed), then reload the summary once it
-  // lands. Do it on open AND on an interval while the page is open, so the fleet
-  // card stays current on its own instead of only refreshing when the manager
-  // reopens the dashboard. Earnings are cumulative daily totals, so a few minutes
-  // is plenty fresh and light on Uber.
+  // Companies still on the browser extension: ask it to refresh the fleet
+  // earnings roll-up (replays getSupplierBreakdownV2 — no Uber tab needed), then
+  // reload the summary once it lands. Migrated companies are synced server-side
+  // into FleetMetric, which the summary poll above already reads.
+  const extensionRetired = user?.tenant?.extension_retired === true;
   useEffect(() => {
+    if (extensionRetired) return;
     function onDone(e: MessageEvent) {
       if (e.source === window && (e.data as { source?: string })?.source === "ridy-fleet-earnings-done") {
         setTimeout(() => void refetch({ silent: true }), 400);
@@ -55,7 +55,7 @@ export default function DashboardPage() {
       clearInterval(id);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [extensionRetired]);
 
   return (
     <div className="space-y-6">
