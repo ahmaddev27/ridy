@@ -1,40 +1,35 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { UserX, Phone, Mail, Star, ChevronLeft, ChevronRight, Loader2, Building2 } from "lucide-react";
+import { UserX, Phone, Mail, Star, Building2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { SearchInput } from "@/components/ui/search-input";
-import { EmptyState } from "@/components/ui/empty-state";
+import { Pager } from "@/components/ui/pager";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale } from "@/lib/utils";
 import { getOrphanDrivers, type OrphanDriver } from "@/lib/api/admin";
 
+/** Deterministic tint (.av.t0-t5) so a driver keeps the same avatar colour. */
+function avTone(name: string | null): number {
+  let h = 0;
+  for (const ch of name ?? "") h = (h * 31 + ch.charCodeAt(0)) % 6;
+  return h;
+}
+
 /**
  * Driver thumbnail that falls back to an initials placeholder — the Uber picture
- * URLs are often expired/blocked (they load with a referrer we can't send), so a
- * broken <img> must degrade to the initials avatar rather than a broken icon.
+ * URLs are often expired/blocked, so a broken <img> degrades to initials.
  */
 function DriverAvatar({ name, picture }: { name: string | null; picture: string | null }) {
   const [broken, setBroken] = useState(false);
   const initials = (name ?? "—").slice(0, 2).toUpperCase();
   if (!picture || broken) {
-    return (
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-ink-muted">
-        {initials}
-      </span>
-    );
+    return <span className={`av t${avTone(name)}`}>{initials}</span>;
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={picture}
-      alt=""
-      referrerPolicy="no-referrer"
-      onError={() => setBroken(true)}
-      className="h-9 w-9 shrink-0 rounded-full object-cover"
-    />
+    <img src={picture} alt="" referrerPolicy="no-referrer" onError={() => setBroken(true)} className="av object-cover" />
   );
 }
 
@@ -72,10 +67,10 @@ export default function OrphanDriversPage() {
   const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(latnLocale(locale)) : "—");
 
   return (
-    <div className="space-y-4">
+    <div className="stack-lg">
       <PageHeader title={c("title")} subtitle={c("subtitle")} />
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="toolbar between">
         <SearchInput
           value={search}
           onChange={(v) => {
@@ -83,21 +78,30 @@ export default function OrphanDriversPage() {
             setPage(1);
           }}
           placeholder={c("searchPlaceholder")}
+          className="max-w-[380px]"
         />
-        <span className="shrink-0 text-sm text-ink-subtle">{c("count").replace("{n}", total.toLocaleString(latnLocale(locale)))}</span>
+        <span className="muted text-sm num">{c("count").replace("{n}", total.toLocaleString(latnLocale(locale)))}</span>
       </div>
 
-      <Card className="overflow-hidden">
+      <Card className="table-card">
         {loading && rows.length === 0 ? (
-          <div className="flex items-center justify-center py-16 text-ink-subtle">
-            <Loader2 className="h-5 w-5 animate-spin" />
+          <div className="stack-sm p-4">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="skel h-12" />
+            ))}
           </div>
         ) : rows.length === 0 ? (
-          <EmptyState icon={UserX} title={c("emptyTitle")} description={c("emptyDesc")} />
+          <div className="empty">
+            <div className="empty-ico">
+              <UserX className="h-6 w-6" />
+            </div>
+            <h3>{c("emptyTitle")}</h3>
+            <p>{c("emptyDesc")}</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:px-4 [&_th]:py-3 [&_th]:text-start [&_th]:font-semibold">
+          <div className="table-wrap">
+            <table className="tbl">
+              <thead>
                 <tr>
                   <th>{c("colDriver")}</th>
                   <th>{c("colContact")}</th>
@@ -106,91 +110,80 @@ export default function OrphanDriversPage() {
                   <th>{c("colRemoved")}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {rows.map((d) => (
-                  <tr key={d.id} className="hover:bg-surface-2">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
+                  <tr key={d.id}>
+                    <td>
+                      <div className="who">
                         <DriverAvatar name={d.name} picture={d.uber_picture_url} />
                         <div className="min-w-0">
-                          <div className="truncate font-medium text-ink">{d.name ?? "—"}</div>
-                          {d.app_registered ? (
-                            <Badge status="connected">{c("appRegistered")}</Badge>
-                          ) : (
-                            <span className="text-[11px] text-ink-subtle">{c("notRegistered")}</span>
-                          )}
+                          <div className="n truncate">{d.name ?? "—"}</div>
+                          <div className="s">
+                            {d.app_registered ? (
+                              <span className="badge success">
+                                <span className="dot" />
+                                {c("appRegistered")}
+                              </span>
+                            ) : (
+                              <span className="subtle text-xs">{c("notRegistered")}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col items-start gap-1">
+                    <td>
+                      <div className="stack-sm" style={{ gap: 2, fontSize: 13 }}>
                         {d.phone && (
-                          <a href={`tel:${d.phone}`} dir="ltr" className="inline-flex items-center gap-1.5 text-ink hover:underline">
-                            <Phone className="h-3.5 w-3.5 text-ink-subtle" /> {d.phone}
+                          <a href={`tel:${d.phone}`} dir="ltr" className="row num" style={{ gap: 6 }}>
+                            <Phone className="h-[15px] w-[15px] shrink-0 text-ink-subtle" /> {d.phone}
                           </a>
                         )}
                         {(d.email || d.uber_email) && (
-                          <a
-                            href={`mailto:${d.email ?? d.uber_email}`}
-                            dir="ltr"
-                            className="inline-flex items-center gap-1.5 text-ink hover:underline"
-                          >
-                            <Mail className="h-3.5 w-3.5 text-ink-subtle" /> {d.email ?? d.uber_email}
+                          <a href={`mailto:${d.email ?? d.uber_email}`} dir="ltr" className="row" style={{ gap: 6 }}>
+                            <Mail className="h-[15px] w-[15px] shrink-0 text-ink-subtle" />
+                            <span className="truncate max-w-[220px]">{d.email ?? d.uber_email}</span>
                           </a>
                         )}
-                        {!d.phone && !d.email && !d.uber_email && <span className="text-ink-subtle">—</span>}
+                        {!d.phone && !d.email && !d.uber_email && <span className="subtle">—</span>}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col gap-0.5 text-ink-muted">
-                        {d.uber_rating != null && (
-                          <span className="inline-flex items-center gap-1">
-                            <Star className="h-3.5 w-3.5 text-amber-500" /> {Number(d.uber_rating).toFixed(2)}
-                          </span>
-                        )}
-                        {d.uber_total_trips != null && (
-                          <span className="text-xs text-ink-subtle">
-                            {c("trips").replace("{n}", d.uber_total_trips.toLocaleString(latnLocale(locale)))}
-                          </span>
-                        )}
-                        {d.uber_rating == null && d.uber_total_trips == null && <span className="text-ink-subtle">—</span>}
-                      </div>
+                    <td>
+                      {d.uber_rating == null && d.uber_total_trips == null ? (
+                        <span className="subtle">—</span>
+                      ) : (
+                        <div>
+                          {d.uber_rating != null && (
+                            <span className="row num" style={{ gap: 4 }}>
+                              <Star className="h-[14px] w-[14px] fill-amber-500 text-amber-500" /> {Number(d.uber_rating).toFixed(2)}
+                            </span>
+                          )}
+                          {d.uber_total_trips != null && (
+                            <div className="subtle text-xs num">
+                              {c("trips").replace("{n}", d.uber_total_trips.toLocaleString(latnLocale(locale)))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1.5 text-ink-muted">
-                        <Building2 className="h-3.5 w-3.5 text-ink-subtle" /> {d.former_company ?? "—"}
+                    <td>
+                      <span className="row" style={{ gap: 6 }}>
+                        <Building2 className="h-[15px] w-[15px] shrink-0 text-ink-subtle" />
+                        {d.former_company ?? "—"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-ink-muted">{fmtDate(d.roster_removed_at)}</td>
+                    <td className="num">{fmtDate(d.roster_removed_at)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+        {lastPage > 1 && (
+          <div className="tbl-foot">
+            <Pager className="w-full" page={page} lastPage={lastPage} total={total} onPage={setPage} />
+          </div>
+        )}
       </Card>
-
-      {lastPage > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-            aria-label={t("common.previousPage")}
-            className="rounded-lg border border-line p-2 text-ink-muted transition hover:bg-surface-2 disabled:opacity-40"
-          >
-            <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
-          </button>
-          <span className="text-sm text-ink-muted">{c("pageOf").replace("{p}", String(page)).replace("{t}", String(lastPage))}</span>
-          <button
-            onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
-            disabled={page >= lastPage}
-            aria-label={t("common.nextPage")}
-            className="rounded-lg border border-line p-2 text-ink-muted transition hover:bg-surface-2 disabled:opacity-40"
-          >
-            <ChevronRight className="h-4 w-4 rtl:rotate-180" />
-          </button>
-        </div>
-      )}
     </div>
   );
 }

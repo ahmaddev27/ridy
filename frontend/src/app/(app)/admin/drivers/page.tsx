@@ -1,17 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, Phone, Mail, Star, ChevronLeft, ChevronRight, Loader2, Building2, Navigation } from "lucide-react";
+import { Users, Phone, Mail, Star, Building2, Navigation } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { SearchInput } from "@/components/ui/search-input";
-import { EmptyState } from "@/components/ui/empty-state";
+import { Pager } from "@/components/ui/pager";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale } from "@/lib/utils";
 import { getAdminDrivers, listCompanies, type AdminDriver, type DriverDirectoryStats, type Company } from "@/lib/api/admin";
 
 type StatusFilter = "" | "online" | "available" | "en_route" | "on_trip" | "offline";
+
+/** Deterministic tint (.av.t0-t5) so a driver keeps the same avatar colour. */
+function avTone(name: string | null): number {
+  let h = 0;
+  for (const ch of name ?? "") h = (h * 31 + ch.charCodeAt(0)) % 6;
+  return h;
+}
 
 /**
  * Driver thumbnail that falls back to an initials placeholder — the Uber picture
@@ -21,15 +27,11 @@ function DriverAvatar({ name, picture }: { name: string | null; picture: string 
   const [broken, setBroken] = useState(false);
   const initials = (name ?? "—").slice(0, 2).toUpperCase();
   if (!picture || broken) {
-    return (
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-ink-muted">
-        {initials}
-      </span>
-    );
+    return <span className={`av t${avTone(name)}`}>{initials}</span>;
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={picture} alt="" referrerPolicy="no-referrer" onError={() => setBroken(true)} className="h-9 w-9 shrink-0 rounded-full object-cover" />
+    <img src={picture} alt="" referrerPolicy="no-referrer" onError={() => setBroken(true)} className="av object-cover" />
   );
 }
 
@@ -43,8 +45,8 @@ function StatusChip({ online, engagement, c }: { online: boolean; engagement: nu
         ? { key: "stEnRoute", color: "#d97706" }
         : { key: "stAvailable", color: "#059669" };
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-ink-muted">
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: m.color }} />
+    <span className="badge" style={{ gap: 7 }}>
+      <span className="dot" style={{ background: m.color }} />
       {c(m.key)}
     </span>
   );
@@ -95,26 +97,30 @@ export default function AdminDriversPage() {
   const num = (n: number) => n.toLocaleString(latnLocale(locale));
 
   const statCards = [
-    { label: c("statOnline"), value: num(stats.online), color: "text-success-fg" },
-    { label: c("statRate"), value: `${stats.rate}%`, color: "text-ink" },
-    { label: c("statTotal"), value: num(stats.total), color: "text-ink" },
+    { label: c("statOnline"), value: num(stats.online), tone: "pos" },
+    { label: c("statRate"), value: `${stats.rate}%`, tone: "" },
+    { label: c("statTotal"), value: num(stats.total), tone: "" },
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="stack-lg">
       <PageHeader title={c("title")} subtitle={c("subtitle")} />
 
       {/* Fleet stats — online / rate / total */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid g-3">
         {statCards.map((x) => (
-          <Card key={x.label} className="p-4 text-center">
-            <div className={`text-2xl font-bold tabular-nums ${x.color}`}>{x.value}</div>
-            <div className="mt-0.5 text-xs text-ink-subtle">{x.label}</div>
-          </Card>
+          <div key={x.label} className="stat text-center">
+            <div className="stat-top justify-center">
+              <span className="truncate">{x.label}</span>
+            </div>
+            <div className={`stat-value ${x.tone}`} dir="ltr">
+              {x.value}
+            </div>
+          </div>
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="toolbar">
         <SearchInput
           value={search}
           onChange={(v) => {
@@ -122,53 +128,62 @@ export default function AdminDriversPage() {
             setPage(1);
           }}
           placeholder={c("searchPlaceholder")}
+          className="max-w-[380px]"
         />
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={companyId}
-            onChange={(e) => {
-              setCompanyId(e.target.value ? Number(e.target.value) : "");
-              setPage(1);
-            }}
-            className="ui-field max-w-[180px] rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink"
-          >
-            <option value="">{c("allCompanies")}</option>
-            {companies.map((co) => (
-              <option key={co.id} value={co.id}>
-                {co.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value as StatusFilter);
-              setPage(1);
-            }}
-            className="ui-field rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink"
-          >
-            <option value="">{c("filterAll")}</option>
-            <option value="online">{c("filterOnline")}</option>
-            <option value="available">{c("filterAvailable")}</option>
-            <option value="en_route">{c("filterEnRoute")}</option>
-            <option value="on_trip">{c("filterOnTrip")}</option>
-            <option value="offline">{c("filterOffline")}</option>
-          </select>
-          <span className="shrink-0 text-sm text-ink-subtle">{c("count").replace("{n}", num(total))}</span>
-        </div>
+        <select
+          value={companyId}
+          onChange={(e) => {
+            setCompanyId(e.target.value ? Number(e.target.value) : "");
+            setPage(1);
+          }}
+          aria-label={c("colCompany")}
+          className="select min-w-[200px] !w-auto"
+        >
+          <option value="">{c("allCompanies")}</option>
+          {companies.map((co) => (
+            <option key={co.id} value={co.id}>
+              {co.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value as StatusFilter);
+            setPage(1);
+          }}
+          aria-label={c("colStatus")}
+          className="select min-w-[150px] !w-auto"
+        >
+          <option value="">{c("filterAll")}</option>
+          <option value="online">{c("filterOnline")}</option>
+          <option value="available">{c("filterAvailable")}</option>
+          <option value="en_route">{c("filterEnRoute")}</option>
+          <option value="on_trip">{c("filterOnTrip")}</option>
+          <option value="offline">{c("filterOffline")}</option>
+        </select>
+        <span className="muted text-sm num ms-auto">{c("count").replace("{n}", num(total))}</span>
       </div>
 
-      <Card className="overflow-hidden">
+      <Card className="table-card">
         {loading && rows.length === 0 ? (
-          <div className="flex items-center justify-center py-16 text-ink-subtle">
-            <Loader2 className="h-5 w-5 animate-spin" />
+          <div className="stack-sm p-4">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="skel h-12" />
+            ))}
           </div>
         ) : rows.length === 0 ? (
-          <EmptyState icon={Users} title={c("emptyTitle")} description={c("emptyDesc")} />
+          <div className="empty">
+            <div className="empty-ico">
+              <Users className="h-6 w-6" />
+            </div>
+            <h3>{c("emptyTitle")}</h3>
+            <p>{c("emptyDesc")}</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:px-4 [&_th]:py-3 [&_th]:text-start [&_th]:font-semibold">
+          <div className="table-wrap">
+            <table className="tbl">
+              <thead>
                 <tr>
                   <th>{c("colDriver")}</th>
                   <th>{c("colStatus")}</th>
@@ -178,73 +193,79 @@ export default function AdminDriversPage() {
                   <th>{c("colUber")}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {rows.map((d) => (
-                  <tr key={d.id} className="hover:bg-surface-2">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
+                  <tr key={d.id}>
+                    <td>
+                      <div className="who">
                         <DriverAvatar name={d.name} picture={d.uber_picture_url} />
                         <div className="min-w-0">
-                          <div className="truncate font-medium text-ink">{d.name ?? "—"}</div>
-                          {d.app_registered ? (
-                            <Badge status="connected">{c("appRegistered")}</Badge>
-                          ) : (
-                            <span className="text-[11px] text-ink-subtle">{c("notRegistered")}</span>
-                          )}
+                          <div className="n truncate">{d.name ?? "—"}</div>
+                          <div className="s">
+                            {d.app_registered ? (
+                              <span className="badge success">
+                                <span className="dot" />
+                                {c("appRegistered")}
+                              </span>
+                            ) : (
+                              <span className="subtle text-xs">{c("notRegistered")}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td>
                       <StatusChip online={d.online} engagement={d.engagement} c={c} />
                     </td>
-                    <td className="max-w-[220px] px-4 py-3">
+                    <td className="max-w-[280px]">
                       {d.active_offer ? (
                         <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 text-ink">
-                            <Navigation className="h-3.5 w-3.5 shrink-0 text-primary" />
+                          <div className="row" style={{ gap: 6 }}>
+                            <Navigation className="h-[15px] w-[15px] shrink-0 text-primary" />
                             <span className="truncate">{d.active_offer.dropoff ?? "—"}</span>
-                            {d.active_offer.stops_count >= 2 && (
-                              <span className="shrink-0 rounded bg-primary/10 px-1.5 text-[11px] font-semibold text-primary">
-                                🟦×{d.active_offer.stops_count}
-                              </span>
-                            )}
+                            {d.active_offer.stops_count >= 2 && <span className="badge square warning">×{num(d.active_offer.stops_count)}</span>}
                           </div>
-                          {d.active_offer.fare && <div className="mt-0.5 text-xs text-ink-subtle">{d.active_offer.fare}</div>}
+                          {d.active_offer.fare && <div className="subtle text-xs num">{d.active_offer.fare}</div>}
                         </div>
                       ) : (
-                        <span className="text-ink-subtle">—</span>
+                        <span className="subtle">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col items-start gap-1">
+                    <td>
+                      <div className="stack-sm" style={{ gap: 2, fontSize: 13 }}>
                         {d.phone && (
-                          <a href={`tel:${d.phone}`} dir="ltr" className="inline-flex items-center gap-1.5 text-ink hover:underline">
-                            <Phone className="h-3.5 w-3.5 text-ink-subtle" /> {d.phone}
+                          <a href={`tel:${d.phone}`} dir="ltr" className="row num" style={{ gap: 6 }}>
+                            <Phone className="h-[15px] w-[15px] shrink-0 text-ink-subtle" /> {d.phone}
                           </a>
                         )}
                         {(d.email || d.uber_email) && (
-                          <a href={`mailto:${d.email ?? d.uber_email}`} dir="ltr" className="inline-flex items-center gap-1.5 text-ink hover:underline">
-                            <Mail className="h-3.5 w-3.5 text-ink-subtle" /> {d.email ?? d.uber_email}
+                          <a href={`mailto:${d.email ?? d.uber_email}`} dir="ltr" className="row" style={{ gap: 6 }}>
+                            <Mail className="h-[15px] w-[15px] shrink-0 text-ink-subtle" />
+                            <span className="truncate max-w-[220px]">{d.email ?? d.uber_email}</span>
                           </a>
                         )}
-                        {!d.phone && !d.email && !d.uber_email && <span className="text-ink-subtle">—</span>}
+                        {!d.phone && !d.email && !d.uber_email && <span className="subtle">—</span>}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1.5 text-ink-muted">
-                        <Building2 className="h-3.5 w-3.5 text-ink-subtle" /> {d.company ?? "—"}
+                    <td>
+                      <span className="row" style={{ gap: 6 }}>
+                        <Building2 className="h-[15px] w-[15px] shrink-0 text-ink-subtle" />
+                        <span className="truncate max-w-[190px]">{d.company ?? "—"}</span>
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col gap-0.5 text-ink-muted">
-                        {d.uber_rating != null && (
-                          <span className="inline-flex items-center gap-1">
-                            <Star className="h-3.5 w-3.5 text-amber-500" /> {Number(d.uber_rating).toFixed(2)}
-                          </span>
-                        )}
-                        {d.uber_total_trips != null && <span className="text-xs text-ink-subtle">{c("trips").replace("{n}", num(d.uber_total_trips))}</span>}
-                        {d.uber_rating == null && d.uber_total_trips == null && <span className="text-ink-subtle">—</span>}
-                      </div>
+                    <td>
+                      {d.uber_rating == null && d.uber_total_trips == null ? (
+                        <span className="subtle">—</span>
+                      ) : (
+                        <div>
+                          {d.uber_rating != null && (
+                            <span className="row num" style={{ gap: 4 }}>
+                              <Star className="h-[14px] w-[14px] fill-amber-500 text-amber-500" /> {Number(d.uber_rating).toFixed(2)}
+                            </span>
+                          )}
+                          {d.uber_total_trips != null && <div className="subtle text-xs num">{c("trips").replace("{n}", num(d.uber_total_trips))}</div>}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -252,29 +273,12 @@ export default function AdminDriversPage() {
             </table>
           </div>
         )}
+        {lastPage > 1 && (
+          <div className="tbl-foot">
+            <Pager className="w-full" page={page} lastPage={lastPage} total={total} onPage={setPage} />
+          </div>
+        )}
       </Card>
-
-      {lastPage > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-            aria-label={t("common.previousPage")}
-            className="rounded-lg border border-line p-2 text-ink-muted transition hover:bg-surface-2 disabled:opacity-40"
-          >
-            <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
-          </button>
-          <span className="text-sm text-ink-muted">{c("pageOf").replace("{p}", String(page)).replace("{t}", String(lastPage))}</span>
-          <button
-            onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
-            disabled={page >= lastPage}
-            aria-label={t("common.nextPage")}
-            className="rounded-lg border border-line p-2 text-ink-muted transition hover:bg-surface-2 disabled:opacity-40"
-          >
-            <ChevronRight className="h-4 w-4 rtl:rotate-180" />
-          </button>
-        </div>
-      )}
     </div>
   );
 }

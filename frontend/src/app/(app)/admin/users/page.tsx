@@ -6,7 +6,6 @@ import { Users as UsersIcon, Trash2, Megaphone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { SearchInput } from "@/components/ui/search-input";
 import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
@@ -18,20 +17,20 @@ import { apiErrorMessage } from "@/lib/api/error-message";
 const PAGE_SIZE = 50;
 
 const ROLE_TONE: Record<string, string> = {
-  super_admin: "bg-primary text-primary-ink",
-  reseller: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
-  fleet_manager: "bg-info-bg text-info-fg",
-  owner: "bg-info-bg text-info-fg",
-  driver: "bg-success-bg text-success-fg",
-  viewer: "bg-surface-2 text-ink-muted",
+  super_admin: "accent",
+  reseller: "info",
+  fleet_manager: "info",
+  owner: "info",
+  driver: "success",
+  viewer: "",
 };
 
 const STATUS_TONE: Record<string, string> = {
-  active: "bg-success-bg text-success-fg",
-  disabled: "bg-surface-2 text-ink-muted",
-  banned: "bg-danger-bg text-danger-fg",
-  expired: "bg-warning-bg text-warning-fg",
-  inactive: "bg-warning-bg text-warning-fg",
+  active: "success",
+  disabled: "",
+  banned: "danger",
+  expired: "warning",
+  inactive: "warning",
 };
 
 export default function UsersPage() {
@@ -119,107 +118,92 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="stack-lg">
       <PageHeader tkey="users" />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <SearchInput value={q} onChange={setQ} placeholder={c("searchPlaceholder")} className="flex-1" />
-        <button
-          onClick={() => setBroadcastOpen(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-ink"
-        >
-          <Megaphone className="h-4 w-4" />
-          {c("broadcast.send")}
-          {selected.size > 0 && <span className="rounded-full bg-primary-ink/20 px-1.5 text-xs">{selected.size}</span>}
-        </button>
-        {/* Multi-select role filter */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {availableRoles.map((r) => {
-            const on = roles.has(r);
-            return (
-              <button
-                key={r}
-                onClick={() => toggleRole(r)}
-                className={
-                  "rounded-full px-3 py-1 text-xs font-semibold transition-colors " +
-                  (on ? "bg-primary text-primary-ink" : "bg-surface-2 text-ink-muted hover:bg-surface-2")
-                }
-              >
-                {c(`role_${r}`)}
-              </button>
-            );
-          })}
+      <div className="toolbar">
+        <div className="min-w-60 flex-1">
+          <SearchInput value={q} onChange={setQ} placeholder={c("searchPlaceholder")} className="max-w-[420px]" />
         </div>
+        <button type="button" onClick={() => setBroadcastOpen(true)} className="btn btn-primary">
+          <Megaphone />
+          {c("broadcast.send")}
+          {selected.size > 0 && <span className="num rounded-full bg-white/25 px-1.5 text-xs">{selected.size}</span>}
+        </button>
       </div>
 
-      <Card className="overflow-hidden">
+      {/* Multi-select role filter */}
+      <div className="row-wrap" role="group">
+        {availableRoles.map((r) => (
+          <button key={r} type="button" onClick={() => toggleRole(r)} aria-pressed={roles.has(r)} className={"chip" + (roles.has(r) ? " on" : "")}>
+            {c(`role_${r}`)}
+          </button>
+        ))}
+      </div>
+
+      <Card className="table-card">
         {loading ? (
-          <div className="space-y-2 p-4">
+          <div className="stack-sm p-4">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded bg-surface-2" />
+              <div key={i} className="skel h-12" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <EmptyState icon={UsersIcon} title={c("emptyTitle")} description={c("emptyDesc")} />
+          <div className="empty">
+            <div className="empty-ico">
+              <UsersIcon className="h-6 w-6" />
+            </div>
+            <h3>{c("emptyTitle")}</h3>
+            <p>{c("emptyDesc")}</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
+          <div className="table-wrap">
+            <table className="tbl">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={allVisibleSelected}
-                      onChange={toggleSelectAll}
-                      aria-label={t("common.selectAll")}
-                      className="h-4 w-4 cursor-pointer accent-primary"
-                    />
+                  <th>
+                    <label className="check">
+                      <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} aria-label={t("common.selectAll")} />
+                    </label>
                   </th>
-                  <th className="px-4 py-3 font-semibold">{c("colUser")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colPhone")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colRole")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colCompany")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colStatus")}</th>
-                  <th className="px-4 py-3" />
+                  <th>{c("colUser")}</th>
+                  <th>{c("colPhone")}</th>
+                  <th>{c("colRole")}</th>
+                  <th>{c("colCompany")}</th>
+                  <th>{c("colStatus")}</th>
+                  <th />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {pageRows.map((u) => (
-                  <tr key={rowKey(u)} className="hover:bg-surface-2">
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(rowKey(u))}
-                        onChange={() => toggleSelected(rowKey(u))}
-                        aria-label={u.name}
-                        className="h-4 w-4 cursor-pointer accent-primary"
-                      />
+                  <tr key={rowKey(u)}>
+                    <td>
+                      <label className="check">
+                        <input type="checkbox" checked={selected.has(rowKey(u))} onChange={() => toggleSelected(rowKey(u))} aria-label={u.name} />
+                      </label>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-ink">{u.name}</div>
-                      <div className="text-xs text-ink-subtle">{u.email}</div>
+                    <td>
+                      <div className="strong">{u.name}</div>
+                      <div className="subtle text-xs">{u.email}</div>
                     </td>
-                    <td className="px-4 py-3 text-ink-muted"><bdi dir="ltr">{u.phone || c("none")}</bdi></td>
-                    <td className="px-4 py-3">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ROLE_TONE[u.role] ?? "bg-surface-2 text-ink-muted"}`}>
-                        {c(`role_${u.role}`)}
-                      </span>
+                    <td>{u.phone ? <bdi dir="ltr" className="num nowrap">{u.phone}</bdi> : <span className="subtle">{c("none")}</span>}</td>
+                    <td>
+                      <span className={`badge square ${ROLE_TONE[u.role] ?? ""}`}>{c(`role_${u.role}`)}</span>
                     </td>
-                    <td className="px-4 py-3 text-ink-muted">{u.company || c("none")}</td>
-                    <td className="px-4 py-3">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_TONE[u.status] ?? "bg-surface-2 text-ink-muted"}`}>
+                    <td>{u.company || <span className="subtle">{c("none")}</span>}</td>
+                    <td>
+                      <span className={`badge ${STATUS_TONE[u.status] ?? ""}`}>
+                        <span className="dot" />
                         {c(`st_${u.status}`)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-end">
+                    <td>
                       {u.kind === "user" && u.role !== "super_admin" && (
-                        <button
-                          onClick={() => setConfirmDel(u)}
-                          className="rounded p-1.5 text-ink-subtle hover:bg-danger-bg hover:text-danger-fg"
-                          title={c("delete")}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="row-actions">
+                          <button type="button" onClick={() => setConfirmDel(u)} className="btn btn-ghost btn-icon btn-sm" title={c("delete")} aria-label={c("delete")}>
+                            <Trash2 />
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -228,7 +212,11 @@ export default function UsersPage() {
             </table>
           </div>
         )}
-        <Pager className="border-t border-line p-3" page={Math.min(page, lastPage)} lastPage={lastPage} total={filtered.length} onPage={setPage} />
+        {lastPage > 1 && (
+          <div className="tbl-foot">
+            <Pager className="w-full" page={Math.min(page, lastPage)} lastPage={lastPage} total={filtered.length} onPage={setPage} />
+          </div>
+        )}
       </Card>
 
       <ConfirmModal

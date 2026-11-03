@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Save, Upload, ImageOff, ChevronUp, ChevronDown, Trash2, Plus } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Loader2, Save, Upload, ImageOff, Eye, ChevronUp, ChevronDown, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { ImageCropper } from "@/components/ads/image-cropper";
@@ -173,10 +172,13 @@ export default function InvoiceTemplatePage() {
 
   if (!settings) {
     return (
-      <div className="space-y-6">
+      <div className="stack-lg">
         <PageHeader tkey="invoiceTemplate" />
-        <div className="flex justify-center py-20 text-ink-muted">
-          <Loader2 className="h-6 w-6 animate-spin" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+          <div className="stack">
+            {[0, 1].map((i) => <div key={i} className="skel" style={{ height: 160, borderRadius: 16 }} />)}
+          </div>
+          <div className="skel" style={{ height: 340, borderRadius: 16 }} />
         </div>
       </div>
     );
@@ -185,7 +187,7 @@ export default function InvoiceTemplatePage() {
   const logoSrc = resolveSrc(settings.logo_url);
 
   return (
-    <div className="space-y-6">
+    <div className="stack-lg">
       <PageHeader
         tkey="invoiceTemplate"
         action={
@@ -196,24 +198,24 @@ export default function InvoiceTemplatePage() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         {/* Editor form */}
-        <div className="space-y-6">
+        <div className="stack">
           {/* Branding */}
           <Section title={c("secBranding")}>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">{c("logo")}</label>
-              <div className="flex items-center gap-3">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-surface-2">
+            <div className="field">
+              <span className="strong text-sm">{c("logo")}</span>
+              <div className="row" style={{ gap: 14 }}>
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-3 text-ink-subtle">
                   {logoSrc ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={logoSrc} alt="" className="max-h-full max-w-full object-contain" />
                   ) : (
-                    <ImageOff className="h-5 w-5 text-ink-subtle" />
+                    <ImageOff className="h-5 w-5" />
                   )}
                 </div>
-                <div className="flex flex-col gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink hover:bg-surface-2">
+                <div className="stack-sm">
+                  <label className="btn btn-secondary btn-sm" style={{ cursor: "pointer" }}>
                     <input type="file" accept="image/*" className="hidden" onChange={onPickLogo} disabled={uploading} />
                     {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                     {settings.logo_url ? c("changeLogo") : c("uploadLogo")}
@@ -222,7 +224,8 @@ export default function InvoiceTemplatePage() {
                     <button
                       type="button"
                       onClick={() => set("logo_url", null)}
-                      className="text-start text-xs text-danger-fg hover:underline"
+                      className="text-start text-sm hover:underline"
+                      style={{ color: "var(--danger-fg)" }}
                     >
                       {c("removeLogo")}
                     </button>
@@ -230,13 +233,15 @@ export default function InvoiceTemplatePage() {
                 </div>
               </div>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">{c("accentColor")}</label>
+            <div className="field">
+              <label htmlFor="it-accent">{c("accentColor")}</label>
               <input
+                id="it-accent"
                 type="color"
                 value={settings.accent_color || "#4f46e5"}
                 onChange={(e) => set("accent_color", e.target.value)}
-                className="h-9 w-full rounded-lg border border-line-strong"
+                className="input"
+                style={{ padding: 3, height: 40, width: 100 }}
               />
             </div>
           </Section>
@@ -245,11 +250,11 @@ export default function InvoiceTemplatePage() {
           <Section title={c("secIssuer")}>
             <Field label={c("issuerName")} value={settings.issuer_name} onChange={(v) => set("issuer_name", v)} />
             <TextArea label={c("issuerAddress")} value={settings.issuer_address} onChange={(v) => set("issuer_address", v)} />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="form-grid">
               <Field label={c("issuerTaxId")} value={settings.issuer_tax_id} onChange={(v) => set("issuer_tax_id", v)} placeholder="DE123456789" />
               <Field label={c("issuerPhone")} value={settings.issuer_phone} onChange={(v) => set("issuer_phone", v)} placeholder="+49 202 000000" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="form-grid">
               <Field label={c("issuerEmail")} value={settings.issuer_email} onChange={(v) => set("issuer_email", v)} placeholder="billing@firma.de" />
               <Field label={c("issuerWebsite")} value={settings.issuer_website} onChange={(v) => set("issuer_website", v)} placeholder="firma.de" />
             </div>
@@ -258,7 +263,7 @@ export default function InvoiceTemplatePage() {
           {/* Bank */}
           <Section title={c("secBank")}>
             <Field label={c("bankName")} value={settings.bank_name} onChange={(v) => set("bank_name", v)} placeholder="Sparkasse Wuppertal" />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="form-grid">
               <Field label={c("bankIban")} value={settings.bank_iban} onChange={(v) => set("bank_iban", v)} placeholder="DE00 0000 0000 0000 00" />
               <Field label={c("bankBic")} value={settings.bank_bic} onChange={(v) => set("bank_bic", v)} placeholder="WELADEDXXX" />
             </div>
@@ -266,33 +271,33 @@ export default function InvoiceTemplatePage() {
 
           {/* Content */}
           <Section title={c("secContent")}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="form-grid">
               <Field label={c("invoiceTitle")} value={settings.invoice_title} onChange={(v) => set("invoice_title", v)} />
               <Field label={c("numberPrefix")} value={settings.number_prefix} onChange={(v) => set("number_prefix", v)} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-ink">{c("vatRate")}</label>
+            <div className="form-grid">
+              <div className="field">
+                <label htmlFor="it-vat">{c("vatRate")}</label>
                 <input
+                  id="it-vat"
                   type="number"
                   min={0}
                   step="0.1"
                   value={String(settings.vat_rate)}
                   onChange={(e) => set("vat_rate", Number(e.target.value) || 0)}
                   disabled={settings.kleinunternehmer}
-                  className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line disabled:opacity-50"
+                  className="input"
                 />
               </div>
               <Field label={c("currency")} value={settings.currency} onChange={(v) => set("currency", v)} />
             </div>
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-muted">
+            <label className="check">
               <input
                 type="checkbox"
                 checked={settings.kleinunternehmer}
                 onChange={(e) => set("kleinunternehmer", e.target.checked)}
-                className="h-4 w-4"
               />
-              {c("kleinunternehmer")}
+              <span>{c("kleinunternehmer")}</span>
             </label>
           </Section>
 
@@ -305,12 +310,13 @@ export default function InvoiceTemplatePage() {
 
           {/* Labels / headings — one override per fixed invoice heading. */}
           <Section title={c("secLabels")}>
-            <p className="text-xs text-ink-muted">{c("labelsHint")}</p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <p className="subtle text-sm">{c("labelsHint")}</p>
+            <div className="form-grid">
               {LABEL_KEYS.map((key) => (
-                <div key={key}>
-                  <label className="mb-1 block text-xs font-medium text-ink-muted">{c(`labelKeys.${key}`)}</label>
+                <div key={key} className="field">
+                  <label htmlFor={`lb-${key}`}>{c(`labelKeys.${key}`)}</label>
                   <input
+                    id={`lb-${key}`}
                     value={settings.labels?.[key] ?? ""}
                     placeholder={GERMAN_DEFAULTS[key]}
                     onChange={(e) => setLabel(key, e.target.value)}
@@ -323,10 +329,10 @@ export default function InvoiceTemplatePage() {
 
           {/* Footer blocks — reorderable columns with reorderable label/value lines. */}
           <Section title={c("secFooterBlocks")}>
-            <p className="text-xs text-ink-muted">{c("footerBlocksHint")}</p>
+            <p className="subtle text-sm">{c("footerBlocksHint")}</p>
             {(settings.footer_blocks ?? []).map((block, bi) => (
-              <div key={bi} className="space-y-3 rounded-lg border border-line bg-surface-2 p-3">
-                <div className="flex items-center gap-2">
+              <div key={bi} className="card inset stack-sm" style={{ padding: 14 }}>
+                <div className="row" style={{ gap: 8 }}>
                   <input
                     value={block.heading}
                     placeholder={c("blockHeading")}
@@ -349,7 +355,7 @@ export default function InvoiceTemplatePage() {
                 </div>
 
                 {block.lines.map((line, li) => (
-                  <div key={li} className="flex items-center gap-2">
+                  <div key={li} className="row" style={{ gap: 8 }}>
                     <input
                       value={line.label ?? ""}
                       placeholder={c("lineLabel")}
@@ -389,9 +395,10 @@ export default function InvoiceTemplatePage() {
                 <button
                   type="button"
                   onClick={() => patchBlock(bi, { lines: [...block.lines, { label: null, value: "" }] })}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-ink-muted hover:text-ink"
+                  className="btn btn-ghost btn-sm"
+                  style={{ alignSelf: "flex-start" }}
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <Plus />
                   {c("addLine")}
                 </button>
               </div>
@@ -399,19 +406,26 @@ export default function InvoiceTemplatePage() {
             <button
               type="button"
               onClick={() => setBlocks((b) => [...b, { heading: "", lines: [{ label: null, value: "" }] }])}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink hover:bg-surface-2"
+              className="btn btn-secondary btn-block"
             >
-              <Plus className="h-4 w-4" />
+              <Plus />
               {c("addBlock")}
             </button>
           </Section>
         </div>
 
         {/* Live preview */}
-        <Card className="p-5 lg:sticky lg:top-6 lg:self-start">
-          <h3 className="mb-3 text-sm font-semibold text-ink-muted">{c("preview")}</h3>
-          <iframe title="invoice-preview" sandbox="" className="h-[720px] w-full rounded-lg border border-line bg-white" srcDoc={preview} />
-        </Card>
+        <section className="card lg:sticky lg:top-6 lg:self-start">
+          <div className="card-head">
+            <h2 className="row" style={{ gap: 8 }}>
+              <span className="subtle"><Eye style={{ width: 18, height: 18 }} /></span>
+              {c("preview")}
+            </h2>
+          </div>
+          <div className="card-body">
+            <iframe title="invoice-preview" sandbox="" className="h-[720px] w-full rounded-lg border border-line bg-white" srcDoc={preview} />
+          </div>
+        </section>
       </div>
 
       {cropFile && (
@@ -423,15 +437,16 @@ export default function InvoiceTemplatePage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <Card className="space-y-4 p-5">
-      <h3 className="text-sm font-semibold text-ink">{title}</h3>
-      {children}
-    </Card>
+    <section className="card">
+      <div className="card-head">
+        <h2>{title}</h2>
+      </div>
+      <div className="card-body stack">{children}</div>
+    </section>
   );
 }
 
-const inputCls =
-  "ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line";
+const inputCls = "input";
 
 /** A small square icon button used for reorder/remove controls. */
 function IconBtn({
@@ -454,9 +469,8 @@ function IconBtn({
       aria-label={title}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface hover:bg-surface-2 disabled:opacity-40 disabled:hover:bg-surface ${
-        danger ? "text-danger-fg" : "text-ink-muted"
-      }`}
+      className="btn btn-secondary btn-sm btn-icon shrink-0"
+      style={danger ? { color: "var(--danger-fg)" } : undefined}
     >
       {children}
     </button>
@@ -475,8 +489,8 @@ function Field({
   placeholder?: string;
 }) {
   return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
+    <div className="field">
+      <label>{label}</label>
       <input value={value ?? ""} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={inputCls} />
     </div>
   );
@@ -484,13 +498,13 @@ function Field({
 
 function TextArea({ label, value, onChange }: { label: string; value: string | null; onChange: (v: string) => void }) {
   return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
+    <div className="field">
+      <label>{label}</label>
       <textarea
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         rows={2}
-        className={`${inputCls} resize-y`}
+        className="textarea resize-y"
       />
     </div>
   );

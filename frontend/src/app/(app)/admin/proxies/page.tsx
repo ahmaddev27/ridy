@@ -3,10 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, Loader2, Plug, Trash2, Pencil, AlertTriangle, RefreshCw } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
@@ -41,99 +38,117 @@ export default function ProxiesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        tkey="proxies"
-        action={
-          <Button onClick={() => setEditing("new")}>
+    <div className="stack-lg">
+      <header className="ph">
+        <div>
+          <h1>{t("pages.proxies.title")}</h1>
+          <p>{t("pages.proxies.subtitle")}</p>
+        </div>
+        <div className="ph-actions">
+          <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
             <Plus className="h-4 w-4" /> {c("add")}
-          </Button>
-        }
-      />
+          </button>
+        </div>
+      </header>
 
-      <Card className="overflow-hidden">
+      <section className="card table-card">
         {loading ? (
-          <div className="space-y-2 p-4">
-            {[0, 1].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded bg-surface-2" />
+          <div className="stack" style={{ padding: 16 }}>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="skel" style={{ height: 52 }} />
             ))}
           </div>
         ) : proxies.length === 0 ? (
-          <EmptyState icon={Plug} title={c("emptyTitle")} description={c("emptyDesc")} />
+          <div className="empty">
+            <div className="empty-ico"><Plug className="h-5 w-5" /></div>
+            <h3>{c("emptyTitle")}</h3>
+            <p>{c("emptyDesc")}</p>
+            <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
+              <Plus className="h-4 w-4" /> {c("add")}
+            </button>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
+          <div className="table-wrap">
+            <table className="tbl">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 font-semibold">{c("colLabel")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colUrl")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colUsage")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colCost")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("fieldNotes")}</th>
-                  <th className="px-4 py-3" />
+                  <th>{c("colLabel")}</th>
+                  <th>{c("colUrl")}</th>
+                  <th>{c("colUsage")}</th>
+                  <th>{c("colCost")}</th>
+                  <th>{c("fieldNotes")}</th>
+                  <th />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {proxies.map((p) => (
-                  <tr key={p.id} className="hover:bg-surface-2">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-ink">{p.label}</div>
-                      {p.expires_at && (
-                        <div
-                          className={
-                            "mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold " +
-                            (p.expiring ? "bg-danger-bg text-danger-fg" : "bg-surface-2 text-ink-muted")
-                          }
-                        >
-                          {p.days_left !== null && p.days_left < 0
-                            ? c("expired")
-                            : c("expiresIn").replace("{n}", String(p.days_left ?? 0))}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-ink-muted">
-                      <bdi dir="ltr">{p.url_masked}</bdi>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-28 overflow-hidden rounded-full bg-surface-2">
-                          <div
-                            className={`h-full rounded-full ${p.near_full ? "bg-amber-500" : "bg-emerald-500"}`}
-                            style={{ width: `${Math.min(100, (p.used / Math.max(1, p.capacity)) * 100)}%` }}
-                          />
-                        </div>
-                        <bdi dir="ltr" className="whitespace-nowrap text-xs text-ink-muted">{p.used} / {p.capacity}</bdi>
-                        {p.near_full && (
-                          <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-warning-fg">
-                            <AlertTriangle className="h-3 w-3" /> {c("nearFull")}
+                  <tr key={p.id}>
+                    <td>
+                      <div className="stack-sm" style={{ gap: 4 }}>
+                        <span className="strong mono">{p.label}</span>
+                        {p.expires_at && (
+                          <span>
+                            <span className={"badge " + (p.expiring ? "danger" : "")}>
+                              {p.days_left !== null && p.days_left < 0
+                                ? c("expired")
+                                : c("expiresIn").replace("{n}", String(p.days_left ?? 0))}
+                            </span>
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td>
+                      <bdi dir="ltr" className="mono subtle truncate" style={{ display: "block", maxWidth: 260 }}>
+                        {p.url_masked}
+                      </bdi>
+                    </td>
+                    <td>
+                      <div style={{ minWidth: 150 }}>
+                        <div className="row" style={{ gap: 10 }}>
+                          <div className={"meter" + (p.near_full ? " warning" : "")} style={{ width: 96 }}>
+                            <i style={{ width: `${Math.min(100, (p.used / Math.max(1, p.capacity)) * 100)}%` }} />
+                          </div>
+                          <bdi dir="ltr" className="num text-sm">{p.used} / {p.capacity}</bdi>
+                        </div>
+                        {p.near_full && (
+                          <div className="warn text-xs row" style={{ gap: 4, marginTop: 4 }}>
+                            <AlertTriangle className="h-3.5 w-3.5" /> {c("nearFull")}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td>
                       {p.price != null ? (
-                        <div className="font-medium tabular-nums text-ink">{formatMoney(p.price, locale)}</div>
+                        <div className="num strong">{formatMoney(p.price, locale)}</div>
                       ) : (
-                        <span className="text-ink-subtle">—</span>
+                        <span className="subtle">—</span>
                       )}
-                      {p.source && <div className="text-xs text-ink-subtle">{p.source}</div>}
+                      {p.source && <div className="subtle text-xs">{p.source}</div>}
                       {p.renewals.length > 0 && (
-                        <div className="mt-0.5 text-xs font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                        <div className="pos text-xs num">
                           {c("totalPaid")}: {formatMoney(p.total_paid, locale)}
                         </div>
                       )}
                     </td>
-                    <td className="max-w-[220px] truncate px-4 py-3 text-ink-muted" title={p.notes ?? ""}>{p.notes || "—"}</td>
-                    <td className="px-4 py-3 text-end">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => setRenewing(p)} className="rounded p-1.5 text-ink-subtle hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950" title={c("renew")}>
-                          <RefreshCw className="h-4 w-4" />
+                    <td>
+                      {p.notes ? (
+                        <span className="muted text-sm truncate" style={{ display: "block", maxWidth: 220 }} title={p.notes}>
+                          {p.notes}
+                        </span>
+                      ) : (
+                        <span className="subtle">—</span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        <button type="button" className="icon-btn pos" onClick={() => setRenewing(p)} title={c("renew")} aria-label={c("renew")}>
+                          <RefreshCw />
                         </button>
-                        <button onClick={() => setEditing(p)} className="rounded p-1.5 text-ink-subtle hover:bg-surface-2 hover:text-ink" title={c("edit")}>
-                          <Pencil className="h-4 w-4" />
+                        <button type="button" className="icon-btn" onClick={() => setEditing(p)} title={c("edit")} aria-label={c("edit")}>
+                          <Pencil />
                         </button>
-                        <button onClick={() => setConfirmDel(p)} className="rounded p-1.5 text-ink-subtle hover:bg-danger-bg hover:text-danger-fg" title={c("delete")}>
-                          <Trash2 className="h-4 w-4" />
+                        <button type="button" className="icon-btn neg" onClick={() => setConfirmDel(p)} title={c("delete")} aria-label={c("delete")}>
+                          <Trash2 />
                         </button>
                       </div>
                     </td>
@@ -143,7 +158,7 @@ export default function ProxiesPage() {
             </table>
           </div>
         )}
-      </Card>
+      </section>
 
       {editing && (
         <ProxyModal proxy={editing === "new" ? null : editing} onClose={() => setEditing(null)} onSaved={refetch} />
@@ -219,7 +234,7 @@ function ProxyModal({ proxy, onClose, onSaved }: { proxy: Proxy | null; onClose:
         </div>
       }
     >
-      <div className="space-y-3 text-start">
+      <div className="stack text-start">
         <Field label={c("fieldLabel")} value={label} onChange={setLabel} />
         <Field
           label={c("fieldUrl")}
@@ -229,11 +244,11 @@ function ProxyModal({ proxy, onClose, onSaved }: { proxy: Proxy | null; onClose:
           placeholder={proxy ? "••••••  (leave blank to keep)" : "http://user:pass@host:port"}
         />
         <Field label={c("fieldCapacity")} type="number" value={capacity} onChange={setCapacity} />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="form-grid">
           <Field label={c("fieldPrice")} type="number" value={price} onChange={setPrice} placeholder="0.00" />
           <Field label={c("fieldSource")} value={source} onChange={setSource} placeholder={c("sourcePlaceholder")} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="form-grid">
           <Field label={c("fieldStart")} type="date" value={startsAt} onChange={setStartsAt} />
           <Field label={c("fieldExpires")} type="date" value={expiresAt} onChange={setExpiresAt} />
         </div>
@@ -290,27 +305,27 @@ function RenewProxyModal({ proxy, onClose, onSaved }: { proxy: Proxy; onClose: (
         </div>
       }
     >
-      <div className="space-y-3 text-start">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center justify-between rounded-lg bg-surface-2 px-3 py-2 text-sm">
-            <span className="text-ink-subtle">{c("totalPaid")}</span>
-            <span className="font-bold tabular-nums text-ink">{formatMoney(proxy.total_paid, locale)}</span>
+      <div className="stack text-start">
+        <div className="form-grid">
+          <div className="card inset" style={{ padding: 12 }}>
+            <div className="subtle text-xs">{c("totalPaid")}</div>
+            <div className="strong num text-md">{formatMoney(proxy.total_paid, locale)}</div>
           </div>
-          <div className="flex items-center justify-between rounded-lg bg-surface-2 px-3 py-2 text-sm">
-            <span className="text-ink-subtle">{c("currentEnd")}</span>
-            <bdi dir="ltr" className="font-medium text-ink">{proxy.ends_at ?? "—"}</bdi>
+          <div className="card inset" style={{ padding: 12 }}>
+            <div className="subtle text-xs">{c("currentEnd")}</div>
+            <bdi dir="ltr" className="strong num text-md">{proxy.ends_at ?? "—"}</bdi>
           </div>
         </div>
 
         <Field label={c("fieldAmount")} type="number" value={amount} onChange={setAmount} placeholder="0.00" />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="form-grid">
           <Field label={c("fieldStart")} type="date" value={startsAt} onChange={setStartsAt} />
           <Field label={c("fieldEnd")} type="date" value={endsAt} onChange={setEndsAt} />
         </div>
         <Field label={c("fieldNotes")} value={note} onChange={setNote} />
 
         <div>
-          <div className="mb-1 mt-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">{c("history")}</div>
+          <h3 className="section-title" style={{ marginBottom: 8 }}>{c("history")}</h3>
           <ul className="divide-y divide-line rounded-lg border border-line">
             {history.map((h) => (
               <li key={h.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
@@ -344,15 +359,15 @@ function Field({
   placeholder?: string;
 }) {
   return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
+    <div className="field">
+      <label>{label}</label>
       <input
         type={type}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         autoComplete="off"
-        className={`ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ${mono ? "font-mono text-xs" : ""}`}
+        className={`input ${mono ? "mono" : ""}`}
       />
     </div>
   );

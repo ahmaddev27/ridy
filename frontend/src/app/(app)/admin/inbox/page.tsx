@@ -3,11 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Inbox, Mail, Phone, Trash2, MailOpen, MailCheck } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/context";
 import { formatDateTime } from "@/lib/utils";
 import { useAsync } from "@/hooks/use-async";
@@ -60,65 +56,97 @@ export default function AdminInboxPage() {
     iso ? formatDateTime(iso, locale, { dateStyle: "medium", timeStyle: "short" }) : "";
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={c("title")}
-        subtitle={c("subtitle")}
-        action={unread > 0 ? <Badge status="connected" dot>{unread} {c("unread")}</Badge> : undefined}
-      />
+    <>
+      <header className="ph">
+        <div>
+          <h1>{c("title")}</h1>
+          <p>{c("subtitle")}</p>
+        </div>
+        {unread > 0 && (
+          <span className="badge success">
+            <span className="dot" />
+            {unread} {c("unread")}
+          </span>
+        )}
+      </header>
 
       {loading && !data ? (
-        <Card className="space-y-2 p-4">{[0, 1].map((k) => <div key={k} className="h-12 animate-pulse rounded bg-surface-2" />)}</Card>
+        <section className="card" style={{ padding: 16 }}>
+          <div className="stack-sm">{[0, 1].map((k) => <div key={k} className="skel" style={{ height: 48 }} />)}</div>
+        </section>
       ) : messages.length === 0 ? (
-        <Card className="overflow-hidden">
-          <EmptyState icon={Inbox} title={c("empty")} description={c("emptyDesc")} />
-        </Card>
+        <section className="card">
+          <div className="empty">
+            <span className="empty-ico"><Inbox /></span>
+            <h3>{c("empty")}</h3>
+            <p>{c("emptyDesc")}</p>
+          </div>
+        </section>
       ) : (
-        <div className="space-y-3">
+        <div className="stack-sm">
           {messages.map((m) => (
-            <Card
+            <article
               key={m.id}
-              className={`p-5 ${m.read ? "" : "border-primary/40 bg-surface-2"}`}
+              className="card"
+              style={{
+                display: "flex",
+                gap: 12,
+                padding: "16px 18px",
+                ...(m.read ? {} : { background: "var(--success-bg)", borderColor: "transparent" }),
+              }}
             >
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {!m.read && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />}
-                    <span className="font-semibold text-ink">{m.name}</span>
-                    <span className="text-xs text-ink-subtle">{fmt(m.created_at)}</span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
-                    <a href={`mailto:${m.email}`} className="inline-flex items-center gap-1.5 hover:text-ink">
-                      <Mail className="h-3.5 w-3.5" /> {m.email}
+              <span
+                aria-hidden
+                style={{
+                  width: 8,
+                  height: 8,
+                  marginTop: 7,
+                  flexShrink: 0,
+                  borderRadius: 99,
+                  background: m.read ? "transparent" : "var(--success-dot)",
+                }}
+              />
+              <div className="grow">
+                <div className="row-wrap" style={{ gap: "6px 14px" }}>
+                  <span className="strong">{m.name}</span>
+                  <span className="subtle text-sm num">{fmt(m.created_at)}</span>
+                  {!m.read && <span className="badge success">{c("unread")}</span>}
+                </div>
+                <div className="row-wrap text-sm" style={{ gap: "4px 16px", marginTop: 4 }}>
+                  <a href={`mailto:${m.email}`} className="link row" style={{ gap: 6 }}>
+                    <Mail className="ico-sm" style={{ width: 15, height: 15 }} />
+                    {m.email}
+                  </a>
+                  {m.phone && (
+                    <a href={`tel:${m.phone}`} className="link row" style={{ gap: 6 }}>
+                      <Phone style={{ width: 15, height: 15 }} />
+                      <span className="num" dir="ltr">{m.phone}</span>
                     </a>
-                    {m.phone && (
-                      <a href={`tel:${m.phone}`} className="inline-flex items-center gap-1.5 hover:text-ink">
-                        <Phone className="h-3.5 w-3.5" /> {m.phone}
-                      </a>
-                    )}
-                  </div>
+                  )}
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    onClick={() => toggleRead(m)}
-                    className="rounded-lg p-1.5 text-ink-muted hover:bg-surface-2"
-                    aria-label={m.read ? c("markUnread") : c("markRead")}
-                    title={m.read ? c("markUnread") : c("markRead")}
-                  >
-                    {m.read ? <MailOpen className="h-4 w-4" /> : <MailCheck className="h-4 w-4" />}
-                  </button>
-                  <button
-                    onClick={() => setDeleting(m)}
-                    className="rounded-lg p-1.5 text-danger-fg hover:bg-danger-bg"
-                    aria-label={c("delete")}
-                    title={c("delete")}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+                <p style={{ marginTop: 10, whiteSpace: "pre-wrap", lineHeight: 1.55 }}>{m.message}</p>
               </div>
-              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-ink">{m.message}</p>
-            </Card>
+              <div className="row" style={{ gap: 2, alignSelf: "flex-start" }}>
+                <button
+                  type="button"
+                  onClick={() => toggleRead(m)}
+                  className="icon-btn"
+                  aria-label={m.read ? c("markUnread") : c("markRead")}
+                  title={m.read ? c("markUnread") : c("markRead")}
+                >
+                  {m.read ? <MailCheck /> : <MailOpen />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeleting(m)}
+                  className="icon-btn neg"
+                  aria-label={c("delete")}
+                  title={c("delete")}
+                >
+                  <Trash2 />
+                </button>
+              </div>
+            </article>
           ))}
         </div>
       )}
@@ -134,6 +162,6 @@ export default function AdminInboxPage() {
         busy={busy}
         danger
       />
-    </div>
+    </>
   );
 }

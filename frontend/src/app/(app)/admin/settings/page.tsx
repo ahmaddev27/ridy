@@ -2,11 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Save, Mail, LifeBuoy, Smartphone, Landmark, Banknote, RotateCcw } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Loader2, Save, Mail, LifeBuoy, Smartphone, Landmark, Banknote, RotateCcw, Send, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import { PageHeader } from "@/components/ui/page-header";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
 import { useI18n } from "@/lib/i18n/context";
@@ -200,12 +198,17 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader tkey="settings" />
+    <div className="stack-lg">
+      <header className="ph">
+        <div>
+          <h1>{t("pages.settings.title")}</h1>
+          <p>{t("pages.settings.subtitle")}</p>
+        </div>
+      </header>
 
-      <div className="flex w-full flex-col gap-4 md:flex-row">
+      <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-[210px_minmax(0,1fr)]">
         {/* Side tabs */}
-        <nav className="flex gap-1 overflow-x-auto glass-panel glass-panel--card rounded-xl p-1.5 md:h-fit md:w-52 md:flex-col md:gap-1">
+        <nav role="tablist" className="flex gap-0.5 overflow-x-auto md:sticky md:top-[76px] md:flex-col">
           {([
             { k: "email", icon: Mail },
             { k: "support", icon: LifeBuoy },
@@ -216,68 +219,63 @@ export default function SettingsPage() {
             return (
               <button
                 key={k}
+                type="button"
+                role="tab"
+                aria-selected={active}
                 onClick={() => setTab(k)}
                 className={
-                  "group flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-start text-sm font-medium transition-all " +
+                  "flex h-[38px] items-center gap-2.5 whitespace-nowrap rounded-[10px] px-3 text-start text-[13.5px] font-medium transition-colors " +
                   (active
-                    ? "bg-primary text-primary-ink shadow-sm"
+                    ? "bg-surface text-ink shadow-[var(--shadow-xs)] outline outline-1 outline-line"
                     : "text-ink-muted hover:bg-surface-2 hover:text-ink")
                 }
               >
-                <Icon className={"h-4 w-4 shrink-0 " + (active ? "text-primary-ink" : "text-ink-subtle group-hover:text-ink-muted")} />
+                <Icon className="h-4 w-4 shrink-0" />
                 {c(`tab_${k}`)}
               </button>
             );
           })}
         </nav>
 
-        <div className="min-w-0 flex-1 space-y-6">
+        <div className="stack-lg min-w-0">
       {/* Email delivery */}
       {/* Never show (or let anyone save) the empty default form: a failed
           load would otherwise overwrite SMTP / payment / support settings. */}
       {!settings && (
-        <Card className="flex flex-col items-center gap-3 p-8 text-center text-sm text-ink-muted">
+        <section className="card">
           {loadFailed ? (
-            <>
-              <p>{t("common.loadFailed")}</p>
-              <Button variant="secondary" onClick={retryLoad}>
+            <div className="empty">
+              <div className="empty-ico"><RotateCcw className="h-5 w-5" /></div>
+              <h3>{t("common.loadFailed")}</h3>
+              <button type="button" className="btn btn-secondary" onClick={retryLoad}>
                 <RotateCcw className="h-4 w-4" />
                 {t("common.retry")}
-              </Button>
-            </>
+              </button>
+            </div>
           ) : (
-            <Loader2 className="h-5 w-5 animate-spin text-ink-subtle" />
+            <div className="card-body stack">
+              <span className="skel" style={{ height: 14, width: "40%" }} />
+              <span className="skel" style={{ height: 40 }} />
+              <span className="skel" style={{ height: 40 }} />
+            </div>
           )}
-        </Card>
+        </section>
       )}
       {settings && tab === "email" && (
-      <Card className="w-full p-5">
-        <div className="mb-4 flex items-center gap-2">
-          <Mail className="h-4 w-4 text-ink" />
-          <h3 className="font-semibold text-ink">{c("email")}</h3>
-        </div>
-
+      <SettingsCard icon={Mail} title={c("email")}>
         {/* Provider picker */}
-        <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-ink">{c("provider")}</label>
-          <div className="flex gap-2">
+        <div className="field">
+          <span className="strong text-sm">{c("provider")}</span>
+          <div className="seg" role="group" style={{ alignSelf: "flex-start" }}>
             {(["smtp", "resend"] as const).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setProvider(p)}
-                className={
-                  "rounded-lg border px-4 py-2 text-sm font-medium transition-colors " +
-                  (provider === p ? "border-ink bg-primary text-primary-ink" : "border-line text-ink-muted hover:bg-surface-2")
-                }
-              >
+              <button key={p} type="button" className={provider === p ? "on" : ""} onClick={() => setProvider(p)}>
                 {p === "smtp" ? "SMTP" : "Resend API"}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="form-grid">
           {provider === "smtp" ? (
             <>
               <Field label={c("host")} value={host} onChange={setHost} />
@@ -290,8 +288,8 @@ export default function SettingsPage() {
                 onChange={setPassword}
                 placeholder={settings?.has_smtp_password ? "••••••••" : ""}
               />
-              <div>
-                <label className="mb-1 block text-sm font-medium text-ink">{c("encryption")}</label>
+              <div className="field">
+                <label>{c("encryption")}</label>
                 <Select
                   value={encryption}
                   onChange={setEncryption}
@@ -305,7 +303,7 @@ export default function SettingsPage() {
               </div>
             </>
           ) : (
-            <div className="md:col-span-2">
+            <div className="full">
               <Field
                 label={c("resendKey")}
                 type="password"
@@ -319,8 +317,9 @@ export default function SettingsPage() {
           <Field label={c("fromName")} value={fromName} onChange={setFromName} />
           <Field label={c("fromAddress")} type="email" value={fromAddress} onChange={setFromAddress} />
         </div>
-        <div className="mt-4 flex justify-end gap-2">
+        <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => { setTestTo(""); setTestOpen(true); }} disabled={busy || !settings}>
+            <Send className="h-4 w-4" />
             {c("sendTest")}
           </Button>
           <Button onClick={saveSmtp} disabled={busy || !settings}>
@@ -328,56 +327,45 @@ export default function SettingsPage() {
             {c("save")}
           </Button>
         </div>
-      </Card>
+      </SettingsCard>
       )}
 
       {/* Support contacts — shown to suspended companies */}
       {settings && tab === "support" && (
-      <Card className="w-full p-5">
-        <div className="mb-1 flex items-center gap-2">
-          <LifeBuoy className="h-4 w-4 text-ink" />
-          <h3 className="font-semibold text-ink">{c("support")}</h3>
-        </div>
-        <p className="mb-3 text-sm text-ink-muted">{c("supportHint")}</p>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <SettingsCard icon={LifeBuoy} title={c("support")} sub={c("supportHint")}>
+        <div className="form-grid">
           <Field label={c("supportEmail")} type="email" value={supportEmail} onChange={setSupportEmail} />
           <Field label={c("supportWhatsapp")} value={supportWhatsapp} onChange={setSupportWhatsapp} placeholder="+491700000000" />
         </div>
-        <div className="mt-4 flex justify-end">
+        <div className="flex justify-end">
           <Button onClick={saveSupport} disabled={busy || !settings}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {c("save")}
           </Button>
         </div>
-      </Card>
+      </SettingsCard>
       )}
 
       {/* Subscription payment methods — shown to companies on the subscription/suspended screens */}
       {settings && tab === "payment" && (
-      <Card className="w-full p-5">
-        <div className="mb-1 flex items-center gap-2">
-          <Banknote className="h-4 w-4 text-ink" />
-          <h3 className="font-semibold text-ink">{c("payment")}</h3>
-        </div>
-        <p className="mb-4 text-sm text-ink-muted">{c("paymentHint")}</p>
-
+      <SettingsCard icon={Banknote} title={c("payment")} sub={c("paymentHint")}>
         {/* Bank transfer */}
-        <div className="rounded-xl border border-line p-4">
+        <div className="flex flex-col gap-3.5 rounded-[var(--r-lg)] border border-line bg-surface p-4">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Landmark className="h-4 w-4 text-ink" />
-              <span className="font-medium text-ink">{c("payBank")}</span>
+            <div className="row" style={{ gap: 10 }}>
+              <span className="stat-ico"><Landmark className="h-4 w-4" /></span>
+              <span className="strong">{c("payBank")}</span>
             </div>
             <Toggle checked={bankEnabled} onChange={() => setBankEnabled((v) => !v)} label={c("payBank")} />
           </div>
           {bankEnabled && (
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="form-grid">
               <Field label={c("payBankHolder")} value={bankHolder} onChange={setBankHolder} />
               <Field label={c("payBankName")} value={bankName} onChange={setBankName} />
               <Field label={c("payBankIban")} value={bankIban} onChange={setBankIban} mono dir="ltr" />
               <Field label={c("payBankBic")} value={bankBic} onChange={setBankBic} mono dir="ltr" />
               <Field label={c("payBankAmount")} value={bankAmount} onChange={setBankAmount} placeholder="300" dir="ltr" />
-              <div className="md:col-span-2">
+              <div className="full">
                 <Field label={c("payBankNote")} value={bankNote} onChange={setBankNote} />
               </div>
             </div>
@@ -385,52 +373,47 @@ export default function SettingsPage() {
         </div>
 
         {/* Cash / phone contact */}
-        <div className="mt-3 rounded-xl border border-line p-4">
+        <div className="flex flex-col gap-3.5 rounded-[var(--r-lg)] border border-line bg-surface p-4">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Banknote className="h-4 w-4 text-ink" />
-              <span className="font-medium text-ink">{c("payCash")}</span>
+            <div className="row" style={{ gap: 10 }}>
+              <span className="stat-ico"><Banknote className="h-4 w-4" /></span>
+              <span className="strong">{c("payCash")}</span>
             </div>
             <Toggle checked={cashEnabled} onChange={() => setCashEnabled((v) => !v)} label={c("payCash")} />
           </div>
           {cashEnabled && (
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="form-grid">
               <Field label={c("payCashWhatsapp")} value={cashWhatsapp} onChange={setCashWhatsapp} placeholder="+491700000000" dir="ltr" />
               <Field label={c("payCashNote")} value={cashNote} onChange={setCashNote} />
             </div>
           )}
         </div>
 
-        <div className="mt-4 flex justify-end">
+        <div className="flex justify-end">
           <Button onClick={savePayments} disabled={busy || !settings}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {c("save")}
           </Button>
         </div>
-      </Card>
+      </SettingsCard>
       )}
 
       {/* Mobile driver-app force-update */}
       {settings && tab === "mobile" && (
-      <Card className="w-full p-5">
-        <div className="mb-1 flex items-center gap-2">
-          <Smartphone className="h-4 w-4 text-ink" />
-          <h3 className="font-semibold text-ink">{c("mobileApp")}</h3>
-        </div>
-        <p className="mb-3 text-sm text-ink-muted">{c("mobileAppHint")}</p>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <SettingsCard icon={Smartphone} title={c("mobileApp")} sub={c("mobileAppHint")}>
+        <div className="form-grid">
           <Field label={c("appMinAndroid")} value={appMinAndroid} onChange={setAppMinAndroid} placeholder="1.0.0" />
           <Field label={c("appMinIos")} value={appMinIos} onChange={setAppMinIos} placeholder="1.0.0" />
           <Field label={c("appAndroidStoreUrl")} type="url" value={appAndroidStoreUrl} onChange={setAppAndroidStoreUrl} placeholder="https://play.google.com/store/apps/details?id=…" />
           <Field label={c("appIosStoreUrl")} type="url" value={appIosStoreUrl} onChange={setAppIosStoreUrl} placeholder="https://apps.apple.com/app/id…" />
         </div>
-        <div className="mt-4 flex justify-end">
+        <div className="flex justify-end">
           <Button onClick={saveMobileApp} disabled={busy || !settings}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {c("save")}
           </Button>
         </div>
-      </Card>
+      </SettingsCard>
       )}
         </div>
       </div>
@@ -448,17 +431,17 @@ export default function SettingsPage() {
           </div>
         }
       >
-        <div className="text-start">
-          <label className="mb-1 block text-sm font-medium text-ink">{c("testTo")}</label>
+        <div className="field text-start">
+          <label>{c("testTo")}</label>
           <input
             type="email"
             value={testTo}
             onChange={(e) => setTestTo(e.target.value)}
             autoFocus
             placeholder={settings ? "you@example.com" : ""}
-            className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
+            className="input"
           />
-          <p className="mt-2 text-xs text-ink-subtle">{c("testHint")}</p>
+          <p className="hint">{c("testHint")}</p>
         </div>
       </Modal>
     </div>
@@ -483,8 +466,8 @@ function Field({
   dir?: "ltr" | "rtl";
 }) {
   return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
+    <div className="field">
+      <label>{label}</label>
       {type === "password" ? (
         <PasswordInput
           value={value}
@@ -501,7 +484,7 @@ function Field({
           dir={dir}
           onChange={(e) => onChange(e.target.value)}
           autoComplete="off"
-          className={`ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ${mono ? "font-mono text-xs" : ""}`}
+          className={`input ${mono ? "mono" : ""}`}
         />
       )}
     </div>
@@ -518,24 +501,36 @@ function Toggle({
   label: string;
 }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      title={label}
-      onClick={onChange}
-      className={
-        "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-line " +
-        (checked ? "bg-primary" : "bg-line-strong")
-      }
-    >
-      <span
-        className={
-          "inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ltr:ml-1 rtl:mr-1 " +
-          (checked ? "ltr:translate-x-5 rtl:-translate-x-5" : "translate-x-0")
-        }
-      />
-    </button>
+    <label className="switch" title={label}>
+      <input type="checkbox" role="switch" checked={checked} onChange={onChange} aria-label={label} />
+      <span />
+    </label>
+  );
+}
+
+function SettingsCard({
+  icon: Icon,
+  title,
+  sub,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  sub?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="card">
+      <div className="card-head">
+        <div>
+          <h2 className="row" style={{ gap: 8 }}>
+            <Icon className="subtle h-4 w-4" />
+            {title}
+          </h2>
+          {sub && <div className="sub">{sub}</div>}
+        </div>
+      </div>
+      <div className="card-body stack">{children}</div>
+    </section>
   );
 }

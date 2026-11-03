@@ -5,10 +5,12 @@ import { formatDate, formatDateTime, formatMoney, formatNumber, latnLocale, relT
 import { fleetDayKey, fleetYmd, formatYmd } from "@/lib/fleet-day";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn, Globe, Network, Copy, Files, Check, Lock } from "lucide-react";
+import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Info, Users, Car, Radio, Plug, Gift, LogIn, Network, Copy, Files, Check, Lock, Star, Ban } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type Status } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Table, TableCard } from "@/components/ui/table";
 import { Modal } from "@/components/ui/modal";
 import { PasswordInput } from "@/components/ui/password-input";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
@@ -319,33 +321,99 @@ export function CompanyDetail({
     }
   }
 
-  return (
-    <div className="w-full text-start">
-      {/* Header with back link */}
-      <div className="mb-5 flex items-center gap-3">
-        <Link href="/admin/companies" className="rounded-lg p-1.5 text-ink-subtle hover:bg-surface-2 hover:text-ink">
-          <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
-        </Link>
-        <h1 className="text-xl font-bold text-ink">{company?.name ?? c("company")}</h1>
-        {company?.payment_reference && (
-          <span
-            className="rounded-md bg-surface-2 px-2 py-0.5 font-mono text-xs text-ink-muted"
-            dir="ltr"
-            title={t("screens.codes.yourReference")}
-          >
-            {company.payment_reference}
-          </span>
-        )}
-        {company?.state !== undefined && company?.state !== null && (
-          <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs font-semibold text-warning-fg">
-            {c(`sub_${company.state}`)}
-          </span>
-        )}
-      </div>
+  const headBadgeSession: Record<string, Status> = { active: "connected", needs_relink: "expiring", expired: "error" };
+  const proxyLabel = proxies.find((p) => p.id === company?.proxy_id)?.label ?? "—";
 
-      {/* Side tabs (start side = right in RTL, left in LTR) + content */}
-      <div className="flex flex-col gap-4 md:flex-row">
-        <nav className="flex gap-1 overflow-x-auto glass-panel glass-panel--card rounded-xl p-1.5 md:h-fit md:w-56 md:flex-col md:gap-1">
+  return (
+    <div className="stack w-full text-start">
+      {/* Page header with back link */}
+      <header className="ph">
+        <div>
+          <Link href="/admin/companies" className="back-link">
+            <ArrowLeft />
+            {c("allCompanies")}
+          </Link>
+          <h1>{c("company")}</h1>
+          <p>{c("pageSubtitle")}</p>
+        </div>
+      </header>
+
+      {/* Identity card: avatar, name, reference, status badges, key facts */}
+      {company && (
+        <section className="card" style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="row-wrap" style={{ gap: 14 }}>
+            <span className={"av lg t" + (company.name.length % 6)} aria-hidden>
+              {initials(company.name)}
+            </span>
+            <div className="grow" style={{ minWidth: 0 }}>
+              <div className="row-wrap" style={{ gap: 10 }}>
+                <h2 style={{ margin: 0, fontSize: 18 }}>{company.name}</h2>
+                {company.payment_reference && (
+                  <span
+                    className="inline-flex items-center rounded-lg bg-surface-3 px-2 py-0.5 font-mono text-xs text-ink-muted"
+                    dir="ltr"
+                    title={t("screens.codes.yourReference")}
+                  >
+                    {company.payment_reference}
+                  </span>
+                )}
+              </div>
+              <div className="row-wrap" style={{ gap: 8, marginTop: 8 }}>
+                {company.state === null ? (
+                  <Badge status="connected" dot>{c("subActive")}</Badge>
+                ) : (
+                  <Badge status={company.state === "banned" || company.state === "disabled" ? "error" : "expiring"} dot>
+                    {c(`sub_${company.state}`)}
+                  </Badge>
+                )}
+                {company.session_status && (
+                  <Badge status={headBadgeSession[company.session_status] ?? "gap"} dot>
+                    {c(`session_${company.session_status}`)}
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <Button onClick={loginAsCompany} disabled={busy}>
+              <LogIn className="h-4 w-4 rtl:rotate-180" /> {c("impersonate")}
+            </Button>
+          </div>
+          <div
+            className="grid"
+            style={{ gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: "14px 22px" }}
+          >
+            <Fact label={c("factCountry")} value={company.country ?? "—"} />
+            <Fact label={c("proxy")} value={<span className="mono">{proxyLabel}</span>} />
+            <Fact label={c("colDrivers")} value={<span className="num">{formatNumber(company.driver_count, locale)}</span>} />
+            <Fact label={c("colOffers")} value={<span className="num">{formatNumber(company.offer_count, locale)}</span>} />
+            <Fact
+              label={c("factSubUntil")}
+              value={<span className="num">{company.subscription_ends_at ? formatDate(company.subscription_ends_at, locale) : "—"}</span>}
+            />
+            <Fact
+              label={c("colDispatchReject")}
+              value={
+                company.dispatch_reject_enabled ? (
+                  <Badge status="info">{c("stateOn")}</Badge>
+                ) : (
+                  <Badge status="neutral">{c("stateOff")}</Badge>
+                )
+              }
+            />
+            <Fact
+              label={c("colElProfessor")}
+              value={
+                <span className={!company.elprofessor_enabled ? "subtle" : company.elprofessor_connected ? "pos" : "warn"}>
+                  {!company.elprofessor_enabled ? c("epClosed") : company.elprofessor_connected ? c("epConnected") : c("epOpenNotLinked")}
+                </span>
+              }
+            />
+          </div>
+        </section>
+      )}
+
+      {/* Tabs + panel */}
+      <div className="stack-sm">
+        <div className="tabs" role="tablist">
           {([
             { k: "details", icon: Info },
             { k: "subscription", icon: Ticket },
@@ -355,27 +423,23 @@ export function CompanyDetail({
             { k: "network", icon: Network },
             { k: "session", icon: Plug },
             { k: "vehicles", icon: Car },
-          ] as const).map(({ k: tk, icon: Icon }) => {
-            const active = tab === tk;
-            return (
-              <button
-                key={tk}
-                onClick={() => setTab(tk)}
-                className={
-                  "group flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-start text-sm font-medium transition-all " +
-                  (active
-                    ? "bg-primary text-primary-ink shadow-sm"
-                    : "text-ink-muted hover:bg-surface-2 hover:text-ink")
-                }
-              >
-                <Icon className={"h-4 w-4 shrink-0 " + (active ? "text-primary-ink" : "text-ink-subtle group-hover:text-ink-muted")} />
-                {c(`tab_${tk}`)}
-              </button>
-            );
-          })}
-        </nav>
+          ] as const).map(({ k: tk, icon: Icon }) => (
+            <button
+              key={tk}
+              type="button"
+              role="tab"
+              aria-selected={tab === tk}
+              onClick={() => setTab(tk)}
+              className={tab === tk ? "on" : ""}
+              style={{ display: "inline-flex", alignItems: "center", gap: 7 }}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{c(`tab_${tk}`)}</span>
+            </button>
+          ))}
+        </div>
 
-        <div className="min-w-0 flex-1 glass-panel glass-panel--card space-y-6 p-5">
+        <div className="stack" role="tabpanel" style={{ paddingTop: 8 }}>
           {error ? (
             <div className="text-sm text-danger-fg">{error}</div>
           ) : !company ? (
@@ -397,258 +461,261 @@ export function CompanyDetail({
           ) : tab === "drivers" || tab === "vehicles" ? (
             <CompanyDataTab id={id} tab={tab} />
           ) : tab === "subscription" ? (
-            <Section title={c("subscription")}>
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  {company.state === null ? (
-                    <Badge status="connected" dot>{c("subActive")}</Badge>
-                  ) : (
-                    <Badge status={company.state === "banned" || company.state === "disabled" ? "error" : "expiring"} dot>
-                      {c(`sub_${company.state}`)}
-                    </Badge>
+            <div className="stack">
+              <div className="row-wrap" style={{ gap: 12 }}>
+                {company.state === null ? (
+                  <Badge status="connected" dot>{c("subActive")}</Badge>
+                ) : (
+                  <Badge status={company.state === "banned" || company.state === "disabled" ? "error" : "expiring"} dot>
+                    {c(`sub_${company.state}`)}
+                  </Badge>
+                )}
+                {company.days_left !== null && (
+                  <b className="num">{c("daysLeft").replace("{n}", String(company.days_left))}</b>
+                )}
+                {company.subscription_ends_at && (
+                  <span className="muted num" dir="ltr">
+                    → {formatDate(company.subscription_ends_at, locale)}
+                  </span>
+                )}
+              </div>
+
+              <p className="muted text-sm">{c("activationHint")}</p>
+              <div className="row-wrap" style={{ alignItems: "flex-end", gap: 14 }}>
+                <div className="field" style={{ minWidth: 260, flex: 1 }}>
+                  <label htmlFor="co-plan">{c("plan")}</label>
+                  <select id="co-plan" value={planId} onChange={(e) => setPlanId(e.target.value)} className="select">
+                    <option value="">{c("selectPlan")}</option>
+                    {plans.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} · {formatMoney(p.price, locale)} · {c("daysN").replace("{n}", String(p.duration_days))}</option>
+                    ))}
+                  </select>
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 text-sm" style={{ paddingBottom: 10 }}>
+                  <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} className="h-4 w-4" />
+                  <span>{c("markPaid")}</span>
+                </label>
+                {company.banned && (
+                  <Button onClick={doReactivate} disabled={busy}>
+                    <ShieldCheck className="h-4 w-4" /> {c("reactivate")}
+                  </Button>
+                )}
+                {company.state === null && (
+                  <Button variant="secondary" onClick={endSubscription} disabled={busy}>
+                    {c("endSubscription")}
+                  </Button>
+                )}
+              </div>
+
+              {/* How the company paid — only methods enabled in settings are
+                  selectable; a disabled one is shown locked so the admin knows it
+                  exists but must be turned on in settings first. */}
+              <div className="row-wrap" style={{ gap: 12 }}>
+                <span className="muted text-sm">{t("screens.codes.method")}</span>
+                <div className="seg" role="group" aria-label={t("screens.codes.method")}>
+                  {PAYMENT_METHOD_KEYS.map((m) => {
+                    const on = enabledMethods.has(m);
+                    const selected = on && payMethod === m;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        disabled={!on}
+                        onClick={() => on && setPayMethod(m)}
+                        title={on ? undefined : t("screens.codes.methodOff")}
+                        className={selected ? "on" : ""}
+                      >
+                        {selected && <Check className="h-3.5 w-3.5" />}
+                        {!on && <Lock className="h-3 w-3" />}
+                        {paymentMethodLabel(m, t)}
+                      </button>
+                    );
+                  })}
+                </div>
+                <Button variant="secondary" onClick={genActivation} disabled={busy || !planId}>
+                  <Ticket className="h-4 w-4" /> {c("generateCode")}
+                </Button>
+              </div>
+              {enabledMethods.size === 0 && (
+                <p className="subtle text-xs">{t("screens.codes.methodNoneHint")}</p>
+              )}
+
+              {genCode && (
+                <div
+                  role="status"
+                  className="flex flex-col gap-1 rounded-[var(--r-lg)] bg-success-bg px-4 py-3.5 text-success-fg"
+                >
+                  <span className="text-sm">{c("codeIs")}</span>
+                  <span className="font-mono text-3xl font-semibold tracking-[0.22em] text-ink" dir="ltr">{genCode}</span>
+                  <span className="text-sm">{c("codeValid")}</span>
+                  {genRef && (
+                    <span className="text-sm">
+                      {c("codeRef")} <span className="font-mono font-semibold" dir="ltr">{genRef}</span>
+                    </span>
                   )}
-                  {company.days_left !== null && (
-                    <span className="text-ink-muted">{c("daysLeft").replace("{n}", String(company.days_left))}</span>
-                  )}
-                  {company.subscription_ends_at && (
-                    <span className="text-xs text-ink-subtle" dir="ltr">
-                      → {formatDate(company.subscription_ends_at, locale)}
+                  {genMethod && (
+                    <span className="text-sm">
+                      {t("screens.codes.method")}: <span className="font-semibold">{paymentMethodLabel(genMethod, t)}</span>
                     </span>
                   )}
                 </div>
+              )}
 
-                <p className="text-xs text-ink-subtle">{c("activationHint")}</p>
-                <div className="flex flex-wrap items-end gap-2">
-                  <div className="min-w-[200px] flex-1">
-                    <label className="mb-1 block text-xs font-medium text-ink-muted">{c("plan")}</label>
-                    <select
-                      value={planId}
-                      onChange={(e) => setPlanId(e.target.value)}
-                      className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
-                    >
-                      <option value="">{c("selectPlan")}</option>
-                      {plans.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name} · {formatMoney(p.price, locale)} · {c("daysN").replace("{n}", String(p.duration_days))}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <label className="flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-line px-3 text-sm text-ink-muted">
-                    <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} className="h-4 w-4" />
-                    {c("markPaid")}
-                  </label>
-                  {company.banned && (
-                    <Button onClick={doReactivate} disabled={busy}>
-                      <ShieldCheck className="h-4 w-4" /> {c("reactivate")}
-                    </Button>
-                  )}
-                  {company.state === null && (
-                    <Button variant="secondary" onClick={endSubscription} disabled={busy}>
-                      {c("endSubscription")}
-                    </Button>
-                  )}
-                </div>
-
-                {/* How the company paid — only methods enabled in settings are
-                    selectable; a disabled one is shown locked so the admin knows it
-                    exists but must be turned on in settings first. */}
-                <div className="flex flex-wrap items-end justify-between gap-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-ink-muted">{t("screens.codes.method")}</label>
-                    <div className="inline-flex rounded-lg border border-line bg-surface-2 p-1">
-                      {PAYMENT_METHOD_KEYS.map((m) => {
-                        const on = enabledMethods.has(m);
-                        const selected = on && payMethod === m;
-                        return (
-                          <button
-                            key={m}
-                            type="button"
-                            disabled={!on}
-                            onClick={() => on && setPayMethod(m)}
-                            title={on ? undefined : t("screens.codes.methodOff")}
-                            className={
-                              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors " +
-                              (selected
-                                ? "bg-surface text-ink shadow-sm"
-                                : on
-                                  ? "text-ink-muted hover:text-ink"
-                                  : "cursor-not-allowed text-ink-subtle/60")
-                            }
-                          >
-                            {selected && <Check className="h-3.5 w-3.5 text-success-fg" />}
-                            {!on && <Lock className="h-3 w-3" />}
-                            {paymentMethodLabel(m, t)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {enabledMethods.size === 0 && (
-                      <p className="mt-1 text-xs text-ink-subtle">{t("screens.codes.methodNoneHint")}</p>
-                    )}
-                  </div>
-                  <Button variant="secondary" onClick={genActivation} disabled={busy || !planId}>
-                    <Ticket className="h-4 w-4" /> {c("generateCode")}
-                  </Button>
-                </div>
-
-                {/* Free subscription — activates the company with no code/invoice. */}
-                <div className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-line bg-surface-2/40 p-3">
-                  <div className="w-28">
-                    <label className="mb-1 block text-xs font-medium text-ink-muted">{c("freeDays")}</label>
+              {/* Free subscription — activates the company with no code/invoice. */}
+              <div className="flex flex-col gap-2.5 rounded-[var(--r-lg)] border border-dashed border-line-strong px-4 py-3.5">
+                <b>{c("freeTitle")}</b>
+                <div className="row-wrap" style={{ alignItems: "flex-end", gap: 12 }}>
+                  <div className="field" style={{ width: 140 }}>
+                    <label htmlFor="co-free-days">{c("freeDays")}</label>
                     <input
+                      id="co-free-days"
                       type="number"
                       min={1}
                       value={freeDays}
                       onChange={(e) => setFreeDays(e.target.value)}
-                      className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
+                      className="input"
                     />
                   </div>
                   <Button variant="secondary" onClick={grantFree} disabled={busy || !(Number(freeDays) > 0)}>
                     <Gift className="h-4 w-4" /> {c("grantFree")}
                   </Button>
-                  <p className="flex-1 text-xs text-ink-subtle">{c("freeHint")}</p>
                 </div>
+                <span className="subtle text-sm">{c("freeHint")}</span>
+              </div>
 
-                {genCode && (
-                  <div className="rounded-lg border border-success-dot/40 bg-success-bg px-3 py-2 text-sm text-success-fg">
-                    {c("codeIs")}{" "}
-                    <span className="font-mono text-lg font-bold tracking-widest" dir="ltr">{genCode}</span>
-                    <span className="ms-2 text-xs text-success-fg">{c("codeValid")}</span>
-                    {genRef && (
-                      <div className="mt-1 text-xs text-success-fg">
-                        {c("codeRef")} <span className="font-mono font-semibold" dir="ltr">{genRef}</span>
-                      </div>
-                    )}
-                    {genMethod && (
-                      <div className="mt-1 text-xs text-success-fg">
-                        {t("screens.codes.method")}: <span className="font-semibold">{paymentMethodLabel(genMethod, t)}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Subscription history (invoices) for this company */}
-                <div className="mt-2">
-                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">{c("subHistory")}</h4>
-                  {invoices.length === 0 ? (
-                    <p className="rounded-lg bg-surface-2 px-3 py-3 text-sm text-ink-subtle">{c("subHistoryEmpty")}</p>
-                  ) : (
-                    <div className="overflow-hidden rounded-lg border border-line">
-                      <table className="w-full text-sm">
-                        <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:px-3 [&_th]:py-2 [&_th]:text-start">
-                          <tr>
-                            <th>{c("subHistPeriod")}</th>
-                            <th>{c("days")}</th>
-                            <th>{c("amount")}</th>
-                            <th>{t("screens.codes.colRef")}</th>
-                            <th>{t("screens.codes.method")}</th>
-                            <th>{c("subHistStatus")}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-line [&_td]:px-3 [&_td]:py-2">
-                          {invoices.map((inv) => (
-                            <tr key={inv.id}>
-                              <td className="text-ink-muted" dir="ltr">
-                                {formatDate(inv.starts_at, locale)} → {formatDate(inv.ends_at, locale)}
-                              </td>
-                              <td className="tabular-nums text-ink-muted">{inv.days}</td>
-                              <td className="font-semibold tabular-nums text-ink">{formatMoney(inv.amount, locale)}</td>
-                              <td className="font-mono text-xs text-ink-muted" dir="ltr">{inv.code?.payment_ref ?? "—"}</td>
-                              <td className="text-ink-muted">{paymentMethodLabel(inv.code?.payment_method, t)}</td>
-                              <td>
-                                <span className={"rounded-full px-2 py-0.5 text-xs font-semibold " + (inv.paid ? "bg-success-bg text-success-fg" : "bg-warning-bg text-warning-fg")}>
-                                  {inv.paid ? c("subPaid") : c("subUnpaid")}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+              {/* Subscription history (invoices) for this company */}
+              <h3 className="section-title" style={{ marginTop: 6 }}>{c("subHistory")}</h3>
+              {invoices.length === 0 ? (
+                <p className="muted text-sm">{c("subHistoryEmpty")}</p>
+              ) : (
+                <TableCard>
+                  <Table>
+                    <thead>
+                      <tr>
+                        <th>{c("subHistPeriod")}</th>
+                        <th className="r">{c("days")}</th>
+                        <th className="r">{c("amount")}</th>
+                        <th>{t("screens.codes.colRef")}</th>
+                        <th>{t("screens.codes.method")}</th>
+                        <th>{c("subHistStatus")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invoices.map((inv) => (
+                        <tr key={inv.id}>
+                          <td className="num nowrap" dir="ltr">
+                            {formatDate(inv.starts_at, locale)} → {formatDate(inv.ends_at, locale)}
+                          </td>
+                          <td className="r num">{inv.days}</td>
+                          <td className="r num">{formatMoney(inv.amount, locale)}</td>
+                          <td className="mono" dir="ltr">{inv.code?.payment_ref ?? "—"}</td>
+                          <td>{paymentMethodLabel(inv.code?.payment_method, t)}</td>
+                          <td>
+                            <Badge status={inv.paid ? "connected" : "expiring"}>{inv.paid ? c("subPaid") : c("subUnpaid")}</Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
                   {invoicesTotal > invoices.length && (
-                    <p className="mt-2 text-xs text-ink-subtle">
-                      {t("common.showingOf").replace("{shown}", String(invoices.length)).replace("{total}", String(invoicesTotal))}{" "}
+                    <div className="tbl-foot">
+                      <span>
+                        {t("common.showingOf").replace("{shown}", String(invoices.length)).replace("{total}", String(invoicesTotal))}
+                      </span>
                       <Link href="/admin/reports" className="font-medium text-primary hover:underline">
                         {t("pages.subscriptions.title")}
                       </Link>
-                    </p>
+                    </div>
+                  )}
+                </TableCard>
+              )}
+            </div>
+          ) : tab === "managers" ? (
+            <div className="stack">
+              <h3 className="section-title">{c("managers")}</h3>
+              <div className="card">
+                <div className="list-rows">
+                  {(company.users ?? []).map((u) => (
+                    <div key={u.id} className="list-row" style={{ flexWrap: "wrap" }}>
+                      <div className="grow" style={{ minWidth: 200 }}>
+                        <b>{u.name}</b>
+                        <div className="row-wrap text-sm" style={{ gap: 12 }}>
+                          <span className="subtle">{u.email}</span>
+                          {u.phone && (
+                            <a href={`tel:${u.phone}`} className="muted num hover:text-ink" dir="ltr">{u.phone}</a>
+                          )}
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => { setResetFor(u.id); setResetPwd(""); }}>
+                        <KeyRound className="h-4 w-4" /> {c("resetPassword")}
+                      </Button>
+                    </div>
+                  ))}
+                  {(company.users ?? []).length === 0 && (
+                    <p className="muted" style={{ padding: "16px 18px" }}>{c("noManagers")}</p>
                   )}
                 </div>
-            </Section>
-          ) : tab === "managers" ? (
-            <Section title={c("managers")}>
-              <div className="divide-y divide-line rounded-lg border border-line">
-                {(company.users ?? []).map((u) => (
-                  <div key={u.id} className="flex items-center justify-between gap-2 px-3 py-2">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-ink">{u.name}</div>
-                      <div className="truncate text-xs text-ink-subtle">{u.email}</div>
-                      {u.phone && (
-                        <a href={`tel:${u.phone}`} className="text-xs font-medium text-ink-muted hover:text-ink" dir="ltr">{u.phone}</a>
-                      )}
-                    </div>
-                    <Button variant="ghost" onClick={() => { setResetFor(u.id); setResetPwd(""); }}>
-                      <KeyRound className="h-4 w-4" /> {c("resetPassword")}
-                    </Button>
-                  </div>
-                ))}
-                {(company.users ?? []).length === 0 && (
-                  <div className="px-3 py-3 text-sm text-ink-subtle">{c("noManagers")}</div>
-                )}
               </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <input placeholder={c("fieldManagerName")} value={newUser.name}
-                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                  className="ui-field rounded-lg border border-line-strong px-2 py-2 text-sm outline-none focus:border-ink" />
-                <input placeholder={c("fieldManagerEmail")} type="email" value={newUser.email}
-                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  className="ui-field rounded-lg border border-line-strong px-2 py-2 text-sm outline-none focus:border-ink" />
-                <PasswordInput placeholder={c("fieldManagerPassword")} value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
+              <div className="g-3" style={{ alignItems: "end" }}>
+                <div className="field">
+                  <label htmlFor="mg-n">{c("fieldManagerName")}</label>
+                  <input id="mg-n" placeholder={c("fieldManagerName")} value={newUser.name}
+                    onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} className="input" />
+                </div>
+                <div className="field">
+                  <label htmlFor="mg-e">{c("fieldManagerEmail")}</label>
+                  <input id="mg-e" placeholder={c("fieldManagerEmail")} type="email" value={newUser.email}
+                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className="input" />
+                </div>
+                <div className="field">
+                  <label htmlFor="mg-p">{c("fieldManagerPassword")}</label>
+                  <PasswordInput id="mg-p" placeholder={c("fieldManagerPassword")} value={newUser.password}
+                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
+                </div>
               </div>
-              <Button variant="secondary" onClick={addUser} disabled={busy || !newUser.email}>
-                <UserPlus className="h-4 w-4" /> {c("addManager")}
-              </Button>
-            </Section>
+              <div>
+                <Button variant="secondary" onClick={addUser} disabled={busy || !newUser.email}>
+                  <UserPlus className="h-4 w-4" /> {c("addManager")}
+                </Button>
+              </div>
+            </div>
           ) : (
             <>
-              {/* One calm form: flat groups, two per row on desktop, no nested cards. */}
-              <div className="grid gap-x-8 gap-y-7 md:grid-cols-2">
-                {/* Status — active toggle + three flat stat tiles (full width) */}
-                <Group title={c("colStatus")} className="md:col-span-2">
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={status === "active"}
-                      onClick={() => setStatus(status === "active" ? "disabled" : "active")}
-                      className={
-                        "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors " +
-                        (status === "active" ? "bg-emerald-500" : "bg-ink-subtle")
-                      }
-                    >
-                      <span
-                        className={
-                          "inline-block h-5 w-5 transform rounded-full bg-surface shadow transition-transform " +
-                          (status === "active" ? "translate-x-[22px] rtl:-translate-x-[22px]" : "translate-x-0.5 rtl:-translate-x-0.5")
-                        }
-                      />
-                    </button>
-                    <span className={"text-sm font-medium " + (status === "active" ? "text-success-fg" : "text-ink-muted")}>
+              {/* Flat bordered groups, two per row on desktop. */}
+              <div className="g-2">
+                {/* Status — active toggle + three tiles + dispatch-reject callout (full width) */}
+                <Group title={c("colStatus")} className="col-span-full">
+                  <div className="row-wrap" style={{ gap: 10 }}>
+                    <Switch
+                      checked={status === "active"}
+                      onChange={() => setStatus(status === "active" ? "disabled" : "active")}
+                      label={c("statusActive")}
+                    />
+                    <b className={status === "active" ? "pos" : "muted"}>
                       {status === "active" ? c("statusActive") : c("statusDisabled")}
-                    </span>
+                    </b>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3">
-                    <StatTile icon={Plug} label={c("colSession")} value={company.session_status ? c(`session_${company.session_status}`) : c("noSession")} />
-                    <StatTile icon={Radio} label={c("colOffers")} value={company.offer_count} />
-                    <StatTile icon={Users} label={c("colDrivers")} value={company.driver_count} />
+                  <div className="g-3">
+                    <Tile label={c("colSession")} value={company.session_status ? c(`session_${company.session_status}`) : c("noSession")} />
+                    <Tile label={c("colOffers")} value={formatNumber(company.offer_count, locale)} />
+                    <Tile label={c("colDrivers")} value={formatNumber(company.driver_count, locale)} />
+                  </div>
+
+                  <div className="callout info">
+                    <Ban className="h-4 w-4 shrink-0" />
+                    <div>
+                      <b>{c("drStateLine").replace("{state}", company.dispatch_reject_enabled ? c("stateOn") : c("stateOff"))}</b>{" "}
+                      {c("drInfoBody")}{" "}
+                      <Link href="/admin/companies" className="font-medium underline">{c("drInfoLink")}</Link>
+                    </div>
                   </div>
                 </Group>
 
                 {/* Details — name + country */}
                 <Group title={c("info")}>
-                  <Field label={c("fieldName")} value={name} onChange={setName} />
-                  <Field label={c("fieldCountry")} value={country} onChange={setCountry} />
+                  <Field id="co-name" label={c("fieldName")} value={name} onChange={setName} />
+                  <Field id="co-country" label={c("fieldCountry")} value={country} onChange={setCountry} />
                 </Group>
 
                 {/* Residential proxy — assigned from the shared pool */}
@@ -665,28 +732,32 @@ export function CompanyDetail({
                       })),
                     ]}
                   />
-                  <p className="text-xs text-ink-subtle">{c("proxyPoolHint")}</p>
+                  <p className="subtle text-xs">{c("proxyPoolHint")}</p>
                 </Group>
 
                 {/* Impersonate — swaps the SPA session to a manager. */}
                 <Group title={c("impersonate")}>
-                  <p className="text-xs text-ink-subtle">{c("impersonateHint")}</p>
-                  <Button variant="secondary" onClick={loginAsCompany} disabled={busy}>
-                    <LogIn className="h-4 w-4 rtl:rotate-180" /> {c("impersonate")}
-                  </Button>
+                  <p className="muted text-sm">{c("impersonateHint")}</p>
+                  <div>
+                    <Button variant="secondary" onClick={loginAsCompany} disabled={busy}>
+                      <LogIn className="h-4 w-4 rtl:rotate-180" /> {c("impersonate")}
+                    </Button>
+                  </div>
                 </Group>
 
                 {/* Danger zone — irreversible purge; flat but visually distinct. */}
                 <Group title={c("dangerZone")} tone="danger">
-                  <p className="text-xs text-danger-fg/80">{c("dangerZoneHint")}</p>
-                  <Button variant="danger" onClick={() => setConfirm("purgeData")} disabled={busy}>
-                    <Trash2 className="h-4 w-4" /> {c("purgeData")}
-                  </Button>
+                  <p className="muted text-sm">{c("dangerZoneHint")}</p>
+                  <div>
+                    <Button variant="danger" onClick={() => setConfirm("purgeData")} disabled={busy}>
+                      <Trash2 className="h-4 w-4" /> {c("purgeData")}
+                    </Button>
+                  </div>
                 </Group>
               </div>
 
               {/* Save — enable/disable lives in the status toggle above. */}
-              <div className="app-sticky-footer sticky bottom-0 -mx-5 -mb-5 flex justify-end border-t border-line bg-surface/95 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
+              <div className="sticky bottom-0 flex justify-end pt-3" style={{ background: "linear-gradient(to top, var(--surface-solid) 70%, transparent)" }}>
                 <Button onClick={saveInfo} disabled={busy}>
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {c("save")}
@@ -713,8 +784,8 @@ export function CompanyDetail({
           </div>
         }
       >
-        <div className="text-start">
-          <label className="mb-1 block text-sm font-medium text-ink">{c("newPasswordLabel")}</label>
+        <div className="field text-start">
+          <label>{c("newPasswordLabel")}</label>
           <PasswordInput
             value={resetPwd}
             onChange={(e) => setResetPwd(e.target.value)}
@@ -722,6 +793,7 @@ export function CompanyDetail({
             autoFocus
             placeholder={c("newPasswordHint")}
           />
+          <span className="hint">{c("newPasswordHint")}</span>
         </div>
       </Modal>
 
@@ -740,18 +812,28 @@ export function CompanyDetail({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/** Two-letter initials for the identity avatar. */
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+}
+
+/** Label over value, used by the identity card's facts row. */
+function Fact({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-ink">{title}</h3>
-      {children}
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <span className="subtle text-xs">{label}</span>
+      <span className="text-sm font-medium">{value}</span>
     </div>
   );
 }
 
-/** Flat, borderless section: a small uppercase title over its stacked controls.
- *  `danger` tone tints the title and adds a subtle inline-start rule — distinct
- *  without becoming a nested card. */
+/** Bordered group: small uppercase title over its stacked controls.
+ *  `danger` adds the inline-start rule from the prototype. */
 function Group({
   title,
   children,
@@ -765,19 +847,36 @@ function Group({
 }) {
   const danger = tone === "danger";
   return (
-    <section className={className}>
-      <h3
-        className={
-          "mb-3 text-xs font-semibold uppercase tracking-wider " +
-          (danger ? "text-danger-fg" : "text-ink-subtle")
-        }
-      >
-        {title}
-      </h3>
-      <div className={"space-y-3 " + (danger ? "border-s-2 border-danger-ring/40 ps-3" : "")}>
-        {children}
-      </div>
+    <section
+      className={
+        "flex flex-col gap-3 rounded-[var(--r-xl)] border border-line bg-surface px-[18px] py-4 " +
+        (danger ? "border-s-[3px] border-s-[var(--danger-dot)] " : "") +
+        className
+      }
+    >
+      <h3 className="m-0 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-ink-subtle">{title}</h3>
+      {children}
     </section>
+  );
+}
+
+/** Soft tile used for the status / session summaries. */
+function Tile({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="min-w-0 rounded-[var(--r-lg)] border border-line bg-surface-2 px-3 py-2.5">
+      <div className="subtle text-xs">{label}</div>
+      <div className="strong num mt-0.5 truncate">{value}</div>
+    </div>
+  );
+}
+
+/** Label left, value right, hairline between rows. */
+function KvRow({ label, value, warn = false }: { label: string; value: React.ReactNode; warn?: boolean }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line py-2.5 last:border-b-0">
+      <span className="muted">{label}</span>
+      <span className={"strong " + (warn ? "warn" : "")}>{value}</span>
+    </div>
   );
 }
 
@@ -828,22 +927,21 @@ function SessionTab({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="stack">
       <Group title={c("sessionState")}>
         {!loaded ? (
           <Loader2 className="h-4 w-4 animate-spin text-ink-subtle" />
         ) : !session ? (
-          <p className="text-sm text-ink-subtle">{c("noSession")}</p>
+          <p className="muted">{c("noSession")}</p>
         ) : (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <StatTile icon={Plug} label={c("sessionStatus")} value={statusLabel(session.status)} />
-            <StatTile
-              icon={Globe}
+          <div className="g-4">
+            <Tile label={c("sessionStatus")} value={statusLabel(session.status)} />
+            <Tile
               label={c("sessionOrg")}
-              value={<span dir="ltr" className="font-mono text-xs">{session.uber_org_uuid ?? "—"}</span>}
+              value={<span dir="ltr" className="mono break-all text-xs">{session.uber_org_uuid ?? "—"}</span>}
             />
-            <StatTile icon={Lock} label={c("sessionExpires")} value={when(session.expires_at)} />
-            <StatTile icon={Radio} label={c("sessionLastSeen")} value={relTime(session.last_event_at, locale, c("neverSeen"))} />
+            <Tile label={c("sessionExpires")} value={when(session.expires_at)} />
+            <Tile label={c("sessionLastSeen")} value={relTime(session.last_event_at, locale, c("neverSeen"))} />
           </div>
         )}
       </Group>
@@ -856,8 +954,8 @@ function SessionTab({
       )}
 
       <Group title={c("session")}>
-        <p className="text-xs text-ink-subtle">{c("sessionHint")}</p>
-        <div className="flex flex-wrap gap-2">
+        <p className="muted text-sm">{c("sessionHint")}</p>
+        <div className="row-wrap">
           <Button variant="secondary" onClick={onRelink} disabled={busy || !company.session_status}>
             <RefreshCw className="h-4 w-4" /> {c("forceRelink")}
           </Button>
@@ -879,11 +977,11 @@ function SessionTab({
 }
 
 const BROWSER_BADGE: Record<SessionBrowserState, string> = {
-  active: "bg-success-bg text-success-fg",
-  needs_otp: "bg-warning-bg text-warning-fg",
-  logging_in: "bg-info-bg text-info-fg",
-  down: "bg-danger-bg text-danger-fg",
-  not_set_up: "bg-surface-2 text-ink-subtle",
+  active: "badge success",
+  needs_otp: "badge warning",
+  logging_in: "badge info",
+  down: "badge danger",
+  not_set_up: "badge",
 };
 
 /** Persistent session browser: state badge + last login/capture/seen, re-auth and error counters. */
@@ -905,11 +1003,11 @@ function SessionBrowserCard({ id, company }: { id: number; company: Company }) {
   }, [id, company]);
 
   if (!loaded) return <Loader2 className="h-4 w-4 animate-spin text-ink-subtle" />;
-  if (!status) return <p className="text-sm text-ink-subtle">{c("pbUnavailable")}</p>;
+  if (!status) return <p className="muted text-sm">{c("pbUnavailable")}</p>;
 
   const state: SessionBrowserState = status.state in BROWSER_BADGE ? status.state : "not_set_up";
   const stamp = (iso?: string | null) => relTime(iso ?? null, locale, c("pbNever"));
-  const num = (n?: number | null) => (typeof n === "number" ? String(n) : "—");
+  const num = (n?: number | null) => (typeof n === "number" ? formatNumber(n, locale) : "—");
   const stale = state === "active" && status.is_live === false;
   const rows: [string, string, boolean][] = [
     [c("pbLastLogin"), stamp(status.last_login_at), false],
@@ -920,19 +1018,19 @@ function SessionBrowserCard({ id, company }: { id: number; company: Company }) {
   ];
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={"rounded-full px-2 py-0.5 text-xs font-semibold " + BROWSER_BADGE[state]}>{c(`pb_${state}`)}</span>
-        {stale && <span className="text-xs text-warning-fg">{c("pbStale")}</span>}
+    <div className="stack-sm">
+      <div className="row-wrap" style={{ gap: 10 }}>
+        <span className={BROWSER_BADGE[state]}>
+          <span className="dot" />
+          {c(`pb_${state}`)}
+        </span>
+        <span className="muted text-sm">{c("pbHint")}</span>
+        {stale && <span className="warn text-xs">{c("pbStale")}</span>}
       </div>
-      <p className="text-xs text-ink-subtle">{c("pbHint")}</p>
       {state !== "not_set_up" && (
-        <div className="space-y-1.5">
+        <div>
           {rows.map(([label, value, warn]) => (
-            <div key={label} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm">
-              <span className="font-medium text-ink">{label}</span>
-              <span className={"text-xs " + (warn ? "text-warning-fg" : "text-ink-subtle")}>{value}</span>
-            </div>
+            <KvRow key={label} label={label} value={<span className="num">{value}</span>} warn={warn} />
           ))}
         </div>
       )}
@@ -951,14 +1049,14 @@ function TokenRow({ label, iso, when, neverAlarm = false, hint }: { label: strin
   const key = left > 0 ? "tokenExpires" : "tokenExpired";
   const text = known ? c(key).replace("{t}", relTime(iso, locale, "")) : "—";
   return (
-    <div className="rounded-lg bg-surface-2 px-3 py-2 text-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-medium text-ink">{label}</span>
-        <span className={"text-xs " + (warn ? "text-warning-fg" : "text-ink-subtle")} title={when(iso)}>
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line py-2.5">
+        <span className="muted">{label}</span>
+        <span className={"strong " + (warn ? "warn" : "")} title={when(iso)}>
           {text}
         </span>
       </div>
-      {hint && <p className="mt-1 text-xs text-ink-subtle">{hint}</p>}
+      {hint && <p className="subtle mt-1 text-sm">{hint}</p>}
     </div>
   );
 }
@@ -988,73 +1086,54 @@ function SessionOutages({ id }: { id: number }) {
   };
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs text-ink-subtle">
+    <div className="stack-sm">
+      <p className="muted text-sm">
         {summary.count === 0
           ? c("outagesNone")
           : c("outagesSummary").replace("{count}", String(summary.count)).replace("{total}", formatDowntime(summary.total_seconds, c))}
       </p>
       {summary.outages.length > 0 && (
-        <div className="max-h-80 overflow-auto rounded-lg border border-line">
-          <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-surface-2 text-ink-subtle">
+        <div className="max-h-80 overflow-auto rounded-[var(--r-lg)] border border-line">
+          <Table>
+            <thead>
               <tr>
                 {["outageStart", "outageEnd", "outageDuration", "outageCause", "outageRecovery"].map((k) => (
-                  <th key={k} className="whitespace-nowrap px-2.5 py-2 text-start font-medium">{c(k)}</th>
+                  <th key={k} className={k === "outageDuration" ? "r" : ""}>{c(k)}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody>
               {summary.outages.map((o) => (
                 <tr key={o.started_at}>
-                  <td className="whitespace-nowrap px-2.5 py-1.5 text-ink-muted">{stamp(o.started_at)}</td>
-                  <td className={"whitespace-nowrap px-2.5 py-1.5 " + (o.ended_at ? "text-ink-muted" : "font-medium text-danger-fg")}>
+                  <td className="num nowrap">{stamp(o.started_at)}</td>
+                  <td className={"num nowrap " + (o.ended_at ? "" : "neg strong")}>
                     {o.ended_at ? stamp(o.ended_at) : c("outageOngoing")}
                   </td>
-                  <td className="whitespace-nowrap px-2.5 py-1.5 font-medium text-ink">{formatDowntime(o.duration_seconds, c)}</td>
-                  <td className="px-2.5 py-1.5 text-ink-muted">{cause(o.cause)}</td>
-                  <td className="px-2.5 py-1.5 text-ink-subtle">
+                  <td className="r num nowrap">{formatDowntime(o.duration_seconds, c)}</td>
+                  <td>{cause(o.cause)}</td>
+                  <td className="text-sm">
                     {o.recovered_via ? c(`outageVia_${o.recovered_via}`) : "—"}
                     {o.relink_attempts > 1 ? ` · ${c("outageAttempts").replace("{n}", String(o.relink_attempts))}` : ""}
                   </td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
       )}
     </div>
   );
 }
 
-/** Flat stat tile — a soft surface panel, no card border. */
-function StatTile({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-lg bg-surface-2 px-3 py-2.5">
-      <div className="flex items-center gap-1.5 text-ink-subtle">
-        <Icon className="h-3.5 w-3.5" />
-        <span className="text-xs font-medium">{label}</span>
-      </div>
-      <div className="mt-1 truncate text-sm font-semibold text-ink">{value}</div>
-    </div>
-  );
-}
-
 function Field({
+  id,
   label,
   value,
   onChange,
   mono = false,
   placeholder,
 }: {
+  id?: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -1062,20 +1141,21 @@ function Field({
   placeholder?: string;
 }) {
   return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
       <input
+        id={id}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         autoComplete="off"
-        className={`ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ${mono ? "font-mono text-xs" : ""}`}
+        className={"input" + (mono ? " mono" : "")}
       />
     </div>
   );
 }
 
-/** Lazy-loaded drill-down list for a company's drivers / offers / vehicles. */
+/** Lazy-loaded drill-down list for a company's drivers / vehicles. */
 function CompanyDataTab({ id, tab }: { id: number; tab: "drivers" | "vehicles" }) {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.companies.${k}`);
@@ -1102,44 +1182,89 @@ function CompanyDataTab({ id, tab }: { id: number; tab: "drivers" | "vehicles" }
     );
   }
   if (rows.length === 0) {
-    return <p className="py-10 text-center text-sm text-ink-subtle">{c("noData")}</p>;
+    return <p className="muted">{c("noData")}</p>;
   }
 
   if (tab === "drivers") {
     return (
-      <ul className="divide-y divide-line">
-        {(rows as CompanyDriverRow[]).map((d) => (
-          <li key={d.id} className="flex items-center justify-between gap-2 py-2.5">
-            <div className="flex items-center gap-2">
-              <span className={`h-2 w-2 rounded-full ${d.online ? "bg-emerald-500" : "bg-ink-subtle"}`} />
-              <span className="text-sm font-medium text-ink">{d.name}</span>
-            </div>
-            <div className="flex items-center gap-3 text-xs text-ink-muted">
-              {d.rating != null && <span>★ {d.rating}</span>}
-              {d.total_trips != null && <span>{d.total_trips.toLocaleString(latnLocale(locale))} {c("trips")}</span>}
+      <div className="card">
+        <div className="list-rows">
+          {(rows as CompanyDriverRow[]).map((d) => (
+            <div key={d.id} className="list-row" style={{ flexWrap: "wrap" }}>
+              <span className="av-wrap">
+                <span className={"av sm t" + (d.name.length % 6)} aria-hidden>{initials(d.name)}</span>
+                <i className="st" style={{ background: d.online ? "var(--success-dot)" : "var(--neutral-dot)" }} />
+              </span>
+              <b className="grow">{d.name}</b>
+              {d.rating != null && (
+                <span className="inline-flex items-center gap-1">
+                  <Star className="h-3.5 w-3.5 text-warning-ring" />
+                  <span className="num">{formatNumber(d.rating, locale)}</span>
+                </span>
+              )}
+              {d.total_trips != null && (
+                <span className="muted num">{d.total_trips.toLocaleString(latnLocale(locale))} {c("trips")}</span>
+              )}
               <Badge status={d.uber_linked ? "connected" : "neutral"} dot>{d.uber_linked ? c("linked") : c("unlinked")}</Badge>
             </div>
-          </li>
-        ))}
-      </ul>
+          ))}
+        </div>
+      </div>
     );
   }
 
   return (
-    <ul className="divide-y divide-line">
-      {(rows as CompanyVehicleRow[]).map((v) => (
-        <li key={v.id} className="flex items-center justify-between gap-2 py-2.5 text-sm">
-          <span className="font-medium text-ink">
-            {[v.make, v.model, v.year].filter(Boolean).join(" ") || "—"}
-          </span>
-          <span className="font-mono text-xs text-ink-muted" dir="ltr">{v.license_plate ?? "—"}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="card">
+      <div className="list-rows">
+        {(rows as CompanyVehicleRow[]).map((v) => (
+          <div key={v.id} className="list-row">
+            <span className="av sm t4" aria-hidden><Car className="h-3.5 w-3.5" /></span>
+            <b className="grow">{[v.make, v.model, v.year].filter(Boolean).join(" ") || "—"}</b>
+            <span className="mono" dir="ltr">{v.license_plate ?? "—"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
-/** Company offers grouped by day, paginated (mirrors the manager offers page). */
+/** Per-kind tint for the network feed's type tag. */
+const NET_KIND_CLASS: Record<string, string> = {
+  offer: "bg-primary/15 text-primary",
+  status: "bg-info-bg text-info-fg",
+  roster: "bg-warning-bg text-warning-fg",
+  vehicle: "bg-accent-bg text-accent-fg",
+  metric: "bg-surface-3 text-ink-muted",
+  session: "bg-danger-bg text-danger-fg",
+  earnerbreakdownsv2: "bg-success-bg text-success-fg",
+};
+
+/** Shared first/prev/next/last pager used by the long, server-paged feeds. */
+function EdgePager({ page, lastPage, total, onPage }: { page: number; lastPage: number; total?: number; onPage: (p: number) => void }) {
+  const { t, locale } = useI18n();
+  const flip = "rtl:rotate-180";
+  return (
+    <div className="flex items-center justify-center gap-1">
+      <button type="button" className="icon-btn" aria-label={t("common.previousPage")} onClick={() => onPage(1)} disabled={page <= 1}>
+        <ChevronsLeft className={flip} />
+      </button>
+      <button type="button" className="icon-btn" aria-label={t("common.previousPage")} onClick={() => onPage(Math.max(1, page - 1))} disabled={page <= 1}>
+        <ChevronLeft className={flip} />
+      </button>
+      <span className="num muted px-2 text-sm">
+        {formatNumber(page, locale)} / {formatNumber(lastPage, locale)}
+        {total != null ? ` · ${formatNumber(total, locale)}` : ""}
+      </span>
+      <button type="button" className="icon-btn" aria-label={t("common.nextPage")} onClick={() => onPage(Math.min(lastPage, page + 1))} disabled={page >= lastPage}>
+        <ChevronRight className={flip} />
+      </button>
+      <button type="button" className="icon-btn" aria-label={t("common.nextPage")} onClick={() => onPage(lastPage)} disabled={page >= lastPage}>
+        <ChevronsRight className={flip} />
+      </button>
+    </div>
+  );
+}
+
 /** The raw supplier "network" feed — every captured Uber offer payload, expandable. */
 function CompanyNetworkTab({ id }: { id: number }) {
   const { t, locale } = useI18n();
@@ -1237,48 +1362,38 @@ function CompanyNetworkTab({ id }: { id: number }) {
   };
 
   return (
-    <div className="space-y-3">
-      <p className="text-xs text-ink-subtle">{c("networkHint")}</p>
+    <div className="stack">
+      <p className="muted text-sm">{c("networkHint")}</p>
 
-      {/* One filter bar: kind chips first, then the date-time range on the right. */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-        {filters.map((f) => (
-          <button
-            key={f.v || "all"}
-            onClick={() => pick(f.v)}
-            className={
-              "rounded-full px-3 py-1 text-xs font-medium transition " +
-              (kind === f.v
-                ? "bg-primary text-primary-ink"
-                : "bg-surface-2 text-ink-muted hover:bg-surface-2 hover:text-ink")
-            }
-          >
-            {f.l}
-          </button>
-        ))}
+      {/* One toolbar: kind chips first, then the date range and bulk actions. */}
+      <div className="toolbar" style={{ justifyContent: "space-between" }}>
+        <div className="row-wrap" role="group" aria-label={c("net_offer")}>
+          {filters.map((f) => (
+            <button
+              key={f.v || "all"}
+              type="button"
+              onClick={() => pick(f.v)}
+              aria-pressed={kind === f.v}
+              className={"chip" + (kind === f.v ? " on" : "")}
+            >
+              {f.l}
+            </button>
+          ))}
+        </div>
 
-        <div className="ms-auto flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+        <div className="row-wrap">
           <DateRangeFilter from={from} to={to} onChange={onDateChange} />
           {rows.length > 0 && (
-            <button
-              onClick={copyAll}
-              title={c("copyAll")}
-              className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 font-medium text-ink-muted transition hover:bg-surface-2 hover:text-ink"
-            >
-              <Files className="h-3.5 w-3.5" />
+            <Button variant="secondary" size="sm" onClick={copyAll} title={c("copyAll")}>
+              <Files className="h-4 w-4" />
               {c("copyAll")}
-            </button>
+            </Button>
           )}
           {total > 0 && (
-            <button
-              onClick={clearNet}
-              disabled={clearing}
-              title={c("clearNet")}
-              className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 font-medium text-danger-fg transition hover:bg-danger-bg disabled:opacity-50"
-            >
-              {clearing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            <Button variant="danger" size="sm" onClick={clearNet} disabled={clearing} title={c("clearNet")}>
+              {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               {c("clearNet")}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -1288,79 +1403,62 @@ function CompanyNetworkTab({ id }: { id: number }) {
           <Loader2 className="h-5 w-5 animate-spin" />
         </div>
       ) : rows.length === 0 ? (
-        <p className="py-10 text-center text-sm text-ink-subtle">{c("noData")}</p>
+        <p className="muted">{c("noData")}</p>
       ) : (
-        rows.map((o) => {
-        const isOpen = open.has(o.id);
-        return (
-          <div key={o.id} className="overflow-hidden rounded-lg border border-line">
-            <button
-              onClick={() => toggle(o.id)}
-              className="flex w-full items-center gap-3 bg-surface-2 px-4 py-3 text-start hover:bg-surface-2"
-            >
-              <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                {
-                  offer: "bg-primary/15 text-primary",
-                  status: "bg-blue-500/15 text-blue-500",
-                  roster: "bg-amber-500/15 text-amber-600",
-                  vehicle: "bg-violet-500/15 text-violet-500",
-                  metric: "bg-teal-500/15 text-teal-500",
-                  session: "bg-rose-500/15 text-rose-500",
-                  earnerbreakdownsv2: "bg-emerald-500/15 text-emerald-500",
-                }[o.kind] ?? "bg-surface-2 text-ink-muted"
-              }`}>{o.kind === "earnerbreakdownsv2" ? c("net_earnings") : ["offer", "status", "roster", "vehicle", "metric", "session"].includes(o.kind) ? c(`net_${o.kind}`) : o.kind}</span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm text-ink">{o.summary ?? "—"}</div>
-                <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-ink-subtle" dir="ltr">
-                  {o.created_at && <span>{formatDateTime(o.created_at, locale)}</span>}
-                  {o.count !== null && <span>· {o.count}×</span>}
+        <div className="card overflow-hidden">
+          <div className="list-rows">
+            {rows.map((o) => {
+              const isOpen = open.has(o.id);
+              return (
+                <div key={o.id}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(o.id)}
+                    aria-expanded={isOpen}
+                    className="flex w-full items-center gap-3 px-[18px] py-3 text-start hover:bg-surface-2"
+                  >
+                    <ChevronRight className={"h-4 w-4 shrink-0 text-ink-subtle transition-transform rtl:rotate-180 " + (isOpen ? "rotate-90 rtl:rotate-90" : "")} />
+                    <span className={"shrink-0 rounded-md px-[7px] py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] " + (NET_KIND_CLASS[o.kind] ?? "bg-surface-3 text-ink-muted")}>
+                      {o.kind === "earnerbreakdownsv2" ? c("net_earnings") : ["offer", "status", "roster", "vehicle", "metric", "session"].includes(o.kind) ? c(`net_${o.kind}`) : o.kind}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm">{o.summary ?? "—"}</div>
+                      <div className="subtle mt-0.5 flex flex-wrap gap-x-3 text-xs" dir="ltr">
+                        {o.created_at && <span>{formatDateTime(o.created_at, locale)}</span>}
+                        {o.count !== null && <span>· {o.count}×</span>}
+                      </div>
+                    </div>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      title={c("copyOne")}
+                      aria-label={c("copyOne")}
+                      onClick={(e) => { e.stopPropagation(); copyOne(o); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); copyOne(o); } }}
+                      className="icon-btn"
+                      style={{ display: "inline-grid" }}
+                    >
+                      <Copy />
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <pre className="max-h-96 overflow-auto border-t border-line bg-surface-2 px-[18px] py-3 text-xs leading-relaxed text-ink" dir="ltr">
+                      {JSON.stringify(o.raw_payload, null, 2)}
+                    </pre>
+                  )}
                 </div>
-              </div>
-              <span
-                role="button"
-                tabIndex={0}
-                title={c("copyOne")}
-                onClick={(e) => { e.stopPropagation(); copyOne(o); }}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); copyOne(o); } }}
-                className="shrink-0 rounded-md p-1.5 text-ink-subtle transition hover:bg-surface hover:text-ink"
-              >
-                <Copy className="h-4 w-4" />
-              </span>
-              <ChevronDown className={"h-4 w-4 shrink-0 text-ink-subtle transition-transform " + (isOpen ? "rotate-180" : "")} />
-            </button>
-            {isOpen && (
-              <pre className="max-h-96 overflow-auto bg-surface px-4 py-3 text-xs leading-relaxed text-ink" dir="ltr">
-                {JSON.stringify(o.raw_payload, null, 2)}
-              </pre>
-            )}
+              );
+            })}
           </div>
-        );
-        })
-      )}
-
-      {lastPage > 1 && (
-        <div className="flex items-center justify-center gap-1.5 border-t border-line pt-4 text-sm">
-          {[
-            { l: "«", go: () => setPage(1), off: page <= 1 },
-            { l: "‹", go: () => setPage((p) => Math.max(1, p - 1)), off: page <= 1 },
-          ].map((b) => (
-            <button key={b.l} onClick={b.go} disabled={b.off}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-ink-muted transition hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40">{b.l}</button>
-          ))}
-          <span className="px-3 font-medium tabular-nums text-ink-muted">{page} / {lastPage} · {formatNumber(total, locale)}</span>
-          {[
-            { l: "›", go: () => setPage((p) => Math.min(lastPage, p + 1)), off: page >= lastPage },
-            { l: "»", go: () => setPage(lastPage), off: page >= lastPage },
-          ].map((b) => (
-            <button key={b.l} onClick={b.go} disabled={b.off}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-ink-muted transition hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40">{b.l}</button>
-          ))}
         </div>
       )}
+
+      {lastPage > 1 && <EdgePager page={page} lastPage={lastPage} total={total} onPage={setPage} />}
     </div>
   );
 }
 
+/** Company offers grouped by day, paginated (mirrors the manager offers page). */
 function CompanyOffersTab({ id }: { id: number }) {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.companies.${k}`);
@@ -1409,61 +1507,72 @@ function CompanyOffersTab({ id }: { id: number }) {
     );
   }
   if (rows.length === 0) {
-    return <p className="py-10 text-center text-sm text-ink-subtle">{c("noData")}</p>;
+    return <p className="muted">{c("noData")}</p>;
   }
 
   return (
-    <div className="space-y-4">
-      {groups.map(([day, dayOffers]) => {
-        const open = openDays.has(day);
-        return (
-          <div key={day} className="overflow-hidden rounded-lg border border-line">
-            <button
-              onClick={() => toggleDay(day)}
-              className="flex w-full items-center gap-2 bg-surface-2 px-4 py-2.5 text-start hover:bg-surface-2"
-            >
-              <ChevronDown className={`h-4 w-4 text-ink-subtle transition ${open ? "" : "-rotate-90"}`} />
-              <span className="font-semibold text-ink">
-                {day === fleetYmd() ? c("today") : day === "—" ? "—" : formatYmd(day, latnLocale(locale), { weekday: "long", day: "numeric", month: "long" })}
-              </span>
-              <span className="rounded-full bg-surface px-2 py-0.5 text-xs font-medium text-ink-muted">{dayOffers.length}</span>
-            </button>
-            {open && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <tbody className="divide-y divide-line">
-                    {dayOffers.map((o) => (
-                      <tr key={o.id}>
-                        <td className="whitespace-nowrap px-4 py-2.5 text-ink-muted">
-                          {o.received_at ? new Date(o.received_at).toLocaleTimeString(latnLocale(locale)) : "—"}
-                        </td>
-                        <td className="px-4 py-2.5 font-medium text-ink">{o.driver_name ?? "—"}</td>
-                        <td className="max-w-[220px] truncate px-4 py-2.5 text-ink-muted">{o.pickup_address ?? "—"}</td>
-                        <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-ink">{o.fare_formatted ?? "—"}</td>
-                        <td className="px-4 py-2.5">
-                          <Badge status={o.accepted ? "connected" : "neutral"} dot>{o.accepted ? c("accepted") : c("notAccepted")}</Badge>
-                        </td>
+    <div className="stack">
+      <div className="stack-sm">
+        {groups.map(([day, dayOffers]) => {
+          const open = openDays.has(day);
+          return (
+            <div key={day} className="card overflow-hidden">
+              <button
+                type="button"
+                onClick={() => toggleDay(day)}
+                aria-expanded={open}
+                className="flex w-full items-center gap-2 px-[18px] py-3 text-start hover:bg-surface-2"
+              >
+                <ChevronRight className={"h-4 w-4 text-ink-subtle transition-transform rtl:rotate-180 " + (open ? "rotate-90 rtl:rotate-90" : "")} />
+                <span className="grow font-semibold">
+                  {day === fleetYmd() ? c("today") : day === "—" ? "—" : formatYmd(day, latnLocale(locale), { weekday: "long", day: "numeric", month: "long" })}
+                </span>
+                <span className="badge">{formatNumber(dayOffers.length, locale)}</span>
+              </button>
+              {open && (
+                <div className="overflow-x-auto border-t border-line">
+                  <Table>
+                    <thead>
+                      <tr>
+                        <th>{c("colTime")}</th>
+                        <th>{c("colDriver")}</th>
+                        <th>{c("colPickup")}</th>
+                        <th className="r">{c("colPrice")}</th>
+                        <th>{c("colStatus")}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        );
-      })}
+                    </thead>
+                    <tbody>
+                      {dayOffers.map((o) => (
+                        <tr key={o.id}>
+                          <td className="num nowrap">
+                            {o.received_at ? new Date(o.received_at).toLocaleTimeString(latnLocale(locale)) : "—"}
+                          </td>
+                          <td>{o.driver_name ?? "—"}</td>
+                          <td><div className="truncate" style={{ maxWidth: 260 }}>{o.pickup_address ?? "—"}</div></td>
+                          <td className="r num strong">{o.fare_formatted ?? "—"}</td>
+                          <td>
+                            <Badge status={o.accepted ? "connected" : "neutral"} dot>{o.accepted ? c("accepted") : c("notAccepted")}</Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       {lastPage > 1 && (
-        <div className="flex items-center justify-end gap-2 pt-1 text-sm">
-          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
-            className="rounded-lg border border-line px-3 py-1.5 text-ink-muted hover:bg-surface-2 disabled:opacity-40">
+        <div className="flex items-center justify-between">
+          <Button variant="secondary" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
             {c("prev")}
-          </button>
-          <span className="text-ink-muted">{page} / {lastPage}</span>
-          <button onClick={() => setPage((p) => Math.min(lastPage, p + 1))} disabled={page >= lastPage}
-            className="rounded-lg border border-line px-3 py-1.5 text-ink-muted hover:bg-surface-2 disabled:opacity-40">
+          </Button>
+          <span className="num muted text-sm">{formatNumber(page, locale)} / {formatNumber(lastPage, locale)}</span>
+          <Button variant="secondary" size="sm" onClick={() => setPage((p) => Math.min(lastPage, p + 1))} disabled={page >= lastPage}>
             {c("next")}
-          </button>
+          </Button>
         </div>
       )}
     </div>

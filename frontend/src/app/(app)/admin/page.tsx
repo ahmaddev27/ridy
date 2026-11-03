@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { latnLocale } from "@/lib/utils";
-import { AlertTriangle, Building2, Radio, Plug, ArrowRight, Users, Wallet, TrendingUp, Clock, ReceiptText } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { PageHeader } from "@/components/ui/page-header";
+import { AlertTriangle, Building2, Radio, Plug, ArrowRight, ArrowUpRight, Users, Wallet, TrendingUp, Clock, ReceiptText, type LucideIcon } from "lucide-react";
 import { AreaChart } from "@/components/charts/area-chart";
 import { BarChart } from "@/components/charts/bar-chart";
 import { DonutChart } from "@/components/charts/donut-chart";
@@ -49,180 +47,200 @@ export default function AdminDashboardPage() {
   const sessionsTotal = sessionSegments.reduce((a, x) => a + x.value, 0);
 
   return (
-    <div className="space-y-6">
-      <PageHeader tkey="adminDashboard" />
+    <>
+      <header className="ph">
+        <div>
+          <h1>{t("pages.adminDashboard.title")}</h1>
+          <p>{t("pages.adminDashboard.subtitle")}</p>
+        </div>
+      </header>
 
       {/* Hero KPIs */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="g-4">
         <Kpi icon={Building2} href="/admin/companies" label={c("companies")} value={s?.companies} sub={`${s?.active_companies ?? 0} ${c("activeShort")}`} />
         <Kpi icon={Users} href="/admin/companies" label={c("drivers")} value={s?.drivers} sub={`${(s?.offers ?? 0).toLocaleString(latnLocale(locale))} ${c("offersTotal")}`} />
         <Kpi icon={Radio} href="/admin/companies" label={c("sessionsActive")} value={s?.sessions_active} tone="positive" />
         <Kpi icon={Wallet} href="/admin/reports" label={c("totalRevenue")} value={billing ? money(billing.totals.total_revenue) : undefined} tone="positive" />
       </div>
 
-      {/* Drivers — live fleet stat (online / rate / total), links to the directory */}
-      <Link href="/admin/drivers" className="group block">
-        <Card className="p-5 transition hover:border-line-strong hover:shadow-md">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-fg opacity-60" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success-fg" />
-            </span>
-            <h3 className="font-semibold text-ink">{c("driversTitle")}</h3>
-            <ArrowRight className="ms-auto h-4 w-4 text-ink-subtle transition group-hover:text-ink rtl:rotate-180" />
+      <div className="g-main-side" style={{ alignItems: "start" }}>
+        {/* Billing & subscriptions */}
+        <section className="card">
+          <div className="card-head">
+            <h2 className="row" style={{ gap: 8 }}>
+              <span className="subtle">
+                <ReceiptText style={{ width: 18, height: 18 }} />
+              </span>
+              {c("billingTitle")}
+            </h2>
+            <Link href="/admin/reports" className="btn btn-ghost btn-sm" aria-label={c("billingTitle")}>
+              <ArrowRight className="rtl:rotate-180" />
+            </Link>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="card-body">
+            <div className="g-main-side" style={{ alignItems: "center" }}>
+              <div>
+                <div className="subtle text-xs" style={{ marginBottom: 8 }}>{c("revenueChart")}</div>
+                {revenueChart.length > 0 ? (
+                  <AreaChart data={revenueChart} color="#10b981" valueFormat={money} />
+                ) : (
+                  <p className="muted" style={{ padding: "50px 0", textAlign: "center" }}>{c("revenueEmpty")}</p>
+                )}
+              </div>
+              <div className="g-2" style={{ gap: 14 }}>
+                <Mini icon={TrendingUp} label={c("monthlyRevenue")} value={billing ? money(thisMonth) : "…"} tone="pos" />
+                <Mini icon={Wallet} label={c("outstanding")} value={billing ? money(billing.totals.outstanding) : "…"} tone={billing?.totals.outstanding ? "warn" : ""} />
+                <Mini icon={ReceiptText} label={c("activeSubs")} value={billing?.totals.active_subscriptions ?? "…"} />
+                <Mini icon={Clock} label={c("expiringSoon")} value={billing?.totals.expiring_soon ?? "…"} tone={billing?.totals.expiring_soon ? "warn" : ""} />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Drivers: live fleet stat, links to the directory */}
+        <Link href="/admin/drivers" className="card hover" style={{ padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <h2 className="section-title row" style={{ gap: 8 }}>
+              <span className="live-dot" />
+              {c("driversTitle")}
+            </h2>
+            <ArrowUpRight className="subtle rtl:-scale-x-100" style={{ width: 15, height: 15 }} />
+          </div>
+          <div className="g-3" style={{ gap: 10, textAlign: "center" }}>
             {[
-              { label: c("dOnline"), value: dOnline.toLocaleString(latnLocale(locale)), color: "text-success-fg" },
-              { label: c("dRate"), value: `${dRate}%`, color: "text-ink" },
-              { label: c("dTotal"), value: dTotal.toLocaleString(latnLocale(locale)), color: "text-ink" },
+              { label: c("dOnline"), value: dOnline.toLocaleString(latnLocale(locale)), cls: "pos" },
+              { label: c("dRate"), value: `${dRate}%`, cls: "" },
+              { label: c("dTotal"), value: dTotal.toLocaleString(latnLocale(locale)), cls: "" },
             ].map((x) => (
-              <div key={x.label} className="rounded-xl border border-line bg-surface-2/40 p-3 text-center">
-                <div className={`text-2xl font-bold tabular-nums ${x.color}`}>{x.value}</div>
-                <div className="mt-0.5 text-xs text-ink-subtle">{x.label}</div>
+              <div key={x.label}>
+                <div className={`stat-value ${x.cls}`} dir="ltr">{x.value}</div>
+                <div className="subtle text-xs" style={{ marginTop: 4 }}>{x.label}</div>
               </div>
             ))}
           </div>
-        </Card>
-      </Link>
-
-      {/* Billing & subscriptions */}
-      <Card className="p-5">
-        <div className="mb-4 flex items-center gap-2">
-          <ReceiptText className="h-4 w-4 text-ink" />
-          <h3 className="font-semibold text-ink">{c("billingTitle")}</h3>
-          <Link href="/admin/reports" className="ms-auto text-ink-subtle transition hover:text-ink">
-            <ArrowRight className="h-4 w-4 rtl:rotate-180" />
-          </Link>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-          {/* Revenue chart */}
-          <div>
-            <div className="mb-2 text-xs font-medium uppercase tracking-wider text-ink-subtle">{c("revenueChart")}</div>
-            {revenueChart.length > 0 ? (
-              <AreaChart data={revenueChart} color="#10b981" valueFormat={money} />
-            ) : (
-              <div className="flex h-[180px] items-center justify-center rounded-lg bg-surface-2 text-sm text-ink-subtle">{c("revenueEmpty")}</div>
-            )}
-          </div>
-          {/* Billing mini-stats */}
-          <div className="grid grid-cols-2 gap-3 self-start">
-            <MiniStat icon={TrendingUp} label={c("monthlyRevenue")} value={billing ? money(thisMonth) : "…"} tone="positive" />
-            <MiniStat icon={Wallet} label={c("outstanding")} value={billing ? money(billing.totals.outstanding) : "…"} tone={billing?.totals.outstanding ? "warning" : "default"} />
-            <MiniStat icon={ReceiptText} label={c("activeSubs")} value={billing?.totals.active_subscriptions ?? "…"} />
-            <MiniStat icon={Clock} label={c("expiringSoon")} value={billing?.totals.expiring_soon ?? "…"} tone={billing?.totals.expiring_soon ? "warning" : "default"} />
-          </div>
-        </div>
-      </Card>
+        </Link>
+      </div>
 
       {/* Offers over time */}
-      <Card className="p-5">
-        <h3 className="mb-4 font-semibold text-ink">{c("offersChart")}</h3>
-        {offersChart.length > 0 ? <BarChart data={offersChart} /> : <div className="h-[180px] animate-pulse rounded-lg bg-surface-2" />}
-      </Card>
+      <section className="card">
+        <div className="card-head">
+          <h2 className="row" style={{ gap: 8 }}>
+            <span className="subtle">
+              <Radio style={{ width: 18, height: 18 }} />
+            </span>
+            {c("offersChart")}
+          </h2>
+        </div>
+        <div className="card-body">
+          {offersChart.length > 0 ? <BarChart data={offersChart} /> : <div className="h-[180px] animate-pulse rounded-lg bg-surface-2" />}
+        </div>
+      </section>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Companies health — active vs inactive donut */}
-        <Card className="p-5">
-          <h3 className="mb-4 font-semibold text-ink">{c("companiesHealth")}</h3>
-          <div className="flex items-center gap-6">
-            <DonutChart
-              segments={[
-                { value: s?.active_companies ?? 0, color: "#10b981" },
-                { value: Math.max(0, (s?.companies ?? 0) - (s?.active_companies ?? 0)), color: "#94a3b8" },
-              ]}
-              total={s?.companies ?? 0}
-            />
-            <div className="flex-1 space-y-2.5">
-              <LegendRow color="#10b981" label={c("cActive")} value={s?.active_companies ?? 0} />
-              <LegendRow color="#94a3b8" label={c("cInactive")} value={Math.max(0, (s?.companies ?? 0) - (s?.active_companies ?? 0))} />
+      <div className="g-3" style={{ alignItems: "start" }}>
+        {/* Companies health: active vs inactive donut */}
+        <section className="card">
+          <div className="card-head"><h2>{c("companiesHealth")}</h2></div>
+          <div className="card-body">
+            <div className="flex items-center gap-6">
+              <DonutChart
+                segments={[
+                  { value: s?.active_companies ?? 0, color: "#10b981" },
+                  { value: Math.max(0, (s?.companies ?? 0) - (s?.active_companies ?? 0)), color: "#94a3b8" },
+                ]}
+                total={s?.companies ?? 0}
+              />
+              <div className="stack-sm grow">
+                <LegendRow color="#10b981" label={c("cActive")} value={s?.active_companies ?? 0} />
+                <LegendRow color="#94a3b8" label={c("cInactive")} value={Math.max(0, (s?.companies ?? 0) - (s?.active_companies ?? 0))} />
+              </div>
             </div>
           </div>
-        </Card>
+        </section>
 
-        {/* Session health — donut */}
-        <Card className="p-5">
-          <h3 className="mb-4 font-semibold text-ink">{c("healthTitle")}</h3>
-          <div className="flex items-center gap-6">
-            <DonutChart segments={sessionSegments} total={sessionsTotal} />
-            <div className="flex-1 space-y-2.5">
-              <LegendRow color={SESSION_COLORS.active} label={c("stActive")} value={breakdown?.active ?? 0} />
-              <LegendRow color={SESSION_COLORS.needs_relink} label={c("stNeedsRelink")} value={breakdown?.needs_relink ?? 0} />
-              <LegendRow color={SESSION_COLORS.expired} label={c("stExpired")} value={breakdown?.expired ?? 0} />
-              <LegendRow color={SESSION_COLORS.no_session} label={c("stNoSession")} value={breakdown?.no_session ?? 0} />
+        {/* Session health: donut */}
+        <section className="card">
+          <div className="card-head"><h2>{c("healthTitle")}</h2></div>
+          <div className="card-body">
+            <div className="flex items-center gap-6">
+              <DonutChart segments={sessionSegments} total={sessionsTotal} />
+              <div className="stack-sm grow">
+                <LegendRow color={SESSION_COLORS.active} label={c("stActive")} value={breakdown?.active ?? 0} />
+                <LegendRow color={SESSION_COLORS.needs_relink} label={c("stNeedsRelink")} value={breakdown?.needs_relink ?? 0} />
+                <LegendRow color={SESSION_COLORS.expired} label={c("stExpired")} value={breakdown?.expired ?? 0} />
+                <LegendRow color={SESSION_COLORS.no_session} label={c("stNoSession")} value={breakdown?.no_session ?? 0} />
+              </div>
             </div>
           </div>
-        </Card>
+        </section>
 
         {/* Top companies */}
-        <Card className="p-5">
-          <h3 className="mb-4 font-semibold text-ink">{c("topCompanies")}</h3>
-          {top.length === 0 ? (
-            <p className="text-sm text-ink-subtle">—</p>
-          ) : (
-            <div className="space-y-3">
-              {top.map((tc) => (
-                <div key={tc.company_id}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-medium text-ink">{tc.company}</span>
-                    <span className="tabular-nums text-ink-subtle">{tc.offers.toLocaleString(latnLocale(locale))}</span>
+        <section className="card">
+          <div className="card-head"><h2>{c("topCompanies")}</h2></div>
+          <div className="card-body">
+            {top.length === 0 ? (
+              <p className="muted">—</p>
+            ) : (
+              <div className="stack">
+                {top.map((tc) => (
+                  <div key={tc.company_id} className="stack-sm" style={{ gap: 6 }}>
+                    <div className="row" style={{ justifyContent: "space-between" }}>
+                      <span className="strong truncate">{tc.company}</span>
+                      <span className="num subtle">{tc.offers.toLocaleString(latnLocale(locale))}</span>
+                    </div>
+                    <div className="meter">
+                      <i style={{ width: `${(tc.offers / topMax) * 100}%` }} />
+                    </div>
                   </div>
-                  <div className="h-2.5 overflow-hidden rounded-full bg-surface-2">
-                    <div
-                      className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
-                      style={{ width: `${(tc.offers / topMax) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
       {/* Alerts */}
-      <Card className="p-5">
-        <div className="mb-3 flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-warning-fg" />
-          <h3 className="font-semibold text-ink">{c("alerts")}</h3>
+      <section className="card">
+        <div className="card-head" style={{ paddingBottom: 6 }}>
+          <h2 className="row" style={{ gap: 8 }}>
+            <span className="subtle">
+              <AlertTriangle style={{ width: 18, height: 18 }} />
+            </span>
+            {c("alerts")}
+          </h2>
         </div>
         {alerts.length === 0 && expiringProxies.length === 0 ? (
-          <p className="text-sm text-ink-subtle">{c("noAlerts")}</p>
+          <p className="muted" style={{ padding: "8px 18px 18px" }}>{c("noAlerts")}</p>
         ) : (
-          <ul className="divide-y divide-line">
+          <div className="list-rows" style={{ marginTop: 8, borderTop: "1px solid var(--line)" }}>
             {expiringProxies.map((p) => (
-              <li key={`px-${p.id}`} className="flex items-center justify-between gap-3 py-2.5">
-                <span className="flex items-center gap-2 text-sm">
-                  <Plug className="h-4 w-4 text-danger-fg" />
-                  <span className="font-medium text-ink">{p.label}</span>
-                  <span className="text-ink-subtle">
-                    — {p.days_left < 0 ? c("proxyExpired") : c("proxyExpiring").replace("{n}", String(p.days_left))}
+              <div key={`px-${p.id}`} className="list-row">
+                <span className="stat-ico danger"><Plug /></span>
+                <div className="grow truncate">
+                  <b>{p.label}</b>{" "}
+                  <span className="muted">
+                    · {p.days_left < 0 ? c("proxyExpired") : c("proxyExpiring").replace("{n}", String(p.days_left))}
                   </span>
-                </span>
-                <Link href="/admin/proxies" className="rounded-lg px-2.5 py-1 text-xs font-medium text-ink hover:bg-surface-2">
-                  {c("resolve")}
-                </Link>
-              </li>
+                </div>
+                <Link href="/admin/proxies" className="btn btn-ghost btn-sm">{c("resolve")}</Link>
+              </div>
             ))}
             {alerts.map((a, i) => (
-              <li key={i} className="flex items-center justify-between gap-3 py-2.5">
-                <span className="flex items-center gap-2 text-sm">
-                  <AlertIcon type={a.type} />
-                  <span className="font-medium text-ink">{a.company}</span>
-                  <span className="text-ink-subtle">— {c(`alert_${a.type}`)}</span>
-                </span>
-                <Link href="/admin/companies" className="rounded-lg px-2.5 py-1 text-xs font-medium text-ink hover:bg-surface-2">
-                  {c("resolve")}
-                </Link>
-              </li>
+              <div key={i} className="list-row">
+                <AlertIcon type={a.type} />
+                <div className="grow truncate">
+                  <b>{a.company}</b> <span className="muted">· {c(`alert_${a.type}`)}</span>
+                </div>
+                <Link href="/admin/companies" className="btn btn-ghost btn-sm">{c("resolve")}</Link>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
-      </Card>
-    </div>
+      </section>
+    </>
   );
 }
 
+/** Prototype KPI: a `.stat` tile wrapped in a link, with a corner arrow. */
 function Kpi({
   href,
   label,
@@ -236,69 +254,64 @@ function Kpi({
   value?: number | string;
   sub?: string;
   tone?: "default" | "positive" | "warning";
-  icon?: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
 }) {
-  const valueColor = tone === "positive" ? "text-success-fg" : tone === "warning" ? "text-warning-fg" : "text-ink";
-  const iconTone =
-    tone === "positive" ? "bg-success-bg text-success-fg" : tone === "warning" ? "bg-warning-bg text-warning-fg" : "bg-surface-2 text-ink-muted";
+  const icoTone = tone === "positive" ? " success" : tone === "warning" ? " warning" : "";
   return (
-    <Link
-      href={href}
-      className="group glass-panel glass-panel--card p-4 transition hover:border-line-strong hover:shadow-md"
-    >
-      <div className="flex items-start justify-between">
-        {Icon && (
-          <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${iconTone}`}>
-            <Icon className="h-[18px] w-[18px]" />
-          </span>
+    <Link href={href} className="relative block transition hover:-translate-y-px">
+      <div className="stat">
+        <div className="stat-top">
+          <span className={`stat-ico${icoTone}`}><Icon /></span>
+          <span className="truncate">{label}</span>
+        </div>
+        <div className={`stat-value${tone === "positive" ? " pos" : ""}`}>{value ?? "…"}</div>
+        {sub && (
+          <div className="stat-foot">
+            <span className="truncate">{sub}</span>
+          </div>
         )}
-        <ArrowRight className="h-4 w-4 text-ink-subtle transition group-hover:text-ink-muted rtl:rotate-180" />
       </div>
-      <div className="mt-3 text-sm text-ink-muted">{label}</div>
-      <div className={`mt-0.5 text-2xl font-bold tabular-nums ${valueColor}`}>{value ?? "…"}</div>
-      {sub && <div className="mt-0.5 text-xs text-ink-subtle">{sub}</div>}
+      <ArrowUpRight className="subtle absolute end-3.5 top-3.5 rtl:-scale-x-100" style={{ width: 15, height: 15 }} />
     </Link>
   );
 }
 
-function MiniStat({
+function Mini({
   icon: Icon,
   label,
   value,
-  tone = "default",
+  tone = "",
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   label: string;
   value: number | string;
-  tone?: "default" | "positive" | "warning";
+  tone?: "pos" | "warn" | "";
 }) {
-  const valueColor = tone === "positive" ? "text-success-fg" : tone === "warning" ? "text-warning-fg" : "text-ink";
   return (
-    <div className="rounded-xl border border-line bg-surface-2/40 p-3">
-      <div className="flex items-center gap-1.5 text-xs text-ink-subtle">
-        <Icon className="h-3.5 w-3.5" />
+    <div>
+      <div className="subtle text-xs row" style={{ gap: 6 }}>
+        <Icon style={{ width: 14, height: 14 }} />
         <span className="truncate">{label}</span>
       </div>
-      <div className={`mt-1 text-lg font-bold tabular-nums ${valueColor}`}>{value}</div>
+      <div className={`stat-value ${tone}`} style={{ fontSize: 20, marginTop: 4 }} dir="ltr">{value}</div>
     </div>
   );
 }
 
-
 function LegendRow({ color, label, value }: { color: string; label: string; value: number }) {
   return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="flex items-center gap-2 text-ink-muted">
+    <div className="row" style={{ justifyContent: "space-between", fontSize: 13.5 }}>
+      <span className="row muted" style={{ gap: 8 }}>
         <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
         {label}
       </span>
-      <span className="font-semibold tabular-nums text-ink">{value}</span>
+      <span className="strong num">{value}</span>
     </div>
   );
 }
 
 function AlertIcon({ type }: { type: string }) {
-  if (type === "no_proxy") return <Plug className="h-4 w-4 text-danger-fg" />;
-  if (type === "no_session") return <Building2 className="h-4 w-4 text-ink-subtle" />;
-  return <Radio className="h-4 w-4 text-warning-fg" />;
+  if (type === "no_proxy") return <span className="stat-ico danger"><Plug /></span>;
+  if (type === "no_session") return <span className="stat-ico warning"><Building2 /></span>;
+  return <span className="stat-ico warning"><Radio /></span>;
 }
