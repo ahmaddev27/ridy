@@ -93,6 +93,23 @@ class AutoRenewalProvisioningTest extends TestCase
         $this->patchJson($url($this->tenant(context: false)), $body)->assertUnprocessable()->assertJsonPath('reason', 'no_prior_session');
     }
 
+    public function test_get_reports_state_email_and_eligibility(): void
+    {
+        $this->asSuperAdmin();
+        $tenant = $this->tenant();
+        $url = "/api/v1/admin/companies/{$tenant->id}/auto-renewal";
+
+        $this->getJson($url)->assertOk()->assertExactJson(['data' => [
+            'enabled' => false, 'email' => null, 'eligible' => true, 'blocker' => null,
+        ]]);
+
+        $this->patchJson($url, ['enabled' => true, 'email' => 'ops@acme.de'])->assertOk();
+        $this->getJson($url)->assertOk()->assertJsonPath('data.enabled', true)->assertJsonPath('data.email', 'ops@acme.de');
+
+        $this->getJson("/api/v1/admin/companies/{$this->tenant(proxy: false)->id}/auto-renewal")
+            ->assertOk()->assertJsonPath('data.eligible', false)->assertJsonPath('data.blocker', 'no_proxy');
+    }
+
     public function test_a_manager_is_forbidden_and_the_old_manager_routes_are_gone(): void
     {
         $this->seed(RolePermissionSeeder::class);
@@ -102,6 +119,7 @@ class AutoRenewalProvisioningTest extends TestCase
         Sanctum::actingAs($manager);
 
         $this->patchJson("/api/v1/admin/companies/{$tenant->id}/auto-renewal", ['enabled' => true, 'email' => 'a@b.de'])->assertForbidden();
+        $this->getJson("/api/v1/admin/companies/{$tenant->id}/auto-renewal")->assertForbidden();
         $this->getJson('/api/v1/uber-login/settings')->assertNotFound();
         $this->putJson('/api/v1/uber-login/settings', [])->assertNotFound();
         $this->postJson('/api/v1/uber-login/inbound-address/rotate')->assertNotFound();

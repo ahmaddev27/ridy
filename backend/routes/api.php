@@ -558,6 +558,7 @@ Route::prefix('v1')->group(function () {
         Route::patch('companies/{tenant}/passwordless-login', [CompanyController::class, 'setPasswordlessLogin']);
         Route::patch('companies/{tenant}/cobrowse', [CompanyController::class, 'setCobrowse']);
         // Variant B (docs/27): operator-provisioned automatic Uber re-auth; returns the secret inbound address once.
+        Route::get('companies/{tenant}/auto-renewal', [CompanyController::class, 'getAutoRenewal']);
         Route::patch('companies/{tenant}/auto-renewal', [CompanyController::class, 'setAutoRenewal']);
 
         // Read-only drill-down into a company's fleet data (admin tabs).

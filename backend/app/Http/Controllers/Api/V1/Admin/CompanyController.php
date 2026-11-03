@@ -189,6 +189,18 @@ class CompanyController extends Controller
         return response()->json(['data' => ['inbound_address' => $address]]);
     }
 
+    public function getAutoRenewal(Tenant $tenant, PasswordlessLoginSettings $settings, PasswordlessLoginService $login): JsonResponse
+    {
+        $blocker = $this->autoRenewalBlocker($tenant, $settings, $login);
+
+        return response()->json(['data' => [
+            'enabled' => $settings->isAutoEnabled($tenant),
+            'email' => $settings->email($tenant),
+            'eligible' => $blocker === null,
+            'blocker' => $blocker,
+        ]]);
+    }
+
     private function autoRenewalBlocker(Tenant $tenant, PasswordlessLoginSettings $settings, PasswordlessLoginService $login): ?string
     {
         return match (true) {

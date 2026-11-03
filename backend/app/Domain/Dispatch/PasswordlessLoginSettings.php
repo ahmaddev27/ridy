@@ -67,6 +67,12 @@ class PasswordlessLoginSettings
             && $this->email($tenant) !== null;
     }
 
+    /** Variant B switch as stored (ignores eligibility, so the admin UI can show a stale-on state). */
+    public function isAutoEnabled(Tenant $tenant): bool
+    {
+        return $this->get($tenant, 'auto_code') === true && $this->get($tenant, 'auto_relogin') === true;
+    }
+
     public function email(Tenant $tenant): ?string
     {
         $stored = $this->get($tenant, 'email');
