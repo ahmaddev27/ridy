@@ -811,3 +811,112 @@ html[data-glass="on"] .app-toast [data-icon] { color: var(--focus); }
   html[data-glass="on"] { --surface: #ffffff; --glass-sheet: #f8fbfa; --glass-strong: #ffffff; }
   html[data-glass="on"].dark { --surface: #121816; --glass-sheet: #0e1412; --glass-strong: #151c19; }
 }
+
+/* ================================================================== *
+ * GLASS REDESIGN (issue #279) — Phase 2: shared UI primitives.
+ *
+ * Same mechanism as Phase 1: UNLAYERED rules scoped to html[data-glass="on"].
+ * The primitives (components/ui/*) carry Tailwind token utilities for the
+ * flag-off look and additive hook classes (ui-btn, ui-field, ui-badge,
+ * app-modal…) for these rules to target; unlayered rules win over the Tailwind
+ * utilities layer, so the prototype recipe takes without !important. Flag off →
+ * byte-for-byte the legacy primitives. Values copied 1:1 from the owner-approved
+ * prototype (.btn / .input / .select / .badge / .modal). Per the perf + AA rules,
+ * form fields and data tables render on --surface-solid (no blur); blur stays on
+ * the transient overlay layers (modal/menu — one at a time) only.
+ * ================================================================== */
+
+/* Buttons — prototype .btn hover/shadow/focus recipe. */
+html[data-glass="on"] .ui-btn {
+  border-radius: var(--r-md);
+  --tw-ring-color: color-mix(in srgb, var(--focus) 55%, transparent);
+}
+html[data-glass="on"] .ui-btn--primary {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 2px rgb(4 120 87 / 0.25);
+}
+html[data-glass="on"] .ui-btn--primary:hover { background: var(--primary-hover); opacity: 1; }
+html[data-glass="on"] .ui-btn--secondary { box-shadow: var(--shadow-xs); }
+html[data-glass="on"] .ui-btn--secondary:hover { border-color: var(--line-strong); background: var(--surface-2); }
+html[data-glass="on"] .ui-btn--ghost:hover { background: var(--surface-2); color: var(--ink); }
+html[data-glass="on"] .ui-btn--danger { background: var(--danger-dot); }
+html[data-glass="on"] .ui-btn--danger:hover { filter: brightness(0.94); opacity: 1; }
+
+/* Form fields — near-solid surface + primary border + a --focus ring (prototype
+   .input/.select/.otp). Solid, not translucent, so typed data stays AA-legible. */
+html[data-glass="on"] .ui-field {
+  background: var(--surface-solid);
+  border-radius: var(--r-md);
+  --tw-ring-color: color-mix(in srgb, var(--focus) 30%, transparent);
+}
+html[data-glass="on"] .ui-field:focus { border-color: var(--primary); }
+html[data-glass="on"] .ui-field:disabled { background: var(--surface-2); color: var(--ink-subtle); }
+
+/* Badges — prototype uses a flat tinted pill (bg + fg + dot), no ring. */
+html[data-glass="on"] .ui-badge { box-shadow: none; }
+
+/* Modal / confirm dialog — the single transient blurred overlay: strong glass
+   panel + a 6px-blurred scrim. Menus/drawers already use .app-menu / Phase-1. */
+html[data-glass="on"] .app-modal-scrim {
+  background: var(--glass-scrim);
+  backdrop-filter: blur(6px) saturate(120%);
+}
+html[data-glass="on"] .app-modal {
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--shadow-lg);
+  backdrop-filter: blur(26px) saturate(180%);
+}
+
+/* ------------------------------------------------------------------ *
+ * Shared solid data-table (components/ui/table.tsx). Token-based so it renders
+ * natively with the flag off AND on; opaque --surface-solid container, sticky
+ * header, tabular figures. Unscoped on purpose — it is the one table look, not a
+ * glass overlay — and only applies where the new `ui-table` classes are used.
+ * ------------------------------------------------------------------ */
+.ui-table-card {
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  overflow: hidden;
+  background: var(--surface);
+}
+html[data-glass="on"] .ui-table-card {
+  border-radius: var(--r-xl);
+  border-color: var(--glass-edge);
+  background: var(--surface-solid);
+  box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--shadow-sm);
+}
+.ui-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+.ui-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: start;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--ink-subtle);
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+html[data-glass="on"] .ui-table thead th { background: var(--surface-3); }
+.ui-table tbody td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.ui-table tbody tr { transition: background 0.15s var(--ease, ease); }
+.ui-table tbody tr:hover { background: var(--surface-2); }
+.ui-table tbody tr:last-child td { border-bottom: 0; }
+.ui-table th:first-child,
+.ui-table td:first-child { padding-inline-start: 18px; }
+.ui-table th:last-child,
+.ui-table td:last-child { padding-inline-end: 18px; }
+.ui-table .r { text-align: end; }
+.ui-table .c { text-align: center; }

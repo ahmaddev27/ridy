@@ -11,6 +11,12 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { GlassPanel, type GlassVariant } from "@/components/ui/glass-panel";
+import { SearchInput } from "@/components/ui/search-input";
+import { Select } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { PasswordInput } from "@/components/ui/password-input";
+import { OtpInput } from "@/components/ui/otp-input";
+import { Table, TableCard } from "@/components/ui/table";
 import { useI18n } from "@/lib/i18n/context";
 
 const swatches: [string, string, string][] = [
@@ -46,6 +52,11 @@ function DesignSystemGallery() {
   const { t } = useI18n();
   const [confirm, setConfirm] = useState(false);
   const [info, setInfo] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sel, setSel] = useState("uber");
+  const [sw, setSw] = useState(true);
+  const [pw, setPw] = useState("");
+  const [otp, setOtp] = useState("");
 
   return (
     <div className="space-y-6">
@@ -109,34 +120,26 @@ function DesignSystemGallery() {
           </div>
         </Section>
 
-        {/* Form controls */}
+        {/* Form controls — the shared input primitives (ui-field / --focus ring). */}
         <Section title={t("screens.designSystem.formControls")}>
           <div className="space-y-3">
-            <input
-              placeholder={t("screens.designSystem.textInput")}
-              className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
+            <SearchInput value={search} onChange={setSearch} placeholder={t("screens.designSystem.textInput")} className="max-w-none" />
+            <Select
+              value={sel}
+              onChange={setSel}
+              options={[
+                { value: "uber", label: "Uber" },
+                { value: "bolt", label: "Bolt" },
+              ]}
             />
-            <select className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink">
-              <option>{t("screens.designSystem.selectOption")}</option>
-              <option>Uber</option>
-              <option>Bolt</option>
-            </select>
+            <PasswordInput value={pw} onChange={(e) => setPw(e.target.value)} placeholder="••••••••" />
             <div className="flex flex-wrap items-center gap-5 text-sm text-ink-muted">
-              <label className="flex items-center gap-2">
-                <input type="checkbox" defaultChecked className="rounded border-line-strong text-ink" />
-                {t("screens.designSystem.checkbox")}
-              </label>
-              <label className="flex items-center gap-2">
-                <input type="radio" name="dsr" defaultChecked className="border-line-strong text-ink" />
-                {t("screens.designSystem.radio")}
-              </label>
               <span className="flex items-center gap-2">
                 {t("screens.designSystem.switchLabel")}
-                <span className="inline-flex h-5 w-9 items-center rounded-full bg-emerald-500 p-0.5">
-                  <span className="ml-auto h-4 w-4 rounded-full bg-surface" />
-                </span>
+                <Switch checked={sw} onChange={() => setSw((v) => !v)} label={t("screens.designSystem.switchLabel")} />
               </span>
             </div>
+            <OtpInput value={otp} onChange={setOtp} length={6} />
           </div>
         </Section>
 
@@ -188,6 +191,38 @@ function DesignSystemGallery() {
             title={t("screens.designSystem.emptyTitle")}
             description={t("screens.designSystem.emptyDesc")}
           />
+        </Section>
+
+        {/* Shared data table (ui-table — solid, sticky header, tabular-nums) */}
+        <Section title="Data table">
+          <TableCard>
+            <Table>
+              <thead>
+                <tr>
+                  <th>Fahrer</th>
+                  <th>Status</th>
+                  <th className="r">Umsatz</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Ahmed Jaber</td>
+                  <td><Badge status="connected" dot>Online</Badge></td>
+                  <td className="r tabular-nums">1.234,56 €</td>
+                </tr>
+                <tr>
+                  <td>Maria Schmidt</td>
+                  <td><Badge status="gap">Offline</Badge></td>
+                  <td className="r tabular-nums">987,00 €</td>
+                </tr>
+                <tr>
+                  <td>Jonas Weber</td>
+                  <td><Badge status="expiring" dot>Ablaufend</Badge></td>
+                  <td className="r tabular-nums">2.045,10 €</td>
+                </tr>
+              </tbody>
+            </Table>
+          </TableCard>
         </Section>
 
         {/* Tabs + pagination */}

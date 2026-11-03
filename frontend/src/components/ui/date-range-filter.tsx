@@ -123,7 +123,7 @@ export function DateRangeFilter({ from, to, onChange, fleetDays = false, classNa
       </button>
 
       {open && (
-        <div className="absolute top-full z-20 mt-2 w-64 rounded-xl border border-line bg-surface p-3 shadow-lg ltr:left-0 rtl:right-0">
+        <div className="app-menu absolute top-full z-20 mt-2 w-64 rounded-xl border border-line bg-surface p-3 shadow-lg ltr:left-0 rtl:right-0">
           {/* Presets */}
           <div className="grid grid-cols-2 gap-1.5">
             {(["today", "yesterday", "week", "month"] as const).map((p) => (
@@ -149,7 +149,7 @@ export function DateRangeFilter({ from, to, onChange, fleetDays = false, classNa
                 value={from}
                 max={to || undefined}
                 onChange={(e) => onChange(e.target.value, to || e.target.value)}
-                className="rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink outline-none focus:border-ink"
+                className="ui-field rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink outline-none focus:border-ink"
               />
             </label>
             <label className="flex items-center justify-between gap-2 text-xs text-ink-muted">
@@ -159,7 +159,7 @@ export function DateRangeFilter({ from, to, onChange, fleetDays = false, classNa
                 value={to}
                 min={from || undefined}
                 onChange={(e) => onChange(from || e.target.value, e.target.value)}
-                className="rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink outline-none focus:border-ink"
+                className="ui-field rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink outline-none focus:border-ink"
               />
             </label>
           </div>
