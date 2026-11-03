@@ -63,6 +63,7 @@ use App\Http\Controllers\Api\V1\DriverMetricController;
 use App\Http\Controllers\Api\V1\DriverPushController;
 use App\Http\Controllers\Api\V1\ElProfessorController;
 use App\Http\Controllers\Api\V1\ExtensionController;
+use App\Http\Controllers\Api\V1\Fleet\FleetWebauthnCredentialController;
 use App\Http\Controllers\Api\V1\FleetAutoDeclineController;
 use App\Http\Controllers\Api\V1\FleetSessionController;
 use App\Http\Controllers\Api\V1\HealthController;
@@ -258,6 +259,13 @@ Route::prefix('v1')->group(function () {
             // The owner's own push device (User token) — receives every driver's offers.
             Route::post('devices', [FleetDeviceController::class, 'store']);
             Route::delete('devices', [FleetDeviceController::class, 'destroy']);
+            // The owner's app passkeys (scope 'app'): enrol, list, remove. No
+            // password step-up (the session came from an emailed code); never
+            // usable at the dashboard, and the dashboard's never here.
+            Route::post('webauthn/register/options', [FleetWebauthnCredentialController::class, 'registerOptions'])->middleware('throttle:webauthn-options');
+            Route::post('webauthn/register', [FleetWebauthnCredentialController::class, 'register'])->middleware('throttle:webauthn-verify');
+            Route::get('webauthn/credentials', [FleetWebauthnCredentialController::class, 'index']);
+            Route::delete('webauthn/credentials/{credential}', [FleetWebauthnCredentialController::class, 'destroy']);
         });
     });
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Auth\Webauthn\PasskeyAuthenticator;
+use App\Domain\Auth\Webauthn\PasskeyScope;
 use App\Http\Controllers\Concerns\RespondsSuspendedLogin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\WebauthnCeremonyRequest;
@@ -30,7 +31,7 @@ class WebauthnLoginController extends Controller
 
     public function login(WebauthnCeremonyRequest $request): JsonResponse
     {
-        $user = $this->passkeys->authenticate($request->ceremonyId(), $request->credential(), User::class);
+        $user = $this->passkeys->authenticate($request->ceremonyId(), $request->credential(), User::class, PasskeyScope::Dashboard);
 
         // A suspended company (disabled / banned / expired) cannot sign in,
         // whatever the credential. Super-admins (no tenant) are never gated.

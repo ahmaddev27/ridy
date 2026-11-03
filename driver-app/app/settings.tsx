@@ -199,11 +199,16 @@ export default function SettingsScreen() {
             <View style={{ gap: 10 }}>
               <Field label={t("settings.name")} value={name} onChangeText={setName} autoCapitalize="words" />
               <PrimaryButton label={t("settings.save")} onPress={save} loading={saving} disabled={!dirty} />
-              {passkeys && (
-                <View style={cardStyle(c)}>
-                  <NavRow icon={KeyRound} label={t("passkey.title")} onPress={() => router.push("/passkeys")} c={c} Chevron={Chevron} />
-                </View>
-              )}
+            </View>
+          </View>
+        )}
+
+        {/* PASSKEYS — for drivers and the owner alike. */}
+        {passkeys && (
+          <View style={{ gap: 10 }}>
+            <SectionLabel>{t("passkey.title")}</SectionLabel>
+            <View style={cardStyle(c)}>
+              <NavRow icon={KeyRound} label={t("passkey.title")} onPress={() => router.push("/passkeys")} c={c} Chevron={Chevron} />
             </View>
           </View>
         )}

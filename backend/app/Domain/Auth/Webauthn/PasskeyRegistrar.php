@@ -29,11 +29,15 @@ class PasskeyRegistrar
     /**
      * @return array{ceremony_id: string, options: array<string, mixed>}
      */
-    public function start(PasskeyHolder $account): array
+    public function start(PasskeyHolder $account, PasskeyScope $scope): array
     {
-        $existing = $account->webauthnCredentials()->get();
-        // The handle stays the same across enrolments so an authenticator keeps
-        // one credential per account; a first enrolment mints it.
+        // Per scope: the handle AND the exclude list come from this front door's
+        // credentials only. Sharing either would make an app enrolment collide
+        // with (and overwrite) the same account's dashboard passkey on the
+        // authenticator, which keys on rpId + user.id.
+        $existing = $account->webauthnCredentialsIn($scope)->get();
+        // The handle stays the same across this scope's enrolments so an
+        // authenticator keeps one credential per account; a first one mints it.
         $userHandle = $existing->first()?->user_handle ?? (string) Str::uuid();
 
         $options = $this->options->creation($account, $userHandle, $existing);
@@ -41,7 +45,7 @@ class PasskeyRegistrar
         // The parked ceremony names its owner — model AND key, since a driver
         // and a user may share an id — so it can only be finished by the
         // account that started it, never with another account's handle.
-        $parked = json_encode(['owner' => self::ownerKey($account), 'options' => $options], JSON_THROW_ON_ERROR);
+        $parked = json_encode(['owner' => self::ownerKey($account, $scope), 'options' => $options], JSON_THROW_ON_ERROR);
 
         return [
             'ceremony_id' => $this->challenges->put($parked),
@@ -54,9 +58,9 @@ class PasskeyRegistrar
      *
      * @throws ValidationException `ceremony_expired` | `verification_failed` | `credential_exists`
      */
-    public function finish(PasskeyHolder $account, string $ceremonyId, array $credential, ?string $alias): WebauthnCredential
+    public function finish(PasskeyHolder $account, string $ceremonyId, array $credential, ?string $alias, PasskeyScope $scope): WebauthnCredential
     {
-        $optionsJson = $this->optionsOwnedBy($account, $ceremonyId);
+        $optionsJson = $this->optionsOwnedBy($account, $scope, $ceremonyId);
         if ($optionsJson === null) {
             throw ValidationException::withMessages(['ceremony_id' => ['ceremony_expired']]);
         }
@@ -64,7 +68,7 @@ class PasskeyRegistrar
         try {
             $verified = $this->verifier->verifyRegistration($optionsJson, $credential);
         } catch (WebauthnVerificationFailed $e) {
-            Log::info('webauthn.registration_failed', ['account' => self::ownerKey($account), 'reason' => $e->getMessage()]);
+            Log::info('webauthn.registration_failed', ['account' => self::ownerKey($account, $scope), 'reason' => $e->getMessage()]);
 
             throw ValidationException::withMessages(['credential' => ['verification_failed']]);
         }
@@ -87,6 +91,7 @@ class PasskeyRegistrar
                 'public_key' => $verified->publicKey,
                 'attestation_format' => $verified->attestationFormat,
                 'alias' => $alias === '' ? null : $alias,
+                'scope' => $scope,
             ]);
         } catch (UniqueConstraintViolationException) {
             // Two valid ceremonies for one authenticator finishing at once: the
@@ -100,7 +105,7 @@ class PasskeyRegistrar
      * account. A ceremony pulled by anyone else is spent all the same — it is
      * single-use whoever answers it.
      */
-    private function optionsOwnedBy(PasskeyHolder $account, string $ceremonyId): ?string
+    private function optionsOwnedBy(PasskeyHolder $account, PasskeyScope $scope, string $ceremonyId): ?string
     {
         $parked = $this->challenges->pull($ceremonyId);
         if ($parked === null) {
@@ -108,7 +113,7 @@ class PasskeyRegistrar
         }
 
         $payload = json_decode($parked, true);
-        if (! is_array($payload) || ($payload['owner'] ?? null) !== self::ownerKey($account) || ! is_array($payload['options'] ?? null)) {
+        if (! is_array($payload) || ($payload['owner'] ?? null) !== self::ownerKey($account, $scope) || ! is_array($payload['options'] ?? null)) {
             return null;
         }
 
@@ -116,8 +121,8 @@ class PasskeyRegistrar
     }
 
     /** "App\Models\User:12" — the morph class keeps a driver and a user with the same id apart. */
-    private static function ownerKey(PasskeyHolder $account): string
+    private static function ownerKey(PasskeyHolder $account, PasskeyScope $scope): string
     {
-        return $account->getMorphClass().':'.$account->getKey();
+        return $account->getMorphClass().':'.$account->getKey().':'.$scope->value;
     }
 }
