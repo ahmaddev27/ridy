@@ -22,14 +22,17 @@ use RuntimeException;
 class ReceiptVision
 {
     private const PROMPT = <<<'TXT'
-You read German fuel-station receipts. Return ONE JSON object with exactly these keys
+You read German receipts (fuel stations, car washes and similar service receipts). Return ONE JSON object with exactly these keys
 (use null when a field is truly absent):
 station_name, street, postal_code, city, date, time, liters, price_per_liter, total_amount,
 receipt_number, station_number.
 Rules: date as YYYY-MM-DD; time as HH:MM (24h, the SALE time, not the TSE UTC timestamp).
 liters, price_per_liter and total_amount are plain decimal numbers with a dot (21.94, 2.279, 50.00):
 NO currency, NO unit, NO label, NO thousands separator. total_amount is the gross amount paid
-(Brutto / Summe / Betrag), not the net. Read digits exactly as printed; do not compute or correct them.
+(Brutto / Summe / Betrag / Gesamtbetrag), not the net. Read every digit EXACTLY as written —
+including HANDWRITTEN values and ink STAMPS; do not compute or correct them. The date is often a
+rotated/sideways ink stamp like "07. OKT. 2026" (= 2026-10-07): read the day, the German month
+abbreviation (JAN..DEZ), and the year.
 TXT;
 
     public function __construct(private readonly ReceiptVisionSanitizer $sanitizer) {}
