@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { View, KeyboardAvoidingView, Platform, Pressable, Linking, ScrollView } from "react-native";
+import { View, KeyboardAvoidingView, Keyboard, Pressable, Linking, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "@/components/typography";
 import { useAuth } from "@/lib/auth";
@@ -46,6 +46,15 @@ export default function LoginScreen() {
   const resendCooldown = useCooldown(60);
   const [passkeyReady, setPasskeyReady] = useState(false);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
+
+  // The pinned legal footer would sit on top of the form once the keyboard shrinks
+  // the viewport, so it is hidden while the keyboard is open.
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () => setKeyboardOpen(true));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardOpen(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -125,12 +134,14 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.canvas }} edges={["top"]}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+      {/* "padding" on both platforms: SDK 57 is edge-to-edge, where Android ignores
+          adjustResize, so without it the keyboard covers the fields on Android. */}
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         {/* The form scrolls, so an open keyboard pushes the focused field (email or
             the OTP boxes) into view instead of hiding it. flexGrow + center keeps it
             vertically centred when the keyboard is closed. */}
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 16 }}
+          contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 16, paddingBottom: keyboardOpen ? 16 : 96 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -202,6 +213,7 @@ export default function LoginScreen() {
 
       {/* Pinned to the screen bottom — outside the scroll view and the KAV — so it
           stays put and simply sits under the keyboard while the driver types. */}
+      {!keyboardOpen && (
       <View style={{ position: "absolute", bottom: 20, left: 16, right: 16, gap: 8, alignItems: "center" }}>
         <Text style={{ color: c.inkSubtle, fontSize: 13, textAlign: "center", lineHeight: 19 }}>{t("signin.inviteNote")}</Text>
         {/* Reachable before sign-in (App Review / Play policy, DDG §5). */}
@@ -214,6 +226,7 @@ export default function LoginScreen() {
           </Text>
         </View>
       </View>
+      )}
     </SafeAreaView>
   );
 }
