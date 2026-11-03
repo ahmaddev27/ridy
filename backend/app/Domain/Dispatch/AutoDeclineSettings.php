@@ -168,9 +168,9 @@ class AutoDeclineSettings
     }
 
     /**
-     * The current tenant's drivers that are ACTIVELY Early-declining (admin-allowed AND
-     * switched on), with their rules — read-only legacy list. A driver the admin has
-     * revoked (admin_enabled off) never fires, so it is excluded even if `enabled` stayed on.
+     * The current tenant's drivers that switched Early decline on, with their rules —
+     * read-only legacy list (the owner never edits a driver's rules here). Filters on the
+     * driver's own switch; the admin-aware state lives on GET /auto-decline/drivers.
      *
      * @return array<int, array{id: int, name: string, rules: array<string, array<string, mixed>>}>
      */
@@ -180,7 +180,7 @@ class AutoDeclineSettings
             ->whereNotNull('auto_decline')
             ->orderBy('name')
             ->get(['id', 'name', 'auto_decline'])
-            ->filter(fn (Driver $d) => $d->autoDeclineActive())
+            ->filter(fn (Driver $d) => $d->autoDeclineEnabled())
             ->map(fn (Driver $d) => ['id' => $d->id, 'name' => $d->name, 'rules' => $this->withDefaults($d->autoDeclineRules())])
             ->values()
             ->all();
