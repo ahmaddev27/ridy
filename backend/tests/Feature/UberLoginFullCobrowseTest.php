@@ -172,6 +172,10 @@ class UberLoginFullCobrowseTest extends TestCase
     public function test_me_exposes_full_cobrowse_only_for_a_cold_cobrowse_company(): void
     {
         $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.full_cobrowse_available', true);
+        // Migrated (co-browse on) but server-sync not enabled yet: the extension is NOT retired
+        // (no dark period — H1). It flips on only once server-sync is enabled for the company.
+        $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.extension_retired', false);
+        config(['services.uber.server_sync' => true]);
         $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.extension_retired', true);
         $this->tenant->setCobrowseEnabled(false);
         $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.extension_retired', false);
