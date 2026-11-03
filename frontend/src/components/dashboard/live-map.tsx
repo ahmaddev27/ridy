@@ -482,7 +482,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
         onClick={toggleFullscreen}
         title={c(fullscreen ? "exitFullscreen" : "fullscreen")}
         aria-label={c(fullscreen ? "exitFullscreen" : "fullscreen")}
-        className="pointer-events-auto absolute top-3 z-[1000] flex h-9 w-9 items-center justify-center rounded-lg bg-surface/95 text-ink-muted shadow-md backdrop-blur transition hover:text-ink ltr:left-3 rtl:right-3"
+        className="pointer-events-auto absolute top-3 z-[1000] flex h-9 w-9 items-center justify-center rounded-lg bg-surface-solid text-ink-muted shadow-md backdrop-blur transition hover:text-ink ltr:left-3 rtl:right-3"
       >
         {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
       </button>
@@ -491,7 +491,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
           (top-left) or the driver list (top-right). Colors come straight from
           PRESENCE_COLOR so they always match the markers and badges. */}
       <div className="pointer-events-none absolute bottom-3 z-[1000] flex flex-wrap gap-2 px-3 ltr:left-3 rtl:right-3">
-        <div className="pointer-events-auto flex items-center gap-3 rounded-xl bg-surface/95 px-3 py-2 text-xs shadow-md backdrop-blur">
+        <div className="pointer-events-auto flex items-center gap-3 rounded-xl bg-surface-solid px-3 py-2 text-xs shadow-md backdrop-blur">
           {(["online", "en_route", "on_trip"] as const).map((p) => (
             <Legend key={p} color={PRESENCE_COLOR[p]} label={c(PRESENCE_LABEL_KEY[p])} />
           ))}
@@ -500,7 +500,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
       {/* Driver list — click to zoom onto one */}
       {drivers.length > 0 && (
-        <div className="pointer-events-auto absolute top-3 z-[1000] max-h-[calc(100%-1.5rem)] w-56 overflow-y-auto rounded-xl bg-surface/95 p-1.5 shadow-md backdrop-blur ltr:right-3 rtl:left-3">
+        <div className="pointer-events-auto absolute top-3 z-[1000] max-h-[calc(100%-1.5rem)] w-56 overflow-y-auto rounded-xl bg-surface-solid p-1.5 shadow-md backdrop-blur ltr:right-3 rtl:left-3">
           {drivers.map((dr) => {
             const p: Presence = presence(dr.status);
             return (
@@ -542,7 +542,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
       {count === 0 && (
         <div className="pointer-events-none absolute inset-0 z-[999] flex items-center justify-center">
-          <div className="rounded-xl bg-surface/95 px-5 py-4 text-center shadow-lg backdrop-blur">
+          <div className="rounded-xl bg-surface-solid px-5 py-4 text-center shadow-lg backdrop-blur">
             <p className="font-semibold text-ink">{c("emptyTitle")}</p>
             <p className="mt-1 text-sm text-ink-muted">{c("emptyDesc")}</p>
           </div>
@@ -550,7 +550,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
       )}
 
       {updatedAt && (
-        <p className="pointer-events-none absolute bottom-2 z-[1000] flex items-center gap-1.5 rounded-lg bg-surface/90 px-2 py-1 text-[11px] text-ink-subtle ltr:right-2 rtl:left-2">
+        <p className="pointer-events-none absolute bottom-2 z-[1000] flex items-center gap-1.5 rounded-lg bg-surface-solid px-2 py-1 text-[11px] text-ink-subtle ltr:right-2 rtl:left-2">
           <RefreshCw className="h-3 w-3" /> {updatedAt.toLocaleTimeString(latnLocale(locale))}
         </p>
       )}
