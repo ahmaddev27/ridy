@@ -31,7 +31,7 @@ import {
 const PER_PAGE = 25;
 
 const selectClass =
-  "rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none hover:bg-surface-2";
+  "ui-field rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none hover:bg-surface-2";
 
 export default function AutoDeclinePage() {
   const { t, locale } = useI18n();
@@ -138,7 +138,7 @@ export default function AutoDeclinePage() {
       <PageHeader title={c("title")} subtitle={c("subtitle")} />
 
       {error && (
-        <div className="rounded-lg border border-rose-200 bg-danger-bg p-3 text-sm text-danger-fg">
+        <div className="rounded-lg border border-danger-dot/40 bg-danger-bg p-3 text-sm text-danger-fg">
           {c("loadError")} — {error}
         </div>
       )}

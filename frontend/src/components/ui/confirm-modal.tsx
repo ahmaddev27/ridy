@@ -41,7 +41,7 @@ export function ConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 z-[1200] flex items-center justify-center bg-overlay p-4 backdrop-blur-sm"
+      className="app-modal-scrim fixed inset-0 z-[1200] flex items-center justify-center bg-overlay p-4 backdrop-blur-sm"
       onClick={() => !busy && onCancel()}
     >
       <div
@@ -51,7 +51,7 @@ export function ConfirmModal({
         aria-labelledby={titleId}
         aria-describedby={messageId}
         tabIndex={-1}
-        className="w-full max-w-sm overflow-hidden rounded-2xl bg-surface text-start shadow-xl outline-none"
+        className="app-modal w-full max-w-sm overflow-hidden rounded-2xl bg-surface text-start shadow-xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-5">
@@ -74,9 +74,9 @@ export function ConfirmModal({
             {cancelLabel}
           </Button>
           <Button
+            variant={danger ? "danger" : "primary"}
             onClick={onConfirm}
             disabled={busy}
-            className={danger ? "bg-danger-ring text-white hover:opacity-90" : undefined}
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
             {confirmLabel}

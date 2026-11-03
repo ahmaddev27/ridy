@@ -20,7 +20,7 @@ export function SidebarBrand() {
 /** Desktop sidebar (hidden below lg — mobile uses the drawer in the topbar). */
 export function Sidebar() {
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-e border-line bg-surface lg:flex">
+    <aside className="app-sidebar hidden w-64 shrink-0 flex-col border-e border-line bg-surface lg:flex">
       <SidebarBrand />
       <NavList />
     </aside>

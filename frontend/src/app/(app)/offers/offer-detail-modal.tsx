@@ -95,7 +95,7 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
 
   return (
     <div
-      className="fixed inset-0 z-[1200] flex items-center justify-center bg-overlay p-4 backdrop-blur-sm"
+      className="app-modal-scrim fixed inset-0 z-[1200] flex items-center justify-center bg-overlay p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -104,7 +104,7 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
         aria-modal="true"
         aria-labelledby={dialogTitleId}
         tabIndex={-1}
-        className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-surface text-start shadow-xl outline-none"
+        className="app-modal flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-surface text-start shadow-xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

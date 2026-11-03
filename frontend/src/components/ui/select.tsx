@@ -98,7 +98,7 @@ export function Select({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 rounded-lg border border-line-strong bg-surface px-3 py-2 text-start text-sm outline-none transition-colors hover:border-line-strong focus:border-ink focus:ring-2 focus:ring-line disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-subtle"
+        className="ui-field flex w-full items-center justify-between gap-2 rounded-lg border border-line-strong bg-surface px-3 py-2 text-start text-sm outline-none transition-colors hover:border-line-strong focus:border-ink focus:ring-2 focus:ring-line disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-subtle"
       >
         <span className={`truncate ${selected ? "text-ink" : "text-ink-subtle"}`}>
           {selected ? selected.label : placeholder}
@@ -107,7 +107,7 @@ export function Select({
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-line bg-surface shadow-lg">
+        <div className="app-menu absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-line bg-surface shadow-lg">
           {showSearch && (
             <div className="flex items-center gap-2 border-b border-line px-2.5 py-2">
               <Search className="h-4 w-4 shrink-0 text-ink-subtle" />

@@ -183,7 +183,7 @@ function ClaimRow({
             <select
               value={planId}
               onChange={(e) => setPlanId(e.target.value)}
-              className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
+              className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
             >
               <option value="">{c("selectPlan")}</option>
               {plans.map((p) => (
@@ -196,7 +196,7 @@ function ClaimRow({
             <select
               value={method}
               onChange={(e) => setMethod(e.target.value)}
-              className="rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
+              className="ui-field rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
             >
               {PAYMENT_METHOD_KEYS.map((m) => (
                 <option key={m} value={m}>{paymentMethodLabel(m, t)}</option>
@@ -218,7 +218,7 @@ function ClaimRow({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={c("reasonPlaceholder")}
-              className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
+              className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
             />
           </div>
           <Button onClick={reject} disabled={busy || reason.trim().length === 0} className="text-sm">

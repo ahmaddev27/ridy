@@ -75,7 +75,7 @@ export function NotificationsBell({
 
       {open && (
         <div
-          className="absolute end-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-line bg-surface text-start shadow-xl"
+          className="app-menu absolute end-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-line bg-surface text-start shadow-xl"
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
         >

@@ -198,12 +198,12 @@ export function CobrowseViewer({
     // A large, focused modal over the whole viewport: the small embedded card was unusable for a
     // real sign-in. Refocus the hidden key-capture input on any press inside the modal.
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm sm:p-6"
+      className="app-modal-scrim fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm sm:p-6"
       role="dialog"
       aria-modal="true"
       onPointerDown={() => state === "live" && inputRef.current?.focus({ preventScroll: true })}
     >
-      <div className="flex max-h-[96vh] w-full max-w-7xl flex-col gap-3 rounded-2xl border border-line-strong bg-surface p-4 shadow-2xl sm:p-5">
+      <div className="app-modal flex max-h-[96vh] w-full max-w-7xl flex-col gap-3 rounded-2xl border border-line-strong bg-surface p-4 shadow-2xl sm:p-5">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h3 className="truncate text-base font-semibold text-ink">{c("cobrowseTitle")}</h3>

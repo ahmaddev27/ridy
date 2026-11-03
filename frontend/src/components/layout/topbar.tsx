@@ -100,8 +100,8 @@ export function Topbar() {
           `fixed` overlay and collapse it to the header's height. */}
       {navOpen && (
         <div className="fixed inset-0 z-[1200] lg:hidden">
-          <div className="absolute inset-0 bg-overlay" onClick={() => setNavOpen(false)} />
-          <div className="absolute inset-y-0 start-0 flex w-64 flex-col bg-surface shadow-xl">
+          <div className="app-drawer-scrim absolute inset-0 bg-overlay" onClick={() => setNavOpen(false)} />
+          <div className="app-drawer absolute inset-y-0 start-0 flex w-64 flex-col bg-surface shadow-xl">
             <div className="relative">
               <SidebarBrand />
               <button
@@ -117,7 +117,7 @@ export function Topbar() {
         </div>
       )}
 
-      <header className="sticky top-0 z-[1100] flex h-16 items-center gap-3 border-b border-line bg-surface/80 px-4 backdrop-blur sm:px-5">
+      <header className="app-topbar sticky top-0 z-[1100] flex h-16 items-center gap-3 border-b border-line bg-surface/80 px-4 backdrop-blur sm:px-5">
         {/* Mobile nav toggle */}
         <button
           onClick={() => setNavOpen(true)}
@@ -211,7 +211,7 @@ export function Topbar() {
                 className="fixed inset-0 z-10"
                 onClick={() => setMenuOpen(false)}
               />
-              <div className="absolute end-0 z-20 mt-2 w-56 rounded-lg border border-line bg-surface py-1 text-start text-sm shadow-lg">
+              <div className="app-menu absolute end-0 z-20 mt-2 w-56 rounded-lg border border-line bg-surface py-1 text-start text-sm shadow-lg">
                 <div className="border-b border-line px-3 py-2">
                   <div className="font-medium text-ink">{user?.name}</div>
                   <div className="text-xs text-ink-subtle">{user?.tenant?.name}</div>

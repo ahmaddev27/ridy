@@ -118,7 +118,7 @@ function Metric({
 }) {
   const pct = percent ?? null;
   return (
-    <div className="rounded-xl border border-line bg-surface p-4">
+    <div className="glass-panel glass-panel--card rounded-xl p-4">
       <div className="flex items-center gap-2 text-ink-muted">
         <Icon className="h-4 w-4 text-ink-subtle" />
         <span className="text-xs font-semibold uppercase tracking-wide">{label}</span>

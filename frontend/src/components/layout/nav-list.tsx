@@ -67,8 +67,9 @@ export function NavList({ onNavigate }: { onNavigate?: () => void }) {
                 key={item.href}
                 href={item.href}
                 onClick={onNavigate}
+                data-active={active ? "true" : undefined}
                 className={cn(
-                  "flex items-center justify-between rounded-xl px-3 py-2.5 font-medium transition-colors",
+                  "app-nav-item flex items-center justify-between rounded-xl px-3 py-2.5 font-medium transition-colors",
                   active
                     ? "bg-primary text-primary-ink shadow-sm dark:bg-surface-2 dark:text-ink dark:ring-1 dark:ring-inset dark:ring-line-strong dark:shadow-none"
                     : "text-ink-muted hover:bg-surface-2",

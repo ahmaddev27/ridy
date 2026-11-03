@@ -63,7 +63,7 @@ export default function DashboardPage() {
       <AdBanner />
 
       {error && (
-        <div className="rounded-lg border border-rose-200 bg-danger-bg p-3 text-sm text-danger-fg">
+        <div className="rounded-lg border border-danger-dot/40 bg-danger-bg p-3 text-sm text-danger-fg">
           {k("loadError")} — {error}
         </div>
       )}
@@ -192,7 +192,7 @@ function FleetTile({
 }) {
   const color = tone === "amber" ? "text-amber-600" : tone === "emerald" ? "text-emerald-600" : "text-ink";
   return (
-    <div className="rounded-xl border border-line bg-surface-2 p-4">
+    <div className="glass-panel glass-panel--card rounded-xl p-4">
       <div className="flex items-center gap-1.5 text-xs text-ink-subtle">
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>

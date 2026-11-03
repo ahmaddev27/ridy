@@ -130,7 +130,7 @@ export default function AdminDriversPage() {
               setCompanyId(e.target.value ? Number(e.target.value) : "");
               setPage(1);
             }}
-            className="max-w-[180px] rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+            className="ui-field max-w-[180px] rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink"
           >
             <option value="">{c("allCompanies")}</option>
             {companies.map((co) => (
@@ -145,7 +145,7 @@ export default function AdminDriversPage() {
               setStatus(e.target.value as StatusFilter);
               setPage(1);
             }}
-            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+            className="ui-field rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink"
           >
             <option value="">{c("filterAll")}</option>
             <option value="online">{c("filterOnline")}</option>

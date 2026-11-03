@@ -85,14 +85,14 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-overlay" onClick={onClose} />
+      <div className="app-modal-scrim absolute inset-0 bg-overlay" onClick={onClose} />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
-        className={`relative max-h-[88vh] w-full overflow-y-auto rounded-xl bg-surface p-6 shadow-xl outline-none ${sizeClass[size]}`}
+        className={`app-modal relative max-h-[88vh] w-full overflow-y-auto rounded-xl bg-surface p-6 shadow-xl outline-none ${sizeClass[size]}`}
       >
         {title && (
           <div className="mb-4 flex items-center justify-between">

@@ -19,9 +19,9 @@ const PAGE_SIZE = 50;
 
 const ROLE_TONE: Record<string, string> = {
   super_admin: "bg-primary text-primary-ink",
-  reseller: "bg-indigo-50 text-indigo-700",
-  fleet_manager: "bg-info-bg text-sky-700",
-  owner: "bg-info-bg text-sky-700",
+  reseller: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
+  fleet_manager: "bg-info-bg text-info-fg",
+  owner: "bg-info-bg text-info-fg",
   driver: "bg-success-bg text-success-fg",
   viewer: "bg-surface-2 text-ink-muted",
 };
