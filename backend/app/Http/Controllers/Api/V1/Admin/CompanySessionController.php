@@ -6,12 +6,14 @@ use App\Domain\Dispatch\FleetSessionService;
 use App\Domain\Dispatch\Models\SessionBrowser;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\SessionOutageTracker;
+use App\Domain\Dispatch\UberAuthClient;
 use App\Domain\Tenancy\CompanyDataPurger;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Admin\CompanySessionResource;
 use App\Http\Resources\Admin\SessionBrowserResource;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Super-admin view + controls over a company's Uber fleet session. Cookies are
@@ -44,15 +46,39 @@ class CompanySessionController extends Controller
         ]);
     }
 
-    /** Force the company to re-link (marks the session needs_relink). */
-    public function forceRelink(Tenant $tenant, FleetSessionService $service): JsonResponse
+    /**
+     * Force the company to re-link: a CLEAN disconnect. Marks the session needs_relink AND stops
+     * the company's persistent browser in uber-auth (which would otherwise keep the dead session
+     * warm and "active"), so the company can re-link through the co-browse window.
+     */
+    public function forceRelink(Tenant $tenant, FleetSessionService $service, UberAuthClient $uberAuth): JsonResponse
     {
         $session = $this->sessionFor($tenant);
         abort_if($session === null, 404, 'No session.');
 
         $service->markNeedsRelink($session, 'admin');
+        $this->dropPersistentBrowser($tenant, $uberAuth);
 
         return response()->json(['data' => ['status' => UberFleetSession::STATUS_NEEDS_RELINK]]);
+    }
+
+    /** Best-effort: an uber-auth hiccup must not fail the relink the admin already got. */
+    private function dropPersistentBrowser(Tenant $tenant, UberAuthClient $uberAuth): void
+    {
+        if (! $uberAuth->configured()) {
+            return;
+        }
+        $result = $uberAuth->dropSession($tenant);
+        if (($result['ok'] ?? false) !== true) {
+            Log::warning('force-relink: uber-auth browser drop failed', ['tenant_id' => $tenant->id, 'status' => $result['status'] ?? 'unknown']);
+
+            return;
+        }
+        // uber-auth stops reporting a dropped browser, so its last "active" mirror would linger.
+        SessionBrowser::updateOrCreate(
+            ['tenant_id' => $tenant->id],
+            ['state' => SessionBrowser::STATE_NOT_SET_UP, 'last_seen_at' => now()],
+        );
     }
 
     /** Delete the session entirely (company must re-link from scratch). */

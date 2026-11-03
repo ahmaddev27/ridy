@@ -245,9 +245,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function verifyCode(email: string, otp: string) {
-    const owner = await signIn(() => api.loginVerify(email, otp));
-    // Passkeys are for the driver principal; owner mode keeps its OTP flow.
-    if (!owner) setPasskeyOffer(true);
+    await signIn(() => api.loginVerify(email, otp));
+    setPasskeyOffer(true);
   }
 
   async function signInWithPasskey() {

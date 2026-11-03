@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Domain\Auth\Webauthn\Models\WebauthnCredential;
+use App\Domain\Auth\Webauthn\PasskeyScope;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -37,6 +38,17 @@ class WebauthnCredentialFactory extends Factory
             'alias' => null,
             'last_used_at' => null,
             'disabled_at' => null,
+            'scope' => PasskeyScope::Dashboard->value,
         ];
+    }
+
+    public function app(): static
+    {
+        return $this->state(['scope' => PasskeyScope::App->value]);
+    }
+
+    public function dashboard(): static
+    {
+        return $this->state(['scope' => PasskeyScope::Dashboard->value]);
     }
 }

@@ -29,6 +29,8 @@ export type Company = {
   elprofessor_connected: boolean;
   /** The PLATFORM's switch for dispatch-side offer declines, set per company. */
   dispatch_reject_enabled: boolean;
+  /** The PLATFORM's switch for the co-browse (window) Uber connect, set per company. */
+  cobrowse_enabled: boolean;
   users?: CompanyUser[] | null;
 };
 
@@ -643,6 +645,17 @@ export async function setCompanyElProfessor(id: number, enabled: boolean): Promi
  */
 export async function setCompanyDispatchReject(id: number, enabled: boolean): Promise<Company> {
   const res = await apiFetch<{ data: Company }>(`${base}/${id}/dispatch-reject`, {
+    method: "PATCH",
+    body: { enabled },
+    withCsrf: true,
+  });
+  return res.data;
+}
+
+/** Super-admin opt-in/out of the co-browse (window) Uber connect for one company — lets a cold
+ *  company sign in to Uber in the streamed window to capture its fleet session (like tenant 15). */
+export async function setCompanyCobrowse(id: number, enabled: boolean): Promise<Company> {
+  const res = await apiFetch<{ data: Company }>(`${base}/${id}/cobrowse`, {
     method: "PATCH",
     body: { enabled },
     withCsrf: true,
