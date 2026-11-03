@@ -17,11 +17,14 @@ import { useAsync } from "@/hooks/use-async";
 import { listDrivers, syncDrivers, inviteDriver, testDriverPush, updateDriverEmail, type Driver } from "@/lib/api/drivers";
 import { apiErrorMessage } from "@/lib/api/error-message";
 import { syncRosterViaExtension, fetchDriverStatusesViaExtension } from "@/lib/extension";
+import { useAuth } from "@/components/auth/auth-provider";
 import { AdBanner } from "@/components/ads/ad-banner";
 
 export default function DriversPage() {
   const { t, locale } = useI18n();
   const router = useRouter();
+  const { user } = useAuth();
+  const extensionRetired = user?.tenant?.extension_retired === true;
   // Poll the (cheap, DB-backed) roster list so linked/status changes surface
   // without a manual refresh. The heavier Uber pull still runs only on mount.
   const { data, loading, error, refetch } = useAsync(listDrivers, { refetchInterval: 15000 });
@@ -89,11 +92,25 @@ export default function DriversPage() {
     }
   }
 
-  async function runSync() {
-    setSyncing(true);
+  // Migrated companies: roster and presence are synced server-side; this just
+  // asks the backend for a fresh pull (best-effort) and re-reads the list.
+  async function runServerSync() {
+    const res = await syncDrivers().catch(() => null);
+    if (res?.reason === "not_connected") {
+      toast.error(t("screens.drivers.connectFirst"));
+      return;
+    }
+    if (res?.reason === "org_mismatch") {
+      toast.error(t("screens.drivers.orgMismatch"));
+      return;
+    }
+    await refetch();
+  }
+
+  // Extension companies: the browser extension pulls the roster from
+  // supplier.uber.com using the manager's real IP (Uber blocks our server).
+  async function runExtensionSync() {
     try {
-      // Preferred path: the browser extension pulls the roster from
-      // supplier.uber.com using the manager's real IP (Uber blocks our server).
       const viaExt = await syncRosterViaExtension();
 
       // The backend refuses a roster pull unless the company has connected its
@@ -117,14 +134,10 @@ export default function DriversPage() {
       await refreshStatuses(fresh ?? []);
     } catch {
       /* best-effort — the cached roster stays visible */
-    } finally {
-      setSyncing(false);
     }
   }
 
-  // Refresh live online/offline presence for the given drivers. Takes the already
-  // -loaded roster so it doesn't re-fetch the list just to read the UUIDs (that
-  // second identical GET was the "drivers fetched twice on open").
+  // Refresh live online/offline presence for the given drivers (extension path).
   async function refreshStatuses(list: Driver[]) {
     const uuids = list.map((d) => d.uber_driver_uuid).filter((u): u is string => Boolean(u));
     if (uuids.length === 0) return;
@@ -132,11 +145,19 @@ export default function DriversPage() {
     if (res?.ok) await refetch();
   }
 
+  async function runSync() {
+    setSyncing(true);
+    try {
+      if (extensionRetired) await runServerSync();
+      else await runExtensionSync();
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   // Stale-while-revalidate: show the cached roster instantly, then silently
-  // pull a fresh one from Uber on open — but at most once every few minutes.
+  // ask for a fresh one on open — at most once every few minutes.
   useEffect(() => {
-    // Wait for the first roster load (from useAsync) so the presence refresh can
-    // reuse it — running before data is ready is what forced the extra fetch.
     if (didAutoSync.current || !data) return;
     didAutoSync.current = true;
     const KEY = "drivers-autosync-at";
@@ -144,7 +165,7 @@ export default function DriversPage() {
     if (Date.now() - last > 3 * 60 * 1000) {
       localStorage.setItem(KEY, String(Date.now()));
       runSync();
-    } else {
+    } else if (!extensionRetired) {
       refreshStatuses(data); // cheap presence refresh even when the roster is fresh
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

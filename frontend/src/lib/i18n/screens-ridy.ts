@@ -13,6 +13,7 @@ const en = {
     colColor: "Color", colStatus: "Status", colAssignment: "Assignment",
     statusActive: "Active", unassigned: "Unassigned",
   },
+driverUber: { title: "From Uber", hint: "Performance metrics as reported by Uber for this period.", hoursOnline: "Hours online", hoursOnTrip: "Hours on trip", acceptance: "Acceptance rate (Uber)", cancellation: "Cancellation rate (Uber)", syncedAt: "Last synced", syncing: "Waiting for the first sync from Uber — data appears automatically." },
   autoDecline: {
     title: "Early decline",
     subtitle: "Drivers who let Reidey decline unwanted offers for them, and the offers declined that way. Managers switch it on or off per driver and edit the criteria; drivers can also change them in the app.",
@@ -335,6 +336,7 @@ const de: typeof en = {
     colColor: "Farbe", colStatus: "Status", colAssignment: "Zuweisung",
     statusActive: "Aktiv", unassigned: "Nicht zugewiesen",
   },
+driverUber: { title: "Von Uber", hint: "Leistungskennzahlen, wie Uber sie für diesen Zeitraum meldet.", hoursOnline: "Stunden online", hoursOnTrip: "Stunden auf Fahrt", acceptance: "Annahmequote (Uber)", cancellation: "Stornoquote (Uber)", syncedAt: "Zuletzt synchronisiert", syncing: "Warten auf die erste Synchronisierung von Uber — die Daten erscheinen automatisch." },
   autoDecline: {
     title: "Früh abgelehnt",
     subtitle: "Fahrer, die unerwünschte Angebote von Reidey für sich ablehnen lassen, und die so abgelehnten Angebote. Verwalter schalten die Funktion pro Fahrer ein oder aus und bearbeiten die Kriterien; Fahrer können sie ebenfalls in der App ändern.",
@@ -652,6 +654,7 @@ const ar: typeof en = {
     colColor: "اللون", colStatus: "الحالة", colAssignment: "الربط",
     statusActive: "نشطة", unassigned: "غير مربوطة",
   },
+driverUber: { title: "من أوبر", hint: "مقاييس الأداء كما يرصدها أوبر لهذه الفترة.", hoursOnline: "ساعات الاتصال", hoursOnTrip: "ساعات الرحلات", acceptance: "نسبة القبول (أوبر)", cancellation: "نسبة الإلغاء (أوبر)", syncedAt: "آخر مزامنة", syncing: "بانتظار أول مزامنة من أوبر — تظهر البيانات تلقائياً." },
   autoDecline: {
     title: "رفض مبكر",
     subtitle: "السائقون الذين فعّلوا رفض العروض غير المرغوبة تلقائياً، والعروض المرفوضة بهذه الطريقة. يفعّل المدراء الميزة أو يوقفونها لكل سائق ويعدّلون المعايير، ويمكن للسائق تعديلها من التطبيق أيضاً.",

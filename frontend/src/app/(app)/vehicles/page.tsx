@@ -12,19 +12,22 @@ import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
 import { listVehicles } from "@/lib/api/vehicles";
 import { fetchVehiclesViaExtension } from "@/lib/extension";
+import { useAuth } from "@/components/auth/auth-provider";
 
 export default function VehiclesPage() {
   const { t } = useI18n();
+  const { user } = useAuth();
+  const extensionRetired = user?.tenant?.extension_retired === true;
   const v = (k: string) => t(`screens.vehicles.${k}`);
   const { data, loading, refetch } = useAsync(listVehicles, { refetchInterval: 30000 });
   const vehicles = data ?? [];
   const [syncing, setSyncing] = useState(false);
   const didAutoSync = useRef(false);
 
-  // Stale-while-revalidate: silently pull fresh vehicles from Uber on open,
-  // throttled to at most once every few minutes.
+  // Extension companies: stale-while-revalidate — silently pull fresh vehicles
+  // from Uber on open, throttled to at most once every few minutes.
   useEffect(() => {
-    if (didAutoSync.current) return;
+    if (extensionRetired || didAutoSync.current) return;
     didAutoSync.current = true;
     const KEY = "vehicles-autosync-at";
     const last = Number(localStorage.getItem(KEY) || 0);
@@ -37,11 +40,17 @@ export default function VehiclesPage() {
         .catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [extensionRetired]);
 
+  // Migrated companies: vehicles are synced server-side, so the button just
+  // re-reads the backend. Extension companies pull through the extension.
   async function sync() {
     setSyncing(true);
     try {
+      if (extensionRetired) {
+        await refetch();
+        return;
+      }
       const res = await fetchVehiclesViaExtension();
       if (!res) {
         toast.error(v("syncNoExtension"));
