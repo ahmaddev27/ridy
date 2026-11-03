@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 
 // Logos are vendored in /public/badges: Apple mark from simple-icons (CC0),
-// Google Play four-facet mark from Wikimedia Commons (Google_Play_Arrow_logo.svg).
+// Google Play four-facet geometry from Wikimedia Commons (Google_Play_Arrow_logo.svg),
+// rendered monochrome white (facets as white tints) per owner.
 const storeLinks = {
   googlePlay: "https://play.google.com/store/apps/details?id=de.reidey.app",
   appStore: "https://apps.apple.com/app/reidey", // TODO(owner): replace with the real https://apps.apple.com/app/id<numeric-id>
@@ -45,13 +46,13 @@ function StoreBadge({ href, label, small, big, logo, logoClassName }: StoreBadge
       target="_blank"
       rel="noopener noreferrer"
       aria-label={label}
-      className="inline-flex h-[50px] min-w-[165px] items-center gap-2.5 rounded-[10px] border border-[#a6a6a6] bg-black px-3.5 text-white transition-colors hover:bg-[#111] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+      className="glass-strong inline-flex items-center gap-3 rounded-2xl px-5 py-3 text-white transition-colors hover:border-white/20"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={logo} alt="" aria-hidden className={logoClassName} />
       <span className="text-left leading-none">
-        <span className="block text-[10px] font-normal tracking-wide">{small}</span>
-        <span className="mt-0.5 block text-[19px] font-semibold tracking-tight">{big}</span>
+        <span className="block text-[10px] uppercase tracking-wide text-white/75">{small}</span>
+        <span className="font-heading block text-sm font-semibold text-white">{big}</span>
       </span>
     </a>
   );
@@ -67,7 +68,7 @@ export function StoreButtons() {
         small="Laden im"
         big="App Store"
         logo="/badges/apple.svg"
-        logoClassName="h-[30px] w-[30px]"
+        logoClassName="h-7 w-7"
       />
       <StoreBadge
         href={links.googlePlay}
@@ -75,7 +76,7 @@ export function StoreButtons() {
         small="Jetzt bei"
         big="Google Play"
         logo="/badges/google-play.svg"
-        logoClassName="h-[28px] w-[26px]"
+        logoClassName="h-7 w-7"
       />
     </div>
   );
