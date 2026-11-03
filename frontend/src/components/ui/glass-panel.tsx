@@ -7,8 +7,7 @@ import { cn } from "@/lib/utils";
  * - strong: modal / menu / drawer / popover, blur(26px) saturate(180%)
  * - solid:  opaque surface for dense data (tables, forms, logs)
  *
- * With html[data-glass="on"] absent every variant renders the legacy Card look,
- * so adopting the component changes nothing until the rollout flag is on.
+ * The recipes live in globals.css under `html:root`.
  * Blur belongs on fixed/sticky layers only: never use sheet/strong for scrolling
  * content cards.
  */

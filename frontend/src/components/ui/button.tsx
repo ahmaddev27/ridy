@@ -5,7 +5,7 @@ type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md";
 
 // The `ui-btn--*` hook classes are additive: the Tailwind token utilities here
-// supply the flag-off look, while html[data-glass="on"] rules (globals.css,
+// supply the base look, while html:root rules (globals.css,
 // Phase 2) override hover/shadow/focus-ring onto the prototype's .btn recipe.
 const variants: Record<Variant, string> = {
   primary: "ui-btn ui-btn--primary bg-primary text-primary-ink shadow-sm hover:opacity-90 focus-visible:ring-line-strong",

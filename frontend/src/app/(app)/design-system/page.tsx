@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { notFound } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Inbox } from "lucide-react";
@@ -286,8 +286,7 @@ function Alert({
 
 // ---------------------------------------------------------------------------
 // Glass redesign test bed (epic #276, Phase 0). Dev-only like the rest of this
-// page. Toggle the rollout flag here (or with ?glass=1 / ?glass=0) to compare
-// legacy vs glass; the flag is OFF for everyone by default.
+// page. Static showcase of the glass tokens and primitives.
 // ---------------------------------------------------------------------------
 const TOKEN_GROUPS: { label: string; tokens: string[] }[] = [
   { label: "Surfaces", tokens: ["canvas", "surface", "surface-solid", "surface-2", "surface-3"] },
@@ -308,40 +307,10 @@ const GLASS_VARIANTS: [GlassVariant, string][] = [
 
 const RADII = ["xs", "sm", "md", "lg", "xl", "2xl"];
 
-function GlassFlagToggle() {
-  const [on, setOn] = useState(false);
-  useEffect(() => {
-    setOn(document.documentElement.dataset.glass === "on");
-  }, []);
-  const flip = () => {
-    const next = !on;
-    if (next) {
-      document.documentElement.setAttribute("data-glass", "on");
-      localStorage.setItem("glass", "on");
-    } else {
-      document.documentElement.removeAttribute("data-glass");
-      localStorage.removeItem("glass");
-    }
-    setOn(next);
-  };
-  return (
-    <Button variant={on ? "primary" : "secondary"} onClick={flip}>
-      {on ? "Glass: ON (click to turn off)" : "Glass: OFF (click to preview)"}
-    </Button>
-  );
-}
-
 function GlassTestBed() {
   return (
-    <Section title="Glass redesign (epic #276, Phase 0)">
+    <Section title="Glass design (epic #276)">
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <GlassFlagToggle />
-          <span className="text-xs text-ink-subtle">
-            Rollout flag html[data-glass=&quot;on&quot;], default OFF. Also ?glass=1 / ?glass=0.
-          </span>
-        </div>
-
         <div className="space-y-3">
           {TOKEN_GROUPS.map((g) => (
             <div key={g.label}>

@@ -8,7 +8,7 @@ export function Card({
   className?: string;
   children: React.ReactNode;
 }) {
-  // Legacy look by default; becomes a glass pane under html[data-glass="on"].
+  // Glass content pane (see GlassPanel "card").
   return <GlassPanel variant="card" className={className}>{children}</GlassPanel>;
 }
 
