@@ -449,7 +449,9 @@ services:
     # Internal only — reached by the backend as http://osrm:5000.
 
   # --- Receipt vision (opt-in: `--profile vision`) ---------------------------
-  # Self-hosted Qwen2.5-VL-3B behind llama.cpp's OpenAI-compatible server. Reads
+  # Self-hosted Qwen3-VL-4B behind llama.cpp's OpenAI-compatible server (reads handwriting
+  # + ink stamps that the 3B missed; ~7 s/receipt on 4 CPUs). --image-min-tokens 1024 is the
+  # model's own accuracy knob. Reads
   # the low-confidence receipts the phone's ML Kit cannot. The photo never leaves
   # our infrastructure. Set RECEIPT_VISION_URL=http://receipt-vision:8080 in the
   # root .env (GitHub secret) to switch the backend on; empty = feature off.
@@ -465,8 +467,8 @@ services:
     restart: unless-stopped
     logging: *default-logging
     command: >
-      -hf ggml-org/Qwen2.5-VL-3B-Instruct-GGUF:Q4_K_M
-      -c 8192 --parallel 1 -t 4 --host 0.0.0.0 --port 8080
+      -hf Qwen/Qwen3-VL-4B-Instruct-GGUF:Q4_K_M
+      -c 8192 --parallel 1 -t 4 --image-min-tokens 1024 --host 0.0.0.0 --port 8080
     cpus: 4
     mem_limit: 8g
     volumes:
