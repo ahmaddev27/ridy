@@ -28,7 +28,7 @@ class DispatchAutoDecline
     public function match(DispatchOffer $offer, Driver $driver): ?string
     {
         $tenant = $offer->tenant;
-        if ($tenant === null || ! $tenant->autoDeclineFeatureEnabled() || ! $driver->autoDeclineEnabled()) {
+        if ($tenant === null || ! $tenant->autoDeclineFeatureEnabled() || ! $driver->autoDeclineActive()) {
             return null;
         }
 

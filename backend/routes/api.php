@@ -378,9 +378,12 @@ Route::prefix('v1')->group(function () {
         Route::post('supplier/capture', [SupplierCaptureController::class, 'store'])->middleware(['throttle:ext-ingest', 'fleet.connected', 'can:connections.manage']);
 
         // Dispatch offers feed
-        // Early decline (docs/25), fleet-wide and READ-ONLY for the owner dashboard.
+        // Early decline (docs/25), fleet-wide for the owner dashboard.
         Route::get('auto-decline', [FleetAutoDeclineController::class, 'drivers'])->middleware('can:offers.view');
         Route::get('auto-decline/history', [FleetAutoDeclineController::class, 'history'])->middleware('can:offers.view');
+        // Admin control: which drivers may use it (and their rules). The driver keeps their own switch.
+        Route::get('auto-decline/drivers', [FleetAutoDeclineController::class, 'driversWithState'])->middleware('can:offers.view');
+        Route::put('auto-decline/drivers/{driver}', [FleetAutoDeclineController::class, 'update'])->middleware('can:offers.manage');
         Route::get('dispatch/offers', [DispatchOfferController::class, 'index'])->middleware('can:offers.view');
         Route::get('dispatch/offers/stats', [DispatchOfferController::class, 'stats'])->middleware('can:offers.view');
         Route::get('dispatch/offers/export', [DispatchOfferController::class, 'export'])->middleware('can:offers.view');
