@@ -351,11 +351,11 @@ export default function DriverProfilePage() {
             <div className="flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface-2 p-3">
               <label className="text-sm">
                 <span className="mb-1 block text-xs font-medium text-ink-muted">{d("from")}</span>
-                <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink" />
+                <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="ui-field rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink" />
               </label>
               <label className="text-sm">
                 <span className="mb-1 block text-xs font-medium text-ink-muted">{d("to")}</span>
-                <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink" />
+                <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="ui-field rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink" />
               </label>
             </div>
           )}

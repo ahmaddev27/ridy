@@ -24,7 +24,7 @@ import {
 const PER_PAGE = 25;
 
 const selectClass =
-  "rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none hover:bg-surface-2";
+  "ui-field rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none hover:bg-surface-2";
 
 export default function AutoDeclinePage() {
   const { t, locale } = useI18n();

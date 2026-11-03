@@ -104,7 +104,7 @@ export function UberAutoCodeSettings() {
           placeholder={c("codeEmail")}
           aria-label={c("codeEmail")}
           dir="ltr"
-          className="min-w-0 flex-1 rounded-xl border border-line-strong bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line"
+          className="ui-field min-w-0 flex-1 rounded-xl border border-line-strong bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line"
         />
         <Button type="submit" variant="secondary" size="sm" disabled={busy}>
           {c("autoSave")}
