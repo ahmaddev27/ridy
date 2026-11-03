@@ -222,6 +222,18 @@ class Driver extends Authenticatable implements PasskeyHolder
         return ($this->auto_decline['enabled'] ?? false) === true;
     }
 
+    /** The company admin allowed this driver to use auto-decline (default: no). */
+    public function adminAutoDeclineEnabled(): bool
+    {
+        return ($this->auto_decline['admin_enabled'] ?? false) === true;
+    }
+
+    /** Admin permission AND the driver's own switch — what the engine checks. */
+    public function autoDeclineActive(): bool
+    {
+        return $this->adminAutoDeclineEnabled() && $this->autoDeclineEnabled();
+    }
+
     /** The driver's configured rules (each independently toggleable), or []. */
     public function autoDeclineRules(): array
     {

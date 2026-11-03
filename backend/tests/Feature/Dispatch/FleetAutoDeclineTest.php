@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Dispatch;
 
+use App\Domain\Dispatch\DispatchAutoDecline;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
@@ -112,5 +113,87 @@ class FleetAutoDeclineTest extends TestCase
 
         $this->getJson('/api/v1/auto-decline')->assertJsonCount(1, 'data.drivers');
         $this->getJson('/api/v1/auto-decline/history')->assertJsonCount(0, 'data');
+    }
+
+    public function test_admin_lists_every_driver_with_state(): void
+    {
+        $this->getJson('/api/v1/auto-decline/drivers')
+            ->assertOk()
+            ->assertJsonPath('data.feature_enabled', true)
+            ->assertJsonCount(2, 'data.drivers')
+            ->assertJsonPath('data.drivers.0.name', 'Anna')
+            ->assertJsonPath('data.drivers.0.enabled', true)
+            ->assertJsonPath('data.drivers.0.admin_enabled', false)
+            ->assertJsonPath('data.drivers.0.active', false)
+            ->assertJsonPath('data.drivers.1.enabled', false);
+    }
+
+    public function test_admin_enabling_a_driver_makes_them_active_at_once(): void
+    {
+        $this->putJson("/api/v1/auto-decline/drivers/{$this->off->id}", ['admin_enabled' => true])
+            ->assertOk()
+            ->assertJsonPath('data.admin_enabled', true)
+            ->assertJsonPath('data.enabled', true)
+            ->assertJsonPath('data.active', true);
+
+        $this->assertTrue($this->off->fresh()->autoDeclineActive());
+    }
+
+    public function test_admin_disabling_locks_the_driver_off_and_they_cannot_self_enable(): void
+    {
+        $this->putJson("/api/v1/auto-decline/drivers/{$this->off->id}", ['admin_enabled' => true])->assertOk();
+        $this->putJson("/api/v1/auto-decline/drivers/{$this->off->id}", ['admin_enabled' => false])
+            ->assertOk()
+            ->assertJsonPath('data.active', false);
+
+        $this->assertFalse($this->off->fresh()->autoDeclineActive());
+
+        Sanctum::actingAs($this->off->fresh(), guard: 'driver');
+        $this->putJson('/api/v1/driver/auto-decline', ['enabled' => true])->assertOk();
+        $this->assertFalse($this->off->fresh()->autoDeclineActive());
+    }
+
+    public function test_admin_edits_rules_without_changing_the_switches(): void
+    {
+        $this->putJson("/api/v1/auto-decline/drivers/{$this->on->id}", [
+            'rules' => ['min_fare' => ['enabled' => true, 'value_e2' => 1500]],
+        ])->assertOk()->assertJsonPath('data.rules.min_fare.value_e2', 1500);
+
+        $driver = $this->on->fresh();
+        $this->assertTrue($driver->autoDeclineEnabled());
+        $this->assertFalse($driver->adminAutoDeclineEnabled());
+        $this->assertSame(1500, $driver->autoDeclineRules()['min_fare']['value_e2']);
+    }
+
+    public function test_a_viewer_cannot_write(): void
+    {
+        $viewer = User::create([
+            'name' => 'V', 'email' => 'v@ya.de', 'password' => Hash::make('password'), 'tenant_id' => $this->tenant->id,
+        ]);
+        $viewer->assignRole('viewer');
+        Sanctum::actingAs($viewer);
+
+        $this->getJson('/api/v1/auto-decline/drivers')->assertOk();
+        $this->putJson("/api/v1/auto-decline/drivers/{$this->off->id}", ['admin_enabled' => true])->assertForbidden();
+    }
+
+    public function test_another_tenants_driver_is_a_404(): void
+    {
+        $other = Tenant::create(['name' => 'Other', 'country' => 'DE', 'settings' => ['dispatch_reject' => ['enabled' => true]]]);
+        $stranger = Driver::withoutGlobalScopes()->create(['tenant_id' => $other->id, 'name' => 'Zoe', 'uber_driver_uuid' => 'x-1']);
+
+        $this->putJson("/api/v1/auto-decline/drivers/{$stranger->id}", ['admin_enabled' => true])->assertNotFound();
+        $this->assertNull($stranger->fresh()->auto_decline);
+    }
+
+    public function test_the_engine_ignores_a_driver_who_is_enabled_but_not_admin_allowed(): void
+    {
+        $offer = $this->offer('eng', $this->on, null, ['fare_amount' => 5]);
+        $engine = app(DispatchAutoDecline::class);
+
+        $this->assertNull($engine->match($offer, $this->on), 'enabled without admin_enabled never fires');
+
+        $this->putJson("/api/v1/auto-decline/drivers/{$this->on->id}", ['admin_enabled' => true])->assertOk();
+        $this->assertSame('min_fare', $engine->match($offer->fresh(), $this->on->fresh()));
     }
 }

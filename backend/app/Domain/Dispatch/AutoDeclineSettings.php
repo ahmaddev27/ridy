@@ -5,6 +5,7 @@ namespace App\Domain\Dispatch;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Geo\PostalCodes;
+use App\Domain\Tenancy\Models\Tenant;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -20,12 +21,13 @@ class AutoDeclineSettings
     private const CITY_SAMPLE = 300;
 
     /**
-     * @return array{feature_enabled: bool, enabled: bool, rules: array<string, array<string, mixed>>, available_cities: array<int, string>}
+     * @return array{feature_enabled: bool, admin_enabled: bool, enabled: bool, rules: array<string, array<string, mixed>>, available_cities: array<int, string>}
      */
     public function show(Driver $driver): array
     {
         return [
             'feature_enabled' => $this->featureEnabled($driver),
+            'admin_enabled' => $driver->adminAutoDeclineEnabled(),
             'enabled' => $driver->autoDeclineEnabled(),
             'rules' => $this->withDefaults($driver->autoDeclineRules()),
             'available_cities' => $this->availableCities($driver),
@@ -38,23 +40,104 @@ class AutoDeclineSettings
     }
 
     /**
-     * Persist the validated config. Only known rules and keys are kept.
+     * Persist the driver's validated config. The driver can never write `admin_enabled`
+     * and can never be active without it: `enabled` is clamped off while the admin has
+     * not allowed the driver. Only known rules and keys are kept.
      *
      * @param  array<string, mixed>  $input  validated request data
      */
     public function update(Driver $driver, array $input): void
     {
-        $rules = $input['rules'] ?? [];
+        $adminEnabled = $driver->adminAutoDeclineEnabled();
 
-        $driver->forceFill(['auto_decline' => [
-            'enabled' => (bool) ($input['enabled'] ?? false),
-            'rules' => $this->withDefaults([
-                'min_fare' => $rules['min_fare'] ?? [],
-                'reject_cities' => $rules['reject_cities'] ?? [],
-                'max_pickup_distance' => $rules['max_pickup_distance'] ?? [],
-                'max_trip_distance' => $rules['max_trip_distance'] ?? [],
-            ]),
-        ]])->save();
+        $this->store($driver, [
+            'admin_enabled' => $adminEnabled,
+            'enabled' => $adminEnabled && (bool) ($input['enabled'] ?? false),
+            'rules' => $this->normaliseRules($input['rules'] ?? []),
+        ]);
+    }
+
+    /**
+     * Company-admin write. Allowing a driver also switches them on (active at once; they
+     * may opt out later). Revoking only clears `admin_enabled`, which locks them off.
+     * Rules, when sent, replace the driver's rules (last write wins).
+     *
+     * @param  array<string, mixed>  $data  validated request data
+     * @return array<string, mixed>
+     */
+    public function adminUpdate(Driver $driver, array $data): array
+    {
+        $wasAdminEnabled = $driver->adminAutoDeclineEnabled();
+        $adminEnabled = $wasAdminEnabled;
+        $enabled = $driver->autoDeclineEnabled();
+
+        if (array_key_exists('admin_enabled', $data)) {
+            $adminEnabled = (bool) $data['admin_enabled'];
+            // Activate only on a fresh switch-on (false -> true). A repeated `true` must NOT
+            // override a driver who has since opted out — only the admin's actual turn-on does.
+            if ($adminEnabled && ! $wasAdminEnabled) {
+                $enabled = true;
+            }
+        }
+
+        $this->store($driver, [
+            'admin_enabled' => $adminEnabled,
+            'enabled' => $enabled,
+            'rules' => array_key_exists('rules', $data)
+                ? $this->normaliseRules($data['rules'] ?? [])
+                : $this->withDefaults($driver->autoDeclineRules()),
+        ]);
+
+        return $this->stateRow($driver->refresh(), $this->featureEnabled($driver));
+    }
+
+    /**
+     * Every driver of the current tenant with their permission/opt-in state — the
+     * admin's control list (unlike enabledDrivers(), includes drivers still switched off).
+     *
+     * @return array{feature_enabled: bool, available_cities: array<int, string>, drivers: array<int, array<string, mixed>>}
+     */
+    public function allDriversWithState(Tenant $tenant): array
+    {
+        $feature = $tenant->autoDeclineFeatureEnabled() === true;
+        $drivers = Driver::query()->orderBy('name')->get(['id', 'name', 'auto_decline']);
+
+        return [
+            'feature_enabled' => $feature,
+            'available_cities' => $this->tenantCities(),
+            'drivers' => $drivers->map(fn (Driver $d) => $this->stateRow($d, $feature))->values()->all(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function stateRow(Driver $driver, bool $feature): array
+    {
+        return [
+            'id' => $driver->id,
+            'name' => $driver->name,
+            'admin_enabled' => $driver->adminAutoDeclineEnabled(),
+            'enabled' => $driver->autoDeclineEnabled(),
+            'active' => $feature && $driver->autoDeclineActive(),
+            'rules' => $this->withDefaults($driver->autoDeclineRules()),
+        ];
+    }
+
+    /** @param  array<string, mixed>  $config */
+    private function store(Driver $driver, array $config): void
+    {
+        $driver->forceFill(['auto_decline' => $config])->save();
+    }
+
+    /**
+     * @param  array<string, mixed>  $rules
+     * @return array<string, array<string, mixed>>
+     */
+    private function normaliseRules(array $rules): array
+    {
+        return $this->withDefaults(array_combine(
+            self::REASONS,
+            array_map(fn (string $key) => $rules[$key] ?? [], self::REASONS),
+        ));
     }
 
     /** The driver's own Early-declined offers whose decline actually landed. */
@@ -86,7 +169,8 @@ class AutoDeclineSettings
 
     /**
      * The current tenant's drivers that switched Early decline on, with their rules —
-     * read-only: the owner never edits a driver's rules.
+     * read-only legacy list (the owner never edits a driver's rules here). Filters on the
+     * driver's own switch; the admin-aware state lives on GET /auto-decline/drivers.
      *
      * @return array<int, array{id: int, name: string, rules: array<string, array<string, mixed>>}>
      */
@@ -150,6 +234,15 @@ class AutoDeclineSettings
             ->limit(self::CITY_SAMPLE)
             ->get(['pickup_address', 'dropoff_address']);
 
+        return $this->citiesFrom($rows);
+    }
+
+    /**
+     * @param  iterable<DispatchOffer>  $rows
+     * @return array<int, string>
+     */
+    private function citiesFrom(iterable $rows): array
+    {
         $cities = [];
         foreach ($rows as $row) {
             foreach ([$row->pickup_address, $row->dropoff_address] as $address) {
@@ -164,6 +257,19 @@ class AutoDeclineSettings
         sort($names, SORT_LOCALE_STRING);
 
         return $names;
+    }
+
+    /**
+     * Cities across the tenant's recent offers, for the admin's rule editor.
+     *
+     * @return array<int, string>
+     */
+    private function tenantCities(): array
+    {
+        $rows = DispatchOffer::query()->latest('id')->limit(self::CITY_SAMPLE)
+            ->get(['pickup_address', 'dropoff_address']);
+
+        return $this->citiesFrom($rows);
     }
 
     private function cityOf(?string $address): ?string

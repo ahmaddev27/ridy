@@ -200,6 +200,19 @@ function SettingsPane({
     setDrafts((p) => ({ ...p, [key]: text }));
   };
 
+  // The company admin has not enabled it for this driver: the switch is locked off
+  // and the rules are hidden, so there is nothing to configure or activate.
+  if (config.admin_enabled !== true) {
+    return (
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+        <View style={{ ...cardStyle(c), padding: 14, gap: 6 }}>
+          <ToggleRow c={c} row={row} label={t("ad.master")} value={false} disabled onChange={() => {}} />
+          <Text style={{ color: c.inkMuted, fontSize: 13, textAlign: textAlign() }}>{t("ad.adminLocked")}</Text>
+        </View>
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
       <View style={{ ...cardStyle(c), padding: 14, gap: 6 }}>
@@ -239,11 +252,11 @@ function SettingsPane({
   );
 }
 
-function ToggleRow({ c, row, label, value, onChange }: { c: Palette; row: Row; label: string; value: boolean; onChange: (v: boolean) => void }) {
+function ToggleRow({ c, row, label, value, onChange, disabled }: { c: Palette; row: Row; label: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between", gap: 12 }}>
       <Text style={{ color: c.ink, fontWeight: "700", fontSize: 14.5, flexShrink: 1 }}>{label}</Text>
-      <Switch value={value} onValueChange={onChange} accessibilityLabel={label} />
+      <Switch value={value} onValueChange={onChange} disabled={disabled} accessibilityLabel={label} />
     </View>
   );
 }

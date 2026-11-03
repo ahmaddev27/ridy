@@ -21,6 +21,22 @@ export type AutoDeclineDriver = { id: number; name: string; rules: AutoDeclineRu
 
 export type AutoDeclineOverview = { feature_enabled: boolean; drivers: AutoDeclineDriver[] };
 
+/** A row of the admin-managed drivers list (all drivers, not only those with the feature on). */
+export type AutoDeclineManagedDriver = AutoDeclineDriver & {
+  /** Admin switch: false locks the feature, the driver cannot enable it. */
+  admin_enabled: boolean;
+  /** The driver's own opt-in. */
+  enabled: boolean;
+  /** admin_enabled && enabled — rules are really being applied. */
+  active: boolean;
+};
+
+export type AutoDeclineDrivers = {
+  feature_enabled: boolean;
+  available_cities: string[];
+  drivers: AutoDeclineManagedDriver[];
+};
+
 /** An offer row plus the rule that declined it (the resource already sends this). */
 export type EarlyDeclinedOffer = DispatchOffer & { auto_decline_reason: AutoDeclineReason | null };
 
@@ -49,4 +65,21 @@ export async function listEarlyDeclined(params: {
     `/api/v1/auto-decline/history${qs ? `?${qs}` : ""}`,
   );
   return { items: res.data, meta: res.meta };
+}
+
+export async function getAutoDeclineDrivers(): Promise<AutoDeclineDrivers> {
+  const res = await apiFetch<{ data: AutoDeclineDrivers }>("/api/v1/auto-decline/drivers");
+  return res.data;
+}
+
+export async function updateDriverAutoDecline(
+  id: number,
+  body: { admin_enabled?: boolean; rules?: AutoDeclineRules },
+): Promise<AutoDeclineManagedDriver> {
+  const res = await apiFetch<{ data: AutoDeclineManagedDriver }>(`/api/v1/auto-decline/drivers/${id}`, {
+    method: "PUT",
+    body,
+    withCsrf: true,
+  });
+  return res.data;
 }
