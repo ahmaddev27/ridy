@@ -127,7 +127,7 @@ export function BroadcastModal({
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
+              className="ui-field mt-2 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
             >
               <option value="">{t("selectRolePlaceholder")}</option>
               {ROLES.map((r) => (
@@ -148,7 +148,7 @@ export function BroadcastModal({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={120}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
+            className="ui-field w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
           />
         </div>
 
@@ -159,7 +159,7 @@ export function BroadcastModal({
             onChange={(e) => setBody(e.target.value)}
             maxLength={2000}
             rows={4}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
+            className="ui-field w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
           />
         </div>
 
@@ -169,7 +169,7 @@ export function BroadcastModal({
             value={href}
             onChange={(e) => setHref(e.target.value)}
             placeholder={t("hrefPlaceholder")}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
+            className="ui-field w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
           />
         </div>
       </div>

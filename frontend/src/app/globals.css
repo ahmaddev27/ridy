@@ -800,6 +800,7 @@ html[data-glass="on"] .app-toast [data-icon] { color: var(--focus); }
   html[data-glass="on"] .app-drawer,
   html[data-glass="on"] .app-drawer-scrim,
   html[data-glass="on"] .app-menu,
+  html[data-glass="on"] .app-sticky-footer,
   html[data-glass="on"] .app-toast { backdrop-filter: none; }
   html[data-glass="on"] body::after { display: none; }
 }
@@ -958,4 +959,24 @@ html[data-glass="on"] .driver-activate-card {
   background: var(--surface);
   border-color: var(--glass-edge);
   box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--glass-shadow);
+}
+
+/* ================================================================== *
+ * GLASS REDESIGN (issue #283) — Phase 6: admin / reseller / elprofessor.
+ *
+ * Almost every admin surface already flows through the Phase-0/2 primitives
+ * (Card → glass pane, shared Modal/Button/Badge/SearchInput/PasswordInput →
+ * their hooks), so this phase is thin + additive: the raw admin form fields and
+ * selects/textareas that are NOT a shared primitive get `ui-field` (the Phase-2
+ * near-solid --surface-solid field recipe, AA for typed data), and the reseller
+ * company-search results popover gets `app-menu` (strong-glass menu). The one new
+ * recipe is the company-detail sticky save-footer: a sticky chrome bar, so it
+ * takes the same glass-bar treatment as the topbar (surface-solid 52% + blur),
+ * but with a top border. UNLAYERED + scoped to html[data-glass="on"] so flag-off
+ * is byte-for-byte unchanged. CARVE-OUT: the El-Professor icon is untouched.
+ * ================================================================== */
+html[data-glass="on"] .app-sticky-footer {
+  background: color-mix(in srgb, var(--surface-solid) 52%, transparent);
+  backdrop-filter: blur(18px) saturate(170%);
+  border-top: 1px solid var(--line);
 }

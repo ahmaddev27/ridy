@@ -423,7 +423,7 @@ export function CompanyDetail({
                     <select
                       value={planId}
                       onChange={(e) => setPlanId(e.target.value)}
-                      className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
+                      className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
                     >
                       <option value="">{c("selectPlan")}</option>
                       {plans.map((p) => (
@@ -498,7 +498,7 @@ export function CompanyDetail({
                       min={1}
                       value={freeDays}
                       onChange={(e) => setFreeDays(e.target.value)}
-                      className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
+                      className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
                     />
                   </div>
                   <Button variant="secondary" onClick={grantFree} disabled={busy || !(Number(freeDays) > 0)}>
@@ -598,10 +598,10 @@ export function CompanyDetail({
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <input placeholder={c("fieldManagerName")} value={newUser.name}
                   onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                  className="rounded-lg border border-line-strong px-2 py-2 text-sm outline-none focus:border-ink" />
+                  className="ui-field rounded-lg border border-line-strong px-2 py-2 text-sm outline-none focus:border-ink" />
                 <input placeholder={c("fieldManagerEmail")} type="email" value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  className="rounded-lg border border-line-strong px-2 py-2 text-sm outline-none focus:border-ink" />
+                  className="ui-field rounded-lg border border-line-strong px-2 py-2 text-sm outline-none focus:border-ink" />
                 <PasswordInput placeholder={c("fieldManagerPassword")} value={newUser.password}
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
               </div>
@@ -686,7 +686,7 @@ export function CompanyDetail({
               </div>
 
               {/* Save — enable/disable lives in the status toggle above. */}
-              <div className="sticky bottom-0 -mx-5 -mb-5 flex justify-end border-t border-line bg-surface/95 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
+              <div className="app-sticky-footer sticky bottom-0 -mx-5 -mb-5 flex justify-end border-t border-line bg-surface/95 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
                 <Button onClick={saveInfo} disabled={busy}>
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {c("save")}
@@ -1069,7 +1069,7 @@ function Field({
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         autoComplete="off"
-        className={`w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ${mono ? "font-mono text-xs" : ""}`}
+        className={`ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ${mono ? "font-mono text-xs" : ""}`}
       />
     </div>
   );

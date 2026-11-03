@@ -153,10 +153,10 @@ export default function ResellerPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={c("searchCompany")}
-                  className="w-full rounded-lg border border-line bg-surface py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3"
+                  className="ui-field w-full rounded-lg border border-line bg-surface py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3"
                 />
                 {(searching || results.length > 0) && (
-                  <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-line bg-surface shadow-lg">
+                  <div className="app-menu absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-line bg-surface shadow-lg">
                     {searching ? (
                       <div className="flex items-center justify-center py-4 text-ink-subtle"><Loader2 className="h-4 w-4 animate-spin" /></div>
                     ) : (
