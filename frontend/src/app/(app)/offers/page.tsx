@@ -271,7 +271,7 @@ export default function OffersPage() {
           {driverFilterOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setDriverFilterOpen(false)} />
-              <div className="absolute z-20 mt-1 max-h-72 w-64 overflow-y-auto rounded-lg border border-line bg-surface p-1 shadow-lg">
+              <div className="app-menu absolute z-20 mt-1 max-h-72 w-64 overflow-y-auto rounded-lg border border-line bg-surface p-1 shadow-lg">
                 {driverUuids.length > 0 && (
                   <button
                     onClick={() => setDriverUuids([])}
