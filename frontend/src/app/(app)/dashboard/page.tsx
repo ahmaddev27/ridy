@@ -34,8 +34,28 @@ export default function DashboardPage() {
 
   const k = (key: string) => t(`screens.dashboard.${key}`);
 
-  // Fleet earnings are synced server-side into FleetMetric; the summary poll
-  // above already reads them, so no browser-side trigger is needed.
+  // Companies still on the browser extension: ask it to refresh the fleet
+  // earnings roll-up (replays getSupplierBreakdownV2 — no Uber tab needed), then
+  // reload the summary once it lands. Migrated companies are synced server-side
+  // into FleetMetric, which the summary poll above already reads.
+  const extensionRetired = user?.tenant?.extension_retired === true;
+  useEffect(() => {
+    if (extensionRetired) return;
+    function onDone(e: MessageEvent) {
+      if (e.source === window && (e.data as { source?: string })?.source === "ridy-fleet-earnings-done") {
+        setTimeout(() => void refetch({ silent: true }), 400);
+      }
+    }
+    const requestEarnings = () => window.postMessage({ source: "ridy-fetch-fleet-earnings" }, "*");
+    window.addEventListener("message", onDone);
+    requestEarnings();
+    const id = setInterval(requestEarnings, 180_000); // every 3 min while open
+    return () => {
+      window.removeEventListener("message", onDone);
+      clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extensionRetired]);
 
   return (
     <div className="space-y-6">

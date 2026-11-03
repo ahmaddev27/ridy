@@ -172,6 +172,10 @@ class UberLoginFullCobrowseTest extends TestCase
     public function test_me_exposes_full_cobrowse_only_for_a_cold_cobrowse_company(): void
     {
         $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.full_cobrowse_available', true);
+        $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.extension_retired', true);
+        $this->tenant->setCobrowseEnabled(false);
+        $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.extension_retired', false);
+        $this->tenant->setCobrowseEnabled(true);
 
         SessionBrowser::create(['tenant_id' => $this->tenant->id, 'state' => 'needs_otp', 'last_seen_at' => now()]);
         $this->getJson('/api/v1/me')->assertJsonPath('data.tenant.full_cobrowse_available', false);

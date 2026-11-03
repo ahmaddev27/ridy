@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -76,6 +77,8 @@ function statusLabel(driver: Driver, d: (k: string) => string): { text: string; 
 
 export default function DriverProfilePage() {
   const { t, locale } = useI18n();
+  const { user } = useAuth();
+  const extensionRetired = user?.tenant?.extension_retired === true;
   const d = (k: string) => t(`screens.drivers.${k}`);
   const o = (k: string) => t(`screens.offers.${k}`);
   const params = useParams<{ id: string }>();
@@ -146,6 +149,23 @@ export default function DriverProfilePage() {
       cancelled = true;
     };
   }, [id]);
+
+  // Extension companies: on open, ask the extension to refresh this driver's Uber
+  // earnings on demand (replays getEarnerBreakdownsV2 → backend), so earnings are
+  // current without the manager reopening the Uber tab. Migrated companies are
+  // synced server-side.
+  useEffect(() => {
+    const uuid = driver?.uber_driver_uuid;
+    if (!uuid || extensionRetired) return;
+    function onDone(e: MessageEvent) {
+      if (e.source !== window || (e.data as { source?: string })?.source !== "ridy-driver-uber-done") return;
+      const d = e.data as { breakdown?: boolean };
+      if (d.breakdown) getDriverMetrics(id).then((m) => setUber(m[0] ?? null)).catch(() => {});
+    }
+    window.addEventListener("message", onDone);
+    window.postMessage({ source: "ridy-fetch-driver-uber", driverUuid: uuid }, "*");
+    return () => window.removeEventListener("message", onDone);
+  }, [driver?.uber_driver_uuid, id, extensionRetired]);
 
   // This driver's own captured offers for the selected window.
   useEffect(() => {

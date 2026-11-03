@@ -39,6 +39,9 @@ class UserResource extends JsonResource
                 'cold_connect_available' => app(PasswordlessLoginService::class)->coldConnectAvailable($this->tenant),
                 // The cold connect is a full co-browse login: the human signs in inside the stream, no email asked.
                 'full_cobrowse_available' => app(PasswordlessLoginService::class)->fullCobrowseAvailable($this->tenant),
+                // Migrated off the browser extension (docs/30): the dashboard reads Uber data
+                // server-side and connects via co-browse. The frontend gates the extension off on this.
+                'extension_retired' => $this->tenant->onNewSystem(),
             ] : null,
             'roles' => $this->getRoleNames(),
             'permissions' => $this->getAllPermissions()->pluck('name')->values(),

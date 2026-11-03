@@ -126,6 +126,16 @@ class Tenant extends Model
         return ($this->settings['passwordless_login']['cobrowse'] ?? false) === true;
     }
 
+    /**
+     * Whether the company is migrated off the browser extension (docs/30): it connects via
+     * co-browse and its Uber data is pulled server-side, so the dashboard neither uses nor
+     * nags the extension. The one admin co-browse toggle is the single switch.
+     */
+    public function onNewSystem(): bool
+    {
+        return $this->cobrowseEnabled();
+    }
+
     public function setCobrowseEnabled(bool $enabled): void
     {
         $this->mergePasswordlessLogin(['cobrowse' => $enabled]);

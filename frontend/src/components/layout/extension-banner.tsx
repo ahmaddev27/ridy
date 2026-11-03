@@ -23,9 +23,11 @@ export function ExtensionBanner() {
   const isManager = Boolean(user?.tenant);
   // A passwordless company connects with email + code and never needs the extension.
   const passwordless = user?.tenant?.passwordless_primary === true;
+  // A company migrated to server-side sync has retired the extension entirely.
+  const retired = user?.tenant?.extension_retired === true;
 
   useEffect(() => {
-    if (!isManager || passwordless) return;
+    if (!isManager || passwordless || retired) return;
     let answered = false;
 
     function onMessage(e: MessageEvent) {
@@ -55,9 +57,9 @@ export function ExtensionBanner() {
       clearInterval(poll);
       clearTimeout(timer);
     };
-  }, [isManager, passwordless]);
+  }, [isManager, passwordless, retired]);
 
-  if (!isManager || passwordless || dismissed || state === "checking" || state === "ok") return null;
+  if (!isManager || passwordless || retired || dismissed || state === "checking" || state === "ok") return null;
 
   const message = t(`extBanner.${state}`);
 
