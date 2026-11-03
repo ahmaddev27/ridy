@@ -211,7 +211,7 @@ export function ElProfessorCard() {
       {/* The company's own setting, shown once the platform has opened the
           integration. Before that there is nothing for it to govern. */}
       {!loading && data?.enabled && (
-        <div className="mt-6 flex items-start justify-between gap-4 rounded-xl border border-line bg-surface-2 px-4 py-4">
+        <div className="mt-6 flex items-start justify-between gap-4 glass-panel glass-panel--card rounded-xl px-4 py-4">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-ink">{c("epGalleryTitle")}</p>
             <p className="mt-1 text-sm text-ink-muted">{c("epGalleryBody")}</p>
@@ -226,7 +226,7 @@ export function ElProfessorCard() {
       )}
 
       {!loading && data?.enabled && (
-        <div className="mt-4 flex items-start justify-between gap-4 rounded-xl border border-line bg-surface-2 px-4 py-4">
+        <div className="mt-4 flex items-start justify-between gap-4 glass-panel glass-panel--card rounded-xl px-4 py-4">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-ink">{c("epOdometerTitle")}</p>
             <p className="mt-1 text-sm text-ink-muted">{c("epOdometerBody")}</p>

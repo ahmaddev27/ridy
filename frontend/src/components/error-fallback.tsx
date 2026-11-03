@@ -39,7 +39,7 @@ export function ErrorFallback({
       role="alert"
       className={
         compact
-          ? "flex items-center gap-3 rounded-xl border border-line bg-surface p-4 text-sm"
+          ? "glass-panel glass-panel--card flex items-center gap-3 rounded-xl p-4 text-sm"
           : "mx-auto flex max-w-md flex-col items-center gap-3 py-16 text-center"
       }
     >

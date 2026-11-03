@@ -352,7 +352,7 @@ export default function OffersPage() {
       )}
 
       {error && (
-        <div className="rounded-lg border border-rose-200 bg-danger-bg p-3 text-sm text-danger-fg">
+        <div className="rounded-lg border border-danger-dot/40 bg-danger-bg p-3 text-sm text-danger-fg">
           {c("loadError")} — {error}
         </div>
       )}

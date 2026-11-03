@@ -205,7 +205,7 @@ export default function SettingsPage() {
 
       <div className="flex w-full flex-col gap-4 md:flex-row">
         {/* Side tabs */}
-        <nav className="flex gap-1 overflow-x-auto rounded-xl border border-line/70 bg-surface-2 p-1.5 md:h-fit md:w-52 md:flex-col md:gap-1">
+        <nav className="flex gap-1 overflow-x-auto glass-panel glass-panel--card rounded-xl p-1.5 md:h-fit md:w-52 md:flex-col md:gap-1">
           {([
             { k: "email", icon: Mail },
             { k: "support", icon: LifeBuoy },

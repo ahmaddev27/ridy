@@ -348,7 +348,7 @@ export default function DriverProfilePage() {
 
           {/* Custom from → to */}
           {range === "custom" && (
-            <div className="flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface-2 p-3">
+            <div className="flex flex-wrap items-end gap-3 glass-panel glass-panel--card rounded-xl p-3">
               <label className="text-sm">
                 <span className="mb-1 block text-xs font-medium text-ink-muted">{d("from")}</span>
                 <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="ui-field rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink" />
@@ -601,7 +601,7 @@ function InfoTile({
 }) {
   const chip = tone === "amber" ? "bg-warning-bg text-warning-fg" : "bg-surface-2 text-ink-muted";
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-line bg-surface-2/40 p-3.5">
+    <div className="flex items-center gap-3 glass-panel glass-panel--card rounded-xl p-3.5">
       <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${chip}`}>
         <Icon className="h-5 w-5" />
       </span>
@@ -615,7 +615,7 @@ function InfoTile({
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+    <div className="glass-panel glass-panel--card rounded-xl px-3 py-2.5">
       <div className="text-[11px] text-ink-subtle">{label}</div>
       <div className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{value}</div>
     </div>

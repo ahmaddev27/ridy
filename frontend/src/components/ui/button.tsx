@@ -25,6 +25,16 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: Size;
 }
 
+/** Same look as <Button>, for links that must stay anchors (e.g. wa.me). */
+export function buttonClasses(variant: Variant = "primary", size: Size = "md", className?: string) {
+  return cn(
+    "inline-flex items-center justify-center gap-2 rounded-lg font-semibold outline-none transition-all focus-visible:ring-2 active:scale-[0.98]",
+    variants[variant],
+    sizes[size],
+    className,
+  );
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = "primary", size = "md", className, ...props }, ref) => (
     <button

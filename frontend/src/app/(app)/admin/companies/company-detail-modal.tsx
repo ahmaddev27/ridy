@@ -345,7 +345,7 @@ export function CompanyDetail({
 
       {/* Side tabs (start side = right in RTL, left in LTR) + content */}
       <div className="flex flex-col gap-4 md:flex-row">
-        <nav className="flex gap-1 overflow-x-auto rounded-xl border border-line/70 bg-surface-2 p-1.5 md:h-fit md:w-56 md:flex-col md:gap-1">
+        <nav className="flex gap-1 overflow-x-auto glass-panel glass-panel--card rounded-xl p-1.5 md:h-fit md:w-56 md:flex-col md:gap-1">
           {([
             { k: "details", icon: Info },
             { k: "subscription", icon: Ticket },
@@ -375,7 +375,7 @@ export function CompanyDetail({
           })}
         </nav>
 
-        <div className="min-w-0 flex-1 space-y-6 rounded-2xl border border-line bg-surface p-5 shadow-sm">
+        <div className="min-w-0 flex-1 glass-panel glass-panel--card space-y-6 p-5">
           {error ? (
             <div className="text-sm text-danger-fg">{error}</div>
           ) : !company ? (
@@ -508,17 +508,17 @@ export function CompanyDetail({
                 </div>
 
                 {genCode && (
-                  <div className="rounded-lg border border-emerald-200 bg-success-bg px-3 py-2 text-sm text-emerald-800">
+                  <div className="rounded-lg border border-success-dot/40 bg-success-bg px-3 py-2 text-sm text-success-fg">
                     {c("codeIs")}{" "}
                     <span className="font-mono text-lg font-bold tracking-widest" dir="ltr">{genCode}</span>
                     <span className="ms-2 text-xs text-success-fg">{c("codeValid")}</span>
                     {genRef && (
-                      <div className="mt-1 text-xs text-emerald-800">
+                      <div className="mt-1 text-xs text-success-fg">
                         {c("codeRef")} <span className="font-mono font-semibold" dir="ltr">{genRef}</span>
                       </div>
                     )}
                     {genMethod && (
-                      <div className="mt-1 text-xs text-emerald-800">
+                      <div className="mt-1 text-xs text-success-fg">
                         {t("screens.codes.method")}: <span className="font-semibold">{paymentMethodLabel(genMethod, t)}</span>
                       </div>
                     )}

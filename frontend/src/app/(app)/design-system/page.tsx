@@ -276,10 +276,10 @@ function Alert({
   children: React.ReactNode;
 }) {
   const styles = {
-    info: "border-line-strong bg-surface-2 text-indigo-800",
-    success: "border-emerald-200 bg-success-bg text-emerald-800",
-    warning: "border-amber-200 bg-warning-bg text-amber-800",
-    error: "border-rose-200 bg-danger-bg text-rose-800",
+    info: "border-line-strong bg-surface-2 text-ink",
+    success: "border-success-dot/40 bg-success-bg text-success-fg",
+    warning: "border-warning-dot/40 bg-warning-bg text-warning-fg",
+    error: "border-danger-dot/40 bg-danger-bg text-danger-fg",
   }[tone];
   return <div className={`rounded-lg border p-3 ${styles}`}>{children}</div>;
 }
