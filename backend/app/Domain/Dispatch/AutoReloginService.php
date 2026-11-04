@@ -58,7 +58,7 @@ class AutoReloginService
 
     private function eligible(?Tenant $tenant): bool
     {
-        return $tenant !== null && $this->client->configured() && $this->settings->autoReloginEnabled($tenant);
+        return $tenant !== null && $this->client->configured() && ! $tenant->isAutolinkBlocked() && $this->settings->autoReloginEnabled($tenant);
     }
 
     private function stillNeedsOtp(int $tenantId): bool

@@ -58,11 +58,14 @@ class CompanySessionController extends Controller
      */
     public function forceRelink(Tenant $tenant, FleetSessionService $service, UberAuthClient $uberAuth): JsonResponse
     {
-        $session = $this->sessionFor($tenant);
-        abort_if($session === null, 404, 'No session.');
+        $sessions = UberFleetSession::withoutGlobalScopes()->where('tenant_id', $tenant->id)->get();
+        abort_if($sessions->isEmpty(), 404, 'No session.');
 
-        $service->markNeedsRelink($session, 'admin');
-        $session->forceFill(['shard_id' => null])->save();
+        // Every row, not just the newest: a sibling left active would keep streaming.
+        foreach ($sessions as $session) {
+            $service->markNeedsRelink($session, 'admin');
+            $session->forceFill(['shard_id' => null])->save();
+        }
         $this->dropPersistentBrowser($tenant, $uberAuth);
         DriverStatusIngestor::forgetDaemonFeeding((int) $tenant->id);
         $tenant->blockAutolink();
