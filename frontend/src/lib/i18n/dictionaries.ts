@@ -111,6 +111,9 @@ const en = {
     search: "Search vehicles, drivers, trips…",
     signOut: "Sign out",
     tour: "Show the tour",
+    sidebarCollapse: "Collapse sidebar",
+    sidebarExpand: "Expand sidebar",
+    brandSub: "Fleet management",
   },
   push: {
     enable: "Enable notifications",
@@ -283,6 +286,9 @@ const de: typeof en = {
     search: "Fahrzeuge, Fahrer, Fahrten suchen…",
     signOut: "Abmelden",
     tour: "Tour anzeigen",
+    sidebarCollapse: "Seitenleiste einklappen",
+    sidebarExpand: "Seitenleiste ausklappen",
+    brandSub: "Flottenmanagement",
   },
   push: {
     enable: "Benachrichtigungen aktivieren",
@@ -456,6 +462,9 @@ const ar: typeof en = {
     search: "ابحث عن مركبات، سائقين، رحلات…",
     signOut: "تسجيل الخروج",
     tour: "عرض الجولة",
+    sidebarCollapse: "طي القائمة الجانبية",
+    sidebarExpand: "توسيع القائمة الجانبية",
+    brandSub: "إدارة الأسطول",
   },
   push: {
     enable: "تفعيل الإشعارات",

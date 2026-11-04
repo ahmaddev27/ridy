@@ -91,25 +91,21 @@ export function DateRangeFilter({ from, to, onChange, fleetDays = false, classNa
   };
 
   return (
-    <div ref={wrapRef} className={`relative inline-flex items-center gap-1 ${className}`}>
+    <div ref={wrapRef} className={`row ${className}`} style={{ gap: 4, position: "relative" }}>
       <button
         type="button"
         onClick={() => step(-1)}
         disabled={!hasRange}
         aria-label={c("previousPeriod")}
-        className="rounded-full p-1.5 text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
+        className="btn btn-secondary btn-sm btn-icon"
       >
-        <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
+        <ChevronLeft className="rtl:rotate-180" />
       </button>
 
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-1.5 text-sm font-semibold text-ink transition hover:bg-surface-2"
-      >
-        <Calendar className="h-3.5 w-3.5 text-ink-subtle" />
-        <span className="tabular-nums">{label}</span>
-        <ChevronDown className={`h-4 w-4 text-ink-subtle transition-transform ${open ? "rotate-180" : ""}`} />
+      <button type="button" onClick={() => setOpen((v) => !v)} className="btn btn-secondary btn-sm" aria-haspopup="true" aria-expanded={open}>
+        <Calendar />
+        <span className="num">{label}</span>
+        <ChevronDown />
       </button>
 
       <button
@@ -117,51 +113,48 @@ export function DateRangeFilter({ from, to, onChange, fleetDays = false, classNa
         onClick={() => step(1)}
         disabled={!hasRange}
         aria-label={c("nextPeriod")}
-        className="rounded-full p-1.5 text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
+        className="btn btn-secondary btn-sm btn-icon"
       >
-        <ChevronRight className="h-4 w-4 rtl:rotate-180" />
+        <ChevronRight className="rtl:rotate-180" />
       </button>
 
       {open && (
-        <div className="app-menu absolute top-full z-20 mt-2 w-64 rounded-xl border border-line bg-surface p-3 shadow-lg ltr:left-0 rtl:right-0">
-          {/* Presets */}
-          <div className="grid grid-cols-2 gap-1.5">
+        <div className="menu" style={{ top: "calc(100% + 6px)", insetInlineStart: 0, padding: 6, width: 250 }}>
+          <div className="g-2" style={{ gap: 6 }}>
             {(["today", "yesterday", "week", "month"] as const).map((p) => (
               <button
                 key={p}
                 type="button"
                 onClick={() => applyPreset(p)}
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  activePreset === p ? "bg-primary text-primary-ink" : "bg-surface-2 text-ink-muted hover:text-ink"
-                }`}
+                className={`btn btn-sm ${activePreset === p ? "btn-primary" : "btn-secondary"}`}
+                style={{ justifyContent: "center", width: "auto" }}
               >
                 {c(p === "today" ? "presetToday" : p === "yesterday" ? "presetYesterday" : p === "week" ? "presetWeek" : "presetMonth")}
               </button>
             ))}
           </div>
 
-          {/* Custom range */}
-          <div className="mt-3 space-y-2 border-t border-line pt-3">
-            <label className="flex items-center justify-between gap-2 text-xs text-ink-muted">
-              <span>{c("dateFrom")}</span>
+          <div className="g-2" style={{ gap: 8, paddingTop: 12 }}>
+            <div className="field">
+              <label>{c("dateFrom")}</label>
               <input
                 type="date"
                 value={from}
                 max={to || undefined}
                 onChange={(e) => onChange(e.target.value, to || e.target.value)}
-                className="ui-field rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink outline-none focus:border-ink"
+                className="input input-sm"
               />
-            </label>
-            <label className="flex items-center justify-between gap-2 text-xs text-ink-muted">
-              <span>{c("dateTo")}</span>
+            </div>
+            <div className="field">
+              <label>{c("dateTo")}</label>
               <input
                 type="date"
                 value={to}
                 min={from || undefined}
                 onChange={(e) => onChange(from || e.target.value, e.target.value)}
-                className="ui-field rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink outline-none focus:border-ink"
+                className="input input-sm"
               />
-            </label>
+            </div>
           </div>
 
           {hasRange && (
@@ -171,7 +164,7 @@ export function DateRangeFilter({ from, to, onChange, fleetDays = false, classNa
                 onChange("", "");
                 setOpen(false);
               }}
-              className="mt-3 w-full rounded-lg py-1.5 text-xs font-medium text-primary hover:bg-surface-2"
+              style={{ marginTop: 8, justifyContent: "center", color: "var(--primary)" }}
             >
               {c("clearDates")}
             </button>

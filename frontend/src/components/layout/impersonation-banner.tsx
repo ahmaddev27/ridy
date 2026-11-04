@@ -38,15 +38,11 @@ export function ImpersonationBanner() {
   }
 
   return (
-    <div className="app-banner app-banner--warning flex items-center gap-3 border-b border-amber-300 bg-amber-500 px-4 py-2 text-sm font-medium text-amber-950">
-      <UserCog className="h-4 w-4 shrink-0" />
-      <span className="flex-1">{message}</span>
-      <button
-        onClick={stop}
-        disabled={busy}
-        className="app-banner__btn inline-flex items-center gap-1.5 rounded-lg bg-amber-950 px-3 py-1 text-xs font-semibold text-amber-50 hover:bg-amber-900 disabled:opacity-60"
-      >
-        {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+    <div className="banner warning">
+      <UserCog />
+      <span className="grow">{message}</span>
+      <button type="button" onClick={stop} disabled={busy} className="btn btn-secondary btn-sm">
+        {busy && <Loader2 className="animate-spin" />}
         {t("impersonation.stop")}
       </button>
     </div>

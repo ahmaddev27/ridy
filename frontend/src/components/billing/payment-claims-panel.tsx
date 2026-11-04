@@ -2,11 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Check, X } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Inbox } from "lucide-react";
+import { Loader2, Check, X, Send, HandCoins, Inbox } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { formatMoney, latnLocale } from "@/lib/utils";
 import { PAYMENT_METHOD_KEYS, paymentMethodLabel } from "@/lib/api/payments";
@@ -23,10 +19,10 @@ import { apiErrorMessage } from "@/lib/api/error-message";
 
 type Filter = "pending" | "confirmed" | "rejected" | "all";
 
-const STATUS_CHIP: Record<PaymentClaimStatus, string> = {
-  pending: "bg-warning-bg text-warning-fg",
-  confirmed: "bg-success-bg text-success-fg",
-  rejected: "bg-danger-bg text-danger-fg",
+const STATUS_TONE: Record<PaymentClaimStatus, string> = {
+  pending: "warning",
+  confirmed: "success",
+  rejected: "danger",
 };
 
 /**
@@ -64,37 +60,40 @@ export function PaymentClaimsList() {
   const date = (iso: string | null) => (iso ? new Date(iso).toLocaleString(latnLocale(locale)) : "—");
 
   return (
-    <Card className="p-5">
-      <div className="mb-4 inline-flex rounded-lg border border-line bg-surface-2 p-1">
-        {(["pending", "confirmed", "rejected", "all"] as const).map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFilter(f)}
-            className={
-              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors " +
-              (filter === f ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink")
-            }
-          >
-            {c(`filter_${f}`)}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div className="space-y-2">
-          {[0, 1].map((i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-surface-2" />)}
-        </div>
-      ) : claims.length === 0 ? (
-        <EmptyState icon={Inbox} title={c("empty")} />
-      ) : (
-        <div className="space-y-2">
-          {claims.map((claim) => (
-            <ClaimRow key={claim.id} claim={claim} plans={plans} onResolved={() => { load(); window.dispatchEvent(new Event(ADMIN_BADGES_REFRESH_EVENT)); }} whenText={date(claim.created_at)} resolvedText={date(claim.resolved_at)} />
+    <section className="card">
+      <div className="card-head">
+        <h2 className="row" style={{ gap: 8 }}>
+          <span className="subtle"><HandCoins style={{ width: 18, height: 18 }} /></span>
+          {c("title")}
+        </h2>
+        <div className="seg" role="group">
+          {(["pending", "confirmed", "rejected", "all"] as const).map((f) => (
+            <button key={f} type="button" className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>
+              {c(`filter_${f}`)}
+            </button>
           ))}
         </div>
-      )}
-    </Card>
+      </div>
+
+      <div className="card-body">
+        {loading ? (
+          <div className="stack-sm">
+            {[0, 1].map((i) => <div key={i} className="skel" style={{ height: 64, borderRadius: 12 }} />)}
+          </div>
+        ) : claims.length === 0 ? (
+          <div className="empty">
+            <span className="empty-ico"><Inbox /></span>
+            <h3>{c("empty")}</h3>
+          </div>
+        ) : (
+          <div className="stack-sm">
+            {claims.map((claim) => (
+              <ClaimRow key={claim.id} claim={claim} plans={plans} onResolved={() => { load(); window.dispatchEvent(new Event(ADMIN_BADGES_REFRESH_EVENT)); }} whenText={date(claim.created_at)} resolvedText={date(claim.resolved_at)} />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -147,84 +146,86 @@ function ClaimRow({
     }
   }
 
+  const panel = { marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" } as const;
+
   return (
-    <div className="rounded-lg border border-line p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-ink">{claim.company ?? "—"}</span>
-            <span className={"rounded-full px-2 py-0.5 text-[11px] font-semibold " + STATUS_CHIP[claim.status]}>
+    <div className="card inset" style={{ padding: 16 }}>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="row" style={{ gap: 10 }}>
+            <span className="strong">{claim.company ?? "—"}</span>
+            <span className={`badge ${STATUS_TONE[claim.status]}`}>
+              <span className="dot" />
               {c(`st_${claim.status}`)}
             </span>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-ink-subtle">
-            <span className="font-mono" dir="ltr">{claim.reference}</span>
-            <span dir="ltr">· {whenText}</span>
-            {!pending && claim.resolved_by && <span>· {c("resolvedBy")} {claim.resolved_by} ({resolvedText})</span>}
+          <div className="subtle text-sm" style={{ marginTop: 3 }}>
+            <span className="mono" dir="ltr">{claim.reference}</span>
+            <span className="num" dir="ltr"> · {whenText}</span>
+            {!pending && claim.resolved_by && <span> · {c("resolvedBy")} {claim.resolved_by} (<span className="num">{resolvedText}</span>)</span>}
           </div>
-          {!pending && claim.reason && <p className="mt-1 text-xs text-ink-muted">{claim.reason}</p>}
+          {!pending && claim.reason && <div className="muted text-sm" style={{ marginTop: 6 }}>{claim.reason}</div>}
         </div>
         {pending && mode === null && (
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={() => setMode("reject")} disabled={busy} className="text-sm">
-              <X className="h-4 w-4" /> {c("reject")}
-            </Button>
-            <Button onClick={() => setMode("accept")} disabled={busy} className="text-sm">
-              <Check className="h-4 w-4" /> {c("accept")}
-            </Button>
+          <div className="row" style={{ gap: 8 }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setMode("reject")} disabled={busy}>
+              <X /> {c("reject")}
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => setMode("accept")} disabled={busy}>
+              <Check /> {c("accept")}
+            </button>
           </div>
         )}
       </div>
 
       {pending && mode === "accept" && (
-        <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-line pt-3">
-          <div className="min-w-[180px] flex-1">
-            <label className="mb-1 block text-xs font-medium text-ink-muted">{c("plan")}</label>
-            <select
-              value={planId}
-              onChange={(e) => setPlanId(e.target.value)}
-              className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
-            >
-              <option value="">{c("selectPlan")}</option>
-              {plans.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} · {formatMoney(p.price, locale)}</option>
-              ))}
-            </select>
+        <div style={panel}>
+          <div className="form-grid">
+            <div className="field">
+              <label htmlFor={`ac-plan-${claim.id}`}>{c("plan")}</label>
+              <select id={`ac-plan-${claim.id}`} className="select" value={planId} onChange={(e) => setPlanId(e.target.value)}>
+                <option value="">{c("selectPlan")}</option>
+                {plans.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name} · {formatMoney(p.price, locale)}</option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor={`ac-art-${claim.id}`}>{c("method")}</label>
+              <select id={`ac-art-${claim.id}`} className="select" value={method} onChange={(e) => setMethod(e.target.value)}>
+                {PAYMENT_METHOD_KEYS.map((m) => (
+                  <option key={m} value={m}>{paymentMethodLabel(m, t)}</option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink-muted">{c("method")}</label>
-            <select
-              value={method}
-              onChange={(e) => setMethod(e.target.value)}
-              className="ui-field rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
-            >
-              {PAYMENT_METHOD_KEYS.map((m) => (
-                <option key={m} value={m}>{paymentMethodLabel(m, t)}</option>
-              ))}
-            </select>
+          <div className="row" style={{ gap: 8, marginTop: 12 }}>
+            <button type="button" className="btn btn-primary" onClick={accept} disabled={busy || !planId}>
+              {busy ? <Loader2 className="animate-spin" /> : <Send />} {c("acceptCta")}
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={() => setMode(null)} disabled={busy}>{c("cancel")}</button>
           </div>
-          <Button onClick={accept} disabled={busy || !planId} className="text-sm">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} {c("acceptCta")}
-          </Button>
-          <Button variant="ghost" onClick={() => setMode(null)} disabled={busy} className="text-sm">{c("cancel")}</Button>
         </div>
       )}
 
       {pending && mode === "reject" && (
-        <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-line pt-3">
-          <div className="min-w-[220px] flex-1">
-            <label className="mb-1 block text-xs font-medium text-ink-muted">{c("reason")}</label>
+        <div style={panel}>
+          <div className="field">
+            <label htmlFor={`rj-${claim.id}`}>{c("reason")}</label>
             <input
+              id={`rj-${claim.id}`}
+              className="input"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={c("reasonPlaceholder")}
-              className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink"
             />
           </div>
-          <Button onClick={reject} disabled={busy || reason.trim().length === 0} className="text-sm">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />} {c("rejectCta")}
-          </Button>
-          <Button variant="ghost" onClick={() => setMode(null)} disabled={busy} className="text-sm">{c("cancel")}</Button>
+          <div className="row" style={{ gap: 8, marginTop: 12 }}>
+            <button type="button" className="btn btn-primary" onClick={reject} disabled={busy || reason.trim().length === 0}>
+              {busy ? <Loader2 className="animate-spin" /> : <Send />} {c("rejectCta")}
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={() => setMode(null)} disabled={busy}>{c("cancel")}</button>
+          </div>
         </div>
       )}
     </div>

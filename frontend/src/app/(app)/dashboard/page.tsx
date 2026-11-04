@@ -1,9 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { formatMoney, latnLocale } from "@/lib/utils";
-import { Users, Wifi, Car, Radio, KeyRound, Wallet, Banknote, CreditCard } from "lucide-react";
-import { Card, StatCard } from "@/components/ui/card";
+import {
+  Users,
+  Wifi,
+  Car,
+  Radio,
+  KeyRound,
+  Wallet,
+  Banknote,
+  CreditCard,
+  MapPin,
+  Maximize2,
+  CalendarPlus,
+  type LucideIcon,
+} from "lucide-react";
 import { RedeemCodeModal } from "@/components/subscription/redeem-code-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
@@ -14,6 +27,7 @@ import { AdBanner } from "@/components/ads/ad-banner";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useCompanyRealtime } from "@/lib/realtime";
 
+const TZ = "Europe/Berlin";
 
 export default function DashboardPage() {
   const { t, locale } = useI18n();
@@ -57,127 +71,214 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extensionRetired]);
 
+  // Set after mount so server and client markup never disagree on "today".
+  const [today, setToday] = useState("");
+  useEffect(() => {
+    setToday(
+      new Date().toLocaleDateString(latnLocale(locale), {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: TZ,
+      }),
+    );
+  }, [locale]);
+
+  const fmtDate = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString(latnLocale(locale)) : "—");
+  const sub = data?.subscription;
+  const fm = data?.fleet_metric;
+  const cur = fm?.currency ?? "EUR";
+  const online = data?.online_drivers ?? 0;
+  const shown = (n: number | undefined) => (loading ? "…" : (n ?? 0));
+  const firstName = (user?.name ?? "").split(" ")[0];
+
   return (
-    <div className="space-y-6">
-      {/* Sponsored banner — full width, at the top */}
+    <>
+      <header className="ph">
+        <div>
+          <h1>{k("greeting").replace("{name}", firstName)}</h1>
+          <p>{k("fleetDayLine").replace("{date}", today)}</p>
+        </div>
+        <div className="ph-actions">
+          <Link href="/offers" className="btn btn-secondary">
+            <Radio />
+            {k("viewOffers")}
+          </Link>
+          <Link href="/map" className="btn btn-primary">
+            <MapPin />
+            {t("pages.map.title")}
+          </Link>
+        </div>
+      </header>
+
+      {/* Sponsored banner */}
       <AdBanner />
 
       {error && (
-        <div className="rounded-lg border border-danger-dot/40 bg-danger-bg p-3 text-sm text-danger-fg">
-          {k("loadError")} — {error}
+        <div className="callout danger">
+          <div>
+            {k("loadError")} — {error}
+          </div>
         </div>
       )}
 
-      {/* Subscription + stat cards (left) beside the live map (right) */}
-      <div className="grid items-start gap-6 lg:grid-cols-3">
-        <div className="space-y-6">
-        {data?.subscription && (
-          <Card className="flex items-center gap-5 p-5">
-            <SubscriptionRing subscription={data.subscription} daysLabel={k("subDaysShort")} />
-            <div className="min-w-0">
-              <h3 className="font-semibold text-ink">{k("subTitle")}</h3>
-              <div className="mt-1.5 flex items-center gap-2">
-                <span
-                  className={
-                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold " +
-                    (data.subscription.state === null ? "bg-success-bg text-success-fg" : "bg-warning-bg text-warning-fg")
-                  }
-                >
-                  <span className={`h-1.5 w-1.5 rounded-full ${data.subscription.state === null ? "bg-emerald-500" : "bg-amber-500"}`} />
-                  {data.subscription.state === null ? k("subActive") : k("subInactive")}
-                </span>
-              </div>
-              <div className="mt-3 flex gap-5 text-sm">
-                <div>
-                  <div className="text-xs text-ink-subtle">{k("subActivated")}</div>
-                  <div className="font-medium text-ink">
-                    {data.subscription.activated_at ? new Date(data.subscription.activated_at).toLocaleDateString(latnLocale(locale)) : "—"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-ink-subtle">{k("subEnds")}</div>
-                  <div className="font-medium text-ink">
-                    {(data.subscription.current_ends_at ?? data.subscription.ends_at)
-                      ? new Date((data.subscription.current_ends_at ?? data.subscription.ends_at) as string).toLocaleDateString(latnLocale(locale))
-                      : "—"}
-                  </div>
-                </div>
-              </div>
-              {data.subscription.queued && (
-                <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-surface-2 px-2.5 py-1.5 text-xs text-ink-muted">
-                  <span className="font-semibold text-ink">+{data.subscription.queued.days} {k("subDaysShort")}</span>
-                  <span className="text-ink-subtle">
-                    {k("subQueued")}
-                    {data.subscription.queued.starts_at
-                      ? ` ${new Date(data.subscription.queued.starts_at).toLocaleDateString(latnLocale(locale))}`
-                      : ""}
+      {/* Subscription + stat tiles (left) beside the live map (right) */}
+      <div className="g-dash" style={{ alignItems: "start" }}>
+        <div className="stack">
+          {sub && (
+            <section className="card" style={{ padding: 18, display: "flex", gap: 18, alignItems: "center" }}>
+              <SubscriptionRing subscription={sub} daysLabel={k("subDaysShort")} />
+              <div className="stack-sm grow">
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <h2 className="section-title">{k("subTitle")}</h2>
+                  <span className={`badge ${sub.state === null ? "success" : "warning"}`}>
+                    <span className="dot" />
+                    {sub.state === null ? k("subActive") : k("subInactive")}
                   </span>
                 </div>
-              )}
-              <button
-                onClick={() => setRedeemOpen(true)}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
-              >
-                <KeyRound className="h-3.5 w-3.5" />
-                {k("redeemCode")}
-              </button>
-            </div>
-          </Card>
-        )}
+                <div className="g-2" style={{ gap: 10 }}>
+                  <div>
+                    <div className="subtle text-xs">{k("subActivated")}</div>
+                    <div className="strong num">{fmtDate(sub.activated_at)}</div>
+                  </div>
+                  <div>
+                    <div className="subtle text-xs">{k("subEnds")}</div>
+                    <div className="strong num">{fmtDate(sub.current_ends_at ?? sub.ends_at)}</div>
+                  </div>
+                </div>
+                {sub.queued && (
+                  <span className="row text-sm" style={{ gap: 6, color: "var(--info-fg)" }}>
+                    <CalendarPlus style={{ width: 15, height: 15 }} />
+                    +{sub.queued.days} {k("subDaysShort")} {k("subQueued")}
+                    {sub.queued.starts_at ? ` ${fmtDate(sub.queued.starts_at)}` : ""}
+                  </span>
+                )}
+                <div>
+                  <button type="button" onClick={() => setRedeemOpen(true)} className="btn btn-secondary btn-sm">
+                    <KeyRound />
+                    {k("redeemCode")}
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
 
-          {/* Key stats — 2 per row, under the subscription */}
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard
+          <div className="g-2">
+            <Stat
               icon={Wifi}
               label={k("statOnline")}
-              value={loading ? "…" : (data?.online_drivers ?? 0)}
-              tone={data?.online_drivers ? "positive" : "default"}
+              value={shown(data?.online_drivers)}
+              positive={online > 0}
+              foot={k("statOnlineFoot").replace("{n}", String(data?.drivers ?? 0))}
             />
-            <StatCard icon={Radio} label={k("statOffersToday")} value={loading ? "…" : (data?.offers_today ?? 0)} />
-            <StatCard icon={Users} label={k("statDrivers")} value={loading ? "…" : (data?.drivers ?? 0)} />
-            <StatCard icon={Car} label={k("statVehicles")} value={loading ? "…" : (data?.vehicles ?? 0)} />
+            <Stat icon={Radio} label={k("statOffersToday")} value={shown(data?.offers_today)} foot={k("statOffersFoot")} />
+            <Stat icon={Users} label={k("statDrivers")} value={shown(data?.drivers)} foot={k("statDriversFoot")} />
+            <Stat icon={Car} label={k("statVehicles")} value={shown(data?.vehicles)} />
           </div>
         </div>
 
-        {/* Live fleet map — drivers list + statuses live inside it. Height tuned
-            so its bottom edge lines up with the subscription + stat cards column. */}
-        <div className="lg:col-span-2">
-          <h3 className="mb-3 font-semibold text-ink">{t("pages.map.title")}</h3>
-          <WidgetBoundary>
-            <LiveMap heightClass="h-[352px]" />
-          </WidgetBoundary>
-        </div>
+        {/* Live fleet map. The map canvas and markers are a carve-out and stay untouched. */}
+        <section className="card">
+          <div className="card-head">
+            <div className="truncate">
+              <h2 className="row" style={{ gap: 8 }}>
+                <span className="subtle">
+                  <MapPin style={{ width: 18, height: 18 }} />
+                </span>
+                {t("pages.map.title")}
+              </h2>
+              <div className="sub">{k("mapSub").replace("{n}", String(online))}</div>
+            </div>
+            <div className="row-wrap">
+              <Link href="/map" className="btn btn-ghost btn-sm">
+                <Maximize2 />
+                {k("fullscreen")}
+              </Link>
+            </div>
+          </div>
+          <div style={{ padding: "14px 18px 18px" }}>
+            <WidgetBoundary>
+              <div className="overflow-hidden" style={{ borderRadius: "var(--r-xl)" }}>
+                <LiveMap heightClass="h-[404px]" />
+              </div>
+            </WidgetBoundary>
+          </div>
+        </section>
       </div>
 
       {/* Fleet-wide Uber earnings: total, cash the drivers hold, net paid out. */}
-      <Card className="p-5">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Wallet className="h-4 w-4 text-ink-subtle" />
-            <h3 className="text-sm font-semibold text-ink">{k("fleetEarnings")}</h3>
-          </div>
-          {data?.fleet_metric?.synced_at && (
-            <span className="text-xs text-ink-subtle" dir="ltr">
-              {new Date(data.fleet_metric.synced_at).toLocaleDateString(latnLocale(locale))}
+      <section className="card">
+        <div className="card-head">
+          <h2 className="row" style={{ gap: 8 }}>
+            <span className="subtle">
+              <Wallet style={{ width: 18, height: 18 }} />
+            </span>
+            {k("fleetEarnings")}
+          </h2>
+          {fm?.synced_at && (
+            <span className="subtle text-sm" dir="ltr">
+              {k("fleetSynced").replace(
+                "{date}",
+                new Date(fm.synced_at).toLocaleString(latnLocale(locale), { dateStyle: "medium", timeStyle: "short", timeZone: TZ }),
+              )}
             </span>
           )}
         </div>
-        {data?.fleet_metric ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <FleetTile icon={Wallet} label={k("fleetEarnings")} value={formatMoney(data.fleet_metric.earnings, locale, data.fleet_metric.currency ?? "EUR")} />
-            <FleetTile icon={Banknote} label={k("fleetCash")} value={formatMoney(data.fleet_metric.cash_collected, locale, data.fleet_metric.currency ?? "EUR")} tone="amber" />
-            <FleetTile icon={CreditCard} label={k("fleetNet")} value={formatMoney(data.fleet_metric.net_outstanding, locale, data.fleet_metric.currency ?? "EUR")} tone="emerald" />
-          </div>
-        ) : (
-          <p className="text-sm text-ink-subtle">{k("fleetEarningsEmpty")}</p>
-        )}
-      </Card>
+        <div className="card-body">
+          {fm ? (
+            <>
+              <div className="g-3">
+                <FleetTile icon={Wallet} label={k("fleetEarnings")} value={formatMoney(fm.earnings, locale, cur)} />
+                <FleetTile icon={Banknote} label={k("fleetCash")} value={formatMoney(fm.cash_collected, locale, cur)} tone="warning" />
+                <FleetTile icon={CreditCard} label={k("fleetNet")} value={formatMoney(fm.net_outstanding, locale, cur)} tone="success" />
+              </div>
+              <p className="subtle text-sm" style={{ marginTop: 12 }}>
+                {k("fleetEarningsHint")}
+              </p>
+            </>
+          ) : (
+            <p className="subtle text-sm">{k("fleetEarningsEmpty")}</p>
+          )}
+        </div>
+      </section>
 
       <RedeemCodeModal open={redeemOpen} onClose={() => setRedeemOpen(false)} onSuccess={refetch} />
-    </div>
+    </>
   );
 }
 
+/** Prototype stat tile: icon chip + label, big tabular value, quiet footer line. */
+function Stat({
+  icon: Icon,
+  label,
+  value,
+  foot,
+  positive,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string | number;
+  foot?: string;
+  positive?: boolean;
+}) {
+  return (
+    <div className="stat">
+      <div className="stat-top">
+        <span className={`stat-ico${positive ? " success" : ""}`}>
+          <Icon />
+        </span>
+        <span className="truncate">{label}</span>
+      </div>
+      <div className={`stat-value${positive ? " pos" : ""}`}>{value}</div>
+      {foot && (
+        <div className="stat-foot">
+          <span className="truncate">{foot}</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function FleetTile({
   icon: Icon,
@@ -185,18 +286,22 @@ function FleetTile({
   value,
   tone,
 }: {
-  icon: typeof Wallet;
+  icon: LucideIcon;
   label: string;
   value: string;
-  tone?: "amber" | "emerald";
+  tone?: "warning" | "success";
 }) {
-  const color = tone === "amber" ? "text-amber-600" : tone === "emerald" ? "text-emerald-600" : "text-ink";
   return (
-    <div className="glass-panel glass-panel--card rounded-xl p-4">
-      <div className="flex items-center gap-1.5 text-xs text-ink-subtle">
-        <Icon className="h-3.5 w-3.5" /> {label}
+    <div className="card inset" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="stat-top">
+        <span className={`stat-ico ${tone ?? ""}`}>
+          <Icon />
+        </span>
+        {label}
       </div>
-      <div className={`mt-1 text-xl font-bold tabular-nums ${color}`} dir="ltr">{value}</div>
+      <div className="stat-value" dir="ltr">
+        {value}
+      </div>
     </div>
   );
 }
@@ -212,13 +317,7 @@ type SubInfo = {
 };
 
 /** Compact radial gauge of the subscription — animates its fill on mount. */
-function SubscriptionRing({
-  subscription,
-  daysLabel,
-}: {
-  subscription: SubInfo;
-  daysLabel: string;
-}) {
+function SubscriptionRing({ subscription, daysLabel }: { subscription: SubInfo; daysLabel: string }) {
   // The ring reflects the CURRENT period only; queued periods show separately.
   const endsAt = subscription.current_ends_at ?? subscription.ends_at;
   const left = Math.max(0, subscription.current_days_left ?? subscription.days_left ?? 0);
@@ -228,9 +327,9 @@ function SubscriptionRing({
       : 30;
   const frac = Math.min(1, left / total);
 
-  const r = 34;
+  const r = 40;
   const circ = 2 * Math.PI * r;
-  const color = left <= 3 ? "#e11d48" : left <= 7 ? "#d97706" : "#059669";
+  const color = left <= 3 ? "var(--danger-dot)" : left <= 7 ? "var(--warning-dot)" : "var(--c1)";
 
   // Animate from empty to the target the first time it mounts (fills on reload).
   const [offset, setOffset] = useState(circ);
@@ -240,26 +339,27 @@ function SubscriptionRing({
   }, [circ, frac]);
 
   return (
-    <div className="relative h-24 w-24 shrink-0">
-      <svg viewBox="0 0 80 80" className="h-24 w-24 -rotate-90">
-        <circle cx="40" cy="40" r={r} fill="none" stroke="#e2e8f0" strokeWidth="7" />
-        <circle
-          cx="40"
-          cy="40"
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth="7"
-          strokeLinecap="round"
-          strokeDasharray={circ}
-          strokeDashoffset={offset}
-          style={{ transition: "stroke-dashoffset 900ms cubic-bezier(0.22,1,0.36,1)" }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold tabular-nums text-ink">{left}</span>
-        <span className="text-[10px] font-medium text-ink-subtle">{daysLabel}</span>
-      </div>
-    </div>
+    <svg width="96" height="96" viewBox="0 0 96 96" role="img" aria-label={`${left} ${daysLabel}`} style={{ flexShrink: 0 }}>
+      <circle cx="48" cy="48" r={r} fill="none" stroke="var(--surface-3)" strokeWidth="8" />
+      <circle
+        cx="48"
+        cy="48"
+        r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth="8"
+        strokeLinecap="round"
+        strokeDasharray={circ}
+        strokeDashoffset={offset}
+        transform="rotate(-90 48 48)"
+        style={{ transition: "stroke-dashoffset 900ms cubic-bezier(0.22,1,0.36,1)" }}
+      />
+      <text x="48" y="50" textAnchor="middle" style={{ font: "650 24px var(--font-sans)", fill: "var(--ink)" }}>
+        {left}
+      </text>
+      <text x="48" y="66" textAnchor="middle" style={{ font: "500 10px var(--font-sans)", fill: "var(--ink-subtle)" }}>
+        {daysLabel}
+      </text>
+    </svg>
   );
 }

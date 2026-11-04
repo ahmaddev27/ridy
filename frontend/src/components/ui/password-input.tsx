@@ -6,7 +6,10 @@ import { Eye, EyeOff } from "lucide-react";
 type PasswordInputProps = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
   "type"
->;
+> & {
+  /** Prototype `.input` look (the remade auth screens) instead of the legacy utility styling. */
+  proto?: boolean;
+};
 
 /**
  * Password field with a show/hide eye toggle.
@@ -14,7 +17,7 @@ type PasswordInputProps = Omit<
  * standard input props. Each instance owns its own visibility state, so
  * paired new/confirm fields toggle independently. RTL-aware and theme-aware.
  */
-export function PasswordInput({ className = "", ...props }: PasswordInputProps) {
+export function PasswordInput({ className = "", proto = false, ...props }: PasswordInputProps) {
   const [show, setShow] = useState(false);
 
   return (
@@ -22,7 +25,11 @@ export function PasswordInput({ className = "", ...props }: PasswordInputProps) 
       <input
         {...props}
         type={show ? "text" : "password"}
-        className={`ui-field w-full rounded-lg border border-line-strong px-3 py-2 pe-10 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ${className}`}
+        className={
+          proto
+            ? `input pe-10 ${className}`
+            : `ui-field w-full rounded-lg border border-line-strong px-3 py-2 pe-10 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ${className}`
+        }
       />
       <button
         type="button"

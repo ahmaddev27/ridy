@@ -1,12 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, Building2, Server, Boxes, FileText, Trash2, AlertTriangle } from "lucide-react";
+import { Activity, Building2, Server, Boxes, FileText, Trash2, AlertTriangle, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
-import { Card } from "@/components/ui/card";
-import { Badge, type Status } from "@/components/ui/badge";
-import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/ui/empty-state";
 import { ShardsPanel } from "@/components/admin/shards-panel";
 import { ServerResources } from "@/components/admin/server-resources";
 import { InfrastructureHealth } from "@/components/admin/infrastructure-health";
@@ -25,46 +21,56 @@ export default function SystemHealthPage() {
   const rows = data ?? [];
   const [tab, setTab] = useState<"health" | "services" | "logs" | "shards">("health");
 
+  const tabs = [
+    { k: "health", icon: Activity, label: t("nav.systemHealth") },
+    { k: "services", icon: Boxes, label: c("infraTitle") },
+    { k: "logs", icon: FileText, label: c("logsTitle") },
+    { k: "shards", icon: Server, label: t("nav.shards") },
+  ] as const;
+
   return (
-    <div className="space-y-6">
-      {/* Sub-tabs (same style as the app's other tab strips). */}
-      <div className="flex flex-wrap gap-1.5">
-        {([
-          { k: "health", icon: Activity, label: t("nav.systemHealth") },
-          { k: "services", icon: Boxes, label: c("infraTitle") },
-          { k: "logs", icon: FileText, label: c("logsTitle") },
-          { k: "shards", icon: Server, label: t("nav.shards") },
-        ] as const).map(({ k: tk, icon: Icon, label }) => {
-          const active = tab === tk;
-          return (
-            <button
-              key={tk}
-              onClick={() => setTab(tk)}
-              className={
-                "group flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-start text-sm font-medium transition-all " +
-                (active ? "bg-primary text-primary-ink shadow-sm" : "text-ink-muted hover:bg-surface-2 hover:text-ink")
-              }
-            >
-              <Icon className={"h-4 w-4 shrink-0 " + (active ? "text-primary-ink" : "text-ink-subtle group-hover:text-ink-muted")} />
+    <>
+      <header className="ph">
+        <div>
+          <h1>{t("pages.systemHealth.title")}</h1>
+          <p>{t("pages.systemHealth.subtitle")}</p>
+        </div>
+      </header>
+
+      <div className="tabs" role="tablist">
+        {tabs.map(({ k: tk, icon: Icon, label }) => (
+          <button
+            key={tk}
+            type="button"
+            role="tab"
+            aria-selected={tab === tk}
+            className={tab === tk ? "on" : ""}
+            onClick={() => setTab(tk)}
+          >
+            <span className="row" style={{ gap: 7 }}>
+              <Icon style={{ width: 16, height: 16 }} />
               {label}
-            </button>
-          );
-        })}
-        <button
-          onClick={async () => {
-            if (!confirm(c("clearNetworkConfirm"))) return;
-            try {
-              const { deleted } = await clearNetworkLogs();
-              toast.success(c("clearNetworkDone").replace("{n}", formatNumber(deleted, locale)));
-            } catch {
-              toast.error(c("clearNetworkFailed"));
-            }
-          }}
-          className="ms-auto inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2.5 text-sm font-medium text-danger-fg transition hover:bg-danger-bg"
-        >
-          <Trash2 className="h-4 w-4" />
-          {c("clearNetwork")}
-        </button>
+            </span>
+          </button>
+        ))}
+        <span style={{ marginInlineStart: "auto", alignSelf: "center", paddingBottom: 4 }}>
+          <button
+            type="button"
+            className="btn btn-danger-soft btn-sm"
+            onClick={async () => {
+              if (!confirm(c("clearNetworkConfirm"))) return;
+              try {
+                const { deleted } = await clearNetworkLogs();
+                toast.success(c("clearNetworkDone").replace("{n}", formatNumber(deleted, locale)));
+              } catch {
+                toast.error(c("clearNetworkFailed"));
+              }
+            }}
+          >
+            <Trash2 />
+            {c("clearNetwork")}
+          </button>
+        </span>
       </div>
 
       {tab === "shards" ? (
@@ -75,86 +81,70 @@ export default function SystemHealthPage() {
         <LogsPanel />
       ) : (
         <>
-          <PageHeader tkey="systemHealth" />
+          <ServerResources />
 
-      <ServerResources />
-
-      <Card className="overflow-hidden">
-        {loading && rows.length === 0 ? (
-          <div className="space-y-2 p-4">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded bg-surface-2" />
-            ))}
-          </div>
-        ) : error && rows.length === 0 ? (
-          <EmptyState icon={Activity} title={c("loadError")} description={error} />
-        ) : rows.length === 0 ? (
-          <EmptyState icon={Building2} title={c("emptyTitle")} description={c("emptyDesc")} />
-        ) : (
-          <>
-            {/* Desktop / tablet table — only one layout is mounted. */}
-            {isWide ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">{c("colCompany")}</th>
-                    <th className="px-4 py-3 font-semibold">{c("colSubscription")}</th>
-                    <th className="px-4 py-3 font-semibold">{c("colSession")}</th>
-                    <th className="px-4 py-3 font-semibold">{c("colDaemon")}</th>
-                    <th className="px-4 py-3 font-semibold">{c("colProxy")}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {rows.map((r) => (
-                    <tr key={r.id} className="hover:bg-surface-2">
-                      <td className="px-4 py-3 font-medium text-ink">{r.name}</td>
-                      <td className="px-4 py-3">
-                        <SubscriptionCell row={r} c={c} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <SessionCell row={r} c={c} locale={locale} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <DaemonCell row={r} c={c} locale={locale} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <ProxyCell row={r} c={c} />
-                      </td>
+          <section className="card table-card">
+            <div className="card-head" style={{ paddingBottom: 12 }}>
+              <h2 className="row" style={{ gap: 8 }}>
+                <span className="subtle">
+                  <Building2 style={{ width: 18, height: 18 }} />
+                </span>
+                {t("nav.companies")}
+              </h2>
+            </div>
+            {loading && rows.length === 0 ? (
+              <div className="stack-sm" style={{ padding: "0 18px 18px" }}>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="skel" style={{ height: 56 }} />
+                ))}
+              </div>
+            ) : error && rows.length === 0 ? (
+              <EmptyBlock icon={Activity} title={c("loadError")} text={error} />
+            ) : rows.length === 0 ? (
+              <EmptyBlock icon={Building2} title={c("emptyTitle")} text={c("emptyDesc")} />
+            ) : isWide ? (
+              <div className="table-wrap" style={{ borderTop: "1px solid var(--line)" }}>
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th>{c("colCompany")}</th>
+                      <th>{c("colSubscription")}</th>
+                      <th>{c("colSession")}</th>
+                      <th>{c("colDaemon")}</th>
+                      <th>{c("colProxy")}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.id}>
+                        <td className="strong nowrap">{r.name}</td>
+                        <td><SubscriptionCell row={r} c={c} /></td>
+                        <td><SessionCell row={r} c={c} locale={locale} /></td>
+                        <td><DaemonCell row={r} c={c} locale={locale} /></td>
+                        <td><ProxyCell row={r} c={c} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : (
-            /* Mobile stacked cards */
-            <div className="divide-y divide-line">
-              {rows.map((r) => (
-                <div key={r.id} className="space-y-3 p-4">
-                  <div className="font-semibold text-ink">{r.name}</div>
-                  <StackRow label={c("colSubscription")}>
-                    <SubscriptionCell row={r} c={c} />
-                  </StackRow>
-                  <StackRow label={c("colSession")}>
-                    <SessionCell row={r} c={c} locale={locale} />
-                  </StackRow>
-                  <StackRow label={c("colDaemon")}>
-                    <DaemonCell row={r} c={c} locale={locale} />
-                  </StackRow>
-                  <StackRow label={c("colProxy")}>
-                    <ProxyCell row={r} c={c} />
-                  </StackRow>
-                </div>
-              ))}
-            </div>
+              /* Mobile stacked rows */
+              <div className="list-rows" style={{ borderTop: "1px solid var(--line)" }}>
+                {rows.map((r) => (
+                  <div key={r.id} className="stack-sm" style={{ padding: "14px 18px", gap: 12 }}>
+                    <div className="strong">{r.name}</div>
+                    <StackRow label={c("colSubscription")}><SubscriptionCell row={r} c={c} /></StackRow>
+                    <StackRow label={c("colSession")}><SessionCell row={r} c={c} locale={locale} /></StackRow>
+                    <StackRow label={c("colDaemon")}><DaemonCell row={r} c={c} locale={locale} /></StackRow>
+                    <StackRow label={c("colProxy")}><ProxyCell row={r} c={c} /></StackRow>
+                  </div>
+                ))}
+              </div>
             )}
-          </>
-        )}
-          </Card>
+          </section>
         </>
       )}
-    </div>
+    </>
   );
 }
 
@@ -162,19 +152,30 @@ type Tr = (k: string) => string;
 
 function StackRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-xs uppercase tracking-wider text-ink-subtle">{label}</span>
-      <div className="text-end">{children}</div>
+    <div className="row" style={{ justifyContent: "space-between", gap: 12 }}>
+      <span className="subtle text-xs">{label}</span>
+      <div style={{ textAlign: "end" }}>{children}</div>
+    </div>
+  );
+}
+
+function EmptyBlock({ icon: Icon, title, text }: { icon: LucideIcon; title: string; text?: string }) {
+  return (
+    <div className="empty" style={{ borderTop: "1px solid var(--line)" }}>
+      <span className="empty-ico"><Icon /></span>
+      <h3>{title}</h3>
+      {text && <p>{text}</p>}
     </div>
   );
 }
 
 function Pill({ ok, warn, children }: { ok: boolean; warn?: boolean; children: React.ReactNode }) {
-  const status: Status = ok ? "connected" : warn ? "expiring" : "error";
+  const tone = ok ? (warn ? "warning" : "success") : warn ? "warning" : "danger";
   return (
-    <Badge status={status} dot>
+    <span className={`badge ${tone}`}>
+      <span className="dot" />
       {children}
-    </Badge>
+    </span>
   );
 }
 
@@ -209,13 +210,13 @@ function SessionCell({ row, c, locale }: { row: SystemHealthRow; c: Tr; locale: 
   const label =
     status === null ? c("noSession") : ok ? c("st_active") : active ? c("st_idle") : c(`st_${status}`);
   return (
-    <div className="space-y-1">
+    <div className="stack-sm" style={{ gap: 4 }}>
       <Pill ok={ok} warn={warn}>
-        {brokenRelink && <AlertTriangle className="me-1 inline h-3 w-3 -translate-y-px" />}
+        {brokenRelink && <AlertTriangle style={{ width: 12, height: 12 }} />}
         {label}
       </Pill>
       {status !== null && (
-        <div className="text-[11px] text-ink-subtle">
+        <div className="subtle text-xs">
           {c("lastSeen").replace("{t}", relTime(last_seen, locale, c("never")))}
         </div>
       )}
@@ -236,7 +237,7 @@ function TokenExpiry({ row, c, locale }: { row: SystemHealthRow; c: Tr; locale: 
   return (
     <div
       title={title}
-      className={"text-[11px] " + (soonest - now < TOKEN_WARN_MS ? "text-warning-fg" : "text-ink-subtle")}
+      className={"text-xs " + (soonest - now < TOKEN_WARN_MS ? "warn" : "subtle")}
     >
       {c("tokenExpires").replace("{t}", relTime(new Date(soonest).toISOString(), locale, ""))}
     </div>
@@ -246,9 +247,9 @@ function TokenExpiry({ row, c, locale }: { row: SystemHealthRow; c: Tr; locale: 
 function DaemonCell({ row, c, locale }: { row: SystemHealthRow; c: Tr; locale: string }) {
   const { ok, last_heartbeat } = row.daemon;
   return (
-    <div className="space-y-1">
+    <div className="stack-sm" style={{ gap: 4 }}>
       <Pill ok={ok}>{ok ? c("ok") : c("down")}</Pill>
-      <div className="text-[11px] text-ink-subtle">
+      <div className="subtle text-xs">
         {c("lastHeartbeat").replace("{t}", relTime(last_heartbeat, locale, c("never")))}
       </div>
     </div>
@@ -261,9 +262,9 @@ function ProxyCell({ row, c }: { row: SystemHealthRow; c: Tr }) {
     return <Pill ok={false}>{c("noProxy")}</Pill>;
   }
   return (
-    <div className="space-y-1">
+    <div className="stack-sm" style={{ gap: 4 }}>
       <Pill ok={ok}>{label}</Pill>
-      <div className="text-[11px] text-ink-subtle">
+      <div className="subtle text-xs">
         {ok
           ? expires_at
             ? c("proxyExpires").replace("{d}", expires_at)

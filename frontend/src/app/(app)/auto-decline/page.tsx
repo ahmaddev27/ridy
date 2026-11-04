@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Ban, ChevronLeft, ChevronRight, MapPin, ArrowRight } from "lucide-react";
+import { Ban, ChevronLeft, ChevronRight, ChevronDown, MapPin, ArrowRight } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,7 @@ export default function AutoDeclinePage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
+  const [driversCollapsed, setDriversCollapsed] = useState(false);
   // Only the newest request may write state, so a slow old filter can't overwrite a newer one.
   const seq = useRef(0);
 
@@ -148,11 +149,19 @@ export default function AutoDeclinePage() {
       )}
 
       <Card className="overflow-hidden">
-        <div className="border-b border-line px-4 py-3">
-          <div className="font-semibold text-ink">{c("driversTitle")}</div>
-          {canManage && <p className="mt-1 text-xs text-ink-subtle">{c("adminHint")}</p>}
-        </div>
-        {overview && overview.drivers.length === 0 ? (
+        <button
+          type="button"
+          onClick={() => setDriversCollapsed((v) => !v)}
+          aria-expanded={!driversCollapsed}
+          className="flex w-full items-center gap-3 border-b border-line px-4 py-3 text-start transition-colors hover:bg-surface-2"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-ink">{c("driversTitle")}</div>
+            {canManage && <p className="mt-1 text-xs text-ink-subtle">{c("adminHint")}</p>}
+          </div>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-ink-subtle transition-transform ${driversCollapsed ? "-rotate-90" : ""}`} />
+        </button>
+        {!driversCollapsed && (overview && overview.drivers.length === 0 ? (
           <p className="px-4 py-6 text-sm text-ink-subtle">{c("driversEmpty")}</p>
         ) : (
           <div className="overflow-x-auto">
@@ -205,7 +214,7 @@ export default function AutoDeclinePage() {
               </tbody>
             </table>
           </div>
-        )}
+        ))}
       </Card>
 
       <div className="flex flex-wrap items-center gap-3">

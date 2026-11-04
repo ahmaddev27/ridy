@@ -2,14 +2,10 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Megaphone, Plus, Pencil, Trash2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Megaphone, Plus, Pencil, Trash2, Upload, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/context";
 import { formatDate } from "@/lib/utils";
 import { useAsync } from "@/hooks/use-async";
@@ -64,83 +60,89 @@ export default function AdminAdsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={c("title")}
-        subtitle={c("subtitle")}
-        action={
-          <Button onClick={() => setEditing("new")}>
-            <Plus className="h-4 w-4" />
+    <>
+      <header className="ph">
+        <div>
+          <h1>{c("title")}</h1>
+          <p>{c("subtitle")}</p>
+        </div>
+        <div className="ph-actions">
+          <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
+            <Plus />
             {c("create")}
-          </Button>
-        }
-      />
+          </button>
+        </div>
+      </header>
 
-      <Card className="overflow-hidden">
+      <section className="card table-card">
         {loading && !data ? (
-          <div className="space-y-2 p-4">{[0, 1].map((k) => <div key={k} className="h-12 animate-pulse rounded bg-surface-2" />)}</div>
+          <div className="stack-sm" style={{ padding: 16 }}>{[0, 1].map((k) => <div key={k} className="skel" style={{ height: 48 }} />)}</div>
         ) : ads.length === 0 ? (
-          <EmptyState icon={Megaphone} title={c("empty")} description={c("emptyDesc")} />
+          <div className="empty">
+            <span className="empty-ico"><Megaphone /></span>
+            <h3>{c("empty")}</h3>
+            <p>{c("emptyDesc")}</p>
+            <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
+              <Plus />
+              {c("create")}
+            </button>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="table-wrap">
+            <table className="tbl">
               <thead>
-                <tr className="border-b border-line text-start text-xs text-ink-subtle">
-                  <th className="px-4 py-3 text-start font-medium">{c("colTitle")}</th>
-                  <th className="px-4 py-3 text-start font-medium">{c("colStatus")}</th>
-                  <th className="px-4 py-3 text-start font-medium">{c("colWindow")}</th>
-                  <th className="px-4 py-3" />
+                <tr>
+                  <th>{c("colTitle")}</th>
+                  <th>{c("colStatus")}</th>
+                  <th>{c("colWindow")}</th>
+                  <th className="r"><span className="sr-only">{c("edit")}</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
-                {ads.map((ad) => (
-                  <tr key={ad.id} className="hover:bg-surface-2">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        {(ad.image_desktop ?? ad.image_url) ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={resolveSrc((ad.image_desktop ?? ad.image_url) as string)}
-                            alt=""
-                            className="h-8 w-20 shrink-0 rounded border border-line object-cover"
-                          />
-                        ) : (
-                          <div className="h-8 w-20 shrink-0 rounded border border-line bg-surface-2" />
-                        )}
-                        <span className="font-medium text-ink">{ad.title || `#${ad.id}`}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge status={ad.active ? "connected" : "neutral"} dot>
-                        {ad.active ? c("active") : c("inactive")}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-ink-muted">{windowLabel(ad)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => setEditing(ad)}
-                          className="rounded-lg p-1.5 text-ink-muted hover:bg-surface-2"
-                          aria-label={c("edit")}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeleting(ad)}
-                          className="rounded-lg p-1.5 text-danger-fg hover:bg-danger-bg"
-                          aria-label={c("delete")}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+              <tbody>
+                {ads.map((ad) => {
+                  const thumb = ad.image_desktop ?? ad.image_url;
+                  return (
+                    <tr key={ad.id}>
+                      <td>
+                        <div className="row" style={{ gap: 12 }}>
+                          {thumb ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={resolveSrc(thumb)}
+                              alt=""
+                              style={{ width: 80, height: 32, flexShrink: 0, borderRadius: 6, objectFit: "cover", border: "1px solid var(--line)" }}
+                            />
+                          ) : (
+                            <span style={{ width: 80, height: 32, flexShrink: 0, borderRadius: 6, background: "var(--surface-3)" }} />
+                          )}
+                          <span className="strong truncate">{ad.title || `#${ad.id}`}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`badge ${ad.active ? "success" : ""}`}>
+                          <span className="dot" />
+                          {ad.active ? c("active") : c("inactive")}
+                        </span>
+                      </td>
+                      <td className="num nowrap">{windowLabel(ad)}</td>
+                      <td>
+                        <div className="row-actions">
+                          <button type="button" onClick={() => setEditing(ad)} className="icon-btn" aria-label={c("edit")} title={c("edit")}>
+                            <Pencil />
+                          </button>
+                          <button type="button" onClick={() => setDeleting(ad)} className="icon-btn neg" aria-label={c("delete")} title={c("delete")}>
+                            <Trash2 />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
-      </Card>
+      </section>
 
       {editing && (
         <AdFormModal
@@ -164,7 +166,7 @@ export default function AdminAdsPage() {
         busy={busy}
         danger
       />
-    </div>
+    </>
   );
 }
 
@@ -251,8 +253,6 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
     }
   }
 
-  const field =
-    "ui-field w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line";
   const err = (k: string) => errors[k]?.[0];
 
   return (
@@ -271,27 +271,48 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
         </>
       }
     >
-      <div className="space-y-4">
-        {/* One image per device — all three required. The whole image is the ad
+      <form
+        className="stack"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!(busy || uploadingKey !== null || !allImagesSet)) void submit();
+        }}
+      >
+        {/* One image per device, all three required. The whole image is the ad
             (design your own button into it); no separate CTA button is shown. */}
-        <div className="space-y-3">
-          <p className="text-xs text-ink-subtle">{c("deviceImagesHint")}</p>
+        <div className="stack-sm">
+          <p className="subtle text-xs">{c("deviceImagesHint")}</p>
           {AD_IMAGES.map((img) => {
             const url = images[img.key];
             const preview = resolveSrc(url);
             const uploading = uploadingKey === img.key;
             return (
-              <div key={img.key} className="rounded-lg border border-line p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-ink">{c(img.labelKey)}</span>
-                  <span className="text-[11px] text-ink-subtle">{c("recommended")}: {img.rec} px</span>
+              <div key={img.key} className="card inset" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <span className="strong">{c(img.labelKey)}</span>
+                  <span className="subtle text-xs num">{c("recommended")}: {img.rec} px</span>
                 </div>
-                {preview && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={preview} alt="" className="mb-2 max-h-28 w-full rounded border border-line object-contain" />
-                )}
-                <div className="flex items-center gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink hover:bg-surface-2">
+                <div
+                  style={{
+                    aspectRatio: img.aspect,
+                    maxHeight: 112,
+                    borderRadius: "var(--r-md)",
+                    overflow: "hidden",
+                    border: preview ? "1px solid var(--line)" : "1.5px dashed var(--line-strong)",
+                    display: "grid",
+                    placeItems: "center",
+                    color: "var(--ink-subtle)",
+                  }}
+                >
+                  {preview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={preview} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                  ) : (
+                    <ImagePlus style={{ width: 22, height: 22 }} />
+                  )}
+                </div>
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <label className={`btn btn-secondary btn-sm${uploading ? " opacity-60" : ""}`} style={{ cursor: "pointer" }}>
                     <input
                       type="file"
                       accept="image/*"
@@ -299,44 +320,46 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
                       className="hidden"
                       disabled={uploading}
                     />
+                    <Upload />
                     {uploading ? c("uploading") : preview ? c("changeImage") : c("uploadImage")}
                   </label>
                   {preview && !uploading && (
                     <button
                       type="button"
                       onClick={() => setImages((prev) => ({ ...prev, [img.key]: "" }))}
-                      className="text-sm text-danger-fg hover:underline"
+                      className="link neg text-sm"
+                      style={{ background: "none", border: 0, cursor: "pointer" }}
                     >
                       {c("removeImage")}
                     </button>
                   )}
                 </div>
-                {err(img.key) && <p className="mt-1 text-xs text-danger-fg">{err(img.key)}</p>}
+                {err(img.key) && <p className="text-xs neg">{err(img.key)}</p>}
               </div>
             );
           })}
         </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-ink">{c("fieldLinkUrl")}</label>
-          <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} className={field} placeholder="https://" />
-          {err("link_url") && <p className="mt-1 text-xs text-danger-fg">{err("link_url")}</p>}
+        <div className="field">
+          <label>{c("fieldLinkUrl")}</label>
+          <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} className="input" placeholder="https://" dir="ltr" />
+          {err("link_url") && <span className="err">{err("link_url")}</span>}
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink">{c("fieldStartsAt")}</label>
-            <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} className={field} />
+        <div className="form-grid">
+          <div className="field">
+            <label>{c("fieldStartsAt")}</label>
+            <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} className="input" />
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink">{c("fieldEndsAt")}</label>
-            <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} className={field} />
-            {err("ends_at") && <p className="mt-1 text-xs text-danger-fg">{err("ends_at")}</p>}
+          <div className="field">
+            <label>{c("fieldEndsAt")}</label>
+            <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} className="input" />
+            {err("ends_at") && <span className="err">{err("ends_at")}</span>}
           </div>
         </div>
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+        <label className="check">
           <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-          {c("fieldActive")}
+          <span>{c("fieldActive")}</span>
         </label>
-      </div>
+      </form>
 
       {crop && (
         <ImageCropper file={crop.file} aspect={crop.aspect} onCancel={() => setCrop(null)} onCropped={onCropped} />

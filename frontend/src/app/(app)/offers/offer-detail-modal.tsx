@@ -5,10 +5,9 @@ import { useDialogFocus } from "@/components/ui/modal";
 import { useRouter } from "next/navigation";
 import { latnLocale, toLatinDigits } from "@/lib/utils";
 import dynamic from "next/dynamic";
-import { X, MapPin, User, CircleDollarSign, Clock, Loader2, Route, Gauge, Wallet } from "lucide-react";
-import { StatCard } from "@/components/ui/card";
+import { X, MapPin, User, Clock, Timer, Loader2, Route, Wallet } from "lucide-react";
+import { StatTile } from "@/components/ui/rd";
 import { OfferStatusBadge } from "@/components/ui/offer-status-badge";
-import { StopMarker } from "@/components/ui/stop-marker";
 import { useI18n } from "@/lib/i18n/context";
 import { getOffer, fareLabel, type DispatchOfferDetail } from "@/lib/api/offers";
 
@@ -93,158 +92,144 @@ export function OfferDetailModal({ id, onClose }: { id: number; onClose: () => v
     ].filter((r) => r.address);
   }, [offer?.raw, offer?.trip?.pickup_address, offer?.trip?.dropoff_address, offer?.trip?.stops, offer?.trip?.distance_km]);
 
-  return (
-    <div
-      className="app-modal-scrim fixed inset-0 z-[1200] flex items-center justify-center bg-overlay p-4 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={dialogTitleId}
-        tabIndex={-1}
-        className="app-modal flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-surface text-start shadow-xl outline-none"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 border-b border-line p-5">
-          <div className="min-w-0">
-            <h2 id={dialogTitleId} className="text-lg font-semibold text-ink">
-              {offer?.rider_first_name || c("colRider") || "—"}
-            </h2>
-            {offer?.driver_id != null ? (
-              <button onClick={openDriver} className="mt-0.5 text-sm font-medium text-primary hover:underline">
-                {offer.driver_name ?? "—"}
-              </button>
-            ) : (
-              <p className="mt-0.5 text-sm text-ink-subtle">{offer?.driver_name ?? "—"}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {offer && <OfferStatusBadge offer={offer} />}
-            {(offer?.fare_amount != null || offer?.fare_formatted) && (
-              <span className="rounded-lg bg-success-bg px-2.5 py-1 text-sm font-semibold text-success-fg">
-                {toLatinDigits(fareLabel(offer, latnLocale(locale)))}
-              </span>
-            )}
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1.5 text-ink-subtle hover:bg-surface-2 hover:text-ink-muted"
-              aria-label={c("close") || "Close"}
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
+  const perKm = offer ? pricePerKm(offer) : null;
+  const fare = offer ? toLatinDigits(fareLabel(offer, latnLocale(locale))) : "";
+  const hasFare = offer != null && (offer.fare_amount != null || !!offer.fare_formatted);
+  const multi = offer?.trip?.stops_count != null && offer.trip.stops_count >= 2;
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {error ? (
-            <div className="p-6 text-sm text-danger-fg">{error}</div>
-          ) : !offer ? (
-            <div className="flex items-center justify-center p-10 text-ink-subtle">
-              <Loader2 className="h-5 w-5 animate-spin" />
-            </div>
+  const head = (
+    <div className="modal-head">
+      <div style={{ minWidth: 0 }}>
+        <h2 id={dialogTitleId}>{offer?.rider_first_name || c("colRider") || "—"}</h2>
+        <p>
+          {offer?.driver_id != null ? (
+            <button type="button" onClick={openDriver} className="link">
+              {offer.driver_name ?? "—"}
+            </button>
           ) : (
-            <>
-              {/* Route with every stop */}
-              <div className="border-b border-line p-5">
-                <ol className="space-y-3">
-                  {stops.map((s, i) => {
-                    const isPickup = i === 0;
-                    return (
-                      <li key={i} className="flex items-start gap-3">
-                        {/* Pickup keeps the green origin pin; every drop-off and
-                            intermediate stop uses the blue stop marker. */}
-                        {isPickup ? (
-                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-success-fg" />
-                        ) : (
-                          <StopMarker size={16} className="mt-0.5 shrink-0" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <span className="text-sm text-ink">{s.address}</span>
-                          {/* Per-stop road distance: the leg from the previous stop,
-                              plus the running total once past the first drop-off. */}
-                          {s.legKm != null && !isPickup && (
-                            <div className="mt-0.5 text-xs text-ink-subtle" dir="ltr">
-                              +{toLatinDigits(s.legKm.toFixed(1))} km
-                              {s.cumulativeKm != null && i > 1 && (
-                                <span className="text-ink-muted"> · {toLatinDigits(s.cumulativeKm.toFixed(1))} km {c("total") || "total"}</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
-                {/* Multi-stop badge — prefer Uber's authoritative stop count (from
-                    the live map after acceptance), else the raw address list. */}
-                {(offer.trip?.stops_count != null && offer.trip.stops_count >= 2) ? (
-                  <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-600">
-                    <Route className="h-3.5 w-3.5" />
-                    {c("multiStop") || "Multi-stop"} · {offer.trip.stops_count} {c("dropoffs") || "drop-offs"}
+            (offer?.driver_name ?? "—")
+          )}
+        </p>
+      </div>
+      <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        {offer && <OfferStatusBadge offer={offer} />}
+        {hasFare && (
+          <span className="badge success num" style={{ height: 26, fontSize: 13 }}>
+            {fare}
+          </span>
+        )}
+        <button type="button" className="icon-btn" onClick={onClose} aria-label={c("close") || "Close"}>
+          <X />
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={dialogTitleId} tabIndex={-1} className="modal lg outline-none">
+        {head}
+        {error ? (
+          <div className="modal-body" style={{ color: "var(--danger-fg)" }}>{error}</div>
+        ) : !offer ? (
+          <div className="modal-body" style={{ alignItems: "center", color: "var(--ink-subtle)" }}>
+            <Loader2 className="ico-sm" style={{ animation: "ofr-spin 1s linear infinite" }} />
+          </div>
+        ) : (
+          <div className="modal-body stack">
+            {/* Route with every stop */}
+            <div className="stack-sm">
+              <div className="row between">
+                <h3 className="section-title">{c("routeTitle")}</h3>
+                {multi ? (
+                  <span className="badge warning">
+                    <Route />
+                    {c("multiStop") || "Multi-stop"} · {offer.trip!.stops_count} {c("dropoffs") || "drop-offs"}
                   </span>
                 ) : stops.length > 2 ? (
-                  <p className="mt-3 text-xs font-medium text-ink">
+                  <span className="subtle text-xs">
                     {stops.length} {c("stops") || "stops"}
-                  </p>
+                  </span>
                 ) : null}
               </div>
+              <ol className="timeline" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                {stops.map((s, i) => {
+                  const isPickup = i === 0;
+                  return (
+                    <li key={i} className="tl-item">
+                      {/* Pickup keeps the green origin pin; drop-offs use the numbered blue marker. */}
+                      <span className={`tl-dot ${isPickup ? "success" : "info"}`}>
+                        {isPickup ? <MapPin /> : <span style={{ fontSize: 11, fontWeight: 700 }}>{i}</span>}
+                      </span>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="strong" style={{ overflowWrap: "anywhere" }}>{s.address}</div>
+                        <div className="subtle text-xs">
+                          {isPickup ? c("stopPickup") : multi || stops.length > 2 ? `${c("stopDropoff")} ${i}` : c("stopDestination")}
+                          {s.legKm != null && !isPickup && (
+                            <span dir="ltr">
+                              {" · "}
+                              <span className="num">+{toLatinDigits(s.legKm.toFixed(1))} km</span>
+                              {s.cumulativeKm != null && i > 1 && (
+                                <span className="num"> · {toLatinDigits(s.cumulativeKm.toFixed(1))} km {c("total") || "total"}</span>
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
 
-              {/* Trip map + distance / price-per-km */}
-              {offer.trip && (offer.trip.pickup || offer.trip.dropoff) && (
-                <div className="space-y-3 border-b border-line p-5">
-                  <TripMap
-                    pickup={offer.trip.pickup}
-                    dropoff={offer.trip.dropoff}
-                    routeGeometry={offer.trip.route_geometry}
-                    stops={offer.trip.stops}
-                  />
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <StatCard
-                      icon={Route}
-                      label={c("distance")}
-                      value={offer.trip.distance_km != null ? `${offer.trip.distance_km} km` : "—"}
-                    />
-                    <StatCard
-                      icon={Gauge}
-                      label={c("pricePerKm")}
-                      value={pricePerKm(offer) != null ? `${pricePerKm(offer)!.toFixed(2)} €/km` : "—"}
-                    />
-                    <StatCard icon={Wallet} label={c("colFare")} value={toLatinDigits(fareLabel(offer, latnLocale(locale)))} />
-                  </div>
+            {/* Trip map + distance / price-per-km */}
+            {offer.trip && (offer.trip.pickup || offer.trip.dropoff) && (
+              <>
+                <TripMap
+                  pickup={offer.trip.pickup}
+                  dropoff={offer.trip.dropoff}
+                  routeGeometry={offer.trip.route_geometry}
+                  stops={offer.trip.stops}
+                />
+                <div className="g-3">
+                  <StatTile label={c("distance")} value={offer.trip.distance_km != null ? `${offer.trip.distance_km} km` : "—"} />
+                  <StatTile label={c("pricePerKm")} value={perKm != null ? `${perKm.toFixed(2)} €/km` : "—"} />
+                  <StatTile label={c("colFare")} value={fare} />
                 </div>
-              )}
+              </>
+            )}
 
-              {/* Known fields */}
-              <dl className="divide-y divide-line">
-                <Row icon={User} label={c("colDriver")}>
-                  {offer.driver_id != null ? (
-                    <button onClick={openDriver} className="font-medium text-primary hover:underline">
-                      {offer.driver_name ?? "—"}
-                    </button>
-                  ) : (offer.driver_name ?? "—")}
-                </Row>
-                <Row icon={CircleDollarSign} label={c("colFare")}>{toLatinDigits(fareLabel(offer, latnLocale(locale)))}</Row>
-                <Row icon={Clock} label={c("colTime")}>
-                  {offer.received_at ? new Date(offer.received_at).toLocaleString(latnLocale(locale)) : "—"}
-                </Row>
-                {offer.trip_duration_seconds != null && (
-                  <Row icon={Clock} label={c("colDuration")}>
-                    {toLatinDigits(`${Math.round(offer.trip_duration_seconds / 60)} min`)}
-                  </Row>
+            {/* Known fields */}
+            <div className="list-rows" style={{ padding: "0 2px" }}>
+              <KvRow icon={User} label={c("colDriver")}>
+                {offer.driver_id != null ? (
+                  <button type="button" onClick={openDriver} className="link">
+                    {offer.driver_name ?? "—"}
+                  </button>
+                ) : (
+                  (offer.driver_name ?? "—")
                 )}
-              </dl>
-            </>
-          )}
-        </div>
+              </KvRow>
+              <KvRow icon={Wallet} label={c("colFare")}>
+                <span className="num">{fare}</span>
+              </KvRow>
+              <KvRow icon={Clock} label={c("colTime")}>
+                <span className="num">{offer.received_at ? new Date(offer.received_at).toLocaleString(latnLocale(locale)) : "—"}</span>
+              </KvRow>
+              {offer.trip_duration_seconds != null && (
+                <KvRow icon={Timer} label={c("colDuration")}>
+                  <span className="num">{toLatinDigits(`${Math.round(offer.trip_duration_seconds / 60)} min`)}</span>
+                </KvRow>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function Row({
+function KvRow({
   icon: Icon,
   label,
   children,
@@ -254,12 +239,12 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 px-5 py-3">
-      <dt className="flex items-center gap-2 text-sm text-ink-muted">
-        <Icon className="h-4 w-4 text-ink-subtle" />
-        {label}
-      </dt>
-      <dd className="min-w-0 truncate text-sm font-medium text-ink">{children}</dd>
+    <div className="list-row" style={{ padding: "11px 0" }}>
+      <span className="subtle">
+        <Icon className="ico-sm" />
+      </span>
+      <span className="muted grow">{label}</span>
+      <span className="strong" style={{ textAlign: "end" }}>{children}</span>
     </div>
   );
 }

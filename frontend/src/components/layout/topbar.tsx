@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { toast } from "sonner";
-import { BellPlus, ChevronDown, LogOut, Volume2, VolumeX, Menu, X, Sun, Moon, HelpCircle } from "lucide-react";
+import { BellPlus, ChevronDown, ChevronRight, CircleUserRound, LogOut, Volume2, VolumeX, Menu, Sun, Moon, CircleHelp } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useI18n } from "@/lib/i18n/context";
 import { enableWebPush, listenForeground } from "@/lib/push/web-push";
@@ -12,8 +13,24 @@ import { ONBOARDING_EVENT } from "@/components/onboarding/onboarding-tour";
 import { NotificationsBell } from "./notifications-bell";
 import { useAppFeeds } from "./app-feeds";
 import { cn } from "@/lib/utils";
-import { SidebarBrand } from "./sidebar";
-import { NavList } from "./nav-list";
+import { navGroups } from "./nav-config";
+
+/** Breadcrumb trail: the nav item that owns the current route. */
+function useCrumbs(t: (key: string) => string): string[] {
+  const pathname = usePathname();
+  const hit = navGroups
+    .flatMap((g) => g.items)
+    .filter((i) => pathname === i.href || pathname.startsWith(i.href + "/"))
+    .sort((a, b) => b.href.length - a.href.length)[0];
+  return hit ? [t(hit.label)] : [];
+}
+
+/** Deterministic avatar tint (t0-t5), same hash as the prototype. */
+function avatarTone(name: string): string {
+  let h = 0;
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return "t" + (h % 6);
+}
 
 function initials(name: string): string {
   return name
@@ -25,13 +42,12 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-export function Topbar() {
-  const router = useRouter();
+export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { user, signOut } = useAuth();
   const { t, locale, setLocale } = useI18n();
   const { theme, toggle: toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [navOpen, setNavOpen] = useState(false);
+  const crumbs = useCrumbs(t);
 
   // Live unread badge — polled so new notifications surface without a refresh.
   const { notifications, refetchNotifications } = useAppFeeds();
@@ -93,144 +109,123 @@ export function Topbar() {
     }
   }
 
+  const firstName = (user?.name ?? "").split(" ")[0];
+
   return (
-    <>
-      {/* Mobile drawer — rendered OUTSIDE the backdrop-blur header, whose
-          `backdrop-filter` would otherwise become the containing block for this
-          `fixed` overlay and collapse it to the header's height. */}
-      {navOpen && (
-        <div className="fixed inset-0 z-[1200] lg:hidden">
-          <div className="app-drawer-scrim absolute inset-0 bg-overlay" onClick={() => setNavOpen(false)} />
-          <div className="app-drawer absolute inset-y-0 start-0 flex w-64 flex-col bg-surface shadow-xl">
-            <div className="relative">
-              <SidebarBrand />
-              <button
-                onClick={() => setNavOpen(false)}
-                className="absolute end-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-ink-subtle hover:bg-surface-2"
-                aria-label={t("common.close")}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <NavList onNavigate={() => setNavOpen(false)} />
-          </div>
-        </div>
-      )}
+    <header className="topbar">
+      <button type="button" className="icon-btn menu-toggle" onClick={onMenu} aria-label={t("common.menu")}>
+        <Menu />
+      </button>
 
-      <header className="app-topbar sticky top-0 z-[1100] flex h-16 items-center gap-3 border-b border-line bg-surface/80 px-4 backdrop-blur sm:px-5">
-        {/* Mobile nav toggle */}
-        <button
-          onClick={() => setNavOpen(true)}
-          className="rounded-lg p-2 text-ink-muted hover:bg-surface-2 lg:hidden"
-          aria-label={t("common.menu")}
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+      <div className="crumbs">
+        {crumbs.map((c, i) => (
+          <span key={c} className="row" style={{ gap: 6 }}>
+            {i > 0 && <ChevronRight />}
+            {i === crumbs.length - 1 ? <b className="truncate">{c}</b> : <span className="truncate">{c}</span>}
+          </span>
+        ))}
+      </div>
 
-      <div className="ms-auto flex items-center gap-2">
+      <div className="top-actions">
         {/* Locale switch (functional) */}
-        <div className="flex items-center rounded-lg border border-line p-0.5 text-xs font-medium">
+        <div className="seg" role="group" style={{ marginInlineEnd: 6 }}>
           {(["en", "de", "ar"] as const).map((l) => (
-            <button
-              key={l}
-              onClick={() => setLocale(l)}
-              className={cn(
-                "rounded-md px-2 py-1 uppercase transition-colors",
-                locale === l ? "bg-primary text-primary-ink" : "text-ink-muted hover:text-ink",
-              )}
-            >
-              {l}
+            <button key={l} type="button" onClick={() => setLocale(l)} className={cn(locale === l && "on")}>
+              {l.toUpperCase()}
             </button>
           ))}
         </div>
 
         {/* Theme (light/dark) toggle */}
         <button
+          type="button"
           onClick={toggleTheme}
-          className="rounded-lg p-2 text-ink-muted hover:bg-surface-2"
+          className="icon-btn"
           title={theme === "dark" ? t("common.lightMode") : t("common.darkMode")}
           aria-label={theme === "dark" ? t("common.lightMode") : t("common.darkMode")}
         >
-          {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          {theme === "dark" ? <Sun /> : <Moon />}
         </button>
 
         {/* Replay the onboarding tour (managers only) */}
         {isManager && (
           <button
+            type="button"
             onClick={() => window.dispatchEvent(new Event(ONBOARDING_EVENT))}
-            className="rounded-lg p-2 text-ink-muted hover:bg-surface-2"
+            className="icon-btn"
             title={t("topbar.tour")}
             aria-label={t("topbar.tour")}
           >
-            <HelpCircle className="h-5 w-5" />
+            <CircleHelp />
           </button>
         )}
 
         {/* Offer-sound mute toggle (managers only) */}
         {isManager && (
           <button
+            type="button"
             onClick={toggleMute}
-            className="rounded-lg p-2 text-ink-muted hover:bg-surface-2"
+            className="icon-btn"
             title={muted ? t("common.unmute") : t("common.mute")}
             aria-label={muted ? t("common.unmute") : t("common.mute")}
           >
-            {muted ? <VolumeX className="h-5 w-5 text-ink-subtle" /> : <Volume2 className="h-5 w-5" />}
+            {muted ? <VolumeX /> : <Volume2 />}
           </button>
         )}
 
-        {/* Enable web push — hidden once permission is granted */}
+        {/* Enable web push - hidden once permission is granted */}
         {!pushGranted && (
-          <button
-            onClick={handleEnablePush}
-            className="rounded-lg p-2 text-ink-muted hover:bg-surface-2"
-            title={t("push.enable")}
-            aria-label={t("push.enable")}
-          >
-            <BellPlus className="h-5 w-5" />
+          <button type="button" onClick={handleEnablePush} className="icon-btn" title={t("push.enable")} aria-label={t("push.enable")}>
+            <BellPlus />
           </button>
         )}
 
-        {/* Notifications — bell with a hover dropdown of the latest 5 */}
+        {/* Notifications - bell with a dropdown of the latest 5 */}
         <NotificationsBell items={notifications?.items ?? []} unread={unread} onChanged={refetchNotifications} />
 
         {/* User menu */}
         <div className="relative">
           <button
+            type="button"
             onClick={() => setMenuOpen((o) => !o)}
-            className="flex items-center gap-2 rounded-lg p-1 pe-2 hover:bg-surface-2"
+            className="avatar-btn"
+            aria-label={user?.name ?? t("topbar.signOut")}
+            aria-expanded={menuOpen}
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-2 text-sm font-semibold text-ink">
-              {initials(user?.name ?? "?")}
-            </span>
-            <ChevronDown className="h-4 w-4 text-ink-subtle" />
+            <span className={cn("av sm", avatarTone(user?.name ?? "?"))} aria-hidden="true">{initials(user?.name ?? "?")}</span>
+            <span className="text-sm strong truncate" style={{ maxWidth: 130 }}>{firstName}</span>
+            <ChevronDown style={{ width: 15, height: 15 }} />
           </button>
 
           {menuOpen && (
             <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setMenuOpen(false)}
-              />
-              <div className="app-menu absolute end-0 z-20 mt-2 w-56 rounded-lg border border-line bg-surface py-1 text-start text-sm shadow-lg">
-                <div className="border-b border-line px-3 py-2">
-                  <div className="font-medium text-ink">{user?.name}</div>
-                  <div className="text-xs text-ink-subtle">{user?.tenant?.name}</div>
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              <div className="menu end-0 top-full z-20 mt-2">
+                <div style={{ padding: "8px 10px 6px" }}>
+                  <div className="strong">{user?.name}</div>
+                  <div className="subtle text-sm">{user?.tenant?.name}</div>
                 </div>
+                <hr />
+                <Link href="/profile" onClick={() => setMenuOpen(false)}>
+                  <CircleUserRound />
+                  {t("nav.profile")}
+                </Link>
+                <hr />
                 <button
+                  type="button"
+                  className="danger"
                   onClick={() => {
                     setMenuOpen(false);
                     signOut();
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-danger-fg hover:bg-danger-bg"
                 >
-                  <LogOut className="h-4 w-4" /> {t("topbar.signOut")}
+                  <LogOut /> {t("topbar.signOut")}
                 </button>
               </div>
             </>
           )}
         </div>
       </div>
-      </header>
-    </>
+    </header>
   );
 }

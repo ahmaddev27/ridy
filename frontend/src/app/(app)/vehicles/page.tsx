@@ -3,10 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Car, RefreshCw, Loader2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHead, SkelRows } from "@/components/ui/rd";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
@@ -66,92 +63,86 @@ export default function VehiclesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        tkey="vehicles"
-        action={
-          <Button onClick={sync} disabled={syncing}>
-            {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+    <>
+      <PageHead
+        title={t("pages.vehicles.title")}
+        sub={t("pages.vehicles.subtitle")}
+        actions={
+          <button type="button" className="btn btn-primary" onClick={sync} disabled={syncing}>
+            {syncing ? <Loader2 style={{ animation: "ofr-spin 1s linear infinite" }} /> : <RefreshCw />}
             {v("sync")}
-          </Button>
+          </button>
         }
       />
 
-      <Card className="overflow-hidden">
+      <section className="card table-card">
         {loading ? (
-          <div className="space-y-2 p-4">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded bg-surface-2" />
-            ))}
-          </div>
+          <SkelRows rows={5} cols={5} />
         ) : vehicles.length === 0 ? (
           <EmptyState icon={Car} title={v("empty")} description={v("emptyDesc")} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">{v("colVehicle")}</th>
-                  <th className="px-4 py-3 font-semibold">{v("colYear")}</th>
-                  <th className="px-4 py-3 font-semibold">{v("colPlate")}</th>
-                  <th className="px-4 py-3 font-semibold">{v("colVin")}</th>
-                  <th className="px-4 py-3 font-semibold">{v("colColor")}</th>
-                  <th className="px-4 py-3 font-semibold">{v("colStatus")}</th>
-                  <th className="px-4 py-3 font-semibold">{v("colAssignment")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {vehicles.map((car) => (
-                  <tr key={car.id} className="hover:bg-surface-2">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        {car.image_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={car.image_url} alt="" className="h-9 w-12 rounded object-cover" />
-                        ) : (
-                          <div className="flex h-9 w-12 items-center justify-center rounded bg-surface-2">
-                            <Car className="h-4 w-4 text-ink-subtle" />
-                          </div>
-                        )}
-                        <span className="font-medium text-ink">
-                          {[car.make, car.model].filter(Boolean).join(" ") || "—"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-ink-muted">{car.year || "—"}</td>
-                    <td className="px-4 py-3">
-                      <span dir="ltr" className="font-mono text-ink">{car.license_plate ?? "—"}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span dir="ltr" className="font-mono text-xs text-ink-subtle">{car.vin ?? "—"}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1.5 text-ink-muted">
-                        {car.color_hex && (
-                          <span className="h-3 w-3 rounded-full border border-line" style={{ background: car.color_hex }} />
-                        )}
-                        {car.color ?? "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge status={car.compliance_status === "ACTIVE" ? "connected" : "gap"} dot>
-                        {car.compliance_status === "ACTIVE" ? v("statusActive") : car.compliance_status ?? "—"}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      {car.assigned_driver ? (
-                        <span className="text-ink">{car.assigned_driver}</span>
-                      ) : (
-                        <span className="text-ink-subtle">{v("unassigned")}</span>
-                      )}
-                    </td>
+          <div className="ofr-tbl">
+            <div className="table-wrap">
+              <table className="tbl" style={{ minWidth: 980 }}>
+                <thead>
+                  <tr>
+                    <th>{v("colVehicle")}</th>
+                    <th>{v("colYear")}</th>
+                    <th>{v("colPlate")}</th>
+                    <th>{v("colVin")}</th>
+                    <th>{v("colColor")}</th>
+                    <th>{v("colStatus")}</th>
+                    <th>{v("colAssignment")}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {vehicles.map((car) => (
+                    <tr key={car.id}>
+                      <td>
+                        <div className="row" style={{ gap: 12 }}>
+                          {car.image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={car.image_url} alt="" style={{ width: 48, height: 36, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+                          ) : (
+                            <span style={{ width: 48, height: 36, borderRadius: 8, background: "var(--surface-3)", color: "var(--ink-subtle)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                              <Car className="ico-sm" />
+                            </span>
+                          )}
+                          <span className="strong">{[car.make, car.model].filter(Boolean).join(" ") || "—"}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="num">{car.year || "—"}</span>
+                      </td>
+                      <td>
+                        <span className="mono strong" dir="ltr">{car.license_plate ?? "—"}</span>
+                      </td>
+                      <td>
+                        <span className="mono subtle" style={{ fontSize: 11.5 }} dir="ltr">{car.vin ?? "—"}</span>
+                      </td>
+                      <td>
+                        <span className="row" style={{ gap: 8 }}>
+                          {car.color_hex && (
+                            <i style={{ width: 12, height: 12, borderRadius: 99, background: car.color_hex, border: "1px solid var(--line-strong)" }} />
+                          )}
+                          {car.color ?? "—"}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge ${car.compliance_status === "ACTIVE" ? "success" : ""}`}>
+                          <span className="dot" />
+                          {car.compliance_status === "ACTIVE" ? v("statusActive") : car.compliance_status ?? "—"}
+                        </span>
+                      </td>
+                      <td>{car.assigned_driver ? car.assigned_driver : <span className="subtle">{v("unassigned")}</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
-      </Card>
-    </div>
+      </section>
+    </>
   );
 }

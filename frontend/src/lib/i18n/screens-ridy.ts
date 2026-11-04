@@ -78,6 +78,7 @@ driverUber: { title: "From Uber", hint: "Performance metrics as reported by Uber
     colRider: "Rider",
     close: "Close",
     stops: "stops", multiStop: "Multi-stop", dropoffs: "drop-offs", total: "total",
+    routeTitle: "Route", stopPickup: "Pickup", stopDropoff: "Drop-off", stopDestination: "Destination",
     acceptWindow: "Accept window",
     rawPayload: "Full raw data",
     distance: "Distance",
@@ -106,6 +107,10 @@ driverUber: { title: "From Uber", hint: "Performance metrics as reported by Uber
     linkedToast: "Driver linked",
     linkedToastDesc: "{count} earlier offers were assigned.",
     linkFailed: "Linking failed",
+  },
+  remake: {
+    suspendedTitle: "Access suspended", suspendedSub: "Your access is not active right now.",
+    email: "Email", inviteTitle: "Invite driver?", inviteAgainTitle: "Resend invitation?", inviteBody: "The invitation to the Reidey app is sent by email to {email}. The driver then signs in without a password using a code.", inviteSend: "Invite", inviteAgain: "Resend", subInfo: "A new period is added after your current one. The payment reference always stays the same for your company.", subHistory: "Subscription history", subHistorySub: "Plan, code, collector and status of your periods.", daysLeft: "days left", subStatus: "Subscription", subActivated: "Activated", subEnds: "Ends", daysShort: "days",
   },
   map: {
     activeTrips: "active trips", enRoute: "En route", onTrip: "On trip", online: "Online", offline: "Offline", active: "Active",
@@ -309,6 +314,7 @@ driverUber: { title: "From Uber", hint: "Performance metrics as reported by Uber
   },
   dashboard: {
     onlineTitle: "Online drivers", online: "Online", onTrip: "On trip", onlineNone: "No drivers online right now.", refresh: "Refresh",
+    greeting: "Hello, {name}", fleetDayLine: "{date} · Fleet day since 04:00", viewOffers: "View offers", fullscreen: "Full screen", mapSub: "{n} drivers active", statOnlineFoot: "of {n} drivers", statOffersFoot: "since 04:00", statDriversFoot: "from Uber", fleetSynced: "Synced {date}",
     subTitle: "Subscription", subActive: "Active", subInactive: "Needs activation", subDaysLeft: "{n} days left", subDaysShort: "days left", subActivated: "Activated", subEnds: "Renews / ends", redeemCode: "Enter code", subQueued: "in queue · starts",
     statDrivers: "Drivers", statOnline: "Online now", statVehicles: "Vehicles", offersTrend: "Offers · last 7 days",
     statLinked: "Linked to Uber",
@@ -399,6 +405,7 @@ driverUber: { title: "Von Uber", hint: "Leistungskennzahlen, wie Uber sie für d
     colRider: "Fahrgast",
     close: "Schließen",
     stops: "Stopps", multiStop: "Mehrere Stopps", dropoffs: "Abgabestellen", total: "gesamt",
+    routeTitle: "Route", stopPickup: "Abholung", stopDropoff: "Abgabe", stopDestination: "Ziel",
     acceptWindow: "Annahmefenster",
     rawPayload: "Vollständige Rohdaten",
     distance: "Distanz",
@@ -427,6 +434,10 @@ driverUber: { title: "Von Uber", hint: "Leistungskennzahlen, wie Uber sie für d
     linkedToast: "Fahrer verknüpft",
     linkedToastDesc: "{count} frühere Angebote wurden zugeordnet.",
     linkFailed: "Verknüpfung fehlgeschlagen",
+  },
+  remake: {
+    suspendedTitle: "Zugang gesperrt", suspendedSub: "Dein Zugang ist derzeit nicht aktiv.",
+    email: "E-Mail", inviteTitle: "Fahrer einladen?", inviteAgainTitle: "Einladung erneut senden?", inviteBody: "Die Einladung zur Reidey-App geht per E-Mail an {email}. Der Fahrer meldet sich danach ohne Passwort mit einem Code an.", inviteSend: "Einladen", inviteAgain: "Erneut senden", subInfo: "Eine neue Periode wird nach deiner aktuellen hinzugefügt. Die Zahlungsreferenz bleibt für deine Firma immer gleich.", subHistory: "Abo-Verlauf", subHistorySub: "Paket, Code, Kassierer und Status deiner Perioden.", daysLeft: "Tage übrig", subStatus: "Abonnement", subActivated: "Aktiviert", subEnds: "Endet", daysShort: "Tage",
   },
   map: {
     activeTrips: "aktive Touren", enRoute: "Unterwegs", onTrip: "Auf Tour", online: "Online", offline: "Offline", active: "Aktiv",
@@ -627,6 +638,7 @@ driverUber: { title: "Von Uber", hint: "Leistungskennzahlen, wie Uber sie für d
   },
   dashboard: {
     onlineTitle: "Fahrer online", online: "Online", onTrip: "Auf Fahrt", onlineNone: "Gerade sind keine Fahrer online.", refresh: "Aktualisieren",
+    greeting: "Guten Tag, {name}", fleetDayLine: "{date} · Flottentag seit 04:00 Uhr", viewOffers: "Angebote ansehen", fullscreen: "Vollbild", mapSub: "{n} Fahrer aktiv", statOnlineFoot: "von {n} Fahrern", statOffersFoot: "seit 04:00 Uhr", statDriversFoot: "aus Uber", fleetSynced: "Synchronisiert {date}",
     subTitle: "Abonnement", subActive: "Aktiv", subInactive: "Aktivierung nötig", subDaysLeft: "{n} Tage übrig", subDaysShort: "Tage übrig", subActivated: "Aktiviert", subEnds: "Verlängert / endet", redeemCode: "Code eingeben", subQueued: "in Warteschlange · ab",
     statDrivers: "Fahrer", statOnline: "Jetzt online", statVehicles: "Fahrzeuge", offersTrend: "Angebote · letzte 7 Tage",
     statLinked: "Mit Uber verknüpft",
@@ -716,6 +728,7 @@ driverUber: { title: "من أوبر", hint: "مقاييس الأداء كما ي
     colRider: "الراكب",
     close: "إغلاق",
     stops: "محطات", multiStop: "متعدد النقاط", dropoffs: "نقاط تسليم", total: "إجمالي",
+    routeTitle: "المسار", stopPickup: "الاستلام", stopDropoff: "التسليم", stopDestination: "الوجهة",
     acceptWindow: "مهلة القبول",
     rawPayload: "كل البيانات الخام",
     distance: "المسافة",
@@ -744,6 +757,10 @@ driverUber: { title: "من أوبر", hint: "مقاييس الأداء كما ي
     linkedToast: "تم ربط السائق",
     linkedToastDesc: "تم إسناد {count} عروض سابقة.",
     linkFailed: "فشل الربط",
+  },
+  remake: {
+    suspendedTitle: "الدخول موقوف", suspendedSub: "حسابك غير نشط حالياً.",
+    email: "البريد الإلكتروني", inviteTitle: "دعوة السائق؟", inviteAgainTitle: "إعادة إرسال الدعوة؟", inviteBody: "تُرسل دعوة تطبيق Reidey بالبريد إلى {email}. بعدها يسجّل السائق الدخول بكود بدون كلمة مرور.", inviteSend: "دعوة", inviteAgain: "إعادة إرسال", subInfo: "تُضاف الفترة الجديدة بعد فترتك الحالية. يبقى مرجع الدفع ثابتاً لشركتك دائماً.", subHistory: "سجل الاشتراكات", subHistorySub: "الباقة والكود والمحصّل وحالة كل فترة.", daysLeft: "يوم متبقٍ", subStatus: "الاشتراك", subActivated: "تاريخ التفعيل", subEnds: "ينتهي", daysShort: "يوم",
   },
   map: {
     activeTrips: "رحلة نشطة", enRoute: "رايح يستلم", onTrip: "على رحلة", online: "أونلاين", offline: "أوفلاين", active: "نشط",
@@ -943,6 +960,7 @@ driverUber: { title: "من أوبر", hint: "مقاييس الأداء كما ي
   },
   dashboard: {
     onlineTitle: "السائقين أونلاين", online: "أونلاين", onTrip: "على رحلة", onlineNone: "ما في سائقين أونلاين حالياً.", refresh: "تحديث",
+    greeting: "أهلاً، {name}", fleetDayLine: "{date} · يوم الأسطول من 04:00", viewOffers: "عرض العروض", fullscreen: "ملء الشاشة", mapSub: "{n} سائق نشط", statOnlineFoot: "من {n} سائق", statOffersFoot: "منذ 04:00", statDriversFoot: "من أوبر", fleetSynced: "تمت المزامنة {date}",
     subTitle: "الاشتراك", subActive: "نشط", subInactive: "يحتاج تفعيل", subDaysLeft: "باقي {n} يوم", subDaysShort: "يوم باقي", subActivated: "تاريخ التفعيل", subEnds: "التجديد / الانتهاء", redeemCode: "إدخال كود", subQueued: "بالانتظار · يبدأ",
     statDrivers: "السائقون", statOnline: "أونلاين الآن", statVehicles: "المركبات", offersTrend: "العروض · آخر 7 أيام",
     statLinked: "مربوطون بأوبر",

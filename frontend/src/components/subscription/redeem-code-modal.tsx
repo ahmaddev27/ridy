@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
-import { Button } from "@/components/ui/button";
+import { Check } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { digitsOnly } from "@/lib/utils";
 import { redeemSubscriptionCode } from "@/lib/api/company-subscription";
@@ -45,24 +45,34 @@ export function RedeemCodeModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={c("redeemTitle")}>
-      <div className="space-y-4">
-        <p className="text-sm text-ink-muted">{c("redeemHint")}</p>
-        <div>
-          <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-ink-subtle">{c("codeLabel")}</label>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={c("redeemTitle")}
+      footer={
+        <button type="button" className="btn btn-primary" onClick={redeem} disabled={code.length !== 6 || submitting}>
+          <Check />
+          {c("activate")}
+        </button>
+      }
+    >
+      <div className="stack">
+        <p className="muted text-sm">{c("redeemHint")}</p>
+        <div className="field">
+          <label htmlFor="redeem-code">{c("codeLabel")}</label>
           <input
+            id="redeem-code"
             value={code}
             onChange={(e) => setCode(digitsOnly(e.target.value).slice(0, 6))}
             onKeyDown={(e) => e.key === "Enter" && redeem()}
             inputMode="numeric"
             placeholder="123456"
             autoFocus
-            className="ui-field w-full rounded-lg border border-line bg-surface px-3 py-2 text-center text-lg font-semibold tracking-[0.3em] tabular-nums text-ink outline-none focus:border-ink"
+            dir="ltr"
+            className="input num"
+            style={{ textAlign: "center", fontSize: 20, fontWeight: 600, letterSpacing: "0.3em" }}
           />
         </div>
-        <Button onClick={redeem} disabled={code.length !== 6 || submitting} className="w-full justify-center">
-          {c("activate")}
-        </Button>
       </div>
     </Modal>
   );

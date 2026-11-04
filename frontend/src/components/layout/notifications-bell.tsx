@@ -62,31 +62,28 @@ export function NotificationsBell({
     >
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative rounded-lg p-2 text-ink-muted hover:bg-surface-2"
+        type="button"
+        className="icon-btn"
         aria-label={t("screens.notifications.title") || "Notifications"}
       >
-        <Bell className="h-5 w-5" />
-        {unread > 0 && (
-          <span className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-ring px-1 text-[10px] font-bold text-white">
-            {unread > 9 ? "9+" : unread}
-          </span>
-        )}
+        <Bell />
+        {unread > 0 && <span className="pip" />}
       </button>
 
       {open && (
         <div
-          className="app-menu absolute end-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-line bg-surface text-start shadow-xl"
+          className="menu end-0 top-full z-50 mt-2 w-[380px] max-w-[calc(100vw-24px)] overflow-hidden p-0 text-start"
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
         >
-          <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
+          <div className="np-head">
             <span className="text-sm font-semibold text-ink">{t("screens.notifications.title")}</span>
             {unread > 0 && (
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleMarkAllRead}
                   disabled={marking}
-                  className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                  className="link text-sm disabled:opacity-50"
                 >
                   {t("screens.notifications.markAllRead")}
                 </button>
@@ -108,7 +105,7 @@ export function NotificationsBell({
                     key={n.id}
                     href={href || "/notifications"}
                     onClick={() => setOpen(false)}
-                    className={cn("flex items-start gap-3 px-4 py-3 transition-colors hover:bg-surface-2", !n.read && "bg-surface-2/40")}
+                    className={cn("notif-item", !n.read && "unread")}
                   >
                     <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full", chip)}>
                       <Icon className="h-4 w-4" />

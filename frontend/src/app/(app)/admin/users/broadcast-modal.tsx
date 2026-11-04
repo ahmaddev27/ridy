@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { Send } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import { apiErrorMessage } from "@/lib/api/error-message";
 import { Modal } from "@/components/ui/modal";
@@ -79,17 +80,14 @@ export function BroadcastModal({
   }
 
   const audienceBtn = (mode: Audience, label: string) => (
-    <button
-      type="button"
-      onClick={() => setAudience(mode)}
-      className={
-        "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors " +
-        (audience === mode ? "bg-primary text-primary-ink" : "bg-surface-2 text-ink-muted hover:bg-surface-2")
-      }
-    >
+    <button type="button" onClick={() => setAudience(mode)} className={audience === mode ? "on" : ""} aria-pressed={audience === mode}>
       {label}
     </button>
   );
+
+  const names = selected.map((u) => u.name);
+  const selectedHint =
+    selected.length === 0 ? t("selectHint") : selected.length <= 3 ? names.join(", ") : t("selectedCount").replace("{n}", String(selected.length));
 
   return (
     <Modal
@@ -99,36 +97,30 @@ export function BroadcastModal({
       size="lg"
       footer={
         <>
-          <button
-            onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-ink-muted hover:bg-surface-2"
-          >
+          <button type="button" onClick={onClose} className="btn btn-secondary">
             {t("cancel")}
           </button>
-          <button
-            onClick={submit}
-            disabled={!canSubmit || busy}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-ink disabled:opacity-50"
-          >
+          <button type="button" onClick={submit} disabled={!canSubmit || busy} className="btn btn-primary">
+            <Send />
             {t("submit")}
           </button>
         </>
       }
     >
-      <div className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-ink">{t("audience")}</label>
-          <div className="flex flex-wrap gap-1.5">
+      <div className="stack">
+        <div className="field">
+          <span className="strong text-sm">{t("audience")}</span>
+          <div className="seg self-start" role="group" aria-label={t("audience")}>
             {audienceBtn("all", t("audAll"))}
             {audienceBtn("role", t("audRole"))}
             {audienceBtn("selected", `${t("audSelected")} (${selected.length})`)}
           </div>
-          {audience === "role" && (
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="ui-field mt-2 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
-            >
+          {audience === "selected" && <span className="hint">{selectedHint}</span>}
+        </div>
+
+        {audience === "role" && (
+          <div className="field">
+            <select value={role} onChange={(e) => setRole(e.target.value)} className="select" aria-label={t("audRole")}>
               <option value="">{t("selectRolePlaceholder")}</option>
               {ROLES.map((r) => (
                 <option key={r} value={r}>
@@ -136,41 +128,22 @@ export function BroadcastModal({
                 </option>
               ))}
             </select>
-          )}
-          {audience === "selected" && selected.length === 0 && (
-            <p className="mt-2 text-xs text-ink-subtle">{t("selectHint")}</p>
-          )}
+          </div>
+        )}
+
+        <div className="field">
+          <label>{t("fieldTitle")}</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} className="input" />
         </div>
 
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-ink">{t("fieldTitle")}</label>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={120}
-            className="ui-field w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
-          />
+        <div className="field">
+          <label>{t("fieldBody")}</label>
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} rows={4} className="textarea" />
         </div>
 
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-ink">{t("fieldBody")}</label>
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            maxLength={2000}
-            rows={4}
-            className="ui-field w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-ink">{t("fieldHref")}</label>
-          <input
-            value={href}
-            onChange={(e) => setHref(e.target.value)}
-            placeholder={t("hrefPlaceholder")}
-            className="ui-field w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
-          />
+        <div className="field">
+          <label>{t("fieldHref")}</label>
+          <input value={href} onChange={(e) => setHref(e.target.value)} placeholder={t("hrefPlaceholder")} className="input" dir="ltr" />
         </div>
       </div>
     </Modal>

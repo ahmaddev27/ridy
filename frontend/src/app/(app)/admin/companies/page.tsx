@@ -5,11 +5,11 @@ import { latnLocale } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Building2, Trash2, ChevronLeft, ChevronRight, Power, PowerOff } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Building2, Trash2, Power, PowerOff } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
 import { Badge, type Status } from "@/components/ui/badge";
-import { PageHeader } from "@/components/ui/page-header";
+import { Pager } from "@/components/ui/pager";
+import { Table, TableCard } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Switch } from "@/components/ui/switch";
@@ -183,11 +183,16 @@ export default function CompaniesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader tkey="companies" />
+    <div className="stack-lg">
+      <header className="ph">
+        <div>
+          <h1>{t("pages.companies.title")}</h1>
+          <p>{t("pages.companies.subtitle")}</p>
+        </div>
+      </header>
 
-      {/* Toolbar: search + rows-per-page */}
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Toolbar: search + filter chips */}
+      <div className="toolbar">
         <SearchInput
           value={search}
           onChange={(v) => {
@@ -196,34 +201,29 @@ export default function CompaniesPage() {
           }}
           placeholder={c("searchPlaceholder")}
         />
+        <div className="row-wrap" role="group" aria-label={c("filter_all")}>
+          {(["all", "linked", "expired", "banned"] as Filter[]).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => {
+                setFilter(f);
+                setPage(1);
+              }}
+              className={"chip" + (filter === f ? " on" : "")}
+              aria-pressed={filter === f}
+            >
+              {c(`filter_${f}`)} <span className="n">{counts[f].toLocaleString(latnLocale(locale))}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Filter chips */}
-      <div className="flex flex-wrap gap-2">
-        {(["all", "linked", "expired", "banned"] as Filter[]).map((f) => (
-          <button
-            key={f}
-            onClick={() => {
-              setFilter(f);
-              setPage(1);
-            }}
-            className={
-              "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors " +
-              (filter === f
-                ? "border-ink bg-primary text-primary-ink"
-                : "border-line bg-surface text-ink-muted hover:bg-surface-2")
-            }
-          >
-            {c(`filter_${f}`)} <span className="opacity-60">{counts[f]}</span>
-          </button>
-        ))}
-      </div>
-
-      <Card className="overflow-hidden">
+      <TableCard>
         {loading ? (
-          <div className="space-y-2 p-4">
+          <div className="stack p-4">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded bg-surface-2" />
+              <div key={i} className="skel" style={{ height: 52 }} />
             ))}
           </div>
         ) : error ? (
@@ -231,170 +231,150 @@ export default function CompaniesPage() {
         ) : companies.length === 0 ? (
           <EmptyState icon={Building2} title={c("emptyTitle")} description={c("emptyDesc")} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">{c("colName")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colStatus")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colSession")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colElProfessor")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colDispatchReject")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colDrivers")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colOffers")}</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {companies.map((co) => (
-                  <tr
-                    key={co.id}
-                    onClick={() => router.push(`/admin/companies/${co.id}`)}
-                    className="cursor-pointer hover:bg-surface-2"
-                  >
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/admin/companies/${co.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="font-medium text-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
-                      >
-                        {co.name}
-                      </Link>
-                      <div className="flex items-center gap-2 text-xs text-ink-subtle">
-                        <span>{co.country ?? "—"}</span>
-                        {co.payment_reference && (
-                          <span className="font-mono" dir="ltr">· {co.payment_reference}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col items-start gap-1">
-                        <Badge status={subActive(co) ? "connected" : "error"} dot>
-                          {subActive(co) ? c("subOk") : c("subNone")}
-                        </Badge>
-                        {co.subscription_ends_at && (
-                          <span className="text-[11px] text-ink-subtle">
-                            {new Date(co.subscription_ends_at).toLocaleDateString(latnLocale(locale))}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {co.session_status ? (
-                        <Badge status={sessionTone[co.session_status] ?? "gap"} dot>
-                          {c(`session_${co.session_status}`)}
-                        </Badge>
-                      ) : (
-                        <span className="text-ink-subtle">{c("noSession")}</span>
+          <Table>
+            <thead>
+              <tr>
+                <th>{c("colName")}</th>
+                <th>{c("colStatus")}</th>
+                <th>{c("colSession")}</th>
+                <th>{c("colElProfessor")}</th>
+                <th>{c("colDispatchReject")}</th>
+                <th className="r">{c("colDrivers")}</th>
+                <th className="r">{c("colOffers")}</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {companies.map((co) => (
+                <tr
+                  key={co.id}
+                  onClick={() => router.push(`/admin/companies/${co.id}`)}
+                  className="cursor-pointer"
+                >
+                  <td>
+                    <Link
+                      href={`/admin/companies/${co.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="strong outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
+                    >
+                      {co.name}
+                    </Link>
+                    <div className="subtle text-xs">
+                      {co.country ?? "—"}
+                      {co.payment_reference && (
+                        <span className="mono" dir="ltr"> · {co.payment_reference}</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      {/* The switch is `enabled`, the platform's own decision.
-                          The word beside it is the second fact the switch
-                          cannot carry: whether the company has actually
-                          completed the link. A company can be open and not yet
-                          connected, and that is precisely the row the operator
-                          is looking for — the one that still owes the paste. */}
-                      <div className="flex items-center gap-2.5">
-                        <Switch
-                          checked={co.elprofessor_enabled}
-                          onChange={() => toggleElProfessor(co)}
-                          disabled={epBusy}
-                          label={co.elprofessor_enabled ? c("epClose") : c("epOpen")}
-                        />
-                        <span
-                          className={
-                            "whitespace-nowrap text-xs " +
-                            (!co.elprofessor_enabled
-                              ? "text-ink-subtle"
-                              : co.elprofessor_connected
-                                ? "text-success-fg"
-                                : // amber: open, and still waiting on the company
-                                  "text-warning-fg")
-                          }
-                        >
-                          {!co.elprofessor_enabled
-                            ? c("epClosed")
-                            : co.elprofessor_connected
-                              ? c("epConnected")
-                              : c("epOpenNotLinked")}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="stack-sm" style={{ alignItems: "flex-start", gap: 4 }}>
+                      <Badge status={subActive(co) ? "connected" : "error"} dot>
+                        {subActive(co) ? c("subOk") : c("subNone")}
+                      </Badge>
+                      {co.subscription_ends_at && (
+                        <span className="subtle text-xs num">
+                          {new Date(co.subscription_ends_at).toLocaleDateString(latnLocale(locale))}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      )}
+                      {co.banned && <Badge status="error">{c("sub_banned")}</Badge>}
+                      {!co.banned && co.state === "expired" && <Badge status="expiring">{c("sub_expired")}</Badge>}
+                    </div>
+                  </td>
+                  <td>
+                    {co.session_status ? (
+                      <Badge status={sessionTone[co.session_status] ?? "gap"} dot>
+                        {c(`session_${co.session_status}`)}
+                      </Badge>
+                    ) : (
+                      <span className="muted">{c("noSession")}</span>
+                    )}
+                  </td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    {/* The switch is `enabled`, the platform's own decision.
+                        The word beside it is the second fact the switch
+                        cannot carry: whether the company has actually
+                        completed the link. A company can be open and not yet
+                        connected, and that is precisely the row the operator
+                        is looking for — the one that still owes the paste. */}
+                    <div className="row-wrap" style={{ gap: 10, flexWrap: "nowrap" }}>
+                      <Switch
+                        checked={co.elprofessor_enabled}
+                        onChange={() => toggleElProfessor(co)}
+                        disabled={epBusy}
+                        label={co.elprofessor_enabled ? c("epClose") : c("epOpen")}
+                      />
+                      <span
+                        className={
+                          "nowrap text-xs " +
+                          (!co.elprofessor_enabled
+                            ? "subtle"
+                            : co.elprofessor_connected
+                              ? "pos"
+                              : // amber: open, and still waiting on the company
+                                "warn")
+                        }
+                      >
+                        {!co.elprofessor_enabled
+                          ? c("epClosed")
+                          : co.elprofessor_connected
+                            ? c("epConnected")
+                            : c("epOpenNotLinked")}
+                      </span>
+                    </div>
+                  </td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <div className="row-wrap" style={{ gap: 10, flexWrap: "nowrap" }}>
                       <Switch
                         checked={co.dispatch_reject_enabled}
                         onChange={() => toggleDispatchReject(co)}
                         disabled={drBusy}
                         label={co.dispatch_reject_enabled ? c("drOff") : c("drOn")}
                       />
-                    </td>
-                    <td className="px-4 py-3 text-ink-muted">{co.driver_count.toLocaleString(latnLocale(locale))}</td>
-                    <td className="px-4 py-3 text-ink-muted">{co.offer_count.toLocaleString(latnLocale(locale))}</td>
-                    <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => toggleActive(co)}
-                          className={
-                            "rounded p-1.5 " +
-                            (co.status === "active"
-                              ? "text-ink-subtle hover:bg-warning-bg hover:text-warning-fg"
-                              : "text-ink-subtle hover:bg-success-bg hover:text-success-fg")
-                          }
-                          title={co.status === "active" ? c("disableCompany") : c("enableCompany")}
-                        >
-                          {co.status === "active" ? (
-                            <PowerOff className="h-4 w-4" />
-                          ) : (
-                            <Power className="h-4 w-4" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => setConfirmDel(co)}
-                          className="rounded p-1.5 text-ink-subtle hover:bg-danger-bg hover:text-danger-fg"
-                          title={c("deleteCompany")}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      <span className={"text-xs " + (co.dispatch_reject_enabled ? "pos" : "subtle")}>
+                        {co.dispatch_reject_enabled ? c("stateOn") : c("stateOff")}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="r num">{co.driver_count.toLocaleString(latnLocale(locale))}</td>
+                  <td className="r num">{co.offer_count.toLocaleString(latnLocale(locale))}</td>
+                  <td className="r" onClick={(e) => e.stopPropagation()}>
+                    <div className="row-actions">
+                      <button
+                        type="button"
+                        onClick={() => toggleActive(co)}
+                        className="icon-btn"
+                        title={co.status === "active" ? c("disableCompany") : c("enableCompany")}
+                        aria-label={co.status === "active" ? c("disableCompany") : c("enableCompany")}
+                      >
+                        {co.status === "active" ? <PowerOff /> : <Power />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDel(co)}
+                        className="icon-btn"
+                        title={c("deleteCompany")}
+                        aria-label={c("deleteCompany")}
+                      >
+                        <Trash2 />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
         )}
 
-        {/* Pagination */}
         {filtered.length > perPage && (
-          <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm">
-            <span className="text-ink-muted">
+          <div className="tbl-foot">
+            <span className="num">
               {(pageClamped - 1) * perPage + 1}–{Math.min(pageClamped * perPage, filtered.length)} {c("of")}{" "}
               {filtered.length}
             </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={pageClamped <= 1}
-                className="rounded-lg border border-line p-1.5 text-ink-muted hover:bg-surface-2 disabled:opacity-40"
-              >
-                <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
-              </button>
-              <span className="px-2 text-ink-muted">
-                {pageClamped} / {lastPage}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
-                disabled={pageClamped >= lastPage}
-                className="rounded-lg border border-line p-1.5 text-ink-muted hover:bg-surface-2 disabled:opacity-40"
-              >
-                <ChevronRight className="h-4 w-4 rtl:rotate-180" />
-              </button>
-            </div>
+            <Pager page={pageClamped} lastPage={lastPage} onPage={setPage} />
           </div>
         )}
-      </Card>
-
+      </TableCard>
 
       <ConfirmModal
         open={confirmDel !== null}

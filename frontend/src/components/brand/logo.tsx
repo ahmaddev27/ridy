@@ -3,12 +3,12 @@
  * A single filled path driven by `currentColor`, so it adopts the parent's
  * text colour (black in the app, white on the dark email/app tile).
  */
-export function Logo({ size = 32, className }: { size?: number; className?: string }) {
+export function Logo({ size = 32, className, tight = false }: { size?: number; className?: string; tight?: boolean }) {
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 963 1024"
+      viewBox={tight ? "215 245 530 530" : "0 0 963 1024"}
       className={className}
       role="img"
       aria-label="Reidey"

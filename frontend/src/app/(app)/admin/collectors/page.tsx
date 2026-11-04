@@ -5,10 +5,8 @@ import { latnLocale } from "@/lib/utils";
 import { toast } from "sonner";
 import { Plus, Loader2, Banknote, Trash2, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { PasswordInput } from "@/components/ui/password-input";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
@@ -53,58 +51,64 @@ export default function CollectorsPage() {
   const money = (n: number) => new Intl.NumberFormat(latnLocale(locale), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
   return (
-    <div className="space-y-6">
+    <div className="stack-lg">
       <PageHeader
         tkey="collectors"
         action={
-          <Button onClick={() => setEditing("new")}>
-            <Plus className="h-4 w-4" /> {c("add")}
-          </Button>
+          <button type="button" onClick={() => setEditing("new")} className="btn btn-primary">
+            <Plus /> {c("add")}
+          </button>
         }
       />
 
       {/* Collectors + totals derived from the paid codes they issued */}
-      <Card className="overflow-hidden">
+      <Card className="table-card">
         {loading ? (
-          <div className="space-y-2 p-4">
+          <div className="stack-sm p-4">
             {[0, 1].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded bg-surface-2" />
+              <div key={i} className="skel h-14" />
             ))}
           </div>
         ) : collectors.length === 0 ? (
-          <EmptyState icon={Banknote} title={c("emptyTitle")} description={c("emptyDesc")} />
+          <div className="empty">
+            <div className="empty-ico">
+              <Banknote className="h-6 w-6" />
+            </div>
+            <h3>{c("emptyTitle")}</h3>
+            <p>{c("emptyDesc")}</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
+          <div className="table-wrap">
+            <table className="tbl">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 font-semibold">{c("colName")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colPhone")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colTotal")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colCount")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colLast")}</th>
-                  <th className="px-4 py-3" />
+                  <th>{c("colName")}</th>
+                  <th>{c("colPhone")}</th>
+                  <th className="r">{c("colTotal")}</th>
+                  <th className="r">{c("colCount")}</th>
+                  <th>{c("colLast")}</th>
+                  <th />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {collectors.map((col) => (
-                  <tr key={col.id} className="hover:bg-surface-2">
-                    <td className="px-4 py-3 font-medium text-ink">{col.name}</td>
-                    <td className="px-4 py-3 text-start text-ink-muted whitespace-nowrap">
-                      <span dir="ltr">{col.phone || c("noneShort")}</span>
+                  <tr key={col.id}>
+                    <td className="strong">{col.name}</td>
+                    <td className="nowrap">
+                      {col.phone ? <bdi dir="ltr" className="num">{col.phone}</bdi> : <span className="subtle">{c("noneShort")}</span>}
                     </td>
-                    <td className="px-4 py-3 font-semibold text-ink">{money(col.total_collected)}</td>
-                    <td className="px-4 py-3 text-ink-muted">{col.payments_count}</td>
-                    <td className="px-4 py-3 text-ink-muted">
-                      {col.last_paid_on ? new Date(col.last_paid_on).toLocaleDateString(latnLocale(locale)) : c("noneShort")}
+                    <td className="r strong num">{money(col.total_collected)}</td>
+                    <td className="r num">{col.payments_count}</td>
+                    <td className="num">
+                      {col.last_paid_on ? new Date(col.last_paid_on).toLocaleDateString(latnLocale(locale)) : <span className="subtle">{c("noneShort")}</span>}
                     </td>
-                    <td className="px-4 py-3 text-end">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => setEditing(col)} className="rounded p-1.5 text-ink-subtle hover:bg-surface-2 hover:text-ink" title={c("edit")}>
-                          <Pencil className="h-4 w-4" />
+                    <td>
+                      <div className="row-actions">
+                        <button type="button" onClick={() => setEditing(col)} className="btn btn-ghost btn-icon btn-sm" title={c("edit")} aria-label={c("edit")}>
+                          <Pencil />
                         </button>
-                        <button onClick={() => setConfirmDel(col)} className="rounded p-1.5 text-ink-subtle hover:bg-danger-bg hover:text-danger-fg" title={c("delete")}>
-                          <Trash2 className="h-4 w-4" />
+                        <button type="button" onClick={() => setConfirmDel(col)} className="btn btn-ghost btn-icon btn-sm" title={c("delete")} aria-label={c("delete")}>
+                          <Trash2 />
                         </button>
                       </div>
                     </td>
@@ -175,24 +179,25 @@ function CollectorModal({ collector, onClose, onSaved }: { collector: Collector 
       title={collector ? c("edit") : c("add")}
       footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose} disabled={busy}>{c("cancel")}</Button>
-          <Button onClick={save} disabled={busy || !name.trim()}>
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />}{c("save")}
-          </Button>
+          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={busy}>{c("cancel")}</button>
+          <button type="button" className="btn btn-primary" onClick={save} disabled={busy || !name.trim()}>
+            {busy && <Loader2 className="animate-spin" />}{c("save")}
+          </button>
         </div>
       }
     >
-      <div className="space-y-3 text-start">
+      <div className="stack text-start">
         <Field label={c("fieldName")} value={name} onChange={setName} />
         <Field label={c("fieldPhone")} value={phone} onChange={setPhone} mono />
         <Field label={c("fieldAddress")} value={address} onChange={setAddress} />
-        <div className="border-t border-line pt-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">{c("loginSection")}</p>
-          <div className="grid grid-cols-2 gap-3">
+        <hr className="sep" />
+        <div className="stack-sm">
+          <p className="strong text-sm">{c("loginSection")}</p>
+          <div className="grid g-2">
             <Field label={c("fieldEmail")} value={email} onChange={setEmail} mono />
             <Field label={c("fieldPassword")} value={password} onChange={setPassword} type="password" placeholder={collector?.has_login ? "••••••" : ""} />
           </div>
-          <p className="mt-1 text-xs text-ink-subtle">{c("loginHint")}</p>
+          <p className="subtle text-sm">{c("loginHint")}</p>
         </div>
       </div>
     </Modal>
@@ -215,8 +220,8 @@ function Field({
   placeholder?: string;
 }) {
   return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
+    <div className="field">
+      <label>{label}</label>
       {type === "password" ? (
         <PasswordInput
           value={value}
@@ -232,7 +237,8 @@ function Field({
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
           autoComplete="off"
-          className={`ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ${mono ? "font-mono text-xs" : ""}`}
+          className={`input ${mono ? "mono" : ""}`}
+          dir={mono ? "ltr" : undefined}
         />
       )}
     </div>

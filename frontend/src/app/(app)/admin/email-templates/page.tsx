@@ -21,10 +21,10 @@ import {
   Link2,
   Image as ImageIcon,
   Braces,
+  Pencil,
+  Eye,
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
 import { useI18n } from "@/lib/i18n/context";
 import { isSafeUrl, sanitizeTemplateHtml } from "@/lib/sanitize-html";
 import {
@@ -141,39 +141,46 @@ export default function EmailTemplatesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader tkey="emailTemplates" />
+    <div className="stack-lg">
+      <header className="ph">
+        <div>
+          <h1>{t("pages.emailTemplates.title")}</h1>
+          <p>{t("pages.emailTemplates.subtitle")}</p>
+        </div>
+      </header>
 
-      {/* Template switcher — a single horizontal scroll row so each chip keeps its
-          full width instead of cramming/wrapping. */}
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2">
+      <div role="group" aria-label={c("chooseTemplate")} className="flex gap-1.5 overflow-x-auto pb-1">
         {templates.map((tpl) => (
           <button
             key={tpl.key}
+            type="button"
             onClick={() => loadInto(tpl)}
-            className={`shrink-0 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium ${
-              tpl.key === activeKey ? "bg-primary text-primary-ink" : "bg-surface text-ink-muted hover:bg-surface-2 border border-line"
-            }`}
+            className={"chip shrink-0" + (tpl.key === activeKey ? " on" : "")}
           >
             {c(`type_${tpl.key}`)}
           </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         {/* Editor */}
-        <Card className="space-y-4 p-5">
+        <section className="card">
+          <div className="card-head">
+            <h2 className="row" style={{ gap: 8 }}><Pencil className="subtle h-4 w-4" />{c("editTitle")}</h2>
+          </div>
+          <div className="card-body stack">
           <Field label={c("subject")} value={subject} onChange={setSubject} />
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">{c("body")}</label>
+          <div className="field">
+            <label>{c("body")}</label>
+            <div className="overflow-hidden rounded-[var(--r-lg)] border border-line bg-surface">
             {/* Toolbar */}
-            <div className="flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 border-line-strong bg-surface-2 p-1.5">
+            <div className="flex flex-wrap items-center gap-0.5 border-b border-line bg-surface-2 p-1.5">
               <ToolBtn onClick={() => exec("bold")} title={c("tool_bold")}><Bold className="h-4 w-4" /></ToolBtn>
               <ToolBtn onClick={() => exec("italic")} title={c("tool_italic")}><Italic className="h-4 w-4" /></ToolBtn>
               <ToolBtn onClick={() => exec("underline")} title={c("tool_underline")}><Underline className="h-4 w-4" /></ToolBtn>
               <ToolBtn onClick={() => exec("strikeThrough")} title={c("tool_strike")}><Strikethrough className="h-4 w-4" /></ToolBtn>
-              <span className="mx-1 h-5 w-px bg-line-strong" />
+              <span className="mx-1 h-5 w-px bg-line" />
               <select
                 onChange={(e) => {
                   if (e.target.value) exec("fontSize", e.target.value);
@@ -181,7 +188,7 @@ export default function EmailTemplatesPage() {
                 }}
                 defaultValue=""
                 title={c("fontSize")}
-                className="ui-field rounded border border-line bg-surface px-1.5 py-1 text-xs text-ink"
+                className="h-[30px] rounded-lg border border-line bg-surface px-1.5 text-xs text-ink"
               >
                 <option value="" disabled>
                   {c("fontSize")}
@@ -197,25 +204,27 @@ export default function EmailTemplatesPage() {
               <ToolBtn onClick={() => exec("formatBlock", "H2")} title={c("tool_h2")}><Heading2 className="h-4 w-4" /></ToolBtn>
               <ToolBtn onClick={() => exec("insertUnorderedList")} title={c("tool_ul")}><List className="h-4 w-4" /></ToolBtn>
               <ToolBtn onClick={() => exec("insertOrderedList")} title={c("tool_ol")}><ListOrdered className="h-4 w-4" /></ToolBtn>
-              <span className="mx-1 h-5 w-px bg-line-strong" />
+              <span className="mx-1 h-5 w-px bg-line" />
               <ToolBtn onClick={() => exec("justifyLeft")} title={c("tool_alignLeft")}><AlignLeft className="h-4 w-4" /></ToolBtn>
               <ToolBtn onClick={() => exec("justifyCenter")} title={c("tool_alignCenter")}><AlignCenter className="h-4 w-4" /></ToolBtn>
               <ToolBtn onClick={() => exec("justifyRight")} title={c("tool_alignRight")}><AlignRight className="h-4 w-4" /></ToolBtn>
-              <span className="mx-1 h-5 w-px bg-line-strong" />
+              <span className="mx-1 h-5 w-px bg-line" />
               <ToolBtn onClick={addLink} title={c("tool_link")}><Link2 className="h-4 w-4" /></ToolBtn>
-              <label className="cursor-pointer rounded p-1.5 text-ink-muted hover:bg-surface-2" title={c("insertImage")}>
+              <label className="icon-btn !h-[30px] !w-[30px] cursor-pointer" title={c("insertImage")}>
                 <ImageIcon className="h-4 w-4" />
                 <input type="file" accept="image/*" className="hidden" onChange={onImage} />
               </label>
               <ToolBtn onClick={() => exec("undo")} title={c("tool_undo")}><Undo2 className="h-4 w-4" /></ToolBtn>
               <ToolBtn onClick={() => exec("redo")} title={c("tool_redo")}><Redo2 className="h-4 w-4" /></ToolBtn>
-              <span className="mx-1 h-5 w-px bg-line-strong" />
-              <span className="px-1 text-xs font-medium text-ink-subtle">{c("variablesLabel")}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-line px-2.5 py-2 text-[12.5px] text-ink-subtle">
+              <span>{c("variablesLabel")}</span>
               {(active?.variables ?? []).map((v) => (
                 <button
                   key={v}
+                  type="button"
                   onClick={() => insertVariable(v)}
-                  className="flex items-center gap-1 rounded bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20"
+                  className="mono inline-flex h-6 items-center gap-1 rounded-full bg-info-bg px-2 text-xs font-semibold text-info-fg"
                   title={c("insertVariable")}
                 >
                   <Braces className="h-3 w-3" /> {v}
@@ -227,20 +236,21 @@ export default function EmailTemplatesPage() {
               contentEditable
               onInput={schedulePreview}
               suppressContentEditableWarning
-              className="min-h-[220px] rounded-b-lg border border-line-strong p-3 text-sm leading-relaxed outline-none focus:border-ink [&_a]:text-ink [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-bold"
+              className="min-h-[220px] p-3.5 text-sm leading-relaxed outline-none focus-visible:shadow-[inset_0_0_0_2px_var(--primary)] [&_a]:text-ink [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-bold"
             />
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">{c("accent")}</label>
-              <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)} className="h-9 w-full rounded-lg border border-line-strong" />
+          <div className="form-grid">
+            <div className="field">
+              <label>{c("accent")}</label>
+              <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)} className="input" style={{ padding: 3, height: 40 }} />
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">{c("logo")}</label>
-              <div className="flex h-9 items-center gap-2 rounded-lg border border-dashed border-line px-3 text-xs text-ink-subtle">
-                <span className="flex h-5 w-5 items-center justify-center rounded bg-primary text-[10px] font-bold text-primary-ink">R</span>
-                {c("logoAuto")}
+            <div className="field">
+              <label>{c("logo")}</label>
+              <div className="dropzone row justify-center" style={{ gap: 10, padding: 8 }}>
+                <span className="grid h-7 w-7 place-items-center rounded-lg bg-info-bg text-[11px] font-bold text-info-fg">R</span>
+                <span className="text-sm">{c("logoAuto")}</span>
               </div>
             </div>
           </div>
@@ -253,14 +263,22 @@ export default function EmailTemplatesPage() {
               {c("save")}
             </Button>
           </div>
-        </Card>
+          </div>
+        </section>
 
         {/* Live preview */}
-        <Card className="p-5">
-          <h3 className="mb-3 text-sm font-semibold text-ink-muted">{c("preview")}</h3>
+        <section className="card lg:sticky lg:top-[76px]">
+          <div className="card-head">
+            <div>
+              <h2 className="row" style={{ gap: 8 }}><Eye className="subtle h-4 w-4" />{c("preview")}</h2>
+              <div className="sub">{c("previewSub")}</div>
+            </div>
+          </div>
+          <div className="card-body">
           {/* sandbox: the preview renders with an opaque origin and no scripts. */}
           <iframe title="preview" sandbox="" className="h-[520px] w-full rounded-lg border border-line" srcDoc={preview} />
-        </Card>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -268,7 +286,7 @@ export default function EmailTemplatesPage() {
 
 function ToolBtn({ onClick, title, children }: { onClick: () => void; title: string; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} title={title} className="rounded p-1.5 text-ink-muted hover:bg-surface-2">
+    <button type="button" onClick={onClick} title={title} aria-label={title} className="icon-btn !h-[30px] !w-[30px]">
       {children}
     </button>
   );
@@ -276,13 +294,9 @@ function ToolBtn({ onClick, title, children }: { onClick: () => void; title: str
 
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
-      />
+    <div className="field">
+      <label>{label}</label>
+      <input value={value} onChange={(e) => onChange(e.target.value)} className="input" />
     </div>
   );
 }

@@ -4,15 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { latnLocale } from "@/lib/utils";
 import { toast } from "sonner";
 import { Wallet, Clock, Download, ReceiptText, CheckCircle2, Loader2, AlertCircle, Package, Plus, Pencil, Trash2, FileText } from "lucide-react";
-import { Card, StatCard } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Table } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Pager } from "@/components/ui/pager";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Select } from "@/components/ui/select";
-import { Badge, type Status } from "@/components/ui/badge";
 import { CodeDetailModal } from "@/components/billing/code-detail-modal";
 import { paymentMethodLabel } from "@/lib/api/payments";
 import { useI18n } from "@/lib/i18n/context";
@@ -54,10 +52,10 @@ export default function ReportsPage() {
   const [codeDetail, setCodeDetail] = useState<SubscriptionInvoice | null>(null);
 
   // Code lifecycle → badge tone (matches the code-detail modal).
-  const CODE_TONE: Record<NonNullable<SubscriptionInvoice["code"]>["status"], Status> = {
-    activated: "matched",
-    pending: "expiring",
-    expired: "error",
+  const CODE_TONE: Record<NonNullable<SubscriptionInvoice["code"]>["status"], string> = {
+    activated: "success",
+    pending: "warning",
+    expired: "danger",
   };
 
   // Paged: older (incl. unpaid, still-to-settle) invoices stay reachable.
@@ -130,194 +128,216 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="stack-lg">
       <PageHeader tkey="subscriptions" />
 
       {/* Headline totals */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={Wallet} label={c("totalRevenue")} value={summary ? money(summary.totals.total_revenue) : "…"} tone="positive" />
-        <StatCard icon={AlertCircle} label={c("outstanding")} value={summary ? money(summary.totals.outstanding) : "…"} tone={summary?.totals.outstanding ? "warning" : "default"} />
-        <StatCard icon={CheckCircle2} label={c("activeSubs")} value={summary?.totals.active_subscriptions ?? "…"} tone="positive" />
-        <StatCard icon={Clock} label={c("expiringSoon")} value={summary?.totals.expiring_soon ?? "…"} tone="warning" />
+      <div className="g-4">
+        <Stat icon={Wallet} tone="success" label={c("totalRevenue")} value={summary ? money(summary.totals.total_revenue) : "…"} />
+        <Stat
+          icon={AlertCircle}
+          tone={summary?.totals.outstanding ? "warning" : undefined}
+          label={c("outstanding")}
+          value={summary ? money(summary.totals.outstanding) : "…"}
+        />
+        <Stat icon={CheckCircle2} tone="success" label={c("activeSubs")} value={summary?.totals.active_subscriptions ?? "…"} />
+        <Stat icon={Clock} tone="warning" label={c("expiringSoon")} value={summary?.totals.expiring_soon ?? "…"} />
       </div>
 
       {/* Plans — resellers issue codes against these */}
-      <Card className="overflow-hidden">
-        <div className="flex items-center justify-between border-b border-line p-4">
-          <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 text-ink" />
-            <h3 className="font-semibold text-ink">{c("plansTitle")}</h3>
-          </div>
-          <Button variant="secondary" onClick={() => setEditingPlan("new")}>
-            <Plus className="h-4 w-4" /> {c("addPlan")}
-          </Button>
+      <section className="card">
+        <div className="card-head">
+          <h2 className="row" style={{ gap: 8 }}>
+            <span className="subtle"><Package style={{ width: 18, height: 18 }} /></span>
+            {c("plansTitle")}
+          </h2>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingPlan("new")}>
+            <Plus /> {c("addPlan")}
+          </button>
         </div>
         {plans.length === 0 ? (
-          <p className="p-5 text-center text-sm text-ink-subtle">{c("noPlans")}</p>
+          <div className="empty">
+            <span className="empty-ico"><Package /></span>
+            <h3>{c("noPlans")}</h3>
+          </div>
         ) : (
-          <div className="divide-y divide-line">
+          <ul className="list-rows" style={{ margin: "14px 0 0", padding: 0, listStyle: "none" }}>
             {plans.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                <div className="flex items-center gap-3">
-                  <span className="font-medium text-ink">{p.name}</span>
-                  {!p.active && (
-                    <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-ink-muted">{c("planInactive")}</span>
-                  )}
+              <li key={p.id} className="list-row">
+                <div className="grow row" style={{ gap: 8 }}>
+                  <span className="strong">{p.name}</span>
+                  {!p.active && <span className="badge">{c("planInactive")}</span>}
                 </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="font-semibold tabular-nums text-ink">{money(p.price)}</span>
-                  <span className="tabular-nums text-ink-muted">{p.duration_days} {c("planDays")}</span>
-                  <button onClick={() => setEditingPlan(p)} className="rounded p-1.5 text-ink-subtle hover:bg-surface-2 hover:text-ink"><Pencil className="h-4 w-4" /></button>
-                  <button onClick={() => setDeletingPlan(p)} className="rounded p-1.5 text-ink-subtle hover:bg-danger-bg hover:text-danger-fg"><Trash2 className="h-4 w-4" /></button>
+                <span className="num strong">{money(p.price)}</span>
+                <span className="num subtle" style={{ minWidth: 64, textAlign: "end" }}>{p.duration_days} {c("planDays")}</span>
+                <div className="row" style={{ gap: 2 }}>
+                  <button type="button" className="btn btn-ghost btn-sm btn-icon" title={c("editPlan")} aria-label={c("editPlan")} onClick={() => setEditingPlan(p)}>
+                    <Pencil />
+                  </button>
+                  <button type="button" className="btn btn-ghost btn-sm btn-icon" style={{ color: "var(--danger-fg)" }} title={c("deletePlan")} aria-label={c("deletePlan")} onClick={() => setDeletingPlan(p)}>
+                    <Trash2 />
+                  </button>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
-      </Card>
+      </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="g-2" style={{ alignItems: "start" }}>
         {/* Revenue by month */}
-        <Card className="p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Wallet className="h-4 w-4 text-ink" />
-            <h3 className="font-semibold text-ink">{c("revenueTitle")}</h3>
+        <section className="card">
+          <div className="card-head">
+            <h2 className="row" style={{ gap: 8 }}>
+              <span className="subtle"><Wallet style={{ width: 18, height: 18 }} /></span>
+              {c("revenueTitle")}
+            </h2>
           </div>
-          {!summary || summary.revenue_by_month.length === 0 ? (
-            <p className="py-6 text-center text-sm text-ink-subtle">{c("revenueEmpty")}</p>
-          ) : (
-            <div className="space-y-2.5">
-              {summary.revenue_by_month.map((r) => (
-                <div key={r.month} className="flex items-center gap-3">
-                  <span className="w-16 shrink-0 text-xs tabular-nums text-ink-muted">{r.month}</span>
-                  <div className="h-3 flex-1 overflow-hidden rounded-full bg-surface-2">
-                    <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(r.total / maxRevenue) * 100}%` }} />
+          <div className="card-body">
+            {!summary || summary.revenue_by_month.length === 0 ? (
+              <div className="empty">
+                <span className="empty-ico"><Wallet /></span>
+                <h3>{c("revenueEmpty")}</h3>
+              </div>
+            ) : (
+              <div className="stack-sm" style={{ gap: 12 }}>
+                {summary.revenue_by_month.map((r) => (
+                  <div key={r.month} className="row" style={{ gap: 12 }}>
+                    <span className="subtle num text-sm" style={{ width: 64, flexShrink: 0 }}>{r.month}</span>
+                    <div className="grow" style={{ height: 12, borderRadius: 99, background: "var(--surface-3)", overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 99, background: "var(--c1)", width: `${(r.total / maxRevenue) * 100}%` }} />
+                    </div>
+                    <span className="num strong text-sm" style={{ width: 84, flexShrink: 0, textAlign: "end" }}>{money(r.total)}</span>
                   </div>
-                  <span className="w-20 shrink-0 text-end text-xs font-semibold tabular-nums text-ink">{money(r.total)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
 
         {/* Expiring subscriptions */}
-        <Card className="p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Clock className="h-4 w-4 text-ink" />
-            <h3 className="font-semibold text-ink">{c("expiringTitle")}</h3>
+        <section className="card">
+          <div className="card-head">
+            <h2 className="row" style={{ gap: 8 }}>
+              <span className="subtle"><Clock style={{ width: 18, height: 18 }} /></span>
+              {c("expiringTitle")}
+            </h2>
           </div>
           {!summary || summary.expiring.length === 0 ? (
-            <p className="py-6 text-center text-sm text-ink-subtle">{c("expiringEmpty")}</p>
+            <div className="empty">
+              <span className="empty-ico"><Clock /></span>
+              <h3>{c("expiringEmpty")}</h3>
+            </div>
           ) : (
-            <ul className="divide-y divide-line">
+            <ul className="list-rows" style={{ margin: "14px 0 0", padding: 0, listStyle: "none" }}>
               {summary.expiring.map((e) => (
-                <li key={e.id} className="flex items-center justify-between py-2.5 text-sm">
-                  <span className="font-medium text-ink">{e.name}</span>
-                  <span className="flex items-center gap-3">
-                    <span className="text-ink-muted">{e.ends_at ? new Date(e.ends_at).toLocaleDateString(latnLocale(locale)) : "—"}</span>
-                    <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs font-semibold text-warning-fg">
-                      {c("daysLeft").replace("{n}", String(e.days_left ?? 0))}
-                    </span>
+                <li key={e.id} className="list-row">
+                  <div className="grow">
+                    <div className="strong">{e.name}</div>
+                    <div className="subtle text-xs num">{e.ends_at ? new Date(e.ends_at).toLocaleDateString(latnLocale(locale)) : "—"}</div>
+                  </div>
+                  <span className="badge warning">
+                    <span className="dot" />
+                    {c("daysLeft").replace("{n}", String(e.days_left ?? 0))}
                   </span>
                 </li>
               ))}
             </ul>
           )}
-        </Card>
+        </section>
       </div>
 
       {/* Invoices */}
-      <Card className="overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
-          <h3 className="font-semibold text-ink">{c("invoicesTitle")}</h3>
-          <div className="flex flex-wrap items-center gap-2">
+      <section className="card table-card">
+        <div className="card-head" style={{ paddingBottom: 14 }}>
+          <h2 className="row" style={{ gap: 8 }}>
+            <span className="subtle"><ReceiptText style={{ width: 18, height: 18 }} /></span>
+            {c("invoicesTitle")}
+          </h2>
+          <div className="row-wrap">
             <Select
               className="w-52"
               value={tenantId ? String(tenantId) : ""}
               onChange={(v) => setTenantId(v ? Number(v) : undefined)}
               options={[{ value: "", label: c("filterCompany") }, ...companies.map((co) => ({ value: String(co.id), label: co.name }))]}
             />
-            <Button variant="secondary" onClick={doExport} disabled={invoices.length === 0}>
-              <Download className="h-4 w-4" /> {c("exportExcel")}
-            </Button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={doExport} disabled={invoices.length === 0}>
+              <Download /> {c("exportExcel")}
+            </button>
           </div>
         </div>
 
         {!invoicesLoaded ? (
-          <div className="space-y-2 p-4">
+          <div className="stack-sm" style={{ padding: 18 }}>
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-10 animate-pulse rounded bg-surface-2" />
+              <div key={i} className="skel" style={{ height: 40, borderRadius: 8 }} />
             ))}
           </div>
         ) : invoices.length === 0 ? (
-          <EmptyState icon={ReceiptText} title={c("invoicesEmpty")} />
+          <div className="empty">
+            <span className="empty-ico"><ReceiptText /></span>
+            <h3>{c("invoicesEmpty")}</h3>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
+          <div className="overflow-x-auto" style={{ borderTop: "1px solid var(--line)" }}>
+            <Table>
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 font-semibold">{c("colInvoice")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colCompany")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colPlan")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colCode")}</th>
-                  <th className="px-4 py-3 font-semibold">{t("screens.codes.colRef")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colDays")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colAmount")}</th>
-                  <th className="px-4 py-3 font-semibold">{t("screens.codes.method")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colStatus")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colStarts")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colEnds")}</th>
-                  <th className="px-4 py-3" />
+                  <th>{c("colInvoice")}</th>
+                  <th>{c("colCompany")}</th>
+                  <th>{c("colPlan")}</th>
+                  <th>{c("colCode")}</th>
+                  <th>{t("screens.codes.colRef")}</th>
+                  <th className="r">{c("colDays")}</th>
+                  <th className="r">{c("colAmount")}</th>
+                  <th>{t("screens.codes.method")}</th>
+                  <th>{c("colStatus")}</th>
+                  <th>{c("colStarts")}</th>
+                  <th>{c("colEnds")}</th>
+                  <th />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {invoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-surface-2">
-                    <td className="px-4 py-3 font-mono text-xs text-ink-muted">#{inv.id}</td>
-                    <td className="px-4 py-3 font-medium text-ink">{inv.company_name ?? "—"}</td>
-                    <td className="px-4 py-3 text-ink-muted">{inv.plan ?? "—"}</td>
-                    <td className="px-4 py-3">
+                  <tr key={inv.id}>
+                    <td><span className="mono">#{inv.id}</span></td>
+                    <td><span className="strong nowrap">{inv.company_name ?? "—"}</span></td>
+                    <td>{inv.plan ?? "—"}</td>
+                    <td>
                       {inv.code ? (
-                        <button onClick={() => setCodeDetail(inv)} title={c("viewCode")} className="transition-opacity hover:opacity-80">
-                          <Badge status={CODE_TONE[inv.code.status]}>
-                            <span className="font-mono tracking-wider" dir="ltr">{inv.code.code}</span>
-                          </Badge>
+                        <button
+                          type="button"
+                          onClick={() => setCodeDetail(inv)}
+                          title={c("viewCode")}
+                          className={`badge ${CODE_TONE[inv.code.status]}`}
+                          style={{ border: 0, cursor: "pointer" }}
+                        >
+                          <span className="mono" dir="ltr">{inv.code.code}</span>
                         </button>
                       ) : (
-                        <span className="text-ink-subtle">—</span>
+                        <span className="subtle">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-ink-muted" dir="ltr">{inv.code?.payment_ref ?? "—"}</td>
-                    <td className="px-4 py-3 tabular-nums text-ink-muted">{inv.days}</td>
-                    <td className="px-4 py-3 font-semibold tabular-nums text-ink">{inv.amount !== null ? money(inv.amount) : "—"}</td>
-                    <td className="px-4 py-3 text-ink-muted">{paymentMethodLabel(inv.code?.payment_method, t)}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={
-                          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold " +
-                          (inv.paid ? "bg-success-bg text-success-fg" : "bg-warning-bg text-warning-fg")
-                        }
-                      >
+                    <td><span className="mono text-sm" dir="ltr">{inv.code?.payment_ref ?? "—"}</span></td>
+                    <td className="r num">{inv.days}</td>
+                    <td className="r num strong">{inv.amount !== null ? money(inv.amount) : "—"}</td>
+                    <td>{paymentMethodLabel(inv.code?.payment_method, t)}</td>
+                    <td>
+                      <span className={`badge ${inv.paid ? "success" : "warning"}`}>
+                        <span className="dot" />
                         {inv.paid ? c("paid") : c("unpaid")}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-ink-muted">{new Date(inv.starts_at).toLocaleDateString(latnLocale(locale))}</td>
-                    <td className="px-4 py-3 text-ink-muted">{new Date(inv.ends_at).toLocaleDateString(latnLocale(locale))}</td>
-                    <td className="px-4 py-3 text-end">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => doDownloadPdf(inv.id)}
-                          title={c("pdf")}
-                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-ink-muted hover:bg-surface-2 hover:text-ink"
-                        >
-                          <FileText className="h-4 w-4" /> {c("pdf")}
+                    <td><span className="num nowrap">{new Date(inv.starts_at).toLocaleDateString(latnLocale(locale))}</span></td>
+                    <td><span className="num nowrap">{new Date(inv.ends_at).toLocaleDateString(latnLocale(locale))}</span></td>
+                    <td className="r">
+                      <div className="row" style={{ gap: 2, justifyContent: "flex-end" }}>
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => doDownloadPdf(inv.id)} title={c("pdf")}>
+                          <FileText /> {c("pdf")}
                         </button>
                         {!inv.paid && (
-                          <button
-                            onClick={() => setSettling(inv)}
-                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg"
-                          >
-                            <CheckCircle2 className="h-4 w-4" /> {c("settle")}
+                          <button type="button" className="btn btn-ghost btn-sm" style={{ color: "var(--success-fg)" }} onClick={() => setSettling(inv)}>
+                            <CheckCircle2 /> {c("settle")}
                           </button>
                         )}
                       </div>
@@ -325,7 +345,7 @@ export default function ReportsPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
         )}
         {invoiceMeta && (
@@ -337,7 +357,7 @@ export default function ReportsPage() {
             onPage={setInvoicePage}
           />
         )}
-      </Card>
+      </section>
 
       {settling && (
         <SettleModal
@@ -374,6 +394,29 @@ export default function ReportsPage() {
   );
 }
 
+/** Prototype stat tile: icon chip, label and a big tabular value. */
+function Stat({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string | number;
+  tone?: "success" | "warning";
+}) {
+  return (
+    <div className="stat">
+      <div className="stat-top">
+        <span className={`stat-ico ${tone ?? ""}`}><Icon /></span>
+        <span className="truncate">{label}</span>
+      </div>
+      <div className="stat-value" style={tone ? { color: `var(--${tone}-fg)` } : undefined}>{value}</div>
+    </div>
+  );
+}
+
 function PlanModal({ plan, onClose, onSaved }: { plan: Plan | null; onClose: () => void; onSaved: () => void }) {
   const { t } = useI18n();
   const c = (k: string) => t(`screens.subscriptions.${k}`);
@@ -400,8 +443,6 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | null; onClose: () 
     }
   }
 
-  const inputCls = "ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line";
-
   return (
     <Modal
       open
@@ -416,24 +457,24 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | null; onClose: () 
         </div>
       }
     >
-      <div className="space-y-3 text-start">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-ink">{c("planName")}</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+      <div className="stack text-start">
+        <div className="field">
+          <label htmlFor="pl-name">{c("planName")}</label>
+          <input id="pl-name" value={name} onChange={(e) => setName(e.target.value)} className="input" />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">{c("planPrice")}</label>
-            <input type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} className={inputCls} />
+        <div className="form-grid">
+          <div className="field">
+            <label htmlFor="pl-price">{c("planPrice")}</label>
+            <input id="pl-price" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} className="input" />
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">{c("planDuration")}</label>
-            <input type="number" min={1} value={days} onChange={(e) => setDays(e.target.value)} className={inputCls} />
+          <div className="field">
+            <label htmlFor="pl-days">{c("planDuration")}</label>
+            <input id="pl-days" type="number" min={1} value={days} onChange={(e) => setDays(e.target.value)} className="input" />
           </div>
         </div>
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-muted">
-          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="h-4 w-4" />
-          {c("planActive")}
+        <label className="check">
+          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+          <span>{c("planActive")}</span>
         </label>
       </div>
     </Modal>
@@ -492,10 +533,10 @@ function SettleModal({
         </div>
       }
     >
-      <div className="space-y-3 text-start">
-        <p className="text-sm text-ink-muted">{c("settleIntro")}</p>
+      <div className="stack text-start">
+        <p className="muted text-sm">{c("settleIntro")}</p>
         {payments.length === 0 ? (
-          <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink-subtle">{c("noPayments")}</p>
+          <p className="subtle text-sm">{c("noPayments")}</p>
         ) : (
           <Select
             value={paymentId}
