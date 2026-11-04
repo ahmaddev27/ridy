@@ -36,15 +36,28 @@ const field = page.locator(emailSel).first();
 await field.click({ timeout: 15000 }).catch(() => {});
 await field.pressSequentially(email, { delay: 40 }).catch((e) => console.log("[spike] type note: " + e.message));
 await page.keyboard.press("Enter").catch(() => {});
-await page.waitForTimeout(3000);
+await page.waitForTimeout(4000);
 
-// Walk any "continue with a passkey" / "weiter" affordance; a discoverable credential often
-// auto-triggers navigator.credentials.get(), which the virtual authenticator answers.
-for (const re of [/passkey/i, /passwort|sicherheitsschl/i, /^continue$/i, /^weiter$/i, /sign in|anmelden/i]) {
+const dump = async (tag) => {
+  const btns = await page.getByRole("button").allInnerTexts().catch(() => []);
+  const links = await page.getByRole("link").allInnerTexts().catch(() => []);
+  const body = (await page.locator("body").innerText().catch(() => "")).replace(/\s+/g, " ").slice(0, 500);
+  console.log(`[dump:${tag}] url=${page.url()}`);
+  console.log(`[dump:${tag}] buttons=${JSON.stringify(btns)} links=${JSON.stringify(links)}`);
+  console.log(`[dump:${tag}] body=${body}`);
+};
+await dump("after-email");   // <-- the method screen Uber shows once the real email is accepted
+
+// Prefer an explicit passkey affordance (de/en); otherwise walk a generic "more options" → passkey.
+const passkeyRe = /passkey|sicherheitsschl|mit einem schl/i;
+for (const re of [passkeyRe, /weitere option|andere option|more option/i, passkeyRe, /^weiter$|^continue$|anmelden|sign in/i]) {
   const btn = page.getByRole("button", { name: re }).first();
-  if (await btn.count().catch(() => 0)) { await btn.click({ timeout: 4000 }).catch(() => {}); await page.waitForTimeout(2500); }
+  if (await btn.count().catch(() => 0)) { console.log("[spike] click:", re); await btn.click({ timeout: 4000 }).catch(() => {}); await page.waitForTimeout(2500); }
+  const lnk = page.getByRole("link", { name: re }).first();
+  if (await lnk.count().catch(() => 0)) { console.log("[spike] click-link:", re); await lnk.click({ timeout: 4000 }).catch(() => {}); await page.waitForTimeout(2500); }
 }
 await page.waitForTimeout(3000);
+await dump("final");
 
 const url = page.url();
 console.log("[spike] final url: " + url);
