@@ -71,6 +71,13 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
 
+  // --- Software passkey (both default OFF) ---------------------------------------------
+  // Register a software passkey on a company's Uber account (owner-approved account write; also
+  // needs the backend's per-company enabled flag). Dormant unless "1".
+  passkeyRegister: process.env.UBER_AUTH_PASSKEY_REGISTER === "1",
+  // Reserved for the later passkey LOGIN / re-auth phase. Nothing reads it yet.
+  passkeyLogin: process.env.UBER_AUTH_PASSKEY_LOGIN === "1",
+
   // --- Co-browse Arkose (docs/28) --------------------------------------------------
   // Second, PUBLIC-facing listener that serves only the WebSocket upgrade on /cobrowse/ws
   // (Caddy proxies /cobrowse/* to it). 0 / unset = co-browse disabled: an Arkose challenge then

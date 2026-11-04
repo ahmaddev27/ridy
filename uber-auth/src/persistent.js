@@ -12,6 +12,7 @@ import { PersistentSessionManager, SESSION_STATE, jarFingerprint } from "./sessi
 import { createWarmDriver, statePath as driverStatePath } from "./warmDriver.js";
 import { launchBrowser, newStealthContext } from "./browser.js";
 import { scopeCookies } from "./cookieScope.js";
+import { registerPasskey } from "./passkey.js";
 
 const driver = createWarmDriver();
 
@@ -36,6 +37,16 @@ async function backendGet(path) {
   if (!res.ok) throw new Error(`backend ${path} -> ${res.status}`);
   const body = await res.json().catch(() => ({}));
   return Array.isArray(body?.data) ? body.data : [];
+}
+
+/** Like backendGet but for endpoints whose `data` is an object. */
+async function backendGetObject(path) {
+  const res = await fetch(`${config.apiBaseUrl}${path}`, {
+    headers: { Accept: "application/json", "X-Dispatch-Secret": config.dispatchSecret },
+  });
+  if (!res.ok) throw new Error(`backend ${path} -> ${res.status}`);
+  const body = await res.json().catch(() => ({}));
+  return body?.data && typeof body.data === "object" ? body.data : {};
 }
 
 /** Resolves "posted" | "skipped" (nothing to send) | "blocked" (backend refused it, 202). */
@@ -84,7 +95,10 @@ export async function adoptLogin(companyKey, session, result) {
     orgUuid: result?.org_uuid ?? null,
     cookies: Array.isArray(result?.cookies) ? result.cookies : [],
   });
+  const entry = manager.get(companyKey);
+  if (entry) entry.proxyUrl = session?.proxyUrl ?? null;
   await pushStatus().catch(() => {});
+  if (outcome.captured) schedulePasskeyRegistration(companyKey);
   return outcome;
 }
 
@@ -116,6 +130,70 @@ export async function backendHasSession(companyKey, { activeOnly = false } = {})
   } catch {
     return true;
   }
+}
+
+// --- Software-passkey registration (dormant: config.passkeyRegister + backend flag) -------
+const PASSKEY_SETTLE_MS = 90 * 1000; // let the first keep-warm cookie rotation finish first
+const PASSKEY_RETRY_MS = 6 * 60 * 60 * 1000;
+const PASSKEY_MAX_PER_DAY = 3;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const passkeyAttempts = new Map(); // key -> attempt timestamps (last 24h)
+const passkeyDone = new Set(); // registered (this process) - the backend remains the source of truth
+const passkeyScheduled = new Set();
+
+function passkeyBackoffActive(key, now = Date.now()) {
+  const recent = (passkeyAttempts.get(key) ?? []).filter((t) => now - t < DAY_MS);
+  passkeyAttempts.set(key, recent);
+  if (recent.length >= PASSKEY_MAX_PER_DAY) return true;
+  return recent.length > 0 && now - recent[recent.length - 1] < PASSKEY_RETRY_MS;
+}
+
+async function passkeyWanted(key) {
+  const path = `/api/v1/internal/session-browser/${encodeURIComponent(key)}/passkey`;
+  const state = await backendGetObject(path);
+  return state.enabled === true && state.registered !== true;
+}
+
+/**
+ * Register a software passkey for one company if everything allows it. Never throws and never
+ * logs the credential - only a reason. Resolves { status, reason? }.
+ */
+export async function maybeRegisterPasskey(companyKey) {
+  const key = String(companyKey);
+  try {
+    if (!config.passkeyRegister) return { status: "skipped", reason: "disabled" };
+    const entry = manager.get(key);
+    if (!entry || entry.state !== SESSION_STATE.ACTIVE) return { status: "skipped", reason: "not_active" };
+    if (passkeyDone.has(key)) return { status: "skipped", reason: "registered" };
+    if (entry.proxyUrl === undefined) return { status: "skipped", reason: "proxy_unknown" };
+    if (passkeyBackoffActive(key)) return { status: "skipped", reason: "backoff" };
+    if (!(await passkeyWanted(key))) return { status: "skipped", reason: "backend_declined" };
+    passkeyAttempts.get(key).push(Date.now());
+    const r = await registerPasskey(key, { cookies: entry.cookies, supplierCookies: entry.supplierCookies, proxyUrl: entry.proxyUrl });
+    if (!r.ok) {
+      console.warn(`[persistent] passkey ${key} not registered: ${r.reason}`);
+      return { status: "failed", reason: r.reason };
+    }
+    await backendPost(`/api/v1/internal/session-browser/${encodeURIComponent(key)}/passkey`, { credential: r.credential });
+    passkeyDone.add(key);
+    console.log(`[persistent] passkey ${key} registered`);
+    return { status: "registered" };
+  } catch (e) {
+    console.warn(`[persistent] passkey ${key} error: ${e?.message}`);
+    return { status: "failed", reason: "error" };
+  }
+}
+
+/** Fire-and-forget trigger: waits for the settle delay, de-duplicates per company. */
+export function schedulePasskeyRegistration(companyKey, delayMs = PASSKEY_SETTLE_MS) {
+  const key = String(companyKey);
+  if (!config.passkeyRegister || passkeyScheduled.has(key)) return;
+  passkeyScheduled.add(key);
+  const timer = setTimeout(() => {
+    passkeyScheduled.delete(key);
+    void maybeRegisterPasskey(key).catch(() => {});
+  }, delayMs);
+  timer.unref?.();
 }
 
 export function statusList() {
@@ -155,6 +233,7 @@ export async function resumeFromDisk() {
       await manager.adopt(companyKey, { browser, context, page, createdAt: Date.now() }, {});
       await manager.renew(companyKey); // verifies the saved session; needs_otp if dead
       console.log(`[persistent] resumed ${companyKey}: ${manager.get(companyKey)?.state}`);
+      schedulePasskeyRegistration(companyKey);
     } catch (e) {
       console.warn(`[persistent] resume ${companyKey} failed: ${e?.message}`);
     }
@@ -177,6 +256,7 @@ async function seedFromSession(companyKey, { cookies, supplierCookies, orgUuid, 
   await manager.adopt(companyKey, { browser, context, page, createdAt: Date.now() }, { orgUuid, cookies });
   // Set before the first renew so a refused stored jar is never posted back unless the rescue rule passes.
   manager.get(companyKey).needsRescue = needsRescue;
+  manager.get(companyKey).proxyUrl = proxyUrl; // the passkey registration must use the session's own IP
   manager.setBackendJar(companyKey, { cookies, supplierCookies });
   await manager.renew(companyKey);
 }
@@ -230,6 +310,7 @@ async function runSync() {
       await seedFromSession(key, { cookies: s.cookies, supplierCookies: s.supplier_cookies, orgUuid: s.uber_org_uuid, needsRescue: s.status === "needs_relink", proxyUrl: s.proxy_url });
       const note = revivedFrom ? `revived ${key} from ${revivedFrom}` : `seeded ${key}`;
       console.log(`[persistent] ${note}: ${manager.get(key)?.state}`);
+      schedulePasskeyRegistration(key);
     } catch (e) {
       console.warn(`[persistent] seed ${key} failed: ${e?.message}`);
     }

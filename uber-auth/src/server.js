@@ -11,7 +11,7 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { startLogin, submitMfa, closeSession, challengeTick, finishChallenge, STATUS } from "./browser.js";
-import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf, forceDrop } from "./persistent.js";
+import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf, forceDrop, maybeRegisterPasskey, schedulePasskeyRegistration } from "./persistent.js";
 import { admitStart, adoptGuard, adoptMode, canCobrowse, canFullLogin, companyMatches, createStartGate } from "./loginPolicy.js";
 import { createCobrowse, createCobrowseServer, FULL_LOGIN_HARD_CAP_MS } from "./cobrowse.js";
 import { openCdpStream } from "./cobrowseStream.js";
@@ -142,6 +142,7 @@ async function onLoginSuccess(companyKey, outcome, res, mode = null) {
   if (!adopted.captured) {
     return send(res, 200, { status: STATUS.CAPTURE_FAILED, message: adopted.reason ?? "not_posted" });
   }
+  schedulePasskeyRegistration(String(companyKey)); // dormant unless UBER_AUTH_PASSKEY_REGISTER=1
   return send(res, 200, { status: STATUS.SUCCESS, persistent: true, org_uuid: outcome.result?.org_uuid ?? null });
 }
 
@@ -451,6 +452,14 @@ async function handleSessionDrop(req, res) {
   return send(res, 200, { ok: true, state });
 }
 
+// Manual trigger for the dormant software-passkey registration; same secret check as every route.
+async function handlePasskeyRegister(req, res) {
+  const body = await readJson(req);
+  const companyKey = String(body.company_key ?? "").trim();
+  if (!companyKey) return send(res, 400, { error: "company_key required" });
+  return send(res, 200, await maybeRegisterPasskey(companyKey));
+}
+
 const server = createServer(async (req, res) => {
   if (req.headers["x-auth-secret"] !== config.secret) {
     return send(res, 401, { error: "unauthorized" });
@@ -461,6 +470,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/login/cancel") return await handleCancel(req, res);
     if (req.method === "POST" && req.url === "/login/resume") return await handleResume(req, res);
     if (req.method === "POST" && req.url === "/cobrowse/close") return await handleCobrowseClose(req, res);
+    if (req.method === "POST" && req.url === "/passkey/register") return await handlePasskeyRegister(req, res);
     if (req.method === "POST" && req.url === "/session/drop") return await handleSessionDrop(req, res);
     if (req.method === "GET" && req.url === "/sessions") return send(res, 200, { data: statusList() });
     if (req.method === "GET" && req.url === "/health") return send(res, 200, { status: "ok", pending: pending.size, live: statusList().length });

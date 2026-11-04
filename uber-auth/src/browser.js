@@ -711,7 +711,7 @@ async function freshSession(proxyUrl, companyKey) {
   const browser = await launchBrowser();
   const context = await newStealthContext(browser, {}, proxyUrl, companyKey);
   const page = await context.newPage();
-  return { browser, context, page, createdAt: Date.now() };
+  return { browser, context, page, createdAt: Date.now(), proxyUrl };
 }
 
 /** Relay the MFA code into a held session and finish the login. */
