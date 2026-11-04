@@ -5,7 +5,7 @@ import { formatDate, formatDateTime, formatMoney, formatNumber, latnLocale, relT
 import { fleetDayKey, fleetYmd, formatYmd } from "@/lib/fleet-day";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Info, Users, Car, Radio, Plug, Gift, LogIn, Network, Copy, Files, Check, Lock, Star, Ban } from "lucide-react";
+import { ArrowLeft, Loader2, Save, KeyRound, Power, Trash2, UserPlus, Ticket, ShieldCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Info, Users, Car, Radio, Plug, Gift, LogIn, Network, Copy, Files, Check, Lock, Star, Ban } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge, type Status } from "@/components/ui/badge";
@@ -23,8 +23,9 @@ import {
   createCompanyUser,
   resetCompanyUserPassword,
   forceRelink,
-  deleteCompanySession,
-  purgeCompanyData,
+  getAutoRenewal,
+  setAutoRenewal,
+  type AutoRenewalState,
   startImpersonation,
   generateActivationCode,
   grantFreeSubscription,
@@ -56,6 +57,7 @@ import {
 } from "@/lib/api/admin";
 import { getPaymentMethods, PAYMENT_METHOD_KEYS, paymentMethodLabel } from "@/lib/api/payments";
 import { apiErrorMessage } from "@/lib/api/error-message";
+import { ApiError } from "@/lib/api/client";
 
 /** Super-admin company detail as a full page: edit, proxy, users, session,
  *  subscription controls, plus drivers/offers/vehicles tabs. */
@@ -82,7 +84,7 @@ export function CompanyDetail({
   const [tab, setTab] = useState<"details" | "subscription" | "managers" | "drivers" | "offers" | "vehicles" | "network" | "session">("details");
 
   // Sub-actions.
-  const [confirm, setConfirm] = useState<null | "disable" | "relink" | "deleteSession" | "purgeData">(null);
+  const [confirm, setConfirm] = useState<null | "disable" | "relink">(null);
   const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
 
   // Subscription/activation — a code is generated against a plan, paid optional.
@@ -279,42 +281,15 @@ export function CompanyDetail({
 
   async function runConfirm() {
     if (!confirm) return;
-    if (confirm === "purgeData") {
-      await runPurge();
-      return;
-    }
     setBusy(true);
     try {
       if (confirm === "disable") await setCompanyActive(id, false); // reversible, never deletes
       if (confirm === "relink") await forceRelink(id);
-      if (confirm === "deleteSession") await deleteCompanySession(id);
       toast.success(c("done"));
       await load();
       onChanged();
     } catch (e) {
       toast.error(c("actionFailed"), { description: apiErrorMessage(e, t, locale) });
-    } finally {
-      setBusy(false);
-      setConfirm(null);
-    }
-  }
-
-  async function runPurge() {
-    setBusy(true);
-    try {
-      const counts = await purgeCompanyData(id);
-      const summary = c("purgedCounts")
-        .replace("{drivers}", String(counts.drivers))
-        .replace("{vehicles}", String(counts.vehicles))
-        .replace("{offers}", String(counts.offers))
-        .replace("{devices}", String(counts.device_tokens))
-        .replace("{metrics}", String(counts.driver_metrics))
-        .replace("{sessions}", String(counts.sessions));
-      toast.success(c("purgedToast"), { description: summary });
-      await load();
-      onChanged();
-    } catch (e) {
-      toast.error(c("purgeFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
       setConfirm(null);
@@ -456,7 +431,6 @@ export function CompanyDetail({
               company={company}
               busy={busy}
               onRelink={() => setConfirm("relink")}
-              onDelete={() => setConfirm("deleteSession")}
             />
           ) : tab === "drivers" || tab === "vehicles" ? (
             <CompanyDataTab id={id} tab={tab} />
@@ -744,16 +718,6 @@ export function CompanyDetail({
                     </Button>
                   </div>
                 </Group>
-
-                {/* Danger zone — irreversible purge; flat but visually distinct. */}
-                <Group title={c("dangerZone")} tone="danger">
-                  <p className="muted text-sm">{c("dangerZoneHint")}</p>
-                  <div>
-                    <Button variant="danger" onClick={() => setConfirm("purgeData")} disabled={busy}>
-                      <Trash2 className="h-4 w-4" /> {c("purgeData")}
-                    </Button>
-                  </div>
-                </Group>
               </div>
 
               {/* Save — enable/disable lives in the status toggle above. */}
@@ -894,13 +858,11 @@ function SessionTab({
   company,
   busy,
   onRelink,
-  onDelete,
 }: {
   id: number;
   company: Company;
   busy: boolean;
   onRelink: () => void;
-  onDelete: () => void;
 }) {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.companies.${k}`);
@@ -956,11 +918,8 @@ function SessionTab({
       <Group title={c("session")}>
         <p className="muted text-sm">{c("sessionHint")}</p>
         <div className="row-wrap">
-          <Button variant="secondary" onClick={onRelink} disabled={busy || !company.session_status}>
-            <RefreshCw className="h-4 w-4" /> {c("forceRelink")}
-          </Button>
-          <Button variant="secondary" onClick={onDelete} disabled={busy || !company.session_status}>
-            <Trash2 className="h-4 w-4" /> {c("deleteSession")}
+          <Button variant="danger" onClick={onRelink} disabled={busy || !company.session_status}>
+            <Power className="h-4 w-4" /> {c("stopSession")}
           </Button>
         </div>
       </Group>
@@ -969,9 +928,139 @@ function SessionTab({
         <SessionBrowserCard id={id} company={company} />
       </Group>
 
+      <Group title={c("arTitle")}>
+        <AutoRenewalCard id={id} />
+      </Group>
+
       <Group title={c("outagesTitle")}>
         <SessionOutages id={id} />
       </Group>
+    </div>
+  );
+}
+
+/** Variant B: super-admin switch for automatic Uber re-auth. The secret forwarding address is returned once on enable. */
+function AutoRenewalCard({ id }: { id: number }) {
+  const { t, locale } = useI18n();
+  const c = (k: string) => t(`screens.companies.${k}`);
+  const [state, setState] = useState<AutoRenewalState | null>(null);
+  const [email, setEmail] = useState("");
+  const [reason, setReason] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [address, setAddress] = useState<string | null>(null);
+  const [confirmOff, setConfirmOff] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getAutoRenewal(id)
+      .then((s) => {
+        if (!alive) return;
+        setState(s);
+        setEmail(s.email ?? "");
+      })
+      .catch(() => alive && setState(null));
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  const reasonText = (r: string | null) => (r ? c(`arReason_${r}`) : null);
+  const refresh = async () => setState(await getAutoRenewal(id));
+
+  async function enable() {
+    setBusy(true);
+    setReason(null);
+    try {
+      setAddress(await setAutoRenewal(id, { enabled: true, email: email.trim() }));
+      toast.success(c("arEnabledToast"));
+      await refresh();
+    } catch (e) {
+      const r = e instanceof ApiError && typeof e.data?.reason === "string" ? e.data.reason : null;
+      if (r) setReason(r);
+      else toast.error(c("arFailed"), { description: apiErrorMessage(e, t, locale) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disable() {
+    setBusy(true);
+    try {
+      await setAutoRenewal(id, { enabled: false });
+      toast.success(c("arDisabledToast"));
+      setConfirmOff(false);
+      await refresh();
+    } catch (e) {
+      toast.error(c("arFailed"), { description: apiErrorMessage(e, t, locale) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(address ?? "");
+      toast.success(c("arCopied"));
+    } catch {
+      toast.error(c("copyFailed"));
+    }
+  }
+
+  if (!state) return <Loader2 className="h-4 w-4 animate-spin text-ink-subtle" />;
+  const blocked = reasonText(state.blocker) ?? reasonText(reason);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge status={state.enabled ? "connected" : "neutral"} dot>{state.enabled ? c("arEnabled") : c("arDisabled")}</Badge>
+      </div>
+      <p className="text-xs text-ink-subtle">{c("arHint")}</p>
+      <Field label={c("arEmail")} value={email} onChange={setEmail} placeholder="name@example.com" />
+      <p className="text-xs text-ink-subtle">{c("arEmailHint")}</p>
+      {blocked && <p className="text-xs text-warning-fg">{blocked}</p>}
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={enable} disabled={busy || !state.eligible || email.trim() === ""}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+          {c("arEnable")}
+        </Button>
+        {state.enabled && (
+          <Button variant="secondary" onClick={() => setConfirmOff(true)} disabled={busy}>
+            {c("arDisable")}
+          </Button>
+        )}
+      </div>
+
+      <Modal
+        open={address !== null}
+        onClose={() => setAddress(null)}
+        title={c("arAddressTitle")}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={copyAddress}>
+              <Copy className="h-4 w-4" /> {c("arCopy")}
+            </Button>
+            <Button onClick={() => setAddress(null)}>{c("arDone")}</Button>
+          </div>
+        }
+      >
+        <div className="space-y-3 text-start">
+          <p dir="ltr" className="break-all rounded-lg bg-surface-2 px-3 py-2 font-mono text-xs text-ink">{address}</p>
+          <p className="text-sm font-medium text-warning-fg">{c("arAddressOnce")}</p>
+          <p className="text-xs text-ink-subtle">{c("arAddressForward")}</p>
+        </div>
+      </Modal>
+
+      <ConfirmModal
+        open={confirmOff}
+        danger
+        title={c("arDisableTitle")}
+        message={c("arDisableBody")}
+        confirmLabel={c("confirm")}
+        cancelLabel={c("cancel")}
+        busy={busy}
+        onConfirm={disable}
+        onCancel={() => setConfirmOff(false)}
+      />
     </div>
   );
 }

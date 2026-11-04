@@ -70,6 +70,12 @@ class DriverStatusIngestor
         Cache::put(self::daemonSourceKey($tenantId), 1, self::DAEMON_SOURCE_TTL_SECONDS);
     }
 
+    /** Drop the "daemon is feeding" marker so a stopped company stops reading as live. */
+    public static function forgetDaemonFeeding(int $tenantId): void
+    {
+        Cache::forget(self::daemonSourceKey($tenantId));
+    }
+
     /** Whether the daemon delivered a status batch for the company recently. */
     public static function daemonIsFeeding(int $tenantId): bool
     {

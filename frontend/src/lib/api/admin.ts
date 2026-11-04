@@ -983,3 +983,29 @@ export async function updateShard(id: number, input: { active?: boolean; label?:
 export async function rebalanceShards(): Promise<void> {
   await apiFetch("/api/v1/admin/shards/rebalance", { method: "POST", withCsrf: true });
 }
+
+export type AutoRenewalState = {
+  enabled: boolean;
+  email: string | null;
+  eligible: boolean;
+  blocker: "not_eligible" | "no_proxy" | "no_prior_session" | null;
+};
+
+/** Super-admin: current variant-B (automatic Uber re-auth) state for one company. */
+export async function getAutoRenewal(id: number): Promise<AutoRenewalState> {
+  const res = await apiFetch<{ data: AutoRenewalState }>(`${base}/${id}/auto-renewal`);
+  return res.data;
+}
+
+/** Enable returns the secret forwarding address ONCE; disable returns null. A blocked enable is a 422 with `reason`. */
+export async function setAutoRenewal(
+  id: number,
+  body: { enabled: boolean; email?: string },
+): Promise<string | null> {
+  const res = await apiFetch<{ data: { inbound_address: string | null } }>(`${base}/${id}/auto-renewal`, {
+    method: "PATCH",
+    body,
+    withCsrf: true,
+  });
+  return res.data.inbound_address;
+}

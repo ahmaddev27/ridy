@@ -322,3 +322,36 @@ active --(Uber يطرد الجلسة: renew فاشل)--> needs_otp --notify(need
 - التبديل **كسول**: فقط عند رفض الكود وعودة أوبر لصفحة الخيارات؛ `submitMfa` يرسل كوداً جديداً عبر القناة التالية ويرجع `mfa_required {retry, channel, switched:true}`. لا أثر على المسار الناجح.
 - الباك-إند: `switched` لا يستهلك `MAX_CODE_TRIES` (يُحتسب الرفض على نفس القناة فقط)؛ `channel` يظهر في `GET /uber-login/status`. استنفاد القنوات = `wrong_code` (ثم مسار الإضافة).
 - بعد إرسال الكود: `settleAfterSubmit` بسقف 8ث (بدل detectStep ~38ث). النصوص تقريبية (de/en) وتُضبط من سجل `[pwless-nav]`.
+
+---
+
+## 13. Variant B — automatic renewal (operator-provisioned)
+
+الواجهة اليدوية للمدير (`uber-login/settings` و`inbound-address/rotate`) **أُزيلت**. السبب: co-browse الكامل لا يعطي الباك-إند إيميل أوبر، فيُدخله **المشغّل (super-admin)** لا المدير.
+
+### 13.1 الـ API (super-admin فقط)
+`PATCH /api/v1/admin/companies/{tenant}/auto-renewal`
+- تفعيل: `{enabled: true, email}` ← `200 {data: {inbound_address}}` (يُعرض **مرة واحدة**؛ نخزّن الـ hash فقط). إعادة التفعيل تُدوّر العنوان وتُبطل التحويل القديم.
+- إيقاف (kill switch): `{enabled: false}` ← `{data: {inbound_address: null}}`؛ يُطفئ `auto_code` و`auto_relogin`.
+- `422` مع `reason`: `not_eligible` (الميزة/الـ allowlist/علم الشركة)، `no_proxy`، `no_prior_session` (لا SessionBrowser ولا UberFleetSession سابق).
+- الـ audit: `company.auto_renewal.enabled|disabled` يحمل الشركة والفاعل فقط — **لا الإيميل ولا العنوان أبداً**.
+
+### 13.2 Runbook لمرة واحدة لكل شركة
+1. المشغّل يفعّل الميزة ويدخل إيميل أوبر وينسخ العنوان السري `uber-<token>@in.reidey.de`.
+2. صاحب صندوق البريد في الشركة ينشئ قاعدة تحويل (forward rule) **مفلترة على إيميلات رمز التحقق من أوبر فقط** (لا تحويل لباقي البريد).
+3. اختبار بكود حقيقي (يؤكَّد تحويله واستلامه).
+4. dry-run مضبوط (يفضّل عند سقوط طبيعي `needs_otp`) قبل الاعتماد؛ الإكستنشن يبقى fallback.
+
+### 13.3 MX / Postfix لـ `in.reidey.de`
+- DNS: سجل MX للنطاق الفرعي `in.reidey.de` يشير إلى خادم الاستقبال.
+- Postfix استقبال فقط، تمرير عبر pipe إلى `php artisan inbound-mail:ingest --rcpt=${original_recipient}`.
+- تقييد المستلم بـ `uber-[a-z0-9]{26}@in.reidey.de` (غيره يُرفض).
+- سقف الحجم 256 KB (`message_size_limit = 262144`).
+- SPF للنطاق: `v=spf1 -all` (لا نرسل أبداً)؛ لا حاجة لتوقيع DKIM.
+- الأوامر تنتهي بـ exit 0 لأي إيميل غير مرغوب كي لا يتولّد backscatter.
+
+### 13.4 المتطلبات القانونية / ToS
+- بند الموافقة عند التسجيل **يجب أن يسمّي صراحةً** تحويل إيميلات رمز التحقق (OTP) من أوبر إلى Reidey لتجديد الجلسة؛ عبارة «التجديد التلقائي» العامة **لا تكفي**.
+- إدخال الـ OTP آلياً منطقة رمادية في شروط أوبر: نُبقيه opt-in لكل شركة مع kill switch فوري (`enabled:false`).
+- الكود لا يُخزَّن ولا يُسجَّل أبداً (DSGVO)؛ لا تُجمع بيانات فوق حاجة الميزة.
+

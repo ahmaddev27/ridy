@@ -704,7 +704,7 @@ class PasswordlessLoginService
     }
 
     /** Mirrors uber-auth's parseProxyUrl: a usable http/https/socks5 proxy with a host. */
-    private function hasValidProxy(Tenant $tenant): bool
+    public function hasValidProxy(Tenant $tenant): bool
     {
         $parts = parse_url(trim((string) $tenant->getAttribute('proxy_url')));
 
@@ -712,7 +712,7 @@ class PasswordlessLoginService
     }
 
     /** The company has been connected before: a browser context or a stored Uber session exists. */
-    private function hasPriorContext(Tenant $tenant): bool
+    public function hasPriorContext(Tenant $tenant): bool
     {
         return SessionBrowser::where('tenant_id', $tenant->id)->where('state', '!=', SessionBrowser::STATE_NOT_SET_UP)->exists()
             || UberFleetSession::withoutGlobalScopes()->where('tenant_id', $tenant->id)->exists();

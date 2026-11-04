@@ -7,6 +7,7 @@ use App\Domain\Dispatch\Models\SessionBrowser;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\SessionOutageTracker;
 use App\Domain\Dispatch\UberAuthClient;
+use App\Domain\Fleet\DriverStatusIngestor;
 use App\Domain\Tenancy\CompanyDataPurger;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Http\Controllers\Controller;
@@ -47,17 +48,27 @@ class CompanySessionController extends Controller
     }
 
     /**
-     * Force the company to re-link: a CLEAN disconnect. Marks the session needs_relink AND stops
-     * the company's persistent browser in uber-auth (which would otherwise keep the dead session
-     * warm and "active"), so the company can re-link through the co-browse window.
+     * Stop session: end the company's live Uber capture and make it stick, KEEPING all data. Stops
+     * the persistent browser in uber-auth (else it keeps the session warm and re-adopts it), marks
+     * the session needs_relink (the daemon streams, driver-status ingest and session-browser
+     * "wanted" list only ever include ACTIVE sessions, so every feed stops; an admin-sourced
+     * outage is never auto-rescued), releases its shard assignment, forgets the "daemon is feeding"
+     * marker, and blocks the extension's silent auto-relink until the manager reconnects.
+     * Nothing is deleted: offers, drivers, vehicles and metrics stay.
      */
     public function forceRelink(Tenant $tenant, FleetSessionService $service, UberAuthClient $uberAuth): JsonResponse
     {
-        $session = $this->sessionFor($tenant);
-        abort_if($session === null, 404, 'No session.');
+        $sessions = UberFleetSession::withoutGlobalScopes()->where('tenant_id', $tenant->id)->get();
+        abort_if($sessions->isEmpty(), 404, 'No session.');
 
-        $service->markNeedsRelink($session, 'admin');
+        // Every row, not just the newest: a sibling left active would keep streaming.
+        foreach ($sessions as $session) {
+            $service->markNeedsRelink($session, 'admin');
+            $session->forceFill(['shard_id' => null])->save();
+        }
         $this->dropPersistentBrowser($tenant, $uberAuth);
+        DriverStatusIngestor::forgetDaemonFeeding((int) $tenant->id);
+        $tenant->blockAutolink();
 
         return response()->json(['data' => ['status' => UberFleetSession::STATUS_NEEDS_RELINK]]);
     }

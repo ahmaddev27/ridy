@@ -53,7 +53,7 @@ class UberLoginTest extends TestCase
     {
         return Tenant::create([
             'name' => $name, 'country' => 'DE', 'status' => 'active', 'activated_at' => now(),
-            'settings' => $flag ? ['passwordless_login' => ['enabled' => true]] : [],
+            'settings' => ['passwordless_login' => ['enabled' => $flag]],
         ]);
     }
 
@@ -89,7 +89,7 @@ class UberLoginTest extends TestCase
         $this->postJson('/api/v1/uber-login/cancel')->assertNotFound();
     }
 
-    public function test_a_company_without_its_own_flag_gets_404(): void
+    public function test_a_company_that_explicitly_opted_out_gets_404(): void
     {
         $other = $this->makeTenant('Closed', false);
         Sanctum::actingAs($this->makeUser($other, 'fleet_manager', 'm@closed.de'));
@@ -99,15 +99,19 @@ class UberLoginTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_the_rollout_allowlist_excludes_other_companies(): void
+    public function test_the_legacy_rollout_allowlist_no_longer_restricts_companies(): void
     {
         config(['services.passwordless_login.tenants' => ['999999']]);
-
-        $this->start()->assertNotFound();
-
-        config(['services.passwordless_login.tenants' => [(string) $this->tenant->id]]);
         $this->fakeUber();
+
         $this->start()->assertStatus(202);
+    }
+
+    public function test_a_company_with_no_passwordless_settings_is_code_login_primary(): void
+    {
+        $fresh = Tenant::create(['name' => 'Fresh GmbH', 'country' => 'DE', 'status' => 'active', 'activated_at' => now()]);
+
+        $this->assertTrue(app(PasswordlessLoginService::class)->codeLoginIsPrimary($fresh));
     }
 
     public function test_connections_manage_is_required(): void

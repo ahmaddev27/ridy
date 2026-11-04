@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { ExtensionBanner } from "./extension-banner";
+import { RelinkBanner } from "./relink-banner";
 import { ImpersonationBanner } from "./impersonation-banner";
 
 const COLLAPSED_KEY = "rdy-sidebar-collapsed";
@@ -58,6 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="sheet">
           <Topbar onMenu={() => setNavOpen(true)} />
           <ImpersonationBanner />
+          <RelinkBanner />
           <ExtensionBanner />
           <main id="main" className="page-scroll">
             <div className="page">{children}</div>

@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 /**
  * Whether a company may use the passwordless Uber login (docs/27), and its per-company
  * options. Gates, all default OFF: the global kill switch (UBER_PASSWORDLESS_LOGIN), the
- * optional rollout allowlist (UBER_PASSWORDLESS_TENANTS, empty = no limit) and the
+ * (the old UBER_PASSWORDLESS_TENANTS allowlist is ignored) and the
  * super-admin's per-company flag (`tenants.settings.passwordless_login.enabled`).
  *
  * Variant B (automatic code from a forwarded email) adds, under the same settings key:
@@ -28,7 +28,8 @@ class PasswordlessLoginSettings
             return false;
         }
 
-        return $this->allowlisted($tenant) && $tenant->passwordlessLoginEnabled();
+        // UBER_PASSWORDLESS_TENANTS no longer restricts: co-browse is the default for every company.
+        return $tenant->passwordlessLoginEnabled();
     }
 
     /**
@@ -65,6 +66,12 @@ class PasswordlessLoginSettings
             && $this->autoCodeEnabled($tenant)
             && $this->get($tenant, 'auto_relogin') === true
             && $this->email($tenant) !== null;
+    }
+
+    /** Variant B switch as stored (ignores eligibility, so the admin UI can show a stale-on state). */
+    public function isAutoEnabled(Tenant $tenant): bool
+    {
+        return $this->get($tenant, 'auto_code') === true && $this->get($tenant, 'auto_relogin') === true;
     }
 
     public function email(Tenant $tenant): ?string
@@ -124,6 +131,24 @@ class PasswordlessLoginSettings
         return $this->addressFor($token);
     }
 
+    /**
+     * Operator-provisioned variant B (docs/27): store the Uber login email, switch the
+     * automatic code + relogin on, and ALWAYS mint a fresh secret address (re-provisioning
+     * invalidates the old forward). The address is returned to be shown once.
+     */
+    public function provisionAuto(Tenant $tenant, string $email): string
+    {
+        $this->update($tenant, ['email' => $email, 'auto_code' => true, 'auto_relogin' => true]);
+
+        return $this->rotateInboundAddress($tenant);
+    }
+
+    /** Kill switch: stops automatic code + relogin (the stored email and address stay inert). */
+    public function deprovisionAuto(Tenant $tenant): void
+    {
+        $this->update($tenant, ['auto_code' => false, 'auto_relogin' => false]);
+    }
+
     public function addressFor(string $token): string
     {
         return 'uber-'.$token.'@'.$this->inboundDomain();
@@ -150,12 +175,5 @@ class PasswordlessLoginSettings
     private function get(Tenant $tenant, string $key): mixed
     {
         return $tenant->settings['passwordless_login'][$key] ?? null;
-    }
-
-    private function allowlisted(Tenant $tenant): bool
-    {
-        $allowed = (array) config('services.passwordless_login.tenants', []);
-
-        return $allowed === [] || in_array((string) $tenant->id, array_map('strval', $allowed), true);
     }
 }

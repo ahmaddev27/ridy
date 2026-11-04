@@ -108,11 +108,11 @@ class Tenant extends Model
 
     /**
      * The platform's per-company opt-in for the passwordless Uber login (docs/27).
-     * Absent = off. The global env switch lives in PasswordlessLoginSettings.
+     * Absent = ON (default-on; an explicit false opts out). The global env switch lives in PasswordlessLoginSettings.
      */
     public function passwordlessLoginEnabled(): bool
     {
-        return ($this->settings['passwordless_login']['enabled'] ?? false) === true;
+        return ($this->settings['passwordless_login']['enabled'] ?? true) === true;
     }
 
     public function setPasswordlessLoginEnabled(bool $enabled): void
@@ -120,10 +120,10 @@ class Tenant extends Model
         $this->mergePasswordlessLogin(['enabled' => $enabled]);
     }
 
-    /** The platform's per-company opt-in for co-browsing Uber's Arkose puzzle (docs/28). Absent = off. */
+    /** The platform's per-company opt-in for co-browsing Uber's Arkose puzzle (docs/28). Absent = ON (explicit false opts out). */
     public function cobrowseEnabled(): bool
     {
-        return ($this->settings['passwordless_login']['cobrowse'] ?? false) === true;
+        return ($this->settings['passwordless_login']['cobrowse'] ?? true) === true;
     }
 
     /**

@@ -91,6 +91,13 @@
       "@react-native-firebase/messaging",
       "./plugins/withExpoOwnsFcm.js",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Reidey braucht die Kamera, damit du einen Beleg scannen und an dein Unternehmen schicken kannst.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Reidey braucht Zugriff auf deine Fotos, damit du einen Beleg aus der Galerie an dein Unternehmen schicken kannst.",
