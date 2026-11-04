@@ -1,64 +1,82 @@
-function AppleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-7 w-7 text-white" aria-hidden>
-      <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.08zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
-    </svg>
-  );
+"use client";
+
+import { useEffect, useState } from "react";
+
+// Logos are vendored in /public/badges: Apple mark from simple-icons (CC0),
+// Google Play four-facet geometry from Wikimedia Commons (Google_Play_Arrow_logo.svg),
+// rendered monochrome white (facets as white tints) per owner.
+const storeLinks = {
+  googlePlay: "https://play.google.com/store/apps/details?id=de.reidey.app",
+  appStore: "https://apps.apple.com/app/reidey", // TODO(owner): replace with the real https://apps.apple.com/app/id<numeric-id>
+};
+
+const isUrl = (v: unknown): v is string => typeof v === "string" && /^https?:\/\//.test(v);
+
+// Backend (super-admin Settings) is the source of truth; storeLinks is the fallback.
+function useStoreLinks() {
+  const [links, setLinks] = useState(storeLinks);
+  useEffect(() => {
+    const base = process.env.NEXT_PUBLIC_API_URL ?? "";
+    fetch(`${base}/api/v1/app/stores`, { headers: { Accept: "application/json" } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) =>
+        setLinks((prev) => ({
+          appStore: isUrl(d?.data?.ios) ? d.data.ios : prev.appStore,
+          googlePlay: isUrl(d?.data?.android) ? d.data.android : prev.googlePlay,
+        })),
+      )
+      .catch(() => undefined);
+  }, []);
+  return links;
 }
 
-function PlayIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-7 w-7 text-white" aria-hidden>
-      <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zM14.439 11.293l3.6-2.08 2.6 1.5c.86.5.86 1.74 0 2.24l-2.6 1.5-3.6-2.08z" />
-    </svg>
-  );
-}
-
-function StoreButton({
-  href,
-  small,
-  big,
-  icon,
-}: {
+interface StoreBadgeProps {
   href: string;
+  label: string;
   small: string;
   big: string;
-  icon: React.ReactNode;
-}) {
+  logo: string;
+  logoClassName: string;
+}
+
+function StoreBadge({ href, label, small, big, logo, logoClassName }: StoreBadgeProps) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
+      aria-label={label}
       className="glass-strong inline-flex items-center gap-3 rounded-2xl px-5 py-3 text-white transition-colors hover:border-white/20"
     >
-      {icon}
-      <span className="text-left leading-tight">
-        <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">
-          {small}
-        </span>
-        <span className="font-heading block text-sm font-semibold text-white">
-          {big}
-        </span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={logo} alt="" aria-hidden className={logoClassName} />
+      <span className="text-left leading-none">
+        <span className="block text-[10px] uppercase tracking-wide text-white/75">{small}</span>
+        <span className="font-heading block text-sm font-semibold text-white">{big}</span>
       </span>
     </a>
   );
 }
 
 export function StoreButtons() {
+  const links = useStoreLinks();
   return (
     <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-start">
-      <StoreButton
-        href="https://apps.apple.com/app/reidey"
+      <StoreBadge
+        href={links.appStore}
+        label="Reidey im App Store laden"
         small="Laden im"
         big="App Store"
-        icon={<AppleIcon />}
+        logo="/badges/apple.svg"
+        logoClassName="h-7 w-7"
       />
-      <StoreButton
-        href="https://play.google.com/store/apps/details?id=de.reidey.app"
+      <StoreBadge
+        href={links.googlePlay}
+        label="Reidey bei Google Play"
         small="Jetzt bei"
         big="Google Play"
-        icon={<PlayIcon />}
+        logo="/badges/google-play.svg"
+        logoClassName="h-7 w-7"
       />
     </div>
   );
