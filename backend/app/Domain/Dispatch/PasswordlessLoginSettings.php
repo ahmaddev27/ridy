@@ -67,6 +67,12 @@ class PasswordlessLoginSettings
             && $this->email($tenant) !== null;
     }
 
+    /** Variant B switch as stored (ignores eligibility, so the admin UI can show a stale-on state). */
+    public function isAutoEnabled(Tenant $tenant): bool
+    {
+        return $this->get($tenant, 'auto_code') === true && $this->get($tenant, 'auto_relogin') === true;
+    }
+
     public function email(Tenant $tenant): ?string
     {
         $stored = $this->get($tenant, 'email');
@@ -122,6 +128,24 @@ class PasswordlessLoginSettings
         $tenant->mergePasswordlessLogin(['inbound_token_hash' => $this->hashToken($token)]);
 
         return $this->addressFor($token);
+    }
+
+    /**
+     * Operator-provisioned variant B (docs/27): store the Uber login email, switch the
+     * automatic code + relogin on, and ALWAYS mint a fresh secret address (re-provisioning
+     * invalidates the old forward). The address is returned to be shown once.
+     */
+    public function provisionAuto(Tenant $tenant, string $email): string
+    {
+        $this->update($tenant, ['email' => $email, 'auto_code' => true, 'auto_relogin' => true]);
+
+        return $this->rotateInboundAddress($tenant);
+    }
+
+    /** Kill switch: stops automatic code + relogin (the stored email and address stay inert). */
+    public function deprovisionAuto(Tenant $tenant): void
+    {
+        $this->update($tenant, ['auto_code' => false, 'auto_relogin' => false]);
     }
 
     public function addressFor(string $token): string

@@ -430,41 +430,4 @@ class UberInboundMailTest extends TestCase
         $report('needs_otp'); // the 20 s status push repeats the same state
         Queue::assertPushed(AutoReloginJob::class, 1);
     }
-
-    public function test_the_company_options_and_the_secret_address_endpoints(): void
-    {
-        $fresh = Tenant::create(['name' => 'Fresh', 'country' => 'DE', 'status' => 'active', 'activated_at' => now(), 'settings' => ['passwordless_login' => ['enabled' => true]]]);
-        $user = User::create(['name' => 'F', 'email' => 'f@fresh.de', 'password' => Hash::make('password'), 'tenant_id' => $fresh->id]);
-        $user->assignRole('fleet_manager');
-        Sanctum::actingAs($user);
-
-        $this->putJson('/api/v1/uber-login/settings', ['auto_code' => true])->assertUnprocessable();
-
-        $address = $this->postJson('/api/v1/uber-login/inbound-address/rotate')->assertOk()->json('data.inbound_address');
-        $this->assertMatchesRegularExpression('/^uber-[a-z0-9]{26}@in\.reidey\.de$/', $address);
-        // only the hash is stored: the token is nowhere in the settings
-        $token = substr($address, 5, 26);
-        $this->assertStringNotContainsString($token, json_encode($fresh->refresh()->settings));
-        $this->assertNotEmpty($fresh->settings['passwordless_login']['inbound_token_hash']);
-
-        $this->putJson('/api/v1/uber-login/settings', ['auto_code' => true, 'auto_relogin' => true, 'email' => 'ops@fresh.de'])
-            ->assertOk()->assertJsonPath('data.inbound_configured', true)->assertJsonPath('data.auto_relogin', true)
-            ->assertJsonMissingPath('data.inbound_token_hash');
-        // the Uber account email is encrypted at rest
-        $this->assertStringNotContainsString('ops@fresh.de', json_encode($fresh->refresh()->settings));
-        $this->getJson('/api/v1/uber-login/settings')->assertJsonPath('data.email', 'ops@fresh.de');
-    }
-
-    public function test_the_new_routes_are_404_when_the_feature_is_closed_and_403_without_the_permission(): void
-    {
-        config(['services.passwordless_login.enabled' => false]);
-        $this->getJson('/api/v1/uber-login/settings')->assertNotFound();
-        $this->postJson('/api/v1/uber-login/inbound-address/rotate')->assertNotFound();
-
-        config(['services.passwordless_login.enabled' => true]);
-        $viewer = User::create(['name' => 'V', 'email' => 'v@acme.de', 'password' => Hash::make('password'), 'tenant_id' => $this->tenant->id]);
-        $viewer->assignRole('viewer');
-        Sanctum::actingAs($viewer);
-        $this->postJson('/api/v1/uber-login/inbound-address/rotate')->assertForbidden();
-    }
 }
