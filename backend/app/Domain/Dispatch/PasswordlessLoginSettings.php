@@ -13,10 +13,11 @@ use Illuminate\Support\Str;
  * super-admin's per-company flag (`tenants.settings.passwordless_login.enabled`).
  *
  * Variant B (automatic code from a forwarded email) adds, under the same settings key:
- *   auto_code           the company forwards Uber's code email to its secret address
- *   auto_relogin        start a login by itself when the session needs re-auth (needs auto_code)
- *   inbound_token_hash  sha256 of the secret address token - the token itself is never stored
- *   email               the Uber account email (encrypted), used by the automatic login
+ *   auto_code           on once the secret address is provisioned (automatic, nobody types anything)
+ *   auto_relogin        start a login by itself when the session needs re-auth (needs auto_code + email)
+ *   inbound_token_hash  sha256 of the secret address token - the lookup key for the inbound handler
+ *   inbound_token       the token, ENCRYPTED, so the stable address can be shown read-only to the operator
+ *   email               the Uber account email (encrypted), captured from the connect flow
  */
 class PasswordlessLoginSettings
 {
@@ -68,12 +69,6 @@ class PasswordlessLoginSettings
             && $this->email($tenant) !== null;
     }
 
-    /** Variant B switch as stored (ignores eligibility, so the admin UI can show a stale-on state). */
-    public function isAutoEnabled(Tenant $tenant): bool
-    {
-        return $this->get($tenant, 'auto_code') === true && $this->get($tenant, 'auto_relogin') === true;
-    }
-
     public function email(Tenant $tenant): ?string
     {
         $stored = $this->get($tenant, 'email');
@@ -85,17 +80,6 @@ class PasswordlessLoginSettings
         } catch (\Throwable) {
             return null;
         }
-    }
-
-    /** @return array{email: ?string, auto_code: bool, auto_relogin: bool, inbound_configured: bool} */
-    public function show(Tenant $tenant): array
-    {
-        return [
-            'email' => $this->email($tenant),
-            'auto_code' => $this->get($tenant, 'auto_code') === true,
-            'auto_relogin' => $this->get($tenant, 'auto_relogin') === true,
-            'inbound_configured' => $this->inboundConfigured($tenant),
-        ];
     }
 
     /** @param  array<string, mixed>  $data  validated: email?, auto_code?, auto_relogin? */
@@ -120,33 +104,55 @@ class PasswordlessLoginSettings
     }
 
     /**
-     * New secret inbound address. Only the hash is stored, so the address is shown ONCE:
-     * rotating again is how a manager who lost it gets a new one (the old stops working).
+     * The company's stable secret forwarding address, minted lazily on first access, which
+     * also switches the automatic code + re-login on (no operator toggle, nothing typed).
+     * Only ever read through the tenant it belongs to - never cross-tenant.
      */
+    public function ensureInboundAddress(Tenant $tenant): string
+    {
+        $existing = $this->inboundAddress($tenant);
+        if ($existing !== null) {
+            return $existing;
+        }
+        $address = $this->rotateInboundAddress($tenant);
+        $this->update($tenant, ['auto_code' => true, 'auto_relogin' => true]);
+
+        return $address;
+    }
+
+    /** The stored address, or null if none was minted yet (a legacy hash-only one cannot be shown). */
+    public function inboundAddress(Tenant $tenant): ?string
+    {
+        $stored = $this->get($tenant, 'inbound_token');
+        if (! is_string($stored) || $stored === '') {
+            return null;
+        }
+        try {
+            return $this->addressFor(Crypt::decryptString($stored));
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** New secret inbound address; the previous one stops working. */
     public function rotateInboundAddress(Tenant $tenant): string
     {
         $token = Str::lower(Str::random(self::TOKEN_LENGTH));
-        $tenant->mergePasswordlessLogin(['inbound_token_hash' => $this->hashToken($token)]);
+        $tenant->mergePasswordlessLogin([
+            'inbound_token_hash' => $this->hashToken($token),
+            'inbound_token' => Crypt::encryptString($token),
+        ]);
 
         return $this->addressFor($token);
     }
 
-    /**
-     * Operator-provisioned variant B (docs/27): store the Uber login email, switch the
-     * automatic code + relogin on, and ALWAYS mint a fresh secret address (re-provisioning
-     * invalidates the old forward). The address is returned to be shown once.
-     */
-    public function provisionAuto(Tenant $tenant, string $email): string
+    /** Remember the Uber account email the manager connected with (encrypted) for the automatic re-login. */
+    public function rememberEmail(Tenant $tenant, string $email): void
     {
-        $this->update($tenant, ['email' => $email, 'auto_code' => true, 'auto_relogin' => true]);
-
-        return $this->rotateInboundAddress($tenant);
-    }
-
-    /** Kill switch: stops automatic code + relogin (the stored email and address stay inert). */
-    public function deprovisionAuto(Tenant $tenant): void
-    {
-        $this->update($tenant, ['auto_code' => false, 'auto_relogin' => false]);
+        $email = trim($email);
+        if ($email !== '' && $this->email($tenant) !== $email) {
+            $this->update($tenant, ['email' => $email]);
+        }
     }
 
     public function addressFor(string $token): string

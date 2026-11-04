@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Domain\Audit\Models\AuditLog;
 use App\Domain\Dispatch\Models\SessionBrowser;
 use App\Domain\Dispatch\PasswordlessLoginSettings;
 use App\Domain\Tenancy\Models\Tenant;
@@ -45,72 +44,45 @@ class AutoRenewalProvisioningTest extends TestCase
         config(['services.passwordless_login.enabled' => true, 'services.passwordless_login.tenants' => []]);
     }
 
-    public function test_provision_and_deprovision_flip_the_flags(): void
+    public function test_the_address_is_minted_lazily_stable_and_switches_auto_on(): void
     {
         $tenant = $this->tenant();
         $settings = app(PasswordlessLoginSettings::class);
+        $this->assertNull($settings->inboundAddress($tenant));
 
-        $address = $settings->provisionAuto($tenant, 'ops@acme.de');
+        $address = $settings->ensureInboundAddress($tenant);
         $this->assertMatchesRegularExpression('/^uber-[a-z0-9]{26}@/', $address);
-        $this->assertTrue($settings->inboundConfigured($tenant));
-        $this->assertTrue($settings->autoReloginEnabled($tenant->refresh()));
-        $this->assertNotSame($address, $settings->provisionAuto($tenant, 'ops@acme.de'));
-
-        $settings->deprovisionAuto($tenant);
-        $this->assertFalse($settings->autoCodeEnabled($tenant->refresh()));
-        $this->assertFalse($settings->autoReloginEnabled($tenant));
+        $this->assertSame($address, $settings->ensureInboundAddress($tenant->refresh()));
+        $this->assertTrue($settings->autoCodeEnabled($tenant));
+        // only the encrypted token + hash are stored, never the plain address
+        $this->assertStringNotContainsString(substr($address, 5, 26), json_encode($tenant->settings));
     }
 
-    public function test_super_admin_enables_and_disables(): void
+    public function test_each_company_gets_its_own_address(): void
     {
-        $this->asSuperAdmin();
-        $tenant = $this->tenant();
+        $settings = app(PasswordlessLoginSettings::class);
 
-        $address = $this->patchJson("/api/v1/admin/companies/{$tenant->id}/auto-renewal", ['enabled' => true, 'email' => 'ops@acme.de'])
-            ->assertOk()->json('data.inbound_address');
-        $this->assertMatchesRegularExpression('/^uber-[a-z0-9]{26}@/', $address);
-        $this->assertTrue(app(PasswordlessLoginSettings::class)->autoReloginEnabled($tenant->refresh()));
-
-        $audit = AuditLog::where('action', 'company.auto_renewal.enabled')->firstOrFail();
-        $this->assertStringNotContainsString('ops@acme.de', json_encode($audit->getAttributes()));
-        $this->assertStringNotContainsString($address, json_encode($audit->getAttributes()));
-
-        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/auto-renewal", ['enabled' => false])
-            ->assertOk()->assertJsonPath('data.inbound_address', null);
-        $this->assertFalse(app(PasswordlessLoginSettings::class)->autoCodeEnabled($tenant->refresh()));
-        $this->assertDatabaseHas('audit_logs', ['action' => 'company.auto_renewal.disabled']);
+        $this->assertNotSame($settings->ensureInboundAddress($this->tenant()), $settings->ensureInboundAddress($this->tenant()));
     }
 
-    public function test_enabling_requires_an_email_and_passes_the_guards(): void
-    {
-        $this->asSuperAdmin();
-        $url = fn (Tenant $t) => "/api/v1/admin/companies/{$t->id}/auto-renewal";
-        $body = ['enabled' => true, 'email' => 'ops@acme.de'];
-
-        $this->patchJson($url($this->tenant()), ['enabled' => true])->assertUnprocessable();
-        $this->patchJson($url($this->tenant(passwordless: false)), $body)->assertUnprocessable()->assertJsonPath('reason', 'not_eligible');
-        $this->patchJson($url($this->tenant(proxy: false)), $body)->assertUnprocessable()->assertJsonPath('reason', 'no_proxy');
-        $this->patchJson($url($this->tenant(context: false)), $body)->assertUnprocessable()->assertJsonPath('reason', 'no_prior_session');
-    }
-
-    public function test_get_reports_state_email_and_eligibility(): void
+    public function test_super_admin_reads_the_address_and_state_without_any_input(): void
     {
         $this->asSuperAdmin();
         $tenant = $this->tenant();
         $url = "/api/v1/admin/companies/{$tenant->id}/auto-renewal";
 
-        $this->getJson($url)->assertOk()->assertExactJson(['data' => [
-            'enabled' => false, 'email' => null, 'eligible' => true, 'blocker' => null,
-        ]]);
-
-        $this->patchJson($url, ['enabled' => true, 'email' => 'ops@acme.de'])->assertOk();
-        $this->getJson($url)->assertOk()->assertJsonPath('data.enabled', true)->assertJsonPath('data.email', 'ops@acme.de');
+        $address = $this->getJson($url)->assertOk()
+            ->assertJsonPath('data.eligible', true)->assertJsonPath('data.email_known', false)
+            ->json('data.inbound_address');
+        $this->assertMatchesRegularExpression('/^uber-[a-z0-9]{26}@/', $address);
+        $this->getJson($url)->assertJsonPath('data.inbound_address', $address);
 
         $this->getJson("/api/v1/admin/companies/{$this->tenant(proxy: false)->id}/auto-renewal")
             ->assertOk()->assertJsonPath('data.eligible', false)->assertJsonPath('data.blocker', 'no_proxy');
+        $this->patchJson($url, ['enabled' => true, 'email' => 'a@b.de'])->assertStatus(405);
     }
 
-    public function test_a_manager_is_forbidden_and_the_old_manager_routes_are_gone(): void
+    public function test_a_manager_is_forbidden(): void
     {
         $this->seed(RolePermissionSeeder::class);
         $tenant = $this->tenant();
@@ -118,10 +90,6 @@ class AutoRenewalProvisioningTest extends TestCase
         $manager->assignRole('fleet_manager');
         Sanctum::actingAs($manager);
 
-        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/auto-renewal", ['enabled' => true, 'email' => 'a@b.de'])->assertForbidden();
         $this->getJson("/api/v1/admin/companies/{$tenant->id}/auto-renewal")->assertForbidden();
-        $this->getJson('/api/v1/uber-login/settings')->assertNotFound();
-        $this->putJson('/api/v1/uber-login/settings', [])->assertNotFound();
-        $this->postJson('/api/v1/uber-login/inbound-address/rotate')->assertNotFound();
     }
 }

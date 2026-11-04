@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
-use App\Domain\Audit\AuditLogger;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\PasswordlessLoginService;
@@ -160,42 +159,17 @@ class CompanyController extends Controller
     }
 
     /**
-     * Super-admin provisioning of automatic Uber re-auth (docs/27 variant B): the OPERATOR
-     * enters the Uber login email (co-browse never reveals it) and gets the secret inbound
-     * address once. Neither the email nor the address is ever written to the audit log.
+     * Variant B (docs/27), read-only for the operator: the company's stable secret forwarding
+     * address (minted lazily here on first view) plus whether the automatic re-login is ready.
+     * Nothing is typed anywhere; the address is never written to the audit log.
      */
-    public function setAutoRenewal(Request $request, Tenant $tenant, PasswordlessLoginSettings $settings, PasswordlessLoginService $login, AuditLogger $audit): JsonResponse
-    {
-        $data = $request->validate([
-            'enabled' => ['required', 'boolean'],
-            'email' => ['required_if:enabled,true', 'nullable', 'email:rfc', 'max:254'],
-        ]);
-
-        if (! (bool) $data['enabled']) {
-            $settings->deprovisionAuto($tenant);
-            $audit->log('company.auto_renewal.disabled', $tenant, [], $tenant->id);
-
-            return response()->json(['data' => ['inbound_address' => null]]);
-        }
-
-        $reason = $this->autoRenewalBlocker($tenant, $settings, $login);
-        if ($reason !== null) {
-            return response()->json(['message' => 'Automatic renewal cannot be enabled.', 'reason' => $reason], 422);
-        }
-
-        $address = $settings->provisionAuto($tenant, (string) $data['email']);
-        $audit->log('company.auto_renewal.enabled', $tenant, [], $tenant->id);
-
-        return response()->json(['data' => ['inbound_address' => $address]]);
-    }
-
     public function getAutoRenewal(Tenant $tenant, PasswordlessLoginSettings $settings, PasswordlessLoginService $login): JsonResponse
     {
         $blocker = $this->autoRenewalBlocker($tenant, $settings, $login);
 
         return response()->json(['data' => [
-            'enabled' => $settings->isAutoEnabled($tenant),
-            'email' => $settings->email($tenant),
+            'inbound_address' => $settings->ensureInboundAddress($tenant),
+            'email_known' => $settings->email($tenant) !== null,
             'eligible' => $blocker === null,
             'blocker' => $blocker,
         ]]);

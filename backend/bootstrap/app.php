@@ -15,6 +15,7 @@ use App\Http\Middleware\EnsureUserTenantActive;
 use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\TrustCloudflareClientIp;
 use App\Http\Middleware\VerifyDispatchSecret;
+use App\Http\Middleware\VerifyInboundMailSecret;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -60,6 +61,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'dispatch.secret' => VerifyDispatchSecret::class,
+            'inbound.mail.secret' => VerifyInboundMailSecret::class,
             'super.admin' => EnsureSuperAdmin::class,
             'driver.active' => EnsureDriverTenantActive::class,
             'user.account' => EnsureUserAccount::class,

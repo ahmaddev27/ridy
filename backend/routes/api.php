@@ -67,6 +67,7 @@ use App\Http\Controllers\Api\V1\Fleet\FleetWebauthnCredentialController;
 use App\Http\Controllers\Api\V1\FleetAutoDeclineController;
 use App\Http\Controllers\Api\V1\FleetSessionController;
 use App\Http\Controllers\Api\V1\HealthController;
+use App\Http\Controllers\Api\V1\InboundMailWebhookController;
 use App\Http\Controllers\Api\V1\Internal\SessionBrowserController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\NotificationPrefsController;
@@ -267,6 +268,11 @@ Route::prefix('v1')->group(function () {
             Route::delete('webauthn/credentials/{credential}', [FleetWebauthnCredentialController::class, 'destroy']);
         });
     });
+
+    // Inbound-mail webhook (SendGrid Inbound Parse, docs/27 variant B over HTTPS, no port 25).
+    // Stateless, so CSRF never applies; authenticated by a shared secret (?token= or header).
+    Route::post('inbound-mail/webhook', [InboundMailWebhookController::class, 'receive'])
+        ->middleware(['inbound.mail.secret', 'throttle:120,1']);
 
     // Internal — the dispatch daemon. Authenticated by a shared secret
     // (VerifyDispatchSecret, optionally IP-allowlisted via DISPATCH_ALLOWED_IPS),
@@ -560,9 +566,8 @@ Route::prefix('v1')->group(function () {
         Route::patch('companies/{tenant}/dispatch-reject', [CompanyController::class, 'setDispatchReject']);
         Route::patch('companies/{tenant}/passwordless-login', [CompanyController::class, 'setPasswordlessLogin']);
         Route::patch('companies/{tenant}/cobrowse', [CompanyController::class, 'setCobrowse']);
-        // Variant B (docs/27): operator-provisioned automatic Uber re-auth; returns the secret inbound address once.
+        // Variant B (docs/27): read-only view of the auto-provisioned secret forwarding address.
         Route::get('companies/{tenant}/auto-renewal', [CompanyController::class, 'getAutoRenewal']);
-        Route::patch('companies/{tenant}/auto-renewal', [CompanyController::class, 'setAutoRenewal']);
 
         // Read-only drill-down into a company's fleet data (admin tabs).
         Route::get('companies/{tenant}/drivers', [CompanyDataController::class, 'drivers']);

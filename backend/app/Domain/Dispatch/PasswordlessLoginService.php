@@ -224,7 +224,10 @@ class PasswordlessLoginService
             'cold' => $cold,
         ];
         $this->store->put($tenant->id, $record, LoginAttemptStore::START_WINDOW);
-        // No email (or anything derived from it) is kept: not in the cache record, not in the log.
+        // The email is kept ONLY encrypted on the tenant (so the automatic re-login knows the
+        // account) - never in the cache record, never in the audit log. A co-browse (full) login
+        // has none: the manager types it into Uber's own page and it never reaches us.
+        $this->settings->rememberEmail($tenant, $email);
         $this->audit->log('uber_login.started', null, ['mode' => $mode, 'cold' => $cold, 'full' => $full], $tenant->id);
 
         $answer = $this->client->startLogin($tenant, $email, $cold, $cobrowse, $full);

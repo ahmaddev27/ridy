@@ -18,6 +18,12 @@ return [
         'key' => env('POSTMARK_API_KEY'),
     ],
 
+    'inbound_mail' => [
+        // Shared secret for POST /api/v1/inbound-mail/webhook (SendGrid Inbound Parse URL ?token=).
+        // Blank = the webhook rejects every call.
+        'webhook_secret' => env('INBOUND_MAIL_WEBHOOK_SECRET', ''),
+    ],
+
     'dispatch' => [
         // Shared secret the Node dispatch daemon uses to authenticate to the
         // internal ingest endpoint. Must be set for that endpoint to accept calls.
