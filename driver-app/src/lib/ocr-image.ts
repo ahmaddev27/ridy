@@ -48,10 +48,11 @@ export type ResizeStep = { width: number } | { height: number };
 export function ocrResizeFor(
   width: number | null | undefined,
   height: number | null | undefined,
+  maxEdge: number = OCR_MAX_EDGE,
 ): ResizeStep | null {
   if (typeof width !== 'number' || typeof height !== 'number') return null;
   if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
   if (width <= 0 || height <= 0) return null;
-  if (Math.max(width, height) <= OCR_MAX_EDGE) return null;
-  return width >= height ? { width: OCR_MAX_EDGE } : { height: OCR_MAX_EDGE };
+  if (Math.max(width, height) <= maxEdge) return null;
+  return width >= height ? { width: maxEdge } : { height: maxEdge };
 }
