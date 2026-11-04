@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\Admin\CollectorController;
 use App\Http\Controllers\Api\V1\Admin\CollectorPaymentController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyDataController;
+use App\Http\Controllers\Api\V1\Admin\CompanyPasskeyController;
 use App\Http\Controllers\Api\V1\Admin\CompanySessionController;
 use App\Http\Controllers\Api\V1\Admin\CompanyUserController;
 use App\Http\Controllers\Api\V1\Admin\ContactMessageController;
@@ -67,6 +68,7 @@ use App\Http\Controllers\Api\V1\Fleet\FleetWebauthnCredentialController;
 use App\Http\Controllers\Api\V1\FleetAutoDeclineController;
 use App\Http\Controllers\Api\V1\FleetSessionController;
 use App\Http\Controllers\Api\V1\HealthController;
+use App\Http\Controllers\Api\V1\Internal\PasskeyController;
 use App\Http\Controllers\Api\V1\Internal\SessionBrowserController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\NotificationPrefsController;
@@ -298,6 +300,9 @@ Route::prefix('v1')->group(function () {
         Route::get('rescue', [SessionBrowserController::class, 'rescue']);
         Route::post('status', [SessionBrowserController::class, 'status']);
         Route::post('{tenant}/capture', [SessionBrowserController::class, 'capture']);
+        // Software passkey (docs/29). Deliberately no GET of the credential itself.
+        Route::get('{tenant}/passkey', [PasskeyController::class, 'show']);
+        Route::post('{tenant}/passkey', [PasskeyController::class, 'store']);
     });
 
     // Session basics every authenticated user needs — including tenant-less ones
@@ -589,6 +594,7 @@ Route::prefix('v1')->group(function () {
         Route::get('companies/{tenant}/session', [CompanySessionController::class, 'show']);
         Route::get('companies/{tenant}/session-browser', [CompanySessionController::class, 'sessionBrowser']);
         Route::get('companies/{tenant}/session/outages', [CompanySessionController::class, 'outages']);
+        Route::post('companies/{tenant}/passkey/register', [CompanyPasskeyController::class, 'register']);
         Route::post('companies/{tenant}/session/relink', [CompanySessionController::class, 'forceRelink']);
         Route::delete('companies/{tenant}/session', [CompanySessionController::class, 'destroy']);
         // Disconnect + wipe all operational fleet data (drivers/vehicles/offers/

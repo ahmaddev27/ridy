@@ -45,6 +45,13 @@ then grep before writing. Reuse the existing service/helper — the backend is s
   (`DriverStatusIngestor` + `OfferLifecycle`); the decline is the one thing we command, and we
   record Uber's answer rather than assume it. Do not reintroduce a timeline reconciler — it was
   tried and reverted.
+- **Amendment to rule #1 - software passkey registration (docs/29).** Registering a software
+  passkey on a company's Uber account is a second, owner-approved account WRITE. It is allowed
+  ONLY when gated by the global `UBER_PASSKEY_REGISTER` flag AND the per-company
+  `settings['passkey']['enabled']` flag (both OFF by default), and every registration is
+  audit-logged (`passkey.registered`, credential-id hash only). The passkey's private key is a
+  high-value secret: encrypted at rest, never logged, serialized, audited or sent to Sentry.
+  It changes nothing about accept/decline/trip rules above.
 - **Time model:** timezone **Europe/Berlin**, week starts **Monday**, the Uber fleet-day
   starts at **04:00**. All stats/windows use fleet-days.
 - **Every offer push carries** distance + dropoff + €/km with the €-quality badge; geocode

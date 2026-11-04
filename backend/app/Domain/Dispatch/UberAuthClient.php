@@ -99,6 +99,17 @@ class UberAuthClient
     }
 
     /**
+     * Ask uber-auth to register a software passkey on the company's Uber account (docs/29).
+     * The credential goes straight to the internal passkey endpoint, never through here.
+     *
+     * @return array<string, mixed>
+     */
+    public function registerPasskey(int $tenantId): array
+    {
+        return $this->post('/passkey/register', ['company_key' => (string) $tenantId], timeout: 120);
+    }
+
+    /**
      * @param  array<string, mixed>  $body
      * @return array<string, mixed>
      */

@@ -85,6 +85,11 @@ x-app-env: &app-env
   # Cold first-connect (no prior session): backend side of the flag. Needs uber-auth's
   # UBER_AUTH_PASSWORDLESS_COLD too. OFF unless "1".
   UBER_PASSWORDLESS_COLD: ${UBER_PASSWORDLESS_COLD:-}
+  # Software passkey auto-registration (docs/29): a scoped Uber account write. ALL OFF by
+  # default (empty); a company also needs its own settings flag. TENANTS = optional allowlist.
+  UBER_PASSKEY_REGISTER: ${UBER_PASSKEY_REGISTER:-}
+  UBER_PASSKEY_TENANTS: ${UBER_PASSKEY_TENANTS:-}
+  UBER_PASSKEY_LOGIN: ${UBER_PASSKEY_LOGIN:-}
   # Variant B: the subdomain whose MX Postfix pipes into `php artisan inbound-mail:ingest`.
   UBER_INBOUND_DOMAIN: ${UBER_INBOUND_DOMAIN:-in.reidey.de}
   # Co-browse (docs/28): backend global kill switch, OFF by default; a company also needs its
@@ -391,6 +396,9 @@ services:
       UBER_AUTH_PASSWORDLESS: ${UBER_AUTH_PASSWORDLESS:-}
       # Cold first-connect: allow a fresh-browser login for a never-connected company. OFF unless "1".
       UBER_AUTH_PASSWORDLESS_COLD: ${UBER_AUTH_PASSWORDLESS_COLD:-}
+      # Software passkey (docs/29): register / sign in with it. OFF unless "1".
+      UBER_AUTH_PASSKEY_REGISTER: ${UBER_AUTH_PASSKEY_REGISTER:-}
+      UBER_AUTH_PASSKEY_LOGIN: ${UBER_AUTH_PASSKEY_LOGIN:-}
       DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
       # Pilot: real Chrome headed under Xvfb (heavier RAM/CPU). Unset = headless Chromium.
       REAL_CHROME: ${REAL_CHROME:-}
