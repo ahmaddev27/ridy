@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Loader2, MessageCircle, Mail, KeyRound, Banknote, ChevronDown, Check, Clock } from "lucide-react";
-import { Button, buttonClasses } from "@/components/ui/button";
+import { Loader2, MessageCircle, Mail, KeyRound, Banknote, ChevronDown, Check, Clock, LockKeyhole } from "lucide-react";
 import { OtpInput } from "@/components/ui/otp-input";
 import { PaymentMethods } from "@/components/subscription/payment-methods";
 import { useI18n } from "@/lib/i18n/context";
@@ -81,91 +80,76 @@ export function SuspendedScreen({
   const wa = info.supportWhatsapp?.replace(/[^\d]/g, "");
 
   return (
-    <div className="space-y-3">
-      <div className="rounded-lg bg-danger-bg px-3 py-2.5 text-sm font-medium text-danger-fg">
-        {s(`reason_${info.reason}`)}
+    <div className="stack">
+      <div className="callout danger" role="alert">
+        <LockKeyhole />
+        <div>{s(`reason_${info.reason}`)}</div>
       </div>
 
       {canActivate ? (
         <>
-          <Section title={t("screens.codes.payTitle")} icon={Banknote} defaultOpen={false}>
+          <Section title={t("screens.codes.payTitle")} icon={Banknote} defaultOpen>
             <PaymentMethods headless reference={info.paymentReference} />
           </Section>
 
           {/* "I've paid" stays OUTSIDE the collapse so it's always visible. */}
           {claimPending ? (
-            <div className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2.5 text-sm text-ink-muted">
-              <Clock className="h-4 w-4 text-ink-subtle" />
-              {t("screens.codes.claimPendingLabel")}
+            <div className="callout">
+              <Clock />
+              <div>{t("screens.codes.claimPendingLabel")}</div>
             </div>
           ) : hasCredentials ? (
-            <div className="glass-panel glass-panel--card rounded-xl p-4">
-              <Button onClick={confirmPayment} disabled={confirming} className="w-full">
-                {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            <div className="card inset" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+              <button type="button" className="btn btn-primary btn-lg btn-block" onClick={confirmPayment} disabled={confirming}>
+                {confirming ? <Loader2 className="animate-spin" /> : <Check />}
                 {t("screens.codes.confirmPayment")}
-              </Button>
-              <p className="mt-2 text-xs text-ink-subtle">{t("screens.codes.confirmPaymentHint")}</p>
+              </button>
+              <p className="subtle text-sm">{t("screens.codes.confirmPaymentHint")}</p>
             </div>
           ) : null}
 
           {hasCredentials ? (
-            <Section title={s("activateTitle")} icon={KeyRound} defaultOpen={false}>
-              <p className="text-xs text-ink-subtle">{s("activateHint")}</p>
-              <form onSubmit={activate} className="mt-3 space-y-3">
+            <Section title={s("activateTitle")} icon={KeyRound}>
+              <form onSubmit={activate} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <p className="subtle text-sm">{s("activateHint")}</p>
                 <OtpInput value={code} onChange={setCode} autoFocus={false} />
-                <Button type="submit" disabled={busy || code.length < 6} className="w-full">
-                  {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+                <button type="submit" className="btn btn-primary btn-block" disabled={busy || code.length < 6}>
+                  {busy && <Loader2 className="animate-spin" />}
                   {s("activateCta")}
-                </Button>
+                </button>
               </form>
             </Section>
           ) : (
-            <div className="glass-panel glass-panel--card rounded-xl p-4">
-              <p className="text-sm text-ink-muted">{s("passwordNeededHint")}</p>
-              {onBackToLogin && (
-                <button
-                  type="button"
-                  onClick={onBackToLogin}
-                  className="mt-3 w-full text-center text-xs font-medium text-ink-muted hover:text-ink"
-                >
-                  {s("backToLogin")}
-                </button>
-              )}
+            <div className="card inset" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+              <p className="text-sm muted">{s("passwordNeededHint")}</p>
             </div>
           )}
         </>
-      ) : (
-        <p className="text-sm text-ink-muted">{s("contactHint")}</p>
-      )}
+      ) : null}
 
-      {(wa || info.supportEmail) && (
-        <div className="flex flex-col gap-2 pt-1">
-          {canActivate && <p className="text-center text-xs text-ink-subtle">{s("contactHint")}</p>}
-          {wa && (
-            <a
-              href={`https://wa.me/${wa}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={buttonClasses("primary", "md", "w-full")}
-            >
-              <MessageCircle className="h-4 w-4" /> {s("whatsapp")}
-            </a>
-          )}
-          {info.supportEmail && (
-            <a
-              href={`mailto:${info.supportEmail}`}
-              className="flex items-center justify-center gap-2 rounded-lg border border-line-strong px-3 py-2.5 text-sm font-semibold text-ink hover:bg-surface-2"
-            >
-              <Mail className="h-4 w-4" /> {s("email")}
-            </a>
-          )}
-        </div>
-      )}
+      <div className="stack-sm" style={{ textAlign: "center" }}>
+        {wa && (
+          <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-lg btn-block">
+            <MessageCircle /> {s("whatsapp")}
+          </a>
+        )}
+        {info.supportEmail && (
+          <a href={`mailto:${info.supportEmail}`} className="btn btn-secondary btn-lg btn-block">
+            <Mail /> {s("email")}
+          </a>
+        )}
+        <p className="subtle text-sm">{s("contactHint")}</p>
+        {onBackToLogin && (
+          <button type="button" className="btn btn-ghost btn-block" onClick={onBackToLogin}>
+            {s("backToLogin")}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-/** A single collapsible section with an icon header and a chevron. */
+/** A collapsible section (prototype `.auth-det`) with an icon header and a chevron. */
 function Section({
   title,
   icon: Icon,
@@ -177,20 +161,14 @@ function Section({
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="glass-panel glass-panel--card overflow-hidden rounded-xl">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center gap-2.5 px-4 py-3 text-start transition-colors hover:bg-surface-2"
-      >
-        <Icon className="h-4 w-4 shrink-0 text-ink" />
-        <span className="flex-1 font-semibold text-ink">{title}</span>
-        <ChevronDown className={"h-4 w-4 shrink-0 text-ink-subtle transition-transform " + (open ? "rotate-180" : "")} />
-      </button>
-      {open && <div className="border-t border-line px-4 py-4">{children}</div>}
-    </div>
+    <details className="auth-det" open={defaultOpen}>
+      <summary>
+        <Icon />
+        {title}
+        <ChevronDown className="chev" />
+      </summary>
+      <div className="det-body">{children}</div>
+    </details>
   );
 }

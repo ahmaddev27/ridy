@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { ExternalLink, Link2Off, Smartphone } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { useI18n } from "@/lib/i18n/context";
 
@@ -50,7 +51,7 @@ function detectPlatform(): "ios" | "android" {
 
 export default function DriverActivatePage() {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-canvas" />}>
+    <Suspense fallback={<div className="mobile-page" />}>
       <ActivateContent />
     </Suspense>
   );
@@ -99,38 +100,41 @@ function ActivateContent() {
   }, [deepLink]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
-      <div className="driver-activate-card w-full max-w-sm glass-panel glass-panel--card p-8 text-center">
-        <Logo size={64} className="mx-auto block text-ink" />
-        <h1 className="mt-6 text-xl font-bold text-ink">{t.title}</h1>
+    <div className="mobile-page">
+      <div className="stack-lg" style={{ width: "min(420px, 100%)" }}>
+        <main className="mobile-card" id="main" tabIndex={-1}>
+          <span className="brand-big">
+            <Logo size={40} tight />
+          </span>
+          <div>
+            <h1>{t.title}</h1>
+            {deepLink ? <p className="muted" style={{ textAlign: "center", marginTop: 8 }}>{t.sub}</p> : null}
+          </div>
 
-        {deepLink ? (
-          <>
-            <p className="mt-2 text-sm leading-relaxed text-ink-muted">{t.sub}</p>
-            <a
-              href={deepLink}
-              className="mt-6 block rounded-xl bg-primary px-4 py-3 font-semibold text-primary-ink transition-opacity hover:opacity-90"
-            >
-              {t.open}
-            </a>
-            {/* Download fallback — always offered so a driver without the app has a
-                clear path, and shown as the primary route once the auto-open failed. */}
-            {storeUrl && (
-              <a
-                href={storeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 block rounded-xl border border-line px-4 py-3 font-semibold text-ink transition-colors hover:bg-surface-2"
-              >
-                {t.download}
+          {deepLink ? (
+            <>
+              <a href={deepLink} className="btn btn-primary btn-lg btn-block">
+                <ExternalLink />
+                {t.open}
               </a>
-            )}
-            {tried && <p className="mt-4 text-xs text-ink-subtle">{t.hint}</p>}
-          </>
-        ) : (
-          <p className="mt-4 text-sm text-danger-fg">{t.noToken}</p>
-        )}
+              {/* Download fallback — always offered so a driver without the app has a
+                  clear path, and shown as the primary route once the auto-open failed. */}
+              {storeUrl && (
+                <a href={storeUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-lg btn-block">
+                  <Smartphone />
+                  {t.download}
+                </a>
+              )}
+              {tried && <p className="subtle text-sm" style={{ textAlign: "center" }}>{t.hint}</p>}
+            </>
+          ) : (
+            <div className="callout danger" role="alert">
+              <Link2Off />
+              <div>{t.noToken}</div>
+            </div>
+          )}
+        </main>
       </div>
-    </main>
+    </div>
   );
 }

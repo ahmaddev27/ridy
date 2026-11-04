@@ -2,11 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Ticket, Search, Loader2, CheckCircle2, Copy, Building2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
-import { Select } from "@/components/ui/select";
+import { Ticket, Search, Loader2, CircleCheck, Copy, Building2, Plus, TriangleAlert } from "lucide-react";
+import { PageHead } from "@/components/ui/rd";
 import { useI18n } from "@/lib/i18n/context";
 import { latnLocale } from "@/lib/utils";
 import { paymentMethodLabel } from "@/lib/api/payments";
@@ -87,131 +84,177 @@ export default function ResellerPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="mx-auto max-w-xl space-y-6">
-      <PageHeader tkey="reseller" />
+    <>
+      <div className="rs-wrap">
+        <PageHead title={t("pages.reseller.title")} sub={t("pages.reseller.subtitle")} />
 
-      {code ? (
-        <Card className="p-6 text-center">
-          <CheckCircle2 className="mx-auto h-10 w-10 text-success-fg" />
-          <p className="mt-3 text-sm text-ink-muted">{c("codeFor").replace("{company}", code.company).replace("{plan}", code.plan)}</p>
-          <div className="mt-4 flex items-center justify-center gap-2">
-            <span className="rounded-xl bg-primary px-6 py-3 font-mono text-3xl font-bold tracking-[0.3em] text-primary-ink" dir="ltr">{code.code}</span>
-            <button
-              onClick={() => { navigator.clipboard.writeText(code.code); toast.success(c("copied")); }}
-              className="rounded-lg p-2 text-ink-subtle hover:bg-surface-2 hover:text-ink"
-              title={c("copy")}
-            >
-              <Copy className="h-5 w-5" />
-            </button>
-          </div>
-          <p className="mt-3 text-sm text-ink-muted">
-            {money(code.price)} · {c("daysN").replace("{n}", String(code.days))} · {c("validHint")}
-          </p>
-          {code.payment_ref && (
-            <p className="mt-2 text-sm text-ink-muted">
-              {c("paymentRef")} <span className="font-mono font-semibold text-ink" dir="ltr">{code.payment_ref}</span>
-            </p>
-          )}
-          {code.payment_method && (
-            <p className="mt-1 text-sm text-ink-muted">
-              {t("screens.codes.method")}: <span className="font-semibold text-ink">{paymentMethodLabel(code.payment_method, t)}</span>
-            </p>
-          )}
-          <Button className="mt-5" onClick={reset}>{c("newCode")}</Button>
-        </Card>
-      ) : (
-        <Card className="space-y-5 p-6">
-          {/* Plan */}
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink">{c("plan")}</label>
-            <Select
-              value={planId}
-              onChange={setPlanId}
-              placeholder={c("selectPlan")}
-              options={plans.map((p) => ({ value: String(p.id), label: `${p.name} · ${money(p.price)} · ${c("daysN").replace("{n}", String(p.duration_days))}` }))}
-            />
-            {plans.length === 0 && <p className="mt-1 text-xs text-warning-fg">{c("noPlans")}</p>}
-          </div>
-
-          {/* Company search */}
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink">{c("company")}</label>
-            {company ? (
-              <div className="flex items-center justify-between rounded-lg border border-line bg-surface-2 px-3 py-2.5">
-                <span className="flex items-center gap-2 text-sm">
-                  <Building2 className="h-4 w-4 text-ink-muted" />
-                  <span className="font-medium text-ink">{company.name}</span>
-                  {company.phone && <span className="text-ink-subtle" dir="ltr">{company.phone}</span>}
-                </span>
-                <button onClick={() => setCompany(null)} className="text-xs font-medium text-ink-muted hover:text-ink">{c("change")}</button>
+        {code ? (
+          <section className="card">
+            <div className="card-body stack-lg" style={{ textAlign: "center", alignItems: "center" }}>
+              <span className="stat-ico success" style={{ width: 56, height: 56, borderRadius: 99 }}>
+                <CircleCheck style={{ width: 28, height: 28 }} />
+              </span>
+              <h2 className="section-title" style={{ fontSize: 17 }}>
+                {c("codeFor").replace("{company}", code.company).replace("{plan}", code.plan)}
+              </h2>
+              <div className="rs-code" style={{ width: "100%" }}>
+                <b>{code.code}</b>
+                <button
+                  type="button"
+                  aria-label={c("copy")}
+                  title={c("copy")}
+                  onClick={() => {
+                    navigator.clipboard.writeText(code.code);
+                    toast.success(c("copied"));
+                  }}
+                >
+                  <Copy className="ico-sm" />
+                </button>
               </div>
-            ) : (
-              <div className="relative">
-                <Search className="absolute top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle ltr:left-3 rtl:right-3" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={c("searchCompany")}
-                  className="ui-field w-full rounded-lg border border-line bg-surface py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3"
-                />
-                {(searching || results.length > 0) && (
-                  <div className="app-menu absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-line bg-surface shadow-lg">
-                    {searching ? (
-                      <div className="flex items-center justify-center py-4 text-ink-subtle"><Loader2 className="h-4 w-4 animate-spin" /></div>
-                    ) : (
-                      results.map((r) => (
-                        <button
-                          key={r.id}
-                          onClick={() => { setCompany(r); setResults([]); }}
-                          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-start text-sm hover:bg-surface-2"
-                        >
-                          <span className="font-medium text-ink">{r.name}</span>
-                          {r.phone && <span className="text-xs text-ink-subtle" dir="ltr">{r.phone}</span>}
-                        </button>
-                      ))
+              <div className="stack-sm">
+                <div className="strong num">
+                  {money(code.price)} · {c("daysN").replace("{n}", String(code.days))} · {c("validHint")}
+                </div>
+                {code.payment_ref && (
+                  <div className="text-sm muted">
+                    {c("paymentRef")} <span className="mono" dir="ltr">{code.payment_ref}</span>
+                  </div>
+                )}
+                {code.payment_method && (
+                  <div className="text-sm muted">
+                    {t("screens.codes.method")}: {paymentMethodLabel(code.payment_method, t)}
+                  </div>
+                )}
+              </div>
+              <button type="button" className="btn btn-secondary" onClick={reset}>
+                <Plus />
+                {c("newCode")}
+              </button>
+            </div>
+          </section>
+        ) : (
+          <section className="card">
+            <div className="card-body stack-lg">
+              {/* Plan */}
+              {plans.length === 0 ? (
+                <div className="callout warning">
+                  <TriangleAlert />
+                  <div>{c("noPlans")}</div>
+                </div>
+              ) : (
+                <div className="field">
+                  <label htmlFor="rs-plan">{c("plan")}</label>
+                  <select id="rs-plan" className="select" value={planId} onChange={(e) => setPlanId(e.target.value)}>
+                    <option value="">{c("selectPlan")}</option>
+                    {plans.map((p) => (
+                      <option key={p.id} value={String(p.id)}>
+                        {`${p.name} · ${money(p.price)} · ${c("daysN").replace("{n}", String(p.duration_days))}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Company search */}
+              <div className="field">
+                <label htmlFor="rs-q">{c("company")}</label>
+                {company ? (
+                  <div className="row card inset" style={{ padding: "10px 12px", gap: 10 }}>
+                    <span className="stat-ico"><Building2 /></span>
+                    <div className="grow truncate">
+                      <div className="strong truncate">{company.name}</div>
+                      {company.phone && <div className="subtle text-sm num" dir="ltr">{company.phone}</div>}
+                    </div>
+                    <button
+                      type="button"
+                      className="link text-sm"
+                      style={{ background: "none", border: 0, cursor: "pointer" }}
+                      onClick={() => setCompany(null)}
+                    >
+                      {c("change")}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="rs-search">
+                    <div className="input-group">
+                      <Search />
+                      <input
+                        id="rs-q"
+                        className="input"
+                        type="search"
+                        autoComplete="off"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder={c("searchCompany")}
+                      />
+                    </div>
+                    {(searching || results.length > 0) && (
+                      <div className="rs-results">
+                        {searching ? (
+                          <div className="row" style={{ justifyContent: "center", padding: 12 }}>
+                            <Loader2 className="ico-sm animate-spin" />
+                          </div>
+                        ) : (
+                          results.map((r) => (
+                            <button
+                              key={r.id}
+                              type="button"
+                              onClick={() => {
+                                setCompany(r);
+                                setResults([]);
+                              }}
+                            >
+                              <span className="truncate">{r.name}</span>
+                              {r.phone && <span className="subtle text-sm num" dir="ltr">{r.phone}</span>}
+                            </button>
+                          ))
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Summary + generate */}
-          {selectedPlan && company && (
-            <div className="rounded-lg bg-surface-2 px-3 py-2.5 text-sm text-ink-muted">
-              {c("summary").replace("{company}", company.name).replace("{plan}", selectedPlan.name).replace("{price}", money(selectedPlan.price))}
+              {/* Summary + generate */}
+              {selectedPlan && company && (
+                <p className="text-sm muted">
+                  {c("summary")
+                    .replace("{company}", company.name)
+                    .replace("{plan}", selectedPlan.name)
+                    .replace("{price}", money(selectedPlan.price))}
+                </p>
+              )}
+              <button
+                type="button"
+                className="btn btn-primary btn-lg btn-block"
+                onClick={generate}
+                disabled={!canGenerate || busy}
+              >
+                {busy ? <Loader2 className="animate-spin" /> : <Ticket />}
+                {c("generate")}
+              </button>
             </div>
-          )}
-          <Button className="w-full" onClick={generate} disabled={!canGenerate || busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ticket className="h-4 w-4" />}
-            {c("generate")}
-          </Button>
-        </Card>
-      )}
+          </section>
+        )}
       </div>
 
       {/* The reseller's own codes and their lifecycle. */}
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold text-ink">{c("myCodesTitle")}</h2>
-          <p className="text-sm text-ink-muted">{c("myCodesDesc")}</p>
-        </div>
-        <CodesLedger
-          key={code?.code ?? "list"}
-          fetchCodes={getResellerCodes}
-          onRegenerate={async (row) => {
-            if (!row.plan_id) return;
-            try {
-              const res = await generateResellerCode(row.tenant_id, row.plan_id);
-              setCode(res);
-              toast.success(c("generated"));
-            } catch (e) {
-              toast.error(c("failed"), { description: apiErrorMessage(e, t, locale) });
-            }
-          }}
-        />
-      </section>
-    </div>
+      <CodesLedger
+        key={code?.code ?? "list"}
+        title={c("myCodesTitle")}
+        sub={c("myCodesDesc")}
+        fetchCodes={getResellerCodes}
+        onRegenerate={async (row) => {
+          if (!row.plan_id) return;
+          try {
+            const res = await generateResellerCode(row.tenant_id, row.plan_id);
+            setCode(res);
+            toast.success(c("generated"));
+          } catch (e) {
+            toast.error(c("failed"), { description: apiErrorMessage(e, t, locale) });
+          }
+        }}
+      />
+    </>
   );
 }

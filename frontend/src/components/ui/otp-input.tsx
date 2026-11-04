@@ -78,7 +78,7 @@ export function OtpInput({
   }
 
   return (
-    <div className="flex justify-center gap-2" dir="ltr">
+    <div className="otp" dir="ltr" role="group">
       {Array.from({ length }).map((_, i) => (
         <input
           key={i}
@@ -96,7 +96,7 @@ export function OtpInput({
           autoFocus={autoFocus && i === 0}
           disabled={disabled}
           aria-label={t("common.otpDigit").replace("{n}", String(i + 1))}
-          className="ui-field h-12 w-11 rounded-lg border border-line-strong text-center font-mono text-xl font-semibold text-ink outline-none transition-colors focus:border-ink focus:ring-2 focus:ring-line disabled:opacity-50"
+          className="disabled:opacity-50"
         />
       ))}
     </div>
