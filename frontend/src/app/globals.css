@@ -793,44 +793,6 @@ html:root .ui-table thead th { background: var(--surface-3); }
 .ui-table .c { text-align: center; }
 
 /* ================================================================== *
- * GLASS REDESIGN (issue #282) — Phase 5: auth shell glass card.
- *
- * Same mechanism as Phases 1–2: UNLAYERED rules scoped to html:root
- * so they win over the auth markup's Tailwind utilities without !important.
- * Ported 1:1 from the prototype's
- * auth CSS (`.auth` transparent over the ambient field; `.auth-form .inner` a
- * translucent glass card — white edge + inner highlight + glass shadow, NO
- * backdrop-filter since it is a content card). The form column loses its opaque
- * surface + seam shadow so the ambient shows behind the floating card; the brand
- * aside (its own column) is untouched. The card uses var(--surface) so the
- * prefers-reduced-transparency / prefers-contrast fallbacks already make it solid
- * for AA. Login/OTP/passkey markup, handlers and i18n keys are unchanged; only
- * these hook classes were added to auth-layout.tsx.
- * ================================================================== */
-html:root .auth-shell,
-html:root .auth-main { background: transparent; }
-html:root .auth-main { box-shadow: none; }
-html:root .auth-card {
-  padding: 32px;
-  background: var(--surface);
-  border: 1px solid var(--glass-edge);
-  border-radius: 26px;
-  box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--glass-shadow);
-}
-
-/* Driver invitation landing (/driver/activate) — a standalone public page whose
- * centred panel is a raw div, not the shared Card primitive, so it needs its own
- * hook to become the prototype's glass content card (translucent pane + white edge
- * + inner highlight + glass shadow, NO backdrop-filter). The global ambient field
- * (body::before) already shows behind it via the glass canvas. Keeps the markup's rounded-2xl radius
- * and p-8; only the border colour and shadow are upgraded. */
-html:root .driver-activate-card {
-  background: var(--surface);
-  border-color: var(--glass-edge);
-  box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--glass-shadow);
-}
-
-/* ================================================================== *
  * GLASS REDESIGN (issue #283) — Phase 6: admin / reseller / elprofessor.
  *
  * Almost every admin surface already flows through the Phase-0/2 primitives
@@ -1395,4 +1357,68 @@ html:root .app-sticky-footer {
     @media (max-width: 720px) { .form-section { grid-template-columns: 1fr; gap: 12px; } }
   @media (max-width: 1000px) { .acc-split { grid-template-columns: 1fr; } }
   @media (max-width: 720px) { .acc-pay { grid-template-columns: 1fr; } }
+}
+
+/* ================================================================== *
+ * REMAKE V2 - auth + reseller + driver-activate, ported 1:1 from the
+ * prototype (.auth / .auth-form / .auth-aside / .auth-det / .mobile-page /
+ * .mobile-card / .rs-*). Real classes in @layer components so utilities still win.
+ * ================================================================== */
+@layer components {
+  .auth { min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); background: transparent; }
+  .auth-form { display: flex; flex-direction: column; padding: 28px clamp(20px, 5vw, 64px); }
+  .auth-form .inner {
+    width: 100%; max-width: 452px; margin: auto; display: flex; flex-direction: column; gap: 22px; padding: 32px;
+    background: var(--surface); border: 1px solid var(--glass-edge); border-radius: 26px;
+    box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--glass-shadow);
+  }
+  .auth-form h1 { font-size: 28px; letter-spacing: -0.03em; }
+  .auth-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .auth-mlogo { display: none; align-items: center; gap: 10px; font-weight: 650; font-size: 16px; }
+  .auth-form .sub { color: var(--ink-muted); margin-top: 6px; }
+  .auth-form form { display: flex; flex-direction: column; gap: 18px; }
+  .auth-form .foot-line { text-align: center; font-size: 13.5px; color: var(--ink-muted); }
+  .fgt .hint { display: block; text-align: end; }
+  .wa svg { color: #25d366; }
+  .auth-aside { position: relative; margin: 10px; border-radius: var(--r-2xl); overflow: hidden; background: #0c1411; color: #e5ebe8; display: flex; flex-direction: column; justify-content: flex-end; padding: 40px; isolation: isolate; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08); }
+  .auth-aside::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(120% 80% at 85% 0%, rgb(16 185 129 / .32), transparent 60%), radial-gradient(90% 60% at 0% 100%, rgb(4 120 87 / .35), transparent 60%); }
+  .auth-aside .grid-dots { position: absolute; inset: 0; z-index: -1; background-image: radial-gradient(rgb(255 255 255 / .08) 1px, transparent 1px); background-size: 22px 22px; mask-image: linear-gradient(to bottom, #000, transparent 85%); }
+  .auth-aside .a-top { display: flex; align-items: center; gap: 12px; margin-bottom: auto; font-weight: 650; font-size: 20px; letter-spacing: -.02em; }
+  .auth-aside .a-top .brand-mark { background: rgb(255 255 255 / .1); color: #6ee7b7; }
+  .auth-aside h2 { font-size: clamp(28px, 3vw, 40px); letter-spacing: -.035em; line-height: 1.1; font-weight: 650; max-width: 16ch; }
+  .auth-aside > p { color: #a9b8b1; margin-top: 12px; max-width: 42ch; line-height: 1.55; }
+  .a-glass { margin-top: 30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 16px; border-radius: 18px; background: rgb(255 255 255 / .06); border: 1px solid rgb(255 255 255 / .12); backdrop-filter: blur(10px); direction: ltr; }
+  .a-glass b { display: block; font-size: 22px; letter-spacing: -.03em; }
+  .a-glass span { font-size: 12px; color: #a9b8b1; }
+  .a-trust { display: flex; gap: 10px; align-items: flex-start; margin-top: 18px; font-size: 12.5px; color: #a9b8b1; }
+  .a-trust svg { flex: none; color: #6ee7b7; width: 16px; height: 16px; margin-top: 1px; }
+  .divider-text { display: flex; align-items: center; gap: 12px; color: var(--ink-subtle); font-size: 12.5px; }
+  .divider-text::before, .divider-text::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+  .auth-det { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+  .auth-det > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 13px 14px; font-weight: 550; font-size: 14px; }
+  .auth-det > summary::-webkit-details-marker { display: none; }
+  .auth-det > summary > svg { width: 18px; height: 18px; flex: none; }
+  .auth-det > summary .chev { margin-inline-start: auto; transition: transform .2s; color: var(--ink-subtle); }
+  .auth-det[open] > summary .chev { transform: rotate(180deg); }
+  .auth-det .det-body { padding: 2px 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+  .otp input.invalid { border-color: var(--danger-dot); }
+  @media (max-width: 900px) {
+    .auth { grid-template-columns: minmax(0, 1fr); }
+    .auth-aside { display: none; }
+    .auth-mlogo { display: inline-flex; }
+  }
+  .mobile-page { min-height: 100dvh; display: grid; place-items: start center; padding: 28px 16px; background: transparent; }
+  .mobile-card { width: min(420px, 100%); background: var(--surface); border: 1px solid var(--glass-edge); border-radius: 26px; box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--glass-shadow); padding: 26px 22px; display: flex; flex-direction: column; gap: 18px; }
+  .mobile-card h1 { font-size: 23px; letter-spacing: -.03em; text-align: center; }
+  .mobile-card .brand-big { align-self: center; width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; background: var(--primary); color: var(--primary-ink); }
+  .rs-wrap { max-width: 576px; width: 100%; margin-inline: auto; display: flex; flex-direction: column; gap: 22px; }
+  .rs-search { position: relative; }
+  .rs-results { position: absolute; inset-inline: 0; top: calc(100% + 6px); z-index: 20; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-md); padding: 4px; max-height: 260px; overflow: auto; }
+  .rs-results button { display: flex; width: 100%; justify-content: space-between; gap: 12px; align-items: center; padding: 9px 10px; border: 0; background: none; border-radius: 8px; cursor: pointer; text-align: start; color: var(--ink); font: inherit; }
+  .rs-results button:hover { background: var(--surface-2); }
+  .rs-code { background: var(--primary); color: var(--primary-ink); border-radius: var(--r-lg); padding: 20px; display: flex; align-items: center; justify-content: center; gap: 14px; }
+  .rs-code b { font-family: var(--font-mono); font-size: 34px; letter-spacing: .28em; padding-inline-start: .28em; direction: ltr; }
+  .rs-code button { background: rgb(255 255 255 / .16); color: inherit; border: 0; width: 38px; height: 38px; border-radius: 10px; cursor: pointer; display: grid; place-items: center; }
+  .rs-code button:hover { background: rgb(255 255 255 / .28); }
+  @media (max-width: 520px) { .rs-code b { font-size: 26px; } }
 }

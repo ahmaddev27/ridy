@@ -38,12 +38,9 @@ export function WhatsAppButton({ className = "" }: { className?: string }) {
       rel="noopener noreferrer"
       title={t("support.whatsapp")}
       aria-label={t("support.whatsapp")}
-      className={
-        "inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-ink-muted transition-colors hover:border-[#25D366] hover:text-[#128C7E] " +
-        className
-      }
+      className={"btn btn-secondary btn-block wa " + className}
     >
-      <WhatsAppIcon className="h-4 w-4 text-[#25D366]" />
+      <WhatsAppIcon className="text-[#25D366]" />
       {t("support.whatsapp")}
     </a>
   );
