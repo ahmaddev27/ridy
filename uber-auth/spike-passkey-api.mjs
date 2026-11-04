@@ -39,9 +39,9 @@ const result = await page.evaluate(async () => {
   const att = (enc) => ({ client_data_json: enc(c.response.clientDataJSON), attestation_object: enc(c.response.attestationObject), transports });
   const post = (body) => fetch("/api/registerPublicKeyCredential", { method: "POST", headers: H, body: JSON.stringify(body) }).then(async (x) => ({ s: x.status, b: (await x.text()).slice(0, 300) })).catch((e) => ({ s: 0, b: String(e) }));
   const attempts = [
-    ["std", { request: { attestation: att(std) } }],
-    ["url", { request: { attestation: att(url) } }],
-    ["std+name", { request: { attestation: att(std), name: "Reidey" } }],
+    ["std", { attestation: att(std) }],
+    ["url", { attestation: att(url) }],
+    ["std+name", { attestation: att(std), name: "Reidey" }],
   ];
   const tries = [];
   for (const [tag, body] of attempts) {
