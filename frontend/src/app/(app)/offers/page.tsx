@@ -4,11 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney, latnLocale, toLatinDigits } from "@/lib/utils";
 import { toast } from "sonner";
-import { Radio, MapPin, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, Inbox, CheckCircle2, XCircle, Gauge, Wallet, Download, Ban } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Radio, ChevronDown, Inbox, Check, CircleX, Gauge, Wallet, Download, Ban, Users, X } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHead, SkelRows, StatTile, PagerBar } from "@/components/ui/rd";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { listOffersPaged, getOfferStats, exportOffers, fareLabel, type DispatchOffer, type PageMeta, type OfferStats } from "@/lib/api/offers";
@@ -18,7 +16,6 @@ import { OfferStatusBadge } from "@/components/ui/offer-status-badge";
 import { DeclineOfferButton } from "./decline-offer-button";
 import { OPEN_OFFER_EVENT } from "@/components/offer-alerts";
 import { usePolling } from "@/hooks/use-polling";
-import { StatCard } from "@/components/ui/card";
 import { listDrivers, type Driver } from "@/lib/api/drivers";
 import { OfferDetailModal } from "./offer-detail-modal";
 import { AdBanner } from "@/components/ads/ad-banner";
@@ -247,53 +244,50 @@ export default function OffersPage() {
   }
 
 
+  const nf = (n: number) => n.toLocaleString(latnLocale(locale));
+  const cols = 6;
+
   return (
-    <div className="space-y-6">
-      <PageHeader title={c("title")} subtitle={c("subtitle")} />
+    <>
+      <PageHead title={c("title")} sub={c("subtitle")} />
 
       {/* Platform ad banner (super-admin authored); renders nothing when none live. */}
       <AdBanner />
 
-      {/* Toolbar: search + driver filter + bulk delete */}
-      <div className="flex flex-wrap items-center gap-3">
-        <SearchInput value={search} onChange={setSearch} placeholder={c("searchPlaceholder")} className="flex-1" />
+      {/* Toolbar: search + driver filter + date range + export */}
+      <div className="toolbar">
+        <SearchInput value={search} onChange={setSearch} placeholder={c("searchPlaceholder")} />
         {/* Multi-select driver filter — lists every company driver */}
-        <div className="relative">
-          <button
-            onClick={() => setDriverFilterOpen((o) => !o)}
-            className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none hover:bg-surface-2"
-          >
-            {driverUuids.length === 0
-              ? c("filterAll")
-              : `${driverUuids.length} ${c("driversSelected")}`}
-            <ChevronDown className="h-4 w-4 text-ink-subtle" />
+        <div style={{ position: "relative" }}>
+          <button type="button" onClick={() => setDriverFilterOpen((o) => !o)} className="btn btn-secondary" aria-haspopup="true" aria-expanded={driverFilterOpen}>
+            <Users />
+            <span className="lbl">{driverUuids.length === 0 ? c("filterAll") : `${driverUuids.length} ${c("driversSelected")}`}</span>
+            <ChevronDown />
           </button>
           {driverFilterOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setDriverFilterOpen(false)} />
-              <div className="app-menu absolute z-20 mt-1 max-h-72 w-64 overflow-y-auto rounded-lg border border-line bg-surface p-1 shadow-lg">
+              <div className="menu" style={{ top: "calc(100% + 6px)", insetInlineStart: 0, width: 264, maxHeight: 288, overflow: "auto", padding: 2 }}>
                 {driverUuids.length > 0 && (
-                  <button
-                    onClick={() => setDriverUuids([])}
-                    className="w-full rounded px-2 py-1.5 text-start text-xs font-medium text-ink hover:bg-surface-2"
-                  >
+                  <button type="button" onClick={() => setDriverUuids([])} style={{ color: "var(--primary)" }}>
+                    <X />
                     {c("clearSelection")}
                   </button>
                 )}
                 {allDrivers.length === 0 ? (
-                  <p className="px-2 py-2 text-xs text-ink-subtle">{c("noDrivers")}</p>
+                  <p className="subtle text-xs" style={{ padding: 10 }}>{c("noDrivers")}</p>
                 ) : (
                   allDrivers.map((d) => (
-                    <label
-                      key={d.id}
-                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-surface-2"
-                    >
+                    <label key={d.id} className="check" style={{ padding: "7px 10px", borderRadius: 8, alignItems: "center" }}>
                       <input
                         type="checkbox"
                         checked={selectedDriverSet.has(d.uber_driver_uuid ?? "")}
                         onChange={() => d.uber_driver_uuid && toggleDriver(d.uber_driver_uuid)}
                       />
-                      <span className="truncate text-ink">{d.name}</span>
+                      <span style={{ minWidth: 0 }}>
+                        <span className="strong truncate" style={{ display: "block", fontSize: 13 }}>{d.name}</span>
+                        <span className="mono subtle" style={{ fontSize: 10 }}>{d.uber_driver_uuid}</span>
+                      </span>
                     </label>
                   ))
                 )}
@@ -314,175 +308,158 @@ export default function OffersPage() {
           }}
         />
 
-        <Button
-          variant="secondary"
-          onClick={handleExport}
-          disabled={exporting}
-          className="ms-auto"
-        >
-          <Download className="h-4 w-4" />
-          {c("exportExcel")}
-        </Button>
+        <span style={{ marginInlineStart: "auto" }}>
+          <button type="button" className="btn btn-secondary" onClick={handleExport} disabled={exporting}>
+            <Download />
+            {c("exportExcel")}
+          </button>
+        </span>
       </div>
 
-      {/* Stat cards for the current filter */}
+      {/* Stat tiles for the current filter */}
       {stats && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <StatCard icon={Inbox} label={c("statTotal")} value={stats.total.toLocaleString(latnLocale(locale))} />
-          <StatCard icon={CheckCircle2} label={c("statAccepted")} value={stats.accepted.toLocaleString(latnLocale(locale))} tone="positive" />
-          <StatCard icon={XCircle} label={c("statNotTaken")} value={stats.declined.toLocaleString(latnLocale(locale))} />
-          {/* Carried separately because the list still shows these rows while the
-              other three figures exclude them — otherwise the counts look broken.
-              The value is defaulted because frontend and backend ship separately:
-              an older API body would crash the render on a missing field.
-              Only shown when the company has dispatch-reject on (the admin "UBER رفض"
-              switch): a company without it never declines from the panel, so the card
-              would always read 0 and only confuse. */}
+        <div className="kpi6">
+          <StatTile icon={Inbox} label={c("statTotal")} value={nf(stats.total)} />
+          <StatTile icon={Check} label={c("statAccepted")} value={nf(stats.accepted)} tone="success" toneValue />
+          <StatTile icon={CircleX} label={c("statNotTaken")} value={nf(stats.declined)} />
+          {/* Only for companies with dispatch-reject on (the admin switch): without
+              it the tile would always read 0. Defaulted because frontend and backend
+              ship separately. */}
           {user?.tenant?.dispatch_reject_enabled && (
-            <StatCard
+            <StatTile
               icon={Ban}
               label={c("statDispatchDeclined")}
-              value={(stats.dispatch_declined ?? 0).toLocaleString(latnLocale(locale))}
-              hint={c("statDispatchDeclinedHint")}
+              value={nf(stats.dispatch_declined ?? 0)}
+              tone="accent"
+              foot={c("statDispatchDeclinedHint")}
             />
           )}
-          <StatCard icon={Gauge} label={c("statRate")} value={`${stats.acceptance_rate}%`} tone={stats.acceptance_rate >= 50 ? "positive" : "default"} />
-          <StatCard icon={Wallet} label={c("statEarnings")} value={formatMoney(stats.earnings, locale)} tone="positive" />
+          <StatTile
+            icon={Gauge}
+            label={c("statRate")}
+            value={`${stats.acceptance_rate}%`}
+            tone={stats.acceptance_rate >= 50 ? "success" : ""}
+            toneValue={stats.acceptance_rate >= 50}
+          />
+          <StatTile icon={Wallet} label={c("statEarnings")} value={formatMoney(stats.earnings, locale)} tone="success" toneValue />
         </div>
       )}
 
       {error && (
-        <div className="rounded-lg border border-danger-dot/40 bg-danger-bg p-3 text-sm text-danger-fg">
-          {c("loadError")} — {error}
+        <div className="callout danger">
+          <div>
+            {c("loadError")} — {error}
+          </div>
         </div>
       )}
 
-      <Card className="overflow-hidden">
+      <section className="card table-card">
         {loading ? (
-          <div className="space-y-2 p-4">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded bg-surface-2" />
-            ))}
-          </div>
+          <SkelRows rows={6} cols={5} />
         ) : offers.length === 0 ? (
           <EmptyState icon={Radio} title={c("empty")} description={c("emptyDesc")} />
         ) : (
-          <div>
-            {groupedByDay.map(([key, dayOffers]) => {
-              const open = openDays.has(key);
-              return (
-                <div key={key} className="border-b border-line last:border-0">
-                  <button
-                    onClick={() => toggleDay(key)}
-                    className="flex w-full items-center gap-2 px-4 py-3 text-start hover:bg-surface-2"
-                  >
-                    <ChevronDown className={`h-4 w-4 text-ink-subtle transition ${open ? "" : "-rotate-90"}`} />
-                    <span className="font-semibold text-ink">{dayLabel(key)}</span>
-                    <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-ink">
-                      {dayOffers.length} {c("offersCount")}
-                    </span>
-                  </button>
-                  {open && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <tbody className="divide-y divide-line">
-                          {dayOffers.map((o) => (
-                            <tr
-                              key={o.id}
-                              onClick={() => setDetailId(o.id)}
-                              className="cursor-pointer hover:bg-surface-2"
-                            >
-                              <td className="whitespace-nowrap px-4 py-3 text-ink-muted">
-                                {/* A real control so keyboard users can open the offer too. */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDetailId(o.id);
-                                  }}
-                                  className="rounded outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                                >
-                                  {o.received_at ? new Date(o.received_at).toLocaleTimeString(latnLocale(locale)) : "—"}
-                                </button>
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="font-medium text-ink">{o.driver_name ?? "—"}</div>
-                                <div className="font-mono text-[10px] text-ink-subtle">{o.driver_uuid}</div>
-                              </td>
-                              <td className="px-4 py-3 text-ink-muted">
-                                <div className="flex items-start gap-1.5">
-                                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success-fg" />
-                                  <div className="min-w-0">
-                                    <div className="truncate">{o.pickup_address ?? "—"}</div>
-                                    <div className="flex items-center gap-1 truncate text-ink-subtle">
-                                      <ArrowRight className="h-3 w-3 shrink-0 rtl:rotate-180" />
-                                      <span className="truncate">{o.dropoff_address ?? "—"}</span>
-                                      {o.stops_count != null && o.stops_count >= 2 && (
-                                        <span className="shrink-0 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">
-                                          +{o.stops_count - 1}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 font-semibold text-ink">
-                                {toLatinDigits(fareLabel(o, latnLocale(locale)))}
-                              </td>
-                              <td className="px-4 py-3">
-                                <OfferStatusBadge offer={o} />
-                              </td>
-                              {/* Declining must not also open the detail modal. */}
-                              <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
-                                <DeclineOfferButton offer={o} />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div className="table-wrap ofr-tbl">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>{c("colTime")}</th>
+                  <th>{c("colDriver")}</th>
+                  <th>{c("colRoute")}</th>
+                  <th className="r">{c("colFare")}</th>
+                  <th>{c("colStatus")}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {groupedByDay.map(([key, dayOffers]) => {
+                  const open = openDays.has(key);
+                  return [
+                    <tr key={`h-${key}`} className="day-row">
+                      <td colSpan={cols}>
+                        <button type="button" className="day-toggle" aria-expanded={open} onClick={() => toggleDay(key)}>
+                          <ChevronDown />
+                          <span>{dayLabel(key)}</span>
+                          <span className="day-pill">
+                            {dayOffers.length} {c("offersCount")}
+                          </span>
+                        </button>
+                      </td>
+                    </tr>,
+                    ...(open ? dayOffers.map((o) => <OfferRow key={o.id} o={o} locale={locale} onOpen={setDetailId} />) : []),
+                  ];
+                })}
+              </tbody>
+            </table>
           </div>
         )}
 
         {/* Pagination */}
         {meta && meta.total > 0 && (
-          <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm">
-            <span className="text-ink-muted">
-              {(meta.current_page - 1) * meta.per_page + 1}–
-              {Math.min(meta.current_page * meta.per_page, meta.total)} {c("of")} {meta.total}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={meta.current_page <= 1}
-                className="rounded-lg border border-line p-1.5 text-ink-muted hover:bg-surface-2 disabled:opacity-40"
-                aria-label={c("prev")}
-              >
-                <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
-              </button>
-              <span className="px-2 text-ink-muted">
-                {meta.current_page} / {meta.last_page}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(meta.last_page, p + 1))}
-                disabled={meta.current_page >= meta.last_page}
-                className="rounded-lg border border-line p-1.5 text-ink-muted hover:bg-surface-2 disabled:opacity-40"
-                aria-label={c("next")}
-              >
-                <ChevronRight className="h-4 w-4 rtl:rotate-180" />
-              </button>
+          <PagerBar
+            range={`${(meta.current_page - 1) * meta.per_page + 1}–${Math.min(meta.current_page * meta.per_page, meta.total)} ${c("of")} ${meta.total}`}
+            page={meta.current_page}
+            lastPage={meta.last_page}
+            onPage={setPage}
+          />
+        )}
+      </section>
+
+      {detailId !== null && <OfferDetailModal id={detailId} onClose={closeDetail} />}
+    </>
+  );
+}
+
+function OfferRow({ o, locale, onOpen }: { o: DispatchOffer; locale: string; onOpen: (id: number) => void }) {
+  return (
+    <tr className="clickable" onClick={() => onOpen(o.id)}>
+      <td>
+        {/* A real control so keyboard users can open the offer too. */}
+        <button
+          type="button"
+          className="time-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen(o.id);
+          }}
+        >
+          {o.received_at ? new Date(o.received_at).toLocaleTimeString(latnLocale(locale)) : "—"}
+        </button>
+      </td>
+      <td>
+        <div className="strong truncate">{o.driver_name ?? "—"}</div>
+        <div className="mono subtle" style={{ fontSize: 10 }}>{o.driver_uuid}</div>
+      </td>
+      <td>
+        <div style={{ minWidth: 240, maxWidth: 400 }}>
+          <div className="route">
+            <span className="dotA" />
+            <div className="truncate">{o.pickup_address ?? "—"}</div>
+            <span className="via" />
+            <span />
+            <span className="dotB" />
+            <div className="truncate">
+              {o.dropoff_address ?? "—"}
+              {o.stops_count != null && o.stops_count >= 2 && (
+                <>
+                  {" "}
+                  <span className="badge warning square" style={{ height: 18, padding: "0 5px" }}>+{o.stops_count - 1}</span>
+                </>
+              )}
             </div>
           </div>
-        )}
-      </Card>
-
-      {detailId !== null && (
-        <OfferDetailModal id={detailId} onClose={closeDetail} />
-      )}
-    </div>
+        </div>
+      </td>
+      <td className="r">
+        <span className="num strong nowrap">{toLatinDigits(fareLabel(o, latnLocale(locale)))}</span>
+      </td>
+      <td>
+        <OfferStatusBadge offer={o} />
+      </td>
+      {/* Declining must not also open the detail modal. */}
+      <td className="r" onClick={(e) => e.stopPropagation()}>
+        <DeclineOfferButton offer={o} />
+      </td>
+    </tr>
   );
 }

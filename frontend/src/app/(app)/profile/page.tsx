@@ -3,9 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Save, User, KeyRound, Fingerprint, Bell } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHead } from "@/components/ui/rd";
 import { PasswordInput } from "@/components/ui/password-input";
 import { useI18n } from "@/lib/i18n/context";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -63,78 +61,91 @@ export default function ProfilePage() {
     }
   }
 
-  return (
-    <div className="space-y-6">
-      <PageHeader tkey="profile" />
+  const spin = { animation: "ofr-spin 1s linear infinite" };
 
-      <div className="flex w-full flex-col gap-4 md:flex-row">
-        {/* Side tabs */}
-        <nav className="flex gap-1 overflow-x-auto glass-panel glass-panel--card rounded-xl p-1.5 md:h-fit md:w-48 md:flex-col md:gap-1">
+  return (
+    <div className="stack" style={{ maxWidth: 880, marginInline: "auto", width: "100%" }}>
+      <PageHead title={t("pages.profile.title")} sub={t("pages.profile.subtitle")} />
+
+      <section className="card acc-tabs">
+        <div className="tabs" role="tablist">
           {([
             { k: "info", icon: User },
             { k: "password", icon: KeyRound },
             { k: "passkeys", icon: Fingerprint },
             { k: "notifications", icon: Bell },
-          ] as const).map(({ k, icon: Icon }) => {
-            const active = tab === k;
-            return (
-              <button
-                key={k}
-                onClick={() => setTab(k)}
-                className={
-                  "group flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-start text-sm font-medium transition-all " +
-                  (active
-                    ? "bg-primary text-primary-ink shadow-sm"
-                    : "text-ink-muted hover:bg-surface-2 hover:text-ink")
-                }
-              >
-                <Icon className={"h-4 w-4 shrink-0 " + (active ? "text-primary-ink" : "text-ink-subtle group-hover:text-ink-muted")} />
-                {c(`tab_${k}`)}
-              </button>
-            );
-          })}
-        </nav>
+          ] as const).map(({ k, icon: Icon }) => (
+            <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
+              <Icon className="ico-sm" style={{ marginInlineEnd: 6, verticalAlign: "-3px" }} />
+              {c(`tab_${k}`)}
+            </button>
+          ))}
+        </div>
 
-        <Card className="min-w-0 flex-1 p-5">
-          {user?.tenant && (
-            <p className="mb-4 text-sm text-ink-subtle">
-              {c("company")}: <span className="font-medium text-ink-muted">{user.tenant.name}</span>
-            </p>
-          )}
-
+        <div className="tab-panel">
           {tab === "notifications" ? (
             <NotificationSettings />
           ) : tab === "passkeys" ? (
             <PasskeySettings />
           ) : tab === "info" ? (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label={c("name")} value={name} onChange={setName} />
-                <Field label={c("email")} type="email" value={email} onChange={setEmail} />
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (name && email) void saveInfo();
+              }}
+            >
+              <div className="form-section">
+                <div>
+                  <h3>{c("tab_info")}</h3>
+                  {user?.tenant && (
+                    <p>
+                      {c("company")}: <b>{user.tenant.name}</b>
+                    </p>
+                  )}
+                </div>
+                <div className="stack">
+                  <div className="form-grid">
+                    <Field label={c("name")} value={name} onChange={setName} id="pf-name" />
+                    <Field label={c("email")} type="email" value={email} onChange={setEmail} id="pf-mail" />
+                  </div>
+                  <div className="row" style={{ justifyContent: "flex-end" }}>
+                    <button type="submit" className="btn btn-primary" disabled={busy || !name || !email}>
+                      {busy ? <Loader2 style={spin} /> : <Save />}
+                      {c("save")}
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="mt-4 flex justify-end">
-                <Button onClick={saveInfo} disabled={busy || !name || !email}>
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {c("save")}
-                </Button>
-              </div>
-            </>
+            </form>
           ) : (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label={c("newPassword")} type="password" value={password} onChange={setPassword} placeholder={c("leaveEmpty")} />
-                <Field label={c("confirmPassword")} type="password" value={confirm} onChange={setConfirm} />
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (password.length >= 8) void savePassword();
+              }}
+            >
+              <div className="form-section">
+                <div>
+                  <h3>{c("tab_password")}</h3>
+                  <p>{c("leaveEmpty")}</p>
+                </div>
+                <div className="stack">
+                  <div className="form-grid">
+                    <Field label={c("newPassword")} type="password" value={password} onChange={setPassword} placeholder={c("leaveEmpty")} id="pf-pw1" />
+                    <Field label={c("confirmPassword")} type="password" value={confirm} onChange={setConfirm} id="pf-pw2" />
+                  </div>
+                  <div className="row" style={{ justifyContent: "flex-end" }}>
+                    <button type="submit" className="btn btn-primary" disabled={busy || password.length < 8}>
+                      {busy ? <Loader2 style={spin} /> : <KeyRound />}
+                      {c("changePassword")}
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="mt-4 flex justify-end">
-                <Button onClick={savePassword} disabled={busy || password.length < 8}>
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                  {c("changePassword")}
-                </Button>
-              </div>
-            </>
+            </form>
           )}
-        </Card>
-      </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -145,32 +156,22 @@ function Field({
   onChange,
   type = "text",
   placeholder,
+  id,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
   placeholder?: string;
+  id: string;
 }) {
   return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-ink">{label}</label>
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
       {type === "password" ? (
-        <PasswordInput
-          value={value}
-          placeholder={placeholder}
-          onChange={(e) => onChange(e.target.value)}
-          autoComplete="off"
-        />
+        <PasswordInput id={id} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} autoComplete="off" />
       ) : (
-        <input
-          type={type}
-          value={value}
-          placeholder={placeholder}
-          onChange={(e) => onChange(e.target.value)}
-          autoComplete="off"
-          className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
-        />
+        <input id={id} type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} autoComplete="off" className="input" />
       )}
     </div>
   );

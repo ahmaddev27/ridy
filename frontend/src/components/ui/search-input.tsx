@@ -11,19 +11,18 @@ type SearchInputProps = {
   className?: string;
 };
 
-/**
- * The single search field used across the app. Fixed, compact width so it never
- * stretches to fill its row — pass `className` only to tweak the wrapper.
- */
+/** The single search field used across the app (prototype `.input-group`). */
 export function SearchInput({ value, onChange, placeholder, className }: SearchInputProps) {
   return (
-    <div className={cn("relative w-full max-w-sm", className)}>
-      <Search className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle ltr:left-3 rtl:right-3" />
+    <div className={cn("input-group", className)} style={{ width: "min(340px, 100%)" }}>
+      <Search />
       <input
+        type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="ui-field w-full rounded-lg border border-line bg-surface py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3"
+        aria-label={placeholder}
+        className="input"
       />
     </div>
   );

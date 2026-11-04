@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Landmark, Banknote, MessageCircle, Copy, Check, Loader2, Clock } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button, buttonClasses } from "@/components/ui/button";
+import { Landmark, Banknote, MessageCircle, Copy, Check, Loader2, Clock, Wallet } from "lucide-react";
 import { formatMoney, toLatinDigits } from "@/lib/utils";
 import { buildEpcPayload, canBuildEpc } from "@/lib/epc";
 import { useI18n } from "@/lib/i18n/context";
@@ -76,114 +74,111 @@ export function PaymentMethods({
       : null;
 
   const body = (
-    <>
-      {!headless && <h3 className="font-semibold text-ink">{c("payTitle")}</h3>}
-      <p className={"text-sm text-ink-muted " + (headless ? "" : "mt-1")}>{c("paySubtitle")}</p>
+    <div className="stack-lg">
+      {!headless && (
+        <h2 className="section-title row" style={{ gap: 8 }}>
+          <span className="subtle"><Wallet style={{ width: 18, height: 18 }} /></span>
+          {c("payTitle")}
+        </h2>
+      )}
+      <p className="muted text-sm">{c("paySubtitle")}</p>
 
       {/* The company's stable reference — quoted on the transfer + to support. */}
       {reference && (
-        <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
-          <div className="text-xs font-medium text-ink-muted">{c("yourReference")}</div>
-          <div className="mt-1 flex items-center gap-2">
-            <span className="font-mono text-lg font-bold tracking-wider text-ink" dir="ltr">{reference}</span>
-            <button
-              type="button"
-              onClick={copyRef}
-              title={c("copy")}
-              className="rounded-md p-1.5 text-ink-subtle hover:bg-surface-2 hover:text-ink"
-            >
-              {copied ? <Check className="h-4 w-4 text-success-fg" /> : <Copy className="h-4 w-4" />}
-            </button>
+        <div className="acc-ref">
+          <div>
+            <div className="subtle text-xs strong" style={{ letterSpacing: ".06em", textTransform: "uppercase" }}>{c("yourReference")}</div>
+            <div className="code">{reference}</div>
+            <div className="text-sm muted" style={{ marginTop: 4 }}>{c("referenceHint")}</div>
           </div>
-          <p className="mt-1 text-xs text-ink-subtle">{c("referenceHint")}</p>
+          <button type="button" className="btn btn-secondary" onClick={copyRef}>
+            {copied ? <Check /> : <Copy />}
+            {c("copy")}
+          </button>
         </div>
       )}
 
-      {/* "I've paid" — files a claim the admin verifies by the reference. Kept high,
-          right under the reference, so it's the obvious next step after paying. */}
+      {/* "I've paid" — files a claim the admin verifies by the reference. */}
       {onConfirm && (
-        <div className="mt-4">
+        <div className="acc-claim">
           {claimPending ? (
-            <div className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2.5 text-sm text-ink-muted">
-              <Clock className="h-4 w-4 text-ink-subtle" />
-              {c("claimPendingLabel")}
+            <div className="acc-pending">
+              <Clock />
+              <span>{c("claimPendingLabel")}</span>
             </div>
           ) : (
             <>
-              <Button onClick={onConfirm} disabled={confirming} className="w-full sm:w-auto">
-                {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              <button type="button" className="btn btn-primary" onClick={onConfirm} disabled={confirming}>
+                {confirming ? <Loader2 style={{ animation: "ofr-spin 1s linear infinite" }} /> : <Check />}
                 {c("confirmPayment")}
-              </Button>
-              <p className="mt-2 text-xs text-ink-subtle">{c("confirmPaymentHint")}</p>
+              </button>
+              <span className="subtle text-sm" style={{ maxWidth: "46ch" }}>{c("confirmPaymentHint")}</span>
             </>
           )}
         </div>
       )}
 
-      <div className="mt-4 space-y-3">
-        {methods.bank && (
-          <div className="rounded-xl border border-line p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Landmark className="h-4 w-4 text-ink" />
-              <span className="font-medium text-ink">{c("payBank")}</span>
+      {methods.bank && (
+        <div className="acc-method">
+          <h3>
+            <span className="stat-ico info"><Landmark /></span>
+            {c("payBank")}
+          </h3>
+          <div className="acc-pay">
+            <div className="stack">
+              <dl className="kv">
+                <Row label={c("payBankHolder")} value={methods.bank.holder} />
+                <Row label={c("payBankName")} value={methods.bank.bank} />
+                <Row label={c("payBankIban")} value={methods.bank.iban} mono />
+                <Row label={c("payBankBic")} value={methods.bank.bic} mono />
+                {bankAmount ? <Row label={c("payBankAmount")} value={formatMoney(bankAmount, locale)} bold /> : null}
+              </dl>
+              {methods.bank.note && <p className="subtle text-sm">{methods.bank.note}</p>}
             </div>
-            <dl className="space-y-2 text-sm">
-              <Row label={c("payBankHolder")} value={methods.bank.holder} />
-              <Row label={c("payBankName")} value={methods.bank.bank} />
-              <Row label={c("payBankIban")} value={methods.bank.iban} mono />
-              <Row label={c("payBankBic")} value={methods.bank.bic} mono />
-              {bankAmount ? <Row label={c("payBankAmount")} value={formatMoney(bankAmount, locale)} /> : null}
-            </dl>
-            {methods.bank.note && <p className="mt-3 text-xs text-ink-subtle">{methods.bank.note}</p>}
             {epc && (
-              <div className="mt-4 flex flex-col items-center gap-1.5 border-t border-line pt-4">
-                <div className="rounded-lg bg-white p-2 shadow-sm ring-1 ring-line">
-                  <QRCodeSVG value={epc} size={140} marginSize={0} />
+              <div className="stack-sm">
+                <div className="acc-qr">
+                  <QRCodeSVG value={epc} size={140} marginSize={0} style={{ width: "100%", height: "auto" }} />
                 </div>
-                <span className="mt-1 text-center text-xs font-medium text-ink-muted">{c("scanToPay")}</span>
-                <span className="text-center text-[11px] leading-snug text-ink-subtle">{c("scanToPayHint")}</span>
+                <p className="text-xs subtle">{c("scanToPay")}</p>
+                <p className="text-xs subtle">{c("scanToPayHint")}</p>
               </div>
             )}
           </div>
-        )}
+        </div>
+      )}
 
-        {methods.cash && (
-          <div className="rounded-xl border border-line p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Banknote className="h-4 w-4 text-ink" />
-              <span className="font-medium text-ink">{c("payCash")}</span>
-            </div>
-            {cashDigits && (
-              <a
-                href={`https://wa.me/${cashDigits}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={buttonClasses()}
-              >
-                <MessageCircle className="h-4 w-4" />
-                <span dir="ltr">{toLatinDigits(methods.cash.whatsapp ?? "")}</span>
-              </a>
-            )}
-            {methods.cash.note && <p className="mt-3 text-xs text-ink-subtle">{methods.cash.note}</p>}
-          </div>
-        )}
-      </div>
-    </>
+      {methods.cash && (
+        <div className="acc-method">
+          <h3>
+            <span className="stat-ico success"><Banknote /></span>
+            {c("payCash")}
+          </h3>
+          {cashDigits && (
+            <a href={`https://wa.me/${cashDigits}`} target="_blank" rel="noopener noreferrer" className="acc-pill">
+              <MessageCircle />
+              <span dir="ltr">{toLatinDigits(methods.cash.whatsapp ?? "")}</span>
+            </a>
+          )}
+          {methods.cash.note && <span className="subtle text-sm">{methods.cash.note}</span>}
+        </div>
+      )}
+    </div>
   );
 
   if (headless) return <div className={className}>{body}</div>;
 
-  return <Card className={`p-5 ${className}`}>{body}</Card>;
+  return <section className={`card ${className}`}><div className="card-body">{body}</div></section>;
 }
 
-function Row({ label, value, mono = false }: { label: string; value: string | null; mono?: boolean }) {
+function Row({ label, value, mono = false, bold = false }: { label: string; value: string | null; mono?: boolean; bold?: boolean }) {
   if (!value) return null;
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="shrink-0 text-ink-subtle">{label}</dt>
-      <dd className={`text-end text-ink ${mono ? "font-mono text-xs" : ""}`} dir={mono ? "ltr" : undefined}>
+    <>
+      <dt>{label}</dt>
+      <dd className={mono ? "mono" : bold ? "num strong" : undefined} dir={mono ? "ltr" : undefined}>
         {mono ? toLatinDigits(value) : value}
       </dd>
-    </div>
+    </>
   );
 }

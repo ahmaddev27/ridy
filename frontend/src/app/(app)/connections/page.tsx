@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, LogIn, CheckCircle2, AlertTriangle, Download } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
+import { Loader2, LogIn, CircleCheck, TriangleAlert, Download, Unplug, RefreshCw } from "lucide-react";
+import { PageHead } from "@/components/ui/rd";
 import { useI18n } from "@/lib/i18n/context";
 import { useAuth } from "@/components/auth/auth-provider";
 import { UberCodeLogin } from "@/components/connections/uber-code-login";
@@ -153,40 +151,38 @@ export default function ConnectionsPage() {
   const passwordless = user?.tenant?.passwordless_primary === true;
   const working = extBusy || awaitingLink;
 
-  return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title={c("title")} subtitle={c("subtitle")} />
+  const spin = { animation: "ofr-spin 1s linear infinite" };
 
-      {/* Installed but outdated: a light, non-blocking nudge (kept trivial). */}
+  return (
+    <div className="stack" style={{ maxWidth: 672, marginInline: "auto", width: "100%" }}>
+      <PageHead title={c("title")} sub={c("subtitle")} />
+
+      {/* Installed but outdated: a light, non-blocking nudge. */}
       {!passwordless && extInstalled && isExtensionOutdated(extVersion) && (
-        <a
-          href={EXTENSION_STORE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded-xl border border-line bg-warning-bg px-4 py-3 text-sm text-warning-fg transition hover:opacity-90"
-        >
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>
+        <a href={EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer" className="callout warning">
+          <TriangleAlert />
+          <div>
             {c("extUpdateBody")
               .replace("{installed}", extVersion ?? "?")
               .replace("{latest}", LATEST_EXTENSION_VERSION)}
-          </span>
+          </div>
         </a>
       )}
 
-      {/* Session broke (e.g. the company changed their Uber password → cookies
-          rejected). A distinct, prominent alert that drives the reconnect flow —
-          so the manager knows offers stopped and exactly what to do. */}
+      {/* Session broke (e.g. the Uber password changed → cookies rejected): the
+          prominent alert that drives the reconnect flow. */}
       {data?.status === "needs_relink" && !passwordless && (
-        <div className="flex items-start gap-3 rounded-xl border border-line bg-danger-bg px-4 py-3 text-sm text-danger-fg">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <div className="flex-1">
-            <p className="font-semibold">{c("brokenTitle")}</p>
-            <p className="mt-0.5 opacity-90">{c("brokenBody")}</p>
-            <Button size="sm" className="mt-3" onClick={connectViaExtension} disabled={working}>
-              {working ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {c("reconnect")}
-            </Button>
+        <div className="callout danger">
+          <Unplug />
+          <div className="stack-sm">
+            <b>{c("brokenTitle")}</b>
+            <span>{c("brokenBody")}</span>
+            <span>
+              <button type="button" className="btn btn-danger btn-sm" onClick={connectViaExtension} disabled={working}>
+                {working ? <Loader2 style={spin} /> : <RefreshCw />}
+                {c("reconnect")}
+              </button>
+            </span>
           </div>
         </div>
       )}
@@ -195,63 +191,57 @@ export default function ConnectionsPage() {
       {passwordless && !connected && !loading && <UberCodeLogin onConnected={refetch} />}
 
       {(!passwordless || connected) && (
-      <Card className="p-8">
-        {loading || extInstalled === null ? (
-          <div className="flex items-center justify-center py-8 text-ink-muted">
-            <Loader2 className="h-5 w-5 animate-spin" />
-          </div>
-        ) : connected ? (
-          // ── Connected: clean success card ──────────────────────────────
-          <div className="flex flex-col items-center text-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-success-bg text-success-fg">
-              <CheckCircle2 className="h-7 w-7" />
-            </span>
-            <h3 className="mt-4 text-lg font-semibold text-ink">{c("connectedTitle")}</h3>
-            <p className="mt-1 text-sm text-ink-muted">{c("connectedBody")}</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mt-6"
-              onClick={connectViaExtension}
-              disabled={working}
-              hidden={passwordless}
-            >
-              {working ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {c("reconnect")}
-            </Button>
-          </div>
-        ) : (
-          // ── Not connected: one primary action ──────────────────────────
-          <div className="flex flex-col items-center text-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-2 text-ink-muted">
-              <LogIn className="h-7 w-7" />
-            </span>
-            <h3 className="mt-4 text-lg font-semibold text-ink">{c("connectUber")}</h3>
-            <p className="mt-1 max-w-sm text-sm text-ink-muted">
-              {extInstalled ? c("connectInstalledHint") : c("connectInstallHint")}
-            </p>
-
-            {extInstalled ? (
-              <Button className="mt-6" onClick={connectViaExtension} disabled={working}>
-                {working ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
-                {c("connectUber")}
-              </Button>
+        <section className="card">
+          <div className="card-body">
+            {loading || extInstalled === null ? (
+              <div className="center-card">
+                <span className="skel" style={{ width: 56, height: 56, borderRadius: 18 }} />
+                <span className="skel" style={{ height: 16, width: 180 }} />
+                <span className="skel" style={{ height: 12, width: 260 }} />
+              </div>
+            ) : connected ? (
+              <div className="center-card">
+                <span className="chip-big success">
+                  <CircleCheck />
+                </span>
+                <h2 style={{ fontSize: 19 }}>{c("connectedTitle")}</h2>
+                <p className="muted" style={{ maxWidth: "44ch" }}>{c("connectedBody")}</p>
+                {!passwordless && (
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={connectViaExtension} disabled={working}>
+                    {working ? <Loader2 style={spin} /> : <RefreshCw />}
+                    {c("reconnect")}
+                  </button>
+                )}
+              </div>
             ) : (
-              <a href={EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer" className="mt-6">
-                <Button>
-                  <Download className="h-4 w-4" /> {c("connectUber")}
-                </Button>
-              </a>
-            )}
-
-            {awaitingLink && (
-              <p className="mt-4 flex items-center gap-1.5 text-sm text-ink-muted">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> {c("awaitingLink")}
-              </p>
+              <div className="center-card">
+                <span className="chip-big">
+                  <LogIn />
+                </span>
+                <h2 style={{ fontSize: 19 }}>{c("connectUber")}</h2>
+                <p className="muted" style={{ maxWidth: "46ch" }}>
+                  {extInstalled ? c("connectInstalledHint") : c("connectInstallHint")}
+                </p>
+                {awaitingLink ? (
+                  <div className="row" style={{ gap: 10, color: "var(--ink-muted)" }}>
+                    <Loader2 style={{ ...spin, width: 16, height: 16 }} />
+                    <span>{c("awaitingLink")}</span>
+                  </div>
+                ) : extInstalled ? (
+                  <button type="button" className="btn btn-primary btn-lg" onClick={connectViaExtension} disabled={working}>
+                    {working ? <Loader2 style={spin} /> : <LogIn />}
+                    {c("connectUber")}
+                  </button>
+                ) : (
+                  <a href={EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-lg">
+                    <Download />
+                    {c("connectUber")}
+                  </a>
+                )}
+              </div>
             )}
           </div>
-        )}
-      </Card>
+        </section>
       )}
     </div>
   );

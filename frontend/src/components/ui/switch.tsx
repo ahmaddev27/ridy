@@ -27,27 +27,9 @@ export function Switch({
   id?: string;
 }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      id={id}
-      aria-checked={checked}
-      aria-label={label}
-      title={label}
-      onClick={onChange}
-      disabled={disabled}
-      className={
-        "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/40 " +
-        (checked ? "bg-primary" : "bg-line-strong") +
-        (disabled ? " cursor-not-allowed opacity-60" : " cursor-pointer")
-      }
-    >
-      <span
-        className={
-          "inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ltr:ml-1 rtl:mr-1 " +
-          (checked ? "ltr:translate-x-5 rtl:-translate-x-5" : "translate-x-0")
-        }
-      />
-    </button>
+    <label className="switch" title={label} style={disabled ? { opacity: 0.6, cursor: "not-allowed" } : undefined}>
+      <input type="checkbox" role="switch" id={id} checked={checked} onChange={() => onChange?.()} disabled={disabled} aria-label={label} />
+      <span />
+    </label>
   );
 }

@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { toast } from "sonner";
-import { Bell, Trash2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
+import { Bell, Trash2, CheckCheck } from "lucide-react";
+import { PageHead, SkelRows } from "@/components/ui/rd";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn, latnLocale } from "@/lib/utils";
 import { notifContent } from "@/lib/notif-content";
@@ -54,81 +52,67 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        tkey="notifications"
-        action={
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={markAll} disabled={unread === 0}>
-              {t("screens.notifications.markAllRead")}
-            </Button>
-            <Button variant="secondary" onClick={clearAll} disabled={items.length === 0}>
-              {t("screens.notifications.clearAll")}
-            </Button>
-          </div>
+    <>
+      <PageHead
+        title={t("pages.notifications.title")}
+        sub={t("pages.notifications.subtitle")}
+        actions={
+          <>
+            <button type="button" className="btn btn-secondary" onClick={markAll} disabled={unread === 0}>
+              <CheckCheck />
+              <span>{t("screens.notifications.markAllRead")}</span>
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={clearAll} disabled={items.length === 0}>
+              <Trash2 />
+              <span>{t("screens.notifications.clearAll")}</span>
+            </button>
+          </>
         }
       />
 
-      <Card className="w-full overflow-hidden">
+      <section className="card">
         {loading ? (
-          <div className="space-y-2 p-4">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded bg-surface-2" />
-            ))}
-          </div>
+          <SkelRows rows={3} cols={3} />
         ) : error && !data ? (
-          <div className="p-6 text-sm text-danger-fg">{t("screens.notifications.loadError")} {error}</div>
+          <div className="callout danger" style={{ margin: 16 }}>
+            <div>
+              {t("screens.notifications.loadError")} {error}
+            </div>
+          </div>
         ) : items.length === 0 ? (
-          <EmptyState
-            icon={Bell}
-            title={t("screens.notifications.emptyTitle")}
-            description={t("screens.notifications.emptyDesc")}
-          />
+          <EmptyState icon={Bell} title={t("screens.notifications.emptyTitle")} description={t("screens.notifications.emptyDesc")} />
         ) : (
-          <div className="divide-y divide-line">
+          <div className="list-rows">
             {items.map((n) => {
               const { icon: Icon, chip, title, body, href } = notifContent(n, t);
-              const inner = (
-                <>
-                  <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", chip)}>
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-ink">{title}</p>
-                    <p className="text-sm text-ink-muted">{body}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="whitespace-nowrap text-xs text-ink-subtle">
-                      {n.created_at ? new Date(n.created_at).toLocaleString(latnLocale(locale)) : ""}
-                    </span>
-                    {!n.read && <span className="h-2 w-2 rounded-full bg-primary" />}
-                  </div>
-                </>
-              );
-              const cls = cn("flex min-w-0 flex-1 items-start gap-3 text-start transition-colors", href && "hover:bg-surface-2");
               return (
-                <div
-                  key={n.id}
-                  className={cn("flex items-stretch", !n.read && "bg-surface-2/30")}
-                >
-                  {href ? (
-                    <Link href={href} className={cn(cls, "p-4")}>{inner}</Link>
-                  ) : (
-                    <div className={cn(cls, "p-4")}>{inner}</div>
-                  )}
-                  <button
-                    onClick={() => del(n.id)}
-                    title={t("screens.notifications.delete")}
-                    className="shrink-0 px-4 text-ink-subtle transition-colors hover:text-danger-fg"
-                  >
-                    <Trash2 className="h-4 w-4" />
+                <div key={n.id} className={cn("list-row notif-row", !n.read && "unread")} style={{ alignItems: "flex-start" }}>
+                  <span className={cn("stat-ico", chip)} style={{ width: 36, height: 36, borderRadius: 99, flexShrink: 0 }}>
+                    <Icon />
+                  </span>
+                  <div className="grow" style={{ minWidth: 0 }}>
+                    {href ? (
+                      <Link href={href} className="strong">
+                        {title}
+                      </Link>
+                    ) : (
+                      <span className="strong">{title}</span>
+                    )}
+                    <div className="muted text-sm">{body}</div>
+                  </div>
+                  <div style={{ textAlign: "end", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                    <span className="when num">{n.created_at ? new Date(n.created_at).toLocaleString(latnLocale(locale)) : ""}</span>
+                    {!n.read && <span style={{ width: 8, height: 8, borderRadius: 99, background: "var(--primary)" }} />}
+                  </div>
+                  <button type="button" className="icon-btn" onClick={() => del(n.id)} title={t("screens.notifications.delete")} aria-label={t("screens.notifications.delete")}>
+                    <Trash2 />
                   </button>
                 </div>
               );
             })}
           </div>
         )}
-      </Card>
-    </div>
+      </section>
+    </>
   );
 }
