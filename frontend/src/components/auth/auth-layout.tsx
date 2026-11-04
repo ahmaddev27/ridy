@@ -87,6 +87,9 @@ export function AuthLayout({
       </div>
 
       <aside className="auth-aside">
+        {/* eslint-disable-next-line @next/next/no-img-element -- static decorative hero */}
+        <img src="/brand/auth-hero.png" alt="" aria-hidden="true" className="a-hero" />
+        <div className="a-scrim" aria-hidden />
         <div className="grid-dots" />
         <div className="a-top">
           <span className="brand-mark">
