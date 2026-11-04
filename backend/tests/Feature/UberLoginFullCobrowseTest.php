@@ -54,7 +54,7 @@ class UberLoginFullCobrowseTest extends TestCase
         return Tenant::create([
             'name' => $name, 'country' => 'DE', 'status' => 'active', 'activated_at' => now(),
             'proxy_url' => 'http://u:p@proxy.test:8000',
-            'settings' => ['passwordless_login' => ['enabled' => true] + ($cobrowse ? ['cobrowse' => true] : [])],
+            'settings' => ['passwordless_login' => ['enabled' => true, 'cobrowse' => $cobrowse]],
         ]);
     }
 

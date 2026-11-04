@@ -15,7 +15,7 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Switch } from "@/components/ui/switch";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
-import { listCompanies, deleteCompany, setCompanyActive, setCompanyElProfessor, setCompanyDispatchReject, setCompanyCobrowse, type Company } from "@/lib/api/admin";
+import { listCompanies, deleteCompany, setCompanyActive, setCompanyElProfessor, setCompanyDispatchReject, type Company } from "@/lib/api/admin";
 import { apiErrorMessage } from "@/lib/api/error-message";
 
 type Filter = "all" | "linked" | "expired" | "banned";
@@ -94,7 +94,6 @@ export default function CompaniesPage() {
   // here so a refetch while the dialog is open cannot change which row it acts on.
   const [confirmDr, setConfirmDr] = useState<Company | null>(null);
   const [drBusy, setDrBusy] = useState(false);
-  const [cbOverride, setCbOverride] = useState<Record<number, boolean>>({});
 
   async function toggleActive(co: Company) {
     const next = co.status !== "active";
@@ -165,26 +164,6 @@ export default function CompaniesPage() {
     } finally {
       setDrBusy(false);
       setConfirmDr(null);
-    }
-  }
-
-  /**
-   * One-click co-browse connect opt-in: lets a cold company sign in to Uber in the streamed
-   * window to capture its fleet session (the tenant-15 pattern). Optimistic; reverts on failure.
-   */
-  async function toggleCobrowse(co: Company) {
-    const next = !(cbOverride[co.id] ?? co.cobrowse_enabled);
-    setCbOverride((m) => ({ ...m, [co.id]: next }));
-    try {
-      await setCompanyCobrowse(co.id, next);
-      await refetch();
-    } catch (e) {
-      toast.error(c("updateFailed"), { description: apiErrorMessage(e, t, locale) });
-    } finally {
-      setCbOverride((m) => {
-        const { [co.id]: _drop, ...rest } = m;
-        return rest;
-      });
     }
   }
 
@@ -261,7 +240,6 @@ export default function CompaniesPage() {
                   <th className="px-4 py-3 font-semibold">{c("colSession")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colElProfessor")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colDispatchReject")}</th>
-                  <th className="px-4 py-3 font-semibold">{c("colCobrowse")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colDrivers")}</th>
                   <th className="px-4 py-3 font-semibold">{c("colOffers")}</th>
                   <th className="px-4 py-3" />
@@ -349,14 +327,6 @@ export default function CompaniesPage() {
                         onChange={() => toggleDispatchReject(co)}
                         disabled={drBusy}
                         label={co.dispatch_reject_enabled ? c("drOff") : c("drOn")}
-                      />
-                    </td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <Switch
-                        checked={cbOverride[co.id] ?? co.cobrowse_enabled}
-                        onChange={() => void toggleCobrowse(co)}
-                        disabled={co.id in cbOverride}
-                        label={(cbOverride[co.id] ?? co.cobrowse_enabled) ? c("cbOff") : c("cbOn")}
                       />
                     </td>
                     <td className="px-4 py-3 text-ink-muted">{co.driver_count.toLocaleString(latnLocale(locale))}</td>

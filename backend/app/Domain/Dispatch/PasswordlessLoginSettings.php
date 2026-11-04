@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 /**
  * Whether a company may use the passwordless Uber login (docs/27), and its per-company
  * options. Gates, all default OFF: the global kill switch (UBER_PASSWORDLESS_LOGIN), the
- * optional rollout allowlist (UBER_PASSWORDLESS_TENANTS, empty = no limit) and the
+ * (the old UBER_PASSWORDLESS_TENANTS allowlist is ignored) and the
  * super-admin's per-company flag (`tenants.settings.passwordless_login.enabled`).
  *
  * Variant B (automatic code from a forwarded email) adds, under the same settings key:
@@ -28,7 +28,8 @@ class PasswordlessLoginSettings
             return false;
         }
 
-        return $this->allowlisted($tenant) && $tenant->passwordlessLoginEnabled();
+        // UBER_PASSWORDLESS_TENANTS no longer restricts: co-browse is the default for every company.
+        return $tenant->passwordlessLoginEnabled();
     }
 
     /**
@@ -174,12 +175,5 @@ class PasswordlessLoginSettings
     private function get(Tenant $tenant, string $key): mixed
     {
         return $tenant->settings['passwordless_login'][$key] ?? null;
-    }
-
-    private function allowlisted(Tenant $tenant): bool
-    {
-        $allowed = (array) config('services.passwordless_login.tenants', []);
-
-        return $allowed === [] || in_array((string) $tenant->id, array_map('strval', $allowed), true);
     }
 }
