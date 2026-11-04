@@ -36,20 +36,25 @@ const result = await page.evaluate(async () => {
   try { c = await navigator.credentials.create({ publicKey: pk }); }
   catch (e) { return { step: "CREATE-FAILED", error: String(e) }; }
   const transports = c.response.getTransports ? c.response.getTransports() : ["internal"];
-  const att = (enc) => ({ client_data_json: enc(c.response.clientDataJSON), attestation_object: enc(c.response.attestationObject), transports });
-  const post = (body) => fetch("/api/registerPublicKeyCredential", { method: "POST", headers: H, body: JSON.stringify(body) }).then(async (x) => ({ s: x.status, b: (await x.text()).slice(0, 300) })).catch((e) => ({ s: 0, b: String(e) }));
+  const post = (body) => fetch("/api/registerPublicKeyCredential", { method: "POST", headers: H, body: JSON.stringify(body) }).then(async (x) => ({ s: x.status, b: (await x.text()).slice(0, 320) })).catch((e) => ({ s: 0, b: String(e) }));
+  const real = (b) => /"status":"success"/.test(b) && !/recoverableError|went wrong|BAD_REQUEST|required|invalid/i.test(b);
   const attempts = [
-    ["std", { attestation: att(std) }],
-    ["url", { attestation: att(url) }],
-    ["std+name", { attestation: att(std), name: "Reidey" }],
+    ["std", { attestation: { client_data_json: std(c.response.clientDataJSON), attestation_object: std(c.response.attestationObject), transports } }],
+    ["url", { attestation: { client_data_json: url(c.response.clientDataJSON), attestation_object: url(c.response.attestationObject), transports } }],
+    ["std,no-transports", { attestation: { client_data_json: std(c.response.clientDataJSON), attestation_object: std(c.response.attestationObject) } }],
+    ["std,+id", { attestation: { id: c.id, raw_id: url(c.rawId), client_data_json: std(c.response.clientDataJSON), attestation_object: std(c.response.attestationObject), transports } }],
   ];
   const tries = [];
+  let persisted = false;
   for (const [tag, body] of attempts) {
     const r = await post(body);
     tries.push(tag + " -> " + r.s + " " + r.b.replace(/\s+/g, " "));
-    if (r.s === 200 && /"status":"success"/i.test(r.b)) { tries.push("*** PERSISTED (" + tag + ")"); break; }
+    if (r.s === 200 && real(r.b)) { tries.push("*** TRUE SUCCESS (" + tag + ")"); persisted = true; break; }
   }
-  return { step: "CREATED", id: c.id, tries };
+  // confirm via getPasskeysInfo
+  const info = await fetch("/api/getPasskeysInfo", { method: "POST", headers: H, body: "{}" }).then((r) => r.json()).catch((e) => ({ err: String(e) }));
+  const n = (((info || {}).data || {}).publicKeyCredentials || []).length;
+  return { step: "CREATED", id: c.id, persistedGuess: persisted, passkeysNow: n, tries };
 });
 console.log("[result]\n" + JSON.stringify(result, null, 1).slice(0, 2200));
 
