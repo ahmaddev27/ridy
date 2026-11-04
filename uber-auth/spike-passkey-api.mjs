@@ -2,7 +2,7 @@
 // registerPublicKeyCredential({ request: { attestation: { client_data_json, attestation_object, transports } } })
 // (snake_case Thrift binary = base64). Try standard-base64 then base64url. Success persists.
 import { chromium } from "playwright";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 
 const companyKey = process.argv[2];
 const stateDir = process.env.STATE_DIR || "./state";
@@ -14,7 +14,7 @@ const context = await browser.newContext({ storageState: state });
 const page = await context.newPage();
 const client = await context.newCDPSession(page);
 await client.send("WebAuthn.enable", { enableUI: false });
-await client.send("WebAuthn.addVirtualAuthenticator", { options: AUTH });
+const { authenticatorId } = await client.send("WebAuthn.addVirtualAuthenticator", { options: AUTH });
 
 page.on("response", async (r) => { const u = r.url(); if (u.indexOf("account.uber.com/api/getPasskeysInfo") >= 0) { let b = ""; try { b = (await r.text()).slice(0, 300); } catch {} console.log("[info] " + r.status() + " :: " + b.replace(/\s+/g, " ")); } });
 
@@ -57,6 +57,22 @@ const result = await page.evaluate(async () => {
   return { step: "CREATED", id: c.id, persistedGuess: persisted, passkeysNow: n, tries };
 });
 console.log("[result]\n" + JSON.stringify(result, null, 1).slice(0, 2200));
+
+// Phase-2 prep: export the credential (incl. the PKCS#8 private key) so a future
+// logged-out session can re-inject it and log in with NO human. The virtual
+// authenticator holds the key in memory only — without this it dies with the browser.
+if (result.persistedGuess || (result.passkeysNow || 0) > 0) {
+  try {
+    const { credentials } = await client.send("WebAuthn.getCredentials", { authenticatorId });
+    if (credentials && credentials.length) {
+      const out = `${stateDir}/passkey-cred-${companyKey}.json`;
+      await writeFile(out, JSON.stringify(credentials[0], null, 2));
+      console.log(`[persist] wrote ${out} — credId=${credentials[0].credentialId} rpId=${credentials[0].rpId} hasPrivateKey=${!!credentials[0].privateKey}`);
+    } else {
+      console.log("[persist] getCredentials returned none — cannot export the private key");
+    }
+  } catch (e) { console.log("[persist] error: " + e.message); }
+}
 
 await page.goto("https://account.uber.com/passkeys", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
 await page.waitForTimeout(2500);
