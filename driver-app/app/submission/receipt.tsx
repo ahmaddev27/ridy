@@ -82,6 +82,7 @@ import {
 } from "@/lib/receipt-steps";
 import { readOdometer } from "@/lib/odometer-read";
 import { useColors, radius, cardStyle, type Palette } from "@/lib/theme";
+import { ReceiptLiveCamera, type LiveCapture } from "@/components/receipt-live-camera";
 
 /** The four El-Professor stores literally. `Other` is a sentinel it never saves,
  *  so a free description takes its place rather than the word. */
@@ -189,6 +190,7 @@ export default function ReceiptScreen() {
 
   const [photo, setPhoto] = useState<PickedPhoto | null>(null);
   const [busy, setBusy] = useState(false);
+  const [liveOpen, setLiveOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [date, setDate] = useState(today());
   const [amount, setAmount] = useState("");
@@ -531,26 +533,44 @@ export default function ReceiptScreen() {
     }
   };
 
-  const take = async (from: "camera" | "library") => {
+  /** One photo from any source (live scan, picker, library) into the ONE
+   *  read path: prepare for OCR, scan, vision fallback, confirm. */
+  const acceptAsset = async (asset: { uri: string; width?: number; height?: number; exif?: Record<string, unknown> | null }) => {
     setBusy(true);
     try {
-      const permission =
-        from === "camera"
-          ? await ImagePicker.requestCameraPermissionsAsync()
-          : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const prepared = await prepare(asset);
+      setPhoto(prepared);
+      await scan(prepared.uri, odoSize(asset), asset.exif?.DateTimeOriginal);
+    } catch {
+      toast.show(t("receipt.photoFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onLiveCaptured = (shot: LiveCapture) => {
+    setLiveOpen(false);
+    void acceptAsset(shot);
+  };
+
+  const take = async (from: "camera" | "library") => {
+    if (from === "camera") {
+      // The live, guided scan; it asks for the camera permission itself.
+      setLiveOpen(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         // Named, because a silent no-op reads as a broken button.
         Alert.alert(t("receipt.permTitle"), t("receipt.permBody"));
         return;
       }
-      const result =
-        from === "camera"
-          ? await ImagePicker.launchCameraAsync({ quality: 1, exif: true })
-          : await ImagePicker.launchImageLibraryAsync({ quality: 1, exif: true, mediaTypes: ["images"] });
+      const result = await ImagePicker.launchImageLibraryAsync({ quality: 1, exif: true, mediaTypes: ["images"] });
       if (result.canceled || !result.assets?.[0]?.uri) return;
-      const prepared = await prepare(result.assets[0]);
-      setPhoto(prepared);
-      await scan(prepared.uri, odoSize(result.assets[0]), result.assets[0].exif?.DateTimeOriginal);
+      setBusy(false);
+      await acceptAsset(result.assets[0]);
     } catch {
       toast.show(t("receipt.photoFailed"));
     } finally {
@@ -1060,6 +1080,7 @@ export default function ReceiptScreen() {
           </View>
         </View>
       </Modal>
+      <ReceiptLiveCamera visible={liveOpen} onCaptured={onLiveCaptured} onClose={() => setLiveOpen(false)} />
     </SafeAreaView>
   );
 }
