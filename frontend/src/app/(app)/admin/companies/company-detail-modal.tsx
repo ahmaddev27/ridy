@@ -455,8 +455,8 @@ export function CompanyDetail({
               </div>
 
               <p className="muted text-sm">{c("activationHint")}</p>
-              <div className="row-wrap" style={{ alignItems: "flex-end", gap: 14 }}>
-                <div className="field" style={{ minWidth: 260, flex: 1 }}>
+              <div className="row-wrap" style={{ alignItems: "flex-end", gap: "12px 16px" }}>
+                <div className="field" style={{ minWidth: "min(260px, 100%)", flex: "1 1 260px" }}>
                   <label htmlFor="co-plan">{c("plan")}</label>
                   <select id="co-plan" value={planId} onChange={(e) => setPlanId(e.target.value)} className="select">
                     <option value="">{c("selectPlan")}</option>
@@ -465,7 +465,7 @@ export function CompanyDetail({
                     ))}
                   </select>
                 </div>
-                <label className="flex cursor-pointer items-center gap-2 text-sm" style={{ paddingBottom: 10 }}>
+                <label className="flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-sm" style={{ paddingBottom: 10 }}>
                   <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} className="h-4 w-4" />
                   <span>{c("markPaid")}</span>
                 </label>
@@ -484,9 +484,9 @@ export function CompanyDetail({
               {/* How the company paid — only methods enabled in settings are
                   selectable; a disabled one is shown locked so the admin knows it
                   exists but must be turned on in settings first. */}
-              <div className="row-wrap" style={{ gap: 12 }}>
+              <div className="row-wrap" style={{ gap: "10px 12px" }}>
                 <span className="muted text-sm">{t("screens.codes.method")}</span>
-                <div className="seg" role="group" aria-label={t("screens.codes.method")}>
+                <div className="seg flex-wrap" role="group" aria-label={t("screens.codes.method")}>
                   {PAYMENT_METHOD_KEYS.map((m) => {
                     const on = enabledMethods.has(m);
                     const selected = on && payMethod === m;
@@ -506,7 +506,7 @@ export function CompanyDetail({
                     );
                   })}
                 </div>
-                <Button variant="secondary" onClick={genActivation} disabled={busy || !planId}>
+                <Button variant="secondary" className="ms-auto" onClick={genActivation} disabled={busy || !planId}>
                   <Ticket className="h-4 w-4" /> {c("generateCode")}
                 </Button>
               </div>
@@ -543,10 +543,11 @@ export function CompanyDetail({
                     <label htmlFor="co-free-days">{c("freeDays")}</label>
                     <input
                       id="co-free-days"
-                      type="number"
-                      min={1}
+                      type="text"
+                      inputMode="numeric"
+                      dir="ltr"
                       value={freeDays}
-                      onChange={(e) => setFreeDays(e.target.value)}
+                      onChange={(e) => setFreeDays(e.target.value.replace(/\D/g, ""))}
                       className="input"
                     />
                   </div>
