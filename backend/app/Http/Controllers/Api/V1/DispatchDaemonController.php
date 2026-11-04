@@ -230,6 +230,10 @@ class DispatchDaemonController extends Controller
 
         $model = $this->find($request, $session);
         $tenantId = (int) $model->tenant_id;
+        // A stopped/broken session must not re-arm the feeding marker an admin Stop cleared.
+        if ($model->status !== UberFleetSession::STATUS_ACTIVE) {
+            return response()->json(['data' => ['updated' => 0, 'skipped' => 'session_not_active']]);
+        }
         // A Fleet Hub live-status read for this org succeeded with the stored
         // cookies: the company's claim on the org is proven.
         $sessions->markVerified($model);
