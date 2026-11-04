@@ -77,6 +77,7 @@ const en = {
     profile: { title: "Profile", subtitle: "Edit your account." },
   },
   extBanner: { missing: "Reidey not installed — offers won’t be captured.", outdated: "Reidey is outdated — please update it.", unpaired: "Reidey isn’t paired yet.", action: "Fix" },
+  relinkBanner: { needs_relink: "Your Uber session needs to be reconnected — offers are not being captured.", expired: "Your Uber session has expired — offers are not being captured.", action: "Reconnect" },
   impersonation: { banner: "You are acting as {company}.", bannerNoCompany: "You are acting as a company.", stop: "Stop" },
   common: {
     open: "Open", menu: "Menu", retry: "Try again", reload: "Reload page", errorTitle: "Something went wrong", errorBody: "This part of the page couldn’t be displayed. Try again — the rest of the dashboard keeps working.", previousPeriod: "Previous period", nextPeriod: "Next period", previousPage: "Previous page", nextPage: "Next page", otpDigit: "Digit {n}", loadMore: "Load more", showingOf: "Showing {shown} of {total}", selectAll: "Select all", loadFailed: "Couldn’t load the data.",
@@ -248,6 +249,7 @@ const de: typeof en = {
     profile: { title: "Profil", subtitle: "Dein Konto bearbeiten." },
   },
   extBanner: { missing: "Reidey nicht installiert — Angebote werden nicht erfasst.", outdated: "Reidey ist veraltet — bitte aktualisieren.", unpaired: "Reidey ist noch nicht gekoppelt.", action: "Beheben" },
+  relinkBanner: { needs_relink: "Deine Uber-Sitzung muss neu verbunden werden — Angebote werden nicht erfasst.", expired: "Deine Uber-Sitzung ist abgelaufen — Angebote werden nicht erfasst.", action: "Neu verbinden" },
   impersonation: { banner: "Du bist als {company} angemeldet.", bannerNoCompany: "Du bist als Firma angemeldet.", stop: "Beenden" },
   common: {
     open: "Öffnen", menu: "Menü", retry: "Erneut versuchen", reload: "Seite neu laden", errorTitle: "Etwas ist schiefgelaufen", errorBody: "Dieser Teil der Seite konnte nicht angezeigt werden. Versuche es erneut — der Rest des Dashboards läuft weiter.", previousPeriod: "Vorheriger Zeitraum", nextPeriod: "Nächster Zeitraum", previousPage: "Vorherige Seite", nextPage: "Nächste Seite", otpDigit: "Ziffer {n}", loadMore: "Mehr laden", showingOf: "{shown} von {total} angezeigt", selectAll: "Alle auswählen", loadFailed: "Die Daten konnten nicht geladen werden.",
@@ -420,6 +422,7 @@ const ar: typeof en = {
     profile: { title: "الملف الشخصي", subtitle: "تعديل حسابك." },
   },
   extBanner: { missing: "رايدي غير مثبّتة — لن تُلتقط العروض.", outdated: "رايدي قديمة — رجاءً حدّثها.", unpaired: "رايدي غير مقترنة بعد.", action: "إصلاح" },
+  relinkBanner: { needs_relink: "جلسة أوبر تحتاج إعادة ربط — لا تُلتقط العروض حاليًا.", expired: "انتهت جلسة أوبر — لا تُلتقط العروض حاليًا.", action: "إعادة الربط" },
   impersonation: { banner: "أنت مسجّل دخول كشركة {company}.", bannerNoCompany: "أنت مسجّل دخول كشركة.", stop: "إيقاف" },
   common: {
     open: "فتح", menu: "القائمة", retry: "حاول مرة أخرى", reload: "إعادة تحميل الصفحة", errorTitle: "حدث خطأ ما", errorBody: "تعذّر عرض هذا الجزء من الصفحة. حاول مرة أخرى — باقي لوحة التحكم يعمل بشكل طبيعي.", previousPeriod: "الفترة السابقة", nextPeriod: "الفترة التالية", previousPage: "الصفحة السابقة", nextPage: "الصفحة التالية", otpDigit: "الرقم {n}", loadMore: "تحميل المزيد", showingOf: "عرض {shown} من {total}", selectAll: "تحديد الكل", loadFailed: "تعذّر تحميل البيانات.",
