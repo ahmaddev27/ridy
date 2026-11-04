@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Link2, Hourglass, CheckCircle2, Copy, AlertTriangle } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Loader2, Link2, Hourglass, CheckCircle2, Copy, AlertTriangle, KeyRound, Unlink } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n/context";
 import { useAsync } from "@/hooks/use-async";
@@ -123,122 +121,129 @@ export function ElProfessorCard() {
   const waiting = !!data && !data.connected && !!data.token_issued_at && !data.revoked_at && !data.first_used_at;
   const hasLiveToken = !!data && (data.connected || waiting);
 
+  const spin = { animation: "ofr-spin 1s linear infinite" };
+  const tone = data?.connected ? "success" : waiting ? "warning" : "";
+
   return (
-    <Card className="p-8">
-      <h2 className="text-lg font-semibold text-ink">{c("epTitle")}</h2>
-      <p className="mt-1 text-sm text-ink-muted">{c("epIntro")}</p>
+    <section className="card">
+      <div className="card-head">
+        <h2>{c("epTitle")}</h2>
+      </div>
+      <div className="card-body stack">
+        <p className="muted">{c("epIntro")}</p>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-8 text-ink-muted">
-          <Loader2 className="h-5 w-5 animate-spin" />
-        </div>
-      ) : error || !data ? (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-danger-bg px-4 py-3 text-sm text-danger-fg">
-          <span className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            {c("epLoadFailed")}
-          </span>
-          <Button variant="secondary" size="sm" onClick={() => refetch({ silent: false })}>
-            {t("common.retry")}
-          </Button>
-        </div>
-      ) : (
-        <div className="mt-6 flex flex-col items-center text-center">
-          <span
-            className={`flex h-14 w-14 items-center justify-center rounded-2xl ${
-              data.connected ? "bg-success-bg text-success-fg" : "bg-surface-2 text-ink-muted"
-            }`}
-          >
-            {data.connected ? <CheckCircle2 className="h-7 w-7" /> : waiting ? <Hourglass className="h-7 w-7" /> : <Link2 className="h-7 w-7" />}
-          </span>
-          <h3 className="mt-4 text-lg font-semibold text-ink">
-            {data.connected ? c("epConnectedTitle") : waiting ? c("epWaitingTitle") : c("epNotConnectedTitle")}
-          </h3>
-          <p className="mt-1 max-w-sm text-sm text-ink-muted">
-            {data.connected
-              ? lastUsed
-                ? c("epLastUsed").replace("{date}", lastUsed)
-                : ""
-              : waiting
-                ? c("epWaitingBody")
-                : c("epNotConnectedBody")}
-          </p>
-
-          {issued && (
-            <div className="mt-6 w-full max-w-md">
-              <p className="text-xs font-medium text-ink-muted">{c("epTokenLabel")}</p>
-              <div className="mt-1 flex items-center gap-2">
-                <code
-                  dir="ltr"
-                  className="min-w-0 flex-1 select-all break-all rounded-xl bg-surface-2 px-4 py-3 text-start font-mono text-sm text-ink"
-                >
-                  {issued.token}
-                </code>
-                <button
-                  type="button"
-                  onClick={copyToken}
-                  className="rounded-lg p-2 text-ink-subtle hover:bg-surface-2 hover:text-ink"
-                  title={c("epCopy")}
-                  aria-label={c("epCopy")}
-                >
-                  <Copy className="h-5 w-5" />
+        {loading ? (
+          <div className="stack">
+            <span className="skel" style={{ height: 14, width: "90%" }} />
+            <span className="skel" style={{ height: 14, width: "70%" }} />
+            <span className="skel" style={{ height: 80 }} />
+          </div>
+        ) : error || !data ? (
+          <div className="callout danger">
+            <AlertTriangle />
+            <div className="stack-sm">
+              <span>{c("epLoadFailed")}</span>
+              <span>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => refetch({ silent: false })}>
+                  {t("common.retry")}
                 </button>
-              </div>
-              <p className="mt-2 text-sm text-warning-fg">{c("epTokenOnce")}</p>
-              <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-start text-sm">
-                <dt className="text-ink-muted">{c("epFleet")}</dt>
-                <dd className="text-ink">{issued.tenant_name}</dd>
-                <dt className="text-ink-muted">{c("epPaymentRef")}</dt>
-                <dd className="text-ink" dir="ltr">{issued.payment_reference}</dd>
-              </dl>
+              </span>
             </div>
-          )}
+          </div>
+        ) : (
+          <>
+            <div className="row" style={{ gap: 16, alignItems: "center", padding: 16, border: "1px solid var(--line)", borderRadius: "var(--r-xl)", background: "var(--surface-2)" }}>
+              <span className={`chip-big ${tone}`}>
+                {data.connected ? <CheckCircle2 /> : waiting ? <Hourglass /> : <Link2 />}
+              </span>
+              <div>
+                <div className="strong" style={{ fontSize: 16 }}>
+                  {data.connected ? c("epConnectedTitle") : waiting ? c("epWaitingTitle") : c("epNotConnectedTitle")}
+                </div>
+                <div className="muted text-sm">
+                  {data.connected
+                    ? lastUsed
+                      ? c("epLastUsed").replace("{date}", lastUsed)
+                      : ""
+                    : waiting
+                      ? c("epWaitingBody")
+                      : c("epNotConnectedBody")}
+                </div>
+              </div>
+            </div>
 
-          <div className="mt-6 flex flex-wrap justify-center gap-2">
-            <Button onClick={generate} disabled={busy}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {hasLiveToken ? c("epRegenerate") : c("epGenerate")}
-            </Button>
-            {hasLiveToken && (
-              <Button variant="ghost" onClick={() => setConfirmRevoke(true)} disabled={busy}>
-                {c("epRevoke")}
-              </Button>
+            {issued && (
+              <div className="stack-sm">
+                <label className="strong text-sm" htmlFor="ep-token">{c("epTokenLabel")}</label>
+                <div className="row" style={{ gap: 8, alignItems: "stretch" }}>
+                  <div className="tok" id="ep-token" tabIndex={0}>{issued.token}</div>
+                  <button type="button" className="icon-btn" onClick={copyToken} title={c("epCopy")} aria-label={c("epCopy")}>
+                    <Copy />
+                  </button>
+                </div>
+                <div className="callout warning">
+                  <AlertTriangle />
+                  <div>{c("epTokenOnce")}</div>
+                </div>
+                <dl className="kv">
+                  <dt>{c("epFleet")}</dt>
+                  <dd>{issued.tenant_name}</dd>
+                  <dt>{c("epPaymentRef")}</dt>
+                  <dd className="mono" dir="ltr">{issued.payment_reference}</dd>
+                </dl>
+              </div>
             )}
-          </div>
-        </div>
-      )}
 
-      {/* The company's own setting, shown once the platform has opened the
-          integration. Before that there is nothing for it to govern. */}
-      {!loading && data?.enabled && (
-        <div className="mt-6 flex items-start justify-between gap-4 glass-panel glass-panel--card rounded-xl px-4 py-4">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-ink">{c("epGalleryTitle")}</p>
-            <p className="mt-1 text-sm text-ink-muted">{c("epGalleryBody")}</p>
-          </div>
-          <Switch
-            checked={data.gallery_import}
-            onChange={() => void toggleGallery()}
-            disabled={savingGallery}
-            label={data.gallery_import ? c("epGalleryOff") : c("epGalleryOn")}
-          />
-        </div>
-      )}
+            <div className="row-wrap">
+              <button type="button" className="btn btn-primary" onClick={generate} disabled={busy}>
+                {busy ? <Loader2 style={spin} /> : <KeyRound />}
+                {hasLiveToken ? c("epRegenerate") : c("epGenerate")}
+              </button>
+              {hasLiveToken && (
+                <button type="button" className="btn btn-ghost" onClick={() => setConfirmRevoke(true)} disabled={busy}>
+                  <Unlink />
+                  {c("epRevoke")}
+                </button>
+              )}
+            </div>
+          </>
+        )}
 
-      {!loading && data?.enabled && (
-        <div className="mt-4 flex items-start justify-between gap-4 glass-panel glass-panel--card rounded-xl px-4 py-4">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-ink">{c("epOdometerTitle")}</p>
-            <p className="mt-1 text-sm text-ink-muted">{c("epOdometerBody")}</p>
+        {/* The company's own settings, shown once the platform has opened the
+            integration. Before that there is nothing for them to govern. */}
+        {!loading && data?.enabled && (
+          <div className="stack-sm">
+            <div className="card inset" style={{ padding: "14px 16px" }}>
+              <div className="setting">
+                <div>
+                  <div className="t">{c("epGalleryTitle")}</div>
+                  <div className="d">{c("epGalleryBody")}</div>
+                </div>
+                <Switch
+                  checked={data.gallery_import}
+                  onChange={() => void toggleGallery()}
+                  disabled={savingGallery}
+                  label={data.gallery_import ? c("epGalleryOff") : c("epGalleryOn")}
+                />
+              </div>
+            </div>
+            <div className="card inset" style={{ padding: "14px 16px" }}>
+              <div className="setting">
+                <div>
+                  <div className="t">{c("epOdometerTitle")}</div>
+                  <div className="d">{c("epOdometerBody")}</div>
+                </div>
+                <Switch
+                  checked={data.odometer_required}
+                  onChange={() => void toggleOdometer()}
+                  disabled={savingOdometer}
+                  label={data.odometer_required ? c("epOdometerOff") : c("epOdometerOn")}
+                />
+              </div>
+            </div>
           </div>
-          <Switch
-            checked={data.odometer_required}
-            onChange={() => void toggleOdometer()}
-            disabled={savingOdometer}
-            label={data.odometer_required ? c("epOdometerOff") : c("epOdometerOn")}
-          />
-        </div>
-      )}
+        )}
+      </div>
 
       <ConfirmModal
         open={confirmRevoke}
@@ -251,6 +256,6 @@ export function ElProfessorCard() {
         busy={busy}
         danger
       />
-    </Card>
+    </section>
   );
 }

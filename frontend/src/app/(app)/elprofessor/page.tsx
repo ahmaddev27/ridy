@@ -15,7 +15,7 @@
  * its own state while closed, so this page can say why rather than fail.
  */
 
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHead } from "@/components/ui/rd";
 import { useI18n } from "@/lib/i18n/context";
 import { ElProfessorCard } from "./elprofessor-card";
 
@@ -23,11 +23,8 @@ export default function ElProfessorPage() {
   const { t } = useI18n();
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={t("screens.connections.pageTitleEp")}
-        subtitle={t("screens.connections.pageSubtitleEp")}
-      />
+    <div className="stack" style={{ maxWidth: 672, marginInline: "auto", width: "100%" }}>
+      <PageHead title={t("screens.connections.pageTitleEp")} sub={t("screens.connections.pageSubtitleEp")} />
       <ElProfessorCard />
     </div>
   );

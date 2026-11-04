@@ -2,7 +2,6 @@
 
 import { useId, useRef } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useDialogFocus } from "@/components/ui/modal";
 
 /**
@@ -40,10 +39,7 @@ export function ConfirmModal({
   if (!open) return null;
 
   return (
-    <div
-      className="app-modal-scrim fixed inset-0 z-[1200] flex items-center justify-center bg-overlay p-4 backdrop-blur-sm"
-      onClick={() => !busy && onCancel()}
-    >
+    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && !busy && onCancel()}>
       <div
         ref={panelRef}
         role="alertdialog"
@@ -51,36 +47,27 @@ export function ConfirmModal({
         aria-labelledby={titleId}
         aria-describedby={messageId}
         tabIndex={-1}
-        className="app-modal w-full max-w-sm overflow-hidden rounded-2xl bg-surface text-start shadow-xl outline-none"
-        onClick={(e) => e.stopPropagation()}
+        className="modal sm outline-none"
       >
-        <div className="p-5">
-          <div className="flex items-start gap-3">
-            <span
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                danger ? "bg-danger-bg text-danger-fg" : "bg-surface-2 text-ink"
-              }`}
-            >
-              <AlertTriangle className="h-5 w-5" />
+        <div className="modal-head">
+          <div>
+            <span className={`stat-ico ${danger ? "danger" : ""}`} style={{ width: 36, height: 36, borderRadius: 10, marginBottom: 12 }}>
+              <AlertTriangle />
             </span>
-            <div className="min-w-0 flex-1">
-              <h2 id={titleId} className="font-semibold text-ink">{title}</h2>
-              <p id={messageId} className="mt-1 text-sm text-ink-muted">{message}</p>
-            </div>
+            <h2 id={titleId}>{title}</h2>
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3">
-          <Button variant="secondary" onClick={onCancel} disabled={busy}>
+        <div className="modal-body">
+          <p id={messageId} className="muted">{message}</p>
+        </div>
+        <div className="modal-foot">
+          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={busy}>
             {cancelLabel}
-          </Button>
-          <Button
-            variant={danger ? "danger" : "primary"}
-            onClick={onConfirm}
-            disabled={busy}
-          >
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+          </button>
+          <button type="button" className={`btn ${danger ? "btn-danger" : "btn-primary"}`} onClick={onConfirm} disabled={busy}>
+            {busy && <Loader2 style={{ animation: "ofr-spin 1s linear infinite" }} />}
             {confirmLabel}
-          </Button>
+          </button>
         </div>
       </div>
     </div>

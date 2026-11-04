@@ -1387,6 +1387,12 @@ html:root .app-sticky-footer {
     .acc-pk .ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary-soft-ink); flex-shrink: 0; }
     .acc-tabs > .tabs { padding-inline: 18px; }
     .acc-tabs > .tab-panel { padding: 6px 18px 18px; }
+    .form-section { display: grid; grid-template-columns: minmax(200px, 0.9fr) minmax(0, 2fr); gap: 24px; padding: 22px 0; }
+    .form-section + .form-section { border-top: 1px solid var(--line); }
+    .form-section h3 { font-size: 14.5px; }
+    .form-section > div:first-child p { color: var(--ink-subtle); font-size: 13px; margin-top: 4px; }
+    @media (max-width: 880px) { .form-section { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
+    @media (max-width: 720px) { .form-section { grid-template-columns: 1fr; gap: 12px; } }
   @media (max-width: 1000px) { .acc-split { grid-template-columns: 1fr; } }
   @media (max-width: 720px) { .acc-pay { grid-template-columns: 1fr; } }
 }
