@@ -5,7 +5,7 @@ import { formatDate, formatDateTime, formatMoney, formatNumber, latnLocale, relT
 import { fleetDayKey, fleetYmd, formatYmd } from "@/lib/fleet-day";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save, KeyRound, RefreshCw, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn, Globe, Network, Copy, Files, Check, Lock } from "lucide-react";
+import { ArrowLeft, Loader2, Save, KeyRound, Power, Trash2, UserPlus, Ticket, ShieldCheck, ChevronDown, Info, Users, Car, Radio, Plug , Gift, LogIn, Globe, Network, Copy, Files, Check, Lock } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,8 +24,6 @@ import {
   getAutoRenewal,
   setAutoRenewal,
   type AutoRenewalState,
-  deleteCompanySession,
-  purgeCompanyData,
   startImpersonation,
   generateActivationCode,
   grantFreeSubscription,
@@ -84,7 +82,7 @@ export function CompanyDetail({
   const [tab, setTab] = useState<"details" | "subscription" | "managers" | "drivers" | "offers" | "vehicles" | "network" | "session">("details");
 
   // Sub-actions.
-  const [confirm, setConfirm] = useState<null | "disable" | "relink" | "deleteSession" | "purgeData">(null);
+  const [confirm, setConfirm] = useState<null | "disable" | "relink">(null);
   const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
 
   // Subscription/activation — a code is generated against a plan, paid optional.
@@ -281,42 +279,15 @@ export function CompanyDetail({
 
   async function runConfirm() {
     if (!confirm) return;
-    if (confirm === "purgeData") {
-      await runPurge();
-      return;
-    }
     setBusy(true);
     try {
       if (confirm === "disable") await setCompanyActive(id, false); // reversible, never deletes
       if (confirm === "relink") await forceRelink(id);
-      if (confirm === "deleteSession") await deleteCompanySession(id);
       toast.success(c("done"));
       await load();
       onChanged();
     } catch (e) {
       toast.error(c("actionFailed"), { description: apiErrorMessage(e, t, locale) });
-    } finally {
-      setBusy(false);
-      setConfirm(null);
-    }
-  }
-
-  async function runPurge() {
-    setBusy(true);
-    try {
-      const counts = await purgeCompanyData(id);
-      const summary = c("purgedCounts")
-        .replace("{drivers}", String(counts.drivers))
-        .replace("{vehicles}", String(counts.vehicles))
-        .replace("{offers}", String(counts.offers))
-        .replace("{devices}", String(counts.device_tokens))
-        .replace("{metrics}", String(counts.driver_metrics))
-        .replace("{sessions}", String(counts.sessions));
-      toast.success(c("purgedToast"), { description: summary });
-      await load();
-      onChanged();
-    } catch (e) {
-      toast.error(c("purgeFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
       setConfirm(null);
@@ -396,7 +367,6 @@ export function CompanyDetail({
               company={company}
               busy={busy}
               onRelink={() => setConfirm("relink")}
-              onDelete={() => setConfirm("deleteSession")}
             />
           ) : tab === "drivers" || tab === "vehicles" ? (
             <CompanyDataTab id={id} tab={tab} />
@@ -679,14 +649,6 @@ export function CompanyDetail({
                     <LogIn className="h-4 w-4 rtl:rotate-180" /> {c("impersonate")}
                   </Button>
                 </Group>
-
-                {/* Danger zone — irreversible purge; flat but visually distinct. */}
-                <Group title={c("dangerZone")} tone="danger">
-                  <p className="text-xs text-danger-fg/80">{c("dangerZoneHint")}</p>
-                  <Button variant="danger" onClick={() => setConfirm("purgeData")} disabled={busy}>
-                    <Trash2 className="h-4 w-4" /> {c("purgeData")}
-                  </Button>
-                </Group>
               </div>
 
               {/* Save — enable/disable lives in the status toggle above. */}
@@ -799,13 +761,11 @@ function SessionTab({
   company,
   busy,
   onRelink,
-  onDelete,
 }: {
   id: number;
   company: Company;
   busy: boolean;
   onRelink: () => void;
-  onDelete: () => void;
 }) {
   const { t, locale } = useI18n();
   const c = (k: string) => t(`screens.companies.${k}`);
@@ -862,11 +822,8 @@ function SessionTab({
       <Group title={c("session")}>
         <p className="text-xs text-ink-subtle">{c("sessionHint")}</p>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={onRelink} disabled={busy || !company.session_status}>
-            <RefreshCw className="h-4 w-4" /> {c("forceRelink")}
-          </Button>
-          <Button variant="secondary" onClick={onDelete} disabled={busy || !company.session_status}>
-            <Trash2 className="h-4 w-4" /> {c("deleteSession")}
+          <Button variant="danger" onClick={onRelink} disabled={busy || !company.session_status}>
+            <Power className="h-4 w-4" /> {c("stopSession")}
           </Button>
         </div>
       </Group>
