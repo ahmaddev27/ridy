@@ -400,7 +400,7 @@ function PlanModal({ plan, onClose, onSaved }: { plan: Plan | null; onClose: () 
     }
   }
 
-  const inputCls = "w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line";
+  const inputCls = "ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line";
 
   return (
     <Modal

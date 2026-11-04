@@ -118,7 +118,7 @@ export function OnboardingTour() {
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-overlay p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-surface shadow-xl">
+      <div className="glass-panel glass-panel--strong w-full max-w-md overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-line px-5 py-3">
           <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">

@@ -244,7 +244,7 @@ function Kpi({
   return (
     <Link
       href={href}
-      className="group rounded-2xl border border-line/70 bg-surface p-4 shadow-[0_2px_10px_-2px_rgba(30,34,43,0.06)] transition hover:border-line-strong hover:shadow-md"
+      className="group glass-panel glass-panel--card p-4 transition hover:border-line-strong hover:shadow-md"
     >
       <div className="flex items-start justify-between">
         {Icon && (

@@ -184,7 +184,7 @@ function Field({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           required
-          className="w-full rounded-lg border border-line-strong bg-surface-2 px-3.5 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-subtle focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/20"
+          className="ui-field w-full rounded-lg border border-line-strong bg-surface-2 px-3.5 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-subtle focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/20"
         />
       )}
     </div>

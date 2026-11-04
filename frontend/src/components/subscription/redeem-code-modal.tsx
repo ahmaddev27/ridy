@@ -57,7 +57,7 @@ export function RedeemCodeModal({
             inputMode="numeric"
             placeholder="123456"
             autoFocus
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-center text-lg font-semibold tracking-[0.3em] tabular-nums text-ink outline-none focus:border-ink"
+            className="ui-field w-full rounded-lg border border-line bg-surface px-3 py-2 text-center text-lg font-semibold tracking-[0.3em] tabular-nums text-ink outline-none focus:border-ink"
           />
         </div>
         <Button onClick={redeem} disabled={code.length !== 6 || submitting} className="w-full justify-center">

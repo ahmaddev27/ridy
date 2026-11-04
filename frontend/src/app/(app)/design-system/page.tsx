@@ -10,6 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { GlassPanel, type GlassVariant } from "@/components/ui/glass-panel";
+import { SearchInput } from "@/components/ui/search-input";
+import { Select } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { PasswordInput } from "@/components/ui/password-input";
+import { OtpInput } from "@/components/ui/otp-input";
+import { Table, TableCard } from "@/components/ui/table";
 import { useI18n } from "@/lib/i18n/context";
 
 const swatches: [string, string, string][] = [
@@ -45,12 +52,19 @@ function DesignSystemGallery() {
   const { t } = useI18n();
   const [confirm, setConfirm] = useState(false);
   const [info, setInfo] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sel, setSel] = useState("uber");
+  const [sw, setSw] = useState(true);
+  const [pw, setPw] = useState("");
+  const [otp, setOtp] = useState("");
 
   return (
     <div className="space-y-6">
       <PageHeader
         tkey="designSystem"
       />
+
+      <GlassTestBed />
 
       {/* Colors */}
       <Section title={t("screens.designSystem.colorTokens")}>
@@ -106,34 +120,26 @@ function DesignSystemGallery() {
           </div>
         </Section>
 
-        {/* Form controls */}
+        {/* Form controls — the shared input primitives (ui-field / --focus ring). */}
         <Section title={t("screens.designSystem.formControls")}>
           <div className="space-y-3">
-            <input
-              placeholder={t("screens.designSystem.textInput")}
-              className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
+            <SearchInput value={search} onChange={setSearch} placeholder={t("screens.designSystem.textInput")} className="max-w-none" />
+            <Select
+              value={sel}
+              onChange={setSel}
+              options={[
+                { value: "uber", label: "Uber" },
+                { value: "bolt", label: "Bolt" },
+              ]}
             />
-            <select className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink">
-              <option>{t("screens.designSystem.selectOption")}</option>
-              <option>Uber</option>
-              <option>Bolt</option>
-            </select>
+            <PasswordInput value={pw} onChange={(e) => setPw(e.target.value)} placeholder="••••••••" />
             <div className="flex flex-wrap items-center gap-5 text-sm text-ink-muted">
-              <label className="flex items-center gap-2">
-                <input type="checkbox" defaultChecked className="rounded border-line-strong text-ink" />
-                {t("screens.designSystem.checkbox")}
-              </label>
-              <label className="flex items-center gap-2">
-                <input type="radio" name="dsr" defaultChecked className="border-line-strong text-ink" />
-                {t("screens.designSystem.radio")}
-              </label>
               <span className="flex items-center gap-2">
                 {t("screens.designSystem.switchLabel")}
-                <span className="inline-flex h-5 w-9 items-center rounded-full bg-emerald-500 p-0.5">
-                  <span className="ml-auto h-4 w-4 rounded-full bg-surface" />
-                </span>
+                <Switch checked={sw} onChange={() => setSw((v) => !v)} label={t("screens.designSystem.switchLabel")} />
               </span>
             </div>
+            <OtpInput value={otp} onChange={setOtp} length={6} />
           </div>
         </Section>
 
@@ -187,6 +193,38 @@ function DesignSystemGallery() {
           />
         </Section>
 
+        {/* Shared data table (ui-table — solid, sticky header, tabular-nums) */}
+        <Section title="Data table">
+          <TableCard>
+            <Table>
+              <thead>
+                <tr>
+                  <th>Fahrer</th>
+                  <th>Status</th>
+                  <th className="r">Umsatz</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Ahmed Jaber</td>
+                  <td><Badge status="connected" dot>Online</Badge></td>
+                  <td className="r tabular-nums">1.234,56 €</td>
+                </tr>
+                <tr>
+                  <td>Maria Schmidt</td>
+                  <td><Badge status="gap">Offline</Badge></td>
+                  <td className="r tabular-nums">987,00 €</td>
+                </tr>
+                <tr>
+                  <td>Jonas Weber</td>
+                  <td><Badge status="expiring" dot>Ablaufend</Badge></td>
+                  <td className="r tabular-nums">2.045,10 €</td>
+                </tr>
+              </tbody>
+            </Table>
+          </TableCard>
+        </Section>
+
         {/* Tabs + pagination */}
         <Section title={t("screens.designSystem.tabsPagination")}>
           <div className="flex gap-5 border-b border-line text-sm">
@@ -238,10 +276,98 @@ function Alert({
   children: React.ReactNode;
 }) {
   const styles = {
-    info: "border-line-strong bg-surface-2 text-indigo-800",
-    success: "border-emerald-200 bg-success-bg text-emerald-800",
-    warning: "border-amber-200 bg-warning-bg text-amber-800",
-    error: "border-rose-200 bg-danger-bg text-rose-800",
+    info: "border-line-strong bg-surface-2 text-ink",
+    success: "border-success-dot/40 bg-success-bg text-success-fg",
+    warning: "border-warning-dot/40 bg-warning-bg text-warning-fg",
+    error: "border-danger-dot/40 bg-danger-bg text-danger-fg",
   }[tone];
   return <div className={`rounded-lg border p-3 ${styles}`}>{children}</div>;
+}
+
+// ---------------------------------------------------------------------------
+// Glass redesign test bed (epic #276, Phase 0). Dev-only like the rest of this
+// page. Static showcase of the glass tokens and primitives.
+// ---------------------------------------------------------------------------
+const TOKEN_GROUPS: { label: string; tokens: string[] }[] = [
+  { label: "Surfaces", tokens: ["canvas", "surface", "surface-solid", "surface-2", "surface-3"] },
+  { label: "Ink", tokens: ["ink", "ink-muted", "ink-subtle", "line", "line-strong"] },
+  { label: "Brand", tokens: ["primary", "primary-hover", "primary-soft", "primary-soft-ink", "focus"] },
+  { label: "Success / Danger", tokens: ["success-bg", "success-fg", "success-dot", "danger-bg", "danger-fg", "danger-dot"] },
+  { label: "Warning / Info", tokens: ["warning-bg", "warning-fg", "warning-dot", "info-bg", "info-fg", "info-dot"] },
+  { label: "Accent / Neutral", tokens: ["accent-bg", "accent-fg", "accent-dot", "neutral-bg", "neutral-fg", "neutral-dot"] },
+  { label: "Charts", tokens: ["c1", "c2", "c3", "c4", "c5"] },
+];
+
+const GLASS_VARIANTS: [GlassVariant, string][] = [
+  ["card", "card: translucent, edge + highlight, no blur"],
+  ["sheet", "sheet: blur(22px) saturate(160%)"],
+  ["strong", "strong: blur(26px) saturate(180%)"],
+  ["solid", "solid: dense data, opaque"],
+];
+
+const RADII = ["xs", "sm", "md", "lg", "xl", "2xl"];
+
+function GlassTestBed() {
+  return (
+    <Section title="Glass design (epic #276)">
+      <div className="space-y-6">
+        <div className="space-y-3">
+          {TOKEN_GROUPS.map((g) => (
+            <div key={g.label}>
+              <p className="mb-1 text-xs font-medium text-ink-muted">{g.label}</p>
+              <div className="flex flex-wrap gap-2">
+                {g.tokens.map((tk) => (
+                  <div key={tk} className="w-24">
+                    <div
+                      className="h-9 rounded-lg border border-line-strong"
+                      style={{ background: `var(--${tk})` }}
+                    />
+                    <p className="mt-1 truncate text-[10px] text-ink-subtle">--{tk}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-medium text-ink-muted">GlassPanel variants (over the ambient field)</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {GLASS_VARIANTS.map(([variant, label]) => (
+              <GlassPanel key={variant} variant={variant} className="p-4">
+                <p className="text-sm font-semibold text-ink">{variant}</p>
+                <p className="mt-1 text-xs text-ink-muted">{label}</p>
+                <p className="mt-2 text-xs text-ink-subtle tabular-nums">1.234,56 € · 12,4 km</p>
+              </GlassPanel>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div>
+            <p className="mb-2 text-xs font-medium text-ink-muted">Fonts</p>
+            <p className="font-sans text-lg">Geist: Fahrer, Fahrzeuge 0123456789 €</p>
+            <p className="mono text-sm">Geist Mono: DE-AB 1234 · 0123456789</p>
+            <p className="text-lg" lang="ar" dir="rtl" style={{ fontFamily: "var(--font-ar)" }}>
+              IBM Plex Sans Arabic: السائقون والمركبات 0123456789 € 12.5 km
+            </p>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-medium text-ink-muted">Radii</p>
+            <div className="flex flex-wrap gap-2">
+              {RADII.map((r) => (
+                <div
+                  key={r}
+                  className="flex h-12 w-14 items-center justify-center border border-line-strong bg-surface-2 text-[10px] text-ink-muted"
+                  style={{ borderRadius: `var(--r-${r}, 8px)` }}
+                >
+                  {r}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Section>
+  );
 }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Loader2, MessageCircle, Mail, KeyRound, Banknote, ChevronDown, Check, Clock } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { OtpInput } from "@/components/ui/otp-input";
 import { PaymentMethods } from "@/components/subscription/payment-methods";
 import { useI18n } from "@/lib/i18n/context";
@@ -99,7 +99,7 @@ export function SuspendedScreen({
               {t("screens.codes.claimPendingLabel")}
             </div>
           ) : hasCredentials ? (
-            <div className="rounded-xl border border-line bg-surface p-4">
+            <div className="glass-panel glass-panel--card rounded-xl p-4">
               <Button onClick={confirmPayment} disabled={confirming} className="w-full">
                 {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 {t("screens.codes.confirmPayment")}
@@ -120,7 +120,7 @@ export function SuspendedScreen({
               </form>
             </Section>
           ) : (
-            <div className="rounded-xl border border-line bg-surface p-4">
+            <div className="glass-panel glass-panel--card rounded-xl p-4">
               <p className="text-sm text-ink-muted">{s("passwordNeededHint")}</p>
               {onBackToLogin && (
                 <button
@@ -146,7 +146,7 @@ export function SuspendedScreen({
               href={`https://wa.me/${wa}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+              className={buttonClasses("primary", "md", "w-full")}
             >
               <MessageCircle className="h-4 w-4" /> {s("whatsapp")}
             </a>
@@ -179,7 +179,7 @@ function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-surface">
+    <div className="glass-panel glass-panel--card overflow-hidden rounded-xl">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

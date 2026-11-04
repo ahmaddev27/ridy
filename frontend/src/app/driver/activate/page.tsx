@@ -100,7 +100,7 @@ function ActivateContent() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
-      <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-8 text-center shadow-sm">
+      <div className="driver-activate-card w-full max-w-sm glass-panel glass-panel--card p-8 text-center">
         <Logo size={64} className="mx-auto block text-ink" />
         <h1 className="mt-6 text-xl font-bold text-ink">{t.title}</h1>
 

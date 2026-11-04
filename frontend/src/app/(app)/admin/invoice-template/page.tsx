@@ -280,7 +280,7 @@ export default function InvoiceTemplatePage() {
                   value={String(settings.vat_rate)}
                   onChange={(e) => set("vat_rate", Number(e.target.value) || 0)}
                   disabled={settings.kleinunternehmer}
-                  className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line disabled:opacity-50"
+                  className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line disabled:opacity-50"
                 />
               </div>
               <Field label={c("currency")} value={settings.currency} onChange={(v) => set("currency", v)} />
@@ -431,7 +431,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 const inputCls =
-  "w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line";
+  "ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line";
 
 /** A small square icon button used for reorder/remove controls. */
 function IconBtn({

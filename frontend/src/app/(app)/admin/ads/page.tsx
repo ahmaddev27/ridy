@@ -252,7 +252,7 @@ function AdFormModal({ ad, onClose, onSaved }: { ad: Ad | null; onClose: () => v
   }
 
   const field =
-    "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line";
+    "ui-field w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-ink focus:ring-2 focus:ring-line";
   const err = (k: string) => errors[k]?.[0];
 
   return (

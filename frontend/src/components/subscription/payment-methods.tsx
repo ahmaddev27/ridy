@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Landmark, Banknote, MessageCircle, Copy, Check, Loader2, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { formatMoney, toLatinDigits } from "@/lib/utils";
 import { buildEpcPayload, canBuildEpc } from "@/lib/epc";
 import { useI18n } from "@/lib/i18n/context";
@@ -158,7 +158,7 @@ export function PaymentMethods({
                 href={`https://wa.me/${cashDigits}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                className={buttonClasses()}
               >
                 <MessageCircle className="h-4 w-4" />
                 <span dir="ltr">{toLatinDigits(methods.cash.whatsapp ?? "")}</span>

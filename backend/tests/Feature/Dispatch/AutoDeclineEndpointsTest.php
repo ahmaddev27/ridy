@@ -70,6 +70,7 @@ class AutoDeclineEndpointsTest extends TestCase
     public function test_update_saves_normalised_rules_and_the_engine_reads_them(): void
     {
         $this->enableFeature();
+        $this->driver->forceFill(['auto_decline' => ['admin_enabled' => true]])->save();
 
         $this->putJson('/api/v1/driver/auto-decline', $this->payload())
             ->assertOk()
@@ -79,6 +80,34 @@ class AutoDeclineEndpointsTest extends TestCase
         $driver = $this->driver->fresh();
         $this->assertTrue($driver->autoDeclineEnabled());
         $this->assertSame(900, $driver->autoDeclineRules()['min_fare']['value_e2']);
+    }
+
+    public function test_a_driver_the_admin_has_not_allowed_cannot_switch_it_on(): void
+    {
+        $this->enableFeature();
+
+        $this->putJson('/api/v1/driver/auto-decline', $this->payload())
+            ->assertOk()
+            ->assertJsonPath('data.admin_enabled', false)
+            ->assertJsonPath('data.enabled', false);
+
+        $driver = $this->driver->fresh();
+        $this->assertFalse($driver->autoDeclineEnabled());
+        $this->assertFalse($driver->autoDeclineActive());
+        $this->assertSame(900, $driver->autoDeclineRules()['min_fare']['value_e2'], 'rules are still saved');
+    }
+
+    public function test_an_allowed_driver_can_opt_out_and_cannot_grant_themselves_permission(): void
+    {
+        $this->enableFeature();
+        $this->driver->forceFill(['auto_decline' => ['admin_enabled' => true, 'enabled' => true]])->save();
+
+        $this->putJson('/api/v1/driver/auto-decline', ['enabled' => false] + ['admin_enabled' => false])->assertOk();
+
+        $driver = $this->driver->fresh();
+        $this->assertTrue($driver->adminAutoDeclineEnabled(), 'the driver cannot write admin_enabled');
+        $this->assertFalse($driver->autoDeclineEnabled());
+        $this->assertFalse($driver->autoDeclineActive());
     }
 
     public function test_money_must_be_integer_cents(): void

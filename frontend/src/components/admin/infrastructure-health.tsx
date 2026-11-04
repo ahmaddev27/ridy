@@ -124,7 +124,7 @@ export function InfrastructureHealth() {
               const Icon = SERVICE_ICON[s.key] ?? Radio;
               const tone = STATUS_TONE[s.status];
               return (
-                <div key={s.key} className="flex items-center justify-between rounded-xl border border-line bg-surface p-3.5">
+                <div key={s.key} className="flex items-center justify-between glass-panel glass-panel--card rounded-xl p-3.5">
                   <div className="flex items-center gap-2.5">
                     <Icon className="h-4 w-4 text-ink-subtle" />
                     <span className="text-sm font-medium text-ink">{c(`svc_${s.key}`)}</span>
@@ -140,7 +140,7 @@ export function InfrastructureHealth() {
 
           {/* Queue + scheduler detail */}
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-line bg-surface p-4">
+            <div className="glass-panel glass-panel--card rounded-xl p-4">
               <div className="flex items-center gap-2 text-ink-muted">
                 <ListChecks className="h-4 w-4 text-ink-subtle" />
                 <span className="text-xs font-semibold uppercase tracking-wide">{c("svc_queue")}</span>
@@ -151,7 +151,7 @@ export function InfrastructureHealth() {
                 <Stat label={c("queueOldest")} value={ageLabel(data.queue.oldest_pending_seconds)} />
               </div>
             </div>
-            <div className="rounded-xl border border-line bg-surface p-4">
+            <div className="glass-panel glass-panel--card rounded-xl p-4">
               <div className="flex items-center gap-2 text-ink-muted">
                 <Clock className="h-4 w-4 text-ink-subtle" />
                 <span className="text-xs font-semibold uppercase tracking-wide">{c("svc_scheduler")}</span>
@@ -193,7 +193,7 @@ export function InfrastructureHealth() {
               {failures.by_name.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {failures.by_name.map((f) => (
-                    <span key={f.name} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs">
+                    <span key={f.name} className="inline-flex items-center gap-1.5 glass-panel glass-panel--card rounded-full px-2.5 py-1 text-xs">
                       <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
                       <span className="font-medium text-ink">{f.name}</span>
                       <span className="tabular-nums text-ink-subtle">{f.count}</span>
@@ -201,7 +201,7 @@ export function InfrastructureHealth() {
                   ))}
                 </div>
               )}
-              <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-line bg-surface p-3">
+              <div className="max-h-64 space-y-2 overflow-y-auto glass-panel glass-panel--card rounded-xl p-3">
                 {failures.jobs.map((j) => (
                   <div key={j.id} className="text-xs">
                     <div className="flex items-center justify-between gap-3">

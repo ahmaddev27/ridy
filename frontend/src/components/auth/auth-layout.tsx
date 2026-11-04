@@ -35,7 +35,7 @@ export function AuthLayout({
   ];
 
   return (
-    <div className="relative min-h-screen bg-surface lg:grid lg:grid-cols-[1.02fr_0.98fr]">
+    <div className="auth-shell relative min-h-screen bg-surface lg:grid lg:grid-cols-[1.02fr_0.98fr]">
       {/* Brand panel — full-bleed hero image, hidden below lg */}
       <aside className="relative hidden overflow-hidden bg-primary lg:block">
         <img
@@ -82,7 +82,7 @@ export function AuthLayout({
       </aside>
 
       {/* Form side — carries the controls + curved seam + floating badge */}
-      <main className="relative flex min-h-screen flex-col bg-surface px-6 py-7 sm:px-10 lg:-ms-10 lg:rounded-s-[2.75rem] lg:ps-16 lg:shadow-[-24px_0_60px_-30px_rgba(0,0,0,.25)]">
+      <main className="auth-main relative flex min-h-screen flex-col bg-surface px-6 py-7 sm:px-10 lg:-ms-10 lg:rounded-s-[2.75rem] lg:ps-16 lg:shadow-[-24px_0_60px_-30px_rgba(0,0,0,.25)]">
         {/* floating logo badge at the seam (desktop) */}
         <div className="absolute -start-10 top-1/2 hidden -translate-y-1/2 lg:block">
           <div className="flex h-[120px] w-[120px] items-center justify-center rounded-full bg-primary shadow-xl ring-4 ring-surface">
@@ -111,7 +111,7 @@ export function AuthLayout({
 
         {/* form — centred in the remaining space */}
         <div className="flex flex-1 items-center justify-center py-8">
-          <div className="w-full max-w-md">{children}</div>
+          <div className="auth-card w-full max-w-md">{children}</div>
         </div>
       </main>
     </div>

@@ -2,29 +2,36 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Ban, ChevronLeft, ChevronRight, MapPin, ArrowRight } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { RulesModal } from "./rules-modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { useI18n } from "@/lib/i18n/context";
 import { formatMoney, latnLocale, toLatinDigits } from "@/lib/utils";
+import { ApiError } from "@/lib/api/client";
 import { fareLabel, type PageMeta } from "@/lib/api/offers";
 import {
   AUTO_DECLINE_REASONS,
-  getAutoDeclineOverview,
+  getAutoDeclineDrivers,
   listEarlyDeclined,
-  type AutoDeclineDriver,
-  type AutoDeclineOverview,
+  updateDriverAutoDecline,
+  type AutoDeclineDrivers,
+  type AutoDeclineManagedDriver,
   type AutoDeclineReason,
+  type AutoDeclineRules,
   type EarlyDeclinedOffer,
 } from "@/lib/api/auto-decline";
 
 const PER_PAGE = 25;
 
 const selectClass =
-  "rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none hover:bg-surface-2";
+  "ui-field rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none hover:bg-surface-2";
 
 export default function AutoDeclinePage() {
   const { t, locale } = useI18n();
@@ -36,12 +43,16 @@ export default function AutoDeclinePage() {
   // the moment we know the flag is off, rather than render a "not enabled" shell.
   const { user } = useAuth();
   const router = useRouter();
+  // Write controls need offers.manage; offers.view alone keeps the read-only table.
+  const canManage = user?.permissions?.includes("offers.manage") ?? false;
   const featureOff = user != null && user.tenant?.dispatch_reject_enabled !== true;
   useEffect(() => {
     if (featureOff) router.replace("/dashboard");
   }, [featureOff, router]);
 
-  const [overview, setOverview] = useState<AutoDeclineOverview | null>(null);
+  const [overview, setOverview] = useState<AutoDeclineDrivers | null>(null);
+  const [editing, setEditing] = useState<AutoDeclineManagedDriver | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
   const [offers, setOffers] = useState<EarlyDeclinedOffer[]>([]);
   const [meta, setMeta] = useState<PageMeta | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +66,7 @@ export default function AutoDeclinePage() {
   const seq = useRef(0);
 
   useEffect(() => {
-    getAutoDeclineOverview()
+    getAutoDeclineDrivers()
       .then(setOverview)
       .catch((e) => setError(e instanceof Error ? e.message : "error"));
   }, []);
@@ -85,7 +96,26 @@ export default function AutoDeclinePage() {
       });
   }, [driverId, reason, from, to, page]);
 
-  function ruleLines(d: AutoDeclineDriver): string[] {
+  async function saveDriver(d: AutoDeclineManagedDriver, body: { admin_enabled?: boolean; rules?: AutoDeclineRules }) {
+    setBusyId(d.id);
+    try {
+      const row = await updateDriverAutoDecline(d.id, body);
+      setOverview((o) => (o ? { ...o, drivers: o.drivers.map((x) => (x.id === row.id ? row : x)) } : o));
+      setEditing(null);
+      toast.success(c("saved"));
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : c("saveError"));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function statusLabel(d: AutoDeclineManagedDriver): string {
+    if (d.active) return c("statusActive");
+    return d.admin_enabled ? c("statusOptedOut") : c("statusLocked");
+  }
+
+  function ruleLines(d: AutoDeclineManagedDriver): string[] {
     const r = d.rules;
     const lines: string[] = [];
     if (r.min_fare.enabled) lines.push(c("ruleMinFare").replace("{v}", formatMoney(r.min_fare.value_e2 / 100, locale)));
@@ -108,7 +138,7 @@ export default function AutoDeclinePage() {
       <PageHeader title={c("title")} subtitle={c("subtitle")} />
 
       {error && (
-        <div className="rounded-lg border border-rose-200 bg-danger-bg p-3 text-sm text-danger-fg">
+        <div className="rounded-lg border border-danger-dot/40 bg-danger-bg p-3 text-sm text-danger-fg">
           {c("loadError")} — {error}
         </div>
       )}
@@ -118,7 +148,10 @@ export default function AutoDeclinePage() {
       )}
 
       <Card className="overflow-hidden">
-        <div className="border-b border-line px-4 py-3 font-semibold text-ink">{c("driversTitle")}</div>
+        <div className="border-b border-line px-4 py-3">
+          <div className="font-semibold text-ink">{c("driversTitle")}</div>
+          {canManage && <p className="mt-1 text-xs text-ink-subtle">{c("adminHint")}</p>}
+        </div>
         {overview && overview.drivers.length === 0 ? (
           <p className="px-4 py-6 text-sm text-ink-subtle">{c("driversEmpty")}</p>
         ) : (
@@ -128,6 +161,7 @@ export default function AutoDeclinePage() {
                 <tr>
                   <th className="px-4 py-2 text-start font-medium">{c("colDriver")}</th>
                   <th className="px-4 py-2 text-start font-medium">{c("colRules")}</th>
+                  {canManage && <th className="px-4 py-2 text-start font-medium">{c("colControl")}</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -149,6 +183,22 @@ export default function AutoDeclinePage() {
                           </div>
                         )}
                       </td>
+                      {canManage && (
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <Switch
+                              checked={d.admin_enabled}
+                              disabled={busyId === d.id}
+                              onChange={() => saveDriver(d, { admin_enabled: !d.admin_enabled })}
+                              label={`${c("adminSwitch")}: ${d.name}`}
+                            />
+                            <Button size="sm" variant="secondary" disabled={busyId === d.id} onClick={() => setEditing(d)}>
+                              {c("editRules")}
+                            </Button>
+                            <span className="text-xs text-ink-subtle">{statusLabel(d)}</span>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -273,6 +323,16 @@ export default function AutoDeclinePage() {
           </div>
         )}
       </Card>
+
+      {editing && (
+        <RulesModal
+          driver={editing}
+          cities={overview?.available_cities ?? []}
+          saving={busyId === editing.id}
+          onClose={() => setEditing(null)}
+          onSave={(rules) => saveDriver(editing, { rules })}
+        />
+      )}
     </div>
   );
 }

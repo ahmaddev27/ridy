@@ -23,7 +23,7 @@ export function SearchInput({ value, onChange, placeholder, className }: SearchI
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-line bg-surface py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3"
+        className="ui-field w-full rounded-lg border border-line bg-surface py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3"
       />
     </div>
   );

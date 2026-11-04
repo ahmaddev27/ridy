@@ -250,7 +250,7 @@ function AddPasskeyForm({
             onChange={(e) => setAlias(e.target.value)}
             disabled={supported !== true || busy}
             autoComplete="off"
-            className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line disabled:opacity-60"
+            className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line disabled:opacity-60"
           />
         </div>
         <div className="min-w-0 flex-1">

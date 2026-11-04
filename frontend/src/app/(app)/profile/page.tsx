@@ -69,7 +69,7 @@ export default function ProfilePage() {
 
       <div className="flex w-full flex-col gap-4 md:flex-row">
         {/* Side tabs */}
-        <nav className="flex gap-1 overflow-x-auto rounded-xl border border-line/70 bg-surface-2 p-1.5 md:h-fit md:w-48 md:flex-col md:gap-1">
+        <nav className="flex gap-1 overflow-x-auto glass-panel glass-panel--card rounded-xl p-1.5 md:h-fit md:w-48 md:flex-col md:gap-1">
           {([
             { k: "info", icon: User },
             { k: "password", icon: KeyRound },
@@ -169,7 +169,7 @@ function Field({
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
           autoComplete="off"
-          className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
+          className="ui-field w-full rounded-lg border border-line-strong px-3 py-2 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line"
         />
       )}
     </div>

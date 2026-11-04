@@ -22,7 +22,7 @@ export function PasswordInput({ className = "", ...props }: PasswordInputProps) 
       <input
         {...props}
         type={show ? "text" : "password"}
-        className={`w-full rounded-lg border border-line-strong px-3 py-2 pe-10 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ${className}`}
+        className={`ui-field w-full rounded-lg border border-line-strong px-3 py-2 pe-10 text-sm outline-none focus:border-ink focus:ring-2 focus:ring-line ${className}`}
       />
       <button
         type="button"
