@@ -42,10 +42,11 @@ class ProxyController extends Controller
         return response()->json(['data' => $this->present($proxy->load('renewals'))]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, ProxyPool $pool): JsonResponse
     {
         $data = $this->validated($request, creating: true);
         $proxy = Proxy::create($data);
+        $pool->assignMissing();
 
         return response()->json(['data' => $this->present($proxy)], 201);
     }
@@ -65,6 +66,8 @@ class ProxyController extends Controller
             if ($urlChanged) {
                 $pool->syncTenantsOf($proxy);
             }
+            // A bigger (or newly added) proxy may now have room for unassigned companies.
+            $pool->assignMissing();
         });
 
         return response()->json(['data' => $this->present($proxy->fresh())]);

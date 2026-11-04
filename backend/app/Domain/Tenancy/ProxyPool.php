@@ -4,6 +4,7 @@ namespace App\Domain\Tenancy;
 
 use App\Domain\Tenancy\Models\Proxy;
 use App\Domain\Tenancy\Models\Tenant;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Assigns companies to residential proxies from the shared pool. A company keeps
@@ -40,6 +41,27 @@ class ProxyPool
         $tenant->forceFill(['proxy_id' => $target->id, 'proxy_url' => $target->url])->save();
 
         return $target;
+    }
+
+    /**
+     * Backfill: place every usable company that has no proxy yet. assign() only runs on
+     * discrete events (signup, activation, capture), so companies that predate the pool,
+     * or arrived while it was empty/full, would otherwise stay on the datacenter IP
+     * forever. Returns how many were placed; with $dryRun the writes are rolled back,
+     * so the count is exact (each placement consumes capacity for the next).
+     */
+    public function assignMissing(bool $dryRun = false): int
+    {
+        return DB::transaction(function () use ($dryRun) {
+            $assigned = Tenant::usable()->whereNull('proxy_id')->get()
+                ->filter(fn (Tenant $tenant) => $this->assign($tenant) !== null)
+                ->count();
+            if ($dryRun) {
+                DB::rollBack();
+            }
+
+            return $assigned;
+        });
     }
 
     /** Detach the tenant from its proxy (on delete). */
