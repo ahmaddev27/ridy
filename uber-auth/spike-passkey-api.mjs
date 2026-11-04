@@ -1,8 +1,6 @@
-// THROWAWAY — finish the passkey registration via Uber's RPC handlers discovered in
-// the client JS: registerPublicKeyCredential / createPasskeys. getRegistrationOptions
-// -> create() (virtual authenticator) -> POST the credential to each handler with a few
-// payload shapes. A wrong payload on the RIGHT handler returns a validation message
-// (reveals the shape); the right one persists. Run in ridy-uber-auth-1 -e DISPLAY=:99 -w /app.
+// THROWAWAY — finish passkey registration via Uber RPC registerPublicKeyCredential.
+// Shape is { request: { attestation: <credential> } } (per the validation message).
+// Try variants; the validation errors converge on the exact shape; success persists.
 import { chromium } from "playwright";
 import { readFile } from "node:fs/promises";
 
@@ -18,7 +16,7 @@ const client = await context.newCDPSession(page);
 await client.send("WebAuthn.enable", { enableUI: false });
 await client.send("WebAuthn.addVirtualAuthenticator", { options: AUTH });
 
-page.on("response", async (r) => { const u = r.url(); if (u.indexOf("account.uber.com/api/getPasskeysInfo") >= 0) { let b = ""; try { b = (await r.text()).slice(0, 220); } catch {} console.log("[info] " + r.status() + " :: " + b.replace(/\s+/g, " ")); } });
+page.on("response", async (r) => { const u = r.url(); if (u.indexOf("account.uber.com/api/getPasskeysInfo") >= 0) { let b = ""; try { b = (await r.text()).slice(0, 260); } catch {} console.log("[info] " + r.status() + " :: " + b.replace(/\s+/g, " ")); } });
 
 await page.goto("https://account.uber.com/passkeys", { waitUntil: "domcontentloaded", timeout: 30000 }).catch((e) => console.log("nav:", e.message));
 if (page.url().indexOf("auth.uber.com") >= 0) { console.log("[spike] FAIL-auth"); await browser.close(); process.exit(3); }
@@ -36,28 +34,25 @@ const result = await page.evaluate(async () => {
   let c;
   try { c = await navigator.credentials.create({ publicKey: pk }); }
   catch (e) { return { step: "CREATE-FAILED", error: String(e) }; }
-  const cred = { id: c.id, rawId: ab(c.rawId), type: c.type, response: { attestationObject: ab(c.response.attestationObject), clientDataJSON: ab(c.response.clientDataJSON), transports: c.response.getTransports ? c.response.getTransports() : [] } };
-  const candidates = [
-    ["/api/registerPublicKeyCredential", cred],
-    ["/api/registerPublicKeyCredential", { publicKeyCredential: cred }],
-    ["/api/registerPublicKeyCredential", { credential: cred }],
-    ["/api/registerPublicKeyCredential", { registrationResponse: cred }],
-    ["/api/createPasskeys", cred],
-    ["/api/createPasskeys", { publicKeyCredential: cred }],
-    ["/api/createPasskeys", { credential: cred }],
-    ["/api/createPasskeys", { passkey: cred }],
+  const full = { id: c.id, rawId: ab(c.rawId), type: c.type, authenticatorAttachment: c.authenticatorAttachment || "platform", clientExtensionResults: {}, response: { attestationObject: ab(c.response.attestationObject), clientDataJSON: ab(c.response.clientDataJSON), transports: c.response.getTransports ? c.response.getTransports() : ["internal"] } };
+  const post = (body) => fetch("/api/registerPublicKeyCredential", { method: "POST", headers: H, body: JSON.stringify(body) }).then(async (x) => ({ s: x.status, b: (await x.text()).slice(0, 260) })).catch((e) => ({ s: 0, b: String(e) }));
+  const attempts = [
+    { request: { attestation: full } },
+    { request: { attestation: full, name: "Reidey" } },
+    { request: { attestation: full, displayName: "Reidey" }, name: "Reidey" },
+    { request: { attestation: { ...full, clientDataJSON: full.response.clientDataJSON, attestationObject: full.response.attestationObject } } },
   ];
   const tries = [];
-  for (const [ep, body] of candidates) {
-    const r = await fetch(ep, { method: "POST", headers: H, body: JSON.stringify(body) }).then(async (x) => ({ s: x.status, b: (await x.text()).slice(0, 240) })).catch((e) => ({ s: 0, b: String(e) }));
-    tries.push(ep + " {" + Object.keys(body).join(",") + "} -> " + r.s + " " + r.b.replace(/\s+/g, " "));
-    if (r.s === 200 && /"status":"success"/i.test(r.b)) { tries.push("*** PERSISTED via " + ep); break; }
+  for (const body of attempts) {
+    const r = await post(body);
+    tries.push("keys=" + JSON.stringify(Object.keys(body.request.attestation)) + " -> " + r.s + " " + r.b.replace(/\s+/g, " "));
+    if (r.s === 200 && /"status":"success"/i.test(r.b)) { tries.push("*** PERSISTED"); break; }
   }
-  return { step: "CREATED", id: cred.id, tries };
+  return { step: "CREATED", id: full.id, tries };
 });
-console.log("[result]\n" + JSON.stringify(result, null, 1).slice(0, 2200));
+console.log("[result]\n" + JSON.stringify(result, null, 1).slice(0, 2400));
 
 await page.goto("https://account.uber.com/passkeys", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
 await page.waitForTimeout(2500);
-console.log("[spike] done — see [info] above: publicKeyCredentials non-empty = PERSISTED.");
+console.log("[spike] done — [info] publicKeyCredentials non-empty = PERSISTED.");
 await browser.close();
