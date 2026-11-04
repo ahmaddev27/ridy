@@ -4,12 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Users, Star, RefreshCw, Send, Smartphone, Loader2, Bell, Mail } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
-import { PageHeader } from "@/components/ui/page-header";
+import { Users, Star, RefreshCw, Send, Smartphone, Loader2, Bell, Mail, Check } from "lucide-react";
+import { PageHead, SkelRows, ModalShell, Av, Who } from "@/components/ui/rd";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { formatNumber } from "@/lib/utils";
@@ -35,6 +31,7 @@ export default function DriversPage() {
   const [emailDriver, setEmailDriver] = useState<Driver | null>(null);
   const [emailValue, setEmailValue] = useState("");
   const [savingEmail, setSavingEmail] = useState(false);
+  const [inviteTarget, setInviteTarget] = useState<Driver | null>(null);
   const didAutoSync = useRef(false);
 
   function openEmailModal(d: Driver) {
@@ -171,254 +168,291 @@ export default function DriversPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
+  const d_ = (k: string) => t(`screens.drivers.${k}`);
+  const r_ = (k: string) => t(`screens.remake.${k}`);
+
   return (
-    <div className="space-y-6">
-      <PageHeader
-        tkey="drivers"
-        action={
-          <Button variant="secondary" onClick={runSync} disabled={syncing}>
-            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? t("screens.drivers.refreshing") : t("screens.drivers.refreshFromUber")}
-          </Button>
+    <>
+      <PageHead
+        title={t("pages.drivers.title")}
+        sub={t("pages.drivers.subtitle")}
+        actions={
+          <button type="button" className="btn btn-secondary" onClick={runSync} disabled={syncing}>
+            <RefreshCw style={syncing ? { animation: "ofr-spin 1s linear infinite" } : undefined} />
+            {syncing ? d_("refreshing") : d_("refreshFromUber")}
+          </button>
         }
       />
 
       {/* Sponsored banner — full width, renders nothing when none live. */}
       <AdBanner />
 
-      <Card className="overflow-hidden">
+      <section className="card table-card">
         {loading ? (
-          <div className="space-y-2 p-4">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded bg-surface-2" />
-            ))}
-          </div>
+          <SkelRows rows={6} cols={5} />
         ) : error ? (
-          <div className="p-6 text-sm text-danger-fg">{t("screens.drivers.loadError")} — {error}</div>
+          <div className="callout danger" style={{ margin: 16 }}>
+            <div>
+              {d_("loadError")} — {error}
+            </div>
+          </div>
         ) : drivers.length === 0 ? (
-          <EmptyState
-            icon={Users}
-            title={t("screens.drivers.emptyTitle")}
-            description={t("screens.drivers.emptyDesc")}
-          />
+          <EmptyState icon={Users} title={d_("emptyTitle")} description={d_("emptyDesc")} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-xs uppercase tracking-wider text-ink-subtle [&_th]:text-start">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">{t("screens.drivers.colName")}</th>
-                  <th className="px-4 py-3 font-semibold">{t("screens.drivers.colPhone")}</th>
-                  <th className="px-4 py-3 font-semibold">{t("screens.drivers.colRating")}</th>
-                  <th className="px-4 py-3 font-semibold">{t("screens.drivers.colTrips")}</th>
-                  <th className="px-4 py-3 font-semibold">{t("screens.drivers.colStatus")}</th>
-                  <th className="px-4 py-3 font-semibold">Uber</th>
-                  <th className="px-4 py-3 font-semibold">{t("screens.drivers.colApp")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {drivers.map((d) => (
-                  <tr
-                    key={d.id}
-                    onClick={() => router.push(`/drivers/${d.id}`)}
-                    className="cursor-pointer hover:bg-surface-2"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          {d.picture_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={d.picture_url}
-                              alt=""
-                              className="h-9 w-9 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-ink-muted">
-                              {d.name.slice(0, 1)}
-                            </div>
-                          )}
-                          {/* Live online/offline dot */}
-                          <span
-                            className={`absolute -end-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-white ${
-                              d.online ? "bg-emerald-500" : "bg-ink-subtle"
-                            }`}
-                            title={d.online ? t("screens.drivers.online") : t("screens.drivers.offline")}
-                          />
-                        </div>
-                        <div>
-                          {/* A real link so keyboard users can open the profile. */}
-                          <Link
-                            href={`/drivers/${d.id}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="font-medium text-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary/40"
-                          >
-                            {d.name}
-                          </Link>
-                          {d.uber_email && (
-                            <div className="text-xs text-ink-subtle">{d.uber_email}</div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-ink-muted">{d.phone ?? "—"}</td>
-                    <td className="px-4 py-3">
-                      {d.rating != null ? (
-                        <span className="inline-flex items-center gap-1 text-ink">
-                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                          {d.rating.toFixed(2)}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-ink-muted">
-                      {d.total_trips != null ? formatNumber(d.total_trips, locale) : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge status={d.active ? "connected" : "gap"} dot>
-                        {d.active ? t("screens.drivers.active") : t("screens.drivers.inactive")}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded px-2 py-0.5 text-[11px] font-bold ${
-                          d.uber_linked ? "bg-primary text-primary-ink" : "bg-surface-2 text-ink-subtle"
-                        }`}
-                      >
-                        {d.uber_linked ? t("screens.drivers.linked") : t("screens.drivers.notLinked")}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => openEmailModal(d)}
-                        title={t("screens.drivers.editEmail")}
-                        aria-label={t("screens.drivers.editEmail")}
-                        className="rounded-lg border border-line p-1.5 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50"
-                      >
-                        <Mail className="h-3.5 w-3.5" />
-                      </button>
-                      {d.app_status === "active" ? (
-                        <div className="flex items-center gap-2">
-                          <Badge status="connected" dot>
-                            <Smartphone className="me-1 inline h-3 w-3" />
-                            {t("screens.drivers.appActive")}
-                          </Badge>
-                          {/* Resend the invite even to an active driver — re-sends
-                              the download + activation link (e.g. new device). */}
-                          <button
-                            onClick={() => invite(d)}
-                            disabled={invitingId === d.id}
-                            title={t("screens.drivers.appResend")}
-                            className="rounded-lg border border-line p-1.5 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50"
-                          >
-                            {invitingId === d.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Send className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                          <button
-                            onClick={() => testPush(d)}
-                            disabled={testingId === d.id}
-                            title={t("screens.drivers.appTest")}
-                            className="rounded-lg border border-line p-1.5 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50"
-                          >
-                            {testingId === d.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Bell className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                        </div>
-                      ) : d.app_status === "invited" || d.app_status === "invite_expired" ? (
-                        <div className="flex items-center gap-2">
-                          <Badge status={d.app_status === "invite_expired" ? "gap" : "expiring"} dot>
-                            {d.app_status === "invite_expired"
-                              ? t("screens.drivers.appInviteExpired")
-                              : t("screens.drivers.appInvited")}
-                          </Badge>
-                          <button
-                            onClick={() => invite(d)}
-                            disabled={invitingId === d.id}
-                            title={t("screens.drivers.appResend")}
-                            className="rounded-lg border border-line p-1.5 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50"
-                          >
-                            {invitingId === d.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Send className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => invite(d)}
-                          disabled={invitingId === d.id}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50"
-                        >
-                          {invitingId === d.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Send className="h-3.5 w-3.5" />
-                          )}
-                          {t("screens.drivers.appInvite")}
-                        </button>
-                      )}
-                      </div>
-                      {d.app_status === "active" && d.device_label && (
-                        <p
-                          className="ps-0.5 text-[11px] text-ink-subtle"
-                          title={t("screens.drivers.appDevice")}
-                        >
-                          {d.device_label}
-                        </p>
-                      )}
-                      </div>
-                    </td>
+          <div className="ofr-tbl">
+            <div className="table-wrap">
+              <table className="tbl" style={{ minWidth: 1040 }}>
+                <thead>
+                  <tr>
+                    <th>{d_("colName")}</th>
+                    <th>{d_("colPhone")}</th>
+                    <th>{d_("colRating")}</th>
+                    <th>{d_("colTrips")}</th>
+                    <th>{d_("colStatus")}</th>
+                    <th>Uber</th>
+                    <th className="r">{d_("colApp")}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {drivers.map((d) => (
+                    <tr key={d.id} className="clickable" onClick={() => router.push(`/drivers/${d.id}`)}>
+                      <td>
+                        <div className="who">
+                          <DriverAvatar d={d} title={d.online ? d_("online") : d_("offline")} />
+                          <div className="truncate">
+                            {/* A real link so keyboard users can open the profile. */}
+                            <Link href={`/drivers/${d.id}`} onClick={(e) => e.stopPropagation()} className="n truncate strong" style={{ display: "block" }}>
+                              {d.name}
+                            </Link>
+                            {(d.email || d.uber_email) && <div className="s truncate">{d.email || d.uber_email}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="num nowrap" dir="ltr">{d.phone ?? "—"}</span>
+                      </td>
+                      <td>
+                        {d.rating != null ? (
+                          <span className="row" style={{ gap: 5 }}>
+                            <span style={{ color: "var(--warning-dot)" }}>
+                              <Star className="ico-sm" />
+                            </span>
+                            <span className="num">{d.rating.toFixed(2)}</span>
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td>
+                        <span className="num">{d.total_trips != null ? formatNumber(d.total_trips, locale) : "—"}</span>
+                      </td>
+                      <td>
+                        <span className={`badge ${d.active ? "success" : ""}`}>
+                          <span className="dot" />
+                          {d.active ? d_("active") : d_("inactive")}
+                        </span>
+                      </td>
+                      <td>
+                        {d.uber_linked ? (
+                          <span className="badge square" style={{ background: "var(--primary)", color: "var(--primary-ink)" }}>{d_("linked")}</span>
+                        ) : (
+                          <span className="badge outline square">{d_("notLinked")}</span>
+                        )}
+                      </td>
+                      <td className="r" onClick={(e) => e.stopPropagation()}>
+                        <AppCell
+                          d={d}
+                          t={t}
+                          invitingId={invitingId}
+                          testingId={testingId}
+                          onEmail={() => openEmailModal(d)}
+                          onInvite={() => setInviteTarget(d)}
+                          onTest={() => testPush(d)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
-      </Card>
+      </section>
 
-      <Modal
-        open={emailDriver !== null}
-        onClose={() => setEmailDriver(null)}
-        title={t("screens.drivers.editEmailTitle")}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setEmailDriver(null)} disabled={savingEmail}>
-              {t("screens.drivers.cancel")}
-            </Button>
-            <Button onClick={saveEmail} disabled={savingEmail}>
-              {savingEmail && <Loader2 className="h-4 w-4 animate-spin" />}
-              {t("screens.drivers.save")}
-            </Button>
-          </>
-        }
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void saveEmail();
-          }}
-          className="space-y-3"
-        >
-          <input
-            type="email"
-            autoFocus
-            value={emailValue}
-            onChange={(e) => setEmailValue(e.target.value)}
-            placeholder={t("screens.drivers.editEmailPlaceholder")}
-            className="ui-field w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-primary"
-          />
-          <p className="text-xs text-ink-subtle">{t("screens.drivers.editEmailHint")}</p>
-        </form>
-      </Modal>
+      {emailDriver && (
+        <ModalShell
+          size="sm"
+          icon={Mail}
+          tone="info"
+          title={d_("editEmailTitle")}
+          sub={emailDriver.name}
+          onClose={() => setEmailDriver(null)}
+          body={
+            <form
+              id="drv-email-form"
+              className="stack"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void saveEmail();
+              }}
+            >
+              <div className="field">
+                <label htmlFor="drv-email">{r_("email")}</label>
+                <input
+                  id="drv-email"
+                  type="email"
+                  autoFocus
+                  className="input"
+                  value={emailValue}
+                  onChange={(e) => setEmailValue(e.target.value)}
+                  placeholder={d_("editEmailPlaceholder")}
+                />
+                <span className="hint">{d_("editEmailHint")}</span>
+              </div>
+            </form>
+          }
+          foot={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setEmailDriver(null)} disabled={savingEmail}>
+                {d_("cancel")}
+              </button>
+              <button type="submit" form="drv-email-form" className="btn btn-primary" disabled={savingEmail}>
+                {savingEmail ? <Loader2 style={{ animation: "ofr-spin 1s linear infinite" }} /> : <Check />}
+                <span>{d_("save")}</span>
+              </button>
+            </>
+          }
+        />
+      )}
+
+      {inviteTarget && (
+        <ModalShell
+          size="sm"
+          icon={Send}
+          tone="success"
+          title={
+            ["active", "invited", "invite_expired"].includes(inviteTarget.app_status ?? "")
+              ? r_("inviteAgainTitle")
+              : r_("inviteTitle")
+          }
+          onClose={() => setInviteTarget(null)}
+          body={
+            <>
+              <p className="muted">
+                {r_("inviteBody").replace("{email}", inviteTarget.email || inviteTarget.uber_email || "—")}
+              </p>
+              <Who name={inviteTarget.name} sub={<span dir="ltr">{inviteTarget.phone ?? ""}</span>} size="sm" />
+            </>
+          }
+          foot={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setInviteTarget(null)}>
+                {d_("cancel")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  const target = inviteTarget;
+                  setInviteTarget(null);
+                  void invite(target);
+                }}
+              >
+                <Send />
+                {["active", "invited", "invite_expired"].includes(inviteTarget.app_status ?? "") ? r_("inviteAgain") : r_("inviteSend")}
+              </button>
+            </>
+          }
+        />
+      )}
+    </>
+  );
+}
+
+function DriverAvatar({ d, title }: { d: Driver; title: string }) {
+  if (!d.picture_url) return <span title={title}><Av name={d.name} presence={d.online ? "online" : "offline"} /></span>;
+  return (
+    <span className="av-wrap" title={title}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={d.picture_url} alt="" className="av" style={{ objectFit: "cover" }} />
+      <i className="st" style={{ background: d.online ? "var(--success-dot)" : "var(--neutral-dot)" }} />
+    </span>
+  );
+}
+
+/** The "App" column: login-email edit, invite state and (once active) resend + test push. */
+function AppCell({
+  d,
+  t,
+  invitingId,
+  testingId,
+  onEmail,
+  onInvite,
+  onTest,
+}: {
+  d: Driver;
+  t: (k: string) => string;
+  invitingId: number | null;
+  testingId: number | null;
+  onEmail: () => void;
+  onInvite: () => void;
+  onTest: () => void;
+}) {
+  const k = (key: string) => t(`screens.drivers.${key}`);
+  const spin = { animation: "ofr-spin 1s linear infinite" };
+  const mail = (
+    <button type="button" className="icon-btn" onClick={onEmail} title={k("editEmail")} aria-label={k("editEmail")}>
+      <Mail />
+    </button>
+  );
+  const resend = (
+    <button type="button" className="icon-btn" onClick={onInvite} disabled={invitingId === d.id} title={k("appResend")} aria-label={k("appResend")}>
+      {invitingId === d.id ? <Loader2 style={spin} /> : <Send />}
+    </button>
+  );
+
+  if (d.app_status === "active") {
+    return (
+      <>
+        <div className="row" style={{ gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
+          {mail}
+          <span className="badge success">
+            <Smartphone />
+            {k("appActive")}
+          </span>
+          {resend}
+          <button type="button" className="icon-btn" onClick={onTest} disabled={testingId === d.id} title={k("appTest")} aria-label={k("appTest")}>
+            {testingId === d.id ? <Loader2 style={spin} /> : <Bell />}
+          </button>
+        </div>
+        {d.device_label && (
+          <div className="subtle text-xs" style={{ textAlign: "end", marginTop: 4 }} title={k("appDevice")}>
+            {d.device_label}
+          </div>
+        )}
+      </>
+    );
+  }
+  if (d.app_status === "invited" || d.app_status === "invite_expired") {
+    const expired = d.app_status === "invite_expired";
+    return (
+      <div className="row" style={{ gap: 6, justifyContent: "flex-end" }}>
+        {mail}
+        <span className={`badge ${expired ? "" : "warning"}`}>
+          <span className="dot" />
+          {expired ? k("appInviteExpired") : k("appInvited")}
+        </span>
+        {resend}
+      </div>
+    );
+  }
+  return (
+    <div className="row" style={{ gap: 6, justifyContent: "flex-end" }}>
+      {mail}
+      <button type="button" className="btn btn-secondary btn-sm" onClick={onInvite} disabled={invitingId === d.id}>
+        {invitingId === d.id ? <Loader2 style={spin} /> : <Send />}
+        {k("appInvite")}
+      </button>
     </div>
   );
 }

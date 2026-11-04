@@ -4,7 +4,7 @@ import { useEffect, useId, useRef } from "react";
 import { X } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 
-const sizeClass = { md: "max-w-md", lg: "max-w-lg", xl: "max-w-2xl" } as const;
+const sizeClass = { md: "sm", lg: "", xl: "lg" } as const;
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -84,30 +84,25 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
-      <div className="app-modal-scrim absolute inset-0 bg-overlay" onClick={onClose} />
+    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
-        className={`app-modal relative max-h-[88vh] w-full overflow-y-auto rounded-xl bg-surface p-6 shadow-xl outline-none ${sizeClass[size]}`}
+        className={`modal ${sizeClass[size]} outline-none`}
       >
         {title && (
-          <div className="mb-4 flex items-center justify-between">
-            <h3 id={titleId} className="text-lg font-semibold text-ink">{title}</h3>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1.5 text-ink-muted hover:bg-surface-2"
-              aria-label={t("common.close")}
-            >
-              <X className="h-5 w-5" />
+          <div className="modal-head">
+            <h2 id={titleId}>{title}</h2>
+            <button type="button" onClick={onClose} className="icon-btn" aria-label={t("common.close")}>
+              <X />
             </button>
           </div>
         )}
-        <div className="text-sm text-ink-muted">{children}</div>
-        {footer && <div className="mt-6 flex justify-end gap-2">{footer}</div>}
+        <div className="modal-body">{children}</div>
+        {footer && <div className="modal-foot">{footer}</div>}
       </div>
     </div>
   );

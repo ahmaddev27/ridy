@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Ban, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/context";
 import { apiErrorMessage } from "@/lib/api/error-message";
 import { dispatchRejectOffer, type DispatchOffer } from "@/lib/api/offers";
@@ -68,39 +67,36 @@ export function DeclineOfferButton({ offer }: { offer: DispatchOffer }) {
 
   if (busy || sent === "waiting") {
     return (
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-ink-subtle">
-        {busy && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />}
-        {c(busy ? "declineBusy" : "declineSent")}
+      <span className="decline">
+        <span className="decl-sent">
+          {busy && <Loader2 className="spin ico-sm" style={{ animation: "ofr-spin 1s linear infinite" }} />}
+          {c(busy ? "declineBusy" : "declineSent")}
+        </span>
       </span>
     );
   }
 
   return (
-    <div className="flex items-center justify-end gap-2">
-      {sent === "lapsed" && (
-        <span className="whitespace-nowrap text-xs font-medium text-warning-fg">{c("declineUnconfirmed")}</span>
-      )}
+    <div className="decline">
+      {sent === "lapsed" && <span className="stale">{c("declineUnconfirmed")}</span>}
       {age != null && (
-        <span
-          title={c("offerAgeHint")}
-          className="shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-ink-subtle"
-        >
+        <span title={c("offerAgeHint")} className="age-pill">
           {Math.min(age, 99)}
           {age > 99 ? "+" : ""}s
         </span>
       )}
-      <Button
-        variant="danger"
-        size="sm"
+      <button
+        type="button"
+        className="btn btn-danger-soft btn-sm"
         onClick={(e) => {
           e.stopPropagation(); // the row itself opens the offer detail
           void decline();
         }}
         disabled={!declinable}
       >
-        <Ban className="h-3.5 w-3.5" />
+        <Ban />
         {c("decline")}
-      </Button>
+      </button>
     </div>
   );
 }

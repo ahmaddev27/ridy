@@ -4,9 +4,8 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ChevronLeft, Phone, Mail, Star, Car, UserCheck, MapPin, ArrowRight, ChevronDown, Inbox, Banknote, CreditCard, RotateCcw } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, Phone, Mail, Star, Car, Link2, ChevronDown, Inbox, RotateCcw, Users, BadgeCheck, Database } from "lucide-react";
+import { Av, SkelRows, type Presence } from "@/components/ui/rd";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { formatMoney, formatNumber, latnLocale, toLatinDigits } from "@/lib/utils";
@@ -67,12 +66,12 @@ function pctLabel(v: number | string | null | undefined, loc: string): string {
   return `${formatNumber(Math.round(pct * 10) / 10, loc)}%`;
 }
 
-function statusLabel(driver: Driver, d: (k: string) => string): { text: string; tone: string } {
+function statusLabel(driver: Driver, d: (k: string) => string): { text: string; color: string } {
   const s = (driver.online_status ?? "").toUpperCase();
-  if (s.includes("ON_TRIP")) return { text: d("onTrip"), tone: "text-success-fg" };
-  if (s.includes("EN_ROUTE")) return { text: d("enRoute"), tone: "text-warning-fg" };
-  if (driver.online) return { text: d("online"), tone: "text-success-fg" };
-  return { text: d("offline"), tone: "text-ink-subtle" };
+  if (s.includes("ON_TRIP")) return { text: d("onTrip"), color: "var(--success-fg)" };
+  if (s.includes("EN_ROUTE")) return { text: d("enRoute"), color: "var(--warning-fg)" };
+  if (driver.online) return { text: d("online"), color: "var(--success-fg)" };
+  return { text: d("offline"), color: "var(--ink-subtle)" };
 }
 
 export default function DriverProfilePage() {
@@ -250,364 +249,404 @@ export default function DriverProfilePage() {
   const money = (amount: number | string | null | undefined, label: string | null) =>
     formatMoney(amount, locale, label || "EUR");
 
+  const presence: Presence = (() => {
+    const s = (driver?.online_status ?? "").toUpperCase();
+    if (s.includes("ON_TRIP")) return "on_trip";
+    if (s.includes("EN_ROUTE")) return "en_route";
+    return driver?.online ? "online" : "offline";
+  })();
+
+  const backLink = (
+    <Link href="/drivers" className="back-link">
+      <ArrowLeft className="ico-sm rtl:rotate-180" />
+      {d("backToDrivers")}
+    </Link>
+  );
+
   if (driverError != null) {
     return (
-      <div className="space-y-6">
-        <Link href="/drivers" className="inline-flex items-center gap-1 text-sm font-medium text-ink-muted hover:text-ink">
-          <ChevronLeft className="h-4 w-4 rtl:rotate-180" /> {d("backToDrivers")}
-        </Link>
-        <Card className="flex flex-col items-center gap-3 p-8 text-center">
-          <p className="text-sm text-ink-muted">
-            {driverError === 404 || driverError === 403 ? d("notFound") : t("common.loadFailed")}
-          </p>
-          {driverError !== 404 && driverError !== 403 && (
-            <Button variant="secondary" onClick={() => setDriverAttempt((n) => n + 1)}>
-              <RotateCcw className="h-4 w-4" />
-              {t("common.retry")}
-            </Button>
-          )}
-        </Card>
-      </div>
+      <>
+        {backLink}
+        <section className="card">
+          <div className="empty">
+            <span className="empty-ico">
+              <Users />
+            </span>
+            <p>{driverError === 404 || driverError === 403 ? d("notFound") : t("common.loadFailed")}</p>
+            {driverError !== 404 && driverError !== 403 && (
+              <button type="button" className="btn btn-secondary" onClick={() => setDriverAttempt((n) => n + 1)}>
+                <RotateCcw />
+                {t("common.retry")}
+              </button>
+            )}
+          </div>
+        </section>
+      </>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Breadcrumb */}
-      <Link href="/drivers" className="inline-flex items-center gap-1 text-sm font-medium text-ink-muted hover:text-ink">
-        <ChevronLeft className="h-4 w-4 rtl:rotate-180" /> {d("backToDrivers")}
-      </Link>
+    <>
+      <div className="stack-sm">{backLink}</div>
 
-      {/* Header — grounded in a card */}
-      <Card className="flex items-center gap-4 p-5">
+      {/* Header card */}
+      <section className="card" style={{ padding: 22, display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
         {driver?.picture_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={driver.picture_url} alt="" className="h-20 w-20 rounded-full object-cover ring-2 ring-white shadow" />
+          <span className="av-wrap">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={driver.picture_url} alt="" className="av xl" style={{ objectFit: "cover" }} />
+            <i className="st" style={{ background: `var(--${presence === "online" ? "success" : presence === "offline" ? "neutral" : presence === "en_route" ? "warning" : "info"}-dot)` }} />
+          </span>
         ) : (
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-surface-2 text-2xl font-semibold text-ink">
-            {driver?.name?.slice(0, 1) ?? "?"}
-          </div>
+          <Av name={driver?.name ?? "?"} size="xl" presence={presence} />
         )}
-        <div>
-          <h1 className="text-2xl font-bold text-ink">{driver?.name ?? "…"}</h1>
+        <div className="stack-sm grow" style={{ minWidth: 0 }}>
+          <h1 style={{ fontSize: 24, letterSpacing: "-.025em" }}>{driver?.name ?? "…"}</h1>
           {status && (
-            <div className="mt-1 flex items-center gap-2 text-sm">
-              <span className="inline-flex items-center gap-1 rounded-full bg-success-bg px-2 py-0.5 text-xs font-semibold text-success-fg">
+            <div className="row-wrap" style={{ gap: 8 }}>
+              <span className={`badge ${driver?.active ? "success" : ""}`}>
+                <span className="dot" />
                 {driver?.active ? d("active") : d("inactive")}
               </span>
-              <span className="text-ink-subtle">·</span>
-              <span className={`font-medium ${status.tone}`}>{status.text}</span>
+              <span className="subtle">·</span>
+              <span className="strong text-sm" style={{ color: status.color }}>{status.text}</span>
             </div>
           )}
-          {driver?.phone && <p className="mt-1 text-sm text-ink-subtle" dir="ltr">{driver.phone}</p>}
+          {driver?.phone && (
+            <div className="muted num" dir="ltr" style={{ textAlign: "start" }}>
+              {driver.phone}
+            </div>
+          )}
         </div>
-      </Card>
+      </section>
 
-      {/* Tabs (Uber-style underline) */}
-      <div className="flex gap-6 border-b border-line">
-        {([
-          { k: "performance", label: d("tabPerformance") },
-          { k: "details", label: d("tabDetails") },
-        ] as const).map(({ k, label }) => (
-          <button
-            key={k}
-            onClick={() => setTab(k)}
-            className={
-              "-mb-px border-b-2 px-1 pb-3 text-sm font-semibold transition-colors " +
-              (tab === k ? "border-ink text-ink" : "border-transparent text-ink-subtle hover:text-ink-muted")
-            }
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <div className="stack">
+        <div className="tabs" role="tablist">
+          {([
+            { k: "performance", label: d("tabPerformance") },
+            { k: "details", label: d("tabDetails") },
+          ] as const).map(({ k, label }) => (
+            <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
+              {label}
+            </button>
+          ))}
+        </div>
 
-      {tab === "performance" ? (
-        <div className="space-y-5">
-          {/* Range toggle */}
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-lg font-bold text-ink">{d("performanceData")}</h3>
-            <div className="flex items-center gap-1 rounded-xl bg-surface-2 p-1 text-sm">
-              {([
-                { k: "today", label: d("today") },
-                { k: "yesterday", label: d("yesterday") },
-                { k: "7", label: `7${d("daysShort")}` },
-                { k: "30", label: `30${d("daysShort")}` },
-                { k: "custom", label: d("customRange") },
-              ] as const).map(({ k, label }) => (
-                <button
-                  key={k}
-                  onClick={() => setRange(k)}
-                  className={"rounded-lg px-3 py-1.5 font-medium transition-colors " + (range === k ? "bg-primary text-primary-ink" : "text-ink-muted hover:text-ink")}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom from → to */}
-          {range === "custom" && (
-            <div className="flex flex-wrap items-end gap-3 glass-panel glass-panel--card rounded-xl p-3">
-              <label className="text-sm">
-                <span className="mb-1 block text-xs font-medium text-ink-muted">{d("from")}</span>
-                <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="ui-field rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink" />
-              </label>
-              <label className="text-sm">
-                <span className="mb-1 block text-xs font-medium text-ink-muted">{d("to")}</span>
-                <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="ui-field rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink" />
-              </label>
-            </div>
-          )}
-
-          {/* This driver's own offers for the window */}
-          {!driver?.uber_driver_uuid ? (
-            <Card className="p-6 text-center text-sm text-ink-subtle">{d("notLinkedNoMetrics")}</Card>
-          ) : (
-            <Card className="overflow-hidden">
-              {loadingOffers ? (
-                <div className="space-y-2 p-4">
-                  {[0, 1, 2, 3].map((i) => (
-                    <div key={i} className="h-12 animate-pulse rounded bg-surface-2" />
+        {tab === "performance" ? (
+          <div className="stack">
+            <div className="stack-sm">
+              <div className="row between">
+                <h2 className="section-title">{d("performanceData")}</h2>
+                <div className="seg" role="group" aria-label={d("performanceData")}>
+                  {([
+                    { k: "today", label: d("today") },
+                    { k: "yesterday", label: d("yesterday") },
+                    { k: "7", label: `7${d("daysShort")}` },
+                    { k: "30", label: `30${d("daysShort")}` },
+                    { k: "custom", label: d("customRange") },
+                  ] as const).map(({ k, label }) => (
+                    <button key={k} type="button" className={range === k ? "on" : ""} onClick={() => setRange(k)}>
+                      {label}
+                    </button>
                   ))}
                 </div>
-              ) : offers.length === 0 ? (
-                <EmptyState icon={Inbox} title={d("offersTitle")} description={d("noOffers")} />
-              ) : (
-                <div>
-                  {groupedByDay.map(([key, dayOffers]) => {
-                    const open = openDays.has(key);
-                    return (
-                      <div key={key} className="border-b border-line last:border-0">
-                        <button
-                          onClick={() => toggleDay(key)}
-                          className="flex w-full items-center gap-2 px-4 py-3 text-start hover:bg-surface-2"
-                        >
-                          <ChevronDown className={`h-4 w-4 text-ink-subtle transition ${open ? "" : "-rotate-90"}`} />
-                          <span className="font-semibold text-ink">{dayLabel(key)}</span>
-                          <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-ink">
-                            {/* The oldest loaded day may continue on the next page. */}
-                            {hasMoreOffers && key === groupedByDay[groupedByDay.length - 1][0] ? "≥ " : ""}
-                            {dayOffers.length} {o("offersCount")}
-                          </span>
-                        </button>
-                        {open && (
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <tbody className="divide-y divide-line">
-                                {dayOffers.map((offer) => (
-                                  <tr
-                                    key={offer.id}
-                                    onClick={() => setDetailId(offer.id)}
-                                    className="cursor-pointer hover:bg-surface-2"
-                                  >
-                                    <td className="whitespace-nowrap px-4 py-3 text-ink-muted">
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setDetailId(offer.id);
-                                        }}
-                                        className="rounded outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                                      >
-                                        {offer.received_at ? new Date(offer.received_at).toLocaleTimeString(latnLocale(locale)) : "—"}
-                                      </button>
-                                    </td>
-                                    <td className="px-4 py-3 text-ink-muted">
-                                      <div className="flex items-start gap-1.5">
-                                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success-fg" />
-                                        <div className="min-w-0">
-                                          <div className="truncate">{offer.pickup_address ?? "—"}</div>
-                                          <div className="flex items-center gap-1 truncate text-ink-subtle">
-                                            <ArrowRight className="h-3 w-3 shrink-0 rtl:rotate-180" />
-                                            <span className="truncate">{offer.dropoff_address ?? "—"}</span>
+              </div>
+              {range === "custom" && (
+                <div className="range-strip">
+                  <div className="field">
+                    <label htmlFor="rs-from">{d("from")}</label>
+                    <input id="rs-from" type="date" className="input" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="rs-to">{d("to")}</label>
+                    <input id="rs-to" type="date" className="input" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* This driver's own offers for the window */}
+            {!driver?.uber_driver_uuid ? (
+              <section className="card">
+                <div className="card-body">
+                  <p className="muted">{d("notLinkedNoMetrics")}</p>
+                </div>
+              </section>
+            ) : (
+              <section className="card table-card">
+                {loadingOffers ? (
+                  <SkelRows rows={4} cols={4} />
+                ) : offers.length === 0 ? (
+                  <EmptyState icon={Inbox} title={d("offersTitle")} description={d("noOffers")} />
+                ) : (
+                  <>
+                    <div className="table-wrap ofr-tbl">
+                      <table className="tbl compact">
+                        <thead>
+                          <tr>
+                            <th>{o("colTime")}</th>
+                            <th>{o("colRoute")}</th>
+                            <th className="r">{o("colFare")}</th>
+                            <th>{o("colStatus")}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {groupedByDay.map(([key, dayOffers]) => {
+                            const open = openDays.has(key);
+                            return [
+                              <tr key={`h-${key}`} className="day-row">
+                                <td colSpan={4}>
+                                  <button type="button" className="day-toggle" aria-expanded={open} onClick={() => toggleDay(key)}>
+                                    <ChevronDown />
+                                    <span>{dayLabel(key)}</span>
+                                    <span className="day-pill">
+                                      {/* The oldest loaded day may continue on the next page. */}
+                                      {hasMoreOffers && key === groupedByDay[groupedByDay.length - 1][0] ? "≥ " : ""}
+                                      {dayOffers.length} {o("offersCount")}
+                                    </span>
+                                  </button>
+                                </td>
+                              </tr>,
+                              ...(open
+                                ? dayOffers.map((offer) => (
+                                    <tr key={offer.id} className="clickable" onClick={() => setDetailId(offer.id)}>
+                                      <td>
+                                        <button
+                                          type="button"
+                                          className="time-btn"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setDetailId(offer.id);
+                                          }}
+                                        >
+                                          {offer.received_at ? new Date(offer.received_at).toLocaleTimeString(latnLocale(locale)) : "—"}
+                                        </button>
+                                      </td>
+                                      <td>
+                                        <div style={{ minWidth: 240, maxWidth: 400 }}>
+                                          <div className="route">
+                                            <span className="dotA" />
+                                            <div className="truncate">{offer.pickup_address ?? "—"}</div>
+                                            <span className="via" />
+                                            <span />
+                                            <span className="dotB" />
+                                            <div className="truncate">
+                                              {offer.dropoff_address ?? "—"}
+                                              {offer.stops_count != null && offer.stops_count >= 2 && (
+                                                <>
+                                                  {" "}
+                                                  <span className="badge warning square" style={{ height: 18, padding: "0 5px" }}>+{offer.stops_count - 1}</span>
+                                                </>
+                                              )}
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    </td>
-                                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-ink">
-                                      {toLatinDigits(fareLabel(offer, latnLocale(locale)))}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                      <OfferStatusBadge offer={offer} />
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                                      </td>
+                                      <td className="r">
+                                        <span className="num strong nowrap">{toLatinDigits(fareLabel(offer, latnLocale(locale)))}</span>
+                                      </td>
+                                      <td>
+                                        <OfferStatusBadge offer={offer} />
+                                      </td>
+                                    </tr>
+                                  ))
+                                : []),
+                            ];
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    {offersMeta && offersMeta.total > offers.length && (
+                      <div className="tbl-foot">
+                        <span>
+                          {t("common.showingOf")
+                            .replace("{shown}", formatNumber(offers.length, locale))
+                            .replace("{total}", formatNumber(offersMeta.total, locale))}
+                        </span>
+                        {hasMoreOffers && (
+                          <button type="button" className="btn btn-secondary btn-sm" onClick={loadMoreOffers} disabled={loadingMore}>
+                            {loadingMore ? t("common.loading") : t("common.loadMore")}
+                          </button>
                         )}
                       </div>
-                    );
-                  })}
-                  {offersMeta && offersMeta.total > offers.length && (
-                    <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm">
-                      <span className="text-ink-muted">
-                        {t("common.showingOf")
-                          .replace("{shown}", formatNumber(offers.length, locale))
-                          .replace("{total}", formatNumber(offersMeta.total, locale))}
+                    )}
+                  </>
+                )}
+              </section>
+            )}
+
+            {/* Uber's official earnings — captured from the Fleet Earnings page */}
+            {uber && (
+              <section className="card">
+                <div className="card-head">
+                  <div className="truncate">
+                    <h2 className="row" style={{ gap: 8 }}>
+                      <span className="subtle">
+                        <BadgeCheck style={{ width: 18, height: 18 }} />
                       </span>
-                      {hasMoreOffers && (
-                        <Button variant="secondary" size="sm" onClick={loadMoreOffers} disabled={loadingMore}>
-                          {loadingMore ? t("common.loading") : t("common.loadMore")}
-                        </Button>
-                      )}
+                      {d("uberData")}
+                    </h2>
+                    <div className="sub">{d("uberDataHint")}</div>
+                  </div>
+                  <span className="subtle text-sm num" dir="ltr">{uberPeriod(uber, latnLocale(locale))}</span>
+                </div>
+                <div className="card-body stack">
+                  <div className="mstat-grid">
+                    <MiniStat label={d("statEarnings")} value={money(uber.earnings, uber.earnings_label)} />
+                    <MiniStat label={d("statTrips")} value={uber.trips != null ? String(uber.trips) : "—"} />
+                    <MiniStat label={d("statKm")} value={uber.distance_km != null ? `${uber.distance_km} km` : "—"} />
+                    <MiniStat label={d("statNet")} value={money(uber.net_outstanding, uber.earnings_label)} />
+                    {uber.breakdown?.promotion != null && (
+                      <MiniStat label={d("statPromo")} value={money(uber.breakdown.promotion, uber.earnings_label)} />
+                    )}
+                    {uber.breakdown?.tip != null && <MiniStat label={d("statTip")} value={money(uber.breakdown.tip, uber.earnings_label)} />}
+                  </div>
+
+                  {/* Cash vs cashless — the cash the driver collected by hand vs what settles to the fleet through Uber. */}
+                  <div className="g-2">
+                    <div className="mstat" style={{ background: "var(--warning-bg)", borderColor: "transparent" }}>
+                      <span className="l" style={{ color: "var(--warning-fg)" }}>{d("statCash")}</span>
+                      <span className="v" dir="ltr">{money(Math.abs(uber.breakdown?.cash_collected ?? 0), uber.earnings_label)}</span>
+                      <span className="h">{d("statCashHint")}</span>
+                    </div>
+                    <div className="mstat" style={{ background: "var(--success-bg)", borderColor: "transparent" }}>
+                      <span className="l" style={{ color: "var(--success-fg)" }}>{d("statCashless")}</span>
+                      <span className="v" dir="ltr">{money(uber.net_outstanding, uber.earnings_label)}</span>
+                      <span className="h">{d("statCashlessHint")}</span>
+                    </div>
+                  </div>
+
+                  {uber.breakdown && Object.keys(uber.breakdown).length > 0 && (
+                    <div>
+                      <h3 className="section-title" style={{ marginBottom: 10 }}>{d("breakdown")}</h3>
+                      <dl className="kv" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
+                        {Object.entries(uber.breakdown).map(([cat, amt]) => (
+                          <div key={cat}>
+                            <dt style={{ fontSize: 12 }}>{prettyCat(cat, t)}</dt>
+                            <dd className="num" dir="ltr">{money(amt, uber.earnings_label)}</dd>
+                          </div>
+                        ))}
+                      </dl>
                     </div>
                   )}
                 </div>
-              )}
-            </Card>
-          )}
+              </section>
+            )}
 
-          {/* Uber's official earnings — captured from the Fleet Earnings page */}
-          {uber && (
-            <Card className="p-5">
-              <div className="flex items-center justify-between gap-2">
-                <h4 className="text-sm font-semibold text-ink">{d("uberData")}</h4>
-                <span className="text-xs text-ink-subtle" dir="ltr">{uberPeriod(uber, latnLocale(locale))}</span>
-              </div>
-              <p className="mb-3 mt-0.5 text-xs text-ink-subtle">{d("uberDataHint")}</p>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                <MiniStat label={d("statEarnings")} value={money(uber.earnings, uber.earnings_label)} />
-                <MiniStat label={d("statTrips")} value={uber.trips != null ? String(uber.trips) : "—"} />
-                <MiniStat label={d("statKm")} value={uber.distance_km != null ? `${uber.distance_km} km` : "—"} />
-                <MiniStat label={d("statNet")} value={money(uber.net_outstanding, uber.earnings_label)} />
-                {uber.breakdown?.promotion != null && (
-                  <MiniStat label={d("statPromo")} value={money(uber.breakdown.promotion, uber.earnings_label)} />
-                )}
-                {uber.breakdown?.tip != null && (
-                  <MiniStat label={d("statTip")} value={money(uber.breakdown.tip, uber.earnings_label)} />
-                )}
-              </div>
-
-              {/* Cash vs cashless — the cash the driver collected by hand (owed to
-                  the fleet) vs the amount that settles to the fleet through Uber. */}
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-lg border border-line bg-surface-2 p-3">
-                  <div className="flex items-center gap-1.5 text-xs text-ink-subtle">
-                    <Banknote className="h-3.5 w-3.5" /> {d("statCash")}
-                  </div>
-                  <div className="mt-1 text-lg font-bold tabular-nums text-amber-600" dir="ltr">
-                    {money(Math.abs(uber.breakdown?.cash_collected ?? 0), uber.earnings_label)}
-                  </div>
-                  <div className="text-[11px] text-ink-subtle">{d("statCashHint")}</div>
+            {/* No Uber earnings captured yet — tell the manager how to populate it. */}
+            {!uber && (
+              <section className="card">
+                <div className="card-head">
+                  <h2 className="row" style={{ gap: 8 }}>
+                    <span className="subtle">
+                      <BadgeCheck style={{ width: 18, height: 18 }} />
+                    </span>
+                    {d("uberData")}
+                  </h2>
                 </div>
-                <div className="rounded-lg border border-line bg-surface-2 p-3">
-                  <div className="flex items-center gap-1.5 text-xs text-ink-subtle">
-                    <CreditCard className="h-3.5 w-3.5" /> {d("statCashless")}
-                  </div>
-                  <div className="mt-1 text-lg font-bold tabular-nums text-emerald-600" dir="ltr">
-                    {money(uber.net_outstanding, uber.earnings_label)}
-                  </div>
-                  <div className="text-[11px] text-ink-subtle">{d("statCashlessHint")}</div>
+                <div className="card-body">
+                  <p className="muted">{d("metricsUnavailable")}</p>
                 </div>
-              </div>
+              </section>
+            )}
 
-              {uber.breakdown && Object.keys(uber.breakdown).length > 0 && (
-                <div className="mt-4 border-t border-line pt-3">
-                  <p className="mb-2 text-xs font-medium text-ink-subtle">{d("breakdown")}</p>
-                  <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
-                    {Object.entries(uber.breakdown).map(([cat, amt]) => (
-                      <div key={cat} className="flex items-center justify-between gap-2 text-sm">
-                        <span className="truncate text-ink-muted">{prettyCat(cat, t)}</span>
-                        <span className="font-medium tabular-nums text-ink" dir="ltr">{money(amt, uber.earnings_label)}</span>
-                      </div>
-                    ))}
+            {/* Uber-sourced performance metrics (server-synced) */}
+            {uber && hasUberPerformance(uber) && (
+              <section className="card">
+                <div className="card-head">
+                  <div className="truncate">
+                    <h2>{t("screens.driverUber.title")}</h2>
+                    <div className="sub">{t("screens.driverUber.hint")}</div>
                   </div>
                 </div>
-              )}
-            </Card>
-          )}
+                <div className="card-body">
+                  <div className="mstat-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+                    <MiniStat label={t("screens.driverUber.hoursOnline")} value={hoursLabel(uber.hours_online, locale)} />
+                    <MiniStat label={t("screens.driverUber.hoursOnTrip")} value={hoursLabel(uber.hours_on_trip, locale)} />
+                    <MiniStat label={t("screens.driverUber.acceptance")} value={pctLabel(uber.acceptance_rate, locale)} />
+                    <MiniStat label={t("screens.driverUber.cancellation")} value={pctLabel(uber.cancellation_rate, locale)} />
+                  </div>
+                </div>
+              </section>
+            )}
 
-          {/* No Uber earnings captured yet for this driver — tell the manager how
-              to populate it (incl. the cash / cashless split) instead of hiding it. */}
-          {!uber && (
-            <Card className="p-5">
-              <h4 className="text-sm font-semibold text-ink">{d("uberData")}</h4>
-              <p className="mt-2 text-sm text-ink-subtle">{d("metricsUnavailable")}</p>
-            </Card>
-          )}
-
-          {/* Uber-sourced performance metrics (server-synced) — distinct from the
-              acceptance rate Reidey computes itself from offers, below. */}
-          {uber && hasUberPerformance(uber) && (
-            <Card className="p-5">
-              <h4 className="text-sm font-semibold text-ink">{t("screens.driverUber.title")}</h4>
-              <p className="mb-3 mt-0.5 text-xs text-ink-subtle">{t("screens.driverUber.hint")}</p>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <MiniStat label={t("screens.driverUber.hoursOnline")} value={hoursLabel(uber.hours_online, locale)} />
-                <MiniStat label={t("screens.driverUber.hoursOnTrip")} value={hoursLabel(uber.hours_on_trip, locale)} />
-                <MiniStat label={t("screens.driverUber.acceptance")} value={pctLabel(uber.acceptance_rate, locale)} />
-                <MiniStat label={t("screens.driverUber.cancellation")} value={pctLabel(uber.cancellation_rate, locale)} />
-              </div>
-            </Card>
-          )}
-
-          {/* Our own captured data */}
-          {stats && (
-            <Card className="p-5">
-              <h4 className="text-sm font-semibold text-ink">{d("ourData")}</h4>
-              <p className="mb-3 mt-0.5 text-xs text-ink-subtle">{d("ourDataHint")}</p>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                <MiniStat label={d("statEarnings")} value={formatMoney(stats.earnings, locale)} />
-                <MiniStat label={d("statTrips")} value={formatNumber(stats.trips, locale)} />
-                <MiniStat label={d("statAccept")} value={`${stats.acceptance_rate}%`} />
-                <MiniStat label={d("statOffers")} value={formatNumber(stats.offers, locale)} />
-                <MiniStat label={d("statAccepted")} value={formatNumber(stats.accepted, locale)} />
-                <MiniStat label={d("statKm")} value={`${stats.km} km`} />
-              </div>
-            </Card>
-          )}
-        </div>
-      ) : (
-        /* Details tab */
-        <Card className="p-4 sm:p-5">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <InfoTile icon={Star} label={d("colRating")} tone="amber">
-              {driver?.rating != null ? (
-                <span className="inline-flex items-center gap-1">
-                  {driver.rating.toFixed(2)}
-                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                </span>
-              ) : "—"}
-            </InfoTile>
-            <InfoTile icon={Car} label={d("colTrips")}>{driver?.total_trips != null ? formatNumber(driver.total_trips, locale) : "—"}</InfoTile>
-            <InfoTile icon={Phone} label={d("colPhone")}>{driver?.phone ? <span dir="ltr">{driver.phone}</span> : "—"}</InfoTile>
-            <InfoTile icon={Mail} label={d("email")}>{driver?.uber_email ? <span dir="ltr">{driver.uber_email}</span> : "—"}</InfoTile>
-            <InfoTile icon={UserCheck} label={d("linkMethod")}>
-              {driver?.uber_link_method ? d(`linkMethod_${driver.uber_link_method}`) : "—"}
-            </InfoTile>
+            {/* Our own captured data */}
+            {stats && (
+              <section className="card">
+                <div className="card-head">
+                  <div className="truncate">
+                    <h2 className="row" style={{ gap: 8 }}>
+                      <span className="subtle">
+                        <Database style={{ width: 18, height: 18 }} />
+                      </span>
+                      {d("ourData")}
+                    </h2>
+                    <div className="sub">{d("ourDataHint")}</div>
+                  </div>
+                </div>
+                <div className="card-body">
+                  <div className="mstat-grid">
+                    <MiniStat label={d("statEarnings")} value={formatMoney(stats.earnings, locale)} />
+                    <MiniStat label={d("statTrips")} value={formatNumber(stats.trips, locale)} />
+                    <MiniStat label={d("statAccept")} value={`${stats.acceptance_rate}%`} />
+                    <MiniStat label={d("statOffers")} value={formatNumber(stats.offers, locale)} />
+                    <MiniStat label={d("statAccepted")} value={formatNumber(stats.accepted, locale)} />
+                    <MiniStat label={d("statKm")} value={`${stats.km} km`} />
+                  </div>
+                </div>
+              </section>
+            )}
           </div>
-        </Card>
-      )}
+        ) : (
+          /* Details tab */
+          <section className="card">
+            <div className="card-body">
+              <div className="g-2">
+                <InfoTile icon={Star} label={d("colRating")} tone="warning">
+                  {driver?.rating != null ? <span className="num">{driver.rating.toFixed(2)}</span> : "—"}
+                </InfoTile>
+                <InfoTile icon={Car} label={d("colTrips")}>
+                  <span className="num">{driver?.total_trips != null ? formatNumber(driver.total_trips, locale) : "—"}</span>
+                </InfoTile>
+                <InfoTile icon={Phone} label={d("colPhone")} tone="info">
+                  {driver?.phone ? <span className="num" dir="ltr">{driver.phone}</span> : "—"}
+                </InfoTile>
+                <InfoTile icon={Mail} label={d("email")}>
+                  {driver?.uber_email ? <span dir="ltr">{driver.uber_email}</span> : "—"}
+                </InfoTile>
+                <InfoTile icon={Link2} label={d("linkMethod")} tone="success">
+                  {driver?.uber_link_method ? d(`linkMethod_${driver.uber_link_method}`) : "—"}
+                </InfoTile>
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
 
-      {detailId !== null && (
-        <OfferDetailModal id={detailId} onClose={closeDetail} />
-      )}
-    </div>
+      {detailId !== null && <OfferDetailModal id={detailId} onClose={closeDetail} />}
+    </>
   );
 }
 
 function InfoTile({
   icon: Icon,
   label,
-  tone = "default",
+  tone = "",
   children,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
-  tone?: "default" | "amber";
+  tone?: "" | "warning" | "info" | "success";
   children: React.ReactNode;
 }) {
-  const chip = tone === "amber" ? "bg-warning-bg text-warning-fg" : "bg-surface-2 text-ink-muted";
   return (
-    <div className="flex items-center gap-3 glass-panel glass-panel--card rounded-xl p-3.5">
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${chip}`}>
-        <Icon className="h-5 w-5" />
+    <div className="info-tile">
+      <span className={`stat-ico ${tone}`} style={{ width: 36, height: 36, borderRadius: 10 }}>
+        <Icon />
       </span>
-      <div className="min-w-0">
-        <div className="text-[11px] font-medium uppercase tracking-wide text-ink-subtle">{label}</div>
-        <div className="truncate text-sm font-semibold text-ink">{children}</div>
+      <div style={{ minWidth: 0 }}>
+        <div className="k">{label}</div>
+        <div className="v">{children}</div>
       </div>
     </div>
   );
@@ -615,9 +654,9 @@ function InfoTile({
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="glass-panel glass-panel--card rounded-xl px-3 py-2.5">
-      <div className="text-[11px] text-ink-subtle">{label}</div>
-      <div className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{value}</div>
+    <div className="mstat">
+      <span className="l">{label}</span>
+      <span className="v">{value}</span>
     </div>
   );
 }

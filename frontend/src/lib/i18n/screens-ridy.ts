@@ -78,6 +78,7 @@ driverUber: { title: "From Uber", hint: "Performance metrics as reported by Uber
     colRider: "Rider",
     close: "Close",
     stops: "stops", multiStop: "Multi-stop", dropoffs: "drop-offs", total: "total",
+    routeTitle: "Route", stopPickup: "Pickup", stopDropoff: "Drop-off", stopDestination: "Destination",
     acceptWindow: "Accept window",
     rawPayload: "Full raw data",
     distance: "Distance",
@@ -106,6 +107,9 @@ driverUber: { title: "From Uber", hint: "Performance metrics as reported by Uber
     linkedToast: "Driver linked",
     linkedToastDesc: "{count} earlier offers were assigned.",
     linkFailed: "Linking failed",
+  },
+  remake: {
+    email: "Email", inviteTitle: "Invite driver?", inviteAgainTitle: "Resend invitation?", inviteBody: "The invitation to the Reidey app is sent by email to {email}. The driver then signs in without a password using a code.", inviteSend: "Invite", inviteAgain: "Resend",
   },
   map: {
     activeTrips: "active trips", enRoute: "En route", onTrip: "On trip", online: "Online", offline: "Offline", active: "Active",
@@ -400,6 +404,7 @@ driverUber: { title: "Von Uber", hint: "Leistungskennzahlen, wie Uber sie für d
     colRider: "Fahrgast",
     close: "Schließen",
     stops: "Stopps", multiStop: "Mehrere Stopps", dropoffs: "Abgabestellen", total: "gesamt",
+    routeTitle: "Route", stopPickup: "Abholung", stopDropoff: "Abgabe", stopDestination: "Ziel",
     acceptWindow: "Annahmefenster",
     rawPayload: "Vollständige Rohdaten",
     distance: "Distanz",
@@ -428,6 +433,9 @@ driverUber: { title: "Von Uber", hint: "Leistungskennzahlen, wie Uber sie für d
     linkedToast: "Fahrer verknüpft",
     linkedToastDesc: "{count} frühere Angebote wurden zugeordnet.",
     linkFailed: "Verknüpfung fehlgeschlagen",
+  },
+  remake: {
+    email: "E-Mail", inviteTitle: "Fahrer einladen?", inviteAgainTitle: "Einladung erneut senden?", inviteBody: "Die Einladung zur Reidey-App geht per E-Mail an {email}. Der Fahrer meldet sich danach ohne Passwort mit einem Code an.", inviteSend: "Einladen", inviteAgain: "Erneut senden",
   },
   map: {
     activeTrips: "aktive Touren", enRoute: "Unterwegs", onTrip: "Auf Tour", online: "Online", offline: "Offline", active: "Aktiv",
@@ -718,6 +726,7 @@ driverUber: { title: "من أوبر", hint: "مقاييس الأداء كما ي
     colRider: "الراكب",
     close: "إغلاق",
     stops: "محطات", multiStop: "متعدد النقاط", dropoffs: "نقاط تسليم", total: "إجمالي",
+    routeTitle: "المسار", stopPickup: "الاستلام", stopDropoff: "التسليم", stopDestination: "الوجهة",
     acceptWindow: "مهلة القبول",
     rawPayload: "كل البيانات الخام",
     distance: "المسافة",
@@ -746,6 +755,9 @@ driverUber: { title: "من أوبر", hint: "مقاييس الأداء كما ي
     linkedToast: "تم ربط السائق",
     linkedToastDesc: "تم إسناد {count} عروض سابقة.",
     linkFailed: "فشل الربط",
+  },
+  remake: {
+    email: "البريد الإلكتروني", inviteTitle: "دعوة السائق؟", inviteAgainTitle: "إعادة إرسال الدعوة؟", inviteBody: "تُرسل دعوة تطبيق Reidey بالبريد إلى {email}. بعدها يسجّل السائق الدخول بكود بدون كلمة مرور.", inviteSend: "دعوة", inviteAgain: "إعادة إرسال",
   },
   map: {
     activeTrips: "رحلة نشطة", enRoute: "رايح يستلم", onTrip: "على رحلة", online: "أونلاين", offline: "أوفلاين", active: "نشط",

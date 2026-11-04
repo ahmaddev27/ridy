@@ -12,24 +12,17 @@ export type Status =
   | "info"
   | "neutral";
 
-const styles: Record<Status, string> = {
-  matched: "bg-success-bg text-success-fg ring-success-ring/20",
-  personal: "bg-danger-bg text-danger-fg ring-danger-ring/20",
-  ambiguous: "bg-warning-bg text-warning-fg ring-warning-ring/20",
-  gap: "bg-surface-2 text-ink-muted ring-line",
-  private: "bg-accent-bg text-accent-fg ring-accent-ring/20",
-  connected: "bg-success-bg text-success-fg ring-success-ring/20",
-  expiring: "bg-warning-bg text-warning-fg ring-warning-ring/20",
-  error: "bg-danger-bg text-danger-fg ring-danger-ring/20",
-  info: "bg-info-bg text-info-fg ring-info-ring/20",
-  neutral: "bg-surface-2 text-ink-muted ring-line",
-};
-
-const dotColors: Partial<Record<Status, string>> = {
-  connected: "bg-success-ring",
-  expiring: "bg-warning-ring",
-  error: "bg-danger-ring",
-  info: "bg-info-ring",
+const tone: Record<Status, string> = {
+  matched: "success",
+  personal: "danger",
+  ambiguous: "warning",
+  gap: "",
+  private: "accent",
+  connected: "success",
+  expiring: "warning",
+  error: "danger",
+  info: "info",
+  neutral: "",
 };
 
 export function Badge({
@@ -44,21 +37,8 @@ export function Badge({
   className?: string;
 }) {
   return (
-    <span
-      className={cn(
-        "ui-badge inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset",
-        styles[status],
-        className,
-      )}
-    >
-      {dot && (
-        <span
-          className={cn(
-            "h-1.5 w-1.5 rounded-full",
-            dotColors[status] ?? "bg-ink-subtle",
-          )}
-        />
-      )}
+    <span className={cn("badge", tone[status], className)}>
+      {dot && <span className="dot" />}
       {children}
     </span>
   );
