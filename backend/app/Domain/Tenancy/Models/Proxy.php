@@ -31,6 +31,20 @@ class Proxy extends Model
         return $this->hasMany(ProxyRenewal::class)->orderByDesc('ends_at');
     }
 
+    /**
+     * Pin `expires_at` to the newest renewal's end so the stored column never lags
+     * the paid history (a stale value reads as "expired" to any check using it
+     * directly). No-op without dated renewals; idempotent.
+     */
+    public function syncExpiryFromRenewals(): void
+    {
+        $latest = $this->renewals()->reorder()->max('ends_at');
+
+        if ($latest !== null && ! $this->expires_at?->isSameDay(Carbon::parse($latest))) {
+            $this->forceFill(['expires_at' => $latest])->save();
+        }
+    }
+
     /** The furthest end date across the base period and every renewal — the real expiry. */
     public function effectiveEndsAt(): ?Carbon
     {

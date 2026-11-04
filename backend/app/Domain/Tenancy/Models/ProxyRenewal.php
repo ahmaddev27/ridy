@@ -16,6 +16,14 @@ class ProxyRenewal extends Model
 
     protected $casts = ['amount' => 'decimal:2', 'starts_at' => 'date', 'ends_at' => 'date'];
 
+    protected static function booted(): void
+    {
+        $sync = fn (ProxyRenewal $r) => $r->proxy?->syncExpiryFromRenewals();
+
+        static::saved($sync);
+        static::deleted($sync);
+    }
+
     public function proxy(): BelongsTo
     {
         return $this->belongsTo(Proxy::class);
