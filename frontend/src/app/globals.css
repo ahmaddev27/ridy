@@ -653,6 +653,25 @@ html:root .app-toast {
   backdrop-filter: blur(16px) saturate(160%);
 }
 html:root .app-toast [data-icon] { color: var(--focus); }
+/* The toast is dark in BOTH themes, but sonner derives its title / description /
+   action / close colours from the *theme* — in light mode that left dark-on-dark
+   text and a dark action button. Pin them all to the dark-surface palette. */
+html:root .app-toast [data-title] { color: #e9f2ee; }
+html:root .app-toast [data-description] { color: rgb(233 242 238 / 0.8); }
+html:root .app-toast [data-button]:not([data-cancel]) {
+  background: var(--focus);
+  color: #06130e;
+  font-weight: 600;
+}
+html:root .app-toast [data-cancel] {
+  background: rgb(255 255 255 / 0.1);
+  color: #e9f2ee;
+}
+html:root .app-toast [data-close-button] {
+  background: rgb(14 22 19 / 0.95);
+  color: #e9f2ee;
+  border-color: rgb(255 255 255 / 0.18);
+}
 
 /* Fallbacks: solid surfaces, no blur, no grain. Opt-in by user preference
    (reduced transparency / more contrast) or when the browser can't blur. */

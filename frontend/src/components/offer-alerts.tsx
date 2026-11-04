@@ -118,9 +118,9 @@ export function OfferAlerts() {
       toast(t("common.newOffer"), {
         description: (
           <div className="w-full min-w-0 space-y-0.5 text-start">
-            {line1 && <div className="truncate font-semibold text-white">{line1}</div>}
-            {line2 && <div className="truncate text-white/80">{line2}</div>}
-            {line3 && <div className="line-clamp-2 break-words text-xs text-white/60">{line3}</div>}
+            {line1 && <div className="truncate font-semibold text-[#e9f2ee]">{line1}</div>}
+            {line2 && <div className="truncate text-[#e9f2ee]/80">{line2}</div>}
+            {line3 && <div className="line-clamp-2 break-words text-xs text-[#e9f2ee]/70">{line3}</div>}
           </div>
         ),
         action: { label: t("common.view"), onClick: () => openOffer(o.id) },
