@@ -1141,6 +1141,9 @@ html:root .app-sticky-footer {
   .toast svg { color: var(--focus); }
   .notif-item { display: flex; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 13px; }
   .notif-item.unread { background: color-mix(in srgb, var(--primary-soft) 45%, transparent); }
+  /* `.menu a` / `.menu button` (34px, full-width rows) outrank the bare classes; restore the multi-line notification row + inline mark-all action. */
+  .menu a.notif-item { height: auto; width: auto; align-items: flex-start; padding: 12px 14px; border-radius: 0; }
+  .menu .np-head button { width: auto; height: auto; padding: 4px 6px; flex: none; }
 
   /* ---------------- offer route + timeline ---------------- */
   .route { display: grid; grid-template-columns: 14px 1fr; gap: 2px 10px; font-size: 13px; }

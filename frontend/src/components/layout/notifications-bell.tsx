@@ -114,7 +114,7 @@ export function NotificationsBell({
                       <p className="truncate text-sm font-medium text-ink">{title}</p>
                       <p className="truncate text-xs text-ink-muted">{body}</p>
                     </div>
-                    <span className="whitespace-nowrap text-[10px] text-ink-subtle">
+                    <span className="whitespace-nowrap text-[11px] text-ink-muted">
                       {n.created_at ? new Date(n.created_at).toLocaleDateString(latnLocale(locale)) : ""}
                     </span>
                   </Link>
