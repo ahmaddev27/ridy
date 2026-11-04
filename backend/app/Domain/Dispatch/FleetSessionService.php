@@ -127,6 +127,14 @@ class FleetSessionService
         return $session;
     }
 
+    public function hasActiveSession(int $tenantId): bool
+    {
+        return UberFleetSession::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('status', UberFleetSession::STATUS_ACTIVE)
+            ->exists();
+    }
+
     /**
      * Mark a session's org claim as proven: the daemon just read the org's Fleet
      * Hub data with the stored cookies. Only the first proof writes.

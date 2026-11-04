@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Dispatch\FleetSessionService;
 use App\Domain\Dispatch\Jobs\BackfillWaypointLabels;
 use App\Domain\Dispatch\RosterSyncService;
 use App\Domain\Dispatch\SupplierNetworkRecorder;
@@ -274,10 +275,16 @@ class DriverController extends Controller
      * Live online/offline presence, posted by the extension after querying
      * Uber's GetDriverLiveLocation. Matched to drivers by Uber UUID.
      */
-    public function ingestStatuses(IngestDriverStatusesRequest $request, DriverStatusIngestor $ingestor, SupplierNetworkRecorder $recorder): JsonResponse
+    public function ingestStatuses(IngestDriverStatusesRequest $request, DriverStatusIngestor $ingestor, SupplierNetworkRecorder $recorder, FleetSessionService $sessions): JsonResponse
     {
         $data = $request->validated();
         $tenantId = (int) $request->user()->tenant_id;
+
+        // An admin Stop (autolink blocked / no active session) must stick: the manager's
+        // open Fleet Hub tab would otherwise take over once the daemon marker is cleared.
+        if ($request->user()->tenant?->isAutolinkBlocked() || ! $sessions->hasActiveSession($tenantId)) {
+            return response()->json(['data' => ['updated' => 0, 'skipped' => 'session_stopped']]);
+        }
 
         // The daemon polls the same statuses every few seconds; this extension batch
         // (once a minute, with fetch/post latency) is often OLDER than what the
