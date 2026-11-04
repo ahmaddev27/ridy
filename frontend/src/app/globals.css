@@ -237,266 +237,142 @@ html[lang="ar"] body,
   background: transparent;
 }
 
-/* Marketing hero: swap phone screenshots between light and dark themes. */
-.theme-dark-only { display: none !important; }
-.dark .theme-light-only { display: none !important; }
-.dark .theme-dark-only { display: block !important; }
-
-/* ------------------------------------------------------------------ *
- * Marketing landing — responsive helpers.
- * The page is built with inline styles which cannot express media
- * queries, so breakpoint-dependent layout lives here (breakpoint: 768px,
- * matching the MobileNav's Tailwind `md:` boundary).
- * ------------------------------------------------------------------ */
-
-/* Header: desktop-only inline nav + secondary actions. Hidden on mobile,
-   where the MobileNav hamburger takes over. */
-.mkt-desktop-only { display: flex; }
-.mkt-mobile-only { display: none; }
-@media (max-width: 767px) {
-  .mkt-desktop-only { display: none !important; }
-  .mkt-mobile-only { display: flex !important; }
-}
-
-/* Hero: single column on mobile with an explicit visual order
-   (headline -> phones -> store badges -> rating); two columns on desktop
-   with the phones spanning the full height of the right side. */
-.mkt-hero {
-  display: grid;
-  gap: clamp(22px, 4vw, 32px);
-  grid-template-columns: 1fr;
-  grid-template-areas:
-    "headline"
-    "phones"
-    "badges"
-    "rating";
-  align-items: start;
-}
-@media (min-width: 768px) {
-  .mkt-hero {
-    grid-template-columns: 1.05fr 0.95fr;
-    grid-template-areas:
-      "headline phones"
-      "badges   phones"
-      "rating   phones";
-    column-gap: clamp(32px, 5vw, 60px);
-    row-gap: clamp(18px, 2.6vw, 24px);
-    align-items: center;
-  }
-}
-.mkt-hero__headline { grid-area: headline; }
-.mkt-hero__phones { grid-area: phones; }
-.mkt-hero__badges { grid-area: badges; }
-.mkt-hero__rating { grid-area: rating; }
-
-/* On mobile the overlapping phones need less vertical room and a tighter
-   spread so they never clip against the edges of a ~360px screen. */
-.mkt-hero__phones {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: clamp(320px, 78vw, 420px);
-}
-@media (min-width: 768px) {
-  .mkt-hero__phones { min-height: clamp(360px, 44vw, 540px); }
-}
-
-/* "Die App" slider: horizontal scroll-snap track, peeking next card,
-   hidden scrollbar, smooth touch scrolling. */
-.mkt-slider {
-  display: flex;
-  gap: clamp(12px, 2vw, 20px);
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-padding-left: var(--mkt-padx, 20px);
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 10px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.mkt-slider::-webkit-scrollbar { display: none; }
-.mkt-slider > * {
-  flex: 0 0 auto;
-  scroll-snap-align: start;
-}
-
 /* ================================================================== *
- * Reidey marketing landing — dark glassy emerald design system.
- * Self-contained: the marketing shell forces the dark palette and uses
- * explicit brand colours, independent of the app's theme toggle.
+ * Reidey marketing landing — remade to the prototype ("Reidey Landing")
+ * on the live app's design tokens (Geist / Tajawal, emerald --primary,
+ * --ink / --line). Follows the app theme (light + dark). Only a few
+ * colours are marketing-local: page ground, card ground, hairline, and
+ * the always-dark "band" (nav + hero, quote block) from the prototype.
  * ================================================================== */
 .mkt-root {
-  --mkt-bg: #0a0a0a;
-  --mkt-card: #171717;
-  --mkt-fg: #ffffff;
-  --mkt-muted: #9ca3af;
-  --mkt-border: #2e2e2e;
-  --mkt-primary: #10b981;
-  --mkt-deep: #059669;
-  --mkt-light: #34d399;
-  --mkt-accent: linear-gradient(100deg, #10b981, #059669);
-  background: var(--mkt-bg);
-  color: var(--mkt-fg);
-  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --m-bg: #f6f8f7;
+  --m-card: #ffffff;
+  --m-rule: #e1e8e5;
+  --m-btn: #111916;
+  --m-btn-ink: #ffffff;
+  --m-band: #0e1512;
+  --m-band-ink: #e6ece9;
+  --m-band-mut: rgb(230 236 233 / 0.74);
+  --m-band-line: rgb(230 236 233 / 0.22);
+  background: var(--m-bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  text-wrap: pretty;
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
 }
-.mkt-root ::selection {
-  background: rgba(16, 185, 129, 0.28);
+.dark .mkt-root {
+  --m-bg: var(--canvas);
+  --m-card: #0f1513;
+  --m-rule: rgb(255 255 255 / 0.09);
+  --m-btn: #e6ece9;
+  --m-btn-ink: #0e1512;
+  --m-band: #0b110f;
 }
-.mkt-root .font-heading {
-  font-family: var(--font-heading), var(--font-manrope), sans-serif;
-  letter-spacing: -0.02em;
-}
-.mkt-root .font-mono-mkt {
-  font-family: var(--font-mono-mkt), ui-monospace, monospace;
-}
+.mkt-root ::selection { background: rgb(16 185 129 / 0.28); }
+.mkt-root :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+.mkt-root h1, .mkt-root h2, .mkt-root h3 { margin: 0; text-wrap: balance; }
+.mkt-root p { margin: 0; }
+.mkt-root a { text-decoration: none; }
 
-/* Clearance for the fixed GazaBanner + floating Navbar is handled by the
-   Hero's own top padding (pt-36 / lg:pt-44), matching the reference layout. */
-.mkt-main {
-  padding-top: 0;
-}
+.mkt-wrap { max-width: 1240px; margin-inline: auto; padding-inline: clamp(20px, 5vw, 40px); }
+.mkt-section { padding-top: clamp(56px, 8vw, 88px); }
 
-/* Only the standard `backdrop-filter` is authored — lightningcss autoprefixes it
-   (emitting -webkit- for Safari) from the build targets. Writing the -webkit-
-   line by hand made the minifier treat the pair as duplicates and drop the
-   standard property, leaving Firefox with no blur (a transparent header). */
-.glass {
-  background: rgba(18, 18, 18, 0.6);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-.glass-strong {
-  background: rgba(10, 10, 10, 0.82);
-  backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-.card-modern {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.045) 0%,
-    rgba(255, 255, 255, 0.012) 100%
-  );
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
-}
-.card-modern:hover {
-  border-color: rgba(16, 185, 129, 0.4);
-  box-shadow: 0 12px 40px -14px rgba(16, 185, 129, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-.card-modern:hover .feat-tile {
-  background: linear-gradient(100deg, #10b981, #059669) !important;
-}
-
-/* Green radial glow blob used behind hero / features / showcase / cta. */
-.mkt-glow {
-  position: absolute;
-  border-radius: 9999px;
-  background: radial-gradient(
-    circle,
-    rgba(16, 185, 129, 0.22) 0%,
-    rgba(16, 185, 129, 0) 70%
-  );
-  filter: blur(20px);
-  pointer-events: none;
-  z-index: 0;
-}
-
+/* Mono caption used for eyebrows, step numbers, section meta. */
 .mkt-eyebrow {
-  font-size: 0.75rem;
+  font: 500 11px / 1.2 var(--font-mono);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0.15em;
-  color: #10b981;
-  font-weight: 500;
+  color: var(--ink-subtle);
+}
+.mkt-eyebrow--band { color: rgb(230 236 233 / 0.55); }
+
+.mkt-h2 { font-size: clamp(27px, 3.9vw, 38px); line-height: 1.14; font-weight: 600; letter-spacing: -0.02em; }
+.mkt-h3 { font-size: clamp(25px, 3.4vw, 32px); line-height: 1.15; font-weight: 600; letter-spacing: -0.02em; }
+.mkt-lead { font-size: 17px; line-height: 1.6; color: var(--ink-muted); }
+.mkt-body { font-size: 14.5px; line-height: 1.6; color: var(--ink-muted); }
+
+.mkt-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; padding-bottom: clamp(22px, 3vw, 30px);
 }
 
-/* Brand gradient helpers mirrored from the reference index.css so cards,
-   tiles and text share the exact emerald ramp (#10b981 → #059669). */
-.bg-gradient-accent {
-  background-image: linear-gradient(100deg, #10b981 0%, #059669 100%);
+/* Buttons. */
+.mkt-btn, .mkt-btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 15.5px; border-radius: 13px; padding: 16px 26px;
+  transition: background 0.2s var(--ease), border-color 0.2s var(--ease), color 0.2s var(--ease);
+  cursor: pointer; border: 1px solid transparent;
 }
-.bg-gradient-accent-soft {
-  background-image: linear-gradient(
-    100deg,
-    rgba(16, 185, 129, 0.14) 0%,
-    rgba(5, 150, 105, 0.14) 100%
-  );
+.mkt-btn { font-weight: 600; background: var(--m-btn); color: var(--m-btn-ink); }
+.mkt-btn:hover { background: var(--primary); color: var(--primary-ink); }
+.mkt-btn--band { background: var(--m-band-ink); color: var(--m-band); }
+.mkt-btn--band:hover { background: #fff; color: var(--m-band); }
+.mkt-btn-ghost { font-weight: 500; }
+.mkt-btn-ghost--band { color: var(--m-band-ink); border-color: var(--m-band-line); }
+.mkt-btn-ghost--band:hover { border-color: rgb(230 236 233 / 0.5); }
+.mkt-btn:disabled { opacity: 0.7; cursor: default; }
+
+/* Hairline-ruled grids: cells separated by 1px of --m-rule. */
+.mkt-rule-grid {
+  display: grid; gap: 1px; background: var(--m-rule);
+  border: 1px solid var(--m-rule); border-radius: 16px; overflow: hidden;
 }
-.text-gradient {
-  background: linear-gradient(100deg, #10b981 0%, #059669 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+.mkt-cell { background: var(--m-card); padding: clamp(20px, 3vw, 26px) clamp(18px, 3vw, 24px); }
+.mkt-card {
+  background: var(--m-card); border: 1px solid var(--m-rule); border-radius: 16px;
+  padding: clamp(20px, 3vw, 26px) clamp(18px, 3vw, 24px);
 }
 
-/* Interactive 3D tilt used by the Problem / Features / HowItWorks cards. */
-.mkt-tilt {
-  transform-style: preserve-3d;
-  transition: transform 0.25s ease-out;
+/* Always-dark band: nav + hero, quote block. */
+.mkt-band { background: var(--m-band); color: var(--m-band-ink); }
+
+/* Nav links. */
+.mkt-navlink { font-size: 14px; color: var(--m-band-mut); transition: color 0.2s var(--ease); white-space: nowrap; }
+.mkt-root .mkt-band .mkt-navlink { color: var(--m-band-mut); }
+.mkt-root .mkt-band .mkt-navlink:hover { color: var(--m-band-ink); }
+
+/* Store badges (band context). */
+.mkt-badge {
+  display: inline-flex; align-items: center; gap: 11px;
+  border: 1px solid var(--m-band-line); border-radius: 12px; padding: 10px 16px;
+  color: var(--m-band-ink); transition: border-color 0.2s var(--ease);
+}
+.mkt-badge:hover { border-color: rgb(230 236 233 / 0.5); }
+
+/* Phone frame for the JSX app screens. */
+.mkt-phone {
+  border-radius: clamp(26px, 5vw, 40px); background: #0f1116;
+  border: 1px solid rgb(255 255 255 / 0.1); padding: 8px;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.35);
 }
 
-/* ------------------------------------------------------------------ *
- * Reference design tokens (from reidey-landing/src/index.css), scoped
- * to the marketing root so the ported JSX can use the exact shadcn-style
- * class names (bg-background, text-muted-foreground, border-border, …)
- * and render identically to the reference without leaking into the app.
- * ------------------------------------------------------------------ */
-.mkt-root {
-  --background: 0 0% 4%;
-  --foreground: 0 0% 100%;
-  --card: 0 0% 9%;
-  --card-foreground: 0 0% 100%;
-  --primary: 160 84% 39%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 12%;
-  --muted: 0 0% 12%;
-  --muted-foreground: 217 10% 65%;
-  --accent: 160 84% 39%;
-  --border: 0 0% 18%;
-  --input: 0 0% 18%;
-  --ring: 160 84% 39%;
+/* "Die App" slider: scroll-snap track, hidden scrollbar. */
+.mkt-slider {
+  display: flex; gap: clamp(12px, 2vw, 20px); overflow-x: auto;
+  scroll-snap-type: x mandatory; padding-bottom: 28px; margin-bottom: -20px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
 }
+.mkt-slider::-webkit-scrollbar { display: none; }
+.mkt-slider > * { flex: 0 0 auto; scroll-snap-align: start; }
 
-/* Color utilities resolving the tokens above (scoped to marketing). */
-.mkt-root .bg-background { background-color: hsl(var(--background)); }
-.mkt-root .bg-card { background-color: hsl(var(--card)); }
-.mkt-root .bg-primary { background-color: hsl(var(--primary)); }
-.mkt-root .bg-muted { background-color: hsl(var(--muted)); }
-.mkt-root .text-foreground { color: hsl(var(--foreground)); }
-.mkt-root .text-primary { color: hsl(var(--primary)); }
-.mkt-root .text-muted-foreground { color: hsl(var(--muted-foreground)); }
-.mkt-root .border-border { border-color: hsl(var(--border)); }
-.mkt-root .hover\:text-foreground:hover { color: hsl(var(--foreground)); }
-.mkt-root .hover\:text-primary:hover { color: hsl(var(--primary)); }
-
-/* Grid dot backdrop + coloured glows from the reference utilities. */
-.grid-bg {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
-  background-size: 24px 24px;
+/* Form fields. */
+.mkt-input {
+  width: 100%; border-radius: 12px; background: var(--surface-solid);
+  border: 1px solid var(--line-strong); color: var(--ink);
+  padding: 12px 16px; font-size: 14.5px;
 }
-.glow-cyan {
-  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.2), 0 8px 40px -8px rgba(16, 185, 129, 0.35);
-}
-.glow-purple {
-  box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.2), 0 8px 40px -8px rgba(5, 150, 105, 0.35);
-}
+.mkt-input::placeholder { color: var(--ink-subtle); }
+.mkt-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgb(16 185 129 / 0.2); }
 
 /* Accordion smooth height (FAQ). */
-.mkt-acc-body {
-  overflow: hidden;
-  transition: grid-template-rows 0.3s ease;
-  display: grid;
-  grid-template-rows: 0fr;
-}
-.mkt-acc-body.open {
-  grid-template-rows: 1fr;
-}
-.mkt-acc-body > div {
-  min-height: 0;
+.mkt-acc-body { overflow: hidden; transition: grid-template-rows 0.3s ease; display: grid; grid-template-rows: 0fr; }
+.mkt-acc-body.open { grid-template-rows: 1fr; }
+.mkt-acc-body > div { min-height: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mkt-root * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
 
 /* MapLibre popups — theme-aware (dark bg + light text in dark mode) via the

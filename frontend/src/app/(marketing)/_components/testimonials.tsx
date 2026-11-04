@@ -1,8 +1,8 @@
-import { Star, ShieldCheck, Lock, Server } from "lucide-react";
-import { Container, SectionHeading } from "./ui";
+import { Container, Eyebrow } from "./ui";
 
 const QUOTES = [
   {
+    label: "Aus dem Betrieb",
     quote:
       "Vorher haben meine Fahrer jede Fahrt genommen, die kam. Heute sehen sie den €/km-Wert, bevor sie zusagen, und die Abende sind deutlich ruhiger geworden.",
     name: "Murat R.",
@@ -10,74 +10,40 @@ const QUOTES = [
     initials: "MR",
   },
   {
-    quote:
-      "Ich höre den Ton, schaue einmal hin und weiß, ob es sich lohnt. Kein Suchen, kein Rechnen im Kopf.",
+    label: "Aus dem Fahrzeug",
+    quote: "Ich höre den Ton, schaue einmal hin und weiß, ob es sich lohnt. Kein Suchen, kein Rechnen im Kopf.",
     name: "Peter K.",
     role: "Fahrer in Wuppertal · seit 2024 dabei",
     initials: "PK",
   },
 ];
 
-const BADGES = [
-  { icon: Star, title: "4.9 Bewertung", note: "Flotten in ganz Deutschland" },
-  { icon: ShieldCheck, title: "DSGVO-konform", note: "Daten in der EU" },
-  { icon: Lock, title: "Ende-zu-Ende", note: "Verschlüsselte Übertragung" },
-  { icon: Server, title: "99,9% Verfügbarkeit", note: "Hosting Frankfurt" },
-];
-
+/** Always-dark quote block (prototype): two voices side by side. */
 export function Testimonials() {
   return (
-    <section className="py-14 lg:py-28">
-      <Container>
-        <SectionHeading
-          eyebrow="Aus dem Betrieb"
-          title="Stille Abende statt Streit um Löhne."
-        />
-        <div className="mb-10 mt-12 grid gap-4 md:grid-cols-2">
-          {QUOTES.map((q) => (
-            <div key={q.name} className="card-modern flex flex-col gap-5 rounded-3xl p-7">
-              <div className="flex items-center gap-1">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} size={16} fill="#f59e0b" className="text-[#f59e0b]" />
-                ))}
-              </div>
-              <blockquote className="font-heading text-lg font-medium leading-relaxed text-balance text-white">
-                “{q.quote}”
-              </blockquote>
-              <div className="mt-auto flex items-center gap-3 border-t border-white/10 pt-4">
-                <div
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold text-white"
-                  style={{ background: "linear-gradient(100deg,#10b981,#059669)" }}
-                >
-                  {q.initials}
-                </div>
-                <div>
-                  <p className="font-heading text-sm font-semibold text-white">
-                    {q.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{q.role}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {BADGES.map((b) => (
-            <div key={b.title} className="card-modern flex items-center gap-3 rounded-3xl p-5">
-              <div className="bg-gradient-accent-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
-                <b.icon size={20} className="text-primary" />
-              </div>
-              <div>
-                <p className="font-heading text-sm font-semibold text-white">
-                  {b.title}
-                </p>
-                <p className="text-xs text-muted-foreground">{b.note}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Container>
+    <section className="mx-auto mt-[clamp(44px,7vw,64px)] max-w-[1240px] px-[clamp(20px,5vw,40px)]">
+      <div className="mkt-band grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] items-start gap-[clamp(28px,4vw,48px)] rounded-[20px] p-[clamp(26px,4vw,48px)_clamp(22px,4vw,44px)]">
+        {QUOTES.map((q) => (
+          <figure key={q.name} className="m-0 flex flex-col gap-3.5">
+            <Eyebrow band>{q.label}</Eyebrow>
+            <blockquote className="m-0 text-[clamp(17.5px,2vw,22px)] font-medium leading-[1.5] tracking-[-0.01em]">
+              „{q.quote}“
+            </blockquote>
+            <figcaption className="flex items-center gap-3 pt-1.5">
+              <span
+                aria-hidden
+                className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-[rgb(230_236_233/0.12)] text-[13px] font-semibold"
+              >
+                {q.initials}
+              </span>
+              <span className="flex flex-col leading-[1.35]">
+                <span className="text-[14.5px] font-semibold">{q.name}</span>
+                <span className="text-[13px] text-[rgb(230_236_233/0.62)]">{q.role}</span>
+              </span>
+            </figcaption>
+          </figure>
+        ))}
+      </div>
     </section>
   );
 }

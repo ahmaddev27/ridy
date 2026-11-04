@@ -36,23 +36,16 @@ interface StoreBadgeProps {
   small: string;
   big: string;
   logo: string;
-  logoClassName: string;
 }
 
-function StoreBadge({ href, label, small, big, logo, logoClassName }: StoreBadgeProps) {
+function StoreBadge({ href, label, small, big, logo }: StoreBadgeProps) {
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label={label}
-      className="glass-strong inline-flex items-center gap-3 rounded-2xl px-5 py-3 text-white transition-colors hover:border-white/20"
-    >
+    <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label} className="mkt-badge">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={logo} alt="" aria-hidden className={logoClassName} />
-      <span className="text-left leading-none">
-        <span className="block text-[10px] uppercase tracking-wide text-white/75">{small}</span>
-        <span className="font-heading block text-sm font-semibold text-white">{big}</span>
+      <img src={logo} alt="" aria-hidden className="h-[22px] w-[22px]" />
+      <span className="flex flex-col text-start leading-[1.2]">
+        <span className="text-[9.5px] uppercase tracking-[0.04em] text-[rgb(230_236_233/0.62)]">{small}</span>
+        <span className="text-[14px] font-semibold">{big}</span>
       </span>
     </a>
   );
@@ -61,14 +54,13 @@ function StoreBadge({ href, label, small, big, logo, logoClassName }: StoreBadge
 export function StoreButtons() {
   const links = useStoreLinks();
   return (
-    <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+    <div className="flex flex-wrap items-center gap-3">
       <StoreBadge
         href={links.appStore}
         label="Reidey im App Store laden"
         small="Laden im"
         big="App Store"
         logo="/badges/apple.svg"
-        logoClassName="h-7 w-7"
       />
       <StoreBadge
         href={links.googlePlay}
@@ -76,7 +68,6 @@ export function StoreButtons() {
         small="Jetzt bei"
         big="Google Play"
         logo="/badges/google-play.svg"
-        logoClassName="h-7 w-7"
       />
     </div>
   );

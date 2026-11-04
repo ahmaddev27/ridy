@@ -1,6 +1,5 @@
 import { Timer, Calculator, Wallet, TrendingDown } from "lucide-react";
-import { Container, SectionHeading } from "./ui";
-import { TiltCard } from "./tilt-card";
+import { Container, Eyebrow } from "./ui";
 
 const ITEMS = [
   {
@@ -27,25 +26,27 @@ const ITEMS = [
 
 export function Problem() {
   return (
-    <section id="problem" className="py-14 lg:py-28">
+    <section id="problem" className="mkt-section">
       <Container>
-        <SectionHeading
-          eyebrow="Das Problem"
-          title="Jedes Angebot kostet dich Sekunden — und oft Geld."
-          sub="Ride-Hailing-Flotten verlieren Zeit und Umsatz mit manuellen Entscheidungen, die längst automatisch bewertet gehören."
-        />
-        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {ITEMS.map((item) => (
-            <TiltCard key={item.title} className="card-modern rounded-3xl p-6">
-              <div className="bg-gradient-accent-soft mb-4 flex h-11 w-11 items-center justify-center rounded-xl">
-                <item.icon size={20} className="text-primary" />
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] items-start gap-[clamp(28px,4vw,56px)]">
+          <div className="flex flex-col gap-4">
+            <Eyebrow>Das Problem</Eyebrow>
+            <h2 className="mkt-h2">Jedes Angebot kostet dich Sekunden — und oft Geld.</h2>
+            <p className="mkt-lead">
+              Ride-Hailing-Flotten verlieren Zeit und Umsatz mit manuellen Entscheidungen, die längst automatisch
+              bewertet gehören.
+            </p>
+          </div>
+
+          <div className="mkt-rule-grid sm:grid-cols-2">
+            {ITEMS.map((item) => (
+              <div key={item.title} className="mkt-cell flex flex-col gap-2">
+                <item.icon size={22} strokeWidth={1.5} className="mb-1 text-primary" aria-hidden />
+                <h3 className="text-[16.5px] font-semibold tracking-[-0.01em]">{item.title}</h3>
+                <p className="text-[13.5px] leading-[1.5] text-ink-muted">{item.body}</p>
               </div>
-              <h3 className="font-heading mb-2 text-lg font-semibold text-white">
-                {item.title}
-              </h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">{item.body}</p>
-            </TiltCard>
-          ))}
+            ))}
+          </div>
         </div>
       </Container>
     </section>

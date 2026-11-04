@@ -1,19 +1,22 @@
-import { Container, SectionHeading } from "./ui";
-import { TiltCard } from "./tilt-card";
+import { Bell, Clock, ExternalLink } from "lucide-react";
+import { Container, SectionHead } from "./ui";
 
 const STEPS = [
   {
     n: "01",
+    icon: Bell,
     title: "Angebot trifft ein",
     body: "Reidey erkennt das Angebot und meldet es mit hoher Priorität — auf dem Sperrbildschirm, mit Ton, auch wenn die App geschlossen ist.",
   },
   {
     n: "02",
+    icon: Clock,
     title: "In einem Blick bewerten",
     body: "Großer Fahrpreis, €/km, Distanz und Route. Ein ruhiger Countdown zeigt, wie viel Zeit bleibt: grün, amber, rot.",
   },
   {
     n: "03",
+    icon: ExternalLink,
     title: "Fahrt bestätigen",
     body: "Die Annahme erfolgt in der Fahr-App des Fahrers. Reidey greift nie in den Auftrag ein — es zeigt das Angebot und protokolliert.",
   },
@@ -21,32 +24,19 @@ const STEPS = [
 
 export function HowItWorks() {
   return (
-    <section id="ablauf" className="py-14 lg:py-28">
+    <section id="ablauf" className="mkt-section">
       <Container>
-        <SectionHeading
-          eyebrow="So funktioniert es"
-          eyebrowColor="#67e8f9"
-          title="Drei Schritte. Keine Einlernphase."
-        />
-        <div className="mt-12 grid gap-4 md:grid-cols-3">
+        <SectionHead title="Drei Schritte. Keine Einlernphase." meta="So funktioniert es" />
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(250px,100%),1fr))] gap-[clamp(14px,2vw,20px)]">
           {STEPS.map((step) => (
-            <TiltCard
-              key={step.n}
-              className="card-modern relative overflow-hidden rounded-3xl p-7"
-            >
-              <span className="font-heading pointer-events-none absolute -right-2 -top-2 text-7xl font-bold text-white/[0.05]">
+            <article key={step.n} className="mkt-card flex flex-col gap-3.5">
+              <span className="mkt-mono text-[12px] tracking-[0.06em] text-primary" style={{ fontFamily: "var(--font-mono)" }}>
                 {step.n}
               </span>
-              <div className="relative">
-                <div className="bg-gradient-accent font-heading mb-5 inline-flex h-10 w-10 items-center justify-center rounded-xl font-bold text-white">
-                  {step.n}
-                </div>
-                <h3 className="font-heading mb-3 text-xl font-semibold text-white">
-                  {step.title}
-                </h3>
-                <p className="leading-relaxed text-muted-foreground">{step.body}</p>
-              </div>
-            </TiltCard>
+              <step.icon size={26} strokeWidth={1.4} aria-hidden />
+              <h3 className="text-[19px] font-semibold tracking-[-0.01em]">{step.title}</h3>
+              <p className="mkt-body">{step.body}</p>
+            </article>
           ))}
         </div>
       </Container>
