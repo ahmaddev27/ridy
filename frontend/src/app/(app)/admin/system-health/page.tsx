@@ -169,11 +169,16 @@ function EmptyBlock({ icon: Icon, title, text }: { icon: LucideIcon; title: stri
   );
 }
 
+/** Status = crisp semantic dot + ink label (inline, auto-width). The tinted
+ *  `.badge` chip washed out as a full-width bar inside the stacked cells. */
 function Pill({ ok, warn, children }: { ok: boolean; warn?: boolean; children: React.ReactNode }) {
-  const tone = ok ? (warn ? "warning" : "success") : warn ? "warning" : "danger";
+  const dot = ok ? (warn ? "warning" : "success") : warn ? "warning" : "danger";
   return (
-    <span className={`badge ${tone}`}>
-      <span className="dot" />
+    <span className="row text-sm strong" style={{ gap: 7, alignSelf: "flex-start" }}>
+      <span
+        aria-hidden
+        style={{ width: 8, height: 8, borderRadius: 99, flex: "none", background: `var(--${dot}-dot)` }}
+      />
       {children}
     </span>
   );
@@ -216,7 +221,7 @@ function SessionCell({ row, c, locale }: { row: SystemHealthRow; c: Tr; locale: 
         {label}
       </Pill>
       {status !== null && (
-        <div className="subtle text-xs">
+        <div className="muted text-xs">
           {c("lastSeen").replace("{t}", relTime(last_seen, locale, c("never")))}
         </div>
       )}
@@ -237,7 +242,7 @@ function TokenExpiry({ row, c, locale }: { row: SystemHealthRow; c: Tr; locale: 
   return (
     <div
       title={title}
-      className={"text-xs " + (soonest - now < TOKEN_WARN_MS ? "warn" : "subtle")}
+      className={"text-xs " + (soonest - now < TOKEN_WARN_MS ? "warn" : "muted")}
     >
       {c("tokenExpires").replace("{t}", relTime(new Date(soonest).toISOString(), locale, ""))}
     </div>
@@ -249,7 +254,7 @@ function DaemonCell({ row, c, locale }: { row: SystemHealthRow; c: Tr; locale: s
   return (
     <div className="stack-sm" style={{ gap: 4 }}>
       <Pill ok={ok}>{ok ? c("ok") : c("down")}</Pill>
-      <div className="subtle text-xs">
+      <div className="muted text-xs">
         {c("lastHeartbeat").replace("{t}", relTime(last_heartbeat, locale, c("never")))}
       </div>
     </div>
@@ -264,7 +269,7 @@ function ProxyCell({ row, c }: { row: SystemHealthRow; c: Tr }) {
   return (
     <div className="stack-sm" style={{ gap: 4 }}>
       <Pill ok={ok}>{label}</Pill>
-      <div className="subtle text-xs">
+      <div className="muted text-xs">
         {ok
           ? expires_at
             ? c("proxyExpires").replace("{d}", expires_at)
