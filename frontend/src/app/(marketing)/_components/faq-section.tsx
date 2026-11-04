@@ -1,8 +1,5 @@
-"use client";
-
-import { useState } from "react";
-import { Plus, Minus } from "lucide-react";
-import { Container, Eyebrow } from "./ui";
+import Link from "next/link";
+import { Container } from "./ui";
 
 const FAQS = [
   {
@@ -28,46 +25,23 @@ const FAQS = [
 ];
 
 export function FaqSection() {
-  const [open, setOpen] = useState(0);
-
   return (
-    <section id="faq" className="py-14 lg:py-28">
+    <section id="faq" className="mkt-section">
       <Container>
-        <div className="mx-auto max-w-3xl">
-          <div className="text-center">
-            <Eyebrow>Häufige Fragen</Eyebrow>
-            <h2 className="font-heading mt-3 text-3xl font-bold leading-[1.08] tracking-[-0.02em] text-balance text-white sm:text-4xl lg:text-5xl">
-              Alles, was du wissen musst.
-            </h2>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] items-start gap-[clamp(24px,4vw,56px)]">
+          <div className="flex flex-col gap-4">
+            <h2 className="mkt-h3">Häufige Fragen</h2>
+            <Link href="/faq" className="text-[14.5px] font-medium text-primary hover:underline">
+              Alle Fragen ansehen →
+            </Link>
           </div>
-
-          <div className="mt-12 flex flex-col gap-3">
-            {FAQS.map((item, i) => {
-              const isOpen = i === open;
-              return (
-                <div key={item.q} className="card-modern overflow-hidden rounded-3xl">
-                  <button
-                    type="button"
-                    onClick={() => setOpen(isOpen ? -1 : i)}
-                    className="flex w-full items-center justify-between gap-4 p-5 text-left"
-                  >
-                    <span className="font-heading text-base font-medium text-white lg:text-lg">
-                      {item.q}
-                    </span>
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 text-primary">
-                      {isOpen ? <Minus size={16} /> : <Plus size={16} />}
-                    </span>
-                  </button>
-                  <div className={`mkt-acc-body ${isOpen ? "open" : ""}`}>
-                    <div>
-                      <p className="px-5 pb-5 leading-relaxed text-muted-foreground">
-                        {item.a}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="mkt-rule-grid">
+            {FAQS.map((item) => (
+              <div key={item.q} className="mkt-cell flex flex-col gap-2 !py-[clamp(18px,3vw,22px)]">
+                <h3 className="text-[16px] font-semibold">{item.q}</h3>
+                <p className="text-[14px] leading-[1.6] text-ink-muted">{item.a}</p>
+              </div>
+            ))}
           </div>
         </div>
       </Container>
