@@ -80,7 +80,9 @@ export function instantLabel(iso: string | null | undefined, locale: string): st
 export function submissionAccess(
   p: { is_owner?: boolean; documents_enabled?: boolean; documents_readable?: boolean } | null | undefined,
 ): { canView: boolean; canSend: boolean; fleetWide: boolean } {
-  if (p?.is_owner === true) return { canView: true, canSend: false, fleetWide: true };
+  // An owner views the whole company's, and MAY FILE a receipt for a driver
+  // (picked on the receipt screen) once the company is connected.
+  if (p?.is_owner === true) return { canView: true, canSend: p.documents_enabled === true, fleetWide: true };
   const canSend = p?.documents_enabled === true;
   // `documents_enabled` implies viewing, so a server that predates
   // `documents_readable` keeps working.

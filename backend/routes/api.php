@@ -56,6 +56,7 @@ use App\Http\Controllers\Api\V1\Driver\DriverSubmissionController;
 use App\Http\Controllers\Api\V1\Driver\DriverWebauthnCredentialController;
 use App\Http\Controllers\Api\V1\Driver\FleetController;
 use App\Http\Controllers\Api\V1\Driver\FleetDeviceController;
+use App\Http\Controllers\Api\V1\Driver\FleetReceiptController;
 use App\Http\Controllers\Api\V1\Driver\FleetSubmissionController;
 use App\Http\Controllers\Api\V1\DriverController;
 use App\Http\Controllers\Api\V1\DriverInviteController;
@@ -251,10 +252,21 @@ Route::prefix('v1')->group(function () {
             Route::get('offers', [FleetController::class, 'offers']);
             Route::get('offers/{offer}', [FleetController::class, 'showOffer']);
             Route::get('stats', [FleetController::class, 'stats']);
-            // Every driver's submissions, READ-ONLY. There is no owner write
-            // path: a submission goes up from a driver, and an owner has none above.
+            // Every driver's submissions (read). The only write is filing a
+            // receipt for a driver, below.
             Route::get('submissions', [FleetSubmissionController::class, 'index']);
             Route::get('submissions/{uuid}', [FleetSubmissionController::class, 'show'])->whereUuid('uuid');
+            // The one owner write: file a RECEIPT for one of the company's own
+            // drivers (`driver_id`, tenant-checked). Same recorder + reader as the
+            // driver's own endpoints; notes stay the driver's.
+            Route::post('submissions', [FleetReceiptController::class, 'store'])
+                ->middleware('throttle:30,1,fleet-submissions');
+            Route::post('receipt-vision', [FleetReceiptController::class, 'visionStart'])
+                ->middleware('throttle:10,1,fleet-receipt-vision');
+            Route::get('receipt-vision/{id}', [FleetReceiptController::class, 'visionShow'])->whereUuid('id');
+            Route::get('postal-codes/{plz}', [DriverPostalCodeController::class, 'show'])
+                ->where('plz', '[0-9]{5}')
+                ->middleware('throttle:60,1,fleet-postal-code');
             // The owner's own push device (User token) — receives every driver's offers.
             Route::post('devices', [FleetDeviceController::class, 'store']);
             Route::delete('devices', [FleetDeviceController::class, 'destroy']);

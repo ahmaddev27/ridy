@@ -13,8 +13,8 @@ use Illuminate\Http\Request;
 /**
  * What every driver of the owner's company has sent, READ-ONLY.
  *
- * An owner never submits (a submission goes UP, and an owner has no company
- * above them), so this surface has no write path and must not gain one.
+ * This controller has no write path and must not gain one. Filing a receipt
+ * for a driver is {@see FleetReceiptController}, kept apart on purpose.
  *
  * ## The tenant is a term in the query
  *

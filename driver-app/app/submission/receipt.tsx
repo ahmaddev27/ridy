@@ -39,7 +39,7 @@
  * accepts a comma from the keyboard (every German keyboard gives one) and
  * converts it once, here, before anything is sent.
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, ScrollView, Pressable, Image, ActivityIndicator, Alert, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -54,7 +54,7 @@ import { AlertCircle, Camera, Check, ChevronLeft, ImageIcon, X } from "@/compone
 import { Text } from "@/components/typography";
 import { Field, PrimaryButton, SecondaryButton, SectionLabel } from "@/components/ui";
 import { useToast } from "@/components/toast";
-import { api, ApiError, type PickedPhoto } from "@/lib/api";
+import { api, ApiError, type FleetDriver, type PickedPhoto } from "@/lib/api";
 import { Sentry } from "@/lib/sentry";
 import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
@@ -178,8 +178,18 @@ export default function ReceiptScreen() {
   const row = isRTL() ? "row-reverse" : "row";
   // The company's connection. The endpoint answers 403 `not_connected` without
   // it, so offering the form would be offering a send that cannot land.
-  const { driver } = useAuth();
+  const { driver, isOwner } = useAuth();
   const connected = driver?.documents_enabled === true;
+  // Owner mode: a manager files the receipt FOR one of their own drivers, picked
+  // here. Everything else (scan, checks, wire format) is the driver's flow.
+  const [fleetDrivers, setFleetDrivers] = useState<FleetDriver[]>([]);
+  const [forDriver, setForDriver] = useState<number | null>(null);
+  const forDriverId = isOwner && forDriver !== null ? forDriver : undefined;
+  const needsDriver = isOwner && forDriver === null;
+  useEffect(() => {
+    if (!isOwner) return;
+    api.fleetDrivers().then((r) => setFleetDrivers(r.data)).catch(() => {});
+  }, [isOwner]);
   // A camera photo is taken now, of something in front of the driver; a
   // gallery picture can be any image on the phone. So the company decides,
   // and an older server that sends nothing here means camera only.
@@ -356,7 +366,7 @@ export default function ReceiptScreen() {
       // The PLZ is read with a score and the city beside it is a guess at a
       // line of text; the server's table is authoritative and wins whenever
       // it knows the PLZ. Offline or unknown, the OCR's own city stands.
-      const authoritative = r.postalCode ? await api.postalCity(r.postalCode) : null;
+      const authoritative = r.postalCode ? await api.postalCity(r.postalCode, isOwner) : null;
       const resolvedCity = authoritative ?? r.city ?? "";
       setCityFromPlz(typeof authoritative === "string" && authoritative.trim() !== "");
 
@@ -424,7 +434,7 @@ export default function ReceiptScreen() {
           category: effective,
         };
         setVisionWaiting(true);
-        const vision = await readWithVision(uri, size, () => run === scanRun.current);
+        const vision = await readWithVision(uri, size, () => run === scanRun.current, forDriverId);
         if (run !== scanRun.current) return; // photo removed or replaced meanwhile
         if (vision !== null) {
           const merged = mergeVision(mlFacts, vision);
@@ -582,6 +592,10 @@ export default function ReceiptScreen() {
     // The last wall, and it asks the SAME function the steps do. A second copy
     // of this list would drift the first time one of them changed, and the
     // driver would be refused on the final screen for a field two steps back.
+    if (needsDriver) {
+      toast.show(t("receipt.pickDriver"));
+      return;
+    }
     const problem = submitProblem(formState, odometerRequired);
     if (problem !== null) {
       toast.show(t(problem));
@@ -640,7 +654,7 @@ export default function ReceiptScreen() {
           odometerSent: category === "Tanken" && odometerRequired,
           visionKeys,
         }),
-      });
+      }, forDriverId);
       toast.show(t("receipt.sent"));
       router.back();
     } catch (e) {
@@ -712,6 +726,20 @@ export default function ReceiptScreen() {
           <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("receipt.photoIntro")}</Text>
         </View>
 
+        {isOwner && (
+          <>
+            <SectionLabel>{t("receipt.forDriver")}</SectionLabel>
+            <View style={{ flexDirection: row, flexWrap: "wrap", gap: 8 }}>
+              {fleetDrivers.map((d) => (
+                <Chip key={d.id} c={c} label={d.name} active={forDriver === d.id} onPress={() => setForDriver(d.id)} />
+              ))}
+            </View>
+            {needsDriver && (
+              <Text style={{ color: c.inkSubtle, fontSize: 12.5 }}>{t("receipt.pickDriver")}</Text>
+            )}
+          </>
+        )}
+
         <SectionLabel>{t("receipt.photo")}</SectionLabel>
         {photo ? (
           <View style={{ ...cardStyle(c), padding: 12, gap: 10 }}>
@@ -746,7 +774,7 @@ export default function ReceiptScreen() {
               <Text style={{ color: c.danger, fontWeight: "700", fontSize: 13.5 }}>{t("receipt.photoRemove")}</Text>
             </Pressable>
           </View>
-        ) : (
+        ) : needsDriver ? null : (
           <View style={{ flexDirection: row, gap: 12 }}>
             <PhotoButton c={c} icon={Camera} label={t("receipt.takePhoto")} busy={busy} onPress={() => void take("camera")} />
             {galleryAllowed && (

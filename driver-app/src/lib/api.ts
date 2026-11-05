@@ -667,10 +667,13 @@ export class ApiClient {
    * there (owner's decision, 10.10.2026), so there is no multipart body and no
    * file to stream. It is an ordinary JSON POST like everything else.
    */
-  submitReceipt(draft: ReceiptDraft) {
-    return this.request<{ data: DriverSubmission }>("/api/v1/driver/submissions", {
+  submitReceipt(draft: ReceiptDraft, forDriverId?: number) {
+    // Owner mode: the manager files it for one of their drivers (tenant-checked
+    // server-side). A driver's own send takes the driver from the token.
+    const path = forDriverId === undefined ? "/api/v1/driver/submissions" : "/api/v1/driver/fleet/submissions";
+    return this.request<{ data: DriverSubmission }>(path, {
       method: "POST",
-      body: JSON.stringify({ subject: "receipt", ...draft }),
+      body: JSON.stringify({ subject: "receipt", ...draft, ...(forDriverId !== undefined ? { driver_id: forDriverId } : {}) }),
     });
   }
 
@@ -692,9 +695,10 @@ export class ApiClient {
    * server does not know it or cannot be reached. Never throws: the caller
    * falls back to the town the OCR read next to the PLZ.
    */
-  async postalCity(plz: string): Promise<string | null> {
+  async postalCity(plz: string, owner = false): Promise<string | null> {
     try {
-      const r = await this.request<{ data: { city: string } }>(`/api/v1/driver/postal-codes/${plz}`, {
+      const base = owner ? "/api/v1/driver/fleet" : "/api/v1/driver";
+      const r = await this.request<{ data: { city: string } }>(`${base}/postal-codes/${plz}`, {
         timeoutMs: 4_000,
       });
       return r.data.city || null;
@@ -709,10 +713,12 @@ export class ApiClient {
    * server-side right after it is parsed. Rejects with 503 when the server
    * has the feature switched off - the caller keeps the on-device result.
    */
-  receiptVisionStart(photo: PickedPhoto) {
+  receiptVisionStart(photo: PickedPhoto, forDriverId?: number) {
     const form = new FormData();
     form.append("image", photo as unknown as Blob);
-    return this.request<{ data: { id: string } }>("/api/v1/driver/receipt-vision", {
+    if (forDriverId !== undefined) form.append("driver_id", String(forDriverId));
+    const path = forDriverId === undefined ? "/api/v1/driver/receipt-vision" : "/api/v1/driver/fleet/receipt-vision";
+    return this.request<{ data: { id: string } }>(path, {
       method: "POST",
       body: form,
       // Empty = let the runtime set multipart with its own boundary.
@@ -722,9 +728,13 @@ export class ApiClient {
   }
 
   /** The state of a vision job: pending, done (with fields) or failed. 404 once expired. */
-  receiptVisionResult(id: string) {
+  receiptVisionResult(id: string, forDriverId?: number) {
+    const path =
+      forDriverId === undefined
+        ? `/api/v1/driver/receipt-vision/${encodeURIComponent(id)}`
+        : `/api/v1/driver/fleet/receipt-vision/${encodeURIComponent(id)}?driver_id=${forDriverId}`;
     return this.request<{ data: { status: "pending" | "done" | "failed"; fields?: VisionFields } }>(
-      `/api/v1/driver/receipt-vision/${encodeURIComponent(id)}`,
+      path,
       { timeoutMs: 10_000 },
     );
   }

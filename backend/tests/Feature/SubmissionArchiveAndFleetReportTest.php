@@ -162,7 +162,7 @@ class SubmissionArchiveAndFleetReportTest extends TestCase
             ->assertJsonPath('data.documents_readable', true);
     }
 
-    public function test_both_owner_payloads_say_an_owner_neither_sends_nor_reads_as_a_driver(): void
+    public function test_the_owner_payload_may_file_only_on_a_connected_company(): void
     {
         $manager = $this->owner($this->tenant, 'm@ya.de');
         $this->connect($this->tenant, $manager);
@@ -170,7 +170,7 @@ class SubmissionArchiveAndFleetReportTest extends TestCase
         $this->actingAsOwner($manager);
         $this->getJson('/api/v1/driver/fleet/me')
             ->assertOk()
-            ->assertJsonPath('data.documents_enabled', false)
+            ->assertJsonPath('data.documents_enabled', true)
             ->assertJsonPath('data.documents_readable', false);
     }
 
@@ -241,12 +241,13 @@ class SubmissionArchiveAndFleetReportTest extends TestCase
         $this->assertSame($unknown->getContent(), $foreign->getContent());
     }
 
-    public function test_there_is_no_owner_write_path(): void
+    public function test_the_only_owner_write_is_a_receipt_for_a_driver(): void
     {
         $owner = $this->owner($this->tenant, 'o@ya.de');
         $this->actingAsOwner($owner);
 
-        $this->postJson('/api/v1/driver/fleet/submissions', ['subject' => 'note'])->assertStatus(405);
+        $this->postJson('/api/v1/driver/fleet/submissions', ['subject' => 'note'])->assertStatus(403);
+        $this->patchJson('/api/v1/driver/fleet/submissions/'.Str::uuid(), [])->assertStatus(405);
         $this->assertSame(0, ElProfessorSubmission::withoutGlobalScopes()->count());
     }
 

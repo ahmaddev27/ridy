@@ -128,13 +128,14 @@ export async function readWithVision(
   uri: string,
   size: { width: number; height: number } | null,
   isCurrent: () => boolean,
+  forDriverId?: number,
 ): Promise<VisionFields | null> {
   try {
-    const started = await api.receiptVisionStart(await shrink(uri, size));
+    const started = await api.receiptVisionStart(await shrink(uri, size), forDriverId);
     const deadline = Date.now() + GIVE_UP_MS;
     while (isCurrent() && Date.now() < deadline) {
       await sleep(POLL_MS);
-      const { data } = await api.receiptVisionResult(started.data.id);
+      const { data } = await api.receiptVisionResult(started.data.id, forDriverId);
       if (data.status === 'done') return data.fields ?? null;
       if (data.status === 'failed') return null;
     }

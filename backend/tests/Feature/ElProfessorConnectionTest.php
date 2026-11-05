@@ -1316,15 +1316,13 @@ class ElProfessorConnectionTest extends TestCase
             ->assertJsonPath('reason', 'not_connected');
     }
 
-    public function test_an_owner_is_never_told_they_may_submit_documents(): void
+    public function test_an_owner_may_file_for_a_driver_only_on_a_connected_company(): void
     {
-        // The company IS connected here — that is the point. `documents_enabled`
-        // answers "may this ACCOUNT submit", not "is the company connected", and
-        // an owner has no company above them to send a Beleg to. Reporting the
-        // company's state put the floating button and the Profil row on the
-        // owner's phone. Both payloads are asserted because they answer different
-        // moments — the login and the app's resume refresh — and a disagreement
-        // would make the button come and go depending on which ran last.
+        // Superseded rule (05.11.2026): a manager may now file a Beleg FOR a
+        // driver, so `documents_enabled` follows the company's connection for
+        // an owner too, while `documents_readable` stays false (their archive
+        // is the fleet-wide one). Both payloads are asserted because they answer
+        // different moments - the login and the app's resume refresh.
         $this->connectCompany();
 
         // A FRESH User, exactly as `actingAsDriver` re-fetches its driver. The
@@ -1337,11 +1335,10 @@ class ElProfessorConnectionTest extends TestCase
         $this->getJson('/api/v1/driver/fleet/me')
             ->assertOk()
             ->assertJsonPath('data.is_owner', true)
-            ->assertJsonPath('data.documents_enabled', false)
-            ->assertJsonPath('data.gallery_import_enabled', false);
+            ->assertJsonPath('data.documents_enabled', true)
+            ->assertJsonPath('data.documents_readable', false);
 
-        // The same company still enables it for an actual driver, so this is a
-        // rule about the ACCOUNT and not the connection being switched off.
+        // And a driver of the same company agrees.
         $this->actingAsDriver($this->driver($this->tenant, 'Omar'));
         $this->getJson('/api/v1/driver/me')
             ->assertOk()
