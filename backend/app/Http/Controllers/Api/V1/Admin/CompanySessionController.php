@@ -66,11 +66,21 @@ class CompanySessionController extends Controller
             $service->markNeedsRelink($session, 'admin');
             $session->forceFill(['shard_id' => null])->save();
         }
+        $this->tearDownLiveCapture($tenant, $uberAuth);
+
+        return response()->json(['data' => ['status' => UberFleetSession::STATUS_NEEDS_RELINK]]);
+    }
+
+    /**
+     * Everything that keeps a company's capture alive besides its session rows: the uber-auth
+     * browser (and its saved state file, so a restart cannot revive it), the "daemon is feeding"
+     * marker, and the extension's silent auto-relink. The passkey, proxy and org binding stay.
+     */
+    private function tearDownLiveCapture(Tenant $tenant, UberAuthClient $uberAuth): void
+    {
         $this->dropPersistentBrowser($tenant, $uberAuth);
         DriverStatusIngestor::forgetDaemonFeeding((int) $tenant->id);
         $tenant->blockAutolink();
-
-        return response()->json(['data' => ['status' => UberFleetSession::STATUS_NEEDS_RELINK]]);
     }
 
     /** Best-effort: an uber-auth hiccup must not fail the relink the admin already got. */
@@ -81,7 +91,7 @@ class CompanySessionController extends Controller
         }
         $result = $uberAuth->dropSession($tenant);
         if (($result['ok'] ?? false) !== true) {
-            Log::warning('force-relink: uber-auth browser drop failed', ['tenant_id' => $tenant->id, 'status' => $result['status'] ?? 'unknown']);
+            Log::warning('session teardown: uber-auth browser drop failed', ['tenant_id' => $tenant->id, 'status' => $result['status'] ?? 'unknown']);
 
             return;
         }
@@ -92,10 +102,15 @@ class CompanySessionController extends Controller
         );
     }
 
-    /** Delete the session entirely (company must re-link from scratch). */
-    public function destroy(Tenant $tenant): JsonResponse
+    /**
+     * Cut session: delete the session rows (the company reads as disconnected, 409) AND fully tear
+     * down the live capture so nothing revives it; a manual Connect is required. The passkey and
+     * proxy binding are kept so the reconnect skips OTP.
+     */
+    public function destroy(Tenant $tenant, UberAuthClient $uberAuth): JsonResponse
     {
         $deleted = UberFleetSession::withoutGlobalScopes()->where('tenant_id', $tenant->id)->delete();
+        $this->tearDownLiveCapture($tenant, $uberAuth);
 
         return response()->json(['data' => ['deleted' => $deleted]]);
     }

@@ -8,6 +8,7 @@ use App\Domain\Tenancy\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
@@ -75,5 +76,23 @@ class AdminForceRelinkTest extends TestCase
         $this->postJson("/api/v1/admin/companies/{$this->tenant->id}/session/relink")->assertForbidden();
 
         Http::assertNothingSent();
+    }
+
+    public function test_cut_session_fully_tears_down_but_keeps_the_passkey(): void
+    {
+        Http::fake(['*/session/drop' => Http::response(['ok' => true, 'state' => 'not_set_up'])]);
+        $this->actAsSuperAdmin();
+        DB::table('uber_passkeys')->insert([
+            'tenant_id' => $this->tenant->id, 'status' => 'active', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->deleteJson("/api/v1/admin/companies/{$this->tenant->id}/session")
+            ->assertOk()->assertJsonPath('data.deleted', 1);
+
+        Http::assertSent(fn ($r) => str_ends_with($r->url(), '/session/drop') && $r['company_key'] === (string) $this->tenant->id);
+        $this->assertSame(0, UberFleetSession::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->count());
+        $this->assertSame(SessionBrowser::STATE_NOT_SET_UP, SessionBrowser::where('tenant_id', $this->tenant->id)->value('state'));
+        $this->assertTrue($this->tenant->fresh()->isAutolinkBlocked());
+        $this->assertSame('active', DB::table('uber_passkeys')->where('tenant_id', $this->tenant->id)->value('status'));
     }
 }
