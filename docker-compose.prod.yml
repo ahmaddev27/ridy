@@ -398,6 +398,8 @@ services:
       # Software passkey registration (docs/31). OFF unless "1". ON_CONNECT additionally tries
       # right after a connect / co-browse; without it only the explicit backfill command runs.
       UBER_AUTH_PASSKEY_REGISTER: ${UBER_AUTH_PASSKEY_REGISTER:-}
+      # Passkey enrolment inside the co-browse session (PR #322). OFF unless "1".
+      UBER_AUTH_PASSKEY_COBROWSE: ${UBER_AUTH_PASSKEY_COBROWSE:-}
       UBER_AUTH_PASSKEY_ON_CONNECT: ${UBER_AUTH_PASSKEY_ON_CONNECT:-}
       DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
       # Pilot: real Chrome headed under Xvfb (heavier RAM/CPU). Unset = headless Chromium.
