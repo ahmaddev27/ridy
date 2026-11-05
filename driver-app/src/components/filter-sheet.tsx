@@ -6,7 +6,7 @@ import { useColors, radius, isDarkPalette } from "@/lib/theme";
 import { t, isRTL } from "@/lib/i18n";
 
 export type SortKey = "new" | "rate" | "total";
-export type StatusKey = "all" | "pending" | "accepted" | "completed" | "rejected" | "canceled";
+export type StatusKey = "all" | "pending" | "accepted" | "completed" | "rejected" | "canceled" | "early_declined";
 
 export type OfferFilters = { sort: SortKey; status: StatusKey };
 export const DEFAULT_FILTERS: OfferFilters = { sort: "new", status: "all" };
@@ -86,6 +86,7 @@ function SheetBody({ c, value, onApply, onClose }: { c: ReturnType<typeof useCol
             { k: "completed", label: t("status.completed") },
             { k: "rejected", label: t("status.rejected") },
             { k: "canceled", label: t("status.canceled") },
+            { k: "early_declined", label: t("filter.earlyDeclined") },
           ]}
           selected={draft.status}
           onSelect={(k) => setDraft({ ...draft, status: k as StatusKey })}
