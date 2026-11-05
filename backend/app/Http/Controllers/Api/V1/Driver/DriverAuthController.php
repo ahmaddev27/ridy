@@ -423,6 +423,9 @@ class DriverAuthController extends Controller
             'company_name' => $driver->tenant?->name,
             'uber_linked' => $driver->uber_driver_uuid !== null,
             'is_owner' => false,
+            // Manager mode (driver token + flag) — NOT is_owner, which is the separate
+            // read-only User/fleet:read mode.
+            'is_manager' => (bool) $driver->is_manager,
             // MAY SEND: needs the live connection and stops when it ends.
             'documents_enabled' => $driver->tenant?->isElprofessorConnected() ?? false,
             // MAY VIEW: the archive stays the driver's own after a disconnect, so
