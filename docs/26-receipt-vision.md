@@ -1,6 +1,6 @@
 # 26 - Receipt vision fallback (self-hosted)
 
-**Status:** built 31.10.2026, off until `RECEIPT_VISION_URL` is set and the `vision` compose profile runs.
+**Status:** built 31.10.2026; live/no-store flow 13.11.2026 (the Flow and Merge sections below that mention ML Kit as first pass are superseded by the live flow section). Off until `RECEIPT_VISION_URL` is set and the `vision` compose profile runs.
 
 ## Why
 
@@ -62,11 +62,9 @@ marks vision-supplied fields `source: "vision"` and the parser as `... + vision`
 - Root `.env` / GitHub secret: `RECEIPT_VISION_URL=http://receipt-vision:8080`
   (`deploy.yml` rewrites `.env` from secrets - add it there too), then `config:clear`.
 - Resource cap: `cpus: 4`, `mem_limit: 8g`, `--parallel 1`. Inference is ~30-90 s on CPU.
-- The queue worker runs `--queue=push,mail,default`; the job uses `default`. A 270 s inference
-  holds that worker, so a single worker serialises vision reads (acceptable: low tail volume).
-  `DB_QUEUE_RETRY_AFTER` is 90 s: a re-released copy is neutralised by a claim lock
-  (`ReceiptVisionJobs::claim`) so inference never runs twice.
-- Orphaned temp files (worker down) are swept after 30 minutes on the next upload.
+- Inference runs synchronously inside the upload request (no queue job, no temp file, no poll
+  route); the photo is never written to disk. Keep the web request timeout above
+  `RECEIPT_VISION_TIMEOUT`. See the live flow section above.
 - Env: `RECEIPT_VISION_TIMEOUT` (240), `RECEIPT_VISION_MAX_EDGE` (1000).
 
 ## Needs the real model to verify
