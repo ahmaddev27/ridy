@@ -353,6 +353,8 @@ export type OffersQuery = {
 /** The driver's standing Early-decline rules (docs/25). Money is integer cents. */
 export type AutoDeclineRules = {
   min_fare: { enabled: boolean; value_e2: number };
+  /** value_e2 = cents per km; mode = how it combines with min_fare (and = keep only if BOTH pass). */
+  min_price_per_km: { enabled: boolean; value_e2: number; mode: "and" | "or" };
   reject_cities: { enabled: boolean; cities: string[] };
   max_pickup_distance: { enabled: boolean; km: number };
   max_trip_distance: { enabled: boolean; km: number };
