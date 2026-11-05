@@ -73,6 +73,7 @@ export function CompanyDetail({
   const [company, setCompany] = useState<Company | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false); // only the Save button spins on this
 
   // Editable fields.
   const [name, setName] = useState("");
@@ -152,6 +153,7 @@ export function CompanyDetail({
 
   async function saveInfo() {
     setBusy(true);
+    setSaving(true);
     try {
       await updateCompany(id, {
         name: name.trim(),
@@ -167,6 +169,7 @@ export function CompanyDetail({
       toast.error(c("saveFailed"), { description: apiErrorMessage(e, t, locale) });
     } finally {
       setBusy(false);
+      setSaving(false);
     }
   }
 
@@ -722,9 +725,18 @@ export function CompanyDetail({
               </div>
 
               {/* Save — enable/disable lives in the status toggle above. */}
-              <div className="sticky bottom-0 flex justify-end pt-3" style={{ background: "linear-gradient(to top, var(--surface-solid) 70%, transparent)" }}>
+              <div
+                className="sticky bottom-0 mt-3 flex justify-end rounded-2xl border px-3 py-2.5"
+                style={{
+                  background: "var(--glass-strong)",
+                  borderColor: "var(--glass-edge)",
+                  boxShadow: "var(--glass-hi), var(--glass-shadow)",
+                  backdropFilter: "blur(14px) saturate(1.4)",
+                  WebkitBackdropFilter: "blur(14px) saturate(1.4)",
+                }}
+              >
                 <Button onClick={saveInfo} disabled={busy}>
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {c("save")}
                 </Button>
               </div>
