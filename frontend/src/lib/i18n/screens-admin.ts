@@ -238,6 +238,7 @@ const en = {
     session_needs_relink: "Needs re-link",
     session_expired: "Expired",
     noSession: "Not connected",
+    colConnection: "Connection", passkeyRegistered: "Passkey", passkeyNone: "No passkey", passkeyRegisteredAt: "Registered", lastEvent: "Last event", proxySet: "Proxy",
     proxyDedicated: "Dedicated",
     proxyGlobal: "Global",
     // Create
@@ -550,6 +551,7 @@ const de: typeof en = {
     session_needs_relink: "Neu verbinden",
     session_expired: "Abgelaufen",
     noSession: "Nicht verbunden",
+    colConnection: "Verbindung", passkeyRegistered: "Passkey", passkeyNone: "Kein Passkey", passkeyRegisteredAt: "Registriert", lastEvent: "Letztes Ereignis", proxySet: "Proxy",
     proxyDedicated: "Eigen",
     proxyGlobal: "Global",
     cancel: "Abbrechen",
@@ -860,6 +862,7 @@ const ar: typeof en = {
     session_needs_relink: "تحتاج إعادة ربط",
     session_expired: "منتهية",
     noSession: "غير مربوطة",
+    colConnection: "الاتصال", passkeyRegistered: "مفتاح المرور", passkeyNone: "لا مفتاح مرور", passkeyRegisteredAt: "سُجّل", lastEvent: "آخر حدث", proxySet: "بروكسي",
     proxyDedicated: "خاص",
     proxyGlobal: "عام",
     cancel: "إلغاء",

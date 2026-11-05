@@ -20,6 +20,8 @@ export type Company = {
   days_left: number | null;
   banned: boolean;
   session_status: string | null;
+  /** Uber passkey registered for this company (active row = registered). */
+  passkey: { registered: boolean; status: string | null; registered_at: string | null };
   session_last_event_at: string | null;
   session_expires_at: string | null;
   /** The PLATFORM's switch for the El-Professor link, set per company. */

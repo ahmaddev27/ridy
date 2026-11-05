@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Dispatch\Models\UberPasskey;
 use App\Domain\Tenancy\Models\Proxy;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Models\User;
@@ -53,6 +54,22 @@ class AdminCompanyTest extends TestCase
         $this->assertTrue($acme['has_proxy']);
         $this->assertSame($proxy->id, $acme['proxy_id']);
         $this->assertStringNotContainsString('secret', json_encode($acme)); // creds never exposed
+    }
+
+    public function test_list_exposes_passkey_status_without_the_credential(): void
+    {
+        Sanctum::actingAs($this->superAdmin());
+        $a = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        Tenant::create(['name' => 'Globex', 'country' => 'DE']);
+        UberPasskey::withoutGlobalScopes()->create([
+            'tenant_id' => $a->id, 'status' => 'active', 'registered_at' => now(), 'credential' => ['k' => 'SECRETKEY'],
+        ]);
+
+        $res = $this->getJson('/api/v1/admin/companies')->assertOk();
+        $rows = collect($res->json('data'));
+        $this->assertTrue($rows->firstWhere('name', 'Acme')['passkey']['registered']);
+        $this->assertFalse($rows->firstWhere('name', 'Globex')['passkey']['registered']);
+        $this->assertStringNotContainsString('SECRETKEY', $res->getContent());
     }
 
     public function test_only_a_super_admin_may_switch_dispatch_declines_for_a_company(): void

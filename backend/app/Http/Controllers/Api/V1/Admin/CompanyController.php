@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
+use App\Domain\Dispatch\Models\UberPasskey;
 use App\Domain\Dispatch\PasswordlessLoginService;
 use App\Domain\Dispatch\PasswordlessLoginSettings;
 use App\Domain\Fleet\Models\Driver;
@@ -52,7 +53,13 @@ class CompanyController extends Controller
         $verifiedTenantIds = User::query()->whereNotNull('email_verified_at')
             ->distinct()->pluck('tenant_id')->flip();
 
-        $tenants->each(function (Tenant $t) use ($driverCounts, $offerCounts, $sessions, $verifiedTenantIds) {
+        // One passkey row per tenant (unique tenant_id): a single query for the whole list.
+        // `credential` (the private key) is never selected.
+        $passkeys = UberPasskey::withoutGlobalScopes()
+            ->get(['tenant_id', 'status', 'registered_at'])->keyBy('tenant_id');
+
+        $tenants->each(function (Tenant $t) use ($driverCounts, $offerCounts, $sessions, $verifiedTenantIds, $passkeys) {
+            $t->setAttribute('passkey_info', $this->passkeyInfo($passkeys->get($t->id)));
             $t->setAttribute('driver_count', $driverCounts[$t->id] ?? 0);
             $t->setAttribute('offer_count', $offerCounts[$t->id] ?? 0);
             $t->setAttribute('session_info', $this->sessionInfo($sessions->get($t->id)));
@@ -270,11 +277,24 @@ class CompanyController extends Controller
         $tenant->setAttribute('session_info', $this->sessionInfo(
             UberFleetSession::withoutGlobalScopes()->where('tenant_id', $tenant->id)->orderByDesc('updated_at')->first()
         ));
+        $tenant->setAttribute('passkey_info', $this->passkeyInfo(
+            UberPasskey::withoutGlobalScopes()->where('tenant_id', $tenant->id)->first(['tenant_id', 'status', 'registered_at'])
+        ));
         $tenant->setAttribute('users_list', User::where('tenant_id', $tenant->id)->orderBy('name')->get());
         $tenant->setAttribute('email_verified', User::where('tenant_id', $tenant->id)->whereNotNull('email_verified_at')->exists());
         $tenant->setAttribute('proxy_label', $tenant->proxy_id ? optional($tenant->proxy)->label : null);
 
         return CompanyResource::detail($tenant);
+    }
+
+    /** Passkey presence for the admin list; an active row = registered. @return array<string, mixed> */
+    private function passkeyInfo(?UberPasskey $passkey): array
+    {
+        return [
+            'registered' => $passkey?->status === UberPasskey::STATUS_ACTIVE,
+            'status' => $passkey?->status,
+            'registered_at' => $passkey?->registered_at?->toIso8601String(),
+        ];
     }
 
     /** @return array<string, mixed>|null */
