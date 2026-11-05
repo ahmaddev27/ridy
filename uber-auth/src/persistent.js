@@ -11,6 +11,7 @@ import { config } from "./config.js";
 import { PersistentSessionManager, SESSION_STATE, jarFingerprint } from "./sessionManager.js";
 import { createWarmDriver, statePath as driverStatePath } from "./warmDriver.js";
 import { launchBrowser, newStealthContext } from "./browser.js";
+import { parseProxyUrl } from "./proxy.js";
 import { scopeCookies } from "./cookieScope.js";
 import { registerPasskey, registerPasskeyInSession } from "./passkey.js";
 import { attachCobrowseAuthenticator } from "./cobrowsePasskey.js";
@@ -202,6 +203,17 @@ export function hasLive(companyKey) {
   return e != null && e.state !== SESSION_STATE.DOWN;
 }
 
+/** True only for a usable proxy URL: an Uber-bound context must never be opened without one. */
+function hasProxy(proxyUrl) {
+  return Boolean(proxyUrl) && parseProxyUrl(proxyUrl) != null;
+}
+
+/** companyKey -> proxy_url for every company the backend still wants (same source as the sync loop). */
+async function wantedProxies() {
+  const wanted = await backendGet("/api/v1/internal/session-browser/wanted");
+  return new Map(wanted.map((s) => [String(s.tenant_id), s.proxy_url ?? null]));
+}
+
 /**
  * Resume saved sessions after a restart: load each company's storageState, verify
  * it is still logged in with one keep-warm, adopt the live ones, and leave the dead
@@ -214,9 +226,26 @@ export async function resumeFromDisk() {
   } catch {
     return; // no saved state yet
   }
+  let proxies;
+  try {
+    proxies = await wantedProxies();
+  } catch (e) {
+    // Without the proxy list we cannot resume safely: never go direct to Uber. The 60 s sync seeds later.
+    console.warn(`[persistent] resume skipped, wanted fetch failed: ${e?.message}`);
+    return;
+  }
   for (const file of files) {
     const companyKey = basename(file, ".json");
     if (config.onlyTenants.length && !config.onlyTenants.includes(companyKey)) continue;
+    if (!proxies.has(companyKey)) {
+      console.log(`[persistent] resume ${companyKey} skipped: no longer wanted`);
+      continue;
+    }
+    const proxyUrl = proxies.get(companyKey);
+    if (!hasProxy(proxyUrl)) {
+      console.warn(`[persistent] ALERT resume ${companyKey} skipped: wanted but has no proxy (never connect to Uber direct)`);
+      continue;
+    }
     try {
       if (manager.atCapacity()) {
         console.warn(`[persistent] resume stopped at capacity before ${companyKey}`);
@@ -224,7 +253,7 @@ export async function resumeFromDisk() {
       }
       const state = JSON.parse(await readFile(join(config.stateDir, file), "utf8"));
       const browser = await launchBrowser();
-      const context = await newStealthContext(browser, { storageState: state }, null, companyKey);
+      const context = await newStealthContext(browser, { storageState: state }, proxyUrl, companyKey);
       const page = await context.newPage();
       page.setDefaultTimeout(config.stepTimeout);
       await manager.adopt(companyKey, { browser, context, page, createdAt: Date.now() }, {});
@@ -244,6 +273,7 @@ export async function resumeFromDisk() {
  * dead cookies flip it to needs_otp; a live session warms and feeds the daemon.
  */
 async function seedFromSession(companyKey, { cookies, supplierCookies, orgUuid, needsRescue = false, proxyUrl = null }) {
+  if (!hasProxy(proxyUrl)) throw new Error("no proxy — refusing to seed a direct Uber connection");
   const browser = await launchBrowser();
   const context = await newStealthContext(browser, {}, proxyUrl, companyKey);
   await context.addCookies(scopeCookies(cookies, supplierCookies));
@@ -301,6 +331,10 @@ async function runSync() {
       continue;
     }
     if (manager.atCapacity()) continue;
+    if (!hasProxy(s.proxy_url)) {
+      console.warn(`[persistent] ALERT seed ${key} skipped: no proxy (never connect to Uber direct)`);
+      continue;
+    }
     try {
       await seedFromSession(key, { cookies: s.cookies, supplierCookies: s.supplier_cookies, orgUuid: s.uber_org_uuid, needsRescue: s.status === "needs_relink", proxyUrl: s.proxy_url });
       const note = revivedFrom ? `revived ${key} from ${revivedFrom}` : `seeded ${key}`;
