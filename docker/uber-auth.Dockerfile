@@ -13,8 +13,8 @@ FROM node:20-bookworm
 WORKDIR /app
 
 # Install deps first for layer caching.
-COPY uber-auth/package.json ./
-RUN npm install --omit=dev
+COPY uber-auth/package.json uber-auth/package-lock.json ./
+RUN npm ci --omit=dev
 
 # Chromium + its system libraries, matched to the installed Playwright.
 RUN npx playwright install --with-deps chromium
