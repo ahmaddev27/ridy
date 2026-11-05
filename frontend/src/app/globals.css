@@ -1270,7 +1270,10 @@ html:root .app-sticky-footer {
   .menu .np-head button { width: auto; height: auto; padding: 4px 6px; flex: none; }
 
   /* ---------------- offer route + timeline ---------------- */
-  .route { display: grid; grid-template-columns: 14px 1fr; gap: 2px 10px; font-size: 13px; }
+  /* Addresses are German (LTR) text; keep the whole pickup→dropoff block LTR in every
+     locale so dots, connector and the address run stay in one consistent order (in RTL the
+     dots flipped to the right edge while the address punctuation/numbers reordered). */
+  .route { display: grid; grid-template-columns: 14px 1fr; gap: 2px 10px; font-size: 13px; direction: ltr; text-align: left; }
   .route .dotA, .route .dotB { width: 10px; height: 10px; border-radius: 99px; margin-top: 4px; }
   .route .dotA { background: var(--ink); } .route .dotB { border: 2.5px solid var(--primary); background: var(--surface-solid); }
   .route .via { width: 2px; margin-inline-start: 4px; background: repeating-linear-gradient(to bottom, var(--line-strong) 0 3px, transparent 3px 6px); min-height: 14px; }
