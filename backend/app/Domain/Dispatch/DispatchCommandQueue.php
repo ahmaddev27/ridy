@@ -8,6 +8,7 @@ use App\Domain\Dispatch\Models\OfferDispatchCommand;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Hands queued dispatch commands to the daemon box that owns their company, and
@@ -218,9 +219,38 @@ class DispatchCommandQueue
                 'updated_at' => now(),
             ]);
 
-        return $won === 1
-            ? OfferDispatchCommand::withoutGlobalScopes()->find($id)
-            : null;
+        if ($won !== 1) {
+            return null;
+        }
+
+        $command = OfferDispatchCommand::withoutGlobalScopes()->find($id);
+
+        return $command !== null && $this->gateHolds($command) ? $command : null;
+    }
+
+    /**
+     * Admin-gate re-check for AUTOMATIC declines, run after the row is won and
+     * immediately before the daemon would receive it — the latest point we control.
+     * If the driver was revoked (or the company's declines switched off) since the
+     * command was queued, no decline goes out: the command is expired and the normal
+     * push is sent instead ({@see AutoDeclineFallback}). Human-initiated declines pass.
+     */
+    private function gateHolds(OfferDispatchCommand $command): bool
+    {
+        if (! $command->is_auto
+            || app(DispatchAutoDecline::class)->stillPermitted((int) $command->tenant_id, $command->driver_id)) {
+            return true;
+        }
+
+        Log::warning('dispatch_command.auto_decline_gate_closed', [
+            'command_id' => $command->id,
+            'offer_id' => $command->dispatch_offer_id,
+            'driver_id' => $command->driver_id,
+        ]);
+
+        app(DispatchActionService::class)->expire($command);
+
+        return false;
     }
 
     /**

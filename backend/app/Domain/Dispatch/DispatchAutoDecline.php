@@ -4,6 +4,7 @@ namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Tenancy\Models\Tenant;
 
 /**
  * Evaluates a driver's auto-decline ("Early decline") rules against an incoming
@@ -36,6 +37,28 @@ class DispatchAutoDecline
         $rules = $driver->autoDeclineRules();
 
         return $this->priceReason($offer, $rules['min_fare'] ?? null, $rules['min_price_per_km'] ?? null);
+    }
+
+    /**
+     * The execution-time gate: whether the company and the driver STILL permit an
+     * automatic decline, judged on a FRESH read of both rows (never a model loaded
+     * earlier, never a cache). Called at the claim step, the last moment before the
+     * daemon is handed the command, so an admin revoke (`admin_enabled = false`) or
+     * a company kill switch that landed after the command was queued still wins.
+     */
+    public function stillPermitted(int $tenantId, ?int $driverId): bool
+    {
+        if ($driverId === null) {
+            return false;
+        }
+
+        $tenant = Tenant::withoutGlobalScopes()->find($tenantId);
+        $driver = Driver::withoutGlobalScopes()->find($driverId);
+
+        return $tenant !== null
+            && $driver !== null
+            && $tenant->autoDeclineFeatureEnabled()
+            && $driver->autoDeclineActive();
     }
 
     /**

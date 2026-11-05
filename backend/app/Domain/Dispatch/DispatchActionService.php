@@ -68,7 +68,7 @@ class DispatchActionService
      *
      * @return array{status: string, reason?: string, command_id?: int}
      */
-    public function requestReject(DispatchOffer $offer, ?Driver $driver = null, ?User $user = null): array
+    public function requestReject(DispatchOffer $offer, ?Driver $driver = null, ?User $user = null, bool $auto = false): array
     {
         $tenant = $offer->tenant;
 
@@ -106,7 +106,7 @@ class DispatchActionService
             return ['status' => 'refused', 'reason' => 'no_session'];
         }
 
-        return $this->queue($offer, $session, $expiresAt, $driver, $user);
+        return $this->queue($offer, $session, $expiresAt, $driver, $user, $auto);
     }
 
     /**
@@ -357,12 +357,14 @@ class DispatchActionService
         CarbonImmutable $expiresAt,
         ?Driver $driver,
         ?User $user,
+        bool $auto,
     ): array {
         $payload = [
             'tenant_id' => $offer->tenant_id,
             'dispatch_offer_id' => $offer->id,
             'uber_fleet_session_id' => $session->id,
             'action' => DispatchCommandAction::Reject,
+            'is_auto' => $auto,
             'driver_id' => $driver?->id,
             'user_id' => $user?->id,
             'offer_uuid' => $offer->offer_uuid,
@@ -387,7 +389,7 @@ class DispatchActionService
                 throw $e;
             }
 
-            return $this->reuse($existing, $expiresAt);
+            return $this->reuse($existing, $expiresAt, $auto);
         }
 
         RidyLog::event('dispatch_action.queued', [
@@ -408,7 +410,7 @@ class DispatchActionService
      *
      * @return array{status: string, reason?: string, command_id?: int}
      */
-    private function reuse(OfferDispatchCommand $existing, CarbonImmutable $expiresAt): array
+    private function reuse(OfferDispatchCommand $existing, CarbonImmutable $expiresAt, bool $auto): array
     {
         // An expired command is NOT a duplicate. Both clients read 'duplicate' as
         // "the panel has it, Uber's answer is coming", so reporting it that way
@@ -416,14 +418,14 @@ class DispatchActionService
         // produce. It is a retry candidate like a failure: nobody ever collected
         // it, so it was never attempted.
         if ($existing->status === DispatchCommandStatus::Expired) {
-            return $this->requeue($existing, $expiresAt);
+            return $this->requeue($existing, $expiresAt, $auto);
         }
 
         if (! $existing->status->isRetryable()) {
             return ['status' => 'duplicate', 'command_id' => $existing->id];
         }
 
-        return $this->requeue($existing, $expiresAt);
+        return $this->requeue($existing, $expiresAt, $auto);
     }
 
     /**
@@ -435,7 +437,7 @@ class DispatchActionService
      *
      * @return array{status: string, reason?: string, command_id?: int}
      */
-    private function requeue(OfferDispatchCommand $existing, CarbonImmutable $expiresAt): array
+    private function requeue(OfferDispatchCommand $existing, CarbonImmutable $expiresAt, bool $auto): array
     {
         if ($existing->attempts >= self::MAX_ATTEMPTS) {
             return ['status' => 'refused', 'reason' => 'too_many_attempts', 'command_id' => $existing->id];
@@ -443,6 +445,7 @@ class DispatchActionService
 
         $existing->forceFill([
             'status' => DispatchCommandStatus::Queued,
+            'is_auto' => $auto,
             'expires_at' => $expiresAt,
             'uber_success' => null,
             'uber_error' => null,
