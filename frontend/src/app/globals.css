@@ -650,33 +650,33 @@ html:root .app-menu {
   backdrop-filter: blur(26px) saturate(180%);
 }
 
-/* Toast — one dark glass surface with an emerald icon (prototype). ThemedToaster
-   adds this class and turns richColors off. */
+/* Toast — glass surface that follows the theme (light surface + dark text in
+   light mode, dark glass in dark mode) with an emerald icon. ThemedToaster adds
+   this class and turns richColors off. Sonner derives title / description /
+   action colours from its own theme prop, so pin them to the tokens here. */
 html:root .app-toast {
-  background: rgb(14 22 19 / 0.84);
-  color: #e9f2ee;
-  border: 1px solid rgb(255 255 255 / 0.1);
+  background: var(--glass-strong);
+  color: var(--ink);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--shadow-lg);
   backdrop-filter: blur(16px) saturate(160%);
 }
 html:root .app-toast [data-icon] { color: var(--focus); }
-/* The toast is dark in BOTH themes, but sonner derives its title / description /
-   action / close colours from the *theme* — in light mode that left dark-on-dark
-   text and a dark action button. Pin them all to the dark-surface palette. */
-html:root .app-toast [data-title] { color: #e9f2ee; }
-html:root .app-toast [data-description] { color: rgb(233 242 238 / 0.8); }
+html:root .app-toast [data-title] { color: var(--ink); }
+html:root .app-toast [data-description] { color: var(--ink-muted); }
 html:root .app-toast [data-button]:not([data-cancel]) {
-  background: var(--focus);
-  color: #06130e;
+  background: var(--primary);
+  color: var(--primary-ink);
   font-weight: 600;
 }
 html:root .app-toast [data-cancel] {
-  background: rgb(255 255 255 / 0.1);
-  color: #e9f2ee;
+  background: var(--surface-2);
+  color: var(--ink);
 }
 html:root .app-toast [data-close-button] {
-  background: rgb(14 22 19 / 0.95);
-  color: #e9f2ee;
-  border-color: rgb(255 255 255 / 0.18);
+  background: var(--surface-solid);
+  color: var(--ink);
+  border-color: var(--line-strong);
 }
 
 /* Fallbacks: solid surfaces, no blur, no grain. Opt-in by user preference
@@ -1240,7 +1240,7 @@ html:root .app-sticky-footer {
   .overlay { position: fixed; inset: 0; z-index: 1400; background: var(--glass-scrim); backdrop-filter: blur(6px) saturate(120%); display: grid; place-items: center; padding: 20px; animation: rdy-fade .2s var(--ease); }
   .modal, .drawer, .menu { background: var(--glass-strong); border: 1px solid var(--glass-edge); backdrop-filter: blur(26px) saturate(180%); box-shadow: var(--glass-hi), 0 0 0 1px var(--line), var(--shadow-lg); }
   .modal { width: min(560px, 100%); max-height: calc(100dvh - 40px); overflow: auto; border-radius: var(--r-2xl); animation: rdy-pop .28s var(--ease); }
-  .modal.lg { width: min(760px, 100%); } .modal.sm { width: min(420px, 100%); }
+  .modal.lg { width: min(760px, 100%); } .modal.wide { width: min(920px, 100%); } .modal.sm { width: min(420px, 100%); }
   .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px 0; }
   .modal-head h2 { font-size: 17px; font-weight: 600; } .modal-head p { color: var(--ink-subtle); font-size: 13px; margin-top: 4px; }
   .modal-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 16px; }

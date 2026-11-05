@@ -23,12 +23,12 @@ function validCents(euros: number | null): boolean {
   return euros !== null && euros > 0 && Math.round(euros * 100) <= MAX_VALUE_E2;
 }
 
-function RuleRow({ label, on, onToggle, children }: {
-  label: string; on: boolean; onToggle: () => void; children: React.ReactNode;
+function RuleRow({ label, on, onToggle, children, className = "" }: {
+  label: string; on: boolean; onToggle: () => void; children: React.ReactNode; className?: string;
 }) {
   const { t } = useI18n();
   return (
-    <div className="space-y-2 rounded-lg border border-line p-3">
+    <div className={`space-y-2 rounded-lg border border-line p-3 ${className}`}>
       <div className="flex items-center justify-between gap-3">
         <span className="font-medium text-ink">{label}</span>
         <Switch checked={on} onChange={onToggle} label={`${label} — ${t("screens.autoDecline.ruleEnabled")}`} />
@@ -88,12 +88,17 @@ export function RulesModal({ driver, cities, saving, onClose, onSave }: {
     });
   }
 
+  // The "declined automatically" warning only makes sense while the rule is live.
+  const perKmValue = parseNumber(perKm);
+  const perKmWarns = perKmOn && perKmValue !== null && perKmValue > 0;
+
   const toggleCity = (city: string) =>
     setPicked((cur) => (cur.includes(city) ? cur.filter((x) => x !== city) : [...cur, city]));
 
   return (
     <Modal
       open
+      size="wide"
       onClose={onClose}
       title={c("editTitle").replace("{v}", driver.name)}
       footer={
@@ -103,13 +108,13 @@ export function RulesModal({ driver, cities, saving, onClose, onSave }: {
         </>
       }
     >
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
         <RuleRow label={c("minFareLabel")} on={fareOn} onToggle={() => setFareOn((v) => !v)}>
           <input dir="ltr" inputMode="decimal" className={inputClass} value={fare} onChange={(e) => setFare(e.target.value)} disabled={!fareOn} />
         </RuleRow>
         <RuleRow label={c("perKmLabel")} on={perKmOn} onToggle={() => setPerKmOn((v) => !v)}>
           <input dir="ltr" inputMode="decimal" className={inputClass} value={perKm} onChange={(e) => setPerKm(e.target.value)} disabled={!perKmOn} />
-          <p className="text-xs text-ink-subtle">{c("perKmHint").replace("{v}", perKm || "3")}</p>
+          <p className="text-xs text-ink-subtle">{perKmWarns ? c("perKmHint").replace("{v}", perKm) : c("perKmHintNeutral")}</p>
           <div className="flex flex-wrap gap-1.5" role="group" aria-label={c("modeLabel")}>
             {(["and", "or"] as const).map((m) => (
               <button
@@ -129,7 +134,13 @@ export function RulesModal({ driver, cities, saving, onClose, onSave }: {
           </div>
           <p className="text-xs text-ink-subtle">{c(mode === "and" ? "modeAndHint" : "modeOrHint")}</p>
         </RuleRow>
-        <RuleRow label={c("citiesLabel")} on={citiesOn} onToggle={() => setCitiesOn((v) => !v)}>
+        <RuleRow label={c("pickupLabel")} on={pickupOn} onToggle={() => setPickupOn((v) => !v)}>
+          <input dir="ltr" inputMode="decimal" className={inputClass} value={pickup} onChange={(e) => setPickup(e.target.value)} disabled={!pickupOn} />
+        </RuleRow>
+        <RuleRow label={c("tripLabel")} on={tripOn} onToggle={() => setTripOn((v) => !v)}>
+          <input dir="ltr" inputMode="decimal" className={inputClass} value={trip} onChange={(e) => setTrip(e.target.value)} disabled={!tripOn} />
+        </RuleRow>
+        <RuleRow label={c("citiesLabel")} on={citiesOn} onToggle={() => setCitiesOn((v) => !v)} className="md:col-span-2">
           {options.length === 0 ? (
             <p className="text-xs text-ink-subtle">{c("citiesEmpty")}</p>
           ) : (
@@ -152,13 +163,7 @@ export function RulesModal({ driver, cities, saving, onClose, onSave }: {
             </div>
           )}
         </RuleRow>
-        <RuleRow label={c("pickupLabel")} on={pickupOn} onToggle={() => setPickupOn((v) => !v)}>
-          <input dir="ltr" inputMode="decimal" className={inputClass} value={pickup} onChange={(e) => setPickup(e.target.value)} disabled={!pickupOn} />
-        </RuleRow>
-        <RuleRow label={c("tripLabel")} on={tripOn} onToggle={() => setTripOn((v) => !v)}>
-          <input dir="ltr" inputMode="decimal" className={inputClass} value={trip} onChange={(e) => setTrip(e.target.value)} disabled={!tripOn} />
-        </RuleRow>
-        {invalid && <p className="text-xs text-danger-fg">{c("invalidValue")}</p>}
+        {invalid && <p className="text-xs text-danger-fg md:col-span-2">{c("invalidValue")}</p>}
       </div>
     </Modal>
   );

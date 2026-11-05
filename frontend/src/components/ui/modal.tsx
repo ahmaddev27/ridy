@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 
-const sizeClass = { md: "sm", lg: "", xl: "lg" } as const;
+const sizeClass = { md: "sm", lg: "", xl: "lg", wide: "wide" } as const;
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -83,7 +84,10 @@ export function Modal({
 
   if (!open) return null;
 
-  return (
+  // Portal to <body>: a transformed/animated ancestor (the page settle animation)
+  // would otherwise become the containing block of the fixed overlay and clip
+  // the blur to the content area.
+  const dialog = (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         ref={panelRef}
@@ -106,4 +110,5 @@ export function Modal({
       </div>
     </div>
   );
+  return typeof document === "undefined" ? dialog : createPortal(dialog, document.body);
 }
