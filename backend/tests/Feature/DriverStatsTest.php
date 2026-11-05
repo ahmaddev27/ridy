@@ -56,4 +56,21 @@ class DriverStatsTest extends TestCase
         $this->assertSame(8.0, $stats['km']);                   // completed only: (5000+3000)/1000
         $this->assertSame(2, $stats['trips']);                  // completed count
     }
+
+    public function test_stats_do_not_leak_previous_company_offers_for_same_uber_uuid(): void
+    {
+        $old = Tenant::create(['name' => 'Old Fleet', 'country' => 'DE']);
+        $new = Tenant::create(['name' => 'New Fleet', 'country' => 'DE']);
+        $oldDriver = Driver::withoutGlobalScopes()->create(['tenant_id' => $old->id, 'name' => 'Basel', 'uber_driver_uuid' => self::UUID]);
+        $newDriver = Driver::withoutGlobalScopes()->create(['tenant_id' => $new->id, 'name' => 'Basel', 'uber_driver_uuid' => self::UUID]);
+
+        $this->offer($old->id, ['fare_amount' => 40, 'distance_m' => 4000, 'accepted_at' => now(), 'status' => OfferStatus::Completed]);
+
+        $from = CarbonImmutable::now()->subDay();
+        $to = CarbonImmutable::now()->addDay();
+        $service = app(DriverStatsService::class);
+
+        $this->assertSame(0, $service->forDriver($newDriver, $from, $to)['offers']);
+        $this->assertSame(1, $service->forDriver($oldDriver, $from, $to)['offers']);
+    }
 }
