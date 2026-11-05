@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/lib/theme/context";
 import { ThemedToaster } from "@/components/ui/themed-toaster";
 import { InitialLoader } from "@/components/brand/initial-loader";
 import { SentryInit } from "@/components/sentry-init";
+import { DomMutationGuard } from "@/components/dom-mutation-guard";
 
 // Runs before paint to set the `.dark` class from the saved/system preference,
 // avoiding a light→dark flash on load. Kept tiny and dependency-free.
@@ -72,6 +73,7 @@ export default function RootLayout({
         </ThemeProvider>
         <InitialLoader />
         <SentryInit />
+        <DomMutationGuard />
       </body>
     </html>
   );

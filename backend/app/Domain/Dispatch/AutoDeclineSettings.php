@@ -7,6 +7,7 @@ use App\Domain\Fleet\Models\Driver;
 use App\Domain\Geo\PostalCodes;
 use App\Domain\Tenancy\Models\Tenant;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Reads and writes a driver's own auto-decline ("Early decline") configuration and
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class AutoDeclineSettings
 {
-    public const REASONS = ['min_fare', 'reject_cities', 'max_pickup_distance', 'max_trip_distance'];
+    public const REASONS = ['min_fare', 'min_price_per_km', 'reject_cities', 'max_pickup_distance', 'max_trip_distance'];
 
     /** How many of the driver's latest offers we mine for the city picker. */
     private const CITY_SAMPLE = 300;
@@ -48,13 +49,25 @@ class AutoDeclineSettings
      */
     public function update(Driver $driver, array $input): void
     {
-        $adminEnabled = $driver->adminAutoDeclineEnabled();
+        // Re-read under a row lock: the authenticated model was loaded at request start,
+        // so a stale `admin_enabled = true` could otherwise be written back over an admin
+        // revoke that landed in between (the revoke would silently be undone).
+        DB::transaction(function () use ($driver, $input): void {
+            $fresh = $this->lockedFresh($driver);
+            $adminEnabled = $fresh->adminAutoDeclineEnabled();
 
-        $this->store($driver, [
-            'admin_enabled' => $adminEnabled,
-            'enabled' => $adminEnabled && (bool) ($input['enabled'] ?? false),
-            'rules' => $this->normaliseRules($input['rules'] ?? []),
-        ]);
+            $this->store($fresh, [
+                'admin_enabled' => $adminEnabled,
+                'enabled' => $adminEnabled && (bool) ($input['enabled'] ?? false),
+                'rules' => $this->normaliseRules($input['rules'] ?? []),
+            ]);
+            $driver->setRawAttributes($fresh->getAttributes(), true);
+        });
+    }
+
+    private function lockedFresh(Driver $driver): Driver
+    {
+        return Driver::withoutGlobalScopes()->lockForUpdate()->findOrFail($driver->id);
     }
 
     /**
@@ -66,6 +79,15 @@ class AutoDeclineSettings
      * @return array<string, mixed>
      */
     public function adminUpdate(Driver $driver, array $data): array
+    {
+        return DB::transaction(fn () => $this->applyAdminUpdate($this->lockedFresh($driver), $data));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function applyAdminUpdate(Driver $driver, array $data): array
     {
         $wasAdminEnabled = $driver->adminAutoDeclineEnabled();
         $adminEnabled = $wasAdminEnabled;
@@ -196,6 +218,11 @@ class AutoDeclineSettings
 
         return [
             'min_fare' => ['enabled' => $on('min_fare'), 'value_e2' => max(0, (int) ($rules['min_fare']['value_e2'] ?? 0))],
+            'min_price_per_km' => [
+                'enabled' => $on('min_price_per_km'),
+                'value_e2' => max(0, (int) ($rules['min_price_per_km']['value_e2'] ?? 0)),
+                'mode' => ($rules['min_price_per_km']['mode'] ?? 'and') === 'or' ? 'or' : 'and',
+            ],
             'reject_cities' => ['enabled' => $on('reject_cities'), 'cities' => $this->cities($rules['reject_cities']['cities'] ?? [])],
             'max_pickup_distance' => ['enabled' => $on('max_pickup_distance'), 'km' => $this->km($rules['max_pickup_distance']['km'] ?? 0)],
             'max_trip_distance' => ['enabled' => $on('max_trip_distance'), 'km' => $this->km($rules['max_trip_distance']['km'] ?? 0)],

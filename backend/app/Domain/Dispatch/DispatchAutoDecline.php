@@ -12,8 +12,9 @@ use App\Domain\Fleet\Models\Driver;
  * Deliberately evaluates only data that is ALREADY to hand (no live geocode, no
  * network call): the engine runs on the ingest hot path inside a ~3–4 s budget,
  * so a rule whose inputs are not instantly available is skipped for this offer
- * rather than delaying the decline. Phase 1 ships the fare rule only; the city and
- * distance rules (cache geocode + the driver's Fleet-Hub position) land later.
+ * rather than delaying the decline. Phase 1 ships the fare rule plus the €/km
+ * floor (combinable by AND/OR); the city and distance rules (cache geocode + the
+ * driver's Fleet-Hub position) land later.
  *
  * This NEVER decides to accept and never acts on its own judgement — it only reads
  * the driver's own standing rules. See AGENTS.md golden rule #1.
@@ -34,31 +35,78 @@ class DispatchAutoDecline
 
         $rules = $driver->autoDeclineRules();
 
-        if ($this->fareBelowFloor($offer, $rules['min_fare'] ?? null)) {
-            return 'min_fare';
-        }
-
-        return null;
+        return $this->priceReason($offer, $rules['min_fare'] ?? null, $rules['min_price_per_km'] ?? null);
     }
 
     /**
-     * Reject when the offer's fare is below the driver's floor. Money is compared in
-     * integer cents, never as a float; a null/zero floor or an offer with no parsed
-     * fare simply does not match (we never auto-decline on missing data).
+     * The two price criteria, combined by the driver's chosen mode. A criterion that
+     * is not configured (off / no positive value) is absent: with none configured we
+     * never decline, with exactly one only that one counts (the mode is moot).
+     *
+     *   and: decline when NOT (passFare && passPerKm)
+     *   or : decline when NOT (passFare || passPerKm)
+     *
+     * Returns the reason to stamp: `min_fare` when the fare check failed, else
+     * `min_price_per_km`.
+     *
+     * @param  array<string, mixed>|null  $fareRule
+     * @param  array<string, mixed>|null  $perKmRule
+     */
+    private function priceReason(DispatchOffer $offer, ?array $fareRule, ?array $perKmRule): ?string
+    {
+        $fareFloorE2 = $this->floorE2($fareRule);
+        $perKmFloorE2 = $this->floorE2($perKmRule);
+        $passFare = $fareFloorE2 === null || $this->fareMeets($offer, $fareFloorE2);
+        $passPerKm = $perKmFloorE2 === null || $this->perKmMeets($offer, $perKmFloorE2);
+
+        $decline = match (true) {
+            $fareFloorE2 === null && $perKmFloorE2 === null => false,
+            $fareFloorE2 === null => ! $passPerKm,
+            $perKmFloorE2 === null => ! $passFare,
+            ($perKmRule['mode'] ?? 'and') === 'or' => ! ($passFare || $passPerKm),
+            default => ! ($passFare && $passPerKm),
+        };
+
+        if (! $decline) {
+            return null;
+        }
+
+        return $passFare ? 'min_price_per_km' : 'min_fare';
+    }
+
+    /**
+     * The configured floor in integer cents, or null when the rule is off/unset.
      *
      * @param  array<string, mixed>|null  $rule
      */
-    private function fareBelowFloor(DispatchOffer $offer, ?array $rule): bool
+    private function floorE2(?array $rule): ?int
     {
-        if (($rule['enabled'] ?? false) !== true) {
-            return false;
-        }
-
         $floorE2 = (int) ($rule['value_e2'] ?? 0);
-        if ($floorE2 <= 0 || $offer->fare_amount === null) {
-            return false;
+
+        return ($rule['enabled'] ?? false) === true && $floorE2 > 0 ? $floorE2 : null;
+    }
+
+    /** Money is compared in integer cents; a missing fare is unknown and passes. */
+    private function fareMeets(DispatchOffer $offer, int $floorE2): bool
+    {
+        if ($offer->fare_amount === null) {
+            return true;
         }
 
-        return (int) round(((float) $offer->fare_amount) * 100) < $floorE2;
+        return (int) round(((float) $offer->fare_amount) * 100) >= $floorE2;
+    }
+
+    /**
+     * Fare / road km (the offer's stored distance — the same value feeding the €/km
+     * badge) against the floor, in cents per km. Unknown fare or distance passes.
+     */
+    private function perKmMeets(DispatchOffer $offer, int $floorE2): bool
+    {
+        $km = $offer->distance_m ? $offer->distance_m / 1000 : 0.0;
+        if ($offer->fare_amount === null || $km <= 0) {
+            return true;
+        }
+
+        return ((float) $offer->fare_amount) * 100 / $km >= $floorE2;
     }
 }
