@@ -120,10 +120,11 @@ async function shrink(uri: string, size: { width: number; height: number } | nul
 export async function readReceipt(
   uri: string,
   size: { width: number; height: number } | null,
+  forDriverId?: number,
 ): Promise<VisionFields> {
   const small = await shrink(uri, size);
   try {
-    const { data } = await api.receiptRead(small);
+    const { data } = await api.receiptRead(small, forDriverId);
     return data.fields;
   } finally {
     discard(small.uri);

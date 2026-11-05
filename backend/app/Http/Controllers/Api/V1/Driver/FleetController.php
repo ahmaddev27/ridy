@@ -185,15 +185,15 @@ class FleetController extends Controller
                 ->where('status', UberFleetSession::STATUS_ACTIVE)
                 ->exists(),
             'is_owner' => true,
-            // FALSE for an owner even on a connected company — see the matching
-            // note in DriverAuthController::ownerProfile(). The two owner payloads
-            // must agree: this one answers the app's resume refresh, that one the
-            // login, and a disagreement would make the button appear or vanish
-            // depending on which call ran last.
-            'documents_enabled' => false,
+            // The manager MAY FILE a receipt for one of their drivers
+            // (`POST fleet/submissions`), which needs the same live El-Professor
+            // connection a driver's own send does. Viewing is the fleet-wide
+            // archive the app already gives owners, so `documents_readable`
+            // stays false. Both owner payloads read the tenant the same way.
+            'documents_enabled' => $owner->tenant?->isElprofessorConnected() ?? false,
             'documents_readable' => false,
-            'gallery_import_enabled' => false,
-            'odometer_required' => false,
+            'gallery_import_enabled' => $owner->tenant?->elprofessorGalleryImportEnabled() ?? false,
+            'odometer_required' => $owner->tenant?->elprofessorOdometerRequired() ?? true,
         ]]);
     }
 

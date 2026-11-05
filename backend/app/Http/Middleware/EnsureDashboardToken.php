@@ -16,7 +16,7 @@ use Symfony\Component\HttpFoundation\Response;
  *    never read drivers/offers, delete data, or invite drivers;
  *  - the fleet-owner app token (`fleet:read`, see DriverAuthController) is
  *    obtained with an emailed 6-digit code and no password, so it must stay
- *    inside the read-only owner surface of the driver app and never reach the
+ *    inside the owner surface of the driver app (read-only, plus filing a receipt for a driver) and never reach the
  *    manager API it would otherwise share credentials-power with.
  *
  * SPA cookie sessions authenticate with a TransientToken and full-ability PATs
@@ -59,6 +59,10 @@ class EnsureDashboardToken
             'POST api/v1/driver/fleet/devices',
             'DELETE api/v1/driver/fleet/devices',
             'POST api/v1/driver/fleet/account/deletion-request',
+            // Filing a receipt FOR one of the company's drivers (and reading it
+            // through our vision model first). Exact patterns, no wildcard.
+            'POST api/v1/driver/fleet/submissions',
+            'POST api/v1/driver/fleet/receipt-vision',
             // The owner's app passkeys: enrol (two steps) and remove. The list is a GET.
             'POST api/v1/driver/fleet/webauthn/register/options',
             'POST api/v1/driver/fleet/webauthn/register',

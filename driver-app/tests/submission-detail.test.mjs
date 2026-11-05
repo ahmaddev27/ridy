@@ -70,7 +70,9 @@ test("a server that predates documents_readable still lets a connected driver in
   assert.deepEqual(submissionAccess({ documents_enabled: true }), { canView: true, canSend: true, fleetWide: false });
 });
 
-test("an owner views the whole company and never sends, whatever the flags say", () => {
+test("an owner views the whole company and may file only once the company is connected", () => {
   assert.deepEqual(submissionAccess({ is_owner: true, documents_enabled: true, documents_readable: true }),
+    { canView: true, canSend: true, fleetWide: true });
+  assert.deepEqual(submissionAccess({ is_owner: true, documents_enabled: false }),
     { canView: true, canSend: false, fleetWide: true });
 });

@@ -669,10 +669,13 @@ export class ApiClient {
    * there (owner's decision, 10.10.2026), so there is no multipart body and no
    * file to stream. It is an ordinary JSON POST like everything else.
    */
-  submitReceipt(draft: ReceiptDraft) {
-    return this.request<{ data: DriverSubmission }>("/api/v1/driver/submissions", {
+  submitReceipt(draft: ReceiptDraft, forDriverId?: number) {
+    // Owner mode: the manager files it for one of their drivers (tenant-checked
+    // server-side). A driver's own send takes the driver from the token.
+    const path = forDriverId === undefined ? "/api/v1/driver/submissions" : "/api/v1/driver/fleet/submissions";
+    return this.request<{ data: DriverSubmission }>(path, {
       method: "POST",
-      body: JSON.stringify({ subject: "receipt", ...draft }),
+      body: JSON.stringify({ subject: "receipt", ...draft, ...(forDriverId !== undefined ? { driver_id: forDriverId } : {}) }),
     });
   }
 
@@ -694,9 +697,10 @@ export class ApiClient {
    * server does not know it or cannot be reached. Never throws: the caller
    * falls back to the town the OCR read next to the PLZ.
    */
-  async postalCity(plz: string): Promise<string | null> {
+  async postalCity(plz: string, owner = false): Promise<string | null> {
     try {
-      const r = await this.request<{ data: { city: string } }>(`/api/v1/driver/postal-codes/${plz}`, {
+      const base = owner ? "/api/v1/driver/fleet" : "/api/v1/driver";
+      const r = await this.request<{ data: { city: string } }>(`${base}/postal-codes/${plz}`, {
         timeoutMs: 4_000,
       });
       return r.data.city || null;
@@ -711,10 +715,14 @@ export class ApiClient {
    * memory and stores nothing. Throws ApiError (503 = feature off, 502 = the
    * model failed); the caller offers a retry and stores nothing.
    */
-  receiptRead(photo: PickedPhoto) {
+  receiptRead(photo: PickedPhoto, forDriverId?: number) {
     const form = new FormData();
     form.append("image", photo as unknown as Blob);
-    return this.request<{ data: { fields: VisionFields } }>("/api/v1/driver/receipt-vision", {
+    // An owner/manager reads it for the driver they picked (tenant-checked
+    // server-side); a driver reads their own.
+    if (forDriverId !== undefined) form.append("driver_id", String(forDriverId));
+    const path = forDriverId === undefined ? "/api/v1/driver/receipt-vision" : "/api/v1/driver/fleet/receipt-vision";
+    return this.request<{ data: { fields: VisionFields } }>(path, {
       method: "POST",
       body: form,
       // Empty = let the runtime set multipart with its own boundary.
