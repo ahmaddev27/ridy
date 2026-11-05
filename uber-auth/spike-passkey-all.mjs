@@ -69,7 +69,7 @@ for (const tenant of tenants) {
     }
     await b1.close(); b1 = null;
 
-    // ===== LOGIN (fresh, logged-out, no human) =====
+    // ===== LOGIN (fresh, logged-out, no human) — SAME freshly-registered credential =====
     const identifier = reg.userName || reg.displayName;
     if (cred && cred.privateKey && identifier) {
       b2 = await chromium.launch({ headless: false, channel: "chrome", args: ["--no-sandbox"] });
@@ -79,18 +79,33 @@ for (const tenant of tenants) {
       await lclient.send("WebAuthn.enable", { enableUI: false });
       const { authenticatorId: aid } = await lclient.send("WebAuthn.addVirtualAuthenticator", { options: AUTH });
       await lclient.send("WebAuthn.addCredential", { authenticatorId: aid, credential: cred });
+      let asserted = false;
+      lclient.on("WebAuthn.credentialAsserted", () => { asserted = true; });
       await lpage.goto("https://auth.uber.com/v2/", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
-      const field = lpage.locator('input[name="identifierTextField"], input[type="email"], input[autocomplete="username"], input[inputmode="email"], form input').first();
+      await lpage.waitForTimeout(1500);                       // let conditional-UI get() fire first
+      const dump = async () => ({ url: lpage.url(), controls: (await lpage.locator('button,a,[role="button"],[role="option"]').allInnerTexts().catch(() => [])).filter(Boolean).slice(0, 20), body: (await lpage.locator("body").innerText().catch(() => "")).replace(/\s+/g, " ").slice(0, 300) });
+      // submit the identifier the proven way: type char-by-char, then CLICK Weiter (Enter alone is swallowed)
+      const field = lpage.getByPlaceholder(/phone number or email|telefonnummer oder e-mail/i).or(lpage.locator('input[type="email"], input[type="tel"], input[name="identifier" i], form input')).first();
       await field.click({ timeout: 15000 }).catch(() => {});
+      await field.fill("").catch(() => {});
       await field.pressSequentially(identifier, { delay: 40 }).catch(() => {});
-      await lpage.keyboard.press("Enter").catch(() => {});
-      await lpage.waitForTimeout(4500);
-      r.afterEmail = { url: lpage.url(), buttons: await lpage.getByRole("button").allInnerTexts().catch(() => []), body: (await lpage.locator("body").innerText().catch(() => "")).replace(/\s+/g, " ").slice(0, 320) };
-      for (const re of [/passkey|sicherheitsschl|mit einem schl/i, /weitere option|andere option|more option/i, /passkey/i, /^weiter$|^continue$|anmelden/i]) {
+      await lpage.waitForTimeout(400);
+      const weiter = lpage.getByRole("button", { name: /\bweiter\b|continue|next|anmelden|sign in/i }).first();
+      if (await weiter.isVisible().catch(() => false)) await weiter.click().catch(() => {});
+      await lpage.waitForTimeout(1200);
+      if (await field.isVisible().catch(() => false)) await field.press("Enter").catch(() => {});
+      await lpage.waitForTimeout(4000);
+      r.afterEmail = await dump();
+      // We WANT the passkey: click any passkey affordance to (re)fire get()
+      for (const re of [/passkey|sicherheitsschl|mit einem schl|windows hello|security key/i, /weitere option|andere option|more option|try another/i, /passkey|sicherheitsschl/i]) {
         const btn = lpage.getByRole("button", { name: re }).first();
-        if (await btn.count().catch(() => 0)) { await btn.click({ timeout: 4000 }).catch(() => {}); await lpage.waitForTimeout(2500); }
+        if (await btn.count().catch(() => 0)) { await btn.click({ timeout: 4000 }).catch(() => {}); await lpage.waitForTimeout(3000); }
+        const txt = lpage.getByText(re).first();
+        if (await txt.count().catch(() => 0)) { await txt.click({ timeout: 4000 }).catch(() => {}); await lpage.waitForTimeout(3000); }
       }
-      await lpage.waitForTimeout(3000);
+      await lpage.waitForTimeout(2500);
+      r.final = await dump();
+      r.asserted = asserted;
       r.login = landed(lpage.url()) ? "✅ LANDED " + lpage.url() : "⚠️ stuck " + lpage.url();
       await b2.close(); b2 = null;
     }
