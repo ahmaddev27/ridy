@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Tabs, usePathname, useRouter } from "expo-router";
 import { View, Pressable, Platform, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Home, Package, BarChart3, User, FileText, Ban, type LucideIcon } from "@/components/icons";
+import { Home, Package, BarChart3, User, FileText, Ban, Map, type LucideIcon } from "@/components/icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Text } from "@/components/typography";
 import { t, useLocale, isRTL } from "@/lib/i18n";
@@ -10,6 +10,15 @@ import { useAuth } from "@/lib/auth";
 import { useAutoDeclineFeature } from "@/lib/auto-decline";
 import { submissionAccess } from "@/lib/submission-detail";
 import { useColors, isDarkPalette, type Palette } from "@/lib/theme";
+
+/**
+ * Manager gate for the Live map tab. Prefers `isManager` (feat/manager-app-shell)
+ * and falls back to `isOwner` (owner/manager read-only account) until it lands.
+ */
+function useIsManager(): boolean {
+  const auth = useAuth();
+  return "isManager" in auth ? Boolean(auth.isManager) : auth.isOwner;
+}
 
 /** Lucide icon for each route (single outline cut; active state = color/stroke). */
 function iconFor(routeName: string): LucideIcon {
@@ -22,6 +31,8 @@ function iconFor(routeName: string): LucideIcon {
       return FileText;
     case "auto-decline":
       return Ban;
+    case "live-map":
+      return Map;
     case "profile":
       return User;
     default: // index / home
@@ -39,6 +50,7 @@ function BottomBar({ state, descriptors, navigation, onHeight }: BottomTabBarPro
   const c = useColors();
   const insets = useSafeAreaInsets();
   const { driver, isOwner } = useAuth();
+  const showLiveMap = useIsManager();
   const autoDecline = useAutoDeclineFeature(driver?.id ?? null, isOwner);
 
   // Submissions is never one of these tabs any more. A tab is a PLACE; sending
@@ -48,7 +60,8 @@ function BottomBar({ state, descriptors, navigation, onHeight }: BottomTabBarPro
   // the row no longer reflows when that switch is turned on.
   const routes = state.routes.filter(
     (route: BottomTabBarProps["state"]["routes"][number]) =>
-      route.name !== "submissions" && (route.name !== "auto-decline" || autoDecline),
+      route.name !== "submissions" && (route.name !== "auto-decline" || autoDecline) &&
+      (route.name !== "live-map" || showLiveMap),
   );
 
   const dark = isDarkPalette(c);
@@ -216,6 +229,8 @@ export default function TabsLayout() {
         <Tabs.Screen name="submissions" options={{ title: t("tabs.submissions") }} />
         {/* Early decline: drawn only when the company has the feature (see BottomBar). */}
         <Tabs.Screen name="auto-decline" options={{ title: t("tabs.autoDecline") }} />
+        {/* Manager live map: drawn only for managers (see BottomBar). */}
+        <Tabs.Screen name="live-map" options={{ title: t("tabs.liveMap") }} />
         <Tabs.Screen name="profile" options={{ title: t("tabs.profile") }} />
       </Tabs>
       {showFab ? <SubmissionsFab bottom={barHeight + 14} /> : null}

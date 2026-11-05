@@ -8,6 +8,19 @@ import type {
   RequestOptionsJSON,
 } from "@/lib/passkeys";
 
+/** One company driver on the manager live map (GET driver/manager/drivers/live). */
+export type ManagerLiveDriver = {
+  id: number;
+  name: string;
+  city: string | null;
+  plz: string | null;
+  status: string | null;
+  lat: number;
+  lng: number;
+  heading: number | null;
+  waypoints: { lat: number; lng: number; type: string | null; address?: string | null }[] | null;
+};
+
 /**
  * Where the app talks.
  *
@@ -784,6 +797,11 @@ export class ApiClient {
     }
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return this.request<{ data: Offer[]; meta: PaginationMeta }>(`/api/v1/driver/auto-decline/history${suffix}`);
+  }
+
+  /** Manager live map: the company's drivers with GPS (same shape as the dashboard). */
+  managerLiveDrivers() {
+    return this.request<{ data: ManagerLiveDriver[] }>("/api/v1/driver/manager/drivers/live");
   }
 
   fleetStats(from?: string, to?: string) {
