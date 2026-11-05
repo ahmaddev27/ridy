@@ -98,6 +98,15 @@ function personImage(color: string): ImageData {
   return ctx.getImageData(0, 0, s, s);
 }
 
+/** Fullscreen API surface incl. the WebKit-prefixed variants (older Safari/iPad). */
+type FullscreenCapable = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+};
+type FullscreenDoc = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => Promise<void> | void;
+};
+
 /**
  * The live fleet map. Self-contained (own MapLibre instance + polling) so it can
  * be embedded on the dashboard and used full-page alike. `heightClass` sets the
@@ -129,6 +138,7 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const [pseudoFullscreen, setPseudoFullscreen] = useState(false);
   const mapRef = useRef<MapLibreMap | null>(null);
   const MRef = useRef<typeof import("maplibre-gl") | null>(null);
   const readyRef = useRef(false);
@@ -454,26 +464,47 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
 
   // Fullscreen the whole map wrapper via the native Fullscreen API, and keep the
   // map canvas sized to it (MapLibre needs an explicit resize on the transition).
+  // iOS Safari (iPhone) has no Element.requestFullscreen at all (iPad only has the
+  // webkit-prefixed one), so fall back to a fixed full-viewport "pseudo" fullscreen.
   const toggleFullscreen = () => {
-    const el = wrapperRef.current;
+    const el = wrapperRef.current as FullscreenCapable | null;
     if (!el) return;
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    else el.requestFullscreen().catch(() => {});
+    const doc = document as FullscreenDoc;
+    if (doc.fullscreenElement ?? doc.webkitFullscreenElement) {
+      const exit = doc.exitFullscreen ?? doc.webkitExitFullscreen;
+      void Promise.resolve(exit?.call(doc)).catch(() => {});
+    } else if (pseudoFullscreen) {
+      setPseudoFullscreen(false);
+    } else if (el.requestFullscreen || el.webkitRequestFullscreen) {
+      const enter = el.requestFullscreen ?? el.webkitRequestFullscreen;
+      void Promise.resolve(enter?.call(el)).catch(() => {});
+    } else {
+      setPseudoFullscreen(true);
+    }
   };
   useEffect(() => {
+    setFullscreen(pseudoFullscreen);
+    requestAnimationFrame(() => mapRef.current?.resize());
+  }, [pseudoFullscreen]);
+  useEffect(() => {
     const onChange = () => {
-      setFullscreen(Boolean(document.fullscreenElement));
+      const doc = document as FullscreenDoc;
+      setFullscreen(Boolean(doc.fullscreenElement ?? doc.webkitFullscreenElement));
       // The container's box changes on the transition — resize after it settles.
       requestAnimationFrame(() => mapRef.current?.resize());
     };
     document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+    };
   }, []);
 
   return (
     <div
       ref={wrapperRef}
-      className="relative overflow-hidden rounded-2xl border border-line/70 bg-surface shadow-[0_2px_10px_-2px_rgba(30,34,43,0.06)]"
+      className={`${pseudoFullscreen ? "fixed inset-0 z-50" : "relative"} overflow-hidden rounded-2xl border border-line/70 bg-surface shadow-[0_2px_10px_-2px_rgba(30,34,43,0.06)]`}
     >
       <div ref={containerRef} className={`w-full ${fullscreen ? "h-screen" : heightClass}`} style={{ zIndex: 0 }} />
 
