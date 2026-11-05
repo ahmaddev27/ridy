@@ -131,6 +131,11 @@ const passkeyBackend = {
     if (!res.ok) throw new Error(`passkey status -> ${res.status}`);
     return (await res.json()).data;
   },
+  // The company's own residential proxy (the daemon's), from the same "wanted" list that seeds the held browser.
+  async proxyUrl(key) {
+    const wanted = await backendGet("/api/v1/internal/session-browser/wanted");
+    return wanted.find((s) => String(s.tenant_id) === String(key))?.proxy_url ?? null;
+  },
   store: (key, body) => backendPost(passkeyUrl(key), body),
   fail: (key, reason) => backendPost(`${passkeyUrl(key)}/failure`, { reason }),
 };
@@ -155,14 +160,15 @@ export async function fetchPasskeyCredential(companyKey) {
 }
 
 /**
- * Register a software passkey from the company's HELD session browser (flag-gated on both
- * sides, idempotent). Resolves { status }; never throws and never carries the credential.
+ * Register a software passkey from a SEPARATE short-lived browser (state-file copy, company
+ * proxy); the held browser and the daemon are untouched (flag-gated on both sides, idempotent). Resolves { status }; never throws and never carries the credential.
  */
 export const registerPasskeyForCompany = (companyKey) =>
   registerPasskey(companyKey, {
     enabled: () => config.passkeyRegister,
     manager,
     backend: passkeyBackend,
+    statePath: driverStatePath,
     log: (m) => console.log(`[passkey] ${m}`),
   });
 

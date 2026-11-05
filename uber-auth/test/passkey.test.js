@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import { registerPasskey, STATUS, pickCredential } from "../src/passkey.js";
 import { PersistentSessionManager } from "../src/sessionManager.js";
 
-const CRED = { credentialId: "cid", privateKey: "PRIVATE-KEY", rpId: "uber.com", userHandle: "uh", signCount: 0, extra: "dropped" };
+import { writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const PROXY = "http://user:pw@proxy.example:8080";
+const STATE_FILE = join(tmpdir(), `passkey-test-state-${process.pid}.json`);
+writeFileSync(STATE_FILE, JSON.stringify({ cookies: [] }));
+const CRED ={ credentialId: "cid", privateKey: "PRIVATE-KEY", rpId: "uber.com", userHandle: "uh", signCount: 0, extra: "dropped" };
 
 async function setup({ attemptResult, backend = {}, enabled = true, afterRenewState = null } = {}) {
   const calls = { stored: [], failed: [], alerts: [], attempts: 0 };
@@ -20,11 +27,13 @@ async function setup({ attemptResult, backend = {}, enabled = true, afterRenewSt
     manager,
     backend: {
       status: async () => ({ enabled: true, registered: false }),
+      proxyUrl: async () => PROXY,
       store: async (_k, body) => void calls.stored.push(body),
       fail: async (_k, reason) => void calls.failed.push(reason),
       ...backend,
     },
     alert: (m) => calls.alerts.push(m),
+    statePath: () => STATE_FILE,
     storeBackoffMs: 0,
     attemptFn: async () => {
       calls.attempts++;
@@ -120,15 +129,36 @@ test("concurrent calls for one company: the second is busy", async () => {
   assert.equal((await first).status, STATUS.UBER_HAS_PASSKEY);
 });
 
-test("keep-warm is parked while the passkey page works", async () => {
+test("no company proxy: skipped as no_proxy, nothing read or launched", async () => {
+  const { calls, deps } = await setup({ backend: { proxyUrl: async () => null } });
+  assert.equal((await registerPasskey("7", deps)).status, STATUS.NO_PROXY);
+  assert.equal(calls.attempts, 0);
+});
+
+test("missing state file: not_authenticated, nothing launched", async () => {
+  const { calls, deps } = await setup();
+  deps.statePath = () => join(tmpdir(), "does-not-exist-passkey.json");
+  assert.equal((await registerPasskey("7", deps)).status, STATUS.NOT_AUTHENTICATED);
+  assert.equal(calls.attempts, 0);
+});
+
+test("isolated browser: gets the state COPY + company proxy, never the held context, and is closed", async () => {
   const { deps, manager } = await setup();
-  let renewedDuring = null;
-  deps.attemptFn = async () => {
-    const before = manager.get("7").lastRenewAt;
-    await manager.renew("7");
-    renewedDuring = manager.get("7").lastRenewAt !== before;
-    return { status: STATUS.UBER_HAS_PASSKEY };
+  let seen = null;
+  deps.attemptFn = undefined; // exercise the real attempt() with a fake launcher
+  let closed = false;
+  deps.launch = async (args) => {
+    seen = args;
+    return {
+      browser: { close: async () => void (closed = true) },
+      context: { newPage: async () => { throw new Error("stop"); } },
+    };
   };
+  const heldContext = manager.get("7").handle.context;
   await registerPasskey("7", deps);
-  assert.equal(renewedDuring, false);
+  assert.equal(seen.proxyUrl, PROXY);
+  assert.deepEqual(seen.state, { cookies: [] });
+  assert.equal(closed, true);
+  assert.equal(manager.get("7").handle.context, heldContext);
+  assert.notEqual(manager.get("7").busy, true);
 });
