@@ -97,6 +97,14 @@ return [
         'secret' => (string) env('UBER_AUTH_SECRET'),
     ],
 
+    // Software passkey REGISTRATION on the company's Uber account (docs/31). A scoped account
+    // WRITE: every gate defaults OFF. `tenants` = optional allowlist (empty = no limit); a
+    // company also needs `settings.passkey.enabled`. uber-auth has its own UBER_AUTH_PASSKEY_REGISTER.
+    'passkey' => [
+        'enabled' => filter_var(env('UBER_PASSKEY_REGISTER', false), FILTER_VALIDATE_BOOL),
+        'tenants' => array_values(array_filter(array_map('trim', explode(',', (string) env('UBER_PASSKEY_TENANTS'))))),
+    ],
+
     // Passwordless Uber login (docs/27). `enabled` is the GLOBAL kill switch (OFF by
     // default); a company also needs its own settings flag. `tenants` is an optional
     // comma-separated allowlist of tenant ids for a gradual rollout (empty = no limit).

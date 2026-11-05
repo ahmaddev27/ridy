@@ -206,16 +206,41 @@ export class PersistentSessionManager {
     return this.sessions.get(companyKey)?.state ?? null;
   }
 
+  /**
+   * Run `fn(entry)` while the company's keep-warm is parked (renew() skips a busy entry), so a
+   * second page in the SAME held context is never raced by a cookie clear + re-inject. Only an
+   * ACTIVE entry qualifies; resolves { ok:false } otherwise. Always releases the flag.
+   */
+  async withBusy(companyKey, fn) {
+    const entry = this.sessions.get(companyKey);
+    if (!entry || entry.state !== SESSION_STATE.ACTIVE || entry.busy || entry.renewing) return { ok: false };
+    entry.busy = true;
+    try {
+      return { ok: true, value: await fn(entry) };
+    } finally {
+      entry.busy = false;
+    }
+  }
+
   /** Whether a session is due for a keep-warm: strictly by cadence (hourly; 10 min in rescue mode). */
   isDue(entry, t = this.now()) {
     const interval = rescueActive(entry) ? this.rescueIntervalMs : this.renewIntervalMs;
-    return WARMABLE.has(entry.state) && t - entry.lastRenewAt >= interval;
+    return WARMABLE.has(entry.state) && !entry.busy && t - entry.lastRenewAt >= interval;
   }
 
   /** Run one keep-warm for a single session. Resolves for every outcome; never throws. */
   async renew(companyKey) {
     const entry = this.sessions.get(companyKey);
-    if (!entry || !WARMABLE.has(entry.state)) return;
+    if (!entry || !WARMABLE.has(entry.state) || entry.busy || entry.renewing) return;
+    entry.renewing = true;
+    try {
+      await this.#renewNow(companyKey, entry);
+    } finally {
+      entry.renewing = false;
+    }
+  }
+
+  async #renewNow(companyKey, entry) {
     let r;
     try {
       const rescue = rescueActive(entry);
