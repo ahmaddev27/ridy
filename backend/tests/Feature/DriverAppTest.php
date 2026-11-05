@@ -233,7 +233,8 @@ class DriverAppTest extends TestCase
     public function test_offers_can_be_filtered_to_early_declined(): void
     {
         $driver = $this->driver(['activated_at' => now()]);
-        $this->offer($driver, 'ed')->update(['status' => OfferStatus::Rejected, 'auto_decline_reason' => 'min_fare']);
+        // auto_decline_reason is not mass-fillable (the engine stamps it via forceFill), so set it the same way here.
+        $this->offer($driver, 'ed')->forceFill(['status' => OfferStatus::Rejected, 'auto_decline_reason' => 'min_fare'])->save();
         $this->offer($driver, 'plain')->update(['status' => OfferStatus::Rejected]);
 
         Sanctum::actingAs($driver, guard: 'driver');
