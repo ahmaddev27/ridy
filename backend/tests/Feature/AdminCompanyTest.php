@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Dispatch\Models\UberPasskey;
 use App\Domain\Tenancy\Models\Proxy;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Models\User;
@@ -60,7 +61,7 @@ class AdminCompanyTest extends TestCase
         Sanctum::actingAs($this->superAdmin());
         $a = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
         Tenant::create(['name' => 'Globex', 'country' => 'DE']);
-        \App\Domain\Dispatch\Models\UberPasskey::withoutGlobalScopes()->create([
+        UberPasskey::withoutGlobalScopes()->create([
             'tenant_id' => $a->id, 'status' => 'active', 'registered_at' => now(), 'credential' => ['k' => 'SECRETKEY'],
         ]);
 
