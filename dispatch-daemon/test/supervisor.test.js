@@ -10,7 +10,7 @@ const { streams, reconcileTick } = await import("../src/supervisor.js");
 // Streams must never touch the network in tests.
 RamenStream.prototype.run = async function () {};
 
-const good = (id) => ({ id, uber_org_uuid: `org-${id}-uuid`, cookies: [{ name: "sid", value: `v${id}` }], proxy_url: "" });
+const good = (id) => ({ id, uber_org_uuid: `org-${id}-uuid`, cookies: [{ name: "sid", value: `v${id}` }], proxy_url: "http://u:p@proxy:8080" });
 
 after(() => {
   for (const stream of streams.values()) stream.stop();
@@ -52,6 +52,36 @@ test("a failing session poll or reconcile error never rejects", async () => {
   await reconcileTick();
   // null session list = nothing active: every stream is stopped, nothing throws.
   assert.equal(streams.size, 0);
+});
+
+test("a session with no proxy is never streamed, and starts once a proxy appears", async () => {
+  const bare = { ...good(6), proxy_url: "" };
+  api.sessions = async () => ({ sessions: [bare], globalProxyUrl: "" });
+  await reconcileTick();
+  await reconcileTick();
+  assert.equal([...streams.keys()].some((k) => k.startsWith("6:")), false);
+
+  api.sessions = async () => ({ sessions: [good(6)], globalProxyUrl: "" });
+  await reconcileTick();
+  assert.equal([...streams.keys()].some((k) => k.startsWith("6:")), true);
+
+  // ONE transient no-proxy pass keeps the live stream (backend glitch grace)...
+  const live = [...streams.entries()].filter(([k]) => k.startsWith("6:")).map(([, s]) => s);
+  api.sessions = async () => ({ sessions: [bare], globalProxyUrl: "" });
+  await reconcileTick();
+  assert.equal([...streams.keys()].some((k) => k.startsWith("6:")), true);
+  assert.ok(live.every((s) => s.stopped === false));
+
+  // ...a proxy reappearing resets the count, so another single miss is still survived...
+  api.sessions = async () => ({ sessions: [good(6)], globalProxyUrl: "" });
+  await reconcileTick();
+  api.sessions = async () => ({ sessions: [bare], globalProxyUrl: "" });
+  await reconcileTick();
+  assert.equal([...streams.keys()].some((k) => k.startsWith("6:")), true);
+
+  // ...and the second consecutive miss tears it down rather than leaving it direct.
+  await reconcileTick();
+  assert.equal([...streams.keys()].some((k) => k.startsWith("6:")), false);
 });
 
 test("a new jar_version restarts the streams even when the cookies match the primary's rotation", async () => {
