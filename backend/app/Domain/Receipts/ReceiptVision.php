@@ -11,7 +11,7 @@ use RuntimeException;
  *
  * The image is downscaled first (a receipt needs ~1000px, and CPU inference
  * time scales with image tokens), sent inline as a data URI, and never
- * written anywhere by this class. The caller owns deleting the source file.
+ * written anywhere by this class: in memory only.
  *
  * The two failure modes seen in validation are closed here, not hoped away:
  * - runaway key repetition -> `response_format: json_object`, temperature 0
