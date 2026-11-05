@@ -132,13 +132,14 @@ function Chip({ c, label, active, onPress }: { c: Palette; label: string; active
 /* ------------------------------ Settings ------------------------------ */
 
 /** Text drafts of the two numeric inputs, so a half-typed "9," is never rejected. */
-type Drafts = Record<"min_fare" | "max_pickup_distance" | "max_trip_distance", string>;
+type Drafts = Record<"min_fare" | "min_price_per_km" | "max_pickup_distance" | "max_trip_distance", string>;
 
 function draftsOf(rules: AutoDeclineRules): Drafts {
   const v = rules.min_fare.value_e2;
   const km = (n: number) => (n > 0 ? kmToText(n) : "");
   return {
     min_fare: v > 0 ? centsToEuros(v) : "",
+    min_price_per_km: rules.min_price_per_km.value_e2 > 0 ? centsToEuros(rules.min_price_per_km.value_e2) : "",
     max_pickup_distance: km(rules.max_pickup_distance.km),
     max_trip_distance: km(rules.max_trip_distance.km),
   };
@@ -149,6 +150,7 @@ function withDrafts(rules: AutoDeclineRules, d: Drafts): AutoDeclineRules {
   return {
     ...rules,
     min_fare: { ...rules.min_fare, value_e2: eurosToCents(d.min_fare) ?? 0 },
+    min_price_per_km: { ...rules.min_price_per_km, value_e2: eurosToCents(d.min_price_per_km) ?? 0 },
     max_pickup_distance: { ...rules.max_pickup_distance, km: parseKm(d.max_pickup_distance) ?? 0 },
     max_trip_distance: { ...rules.max_trip_distance, km: parseKm(d.max_trip_distance) ?? 0 },
   };
@@ -225,6 +227,21 @@ function SettingsPane({
       <RuleCard c={c} row={row} title={t("ad.rule.min_fare")} on={rules.min_fare.enabled} bad={invalid.includes("min_fare")}
         onToggle={(v) => patch("min_fare", { enabled: v })}>
         <NumberInput c={c} unit="€" value={drafts.min_fare} onChange={draft("min_fare")} placeholder="9,00" />
+      </RuleCard>
+
+      <RuleCard c={c} row={row} title={t("ad.rule.min_price_per_km")} on={rules.min_price_per_km.enabled} bad={invalid.includes("min_price_per_km")}
+        onToggle={(v) => patch("min_price_per_km", { enabled: v })}>
+        <NumberInput c={c} unit="€/km" value={drafts.min_price_per_km} onChange={draft("min_price_per_km")} placeholder="3,00" />
+        <Text style={{ color: c.inkMuted, fontSize: 12.5, textAlign: textAlign() }}>
+          {t("ad.perKm.hint").replace("{v}", drafts.min_price_per_km || "3,00")}
+        </Text>
+        <View style={{ flexDirection: row, flexWrap: "wrap", gap: 8 }}>
+          <Chip c={c} label={t("ad.perKm.and")} active={rules.min_price_per_km.mode === "and"} onPress={() => patch("min_price_per_km", { mode: "and" })} />
+          <Chip c={c} label={t("ad.perKm.or")} active={rules.min_price_per_km.mode === "or"} onPress={() => patch("min_price_per_km", { mode: "or" })} />
+        </View>
+        <Text style={{ color: c.inkMuted, fontSize: 12.5, textAlign: textAlign() }}>
+          {t(rules.min_price_per_km.mode === "or" ? "ad.perKm.orHint" : "ad.perKm.andHint")}
+        </Text>
       </RuleCard>
 
       <RuleCard c={c} row={row} title={t("ad.rule.reject_cities")} on={rules.reject_cities.enabled} bad={invalid.includes("reject_cities")}
