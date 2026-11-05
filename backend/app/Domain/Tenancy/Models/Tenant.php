@@ -106,6 +106,27 @@ class Tenant extends Model
         $this->forceFill(['settings' => $settings])->save();
     }
 
+    /** Per-company passkey eligibility (docs/31). The real register is still gated by PasskeySettings' global/allowlist flags. */
+    public function passkeyEnabled(): bool
+    {
+        return ($this->settings['passkey']['enabled'] ?? false) === true;
+    }
+
+    public function setPasskeyEnabled(bool $enabled): void
+    {
+        $settings = $this->settings ?? [];
+        $settings['passkey'] = array_merge($settings['passkey'] ?? [], ['enabled' => $enabled]);
+        $this->forceFill(['settings' => $settings])->save();
+    }
+
+    /** Default-on at subscription activation; an explicit admin choice (either way) is never overridden. */
+    public function enablePasskeyByDefault(): void
+    {
+        if (! isset($this->settings['passkey']['enabled'])) {
+            $this->setPasskeyEnabled(true);
+        }
+    }
+
     /**
      * The platform's per-company opt-in for the passwordless Uber login (docs/27).
      * Absent = ON (default-on; an explicit false opts out). The global env switch lives in PasswordlessLoginSettings.

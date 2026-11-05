@@ -222,6 +222,7 @@ class SubscriptionActivator
         ?string $usedCode,
     ): void {
         $this->proxies->assign($tenant);
+        $tenant->enablePasskeyByDefault();
 
         // Email the invoice PDF for a genuine paid activation only (free grants
         // never reach here). Best-effort — a mail failure must not break activation.

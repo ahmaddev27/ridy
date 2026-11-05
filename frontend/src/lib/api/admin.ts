@@ -33,6 +33,8 @@ export type Company = {
   dispatch_reject_enabled: boolean;
   /** The PLATFORM's switch for the co-browse (window) Uber connect, set per company. */
   cobrowse_enabled: boolean;
+  /** Per-company passkey eligibility (default-on at subscription activation). */
+  passkey_enabled: boolean;
   users?: CompanyUser[] | null;
 };
 
@@ -658,6 +660,16 @@ export async function setCompanyDispatchReject(id: number, enabled: boolean): Pr
  *  company sign in to Uber in the streamed window to capture its fleet session (like tenant 15). */
 export async function setCompanyCobrowse(id: number, enabled: boolean): Promise<Company> {
   const res = await apiFetch<{ data: Company }>(`${base}/${id}/cobrowse`, {
+    method: "PATCH",
+    body: { enabled },
+    withCsrf: true,
+  });
+  return res.data;
+}
+
+/** Super-admin per-company Uber passkey eligibility (flag only; the register stays gated server-side). */
+export async function setCompanyPasskey(id: number, enabled: boolean): Promise<Company> {
+  const res = await apiFetch<{ data: Company }>(`${base}/${id}/passkey`, {
     method: "PATCH",
     body: { enabled },
     withCsrf: true,

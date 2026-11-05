@@ -20,6 +20,7 @@ import {
   getCompany,
   updateCompany,
   setCompanyActive,
+  setCompanyPasskey,
   createCompanyUser,
   resetCompanyUserPassword,
   forceRelink,
@@ -150,6 +151,20 @@ export function CompanyDetail({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  async function togglePasskey(next: boolean) {
+    setBusy(true);
+    try {
+      await setCompanyPasskey(id, next);
+      toast.success(next ? c("passkeyEnabledToast") : c("passkeyDisabledToast"));
+      await load();
+      onChanged();
+    } catch (e) {
+      toast.error(c("saveFailed"), { description: apiErrorMessage(e, t, locale) });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function saveInfo() {
     setBusy(true);
@@ -375,6 +390,17 @@ export function CompanyDetail({
                 ) : (
                   <Badge status="neutral">{c("stateOff")}</Badge>
                 )
+              }
+            />
+            <Fact
+              label={c("passkeyEnabledLabel")}
+              value={
+                <Switch
+                  checked={company.passkey_enabled}
+                  onChange={() => void togglePasskey(!company.passkey_enabled)}
+                  disabled={busy}
+                  label={company.passkey_enabled ? c("passkeyToggleOff") : c("passkeyToggleOn")}
+                />
               }
             />
             <Fact

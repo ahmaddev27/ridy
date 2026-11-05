@@ -155,6 +155,16 @@ class BillingIntegrityTest extends TestCase
         $this->assertSame(0, SubscriptionPeriod::count());
     }
 
+    public function test_activation_marks_the_company_passkey_eligible(): void
+    {
+        $tenant = $this->company();
+        $this->pendingCode($tenant, '654321', 30, '119.00');
+
+        app(SubscriptionActivator::class)->redeemIssuedCode($tenant, '654321');
+
+        $this->assertTrue($tenant->fresh()->passkeyEnabled());
+    }
+
     public function test_an_issued_invoice_is_frozen_against_later_settings_and_name_changes(): void
     {
         $tenant = $this->company('Acme Fleet GmbH');

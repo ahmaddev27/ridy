@@ -156,6 +156,16 @@ class CompanyController extends Controller
         return response()->json(['data' => $this->detail($tenant->refresh())]);
     }
 
+    /** Super-admin per-company passkey eligibility (docs/31). Flag only: no Uber call, no register. */
+    public function setPasskey(Request $request, Tenant $tenant): JsonResponse
+    {
+        $data = $request->validate(['enabled' => ['required', 'boolean']]);
+
+        $tenant->setPasskeyEnabled((bool) $data['enabled']);
+
+        return response()->json(['data' => $this->detail($tenant->refresh())]);
+    }
+
     /** Super-admin opt-in/out of co-browsing Uber's Arkose puzzle (docs/28) for one company. */
     public function setCobrowse(Request $request, Tenant $tenant): JsonResponse
     {

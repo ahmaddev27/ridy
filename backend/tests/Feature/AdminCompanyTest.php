@@ -154,6 +154,46 @@ class AdminCompanyTest extends TestCase
         $this->assertTrue($manager->hasRole('fleet_manager'));
     }
 
+    public function test_super_admin_can_toggle_passkey_without_clobbering_other_settings(): void
+    {
+        Sanctum::actingAs($this->superAdmin());
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE', 'settings' => ['dispatch_reject' => ['enabled' => true]]]);
+
+        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/passkey", ['enabled' => true])
+            ->assertOk()->assertJsonPath('data.passkey_enabled', true);
+        $this->assertTrue($tenant->fresh()->settings['dispatch_reject']['enabled']);
+        $this->assertTrue($tenant->fresh()->settings['passkey']['enabled']);
+
+        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/passkey", ['enabled' => false])
+            ->assertOk()->assertJsonPath('data.passkey_enabled', false);
+        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/passkey", ['enabled' => 'nope'])->assertUnprocessable();
+    }
+
+    public function test_passkey_toggle_is_forbidden_for_a_manager(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $tenant = Tenant::create(['name' => 'Acme', 'country' => 'DE']);
+        $manager = User::create(['name' => 'M', 'email' => 'm@a.de', 'password' => Hash::make('password'), 'tenant_id' => $tenant->id]);
+        $manager->assignRole('fleet_manager');
+
+        Sanctum::actingAs($manager);
+        $this->patchJson("/api/v1/admin/companies/{$tenant->id}/passkey", ['enabled' => true])->assertForbidden();
+    }
+
+    public function test_enable_by_default_is_idempotent_and_respects_an_explicit_off(): void
+    {
+        $fresh = Tenant::create(['name' => 'A', 'country' => 'DE', 'settings' => ['x' => 1]]);
+        $fresh->enablePasskeyByDefault();
+        $fresh->enablePasskeyByDefault();
+        $this->assertTrue($fresh->fresh()->passkeyEnabled());
+        $this->assertSame(1, $fresh->fresh()->settings['x']);
+
+        $off = Tenant::create(['name' => 'B', 'country' => 'DE']);
+        $off->setPasskeyEnabled(false);
+        $off->enablePasskeyByDefault();
+        $this->assertFalse($off->fresh()->passkeyEnabled());
+    }
+
     public function test_detail_shows_pool_proxy_and_update_can_bind_and_clear_it(): void
     {
         Sanctum::actingAs($this->superAdmin());
