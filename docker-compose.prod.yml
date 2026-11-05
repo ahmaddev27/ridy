@@ -98,6 +98,10 @@ x-app-env: &app-env
   UBER_SERVER_SYNC: ${UBER_SERVER_SYNC:-}
   # Optional tenant-id allowlist for a gradual rollout (empty = all eligible companies).
   UBER_SERVER_SYNC_TENANTS: ${UBER_SERVER_SYNC_TENANTS:-}
+  # Software passkey REGISTRATION (docs/29): a scoped Uber account write. OFF unless "1"; a
+  # company also needs its own settings flag. TENANTS = optional allowlist (empty = no limit).
+  UBER_PASSKEY_REGISTER: ${UBER_PASSKEY_REGISTER:-}
+  UBER_PASSKEY_TENANTS: ${UBER_PASSKEY_TENANTS:-}
   # FCM HTTP v1 (OAuth2 service-account) — used by FcmPushSender for driver + web
   # push. Point FCM_CREDENTIALS at the mounted service-account JSON. Without it the
   # app falls back to LogPushSender (pushes are only logged, not sent).
@@ -391,6 +395,10 @@ services:
       UBER_AUTH_PASSWORDLESS: ${UBER_AUTH_PASSWORDLESS:-}
       # Cold first-connect: allow a fresh-browser login for a never-connected company. OFF unless "1".
       UBER_AUTH_PASSWORDLESS_COLD: ${UBER_AUTH_PASSWORDLESS_COLD:-}
+      # Software passkey registration (docs/29). OFF unless "1". ON_CONNECT additionally tries
+      # right after a connect / co-browse; without it only the explicit backfill command runs.
+      UBER_AUTH_PASSKEY_REGISTER: ${UBER_AUTH_PASSKEY_REGISTER:-}
+      UBER_AUTH_PASSKEY_ON_CONNECT: ${UBER_AUTH_PASSKEY_ON_CONNECT:-}
       DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
       # Pilot: real Chrome headed under Xvfb (heavier RAM/CPU). Unset = headless Chromium.
       REAL_CHROME: ${REAL_CHROME:-}

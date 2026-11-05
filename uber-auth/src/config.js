@@ -34,6 +34,14 @@ export const config = {
   // never-connected company is still refused (no_session) and connects through the extension.
   passwordlessCold: ["1", "true"].includes(String(process.env.UBER_AUTH_PASSWORDLESS_COLD || "").toLowerCase()),
 
+  // Software-passkey REGISTRATION (docs/29): a scoped, owner-approved account write. OFF = the
+  // /passkey/register route answers `disabled` and nothing touches Uber. The backend must ALSO
+  // have UBER_PASSKEY_REGISTER + the company's own flag on; both sides gate every attempt.
+  passkeyRegister: ["1", "true"].includes(String(process.env.UBER_AUTH_PASSKEY_REGISTER || "").toLowerCase()),
+  // Additionally try to register right after a successful connect / co-browse. OFF by default
+  // even with the flag above: the explicit route + `uber:passkey-backfill` work without it.
+  passkeyOnConnect: ["1", "true"].includes(String(process.env.UBER_AUTH_PASSKEY_ON_CONNECT || "").toLowerCase()),
+
   // Per-step wait budget (ms).
   stepTimeout: Number(process.env.UBER_AUTH_STEP_TIMEOUT || 30000),
 

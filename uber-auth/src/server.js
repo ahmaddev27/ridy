@@ -11,7 +11,7 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { startLogin, submitMfa, closeSession, challengeTick, finishChallenge, STATUS } from "./browser.js";
-import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf, forceDrop } from "./persistent.js";
+import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf, forceDrop, registerPasskeyForCompany } from "./persistent.js";
 import { admitStart, adoptGuard, adoptMode, canCobrowse, canFullLogin, companyMatches, createStartGate } from "./loginPolicy.js";
 import { createCobrowse, createCobrowseServer, FULL_LOGIN_HARD_CAP_MS } from "./cobrowse.js";
 import { openCdpStream } from "./cobrowseStream.js";
@@ -142,7 +142,22 @@ async function onLoginSuccess(companyKey, outcome, res, mode = null) {
   if (!adopted.captured) {
     return send(res, 200, { status: STATUS.CAPTURE_FAILED, message: adopted.reason ?? "not_posted" });
   }
+  maybeRegisterPasskeyAfterConnect(String(companyKey));
   return send(res, 200, { status: STATUS.SUCCESS, persistent: true, org_uuid: outcome.result?.org_uuid ?? null });
+}
+
+// Trigger (a) of docs/29: after a successful connect / co-browse, try a passkey registration in
+// the background. Needs BOTH UBER_AUTH_PASSKEY_REGISTER and UBER_AUTH_PASSKEY_ON_CONNECT (default
+// off), plus the backend's per-company flag. The delay lets the first capture settle; the response
+// never waits for it and a failure never touches the login outcome.
+const PASSKEY_AFTER_CONNECT_DELAY_MS = 20_000;
+function maybeRegisterPasskeyAfterConnect(companyKey) {
+  if (!config.passkeyRegister || !config.passkeyOnConnect) return;
+  setTimeout(() => {
+    registerPasskeyForCompany(companyKey)
+      .then((r) => console.log(`[passkey] after-connect ${companyKey}: ${r.status}`))
+      .catch((e) => console.warn(`[passkey] after-connect ${companyKey} failed: ${e?.message}`));
+  }, PASSKEY_AFTER_CONNECT_DELAY_MS).unref?.();
 }
 
 async function adoptRefused(companyKey, mode) {
@@ -451,6 +466,14 @@ async function handleSessionDrop(req, res) {
   return send(res, 200, { ok: true, state });
 }
 
+// Trigger (b): explicit, from the backend's `uber:passkey-backfill`. Answers a status word only.
+async function handlePasskeyRegister(req, res) {
+  const body = await readJson(req);
+  const companyKey = String(body.company_key ?? "").trim();
+  if (!companyKey) return send(res, 400, { error: "company_key required" });
+  return send(res, 200, await registerPasskeyForCompany(companyKey));
+}
+
 const server = createServer(async (req, res) => {
   if (req.headers["x-auth-secret"] !== config.secret) {
     return send(res, 401, { error: "unauthorized" });
@@ -462,6 +485,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/login/resume") return await handleResume(req, res);
     if (req.method === "POST" && req.url === "/cobrowse/close") return await handleCobrowseClose(req, res);
     if (req.method === "POST" && req.url === "/session/drop") return await handleSessionDrop(req, res);
+    if (req.method === "POST" && req.url === "/passkey/register") return await handlePasskeyRegister(req, res);
     if (req.method === "GET" && req.url === "/sessions") return send(res, 200, { data: statusList() });
     if (req.method === "GET" && req.url === "/health") return send(res, 200, { status: "ok", pending: pending.size, live: statusList().length });
     return send(res, 404, { error: "not found" });
