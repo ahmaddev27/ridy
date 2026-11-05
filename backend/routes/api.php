@@ -326,6 +326,8 @@ Route::prefix('v1')->group(function () {
         Route::get('{tenant}/passkey', [PasskeyController::class, 'show']);
         Route::post('{tenant}/passkey', [PasskeyController::class, 'store']);
         Route::post('{tenant}/passkey/failure', [PasskeyController::class, 'failure']);
+        Route::post('{tenant}/passkey/used', [PasskeyController::class, 'used']);
+        Route::post('{tenant}/passkey/login-failed', [PasskeyController::class, 'loginFailed']);
         // Decrypted CDP-ready credential for co-browse injection (follow-up task); same flags.
         Route::get('{tenant}/passkey/credential', [PasskeyController::class, 'credential']);
     });

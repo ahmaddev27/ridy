@@ -14,7 +14,7 @@ import { launchBrowser, newStealthContext } from "./browser.js";
 import { parseProxyUrl } from "./proxy.js";
 import { scopeCookies } from "./cookieScope.js";
 import { registerPasskey, registerPasskeyInSession } from "./passkey.js";
-import { attachCobrowseAuthenticator } from "./cobrowsePasskey.js";
+import { attachCobrowseAuthenticator, ATTACH, readSignCount, removeAuthenticator } from "./cobrowsePasskey.js";
 
 const driver = createWarmDriver();
 
@@ -393,4 +393,45 @@ export function startLoops() {
 export function stopLoops() {
   for (const t of loops) clearInterval(t);
   loops = [];
+}
+
+const reloginPasskeyOn = () => config.passkeyRegister && config.passkeyRelogin;
+
+/**
+ * Passkey sign-in on the unattended re-login: attach a virtual authenticator to the company's HELD
+ * handle and inject the stored passkey. Refuses (-> email path) without the flags or a proxy.
+ * Marks `handle.passkeyInjected` only when a credential really went in. Never throws.
+ */
+export async function attachReloginPasskey(handle, companyKey, proxyUrl) {
+  const status = await attachCobrowseAuthenticator(handle, String(companyKey), {
+    enabled: reloginPasskeyOn,
+    proxied: () => Boolean(proxyUrl) && parseProxyUrl(proxyUrl) != null,
+    flags: (k) => passkeyBackend.status(k),
+    fetchCredential: fetchPasskeyCredential,
+    log: (m) => console.log(`[passkey][relogin] ${m}`),
+  });
+  handle.passkeyInjected = status === ATTACH.INJECTED;
+  return handle.passkeyInjected;
+}
+
+/**
+ * Always runs after a relogin attempt that attached an authenticator: report the outcome to the
+ * backend (landed -> new signCount, else the breaker counter), then remove the authenticator.
+ */
+export async function finishReloginPasskey(handle, companyKey) {
+  const base = `${passkeyUrl(companyKey)}`;
+  try {
+    if (handle.passkeyLanded) {
+      const signCount = await readSignCount(handle);
+      if (signCount != null) await backendPost(`${base}/used`, { signCount });
+    } else if (handle.passkeyInjected && handle.passkeyTried) {
+      await backendPost(`${base}/login-failed`, {});
+    }
+  } catch (e) {
+    console.warn(`[passkey][relogin] ${companyKey}: outcome report failed: ${e?.message}`);
+  } finally {
+    await removeAuthenticator(handle);
+    handle.passkeyTried = false;
+    handle.passkeyLanded = false;
+  }
 }

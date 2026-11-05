@@ -58,9 +58,25 @@ class PasskeyController extends Controller
         $credential = $passkeys->credentialForInjection($tenant);
         abort_if($credential === null, 404, 'No usable passkey.');
 
-        // TODO: PasskeyService::markUsed() is never called. This is a fetch for injection, not proof
-        // of a successful sign-in; wire it once uber-auth reports the outcome back.
+        // A fetch for injection is not proof of a sign-in: uber-auth reports that via used()/loginFailed().
         return response()->json(['data' => $credential])->header('Cache-Control', 'no-store');
+    }
+
+    /** uber-auth confirms a passkey sign-in landed and reports the authenticator's new signCount. */
+    public function used(Request $request, Tenant $tenant, PasskeyService $passkeys): JsonResponse
+    {
+        $data = $request->validate(['signCount' => ['required', 'integer', 'min:0']]);
+        $passkeys->recordSignIn($tenant->id, (int) $data['signCount']);
+
+        return response()->json(['data' => ['recorded' => true]]);
+    }
+
+    /** uber-auth reports an injected passkey that did NOT sign in (feeds the consecutive-failure breaker). */
+    public function loginFailed(Tenant $tenant, PasskeyService $passkeys): JsonResponse
+    {
+        $passkeys->recordLoginResult($tenant->id, false);
+
+        return response()->json(['data' => ['recorded' => true]]);
     }
 
     /** uber-auth reports a failed attempt (incl. `session_lost`); recorded and logged loudly. */

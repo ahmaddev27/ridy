@@ -5,6 +5,7 @@ namespace App\Domain\Dispatch;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Dispatch\Models\UberPasskey;
 use App\Domain\Tenancy\Models\Tenant;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -14,6 +15,14 @@ use Illuminate\Support\Facades\Log;
  */
 class PasskeyService
 {
+    public const MAX_CONSECUTIVE_FAILURES = 2;
+
+    private const FAILURES_KEY = 'passkey:relogin_failures:';
+
+    private const BREAKER_KEY = 'passkey:relogin_breaker:';
+
+    private const BREAKER_TTL = 604800; // 7 days; a successful sign-in resets it
+
     public function __construct(private PasskeySettings $settings, private AuditLogger $audit) {}
 
     public function isEnabledFor(?Tenant $tenant): bool
@@ -72,6 +81,51 @@ class PasskeyService
     {
         UberPasskey::withoutGlobalScopes()->where('tenant_id', $tenantId)
             ->update(['last_used_at' => now(), 'use_count' => DB::raw('use_count + 1')]);
+    }
+
+    /** A confirmed passkey sign-in: persist the authenticator's new signCount, then count the use. */
+    public function recordSignIn(int $tenantId, int $signCount): void
+    {
+        $passkey = UberPasskey::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)->where('status', UberPasskey::STATUS_ACTIVE)->first();
+        if ($passkey !== null && is_array($passkey->credential)) {
+            $credential = $passkey->credential;
+            $credential['signCount'] = max($signCount, (int) ($credential['signCount'] ?? 0));
+            $passkey->credential = $credential;
+            $passkey->save();
+        }
+        $this->markUsed($tenantId);
+        $this->recordLoginResult($tenantId, true);
+    }
+
+    /** Should /login/start ask uber-auth to sign in with the passkey? Gates + an active key + breaker closed. */
+    public function shouldOfferForRelogin(Tenant $tenant): bool
+    {
+        return $this->settings->reloginAvailableFor($tenant)
+            && ! Cache::has(self::BREAKER_KEY.$tenant->id)
+            && $this->hasActive($tenant->id);
+    }
+
+    /**
+     * Track consecutive passkey sign-in outcomes. After MAX_CONSECUTIVE_FAILURES in a row the
+     * breaker opens (the passkey is no longer offered to this company) and an alert fires.
+     */
+    public function recordLoginResult(int $tenantId, bool $ok): void
+    {
+        $counter = self::FAILURES_KEY.$tenantId;
+        if ($ok) {
+            Cache::forget($counter);
+            Cache::forget(self::BREAKER_KEY.$tenantId);
+
+            return;
+        }
+        Cache::add($counter, 0, self::BREAKER_TTL);
+        if (Cache::increment($counter) < self::MAX_CONSECUTIVE_FAILURES) {
+            return;
+        }
+        Cache::put(self::BREAKER_KEY.$tenantId, true, self::BREAKER_TTL);
+        $this->audit->log('passkey.relogin_breaker_open', null, [], $tenantId);
+        Log::critical('uber passkey re-login disabled after consecutive failures', ['tenant_id' => $tenantId]);
     }
 
     /**
