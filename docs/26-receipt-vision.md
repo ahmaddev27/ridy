@@ -18,27 +18,25 @@ leaves the phone.
 - Observation only; this adds no write to Uber and no new data collection beyond the receipt
   the driver chose to photograph.
 
-## Flow
+## Flow (live, no-store - 13.11.2026, supersedes the ML Kit + fallback design above)
 
 ```
-phone: ML Kit + parser -> evaluateScan()
-  ok and no "Unsicher" on date/amount -> done, photo stays on the phone
-  otherwise ("low confidence"):
-    downscale to 1000px long edge, JPEG q0.8
-    POST /api/v1/driver/receipt-vision (multipart `image`)   -> 202 {id}   (throttle 10/min)
-backend: ReceiptVisionJobs::begin  parks the bytes in storage/app/receipt-vision-tmp/{id}.bin,
-         cache["receipt-vision:{driver}:{id}"] = pending (15 min TTL), dispatches ProcessReceiptVision
-queue (default queue, 1 try, timeout 270s):
-         ReceiptVision::read -> GD downscale (<=1000px) -> POST llama.cpp /v1/chat/completions
-         -> ReceiptVisionSanitizer -> cache = done{fields} | failed ; image deleted in `finally`
-phone: GET /api/v1/driver/receipt-vision/{id} every 3 s (give up after 150 s)
-         done   -> mergeVision() over the ML Kit values, gate re-evaluated
-         failed / 503 / timeout / offline -> ML Kit result stands (retake gate as before)
+phone: live camera guides the shot (on-device frame OCR, nothing leaves the phone)
+  capture -> downscale to 1000px long edge, JPEG q0.8
+    POST /api/v1/driver/receipt-vision (multipart `image`)   (throttle 20/min)
+backend: DriverReceiptVisionController -> ReceiptVision::read (bytes in memory only)
+         -> GD downscale -> llama.cpp /v1/chat/completions -> ReceiptVisionSanitizer
+         -> 200 {data:{fields}}  | 503 not configured | 502 model failed
+phone: server fields are AUTHORITATIVE (mergeVision over an empty base); the temp
+       photo file is deleted in `finally`; failure shows "Try again", nothing stored
 ```
 
-The step cannot advance while the second pass runs (`scanning` stays true, label
-"reading more closely"); the driver can remove the photo at any time, which cancels the
-poll. A job id is bound to the driver in the cache key, so nobody can poll another's.
+**No image is persisted anywhere.** No disk/S3/DB/cache/queue payload on the server (the
+old `ReceiptVisionJobs` temp file + `ProcessReceiptVision` job + poll route are removed);
+the app keeps no copy and does not upload the photo with the submission. The submission
+endpoint still *accepts* a legacy `document` from old builds but drops it. The
+`elprofessor_submissions.document_*` columns are legacy-only now; a drop-migration is a
+possible follow-up (owner decision, not done). Latency ~7 s on the 4B model.
 
 ## The model call (fixes for the two validation bugs)
 

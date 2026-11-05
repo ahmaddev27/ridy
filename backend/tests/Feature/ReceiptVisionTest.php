@@ -4,11 +4,9 @@ namespace Tests\Feature;
 
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Receipts\ReceiptVision;
-use App\Domain\Receipts\ReceiptVisionJobs;
 use App\Domain\Receipts\ReceiptVisionSanitizer;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
-use App\Jobs\ProcessReceiptVision;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -118,53 +116,40 @@ class ReceiptVisionTest extends TestCase
         $this->assertSame('2026-10-30', $s->sanitize(['date' => '30.10.2026'], CarbonImmutable::parse('2026-10-31'))['date']);
     }
 
-    public function test_upload_acks_then_the_job_parses_and_deletes_the_image(): void
+    public function test_capture_is_read_in_memory_and_answered_in_the_same_response(): void
     {
         Storage::fake('local');
+        Bus::fake();
         config(['services.receipt_vision.url' => 'http://vision:8080']);
         Http::fake(['vision:8080/*' => Http::response($this->modelReply($this->shell()))]);
-        $driver = $this->driver();
-        Bus::fake();
+        $this->driver();
 
-        $id = $this->postJson('/api/v1/driver/receipt-vision', ['image' => UploadedFile::fake()->createWithContent('b.jpg', $this->jpeg(400, 600))])
-            ->assertStatus(202)->json('data.id');
+        $this->postJson('/api/v1/driver/receipt-vision', ['image' => UploadedFile::fake()->createWithContent('b.jpg', $this->jpeg(400, 600))])
+            ->assertOk()->assertJsonPath('data.fields.amount', 50);
 
-        Bus::assertDispatched(ProcessReceiptVision::class);
-        $this->getJson("/api/v1/driver/receipt-vision/{$id}")->assertOk()->assertJsonPath('data.status', 'pending');
-        Storage::disk('local')->assertExists("receipt-vision-tmp/{$id}.bin");
-
-        (new ProcessReceiptVision($driver->id, $id))->handle(app(ReceiptVision::class), app(ReceiptVisionJobs::class));
-
-        $this->getJson("/api/v1/driver/receipt-vision/{$id}")
-            ->assertOk()->assertJsonPath('data.status', 'done')->assertJsonPath('data.fields.amount', 50);
-        Storage::disk('local')->assertMissing("receipt-vision-tmp/{$id}.bin");
+        $this->assertSame([], Storage::disk('local')->allFiles());
+        Bus::assertNothingDispatched();
     }
 
-    public function test_a_model_failure_is_reported_failed_and_the_image_is_still_deleted(): void
+    public function test_a_model_failure_is_a_502_and_nothing_is_stored(): void
     {
         Storage::fake('local');
         config(['services.receipt_vision.url' => 'http://vision:8080']);
         Http::fake(['vision:8080/*' => Http::response('boom', 500)]);
-        $driver = $this->driver();
-        $jobs = app(ReceiptVisionJobs::class);
-        $id = $jobs->begin($driver->id, $this->jpeg(300, 300));
+        $this->driver();
 
-        (new ProcessReceiptVision($driver->id, $id))->handle(app(ReceiptVision::class), $jobs);
+        $this->postJson('/api/v1/driver/receipt-vision', ['image' => UploadedFile::fake()->createWithContent('b.jpg', $this->jpeg(300, 300))])
+            ->assertStatus(502);
 
-        $this->assertSame('failed', $jobs->status($driver->id, $id)['status']);
-        Storage::disk('local')->assertMissing("receipt-vision-tmp/{$id}.bin");
+        $this->assertSame([], Storage::disk('local')->allFiles());
     }
 
-    public function test_it_is_503_when_not_configured_and_a_job_is_private_to_its_driver(): void
+    public function test_it_is_503_when_not_configured(): void
     {
-        Storage::fake('local');
         config(['services.receipt_vision.url' => '']);
-        $driver = $this->driver();
+        $this->driver();
 
         $this->postJson('/api/v1/driver/receipt-vision', ['image' => UploadedFile::fake()->createWithContent('b.jpg', $this->jpeg(100, 100))])
             ->assertStatus(503);
-
-        $id = app(ReceiptVisionJobs::class)->begin($driver->id + 999, $this->jpeg(100, 100));
-        $this->getJson("/api/v1/driver/receipt-vision/{$id}")->assertNotFound();
     }
 }

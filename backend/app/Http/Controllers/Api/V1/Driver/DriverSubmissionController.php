@@ -51,19 +51,14 @@ use Illuminate\Validation\Rule;
  * token after the app last loaded all reach here, and all are refused with a
  * stable reason the app can render.
  *
- * ## The photo is OPTIONAL, and new apps do not send one
+ * ## The photo is NEVER stored
  *
- * It was mandatory until 10.10.2026, when the owner decided a driver sends the
- * figures and not the document: the app photographs the receipt, reads it with
- * the phone's own OCR, and keeps the image on the device.
- *
- * It stays accepted rather than refused, because **an app already installed on
- * a driver's phone still sends one**. There is no store update that reaches
- * every device at once, so a rule that refused a photo would break every
- * submission from an older build; and a rule that required one would break
- * every submission from a newer one. Optional is the only shape that serves
- * both, and it is not temporary scaffolding - it is what a fleet of phones on
- * different versions actually needs.
+ * A receipt is read live by the server vision model (`receipt-vision`: in
+ * memory, answered in the same response, discarded) and only the parsed
+ * figures are submitted. A `document` is still ACCEPTED, because an app
+ * already installed on a driver's phone may send one and refusing it would
+ * break those submissions; it is validated and then DROPPED - no disk, no row
+ * column. The `document_*` columns remain for legacy rows only.
  *
  * What is lost with it is the only way to check a figure afterwards. The app
  * replaces that at the point of entry: a field its rules were unsure about is
@@ -201,10 +196,9 @@ class DriverSubmissionController extends Controller
 
         if ($subject === 'receipt') {
             $rules += [
-                // The photo, when there is one. Older app builds still send it;
-                // builds from 10.10.2026 read the receipt on the phone and send
-                // the figures alone. Still capped below PHP's post_max_size,
-                // above which the request arrives EMPTY with no message at all.
+                // Accepted from older builds, validated and DROPPED (never
+                // stored). Capped below PHP's post_max_size, above which the
+                // request arrives EMPTY with no message at all.
                 'document' => [
                     'nullable', 'file', 'mimes:jpg,jpeg,png,pdf',
                     'max:'.config('elprofessor.max_document_kb', 8192),
@@ -306,18 +300,6 @@ class DriverSubmissionController extends Controller
             ], 422);
         }
 
-        $path = null;
-        $mime = null;
-        $bytes = null;
-        $file = $subject === 'receipt' ? $request->file('document') : null;
-        if ($file !== null) {
-            // One folder per fleet, so a cleanup or an export is per tenant and
-            // never has to parse a filename to know whose it is.
-            $path = $file->store('elprofessor/'.$driver->tenant_id, config('elprofessor.disk', 'local'));
-            $mime = $file->getMimeType();
-            $bytes = $file->getSize();
-        }
-
         // An absent plate is sent as an absent field, never as null.
         $payload = collect($data)
             ->except(['subject', 'document', 'ocr_text', 'ocr_meta'])
@@ -332,9 +314,6 @@ class DriverSubmissionController extends Controller
             'payload' => $payload,
             'ocr_text' => $data['ocr_text'] ?? null,
             'ocr_meta' => $data['ocr_meta'] ?? null,
-            'document_path' => $path,
-            'document_mime' => $mime,
-            'document_bytes' => $bytes,
         ]);
 
         // The ring is best-effort by design: the submission is already stored

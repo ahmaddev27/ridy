@@ -704,29 +704,21 @@ export class ApiClient {
   }
 
   /**
-   * Hand a hard-to-read receipt photo to OUR vision model (low-confidence
-   * fallback only). Acked at once with a job id; the photo is deleted
-   * server-side right after it is parsed. Rejects with 503 when the server
-   * has the feature switched off - the caller keeps the on-device result.
+   * Live receipt reading: the captured photo goes to OUR vision model and the
+   * parsed fields come back in the same response. The server processes it in
+   * memory and stores nothing. Throws ApiError (503 = feature off, 502 = the
+   * model failed); the caller offers a retry and stores nothing.
    */
-  receiptVisionStart(photo: PickedPhoto) {
+  receiptRead(photo: PickedPhoto) {
     const form = new FormData();
     form.append("image", photo as unknown as Blob);
-    return this.request<{ data: { id: string } }>("/api/v1/driver/receipt-vision", {
+    return this.request<{ data: { fields: VisionFields } }>("/api/v1/driver/receipt-vision", {
       method: "POST",
       body: form,
       // Empty = let the runtime set multipart with its own boundary.
       headers: { "Content-Type": "" },
-      timeoutMs: 45_000,
+      timeoutMs: 60_000,
     });
-  }
-
-  /** The state of a vision job: pending, done (with fields) or failed. 404 once expired. */
-  receiptVisionResult(id: string) {
-    return this.request<{ data: { status: "pending" | "done" | "failed"; fields?: VisionFields } }>(
-      `/api/v1/driver/receipt-vision/${encodeURIComponent(id)}`,
-      { timeoutMs: 10_000 },
-    );
   }
 
   fleetMe() {

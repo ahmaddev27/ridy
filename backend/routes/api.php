@@ -216,12 +216,11 @@ Route::prefix('v1')->group(function () {
                 Route::get('postal-codes/{plz}', [DriverPostalCodeController::class, 'show'])
                     ->where('plz', '[0-9]{5}')
                     ->middleware('throttle:60,1,driver-postal-code');
-                // Low-confidence receipts only: upload -> 202 + id, then poll.
-                // The photo is parsed by our own model and deleted.
+                // Live receipt capture: the photo is read in memory by our own
+                // model and the fields come back in the same response. The
+                // photo is never stored anywhere.
                 Route::post('receipt-vision', [DriverReceiptVisionController::class, 'store'])
-                    ->middleware('throttle:10,1,driver-receipt-vision');
-                Route::get('receipt-vision/{id}', [DriverReceiptVisionController::class, 'show'])
-                    ->whereUuid('id');
+                    ->middleware('throttle:20,1,driver-receipt-vision');
                 Route::post('submissions', [DriverSubmissionController::class, 'store'])
                     ->middleware('throttle:30,1,driver-submissions');
 
