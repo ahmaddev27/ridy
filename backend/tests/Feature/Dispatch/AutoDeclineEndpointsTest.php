@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Dispatch;
 
+use App\Domain\Dispatch\AutoDeclineSettings;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
@@ -95,6 +96,22 @@ class AutoDeclineEndpointsTest extends TestCase
         $this->assertFalse($driver->autoDeclineEnabled());
         $this->assertFalse($driver->autoDeclineActive());
         $this->assertSame(900, $driver->autoDeclineRules()['min_fare']['value_e2'], 'rules are still saved');
+    }
+
+    public function test_a_stale_driver_model_cannot_overwrite_an_admin_revoke(): void
+    {
+        $this->enableFeature();
+        $this->driver->forceFill(['auto_decline' => ['admin_enabled' => true, 'enabled' => true]])->save();
+        $stale = Driver::find($this->driver->id);
+
+        // The admin revokes AFTER the driver's request loaded its model.
+        Driver::whereKey($this->driver->id)->update(['auto_decline' => json_encode(['admin_enabled' => false, 'enabled' => true])]);
+
+        app(AutoDeclineSettings::class)->update($stale, $this->payload());
+
+        $fresh = $this->driver->fresh();
+        $this->assertFalse($fresh->adminAutoDeclineEnabled(), 'the revoke must survive the driver save');
+        $this->assertFalse($fresh->autoDeclineActive());
     }
 
     public function test_an_allowed_driver_can_opt_out_and_cannot_grant_themselves_permission(): void

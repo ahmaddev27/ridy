@@ -7,6 +7,7 @@ use App\Domain\Fleet\Models\Driver;
 use App\Domain\Geo\PostalCodes;
 use App\Domain\Tenancy\Models\Tenant;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Reads and writes a driver's own auto-decline ("Early decline") configuration and
@@ -48,13 +49,25 @@ class AutoDeclineSettings
      */
     public function update(Driver $driver, array $input): void
     {
-        $adminEnabled = $driver->adminAutoDeclineEnabled();
+        // Re-read under a row lock: the authenticated model was loaded at request start,
+        // so a stale `admin_enabled = true` could otherwise be written back over an admin
+        // revoke that landed in between (the revoke would silently be undone).
+        DB::transaction(function () use ($driver, $input): void {
+            $fresh = $this->lockedFresh($driver);
+            $adminEnabled = $fresh->adminAutoDeclineEnabled();
 
-        $this->store($driver, [
-            'admin_enabled' => $adminEnabled,
-            'enabled' => $adminEnabled && (bool) ($input['enabled'] ?? false),
-            'rules' => $this->normaliseRules($input['rules'] ?? []),
-        ]);
+            $this->store($fresh, [
+                'admin_enabled' => $adminEnabled,
+                'enabled' => $adminEnabled && (bool) ($input['enabled'] ?? false),
+                'rules' => $this->normaliseRules($input['rules'] ?? []),
+            ]);
+            $driver->setRawAttributes($fresh->getAttributes(), true);
+        });
+    }
+
+    private function lockedFresh(Driver $driver): Driver
+    {
+        return Driver::withoutGlobalScopes()->lockForUpdate()->findOrFail($driver->id);
     }
 
     /**
@@ -66,6 +79,15 @@ class AutoDeclineSettings
      * @return array<string, mixed>
      */
     public function adminUpdate(Driver $driver, array $data): array
+    {
+        return DB::transaction(fn () => $this->applyAdminUpdate($this->lockedFresh($driver), $data));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function applyAdminUpdate(Driver $driver, array $data): array
     {
         $wasAdminEnabled = $driver->adminAutoDeclineEnabled();
         $adminEnabled = $wasAdminEnabled;
