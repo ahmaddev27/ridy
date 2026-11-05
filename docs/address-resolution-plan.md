@@ -137,8 +137,32 @@ for every PLZ), then 2 and 4.
 
 ## Addendum (2026-11-05) — Receipt snapshot, clean-after-accept, and chaining context
 
-**Status:** proposed, NOT started. Assessed against `origin/main` (cfe47cb). Design only: no code in
-this addendum. Companion to `docs/29-addresses-and-geocoding.md` (the AN/AF/AL/TG/DOI/OL/DSI
+**Status (2026-11-06):** Point 1 (receipt-time driver location, Phase A) and the Point 3 chain link
+(Phase C, raw inputs only) are **STARTED and recording**, backend only, passive, no UI. Point 2
+(`receipt_geo`, Phase B) and the `gap_*` distances are still NOT started. The owner approved the
+per-offer driver-location persistence on 2026-11-05 (Decisions, item 1). Originally assessed against
+`origin/main` (cfe47cb).
+
+**Recording-phase notes (read before relying on this data):**
+
+- **Only ENGAGED drivers have a position.** Uber sends 0,0 for idle/offline drivers, which we store as
+  NULL, so `receipt_driver_*` is NULL for them (and for unlinked drivers and fixes older than
+  `LIVE_STALE_MINUTES`). This is a first-class limitation of the dataset, not a bug: a large share of
+  offers will carry no fix.
+- **Recording starts now, for the study.** The distance/city-based early-decline rules and any
+  reliable €/km rule are **gated on a post-hoc coverage measurement**: query, after about one week, what
+  share of offers carry a non-null `receipt_driver_lat` (overall, per tenant, per `receipt_driver_status`).
+  Do not build rules on this signal before that number is known.
+- **Implemented:** migration `2026_11_06_100000_add_driver_geo_study_columns_to_dispatch_offers`
+  (adds `receipt_driver_heading` and `chained_after_offer_id` indexed, `chain_context` json). The
+  driver fields are stamped inside `DOI::route`'s `create()` from the already-loaded driver (no extra
+  query, no push delay); the chain link is written AFTER the push, best-effort. All new columns are in
+  `OfferAnonymizer::CLEARED` (wiped at the retention cutoff with `raw_payload`).
+- **`chain_context.dest_source`** records where B came from: `'waypoints'` (final point of the
+  driver's `trip_waypoints`, snapshotted because it is transient) or `'active_offer'` (the active
+  offer's `dropoff_lat/lng`). `gap_bd_m` / `gap_cd_m` / `gap_method` are added later in `GeocodeOffer`.
+
+Design notes follow. Original status line: design only, no code in this addendum. Companion to `docs/29-addresses-and-geocoding.md` (the AN/AF/AL/TG/DOI/OL/DSI
 abbreviations are used as defined there).
 
 ### Owner requirement

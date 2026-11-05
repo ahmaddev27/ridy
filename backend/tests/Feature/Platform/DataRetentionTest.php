@@ -8,6 +8,7 @@ use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\Models\DriverMetric;
 use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Privacy\DriverEraser;
+use App\Domain\Privacy\OfferAnonymizer;
 use App\Domain\Privacy\RetentionPolicy;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
@@ -72,6 +73,29 @@ class DataRetentionTest extends TestCase
         $this->assertNotNull(DB::table('dispatch_offers')->where('id', $old->id)->value('anonymized_at'));
 
         $this->assertSame('Peter', $recent->fresh()->rider_first_name);
+    }
+
+    public function test_driver_geo_study_columns_are_wiped_with_the_offer(): void
+    {
+        foreach (['receipt_driver_lat', 'receipt_driver_lng', 'receipt_driver_fix_at', 'receipt_driver_status',
+            'receipt_driver_heading', 'chained_after_offer_id', 'chain_context'] as $column) {
+            $this->assertArrayHasKey($column, OfferAnonymizer::CLEARED);
+        }
+
+        Settings::setMany([RetentionPolicy::OFFER_MONTHS => '12']);
+        $old = $this->offer([
+            'received_at' => now()->subMonths(13), 'receipt_driver_lat' => 51.5136, 'receipt_driver_lng' => 7.4653,
+            'receipt_driver_fix_at' => now()->subMonths(13), 'receipt_driver_status' => 'ON_TRIP',
+            'chained_after_offer_id' => 99, 'chain_context' => ['dest_source' => 'waypoints'],
+        ]);
+
+        $this->artisan('data:retention')->assertSuccessful();
+
+        $old->refresh();
+        $this->assertNull($old->receipt_driver_lat);
+        $this->assertNull($old->receipt_driver_status);
+        $this->assertNull($old->chained_after_offer_id);
+        $this->assertNull($old->chain_context);
     }
 
     public function test_old_driver_metrics_are_deleted_when_enabled(): void
