@@ -1,10 +1,11 @@
 import { apiFetch } from "./client";
 import type { DispatchOffer, PageMeta } from "./offers";
 
-export type AutoDeclineReason = "min_fare" | "reject_cities" | "max_pickup_distance" | "max_trip_distance";
+export type AutoDeclineReason = "min_fare" | "min_price_per_km" | "reject_cities" | "max_pickup_distance" | "max_trip_distance";
 
 export const AUTO_DECLINE_REASONS: AutoDeclineReason[] = [
   "min_fare",
+  "min_price_per_km",
   "reject_cities",
   "max_pickup_distance",
   "max_trip_distance",
@@ -12,6 +13,8 @@ export const AUTO_DECLINE_REASONS: AutoDeclineReason[] = [
 
 export type AutoDeclineRules = {
   min_fare: { enabled: boolean; value_e2: number };
+  /** value_e2 = cents per km; and = keep only if BOTH fare and EUR/km pass, or = either. */
+  min_price_per_km: { enabled: boolean; value_e2: number; mode: "and" | "or" };
   reject_cities: { enabled: boolean; cities: string[] };
   max_pickup_distance: { enabled: boolean; km: number };
   max_trip_distance: { enabled: boolean; km: number };

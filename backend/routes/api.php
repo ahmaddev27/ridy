@@ -68,6 +68,7 @@ use App\Http\Controllers\Api\V1\Fleet\FleetWebauthnCredentialController;
 use App\Http\Controllers\Api\V1\FleetAutoDeclineController;
 use App\Http\Controllers\Api\V1\FleetSessionController;
 use App\Http\Controllers\Api\V1\HealthController;
+use App\Http\Controllers\Api\V1\Internal\PasskeyController;
 use App\Http\Controllers\Api\V1\Internal\SessionBrowserController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\NotificationPrefsController;
@@ -229,12 +230,11 @@ Route::prefix('v1')->group(function () {
                 Route::get('postal-codes/{plz}', [DriverPostalCodeController::class, 'show'])
                     ->where('plz', '[0-9]{5}')
                     ->middleware('throttle:60,1,driver-postal-code');
-                // Low-confidence receipts only: upload -> 202 + id, then poll.
-                // The photo is parsed by our own model and deleted.
+                // Live receipt capture: the photo is read in memory by our own
+                // model and the fields come back in the same response. The
+                // photo is never stored anywhere.
                 Route::post('receipt-vision', [DriverReceiptVisionController::class, 'store'])
-                    ->middleware('throttle:10,1,driver-receipt-vision');
-                Route::get('receipt-vision/{id}', [DriverReceiptVisionController::class, 'show'])
-                    ->whereUuid('id');
+                    ->middleware('throttle:20,1,driver-receipt-vision');
                 Route::post('submissions', [DriverSubmissionController::class, 'store'])
                     ->middleware('throttle:30,1,driver-submissions');
 
@@ -311,6 +311,12 @@ Route::prefix('v1')->group(function () {
         Route::get('rescue', [SessionBrowserController::class, 'rescue']);
         Route::post('status', [SessionBrowserController::class, 'status']);
         Route::post('{tenant}/capture', [SessionBrowserController::class, 'capture']);
+        // Software passkey registration (docs/31). Deliberately no GET of the credential itself.
+        Route::get('{tenant}/passkey', [PasskeyController::class, 'show']);
+        Route::post('{tenant}/passkey', [PasskeyController::class, 'store']);
+        Route::post('{tenant}/passkey/failure', [PasskeyController::class, 'failure']);
+        // Decrypted CDP-ready credential for co-browse injection (follow-up task); same flags.
+        Route::get('{tenant}/passkey/credential', [PasskeyController::class, 'credential']);
     });
 
     // Session basics every authenticated user needs — including tenant-less ones

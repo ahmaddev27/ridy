@@ -12,6 +12,7 @@ import { PersistentSessionManager, SESSION_STATE, jarFingerprint } from "./sessi
 import { createWarmDriver, statePath as driverStatePath } from "./warmDriver.js";
 import { launchBrowser, newStealthContext } from "./browser.js";
 import { scopeCookies } from "./cookieScope.js";
+import { registerPasskey } from "./passkey.js";
 
 const driver = createWarmDriver();
 
@@ -117,6 +118,53 @@ export async function backendHasSession(companyKey, { activeOnly = false } = {})
     return true;
   }
 }
+
+const passkeyUrl = (key) => `/api/v1/internal/session-browser/${encodeURIComponent(key)}/passkey`;
+
+// Backend side of the passkey registration (docs/31). The credential only ever goes OUT through
+// store(); nothing here reads one back.
+const passkeyBackend = {
+  async status(key) {
+    const res = await fetch(`${config.apiBaseUrl}${passkeyUrl(key)}`, {
+      headers: { Accept: "application/json", "X-Dispatch-Secret": config.dispatchSecret },
+    });
+    if (!res.ok) throw new Error(`passkey status -> ${res.status}`);
+    return (await res.json()).data;
+  },
+  store: (key, body) => backendPost(passkeyUrl(key), body),
+  fail: (key, reason) => backendPost(`${passkeyUrl(key)}/failure`, { reason }),
+};
+
+/**
+ * For the co-browse INJECTION step (next task): the company's decrypted credential, exactly the
+ * object CDP `WebAuthn.addCredential` takes ({credentialId, isResidentCredential, rpId,
+ * privateKey, userHandle, signCount}), or null (flags off / none / backend unreachable).
+ * Gated by UBER_AUTH_PASSKEY_REGISTER here and by the backend flags there. The caller must
+ * never log or persist the result.
+ */
+export async function fetchPasskeyCredential(companyKey) {
+  if (!config.passkeyRegister) return null;
+  try {
+    const res = await fetch(`${config.apiBaseUrl}${passkeyUrl(companyKey)}/credential`, {
+      headers: { Accept: "application/json", "X-Dispatch-Secret": config.dispatchSecret },
+    });
+    return res.ok ? ((await res.json()).data ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Register a software passkey from the company's HELD session browser (flag-gated on both
+ * sides, idempotent). Resolves { status }; never throws and never carries the credential.
+ */
+export const registerPasskeyForCompany = (companyKey) =>
+  registerPasskey(companyKey, {
+    enabled: () => config.passkeyRegister,
+    manager,
+    backend: passkeyBackend,
+    log: (m) => console.log(`[passkey] ${m}`),
+  });
 
 export function statusList() {
   return manager.status();

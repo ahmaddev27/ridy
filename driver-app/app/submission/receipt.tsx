@@ -1,20 +1,16 @@
 /**
  * Send a receipt to your own company.
  *
- * ## The photo is READ here and never sent
+ * ## The photo is ANALYSED live on our server and never stored (13.11.2026)
  *
- * The owner decided on 10.10.2026 that a driver sends the figures, not the
- * document. So the photo is taken, downscaled, passed to the phone's own OCR
- * engine, and stays on the device; what travels is what is on screen after
- * that, which the driver can correct first.
+ * The captured photo is sent to our own vision model, which is the
+ * authoritative reader; it answers with the fields in the same request. The
+ * server works in memory and stores nothing, and the phone deletes its temp
+ * copy the moment the answer (or failure) arrives. Only the parsed figures
+ * travel on to the company. A failed read shows a retry and stores nothing.
  *
- * **That removes the only thing that could catch a misreading later.** A
- * company reviewing a submission no longer has a document to compare the
- * amount against, so a wrong figure nobody notices at this screen is wrong for
- * good. Hence the marker below: a field the rules are UNSURE about is flagged
- * in the open and the form will not send until the driver has confirmed it by
- * hand. That guard is the whole of what replaced the evidence, and it should
- * not be quietly relaxed.
+ * With no photo kept anywhere, the server's reading is the only evidence; a
+ * value the driver does not recognise is caught at the confirm step.
  *
  * ## Nothing is typed (owner, 25.10.2026)
  *
@@ -60,10 +56,9 @@ import { useAuth } from "@/lib/auth";
 import { t, isRTL } from "@/lib/i18n";
 // A COPY of El-Professor's rules; the two move together and are measured
 // against the same fixtures in `tests/receipt-text-parse.test.mjs`.
-import { parseReceiptText, formatAmountDE, type OcrResult } from "@/lib/receipt-text-parse";
-import { rowsFromLines } from "@/lib/ocr-lines";
+import { formatAmountDE, type OcrResult } from "@/lib/receipt-text-parse";
 import { ocrResizeFor, OCR_QUALITY } from "@/lib/ocr-image";
-import { mergeVision, readWithVision, VISION_META_FIELD, type ReceiptFacts, type VisionKey } from "@/lib/receipt-vision";
+import { discard, mergeVision, readReceipt, VISION_META_FIELD, type ReceiptFacts, type VisionKey } from "@/lib/receipt-vision";
 import {
   evaluateScan,
   evaluateOdometer,
@@ -217,8 +212,6 @@ export default function ReceiptScreen() {
   // whether the city came from the server's PLZ table rather than the paper,
   // and when the driver vouched for a flagged field. The photo still stays on
   // the phone; this is the review trail that replaced it.
-  const [ocrText, setOcrText] = useState("");
-  const [lastScan, setLastScan] = useState<OcrResult | null>(null);
   const [cityFromPlz, setCityFromPlz] = useState(false);
   const [confirmedDateAt, setConfirmedDateAt] = useState<string | null>(null);
   const [confirmedAmountAt, setConfirmedAmountAt] = useState<string | null>(null);
@@ -239,9 +232,6 @@ export default function ReceiptScreen() {
   // `scanNote` is the one line explaining why a form came back empty; without
   // it a failed read is indistinguishable from a receipt with nothing on it.
   const [scanning, setScanning] = useState(false);
-  // The slow second pass (server vision model) is running; `scanning` stays
-  // true meanwhile so the step cannot advance on half a read.
-  const [visionWaiting, setVisionWaiting] = useState(false);
   const [visionKeys, setVisionKeys] = useState<VisionKey[]>([]);
   // Bumped on every new scan and on photo removal: a stale vision answer for a
   // photo that is gone must never land in the form.
@@ -291,8 +281,8 @@ export default function ReceiptScreen() {
   };
 
   /**
-   * Re-encode for OCR at near-lossless quality, shrinking only a source whose
-   * true long edge exceeds the cap. The re-encode also strips the EXIF.
+   * Re-encode the ODOMETER photo for on-device OCR (the receipt itself no
+   * longer goes through this: it is read by the server, see `scan`).
    */
   const prepare = async (asset: { uri: string; width?: number; height?: number }): Promise<PickedPhoto> => {
     const resize = ocrResizeFor(asset.width, asset.height);
@@ -333,8 +323,6 @@ export default function ReceiptScreen() {
     setPricePerLitre("");
     setStreet("");
     setBonNumber("");
-    setOcrText("");
-    setLastScan(null);
     setCityFromPlz(false);
     setConfirmedDateAt(null);
     setConfirmedAmountAt(null);
@@ -342,140 +330,63 @@ export default function ReceiptScreen() {
     const run = ++scanRun.current;
     setScanning(true);
     try {
-      // The engine's lines are NOT the receipt's rows: on a two-column till
-      // roll a label and its figure come back as separate lines, and every
-      // "same line" rule in the parser then sees nothing. `rowsFromLines` puts
-      // them back by where they sit on the page.
-      const result = await TextRecognition.recognize(uri);
-      const lines = result.blocks.flatMap((b) => b.lines);
-      const text = rowsFromLines(lines).join("\n");
-      const r: OcrResult = text.trim() === "" ? {} : parseReceiptText(text);
-      setOcrText(text);
-      setLastScan(r);
-
-      // The PLZ is read with a score and the city beside it is a guess at a
-      // line of text; the server's table is authoritative and wins whenever
-      // it knows the PLZ. Offline or unknown, the OCR's own city stands.
-      const authoritative = r.postalCode ? await api.postalCity(r.postalCode) : null;
-      const resolvedCity = authoritative ?? r.city ?? "";
-      setCityFromPlz(typeof authoritative === "string" && authoritative.trim() !== "");
-
-      // A category this build does not offer is dropped rather than shown. With
-      // none read, fuel figures still say it is a refuel; with neither, the
-      // category is left for the driver's tap and the fuel fields are not
-      // demanded here (a car wash must not loop on "litres not read").
-      const parsed = (CATEGORIES as readonly string[]).includes(r.category ?? "") ? (r.category as string) : null;
-      const sawFuelFigures = r.litres !== undefined || r.pricePerLitre !== undefined;
-      const effective = parsed ?? (sawFuelFigures ? "Tanken" : null);
-      if (effective !== null) setCategory(effective);
-
-      if (r.date) {
-        setDate(r.date);
-        setCheckDate(r.dateReason?.startsWith("Unsicher") === true);
-      }
-      if (r.amount !== undefined) {
-        setAmount(formatAmountDE(r.amount));
-        setCheckAmount(r.amountReason?.startsWith("Unsicher") === true);
-      }
-      if (r.postalCode) setPlz(r.postalCode);
-      if (r.merchantName) setMerchant(r.merchantName);
-      if (resolvedCity) setCity(resolvedCity);
-      if (r.street) setStreet(r.street);
-      // The printed Bon wins; a labelled Beleg-Nr stands in when there is none.
-      const printedNo = r.bonNumber ?? r.receiptNumber;
-      if (printedNo) setBonNumber(printedNo);
-      // A printed time wins; none printed means the capture time, labelled as
-      // such on screen. See `resolveReceiptTime` for why that is a proxy.
-      const when = resolveReceiptTime(r.time, captureClock(exifStamp, new Date()));
-      setReceiptTime(when.time);
-      setTimeFromCapture(when.fromCapture);
-      // German decimals on screen, converted once on the way out.
-      if (r.litres !== undefined) setLitres(r.litres.toFixed(2).replace(".", ","));
-      if (r.pricePerLitre !== undefined) {
-        setPricePerLitre(r.pricePerLitre.toFixed(3).replace(".", ","));
-      }
-
-      // The gate. Every field the send requires must have been READ; a photo
-      // that missed any is retaken, and the message names what was missed and
-      // the most likely reason, so the next photo is not the same one.
-      let verdict = evaluateScan(
-        lines,
+      const fields = await readReceipt(uri, size);
+      if (run !== scanRun.current) return; // photo removed or replaced meanwhile
+      const { facts, overridden } = mergeVision({}, fields);
+      applyFacts(facts, exifStamp);
+      setVisionKeys(overridden);
+      setCityFromPlz(fields.city_from_plz === true && Boolean(fields.city));
+      const verdict = evaluateScan(
+        [],
         {
-          date: r.date,
-          amount: r.amount,
-          merchant: r.merchantName,
-          city: resolvedCity,
-          litres: r.litres,
-          pricePerLitre: r.pricePerLitre,
-          fuel: effective === "Tanken",
+          date: facts.date,
+          amount: facts.amount,
+          merchant: facts.merchant,
+          city: facts.city,
+          litres: facts.litres,
+          pricePerLitre: facts.pricePerLitre,
+          fuel: effectiveCategory(facts) === "Tanken",
         },
         size,
       );
-
-      // Low confidence = the gate failed or a key field is only "Unsicher".
-      // Only then does the photo go to OUR server's vision model (deleted
-      // after parse); a clean on-device read never leaves the phone.
-      const flaggedDate = r.dateReason?.startsWith("Unsicher") === true;
-      const flaggedAmount = r.amountReason?.startsWith("Unsicher") === true;
-      if (!verdict.ok || flaggedDate || flaggedAmount) {
-        const mlFacts: ReceiptFacts = {
-          date: r.date, amount: r.amount, merchant: r.merchantName, city: resolvedCity || undefined,
-          plz: r.postalCode, street: r.street, litres: r.litres, pricePerLitre: r.pricePerLitre,
-          category: effective,
-        };
-        setVisionWaiting(true);
-        const vision = await readWithVision(uri, size, () => run === scanRun.current);
-        if (run !== scanRun.current) return; // photo removed or replaced meanwhile
-        if (vision !== null) {
-          const merged = mergeVision(mlFacts, vision);
-          const f = merged.facts;
-          if (f.date) setDate(f.date);
-          if (f.amount !== undefined) setAmount(formatAmountDE(f.amount));
-          if (f.merchant) setMerchant(f.merchant);
-          if (f.city) setCity(f.city);
-          if (f.plz) setPlz(f.plz);
-          if (f.street) setStreet(f.street);
-          if (f.receiptNumber) setBonNumber(f.receiptNumber);
-          if (f.litres !== undefined) setLitres(f.litres.toFixed(2).replace(".", ","));
-          if (f.pricePerLitre !== undefined) setPricePerLitre(f.pricePerLitre.toFixed(3).replace(".", ","));
-          if (f.category && (CATEGORIES as readonly string[]).includes(f.category)) setCategory(f.category);
-          if (merged.overridden.includes("time") && f.time && !r.time) {
-            setReceiptTime(f.time);
-            setTimeFromCapture(false);
-          }
-          if (merged.cityFromPlz) setCityFromPlz(true);
-          // Two readers that disagree on a date/amount: the driver confirms it.
-          const dateDiffers = merged.overridden.includes("date") && !merged.dateAgrees && (flaggedDate || r.date !== undefined);
-          const amountDiffers = merged.overridden.includes("amount") && !merged.amountAgrees && (flaggedAmount || r.amount !== undefined);
-          setCheckDate(merged.overridden.includes("date") ? dateDiffers : flaggedDate);
-          setCheckAmount(merged.overridden.includes("amount") ? amountDiffers : flaggedAmount);
-          setVisionKeys(merged.overridden);
-          verdict = evaluateScan(
-            lines,
-            {
-              date: f.date,
-              amount: f.amount,
-              merchant: f.merchant,
-              city: f.city,
-              litres: f.litres,
-              pricePerLitre: f.pricePerLitre,
-              fuel: (f.category ?? effective) === "Tanken",
-            },
-            size,
-          );
-        }
-      }
       if (!verdict.ok) {
         setNeedsRetake(true);
-        setScanNote(retakeMessage(verdict.messageKey, verdict.missing));
+        setScanNote(retakeMessage("receipt.retakeGeneric", verdict.missing));
       }
     } catch {
+      if (run !== scanRun.current) return;
       setNeedsRetake(true);
-      setScanNote(t("receipt.scanFailed"));
+      setScanNote(t("receipt.scanFailedRetry"));
     } finally {
-      setVisionWaiting(false);
+      // The photo has done its one job; nothing keeps a copy of it.
+      discard(uri);
       if (run === scanRun.current) setScanning(false);
     }
+  };
+
+  /** Category the server named, else Tanken when it saw fuel figures. */
+  const effectiveCategory = (f: ReceiptFacts): string | null => {
+    const named = (CATEGORIES as readonly string[]).includes(f.category ?? "") ? (f.category as string) : null;
+    return named ?? (f.litres !== undefined || f.pricePerLitre !== undefined ? "Tanken" : null);
+  };
+
+  /** Put the server's fields into the (read-only) form state. */
+  const applyFacts = (f: ReceiptFacts, exifStamp: unknown) => {
+    const category = effectiveCategory(f);
+    if (category !== null) setCategory(category);
+    if (f.date) setDate(f.date);
+    if (f.amount !== undefined) setAmount(formatAmountDE(f.amount));
+    if (f.plz) setPlz(f.plz);
+    if (f.merchant) setMerchant(f.merchant);
+    if (f.city) setCity(f.city);
+    if (f.street) setStreet(f.street);
+    if (f.receiptNumber) setBonNumber(f.receiptNumber);
+    // A printed time wins; none printed means the capture time, labelled as such.
+    const when = resolveReceiptTime(f.time, captureClock(exifStamp, new Date()));
+    setReceiptTime(when.time);
+    setTimeFromCapture(when.fromCapture);
+    if (f.litres !== undefined) setLitres(f.litres.toFixed(2).replace(".", ","));
+    if (f.pricePerLitre !== undefined) setPricePerLitre(f.pricePerLitre.toFixed(3).replace(".", ","));
   };
 
   /**
@@ -534,13 +445,14 @@ export default function ReceiptScreen() {
   };
 
   /** One photo from any source (live scan, picker, library) into the ONE
-   *  read path: prepare for OCR, scan, vision fallback, confirm. */
+   *  read path: send to the server reader, fill the form, confirm. */
   const acceptAsset = async (asset: { uri: string; width?: number; height?: number; exif?: Record<string, unknown> | null }) => {
     setBusy(true);
     try {
-      const prepared = await prepare(asset);
-      setPhoto(prepared);
-      await scan(prepared.uri, odoSize(asset), asset.exif?.DateTimeOriginal);
+      // No re-encode and no copy: the photo goes to the server as captured
+      // (scaled in readReceipt) and its file is deleted when the read ends.
+      setPhoto({ uri: asset.uri, name: "beleg.jpg", type: "image/jpeg" });
+      await scan(asset.uri, odoSize(asset), asset.exif?.DateTimeOriginal);
     } catch {
       toast.show(t("receipt.photoFailed"));
     } finally {
@@ -623,15 +535,16 @@ export default function ReceiptScreen() {
         range_km:
           category === "Tanken" && odometerRequired && rangeKm.trim() !== "" ? rangeKm.trim() : null,
         street: street.trim() || null,
-        station_name: lastScan?.stationName ?? null,
-        operator_name: lastScan?.operatorName ?? null,
-        station_number: lastScan?.stationNumber ?? null,
+        station_name: null,
+        operator_name: null,
+        station_number: null,
         receipt_number: bonNumber.trim() || null,
-        tse_time: lastScan?.tseTime ?? null,
+        tse_time: null,
         // The review trail: the raw rows and, per field, where its value came
         // from. The server keeps both OUTSIDE the business payload.
-        ocr_text: ocrText.trim() === "" ? null : ocrText.slice(0, 8000),
-        ocr_meta: buildOcrMeta(lastScan, {
+        // No raw text either: the photo and its transcript are never kept.
+        ocr_text: null,
+        ocr_meta: buildOcrMeta(null, {
           timeFromCapture,
           cityFromPlz,
           confirmedDateAt,
@@ -715,17 +628,11 @@ export default function ReceiptScreen() {
         <SectionLabel>{t("receipt.photo")}</SectionLabel>
         {photo ? (
           <View style={{ ...cardStyle(c), padding: 12, gap: 10 }}>
-            <Image
-              source={{ uri: photo.uri }}
-              style={{ width: "100%", height: 260, borderRadius: radius.md, backgroundColor: c.surface2 }}
-              resizeMode="contain"
-              accessibilityLabel={t("receipt.photoAlt")}
-            />
             {scanning && (
               <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 8 }}>
                 <ActivityIndicator color={c.ink} />
                 <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>
-                  {visionWaiting ? t("receipt.scanningDeep") : t("receipt.scanning")}
+                  {t("receipt.scanning")}
                 </Text>
               </View>
             )}
@@ -735,15 +642,17 @@ export default function ReceiptScreen() {
             {/* Said plainly, because it is the opposite of what a driver expects
                 from a button labelled "take a photo of the receipt". */}
             <Text style={{ color: c.inkSubtle, fontSize: 12.5, textAlign: "center" }}>
-              {t("receipt.photoStaysHere")}
+              {t("receipt.photoAnalysed")}
             </Text>
             <Pressable
-              onPress={() => { scanRun.current += 1; setScanning(false); setVisionWaiting(false); setPhoto(null); setScanNote(null); setCheckDate(false); setCheckAmount(false); setNeedsRetake(false); }}
+              onPress={() => { scanRun.current += 1; setScanning(false); setPhoto(null); setScanNote(null); setCheckDate(false); setCheckAmount(false); setNeedsRetake(false); }}
               accessibilityRole="button"
               style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 6 }}
             >
               <X size={16} color={c.danger} strokeWidth={2} />
-              <Text style={{ color: c.danger, fontWeight: "700", fontSize: 13.5 }}>{t("receipt.photoRemove")}</Text>
+              <Text style={{ color: c.danger, fontWeight: "700", fontSize: 13.5 }}>
+                {needsRetake ? t("receipt.retry") : t("receipt.photoRemove")}
+              </Text>
             </Pressable>
           </View>
         ) : (
