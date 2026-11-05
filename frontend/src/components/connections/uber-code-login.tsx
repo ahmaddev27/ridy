@@ -10,6 +10,7 @@ import { CobrowseViewer, type CobrowseEndReason } from "@/components/connections
 import { useI18n } from "@/lib/i18n/context";
 import { useAuth } from "@/components/auth/auth-provider";
 import { apiErrorMessage } from "@/lib/api/error-message";
+import { getFleetSession } from "@/lib/api/fleet-session";
 import {
   cancelUberLogin,
   closeCobrowse,
@@ -117,6 +118,26 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
     }
   }, [waiting, remaining]);
 
+  // A "failed" login status can be stale: the puzzle may have been solved and the session adopted
+  // (fleet session active) while the login attempt still reports e.g. challenge_timeout. Before
+  // showing a failure, confirm against the real session and treat an active one as success.
+  useEffect(() => {
+    if (status?.state !== "failed") return;
+    let cancelled = false;
+    getFleetSession()
+      .then((session) => {
+        if (cancelled || session?.status !== "active") return;
+        setStatus({ state: "connected", mode: status.mode, channel: null, expires_at: null });
+        toast.success(c("codeSuccess"));
+        onConnected();
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status?.state]);
+
   // Leaving the challenge step (solved, failed, cancelled) always tears the viewer down.
   useEffect(() => {
     if (!challenge) setTicket(null);
@@ -130,7 +151,7 @@ export function UberCodeLogin({ onConnected }: { onConnected: () => void }) {
     setTicket(null);
     getUberLoginStatus()
       .then((next) => {
-        setStatus(next);
+        setStatus(next); // a stale "failed" is re-checked against the fleet session by the effect above
         if (next.state === "connected") {
           toast.success(c("codeSuccess"));
           onConnected();
