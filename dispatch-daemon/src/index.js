@@ -36,7 +36,7 @@ async function main() {
   console.log(
     config.proxyUrl
       ? "global fallback proxy configured; per-company proxy_url overrides it"
-      : "no global proxy — companies without their own proxy_url connect directly (Uber blocks that)",
+      : "no global proxy — companies without their own proxy_url are NOT streamed (fail closed, never datacenter-direct)",
   );
   await reconcileTick();
   polling = true;

@@ -199,8 +199,35 @@ async function reconcile() {
   }
 }
 
+// Sessions already warned about for having no proxy, so the 60s reconcile loop
+// logs once per outage instead of every pass. Cleared when a proxy appears.
+const noProxyWarned = new Set();
+
+/**
+ * Fail CLOSED: a company's Uber traffic must go through its own residential
+ * proxy. A session with no per-company, global or env proxy is never streamed
+ * (a datacenter-direct stream is a ban risk); it starts on the reconcile after
+ * a proxy is assigned.
+ */
+function hasUsableProxy(session) {
+  if (session.proxy_url || config.proxyUrl) {
+    noProxyWarned.delete(session.id);
+    return true;
+  }
+  if (!noProxyWarned.has(session.id)) {
+    noProxyWarned.add(session.id);
+    console.warn(`session ${session.id}: no proxy configured — refusing to stream (never connect datacenter-direct)`);
+  }
+  captureThrottled(`no-proxy:${session.id}`, new Error("session has no proxy; stream refused"), {
+    where: "stream_no_proxy",
+    sessionId: session.id,
+  });
+  return false;
+}
+
 /** Build (but don't run) the missing streams of one session; all-or-nothing. */
 function startSessionStreams(session) {
+  if (!hasUsableProxy(session)) return [];
   const created = [];
   try {
     config.ramenPaths.forEach((path, index) => {

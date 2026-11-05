@@ -10,7 +10,7 @@ const { streams, reconcileTick } = await import("../src/supervisor.js");
 // Streams must never touch the network in tests.
 RamenStream.prototype.run = async function () {};
 
-const good = (id) => ({ id, uber_org_uuid: `org-${id}-uuid`, cookies: [{ name: "sid", value: `v${id}` }], proxy_url: "" });
+const good = (id) => ({ id, uber_org_uuid: `org-${id}-uuid`, cookies: [{ name: "sid", value: `v${id}` }], proxy_url: "http://u:p@proxy:8080" });
 
 after(() => {
   for (const stream of streams.values()) stream.stop();
@@ -52,6 +52,23 @@ test("a failing session poll or reconcile error never rejects", async () => {
   await reconcileTick();
   // null session list = nothing active: every stream is stopped, nothing throws.
   assert.equal(streams.size, 0);
+});
+
+test("a session with no proxy is never streamed, and starts once a proxy appears", async () => {
+  const bare = { ...good(6), proxy_url: "" };
+  api.sessions = async () => ({ sessions: [bare], globalProxyUrl: "" });
+  await reconcileTick();
+  await reconcileTick();
+  assert.equal([...streams.keys()].some((k) => k.startsWith("6:")), false);
+
+  api.sessions = async () => ({ sessions: [good(6)], globalProxyUrl: "" });
+  await reconcileTick();
+  assert.equal([...streams.keys()].some((k) => k.startsWith("6:")), true);
+
+  // Losing the proxy tears the stream down rather than leaving it direct.
+  api.sessions = async () => ({ sessions: [bare], globalProxyUrl: "" });
+  await reconcileTick();
+  assert.equal([...streams.keys()].some((k) => k.startsWith("6:")), false);
 });
 
 test("a new jar_version restarts the streams even when the cookies match the primary's rotation", async () => {
