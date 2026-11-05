@@ -165,6 +165,29 @@ class OfferPushPathTest extends TestCase
         $this->assertSame([], $this->spy->tokens, 'an auto-declined offer must never be pushed');
     }
 
+    public function test_admin_revoked_driver_is_never_auto_declined_even_if_opted_in_with_rules(): void
+    {
+        $tenant = Tenant::first();
+        $tenant->setDispatchRejectEnabled(true);
+
+        Driver::where('uber_driver_uuid', self::DRIVER_UUID)->update([
+            'auto_decline' => ['admin_enabled' => false, 'enabled' => true, 'rules' => [
+                'min_fare' => ['enabled' => true, 'value_e2' => 1000],
+                'min_price_per_km' => ['enabled' => true, 'value_e2' => 500, 'mode' => 'or'],
+            ]],
+        ]);
+
+        // €7.41 is under the floor, but the admin gate is closed: normal push, no decline.
+        $this->ingest([$this->offer('o-revoked') + ['realOfferUUID' => 'real-revoked']])
+            ->assertOk()
+            ->assertJsonPath('data.early_declined', 0)
+            ->assertJsonPath('data.routed', 1);
+
+        $record = DispatchOffer::withoutGlobalScopes()->where('offer_uuid', 'o-revoked')->first();
+        $this->assertNull($record->auto_decline_reason);
+        $this->assertSame(['phone'], $this->spy->tokens, 'the normal push must still go out');
+    }
+
     public function test_an_offer_above_the_fare_floor_is_pushed_normally(): void
     {
         $tenant = Tenant::first();
