@@ -474,6 +474,24 @@ const de: Dict = {
   "note.sent": "Notiz gesendet und übernommen.",
   "note.sendFailed": "Senden fehlgeschlagen. Bitte später erneut versuchen.",
   "note.rejectedByServer": "Eine Angabe wurde nicht akzeptiert. Bitte Datum und Uhrzeit prüfen.",
+  // ---- Manager app ----
+  "tabs.manager": "Flotte",
+  "mgr.title": "Früh abgelehnt – Fahrer",
+  "mgr.hint": "Entscheide, wer „Früh abgelehnt“ nutzen darf.",
+  "mgr.allowed": "Erlaubt",
+  "mgr.blocked": "Gesperrt",
+  "mgr.driverOn": "Beim Fahrer aktiv",
+  "mgr.driverOff": "Vom Fahrer nicht aktiviert",
+  "mgr.empty": "Keine Fahrer gefunden.",
+  "mgr.featureOff": "Die Funktion ist für dein Unternehmen nicht aktiviert. Der Betreiber schaltet sie frei.",
+  "mgr.loadFailed": "Laden fehlgeschlagen",
+  "mgr.loadFailedBody": "Zum Aktualisieren nach unten ziehen.",
+  "mgr.saveFailed": "Änderung konnte nicht gespeichert werden",
+  "mgr.minFare": "Mindestpreis",
+  "mgr.perKm": "pro km",
+  "mgr.and": "und",
+  "mgr.or": "oder",
+  "mgr.noRules": "Keine Regeln aktiv",
 };
 
 const en: Dict = {
@@ -942,6 +960,24 @@ const en: Dict = {
   "note.sent": "Note sent and taken over.",
   "note.sendFailed": "Sending failed. Please try again later.",
   "note.rejectedByServer": "One of the details was not accepted. Please check the date and the time.",
+  // ---- Manager app ----
+  "tabs.manager": "Fleet",
+  "mgr.title": "Early decline – drivers",
+  "mgr.hint": "Decide who may use Early decline.",
+  "mgr.allowed": "Allowed",
+  "mgr.blocked": "Blocked",
+  "mgr.driverOn": "Active for the driver",
+  "mgr.driverOff": "Not switched on by the driver",
+  "mgr.empty": "No drivers found.",
+  "mgr.featureOff": "The feature is not enabled for your company. The operator turns it on.",
+  "mgr.loadFailed": "Could not load",
+  "mgr.loadFailedBody": "Pull down to refresh.",
+  "mgr.saveFailed": "Could not save the change",
+  "mgr.minFare": "Min. fare",
+  "mgr.perKm": "per km",
+  "mgr.and": "and",
+  "mgr.or": "or",
+  "mgr.noRules": "No rules active",
 };
 
 const ar: Dict = {
@@ -1410,6 +1446,24 @@ const ar: Dict = {
   "note.sent": "تم إرسال الملاحظة واعتمادها.",
   "note.sendFailed": "فشل الإرسال. حاول لاحقاً.",
   "note.rejectedByServer": "إحدى البيانات غير مقبولة. راجع التاريخ والوقت.",
+  // ---- Manager app ----
+  "tabs.manager": "الأسطول",
+  "mgr.title": "الرفض المبكر – السائقون",
+  "mgr.hint": "حدّد من يحق له استخدام الرفض المبكر.",
+  "mgr.allowed": "مسموح",
+  "mgr.blocked": "محظور",
+  "mgr.driverOn": "مفعّل لدى السائق",
+  "mgr.driverOff": "لم يفعّله السائق",
+  "mgr.empty": "لا يوجد سائقون.",
+  "mgr.featureOff": "الميزة غير مفعّلة لشركتك. يفعّلها المشغّل.",
+  "mgr.loadFailed": "تعذّر التحميل",
+  "mgr.loadFailedBody": "اسحب للأسفل للتحديث.",
+  "mgr.saveFailed": "تعذّر حفظ التغيير",
+  "mgr.minFare": "الحد الأدنى للأجرة",
+  "mgr.perKm": "لكل كم",
+  "mgr.and": "و",
+  "mgr.or": "أو",
+  "mgr.noRules": "لا توجد قواعد مفعّلة",
 };
 
 const DICTS: Record<string, Dict> = { de, en, ar };
