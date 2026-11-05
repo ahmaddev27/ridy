@@ -13,7 +13,7 @@ use Illuminate\Validation\ValidationException;
  * Validates and stores one Beleg or note filed IN A DRIVER'S NAME.
  *
  * Shared by the driver's own endpoint and the manager's on-behalf one, so the
- * wire rules, the photo handling and the El-Professor ring exist exactly once.
+ * wire rules, the El-Professor ring exist exactly once.
  * The caller decides WHO the driver is (token for a driver; a tenant-checked
  * pick for a manager) and whether the company is connected; this class only
  * ever receives an already-authorised {@see Driver}.
@@ -56,10 +56,9 @@ class SubmissionRecorder
 
         if ($subject === 'receipt') {
             $rules += [
-                // The photo, when there is one. Older app builds still send it;
-                // builds from 10.10.2026 read the receipt on the phone and send
-                // the figures alone. Still capped below PHP's post_max_size,
-                // above which the request arrives EMPTY with no message at all.
+                // Accepted from older builds, validated and DROPPED (never
+                // stored). Capped below PHP's post_max_size, above which the
+                // request arrives EMPTY with no message at all.
                 'document' => [
                     'nullable', 'file', 'mimes:jpg,jpeg,png,pdf',
                     'max:'.config('elprofessor.max_document_kb', 8192),
@@ -164,20 +163,8 @@ class SubmissionRecorder
     }
 
     /** @param  array<string, mixed>  $data  as returned by {@see validate()} */
-    public function record(Driver $driver, string $subject, array $data, Request $request, bool $storePhoto = true): ElProfessorSubmission
+    public function record(Driver $driver, string $subject, array $data, Request $request): ElProfessorSubmission
     {
-        $path = null;
-        $mime = null;
-        $bytes = null;
-        $file = $subject === 'receipt' && $storePhoto ? $request->file('document') : null;
-        if ($file !== null) {
-            // One folder per fleet, so a cleanup or an export is per tenant and
-            // never has to parse a filename to know whose it is.
-            $path = $file->store('elprofessor/'.$driver->tenant_id, config('elprofessor.disk', 'local'));
-            $mime = $file->getMimeType();
-            $bytes = $file->getSize();
-        }
-
         // An absent plate is sent as an absent field, never as null.
         $payload = collect($data)
             ->except(['subject', 'document', 'ocr_text', 'ocr_meta', 'driver_id'])
@@ -192,9 +179,6 @@ class SubmissionRecorder
             'payload' => $payload,
             'ocr_text' => $data['ocr_text'] ?? null,
             'ocr_meta' => $data['ocr_meta'] ?? null,
-            'document_path' => $path,
-            'document_mime' => $mime,
-            'document_bytes' => $bytes,
         ]);
 
         // The ring is best-effort by design: the submission is already stored

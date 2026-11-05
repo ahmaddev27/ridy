@@ -353,6 +353,8 @@ export type OffersQuery = {
 /** The driver's standing Early-decline rules (docs/25). Money is integer cents. */
 export type AutoDeclineRules = {
   min_fare: { enabled: boolean; value_e2: number };
+  /** value_e2 = cents per km; mode = how it combines with min_fare (and = keep only if BOTH pass). */
+  min_price_per_km: { enabled: boolean; value_e2: number; mode: "and" | "or" };
   reject_cities: { enabled: boolean; cities: string[] };
   max_pickup_distance: { enabled: boolean; km: number };
   max_trip_distance: { enabled: boolean; km: number };
@@ -708,35 +710,25 @@ export class ApiClient {
   }
 
   /**
-   * Hand a hard-to-read receipt photo to OUR vision model (low-confidence
-   * fallback only). Acked at once with a job id; the photo is deleted
-   * server-side right after it is parsed. Rejects with 503 when the server
-   * has the feature switched off - the caller keeps the on-device result.
+   * Live receipt reading: the captured photo goes to OUR vision model and the
+   * parsed fields come back in the same response. The server processes it in
+   * memory and stores nothing. Throws ApiError (503 = feature off, 502 = the
+   * model failed); the caller offers a retry and stores nothing.
    */
-  receiptVisionStart(photo: PickedPhoto, forDriverId?: number) {
+  receiptRead(photo: PickedPhoto, forDriverId?: number) {
     const form = new FormData();
     form.append("image", photo as unknown as Blob);
+    // An owner/manager reads it for the driver they picked (tenant-checked
+    // server-side); a driver reads their own.
     if (forDriverId !== undefined) form.append("driver_id", String(forDriverId));
     const path = forDriverId === undefined ? "/api/v1/driver/receipt-vision" : "/api/v1/driver/fleet/receipt-vision";
-    return this.request<{ data: { id: string } }>(path, {
+    return this.request<{ data: { fields: VisionFields } }>(path, {
       method: "POST",
       body: form,
       // Empty = let the runtime set multipart with its own boundary.
       headers: { "Content-Type": "" },
-      timeoutMs: 45_000,
+      timeoutMs: 60_000,
     });
-  }
-
-  /** The state of a vision job: pending, done (with fields) or failed. 404 once expired. */
-  receiptVisionResult(id: string, forDriverId?: number) {
-    const path =
-      forDriverId === undefined
-        ? `/api/v1/driver/receipt-vision/${encodeURIComponent(id)}`
-        : `/api/v1/driver/fleet/receipt-vision/${encodeURIComponent(id)}?driver_id=${forDriverId}`;
-    return this.request<{ data: { status: "pending" | "done" | "failed"; fields?: VisionFields } }>(
-      path,
-      { timeoutMs: 10_000 },
-    );
   }
 
   fleetMe() {

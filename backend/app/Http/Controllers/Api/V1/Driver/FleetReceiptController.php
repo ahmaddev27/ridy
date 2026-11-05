@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Api\V1\Driver;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\SubmissionRecorder;
 use App\Domain\Receipts\ReceiptVision;
-use App\Domain\Receipts\ReceiptVisionJobs;
 use App\Http\Controllers\Controller;
-use App\Jobs\ProcessReceiptVision;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * A company manager/owner files a Beleg FOR one of their own drivers.
@@ -44,19 +44,22 @@ class FleetReceiptController extends Controller
         }
 
         $driver = $this->driverOf($request, $user);
-        // Zero image storage on this path: the photo is analysed through
-        // `visionStart` (parsed, then deleted) and only the figures are filed.
-        // A `document` sent anyway is ignored (storePhoto: false).
+        // Zero image storage: the photo is analysed in memory by `vision` and
+        // only the figures are filed; a `document` sent anyway is dropped.
         $request->merge(['subject' => 'receipt']);
         [$subject, $data] = $recorder->validate($request);
-        $row = $recorder->record($driver, $subject, $data, $request, storePhoto: false);
+        $row = $recorder->record($driver, $subject, $data, $request);
 
         return response()->json([
             'data' => ['id' => $row->uuid, 'subject' => $row->subject, 'status' => $row->status],
         ], 201);
     }
 
-    public function visionStart(Request $request, ReceiptVision $vision, ReceiptVisionJobs $jobs): JsonResponse
+    /**
+     * Synchronous and no-store, exactly like the driver's `receipt-vision`: the
+     * photo is read into memory, parsed and answered in this response.
+     */
+    public function vision(Request $request, ReceiptVision $vision): JsonResponse
     {
         $user = $this->owner($request);
         $request->validate(['image' => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:4096']]);
@@ -66,20 +69,15 @@ class FleetReceiptController extends Controller
             return response()->json(['message' => 'Receipt vision is not available.'], 503);
         }
 
-        $id = $jobs->begin($driver->id, (string) $request->file('image')->get());
-        ProcessReceiptVision::dispatch($driver->id, $id);
+        try {
+            $fields = $vision->read((string) $request->file('image')->get());
+        } catch (Throwable $e) {
+            Log::warning('receipt-vision.failed', ['driver' => $driver->id, 'error' => $e->getMessage()]);
 
-        return response()->json(['data' => ['id' => $id, 'status' => 'pending']], 202);
-    }
+            return response()->json(['message' => 'The receipt could not be read.'], 502);
+        }
 
-    public function visionShow(Request $request, ReceiptVisionJobs $jobs, string $id): JsonResponse
-    {
-        $driver = $this->driverOf($request, $this->owner($request));
-        $state = $jobs->status($driver->id, $id);
-
-        return $state === null
-            ? response()->json(['message' => 'Unknown or expired.'], 404)
-            : response()->json(['data' => $state]);
+        return response()->json(['data' => ['fields' => $fields]]);
     }
 
     private function owner(Request $request): User

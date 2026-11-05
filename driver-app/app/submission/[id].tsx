@@ -10,9 +10,8 @@
  *
  * ## The photo is NOT shown here
  *
- * The owner decided (25.10.2026) that no image is displayed in the app. The
- * screen only says whether a photo was attached and sent, from the `document`
- * metadata; El-Professor reads the file through its own integration path.
+ * No photo is ever stored (13.11.2026), so the screen says nothing about
+ * one: no "photo sent" and no "no photo" line.
  */
 import { useCallback, useEffect, useState } from "react";
 import { View, ScrollView, Pressable, ActivityIndicator } from "react-native";
@@ -162,7 +161,6 @@ export default function SubmissionDetailScreen() {
   }, [load]);
 
   const groups = item ? (item.subject === "receipt" ? receiptGroups(item.fields) : noteGroups(item.fields)) : [];
-  const doc = item?.document;
   const sent = instantLabel(item?.created_at, intlLocale());
 
   return (
@@ -213,14 +211,6 @@ export default function SubmissionDetailScreen() {
             {groups.map((g) => (
               <Rows key={g.title} c={c} row={row} group={g} />
             ))}
-            {item.subject === "receipt" && doc && (
-              <View style={{ gap: 8 }}>
-                <SectionLabel>{t("subs.d.photo")}</SectionLabel>
-                <Text style={{ color: c.inkMuted, fontSize: 13.5 }}>
-                  {doc.available ? t("subs.d.photoSent") : t("subs.d.photoNone")}
-                </Text>
-              </View>
-            )}
           </>
         )}
       </ScrollView>

@@ -18,7 +18,12 @@ class DriverStatsService
     public function forDriver(Driver $driver, CarbonImmutable $from, CarbonImmutable $to): array
     {
         // $to is an exclusive upper bound (fleet-day next-04:00 boundary).
-        $rows = DispatchOffer::where('driver_uuid', $driver->uber_driver_uuid)
+        // The same person keeps their Uber UUID across companies, so the UUID alone
+        // would surface a previous company's offers: pin to this row's tenant too, and
+        // drop the global scope (a no-op without a tenant context) for an explicit one.
+        $rows = DispatchOffer::withoutGlobalScopes()
+            ->where('tenant_id', $driver->tenant_id)
+            ->where('driver_uuid', $driver->uber_driver_uuid)
             ->where('received_at', '>=', $from)
             ->where('received_at', '<', $to)
             ->get(['fare_amount', 'distance_m', 'accepted_at', 'status', 'dispatch_rejected_at']);

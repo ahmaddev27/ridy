@@ -8,7 +8,10 @@ import { useEffect, useSyncExternalStore } from "react";
 import { api, type AutoDeclineRules } from "@/lib/api";
 import { toAsciiDigits } from "@/lib/format";
 
-export const RULE_KEYS = ["min_fare", "reject_cities", "max_pickup_distance", "max_trip_distance"] as const;
+/** Server cap for a money rule (cents). */
+export const MAX_VALUE_E2 = 100000;
+
+export const RULE_KEYS = ["min_fare", "min_price_per_km", "reject_cities", "max_pickup_distance", "max_trip_distance"] as const;
 export type AutoDeclineRuleKey = (typeof RULE_KEYS)[number];
 
 let featureEnabled = false;
@@ -87,7 +90,9 @@ export function kmToText(km: number): string {
 /** A rule that is switched on but has nothing to compare against is not savable. */
 export function invalidRules(rules: AutoDeclineRules): AutoDeclineRuleKey[] {
   const bad: AutoDeclineRuleKey[] = [];
-  if (rules.min_fare.enabled && rules.min_fare.value_e2 <= 0) bad.push("min_fare");
+  if (rules.min_fare.enabled && (rules.min_fare.value_e2 <= 0 || rules.min_fare.value_e2 > MAX_VALUE_E2)) bad.push("min_fare");
+  const perKm = rules.min_price_per_km;
+  if (perKm.enabled && (perKm.value_e2 <= 0 || perKm.value_e2 > MAX_VALUE_E2)) bad.push("min_price_per_km");
   if (rules.reject_cities.enabled && rules.reject_cities.cities.length === 0) bad.push("reject_cities");
   if (rules.max_pickup_distance.enabled && rules.max_pickup_distance.km <= 0) bad.push("max_pickup_distance");
   if (rules.max_trip_distance.enabled && rules.max_trip_distance.km <= 0) bad.push("max_trip_distance");

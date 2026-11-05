@@ -609,7 +609,7 @@ class ElProfessorConnectionTest extends TestCase
 
     // ── The driver's own submission ──────────────────────────────────────────
 
-    public function test_a_driver_submits_a_receipt_with_its_photo_and_it_rings(): void
+    public function test_a_driver_submits_a_receipt_and_it_rings_without_storing_any_photo(): void
     {
         Storage::fake('local');
         Queue::fake();
@@ -632,7 +632,8 @@ class ElProfessorConnectionTest extends TestCase
         $this->assertSame($driver->id, (int) $row->driver_id);
         $this->assertSame($this->tenant->id, (int) $row->tenant_id);
         $this->assertSame('41.47', $row->payload['amount']);
-        Storage::disk('local')->assertExists($row->document_path);
+        $this->assertNull($row->document_path);
+        $this->assertSame([], Storage::disk('local')->allFiles());
 
         Queue::assertPushed(RingElProfessor::class);
     }
@@ -792,8 +793,8 @@ class ElProfessorConnectionTest extends TestCase
         ])->assertStatus(201)->json('data');
 
         $row = ElProfessorSubmission::withoutGlobalScopes()->firstWhere('uuid', $body['id']);
-        $this->assertNotNull($row->document_path);
-        Storage::disk('local')->assertExists($row->document_path);
+        $this->assertNull($row->document_path);
+        $this->assertSame([], Storage::disk('local')->allFiles());
     }
 
     public function test_a_refuel_carries_the_odometer_and_the_range_into_the_payload(): void

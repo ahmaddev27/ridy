@@ -1,25 +1,20 @@
 /**
- * The low-confidence fallback: when the phone's ML Kit read of a receipt is
- * not good enough, the photo goes to OUR server's vision model and its fields
- * are merged over the on-device ones.
+ * Live receipt reading. The captured photo is sent to OUR server's vision
+ * model, which is the authoritative reader; the parsed fields come back and
+ * only those are kept. Owner's decision (13.11.2026): the image is processed
+ * in memory on the server and discarded - never stored, there or here.
  *
- * ML Kit stays the instant first pass and the only path for a clean receipt;
- * this is the tail. Owner's decision (31.10.2026): automatic, no consent
- * prompt (the privacy policy says so), photo deleted server-side after parse.
- *
- * Merge rule: a vision value (already sanitised and cross-checked on the
- * server) replaces the on-device one. When the two readers DISAGREE on a date
- * or amount the driver confirms it by tap, like any other uncertain field.
+ * `mergeVision` lays the server fields over an (empty) base so the screen
+ * gets one ReceiptFacts shape plus the list of fields the model supplied.
  */
 
+import { File } from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { api, type PickedPhoto, type VisionFields } from './api';
 
 /** Receipts need no more; fewer pixels is much faster on the server's CPU. */
 export const VISION_MAX_EDGE = 1000;
 export const VISION_QUALITY = 0.8;
-export const POLL_MS = 3000;
-export const GIVE_UP_MS = 150_000;
 
 export type ReceiptFacts = {
   date?: string;
@@ -107,8 +102,6 @@ export function mergeVision(ml: ReceiptFacts, v: VisionFields): VisionMerge {
   };
 }
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
 async function shrink(uri: string, size: { width: number; height: number } | null): Promise<PickedPhoto> {
   const resize = visionResizeFor(size?.width, size?.height);
   const out = await ImageManipulator.manipulateAsync(uri, resize ? [{ resize }] : [], {
@@ -119,28 +112,30 @@ async function shrink(uri: string, size: { width: number; height: number } | nul
 }
 
 /**
- * Upload the photo, then poll until the model has answered. Returns null on
- * ANY failure (feature off, offline, model error, timeout, superseded) - the
- * caller then just keeps what ML Kit read. `isCurrent` lets a removed or
- * replaced photo stop the polling.
+ * Send the captured photo to the server vision model and return its fields.
+ * The server's answer is authoritative. Throws on ANY failure (feature off,
+ * offline, model error) so the caller can show a retry; nothing is stored on
+ * either side. The downscaled temp copy is deleted as soon as the call ends.
  */
-export async function readWithVision(
+export async function readReceipt(
   uri: string,
   size: { width: number; height: number } | null,
-  isCurrent: () => boolean,
   forDriverId?: number,
-): Promise<VisionFields | null> {
+): Promise<VisionFields> {
+  const small = await shrink(uri, size);
   try {
-    const started = await api.receiptVisionStart(await shrink(uri, size), forDriverId);
-    const deadline = Date.now() + GIVE_UP_MS;
-    while (isCurrent() && Date.now() < deadline) {
-      await sleep(POLL_MS);
-      const { data } = await api.receiptVisionResult(started.data.id, forDriverId);
-      if (data.status === 'done') return data.fields ?? null;
-      if (data.status === 'failed') return null;
-    }
-  } catch {
-    // Offline, 503, 404 (expired), network: the on-device result stands.
+    const { data } = await api.receiptRead(small, forDriverId);
+    return data.fields;
+  } finally {
+    discard(small.uri);
   }
-  return null;
+}
+
+/** Best-effort removal of a temp image; never throws. */
+export function discard(uri: string): void {
+  try {
+    new File(uri).delete();
+  } catch {
+    // Already gone or outside our cache: nothing to clean.
+  }
 }

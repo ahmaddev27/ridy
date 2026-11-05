@@ -12,9 +12,9 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -177,14 +177,24 @@ class FleetReceiptOnBehalfTest extends TestCase
             ->assertStatus(422)->assertJsonValidationErrors('amount');
     }
 
-    public function test_the_postal_lookup_and_vision_poll_are_reachable_but_tenant_checked(): void
+    public function test_the_postal_lookup_is_reachable_but_tenant_checked_and_vision_is_synchronous(): void
     {
         $manager = $this->manager($this->tenant, 'm@ya.de');
         $foreign = $this->driver($this->other, 'Fred');
+        $omar = $this->driver($this->tenant, 'Omar');
+        config(['services.receipt_vision.url' => 'http://vision:8080']);
+        Http::fake(['vision:8080/*' => Http::response(['choices' => [['message' => ['content' => json_encode([
+            'station_name' => 'Shell', 'date' => '2026-11-04', 'total_amount' => '50.00',
+        ])]]]])]);
+        $photo = fn () => UploadedFile::fake()->image('b.jpg', 200, 300);
 
         $this->actingAsOwner($manager);
         $this->getJson('/api/v1/driver/fleet/postal-codes/00000')->assertNotFound();
-        $this->getJson('/api/v1/driver/fleet/receipt-vision/'.Str::uuid().'?driver_id='.$foreign->id)
+        $this->post('/api/v1/driver/fleet/receipt-vision', ['image' => $photo(), 'driver_id' => $foreign->id], ['Accept' => 'application/json'])
             ->assertNotFound();
+        Http::assertNothingSent();
+
+        $this->post('/api/v1/driver/fleet/receipt-vision', ['image' => $photo(), 'driver_id' => $omar->id], ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonPath('data.fields.amount', 50);
     }
 }
