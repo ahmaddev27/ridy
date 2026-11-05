@@ -9,67 +9,71 @@ const NAV = [
   { href: "/#faq", label: "FAQ" },
 ];
 
-const LEGAL = [
-  { href: "/impressum", label: "Impressum" },
-  { href: "/datenschutz", label: "Datenschutz" },
-  { href: "/faq", label: "Alle Fragen" },
-];
-
-const colLink = "text-[14px] text-ink-muted transition-colors hover:text-primary";
-
 export function SiteFooter() {
   const year = new Date().getFullYear();
   return (
-    <footer className="mt-[clamp(58px,8vw,88px)]">
-      <Container className="pb-11 pt-[clamp(52px,7vw,72px)]">
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(168px,1fr))] gap-[clamp(24px,3vw,40px)] border-b border-[var(--m-rule)] pb-[clamp(26px,4vw,36px)]">
-          <div className="flex flex-col gap-3.5">
-            <Link href="/#top" className="flex items-center gap-2.5">
+    <footer className="relative py-12 lg:py-14">
+      <Container>
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 lg:gap-10">
+          <div className="text-center sm:text-left">
+            <Link href="/#top" className="flex items-center justify-center gap-2.5 text-white sm:justify-start">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/reidey-logo.jpeg"
                 alt="Reidey"
-                className="h-[38px] w-[38px] object-contain mix-blend-multiply dark:mix-blend-screen dark:invert"
+                className="h-10 w-10 rounded-xl object-contain mix-blend-screen invert"
               />
-              <span className="text-[17px] font-semibold">Reidey</span>
+              <span className="font-heading font-bold tracking-tight">REIDEY</span>
             </Link>
-            <p className="max-w-[24em] text-[13.5px] leading-relaxed text-ink-subtle">
-              Fahrtbewertung für Flotten. Jedes Angebot klar bewertet, bevor dein Fahrer zusagt.
+            <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground sm:mx-0">
+              Fahrtbewertung für Flotten. Jedes Angebot klar bewertet, bevor dein
+              Fahrer zusagt.
             </p>
           </div>
 
-          <div className="flex flex-col gap-2.5">
-            <span className="mkt-eyebrow">Produkt</span>
-            {NAV.map((l) => (
-              <Link key={l.href} href={l.href} className={colLink}>
-                {l.label}
-              </Link>
-            ))}
+          <div className="text-center sm:text-left">
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              Navigation
+            </p>
+            <ul className="mx-auto mt-4 grid max-w-[16rem] grid-cols-2 gap-x-6 gap-y-2.5 justify-items-center sm:mx-0 sm:justify-items-start">
+              {NAV.map((l) => (
+                <li key={l.href}>
+                  <Link
+                    href={l.href}
+                    className="text-sm text-muted-foreground transition-colors hover:text-white"
+                  >
+                    {l.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
 
-          <div className="flex flex-col gap-2.5">
-            <span className="mkt-eyebrow">Kontakt</span>
-            <a href="mailto:info@reidey.de" className={colLink}>
-              info@reidey.de
-            </a>
-            <p className="text-[14px] text-ink-muted">Server in der EU · DSGVO-konform</p>
-          </div>
-
-          <div className="flex flex-col gap-2.5">
-            <span className="mkt-eyebrow">Rechtliches</span>
-            {LEGAL.map((l) => (
-              <Link key={l.href} href={l.href} className={colLink}>
-                {l.label}
-              </Link>
-            ))}
+          <div className="text-center sm:text-left">
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              Kontakt
+            </p>
+            <div className="mt-4 flex flex-col gap-3">
+              <a
+                href="mailto:info@reidey.de"
+                className="text-sm text-white transition-colors hover:text-primary"
+              >
+                info@reidey.de
+              </a>
+              <p className="text-sm text-muted-foreground">
+                Server in der EU · DSGVO-konform
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-[22px]">
-          <span className="mkt-eyebrow normal-case tracking-normal">
+        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-white/10 pt-6 sm:flex-row">
+          <p className="text-xs text-muted-foreground">
             © {year} REIDEY · Alle Rechte vorbehalten
-          </span>
-          <span className="text-[12.5px] text-ink-subtle">Gebaut für Ride-Hailing-Flotten in Deutschland</span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Gebaut für Ride-Hailing-Flotten in Deutschland
+          </p>
         </div>
       </Container>
     </footer>
