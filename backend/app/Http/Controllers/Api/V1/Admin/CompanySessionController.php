@@ -61,6 +61,7 @@ class CompanySessionController extends Controller
         $sessions = UberFleetSession::withoutGlobalScopes()->where('tenant_id', $tenant->id)->get();
         abort_if($sessions->isEmpty(), 404, 'No session.');
 
+        $tenant->blockAutolink();
         // Every row, not just the newest: a sibling left active would keep streaming.
         foreach ($sessions as $session) {
             $service->markNeedsRelink($session, 'admin');
@@ -74,13 +75,13 @@ class CompanySessionController extends Controller
     /**
      * Everything that keeps a company's capture alive besides its session rows: the uber-auth
      * browser (and its saved state file, so a restart cannot revive it), the "daemon is feeding"
-     * marker, and the extension's silent auto-relink. The passkey, proxy and org binding stay.
+     * marker. Callers MUST `blockAutolink()` first: the uber-auth drop is a slow network call and
+     * the extension could re-capture the session meanwhile. The passkey, proxy and org binding stay.
      */
     private function tearDownLiveCapture(Tenant $tenant, UberAuthClient $uberAuth): void
     {
-        $this->dropPersistentBrowser($tenant, $uberAuth);
         DriverStatusIngestor::forgetDaemonFeeding((int) $tenant->id);
-        $tenant->blockAutolink();
+        $this->dropPersistentBrowser($tenant, $uberAuth);
     }
 
     /** Best-effort: an uber-auth hiccup must not fail the relink the admin already got. */
@@ -109,6 +110,7 @@ class CompanySessionController extends Controller
      */
     public function destroy(Tenant $tenant, UberAuthClient $uberAuth): JsonResponse
     {
+        $tenant->blockAutolink();
         $deleted = UberFleetSession::withoutGlobalScopes()->where('tenant_id', $tenant->id)->delete();
         $this->tearDownLiveCapture($tenant, $uberAuth);
 

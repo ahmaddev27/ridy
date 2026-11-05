@@ -95,4 +95,16 @@ class AdminForceRelinkTest extends TestCase
         $this->assertTrue($this->tenant->fresh()->isAutolinkBlocked());
         $this->assertSame('active', DB::table('uber_passkeys')->where('tenant_id', $this->tenant->id)->value('status'));
     }
+
+    public function test_cut_session_survives_an_uber_auth_failure_and_still_blocks_autolink(): void
+    {
+        Http::fake(['*/session/drop' => Http::response('boom', 500)]);
+        $this->actAsSuperAdmin();
+
+        $this->deleteJson("/api/v1/admin/companies/{$this->tenant->id}/session")
+            ->assertOk()->assertJsonPath('data.deleted', 1);
+
+        $this->assertSame(0, UberFleetSession::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->count());
+        $this->assertTrue($this->tenant->fresh()->isAutolinkBlocked());
+    }
 }
