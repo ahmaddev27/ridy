@@ -236,7 +236,7 @@ export default function CompaniesPage() {
               <tr>
                 <th>{c("colName")}</th>
                 <th>{c("colStatus")}</th>
-                <th>{c("colSession")}</th>
+                <th>{c("colConnection")}</th>
                 <th>{c("colElProfessor")}</th>
                 <th>{c("colDispatchReject")}</th>
                 <th className="r">{c("colDrivers")}</th>
@@ -281,13 +281,34 @@ export default function CompaniesPage() {
                     </div>
                   </td>
                   <td>
-                    {co.session_status ? (
-                      <Badge status={sessionTone[co.session_status] ?? "gap"} dot>
-                        {c(`session_${co.session_status}`)}
-                      </Badge>
-                    ) : (
-                      <span className="muted">{c("noSession")}</span>
-                    )}
+                    {/* One connection cell: session state, last event, then the
+                        two supporting facts (proxy, passkey) as small badges. */}
+                    <div className="stack-sm" style={{ alignItems: "flex-start", gap: 4 }}>
+                      {co.session_status ? (
+                        <Badge status={sessionTone[co.session_status] ?? "gap"} dot>
+                          {c(`session_${co.session_status}`)}
+                        </Badge>
+                      ) : (
+                        <span className="muted">{c("noSession")}</span>
+                      )}
+                      {co.session_last_event_at && (
+                        <span className="subtle text-xs num" dir="ltr">
+                          {c("lastEvent")}:{" "}
+                          {new Date(co.session_last_event_at).toLocaleString(latnLocale(locale), {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          })}
+                        </span>
+                      )}
+                      <div className="row-wrap" style={{ gap: 4 }}>
+                        <Badge status={co.has_proxy ? "connected" : "gap"}>
+                          {co.has_proxy ? c("proxySet") : c("proxyNone")}
+                        </Badge>
+                        <Badge status={co.passkey.registered ? "connected" : "gap"}>
+                          {co.passkey.registered ? `✓ ${c("passkeyRegistered")}` : `✗ ${c("passkeyNone")}`}
+                        </Badge>
+                      </div>
+                    </div>
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
                     {/* The switch is `enabled`, the platform's own decision.
