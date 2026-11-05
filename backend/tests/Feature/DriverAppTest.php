@@ -230,6 +230,19 @@ class DriverAppTest extends TestCase
         $this->assertCount(3, $res->json('data.recent'));
     }
 
+    public function test_offers_can_be_filtered_to_early_declined(): void
+    {
+        $driver = $this->driver(['activated_at' => now()]);
+        $this->offer($driver, 'ed')->update(['status' => OfferStatus::Rejected, 'auto_decline_reason' => 'min_fare']);
+        $this->offer($driver, 'plain')->update(['status' => OfferStatus::Rejected]);
+
+        Sanctum::actingAs($driver, guard: 'driver');
+        $res = $this->getJson('/api/v1/driver/offers?status=early_declined')->assertOk();
+
+        $this->assertCount(1, $res->json('data'));
+        $this->assertSame('min_fare', $res->json('data.0.auto_decline_reason'));
+    }
+
     public function test_offers_can_be_filtered_by_status(): void
     {
         $driver = $this->driver(['activated_at' => now()]);

@@ -204,7 +204,7 @@ class FleetController extends Controller
 
         return $this->scoped($this->tenantId($request))
             ->when($request->filled('driver_id'), fn ($q) => $q->where('driver_id', $request->integer('driver_id')))
-            ->when($request->filled('status'), fn ($q) => $q->where('status', (string) $request->string('status')))
+            ->when($request->filled('status'), fn ($q) => $q->withStatusFilter((string) $request->string('status')))
             ->when($from !== null, fn ($q) => $q->where('received_at', '>=', $from))
             ->when($to !== null, fn ($q) => $q->where('received_at', '<', $to))
             ->when($request->filled('search'), function ($q) use ($request) {
