@@ -203,8 +203,8 @@ What adopting it risks, and the mitigations:
   owner's explicit OK.
 - **Posture:** ONE fix per offer, at receipt, only for offers with a linked driver; no trail, no
   periodic sampling. Store the fix age (`receipt_driver_fix_at`) and write NULL when the stored fix is
-  older than `Driver::LIVE_STALE_MINUTES` (never snapshot a ghost position). Consider rounding to 4-5
-  decimals (11 m to 1 m) depending on the purpose.
+  older than `Driver::LIVE_STALE_MINUTES` (never snapshot a ghost position). Stored at 4 decimals
+  (~11 m): enough for chaining, lighter privacy footprint (decision 3).
 - **Retention:** the driver snapshot, the chain-context copy of B, and the receipt geocode are personal
   data like the existing coordinates. They MUST be added to `OfferAnonymizer::CLEARED` (same cutoff as
   `retention_offer_months`); `DriverEraser`/`EraseDriver` go through `OfferAnonymizer`, so one constant
@@ -231,7 +231,7 @@ Point 1 — receipt-time driver location:
 
 | Column | Type | Meaning |
 |---|---|---|
-| `receipt_driver_lat` / `receipt_driver_lng` | decimal(9,7) null | Driver position when the offer landed, copied from `drivers.latitude/longitude` in `DOI::route`. NULL when no linked driver, no fix, or fix older than `LIVE_STALE_MINUTES`. |
+| `receipt_driver_lat` / `receipt_driver_lng` | decimal(8,4) null | Driver position (rounded to 4 decimals, ~11 m) when the offer landed, copied from `drivers.latitude/longitude` in `DOI::route`. NULL when no linked driver, no fix, or fix older than `LIVE_STALE_MINUTES`. |
 | `receipt_driver_fix_at` | datetime null | `drivers.location_updated_at` of that fix (age = `received_at` minus this). |
 | `receipt_driver_status` | string(32) null | Uber `driverStatus` at receipt (idle / en route / on trip), so analysis needs no join into a mutating row. |
 
@@ -252,11 +252,11 @@ Point 3 — chaining context:
 | Column | Type | Meaning |
 |---|---|---|
 | `chained_after_offer_id` | unsignedBigInteger null, indexed | The driver's active (Accepted/Started) offer at receipt, via `OL::activeOfferFor`. Plain indexed column, not a hard FK (offers get anonymized). |
-| `chain_context` | json null | Frozen at receipt: `{current_dropoff:{lat,lng}, driver:{lat,lng}, gap_m, gap_method}`. B = last stop of the active offer (final `trip_waypoints` point, else `dropoff_lat/lng`); `gap_m` = B to D distance (haversine; no OSRM on the hot path). |
+| `chain_context` | json null | Frozen at receipt: `{current_dropoff:{lat,lng}, driver:{lat,lng}, gap_bd_m, gap_cd_m, gap_method}`. B = last stop of the active offer (final `trip_waypoints` point, else `dropoff_lat/lng`); `gap_bd_m` = B to D and `gap_cd_m` = C to D (haversine; no OSRM on the hot path). |
 
 Definitions: A = active offer's pickup (history only), B = active offer's dropoff, C = driver position
 (`receipt_driver_*`), D = new offer's pickup. D has no coordinate at receipt (offers carry text only),
-so `gap_m` is computed **after** D is geocoded, in `GeocodeOffer`/`TG::enrich` (already off the hot
+so both gaps are computed **after** D is geocoded, in `GeocodeOffer`/`TG::enrich` (already off the hot
 path), not in `DOI::route`. The link and B are captured at receipt; the distance fills in once D
 resolves. The push path stays untouched.
 
@@ -279,7 +279,7 @@ ran keep `receipt_geo` null (never backfill from the overwritten value). Fast-pa
 **Phase C — Chain link.**
 Add `chained_after_offer_id` + `chain_context`. In `DOI::route`, AFTER `notifyDriver` and beside
 `supersedePendingFor` (best-effort, `LockRetry`, never fails the batch), call `OL::activeOfferFor` and
-write the link + B. Compute `gap_m` in `GeocodeOffer` once D resolves. Tests: a driver with an active
+write the link + B. Compute `gap_bd_m` and `gap_cd_m` in `GeocodeOffer` once D resolves. Tests: a driver with an active
 trip yields the link and B; idle driver yields null; superseded/duplicate paths unchanged; the query
 runs after notify.
 
@@ -291,11 +291,22 @@ coordinates). No driver-app or push changes. Any UI exposure is a separate owner
 Verify anonymizer + `DriverEraser` coverage; update docs/29 (§0 column list, §3 discrepancy list),
 HANDOFF.md change log, and the privacy-notice wording.
 
-### Open questions for the owner
+### Decisions (owner, 2026-11-05, final)
 
-1. Is chaining judged on B to D only, or also C to D (current position to new pickup)? The schema
-   stores both inputs; the analysis choice can follow.
-2. Stored precision of the driver position (4 vs 5 decimals) and retention (same as offers, or shorter
-   for the position specifically)?
-3. Keep `receipt_geo` for offers that never reach acceptance (declined/expired)? Recommended yes: that
-   is exactly where geocoder quality matters most for the decline decision.
+1. **DSGVO: store ONE driver location fix per offer at receipt.** Justification: it is a reuse of
+   position data we already ingest (DSI status poll) and already use (geocoder bias), not new
+   collection; it is bounded (one fix per offer, no trail, no sampling), self-limiting (a fix older than
+   `LIVE_STALE_MINUTES` = 10 is stored as NULL), and purged (nulled by `OfferAnonymizer` at the
+   retention cutoff, and by `DriverEraser`). It is NOT surfaced in the driver or manager UI for now.
+   This fits "detect, don't surveil".
+2. **Chaining captures BOTH gaps:** B to D (current ride dropoff to new pickup) and C to D (driver
+   position at receipt to new pickup), matching the owner's A/B/C/D example. Both are stored in
+   `chain_context` (`gap_bd_m`, `gap_cd_m`).
+3. **Precision and retention:** pickup/dropoff geocode keeps full precision (unchanged). The driver
+   receipt-location snapshot (`receipt_driver_lat/lng`, and the driver point inside `chain_context`) is
+   stored at 4 decimals (~11 m). Retention is the same cutoff as `raw_payload`, via
+   `OfferAnonymizer::CLEARED`.
+4. **Keep `receipt_geo` for declined/expired offers too.** It feeds the geocoder-accuracy audit and is
+   purged at the same retention cutoff anyway.
+
+Phases A to E above stand unchanged; no open questions remain.
