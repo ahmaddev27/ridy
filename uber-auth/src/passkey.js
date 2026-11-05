@@ -161,6 +161,14 @@ async function attempt({ state, proxyUrl, key, launch }, log) {
 
 async function registerOnContext(context, log) {
   const page = await context.newPage();
+  try {
+    return await registerOnPage(context, page, log);
+  } finally {
+    await page.close?.()?.catch?.(() => {}); // a held (co-browse) context outlives this: leave no stray tab
+  }
+}
+
+async function registerOnPage(context, page, log) {
   const client = await context.newCDPSession(page);
   await client.send("WebAuthn.enable", { enableUI: false });
   const { authenticatorId } = await client.send("WebAuthn.addVirtualAuthenticator", { options: AUTHENTICATOR });
@@ -248,6 +256,41 @@ async function run(key, { manager, backend, log, alert, storeBackoffMs, attemptF
     await backend.fail(key, outcome.reason ?? "failed").catch(() => {});
   }
   return (await sessionGuard(key, manager, backend, alert)) ?? result;
+}
+
+/**
+ * Register from INSIDE the co-browse browser, after the human's login has LANDED and was adopted
+ * (docs/31 Path A). That context is the session Uber keeps, so adding the passkey here is safe:
+ * no separate browser, no second device, no daemon call. A short-lived extra TAB on the same
+ * context does the work and is closed. Never throws; the credential stays inside this call.
+ * @param {string} companyKey
+ * @param {object} context  the adopted co-browse Playwright context
+ * @param {object} deps     { enabled, manager, backend:{status,store,fail}, log?, alert?, storeBackoffMs? }
+ */
+export async function registerPasskeyInSession(companyKey, context, deps) {
+  const { enabled, manager, backend, log = () => {}, alert = (m) => console.error(m), storeBackoffMs = 1500 } = deps;
+  const key = String(companyKey);
+  if (!enabled()) return { status: STATUS.DISABLED };
+  if (manager.stateOf(key) !== "active") return { status: STATUS.NO_SESSION };
+  if (inFlight.has(key)) return { status: STATUS.BUSY };
+  inFlight.add(key);
+  try {
+    const flags = await backend.status(key).catch(() => null);
+    if (!flags?.enabled) return { status: STATUS.COMPANY_DISABLED };
+    if (flags.registered) return { status: STATUS.ALREADY_REGISTERED };
+    const outcome = await registerOnContext(context, log);
+    if (outcome.status === STATUS.FAILED) await backend.fail(key, outcome.reason ?? "failed").catch(() => {});
+    if (outcome.status !== STATUS.REGISTERED) return { status: outcome.status, reason: outcome.reason };
+    if (await storeWithRetry(backend, key, outcome.credential, manager.get(key)?.orgUuid, storeBackoffMs)) return { status: STATUS.REGISTERED };
+    alert(`[passkey][ALERT] ${key}: passkey exists on Uber but the backend did NOT store it - remove it on account.uber.com/passkeys`);
+    await backend.fail(key, "store_failed").catch(() => {});
+    return { status: STATUS.STORE_FAILED };
+  } catch (e) {
+    alert(`[passkey][ALERT] ${key}: unexpected ${e?.message}`);
+    return { status: STATUS.FAILED, reason: "error" };
+  } finally {
+    inFlight.delete(key);
+  }
 }
 
 /** The live session is never touched, so it must still be active; one normal keep-warm proves it. */

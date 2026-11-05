@@ -104,4 +104,16 @@ class DispatchOffer extends Model
     {
         return $query->whereNull('dispatch_rejected_at');
     }
+
+    /**
+     * The offer-list status filter. `early_declined` is not a status of its own:
+     * it selects offers the driver's Early-decline rules declined (docs/25), which
+     * are stamped with `auto_decline_reason`. Anything else is a plain status.
+     */
+    public function scopeWithStatusFilter(Builder $query, string $status): Builder
+    {
+        return $status === 'early_declined'
+            ? $query->whereNotNull('auto_decline_reason')
+            : $query->where('status', $status);
+    }
 }

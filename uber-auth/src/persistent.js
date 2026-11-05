@@ -12,7 +12,8 @@ import { PersistentSessionManager, SESSION_STATE, jarFingerprint } from "./sessi
 import { createWarmDriver, statePath as driverStatePath } from "./warmDriver.js";
 import { launchBrowser, newStealthContext } from "./browser.js";
 import { scopeCookies } from "./cookieScope.js";
-import { registerPasskey } from "./passkey.js";
+import { registerPasskey, registerPasskeyInSession } from "./passkey.js";
+import { attachCobrowseAuthenticator } from "./cobrowsePasskey.js";
 
 const driver = createWarmDriver();
 
@@ -158,6 +159,26 @@ export async function fetchPasskeyCredential(companyKey) {
     return null;
   }
 }
+
+const cobrowsePasskeyOn = () => config.passkeyRegister && config.passkeyCobrowse;
+
+/** docs/31 Path A, step 1+2: authenticator (+ stored passkey) in the co-browse browser. Never throws. */
+export const attachCobrowsePasskey = (session, companyKey) =>
+  attachCobrowseAuthenticator(session, String(companyKey), {
+    enabled: cobrowsePasskeyOn,
+    flags: (k) => passkeyBackend.status(k),
+    fetchCredential: fetchPasskeyCredential,
+    log: (m) => console.log(`[passkey][cobrowse] ${m}`),
+  });
+
+/** docs/31 Path A, step 3: register in the adopted co-browse context, AFTER the login landed. Never throws. */
+export const registerPasskeyInCobrowse = (companyKey, session) =>
+  registerPasskeyInSession(companyKey, session.context, {
+    enabled: cobrowsePasskeyOn,
+    manager,
+    backend: passkeyBackend,
+    log: (m) => console.log(`[passkey][cobrowse] ${m}`),
+  });
 
 /**
  * Register a software passkey from a SEPARATE short-lived browser (state-file copy, company

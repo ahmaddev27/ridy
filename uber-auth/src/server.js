@@ -11,7 +11,7 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { startLogin, submitMfa, closeSession, challengeTick, finishChallenge, STATUS } from "./browser.js";
-import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf, forceDrop, registerPasskeyForCompany } from "./persistent.js";
+import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf, forceDrop, registerPasskeyForCompany, attachCobrowsePasskey, registerPasskeyInCobrowse } from "./persistent.js";
 import { admitStart, adoptGuard, adoptMode, canCobrowse, canFullLogin, companyMatches, createStartGate } from "./loginPolicy.js";
 import { createCobrowse, createCobrowseServer, FULL_LOGIN_HARD_CAP_MS } from "./cobrowse.js";
 import { openCdpStream } from "./cobrowseStream.js";
@@ -142,7 +142,8 @@ async function onLoginSuccess(companyKey, outcome, res, mode = null) {
   if (!adopted.captured) {
     return send(res, 200, { status: STATUS.CAPTURE_FAILED, message: adopted.reason ?? "not_posted" });
   }
-  maybeRegisterPasskeyAfterConnect(String(companyKey));
+  if (outcome.session?.fullLogin && config.passkeyRegister && config.passkeyCobrowse) registerPasskeyInCobrowseLater(String(companyKey), outcome.session);
+  else maybeRegisterPasskeyAfterConnect(String(companyKey));
   return send(res, 200, { status: STATUS.SUCCESS, persistent: true, org_uuid: outcome.result?.org_uuid ?? null });
 }
 
@@ -151,6 +152,19 @@ async function onLoginSuccess(companyKey, outcome, res, mode = null) {
 // off), plus the backend's per-company flag. The delay lets the first capture settle; the response
 // never waits for it and a failure never touches the login outcome.
 const PASSKEY_AFTER_CONNECT_DELAY_MS = 20_000;
+const PASSKEY_ATTACH_MAX_MS = 5000;
+const PASSKEY_IN_COBROWSE_DELAY_MS = 8000;
+
+// docs/31 Path A, step 3: ONLY after the login LANDED and was adopted (captured), register inside
+// the co-browse context itself (the session Uber keeps). Never a separate browser.
+function registerPasskeyInCobrowseLater(companyKey, session) {
+  setTimeout(() => {
+    registerPasskeyInCobrowse(companyKey, session)
+      .then((r) => console.log(`[passkey][cobrowse] ${companyKey}: ${r.status}`))
+      .catch((e) => console.warn(`[passkey][cobrowse] ${companyKey} failed: ${e?.message}`));
+  }, PASSKEY_IN_COBROWSE_DELAY_MS).unref?.();
+}
+
 function maybeRegisterPasskeyAfterConnect(companyKey) {
   if (!config.passkeyRegister || !config.passkeyOnConnect) return;
   setTimeout(() => {
@@ -261,6 +275,9 @@ async function runStartNow(body, { companyKey, password, cold, fresh }, res) {
     const loginId = randomUUID();
     const createdAt = Date.now();
     const fullLogin = full && outcome.session?.fullLogin === true;
+    // docs/31 Path A: before the human types anything, give THIS co-browse browser an authenticator
+    // (+ the stored passkey). Bounded and best-effort; it can never fail or delay the login for long.
+    if (fullLogin) await Promise.race([attachCobrowsePasskey(outcome.session, companyKey), sleep(PASSKEY_ATTACH_MAX_MS)]).catch(() => {});
     pending.set(loginId, { session: outcome.session, companyKey, createdAt, passwordless, cold: cold === true, fresh: fresh === true, challenge: true, fullLogin });
     return send(res, 200, challengeBody(loginId, createdAt, fullLogin));
   }
