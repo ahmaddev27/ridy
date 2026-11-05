@@ -1,6 +1,7 @@
 // Turns a company's proxy URL (the one the daemon uses) into Playwright's `proxy`
-// context option. Returns null for an empty/invalid value so the caller goes
-// direct instead of failing: a company without a proxy keeps working as before.
+// context option. Returns null for an empty/invalid value. Uber-bound callers
+// (persistent resumeFromDisk/seedFromSession, cold login) must treat null as "no
+// proxy" and refuse: a datacenter-direct connection to Uber is a ban risk.
 export function parseProxyUrl(raw) {
   if (!raw || typeof raw !== "string") return null;
   let u;
