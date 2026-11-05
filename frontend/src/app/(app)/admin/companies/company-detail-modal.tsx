@@ -937,6 +937,7 @@ function SessionTab({
 
   return (
     <div className="stack">
+      <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
       <Group title={c("sessionState")}>
         {!loaded ? (
           <Loader2 className="h-4 w-4 animate-spin text-ink-subtle" />
@@ -955,13 +956,6 @@ function SessionTab({
         )}
       </Group>
 
-      {session && (
-        <Group title={c("tokens")}>
-          <TokenRow label={c("tokenJwt")} iso={session.session_token_expires_at} when={when} neverAlarm hint={c("tokenJwtHint")} />
-          <TokenRow label={c("tokenSupplier")} iso={session.supplier_token_expires_at} when={when} />
-        </Group>
-      )}
-
       <Group title={c("session")}>
         <p className="muted text-sm">{c("sessionHint")}</p>
         <div className="row-wrap">
@@ -970,6 +964,14 @@ function SessionTab({
           </Button>
         </div>
       </Group>
+      </div>
+
+      {session && (
+        <Group title={c("tokens")}>
+          <TokenRow label={c("tokenJwt")} iso={session.session_token_expires_at} when={when} neverAlarm hint={c("tokenJwtHint")} />
+          <TokenRow label={c("tokenSupplier")} iso={session.supplier_token_expires_at} when={when} />
+        </Group>
+      )}
 
       <Group title={c("pbTitle")}>
         <SessionBrowserCard id={id} company={company} />
