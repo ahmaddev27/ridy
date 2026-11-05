@@ -11,6 +11,7 @@ export const ATTACH = {
   DISABLED: "disabled",
   COMPANY_DISABLED: "company_disabled",
   NO_PAGE: "no_page",
+  NO_PROXY: "no_proxy",
   ATTACHED: "attached",
   INJECTED: "injected",
   FAILED: "failed",
@@ -30,6 +31,8 @@ export async function attachCobrowseAuthenticator(session, companyKey, deps) {
   try {
     if (!enabled()) return ATTACH.DISABLED;
     if (!session?.page) return ATTACH.NO_PAGE;
+    // An Uber-bound context must ride the company's residential proxy; callers that care say so.
+    if (deps.proxied && !deps.proxied()) return ATTACH.NO_PROXY;
     const f = await flags(companyKey).catch(() => null);
     if (!f?.enabled) return ATTACH.COMPANY_DISABLED;
     const client = await session.page.context().newCDPSession(session.page);
@@ -38,11 +41,42 @@ export async function attachCobrowseAuthenticator(session, companyKey, deps) {
     session.passkeyAuth = { client, authenticatorId };
     const credential = await fetchCredential(companyKey).catch(() => null);
     if (!credential) return ATTACH.ATTACHED;
-    await client.send("WebAuthn.addCredential", { authenticatorId, credential });
+    // userHandle + isResidentCredential must survive: they are what lets a usernameless assertion
+    // identify the account. Only null/undefined fields are dropped (CDP rejects explicit nulls).
+    const clean = Object.fromEntries(Object.entries(credential).filter(([, v]) => v != null));
+    await client.send("WebAuthn.addCredential", { authenticatorId, credential: clean });
     log(`${companyKey}: stored passkey injected into the co-browse authenticator`);
     return ATTACH.INJECTED;
   } catch (e) {
     log(`${companyKey}: co-browse authenticator failed: ${e?.message}`);
     return ATTACH.FAILED;
+  }
+}
+
+/** The authenticator's current signCount for the injected credential, or null. Never returns key material. */
+export async function readSignCount(session) {
+  const auth = session?.passkeyAuth;
+  if (!auth) return null;
+  try {
+    const { credentials = [] } = await auth.client.send("WebAuthn.getCredentials", { authenticatorId: auth.authenticatorId });
+    const n = credentials[0]?.signCount;
+    return Number.isInteger(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Remove the virtual authenticator (never leave it on a long-lived held context). Never throws. */
+export async function removeAuthenticator(session) {
+  const auth = session?.passkeyAuth;
+  if (!auth) return;
+  session.passkeyAuth = null;
+  session.passkeyInjected = false;
+  try {
+    await auth.client.send("WebAuthn.removeVirtualAuthenticator", { authenticatorId: auth.authenticatorId });
+    await auth.client.send("WebAuthn.disable");
+    await auth.client.detach?.();
+  } catch {
+    /* page/context already gone */
   }
 }

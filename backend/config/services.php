@@ -103,6 +103,9 @@ return [
     'passkey' => [
         'enabled' => filter_var(env('UBER_PASSKEY_REGISTER', false), FILTER_VALIDATE_BOOL),
         'tenants' => array_values(array_filter(array_map('trim', explode(',', (string) env('UBER_PASSKEY_TENANTS'))))),
+        // Passkey SIGN-IN on the unattended re-login (skips the emailed code). OFF by default; a
+        // company also needs `settings.passkey.relogin`. uber-auth has UBER_AUTH_PASSKEY_RELOGIN.
+        'relogin' => filter_var(env('UBER_PASSKEY_RELOGIN', false), FILTER_VALIDATE_BOOL),
     ],
 
     // Passwordless Uber login (docs/27). `enabled` is the GLOBAL kill switch (OFF by

@@ -102,6 +102,9 @@ x-app-env: &app-env
   # company also needs its own settings flag. TENANTS = optional allowlist (empty = no limit).
   UBER_PASSKEY_REGISTER: ${UBER_PASSKEY_REGISTER:-}
   UBER_PASSKEY_TENANTS: ${UBER_PASSKEY_TENANTS:-}
+  # Passkey SIGN-IN on the unattended re-login (skips the emailed code). OFF unless "1"; also needs
+  # the company's settings.passkey.relogin and UBER_AUTH_PASSKEY_RELOGIN on uber-auth.
+  UBER_PASSKEY_RELOGIN: ${UBER_PASSKEY_RELOGIN:-}
   # FCM HTTP v1 (OAuth2 service-account) — used by FcmPushSender for driver + web
   # push. Point FCM_CREDENTIALS at the mounted service-account JSON. Without it the
   # app falls back to LogPushSender (pushes are only logged, not sent).
@@ -401,6 +404,8 @@ services:
       # Passkey enrolment inside the co-browse session (PR #322). OFF unless "1".
       UBER_AUTH_PASSKEY_COBROWSE: ${UBER_AUTH_PASSKEY_COBROWSE:-}
       UBER_AUTH_PASSKEY_ON_CONNECT: ${UBER_AUTH_PASSKEY_ON_CONNECT:-}
+      # Inject the stored passkey on the unattended re-login (needs REGISTER too). OFF unless "1".
+      UBER_AUTH_PASSKEY_RELOGIN: ${UBER_AUTH_PASSKEY_RELOGIN:-}
       DISPATCH_INGEST_SECRET: ${DISPATCH_INGEST_SECRET}
       # Pilot: real Chrome headed under Xvfb (heavier RAM/CPU). Unset = headless Chromium.
       REAL_CHROME: ${REAL_CHROME:-}

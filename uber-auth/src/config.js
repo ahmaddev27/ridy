@@ -42,6 +42,9 @@ export const config = {
   // even with the flag above: the explicit route + `uber:passkey-backfill` work without it.
   // Passkey USE + register INSIDE the co-browse login (docs/31 Path A). Needs passkeyRegister too.
   passkeyCobrowse: ["1", "true"].includes(String(process.env.UBER_AUTH_PASSKEY_COBROWSE || "").toLowerCase()),
+  // Passkey SIGN-IN on the unattended re-login (skips the emailed code). Needs passkeyRegister too;
+  // the backend must also have UBER_PASSKEY_RELOGIN + the company's settings.passkey.relogin.
+  passkeyRelogin: ["1", "true"].includes(String(process.env.UBER_AUTH_PASSKEY_RELOGIN || "").toLowerCase()),
   passkeyOnConnect: ["1", "true"].includes(String(process.env.UBER_AUTH_PASSKEY_ON_CONNECT || "").toLowerCase()),
 
   // Per-step wait budget (ms).

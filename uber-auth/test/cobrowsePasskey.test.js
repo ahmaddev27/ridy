@@ -106,3 +106,17 @@ test("register in session: exceptions never escape", async () => {
   d.alert = () => {};
   assert.equal((await registerPasskeyInSession("7", ctx, d)).status, STATUS.FAILED);
 });
+
+test("attach: refuses a non-proxied handle (relogin dep) and keeps userHandle + resident flag, dropping nulls", async () => {
+  const a = fakeSession();
+  assert.equal(await attachCobrowseAuthenticator(a.session, "7", deps({ proxied: () => false })), ATTACH.NO_PROXY);
+  assert.equal(a.sent.length, 0);
+  const b = fakeSession();
+  await attachCobrowseAuthenticator(b.session, "7", deps({ proxied: () => true, fetchCredential: async () => ({ ...CRED, userHandle: null }) }));
+  const injected = b.sent.at(-1)[1].credential;
+  assert.equal(injected.isResidentCredential, true);
+  assert.equal("userHandle" in injected, false);
+  const c = fakeSession();
+  await attachCobrowseAuthenticator(c.session, "7", deps({ proxied: () => true }));
+  assert.equal(c.sent.at(-1)[1].credential.userHandle, "uh");
+});

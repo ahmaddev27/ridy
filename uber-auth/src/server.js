@@ -11,7 +11,8 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { startLogin, submitMfa, closeSession, challengeTick, finishChallenge, STATUS } from "./browser.js";
-import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf, forceDrop, registerPasskeyForCompany, attachCobrowsePasskey, registerPasskeyInCobrowse } from "./persistent.js";
+import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf, forceDrop, registerPasskeyForCompany, attachCobrowsePasskey, registerPasskeyInCobrowse, attachReloginPasskey, finishReloginPasskey } from "./persistent.js";
+import { removeAuthenticator } from "./cobrowsePasskey.js";
 import { admitStart, adoptGuard, adoptMode, canCobrowse, canFullLogin, companyMatches, createStartGate } from "./loginPolicy.js";
 import { createCobrowse, createCobrowseServer, FULL_LOGIN_HARD_CAP_MS } from "./cobrowse.js";
 import { openCdpStream } from "./cobrowseStream.js";
@@ -238,6 +239,22 @@ async function runStart(body, admitted, res) {
   }
 }
 
+/** Attach never throws, but a hang must not hold the login: bounded like the co-browse attach. */
+async function attachReloginPasskeySafe(handle, companyKey, proxyUrl) {
+  // The race cannot cancel the attach: flag it so a late finish removes what it created instead of
+  // leaving a key-holding authenticator on the long-lived held context.
+  let timedOut = false;
+  const timeout = sleep(PASSKEY_ATTACH_MAX_MS).then(() => {
+    timedOut = true;
+    handle.passkeyAttachAborted = true;
+    return false;
+  });
+  const ok = await Promise.race([attachReloginPasskey(handle, companyKey, proxyUrl), timeout]).catch(() => false);
+  if (timedOut) await removeAuthenticator(handle); // whatever was created before the timeout; a later finish self-cleans
+  if (!ok) await finishReloginPasskey(handle, companyKey);
+  return ok;
+}
+
 async function runStartNow(body, { companyKey, password, cold, fresh }, res) {
   const passwordless = !password;
   // Cold or warm-dead full login: a FRESH browser through the proxy, never the held one.
@@ -257,19 +274,22 @@ async function runStartNow(body, { companyKey, password, cold, fresh }, res) {
     if (passwordless) markNeedsOtp(companyKey);
     return send(res, 409, { status: "full_login_unavailable", message: "full_login_unavailable" });
   }
+  // Warm re-auth: ride the company's own browser (cookies + proxy already there).
+  const reuse = passwordless && !freshBrowser ? handleOf(companyKey) : null;
+  // Passkey sign-in (flag-gated both sides): authenticator + stored passkey on the held handle, one try.
+  const passkeyAttached = reuse != null && body.passkey === true && !full && (await attachReloginPasskeySafe(reuse, companyKey, body.proxy_url));
   const outcome = await startLogin({
     email: body.email,
     password,
     proxyUrl: typeof body.proxy_url === "string" ? body.proxy_url : null,
     companyKey,
-    // Warm re-auth: ride the company's own browser (cookies + proxy already there).
-    reuse: passwordless && !freshBrowser ? handleOf(companyKey) : null,
+    reuse,
     // Cold first connect or a full login over a dead session: a fresh browser is built (the dead
     // one stays untouched until a successful capture replaces it).
     cold: freshBrowser,
     cobrowse: cobrowseOk,
     full,
-  });
+  }).finally(() => (passkeyAttached ? finishReloginPasskey(reuse, companyKey) : null));
 
   if (outcome.status === STATUS.CHALLENGE_REQUIRED) {
     const loginId = randomUUID();

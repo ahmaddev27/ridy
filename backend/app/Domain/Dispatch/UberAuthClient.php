@@ -32,6 +32,9 @@ class UberAuthClient
      */
     public function startLogin(Tenant $tenant, string $email, bool $cold = false, bool $cobrowse = false, bool $full = false): array
     {
+        // Only a flag: uber-auth fetches the key itself from the internal endpoint, never from this body.
+        $passkey = app(PasskeyService::class)->shouldOfferForRelogin($tenant);
+
         return $this->post('/login/start', [
             // A full co-browse start types nothing: the human enters their own email in the stream.
             'email' => $email,
@@ -39,7 +42,7 @@ class UberAuthClient
             'proxy_url' => $tenant->getAttribute('proxy_url') ?: null,
             // First connect, nothing to ride: uber-auth opens a fresh browser through the proxy.
             'cold' => $cold,
-        ] + ($cobrowse ? ['cobrowse' => true] : []) + ($full ? ['full' => true] : []), timeout: 90);
+        ] + ($cobrowse ? ['cobrowse' => true] : []) + ($full ? ['full' => true] : []) + ($passkey ? ['passkey' => true] : []), timeout: 90);
     }
 
     /**

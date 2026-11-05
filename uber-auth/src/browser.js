@@ -424,6 +424,10 @@ export const CHANNELS = [
 ];
 export const NEVER_CLICK_RE = /google|passkey|apple|facebook|sicherheitsschl/i;
 
+// The ONE place allowed to click a passkey control (NEVER_CLICK_RE stays untouched for every
+// code-channel hunt). Used only by trySignInWithPasskey, and only with an injected authenticator.
+export const PASSKEY_BUTTON_RE = /passkey|sicherheitsschl|security key/i;
+
 const navLog = (m) => console.log(`[pwless-nav] ${m}`);
 
 /**
@@ -543,6 +547,52 @@ export async function reachCodeStep(page, tried, ops = {}) {
   return { step: "passkey", channel: null };
 }
 
+/** Shortest visible+enabled control naming a passkey (Uber's own "sign in with a passkey" entry). */
+async function findPasskeyControl(page, waitMs) {
+  const deadline = Date.now() + waitMs;
+  do {
+    try {
+      let best = null;
+      for (const el of await page.locator(NAV_CLICKABLE).filter({ hasText: PASSKEY_BUTTON_RE }).all()) {
+        if (!(await isVisible(el)) || !(await el.isEnabled().catch(() => false))) continue;
+        const text = ((await el.innerText().catch(() => "")) || "").replace(/\s+/g, " ").trim();
+        if (!best || text.length < best.text.length) best = { el, text };
+      }
+      if (best) return best.el;
+    } catch {
+      /* mid-navigation */
+    }
+    if (Date.now() < deadline) await page.waitForTimeout(POLL_MS);
+  } while (Date.now() < deadline);
+  return null;
+}
+
+export const PASSKEY_CLICK_WAIT_MS = 3000;
+export const PASSKEY_LAND_WAIT_MS = 8000;
+
+/**
+ * Let the injected virtual authenticator sign in: click Uber's passkey control (if any - Uber may
+ * auto-prompt right after the identifier, or via conditional UI on the identifier page), then poll
+ * up to ~8 s. Resolves 'landed' | 'arkose' | 'otp' | 'password' | 'timeout' | 'error'. Never throws; any
+ * result but 'landed' means the caller falls through to the email-code path unchanged.
+ */
+export async function trySignInWithPasskey(page, { clickWaitMs = PASSKEY_CLICK_WAIT_MS, landWaitMs = PASSKEY_LAND_WAIT_MS } = {}) {
+  try {
+    const control = await findPasskeyControl(page, clickWaitMs);
+    if (control) await control.click({ timeout: 3000 }).catch(() => {});
+    const deadline = Date.now() + landWaitMs;
+    while (Date.now() < deadline) {
+      const step = await probeStep(page);
+      if (step === "landed" || step === "arkose" || step === "otp" || step === "password") return step;
+      await page.waitForTimeout(POLL_MS);
+    }
+    return "timeout";
+  } catch (e) {
+    navLog(`passkey sign-in failed: ${e.message}`);
+    return "error";
+  }
+}
+
 /** Passkey/chooser start: reach the code step. Returns {step, channel}. */
 export async function navigatePastPasskey(page, ops = {}) {
   navLog("step=passkey; trying to reach the code step");
@@ -641,6 +691,15 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
       return { status: STATUS.CHALLENGE_REQUIRED, session };
     }
 
+    // Passkey sign-in, tier 1 - USERNAMELESS: the injected credential is resident, so the assertion
+    // identifies the account by itself; no identifier is typed. Any miss re-opens the login page.
+    if (session.passkeyInjected && !password) {
+      session.passkeyTried = true;
+      session.passkeyOutcome = await trySignInWithPasskey(page);
+      if (session.passkeyOutcome === "landed") return passkeyLanded(session, context, page);
+      await page.goto(config.dashboardUrl, { waitUntil: "domcontentloaded" }).catch(() => {});
+    }
+
     // A remembered account ("Welcome back") may not ask for the identifier again. Then we
     // only continue if the page shows the SAME account (its email or a masked form of it);
     // otherwise Continue would send a code to / sign in a different remembered account.
@@ -677,6 +736,13 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
       session.channel = "unknown";
       return { status: STATUS.MFA_REQUIRED, session, channel: "unknown" };
     }
+    // Tier 2: identifier submitted and Uber now offers / auto-prompts the passkey step.
+    if ((step === "channel_choice" || step === "passkey") && !password && session.passkeyInjected) {
+      session.passkeyTried = true;
+      const outcome = (session.passkeyOutcome = await trySignInWithPasskey(page));
+      if (outcome === "landed") return passkeyLanded(session, context, page);
+      if (outcome === "arkose") step = "arkose";
+    }
     if ((step === "channel_choice" || step === "passkey") && !password) {
       const reached = await navigatePastPasskey(page, { tried: (session.channelsTried = new Set()) });
       step = reached.step;
@@ -707,11 +773,17 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
   }
 }
 
+/** A passkey sign-in landed: capture as for any login; the server reports the signCount afterwards. */
+async function passkeyLanded(session, context, page) {
+  session.passkeyLanded = true;
+  return { status: STATUS.SUCCESS, result: await captureResult(context, page), session, passkeyUsed: true };
+}
+
 async function freshSession(proxyUrl, companyKey) {
   const browser = await launchBrowser();
   const context = await newStealthContext(browser, {}, proxyUrl, companyKey);
   const page = await context.newPage();
-  return { browser, context, page, createdAt: Date.now() };
+  return { browser, context, page, createdAt: Date.now(), proxyUrl };
 }
 
 /** Relay the MFA code into a held session and finish the login. */
