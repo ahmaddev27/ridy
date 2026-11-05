@@ -150,7 +150,17 @@ async function reconcile() {
     // untouched rather than being torn down for a config we can't apply.
     if (invalidIds.has(sessionId)) continue;
 
-    const proxyChanged = effectiveProxy.has(sessionId) && effectiveProxy.get(sessionId) !== stream.proxyUrl;
+    let proxyChanged = effectiveProxy.has(sessionId) && effectiveProxy.get(sessionId) !== stream.proxyUrl;
+    // Grace for a LIVE stream: a single pass with no proxy is most likely a transient
+    // backend glitch (pool reassignment), so keep streaming and tear down only on the
+    // second consecutive one. New streams are still refused immediately.
+    if (proxyChanged && effectiveProxy.get(sessionId) === "") {
+      const strikes = (noProxyStrikes.get(key) ?? 0) + 1;
+      noProxyStrikes.set(key, strikes);
+      if (strikes < NO_PROXY_STRIKES_TO_STOP) continue;
+    } else {
+      noProxyStrikes.delete(key);
+    }
     const fpNow = effectiveFp.get(sessionId);
     const versionNow = jarVersions.get(sessionId);
     const versionChanged = versionNow != null && stream.jarVersion != null && versionNow !== stream.jarVersion;
@@ -202,6 +212,9 @@ async function reconcile() {
 // Sessions already warned about for having no proxy, so the 60s reconcile loop
 // logs once per outage instead of every pass. Cleared when a proxy appears.
 const noProxyWarned = new Set();
+// Consecutive reconciles in which a RUNNING stream's session had no proxy.
+const noProxyStrikes = new Map();
+const NO_PROXY_STRIKES_TO_STOP = 2;
 
 /**
  * Fail CLOSED: a company's Uber traffic must go through its own residential
@@ -217,11 +230,11 @@ function hasUsableProxy(session) {
   if (!noProxyWarned.has(session.id)) {
     noProxyWarned.add(session.id);
     console.warn(`session ${session.id}: no proxy configured — refusing to stream (never connect datacenter-direct)`);
+    captureThrottled(`no-proxy:${session.id}`, new Error("session has no proxy; stream refused"), {
+      where: "stream_no_proxy",
+      sessionId: session.id,
+    });
   }
-  captureThrottled(`no-proxy:${session.id}`, new Error("session has no proxy; stream refused"), {
-    where: "stream_no_proxy",
-    sessionId: session.id,
-  });
   return false;
 }
 

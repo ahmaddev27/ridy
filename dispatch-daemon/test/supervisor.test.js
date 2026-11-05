@@ -65,8 +65,21 @@ test("a session with no proxy is never streamed, and starts once a proxy appears
   await reconcileTick();
   assert.equal([...streams.keys()].some((k) => k.startsWith("6:")), true);
 
-  // Losing the proxy tears the stream down rather than leaving it direct.
+  // ONE transient no-proxy pass keeps the live stream (backend glitch grace)...
+  const live = [...streams.entries()].filter(([k]) => k.startsWith("6:")).map(([, s]) => s);
   api.sessions = async () => ({ sessions: [bare], globalProxyUrl: "" });
+  await reconcileTick();
+  assert.equal([...streams.keys()].some((k) => k.startsWith("6:")), true);
+  assert.ok(live.every((s) => s.stopped === false));
+
+  // ...a proxy reappearing resets the count, so another single miss is still survived...
+  api.sessions = async () => ({ sessions: [good(6)], globalProxyUrl: "" });
+  await reconcileTick();
+  api.sessions = async () => ({ sessions: [bare], globalProxyUrl: "" });
+  await reconcileTick();
+  assert.equal([...streams.keys()].some((k) => k.startsWith("6:")), true);
+
+  // ...and the second consecutive miss tears it down rather than leaving it direct.
   await reconcileTick();
   assert.equal([...streams.keys()].some((k) => k.startsWith("6:")), false);
 });
