@@ -568,12 +568,12 @@ async function findPasskeyControl(page, waitMs) {
 }
 
 export const PASSKEY_CLICK_WAIT_MS = 3000;
-export const PASSKEY_LAND_WAIT_MS = 15000;
+export const PASSKEY_LAND_WAIT_MS = 8000;
 
 /**
  * Let the injected virtual authenticator sign in: click Uber's passkey control (if any - Uber may
  * auto-prompt right after the identifier, or via conditional UI on the identifier page), then poll
- * up to ~15 s. Resolves 'landed' | 'arkose' | 'otp' | 'password' | 'timeout'. Never throws; any
+ * up to ~8 s. Resolves 'landed' | 'arkose' | 'otp' | 'password' | 'timeout' | 'error'. Never throws; any
  * result but 'landed' means the caller falls through to the email-code path unchanged.
  */
 export async function trySignInWithPasskey(page, { clickWaitMs = PASSKEY_CLICK_WAIT_MS, landWaitMs = PASSKEY_LAND_WAIT_MS } = {}) {
@@ -589,7 +589,7 @@ export async function trySignInWithPasskey(page, { clickWaitMs = PASSKEY_CLICK_W
     return "timeout";
   } catch (e) {
     navLog(`passkey sign-in failed: ${e.message}`);
-    return "timeout";
+    return "error";
   }
 }
 
@@ -695,7 +695,8 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
     // identifies the account by itself; no identifier is typed. Any miss re-opens the login page.
     if (session.passkeyInjected && !password) {
       session.passkeyTried = true;
-      if ((await trySignInWithPasskey(page)) === "landed") return passkeyLanded(session, context, page);
+      session.passkeyOutcome = await trySignInWithPasskey(page);
+      if (session.passkeyOutcome === "landed") return passkeyLanded(session, context, page);
       await page.goto(config.dashboardUrl, { waitUntil: "domcontentloaded" }).catch(() => {});
     }
 
@@ -738,7 +739,7 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
     // Tier 2: identifier submitted and Uber now offers / auto-prompts the passkey step.
     if ((step === "channel_choice" || step === "passkey") && !password && session.passkeyInjected) {
       session.passkeyTried = true;
-      const outcome = await trySignInWithPasskey(page);
+      const outcome = (session.passkeyOutcome = await trySignInWithPasskey(page));
       if (outcome === "landed") return passkeyLanded(session, context, page);
       if (outcome === "arkose") step = "arkose";
     }
@@ -782,7 +783,7 @@ async function freshSession(proxyUrl, companyKey) {
   const browser = await launchBrowser();
   const context = await newStealthContext(browser, {}, proxyUrl, companyKey);
   const page = await context.newPage();
-  return { browser, context, page, createdAt: Date.now() };
+  return { browser, context, page, createdAt: Date.now(), proxyUrl };
 }
 
 /** Relay the MFA code into a held session and finish the login. */

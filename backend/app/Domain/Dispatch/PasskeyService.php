@@ -84,11 +84,11 @@ class PasskeyService
     }
 
     /** A confirmed passkey sign-in: persist the authenticator's new signCount, then count the use. */
-    public function recordSignIn(int $tenantId, int $signCount): void
+    public function recordSignIn(int $tenantId, ?int $signCount = null): void
     {
         $passkey = UberPasskey::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)->where('status', UberPasskey::STATUS_ACTIVE)->first();
-        if ($passkey !== null && is_array($passkey->credential)) {
+        if ($signCount !== null && $passkey !== null && is_array($passkey->credential)) {
             $credential = $passkey->credential;
             $credential['signCount'] = max($signCount, (int) ($credential['signCount'] ?? 0));
             $passkey->credential = $credential;

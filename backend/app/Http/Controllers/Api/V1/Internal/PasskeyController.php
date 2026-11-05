@@ -65,8 +65,10 @@ class PasskeyController extends Controller
     /** uber-auth confirms a passkey sign-in landed and reports the authenticator's new signCount. */
     public function used(Request $request, Tenant $tenant, PasskeyService $passkeys): JsonResponse
     {
-        $data = $request->validate(['signCount' => ['required', 'integer', 'min:0']]);
-        $passkeys->recordSignIn($tenant->id, (int) $data['signCount']);
+        abort_unless($passkeys->isEnabledFor($tenant), 404);
+        // signCount is optional: a landed sign-in whose counter could not be read still resets the breaker.
+        $data = $request->validate(['signCount' => ['nullable', 'integer', 'min:0']]);
+        $passkeys->recordSignIn($tenant->id, isset($data['signCount']) ? (int) $data['signCount'] : null);
 
         return response()->json(['data' => ['recorded' => true]]);
     }
@@ -74,6 +76,7 @@ class PasskeyController extends Controller
     /** uber-auth reports an injected passkey that did NOT sign in (feeds the consecutive-failure breaker). */
     public function loginFailed(Tenant $tenant, PasskeyService $passkeys): JsonResponse
     {
+        abort_unless($passkeys->isEnabledFor($tenant), 404);
         $passkeys->recordLoginResult($tenant->id, false);
 
         return response()->json(['data' => ['recorded' => true]]);

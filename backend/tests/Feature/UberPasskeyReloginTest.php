@@ -107,7 +107,41 @@ class UberPasskeyReloginTest extends TestCase
         $tenant = $this->tenant();
         $url = "/api/v1/internal/session-browser/{$tenant->id}/passkey/used";
         $this->postJson($url, ['signCount' => 1])->assertStatus(401);
-        $this->withHeader('X-Dispatch-Secret', self::SECRET)->postJson($url, [])->assertStatus(422);
+        $this->withHeader('X-Dispatch-Secret', self::SECRET)->postJson($url, ['signCount' => 'x'])->assertStatus(422);
+    }
+
+    public function test_used_without_sign_count_still_resets_the_breaker_and_marks_used(): void
+    {
+        $tenant = $this->tenant();
+        $this->register($tenant);
+        $svc = app(PasskeyService::class);
+        $svc->recordLoginResult($tenant->id, false);
+        $this->withHeader('X-Dispatch-Secret', self::SECRET)
+            ->postJson("/api/v1/internal/session-browser/{$tenant->id}/passkey/used", [])->assertOk();
+        $row = UberPasskey::withoutGlobalScopes()->where('tenant_id', $tenant->id)->first();
+        $this->assertSame(3, $row->credential['signCount']);
+        $this->assertSame(1, $row->use_count);
+        $svc->recordLoginResult($tenant->id, false);
+        $this->assertTrue($svc->shouldOfferForRelogin($tenant)); // counter was reset by the success
+    }
+
+    public function test_used_and_login_failed_404_when_the_passkey_gate_is_off(): void
+    {
+        $tenant = $this->tenant();
+        $this->register($tenant);
+        config(['services.passkey.enabled' => false]);
+        $base = "/api/v1/internal/session-browser/{$tenant->id}/passkey";
+        $this->withHeader('X-Dispatch-Secret', self::SECRET)->postJson("$base/used", ['signCount' => 5])->assertNotFound();
+        $this->withHeader('X-Dispatch-Secret', self::SECRET)->postJson("$base/login-failed", [])->assertNotFound();
+    }
+
+    public function test_the_credential_is_encrypted_at_rest(): void
+    {
+        $tenant = $this->tenant();
+        $this->register($tenant);
+        app(PasskeyService::class)->recordSignIn($tenant->id, 11);
+        $raw = \DB::table('uber_passkeys')->where('tenant_id', $tenant->id)->value('credential');
+        $this->assertStringNotContainsString('SECRET-KEY', (string) $raw);
     }
 
     public function test_credential_endpoint_still_404s_when_disabled(): void

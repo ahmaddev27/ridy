@@ -55,7 +55,7 @@ test("arkose and timeout fall through (never landed)", async () => {
 test("exceptions never escape", async () => {
   const page = fakePage();
   page.locator = () => { throw new Error("boom"); };
-  assert.equal(await trySignInWithPasskey(page, quick), "timeout");
+  assert.equal(await trySignInWithPasskey(page, quick), "error");
 });
 
 test("PASSKEY_BUTTON_RE is separate from NEVER_CLICK_RE, which still blocks passkeys in the code hunt", () => {
@@ -98,4 +98,35 @@ test("finish with nothing attached still never throws and clears flags", async (
   const handle = { passkeyTried: true, passkeyLanded: false, passkeyInjected: false };
   await finishReloginPasskey(handle, "7");
   assert.equal(handle.passkeyTried, false);
+});
+
+// finishReloginPasskey -> backend outcome reporting (fetch is stubbed; nothing leaves the process).
+async function reported(handle) {
+  const calls = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url, init) => (calls.push({ url: String(url), body: JSON.parse(init.body) }), { ok: true, json: async () => ({}) });
+  try { await finishReloginPasskey(handle, "7"); } finally { globalThis.fetch = real; }
+  return calls;
+}
+
+test("only a real passkey miss (timeout/password) feeds the breaker; arkose/error do not", async () => {
+  for (const [outcome, expected] of [["timeout", 1], ["password", 1], ["arkose", 0], ["error", 0], ["otp", 0]]) {
+    const calls = await reported({ passkeyInjected: true, passkeyTried: true, passkeyLanded: false, passkeyOutcome: outcome });
+    assert.equal(calls.length, expected, outcome);
+    if (expected) assert.match(calls[0].url, /login-failed$/);
+  }
+});
+
+test("a landed sign-in reports /used even when the signCount is unreadable", async () => {
+  const handle = { passkeyLanded: true, passkeyInjected: true, passkeyAuth: { client: { send: async () => { throw new Error("gone"); }, detach: async () => {} }, authenticatorId: "a" } };
+  const calls = await reported(handle);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/used$/);
+  assert.deepEqual(calls[0].body, {});
+});
+
+test("the proxy guard uses the handle's own proxy, not the request body", async () => {
+  const handle = { page: { context: () => ({ newCDPSession: async () => { throw new Error("must not attach"); } }) } }; // no handle.proxyUrl
+  assert.equal(await attachReloginPasskey(handle, "7", "http://u:p@proxy.example:8000"), false);
+  assert.equal(handle.passkeyInjected, false);
 });

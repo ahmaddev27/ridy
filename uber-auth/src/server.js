@@ -12,6 +12,7 @@ import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { startLogin, submitMfa, closeSession, challengeTick, finishChallenge, STATUS } from "./browser.js";
 import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf, forceDrop, registerPasskeyForCompany, attachCobrowsePasskey, registerPasskeyInCobrowse, attachReloginPasskey, finishReloginPasskey } from "./persistent.js";
+import { removeAuthenticator } from "./cobrowsePasskey.js";
 import { admitStart, adoptGuard, adoptMode, canCobrowse, canFullLogin, companyMatches, createStartGate } from "./loginPolicy.js";
 import { createCobrowse, createCobrowseServer, FULL_LOGIN_HARD_CAP_MS } from "./cobrowse.js";
 import { openCdpStream } from "./cobrowseStream.js";
@@ -240,7 +241,16 @@ async function runStart(body, admitted, res) {
 
 /** Attach never throws, but a hang must not hold the login: bounded like the co-browse attach. */
 async function attachReloginPasskeySafe(handle, companyKey, proxyUrl) {
-  const ok = await Promise.race([attachReloginPasskey(handle, companyKey, proxyUrl), sleep(PASSKEY_ATTACH_MAX_MS).then(() => false)]).catch(() => false);
+  // The race cannot cancel the attach: flag it so a late finish removes what it created instead of
+  // leaving a key-holding authenticator on the long-lived held context.
+  let timedOut = false;
+  const timeout = sleep(PASSKEY_ATTACH_MAX_MS).then(() => {
+    timedOut = true;
+    handle.passkeyAttachAborted = true;
+    return false;
+  });
+  const ok = await Promise.race([attachReloginPasskey(handle, companyKey, proxyUrl), timeout]).catch(() => false);
+  if (timedOut) await removeAuthenticator(handle); // whatever was created before the timeout; a later finish self-cleans
   if (!ok) await finishReloginPasskey(handle, companyKey);
   return ok;
 }
