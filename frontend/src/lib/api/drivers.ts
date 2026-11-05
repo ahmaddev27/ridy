@@ -18,6 +18,8 @@ export type Driver = {
   online_status: string | null;
   location_updated_at: string | null;
   email: string | null;
+  /** Driver-app manager mode (set by the company owner only). */
+  is_manager?: boolean;
   /** Mobile-app onboarding state. */
   app_status: "none" | "invited" | "invite_expired" | "active";
   /** Human label of the driver's most-recent app device, e.g. "Pixel 7 · Android 14". */
@@ -113,6 +115,16 @@ export async function updateDriverEmail(id: number, email: string | null): Promi
     method: "PATCH",
     withCsrf: true,
     body: { email },
+  });
+  return res.data;
+}
+
+/** Owner-only: mark a driver as a manager so their app runs with manager features. */
+export async function setDriverManager(id: number, isManager: boolean): Promise<Driver> {
+  const res = await apiFetch<{ data: Driver }>(`/api/v1/drivers/${id}/manager`, {
+    method: "PATCH",
+    withCsrf: true,
+    body: { is_manager: isManager },
   });
   return res.data;
 }

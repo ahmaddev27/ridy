@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureCobrowseEnabled;
 use App\Http\Middleware\EnsureDashboardToken;
 use App\Http\Middleware\EnsureDriverAccount;
+use App\Http\Middleware\EnsureDriverManager;
 use App\Http\Middleware\EnsureDriverTenantActive;
 use App\Http\Middleware\EnsureElProfessorEnabled;
 use App\Http\Middleware\EnsureFleetConnected;
@@ -69,6 +70,8 @@ return Application::configure(basePath: dirname(__DIR__))
             // Refuses credential changes while a super-admin acts as a company.
             'not.impersonating' => EnsureNotImpersonating::class,
             'driver.account' => EnsureDriverAccount::class,
+            // Driver-app manager mode: Driver token with is_manager, re-read per request.
+            'driver.manager' => EnsureDriverManager::class,
             'fleet.owner' => EnsureFleetOwner::class,
             // The platform's per-company switch for the El-Professor link.
             'elprofessor.enabled' => EnsureElProfessorEnabled::class,

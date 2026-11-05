@@ -6,6 +6,7 @@ use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
+use App\Domain\Fleet\TenantDriverOptions;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FleetDayRange;
 use App\Http\Resources\DispatchOfferResource;
@@ -130,14 +131,9 @@ class FleetController extends Controller
     }
 
     /** The tenant's drivers, for the offers-view driver picker (id + name only). */
-    public function drivers(Request $request): JsonResponse
+    public function drivers(Request $request, TenantDriverOptions $options): JsonResponse
     {
-        $drivers = Driver::withoutGlobalScopes()
-            ->where('tenant_id', $this->tenantId($request))
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        return response()->json(['data' => $drivers]);
+        return response()->json(['data' => $options->forTenant($this->tenantId($request))]);
     }
 
     /**
