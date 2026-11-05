@@ -1,5 +1,15 @@
-import { Gauge, ScrollText, Bell, MapPin, BarChart3, Users, Languages, Moon } from "lucide-react";
-import { Container, SectionHead } from "./ui";
+import {
+  Gauge,
+  ScrollText,
+  Bell,
+  MapPin,
+  BarChart3,
+  Users,
+  Languages,
+  Moon,
+} from "lucide-react";
+import { Container, SectionHeading } from "./ui";
+import { TiltCard } from "./tilt-card";
 
 const FEATURES = [
   {
@@ -46,16 +56,31 @@ const FEATURES = [
 
 export function Features() {
   return (
-    <section id="funktionen" className="mkt-section">
-      <Container>
-        <SectionHead title="Alles, was eine Flottencrew braucht. In einer App." meta="Alle Funktionen" />
-        <div className="mkt-rule-grid grid-cols-[repeat(auto-fit,minmax(min(258px,100%),1fr))]">
+    <section id="funktionen" className="relative overflow-hidden py-14 lg:py-28">
+      <div
+        className="bg-gradient-accent pointer-events-none absolute left-1/2 top-40 h-[300px] w-[600px] -translate-x-1/2 rounded-full"
+        style={{ opacity: 0.06, filter: "blur(120px)" }}
+      />
+      <Container className="relative">
+        <SectionHeading
+          eyebrow="Alle Funktionen"
+          title="Alles, was eine Flottencrew braucht. In einer App."
+          sub="Acht Module, die nahtlos zusammenarbeiten. Keine Integrationen. Keine Umwege."
+        />
+        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map((f) => (
-            <article key={f.title} className="mkt-cell flex flex-col gap-[11px]">
-              <f.icon size={24} strokeWidth={1.4} aria-hidden />
-              <h3 className="text-[17px] font-semibold">{f.title}</h3>
-              <p className="text-[14px] leading-[1.6] text-ink-muted">{f.body}</p>
-            </article>
+            <TiltCard key={f.title} className="card-modern group rounded-3xl p-6">
+              <div className="feat-tile bg-gradient-accent-soft mb-4 flex h-11 w-11 items-center justify-center rounded-xl transition-colors">
+                <f.icon
+                  size={20}
+                  className="text-primary transition-colors group-hover:text-white"
+                />
+              </div>
+              <h3 className="font-heading mb-1.5 text-base font-semibold text-white">
+                {f.title}
+              </h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">{f.body}</p>
+            </TiltCard>
           ))}
         </div>
       </Container>
