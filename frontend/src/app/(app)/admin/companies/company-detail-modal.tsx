@@ -661,8 +661,26 @@ export function CompanyDetail({
             <>
               {/* Flat bordered groups, two per row on desktop. */}
               <div className="g-2">
-                {/* Status — active toggle + three tiles + dispatch-reject callout (full width) */}
+                {/* Status — three tiles (Uber session first) + active toggle + dispatch-reject callout (full width) */}
                 <Group title={c("colStatus")} className="col-span-full">
+                  <div className="g-3">
+                    <Tile label={c("colSession")} value={company.session_status ? c(`session_${company.session_status}`) : c("noSession")} />
+                    <Tile label={c("colOffers")} value={formatNumber(company.offer_count, locale)} />
+                    <Tile label={c("colDrivers")} value={formatNumber(company.driver_count, locale)} />
+                  </div>
+
+                  <div className="row-wrap" style={{ gap: 10 }}>
+                    <Badge status={company.passkey.registered ? "connected" : "gap"}>
+                      {company.passkey.registered ? `✓ ${c("passkeyRegistered")}` : `✗ ${c("passkeyNone")}`}
+                    </Badge>
+                    {company.passkey.registered_at && (
+                      <span className="muted text-xs">
+                        {c("passkeyRegisteredAt")}:{" "}
+                        <span dir="ltr">{formatDateTime(company.passkey.registered_at, locale, { timeZone: "Europe/Berlin", dateStyle: "medium", timeStyle: "short" })}</span>
+                      </span>
+                    )}
+                  </div>
+
                   <div className="row-wrap" style={{ gap: 10 }}>
                     <Switch
                       checked={status === "active"}
@@ -672,12 +690,6 @@ export function CompanyDetail({
                     <b className={status === "active" ? "pos" : "muted"}>
                       {status === "active" ? c("statusActive") : c("statusDisabled")}
                     </b>
-                  </div>
-
-                  <div className="g-3">
-                    <Tile label={c("colSession")} value={company.session_status ? c(`session_${company.session_status}`) : c("noSession")} />
-                    <Tile label={c("colOffers")} value={formatNumber(company.offer_count, locale)} />
-                    <Tile label={c("colDrivers")} value={formatNumber(company.driver_count, locale)} />
                   </div>
 
                   <div className="callout info">
