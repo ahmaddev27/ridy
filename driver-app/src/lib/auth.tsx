@@ -35,6 +35,8 @@ type AuthState = {
   driver: DriverProfile | null;
   /** True when the signed-in account is a company owner/manager (read-only fleet monitor). */
   isOwner: boolean;
+  /** True when this DRIVER is also a fleet manager (additive; separate from isOwner). */
+  isManager: boolean;
   /** True when a stored session exists but the server is unreachable (offline). */
   offline: boolean;
   /** Set when the company is suspended — the app shows the suspension screen. */
@@ -85,6 +87,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // owner would hit a driver-only endpoint (api.home) → 401 → instant logout.
   // Sourcing it from the same object makes the two always consistent.
   const isOwner = driver?.is_owner === true;
+  // Same derivation for managers; restore() re-reads /driver/me on every
+  // foreground, so a promotion/demotion applies without a re-login.
+  const isManager = !isOwner && driver?.is_manager === true;
 
   const applyProfile = useCallback((d: DriverProfile, owner: boolean) => {
     // Do NOT override the language from the server profile: the user's in-app
@@ -299,6 +304,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ready,
         driver,
         isOwner,
+        isManager,
         offline,
         suspended,
         clearSuspended,

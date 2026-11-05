@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Tabs, usePathname, useRouter } from "expo-router";
 import { View, Pressable, Platform, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Home, Package, BarChart3, User, FileText, Ban, type LucideIcon } from "@/components/icons";
+import { Home, Package, BarChart3, User, FileText, Ban, Users, type LucideIcon } from "@/components/icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Text } from "@/components/typography";
 import { t, useLocale, isRTL } from "@/lib/i18n";
@@ -22,6 +22,8 @@ function iconFor(routeName: string): LucideIcon {
       return FileText;
     case "auto-decline":
       return Ban;
+    case "manager-drivers":
+      return Users;
     case "profile":
       return User;
     default: // index / home
@@ -38,7 +40,7 @@ function iconFor(routeName: string): LucideIcon {
 function BottomBar({ state, descriptors, navigation, onHeight }: BottomTabBarProps & { onHeight: (h: number) => void }) {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const { driver, isOwner } = useAuth();
+  const { driver, isOwner, isManager } = useAuth();
   const autoDecline = useAutoDeclineFeature(driver?.id ?? null, isOwner);
 
   // Submissions is never one of these tabs any more. A tab is a PLACE; sending
@@ -48,7 +50,8 @@ function BottomBar({ state, descriptors, navigation, onHeight }: BottomTabBarPro
   // the row no longer reflows when that switch is turned on.
   const routes = state.routes.filter(
     (route: BottomTabBarProps["state"]["routes"][number]) =>
-      route.name !== "submissions" && (route.name !== "auto-decline" || autoDecline),
+      route.name !== "submissions" && (route.name !== "auto-decline" || autoDecline) &&
+      (route.name !== "manager-drivers" || isManager),
   );
 
   const dark = isDarkPalette(c);
@@ -216,6 +219,8 @@ export default function TabsLayout() {
         <Tabs.Screen name="submissions" options={{ title: t("tabs.submissions") }} />
         {/* Early decline: drawn only when the company has the feature (see BottomBar). */}
         <Tabs.Screen name="auto-decline" options={{ title: t("tabs.autoDecline") }} />
+        {/* Manager: drawn only for a driver flagged is_manager (see BottomBar). */}
+        <Tabs.Screen name="manager-drivers" options={{ title: t("tabs.manager") }} />
         <Tabs.Screen name="profile" options={{ title: t("tabs.profile") }} />
       </Tabs>
       {showFab ? <SubmissionsFab bottom={barHeight + 14} /> : null}
