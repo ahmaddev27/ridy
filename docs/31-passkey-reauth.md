@@ -82,3 +82,34 @@ RECEIVES the credential, and releases it ONLY through the one injection accessor
 1. Set the three flags + the company flag for ONE tenant. 2. `uber:passkey-backfill --tenant=ID`
 (dry run), then `--run`. 3. Check result status, `uber_passkeys` row, session still active,
 daemon streaming. 4. Only then widen.
+
+## Path A: passkey inside the co-browse login (UBER_AUTH_PASSKEY_COBROWSE)
+Why it is safe: a live test showed that adding a passkey from a SEPARATE browser makes Uber sign
+out the account's OTHER sessions (it killed the persistent/daemon session). The device that ADDS
+the passkey is the one Uber keeps. Co-browse only runs during a relink / first connect, and the
+browser the human logs into becomes the new live session. So doing the passkey work inside that
+very browser is the "add from the kept session" case, with no healthy session to disturb. Nothing
+here calls a daemon stop/relink, opens a second browser, or touches the held persistent browser.
+
+Flags (all default OFF): `UBER_AUTH_PASSKEY_REGISTER` AND `UBER_AUTH_PASSKEY_COBROWSE` in uber-auth,
+plus the backend flags and `tenants.settings.passkey.enabled`. Everything is best-effort: an error is
+logged and swallowed and never fails the human's login. Only fullLogin (human_login) co-browse.
+
+1. USE (before the human types): `server.js` `/login/start`, right after `startLogin` parks a
+   fullLogin session, calls `attachCobrowsePasskey` (`cobrowsePasskey.js`): CDP `WebAuthn.enable` +
+   `addVirtualAuthenticator` (ctap2/internal/resident/UV/auto presence) on the co-browse page's
+   context. If the company has a stored passkey (`fetchPasskeyCredential`), `addCredential` puts it
+   in, so Uber's own WebAuthn step auto-signs and the human skips the code step. Email and
+   Arkose/captcha stay with the human. If Uber offers no passkey, the normal OTP path continues.
+   Bounded to 5 s so it can never stall the start.
+2. REGISTER (only after the login LANDED): `onLoginSuccess`, after the capture was accepted, runs
+   `registerPasskeyInCobrowse` (8 s later, background): `passkey.js registerPasskeyInSession` opens
+   one short-lived tab on the adopted co-browse context, runs the proven base64url register against
+   account.uber.com, stores the key encrypted via the backend, closes the tab. Skipped if the backend
+   or Uber already has a passkey, or the manager does not hold the company as `active`. Never before
+   the landing, never from another browser. With Path A on, the legacy separate-browser
+   after-connect trigger is NOT used for co-browse logins.
+3. Known follow-up: the injected credential's `signCount` is not written back after use.
+
+Golden rule #1: the register is the owner-approved WRITE exception; the injection only answers
+Uber's own verification prompt and never acts for the driver on an offer.
