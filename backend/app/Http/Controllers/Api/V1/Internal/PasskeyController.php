@@ -58,6 +58,8 @@ class PasskeyController extends Controller
         $credential = $passkeys->credentialForInjection($tenant);
         abort_if($credential === null, 404, 'No usable passkey.');
 
+        // TODO: PasskeyService::markUsed() is never called. This is a fetch for injection, not proof
+        // of a successful sign-in; wire it once uber-auth reports the outcome back.
         return response()->json(['data' => $credential])->header('Cache-Control', 'no-store');
     }
 

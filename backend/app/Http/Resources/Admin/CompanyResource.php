@@ -75,6 +75,7 @@ class CompanyResource extends JsonResource
             'session_last_event_at' => $session['last_event_at'] ?? null,
             'session_expires_at' => $session['expires_at'] ?? null,
 
+            'passkey_enabled' => $this->passkeyEnabled(),
             'passkey' => $this->getAttribute('passkey_info')
                 ?? ['registered' => false, 'status' => null, 'registered_at' => null],
 
