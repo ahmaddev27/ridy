@@ -81,6 +81,11 @@ for (const tenant of tenants) {
       await lclient.send("WebAuthn.addCredential", { authenticatorId: aid, credential: cred });
       let asserted = false;
       lclient.on("WebAuthn.credentialAsserted", () => { asserted = true; });
+      // Full network trace of the login page's API traffic — to discover the WebAuthn LOGIN
+      // endpoints (getAuthenticationOptions / verify) and see why the identifier won't submit.
+      const netRe = /\/api\/|graphql|authenticate|webauthn|passkey|credential|challenge|login|identity/i;
+      lpage.on("request", (rq) => { const u = rq.url(); if (netRe.test(u)) console.log("[req] " + rq.method() + " " + u.replace(/https:\/\/[^/]+/, "").split("?")[0]); });
+      lpage.on("response", async (rs) => { const u = rs.url(); if (!netRe.test(u)) return; let b = ""; try { b = (await rs.text()).slice(0, 240); } catch {} console.log("[res] " + rs.status() + " " + u.replace(/https:\/\/[^/]+/, "").split("?")[0] + " :: " + b.replace(/\s+/g, " ")); });
       await lpage.goto("https://auth.uber.com/v2/", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
       await lpage.waitForTimeout(1500);                       // let conditional-UI get() fire first
       const dump = async () => ({ url: lpage.url(), controls: (await lpage.locator('button,a,[role="button"],[role="option"]').allInnerTexts().catch(() => [])).filter(Boolean).slice(0, 20), body: (await lpage.locator("body").innerText().catch(() => "")).replace(/\s+/g, " ").slice(0, 300) });
