@@ -16,22 +16,34 @@ A second, owner-approved account WRITE. Allowed only when ALL hold:
 `UBER_AUTH_PASSKEY_ON_CONNECT=1` additionally enables the after-connect hook.
 
 ## Safety design
-- Runs on a NEW PAGE of the company's HELD session context (the persistent session browser,
-  which `adoptLogin()` fills after a connect / co-browse). No second browser, no cookie copy:
-  Uber sees the one device it already knows. The company's keep-warm is parked meanwhile
-  (`PersistentSessionManager.withBusy`; `renew()` skips a busy or already-renewing entry).
+- **Separate, short-lived browser; the live session is never touched.** LIVE-TEST FINDING
+  (tenant 15): registering INSIDE the held persistent-session browser context made Uber sign
+  that live session out (needs_otp / hard re-auth). In-session registration is UNSAFE and was
+  removed. Now `passkey.js` launches its OWN ephemeral Chrome seeded (`storageState`) from a
+  read-only COPY of `state/<companyKey>.json`, registers via the CDP virtual authenticator,
+  verifies with `getPasskeysInfo`, exports the PKCS#8 credential and closes the browser. This
+  is the recipe the spikes (spike/passkey-api) used 7 times on tenant 15 without a sign-out.
+  The persistent browser, its context, the keep-warm and the daemon / RAMEN stream are not
+  parked, adopted, mutated or restarted.
+- **All traffic through the company's own residential proxy.** The ephemeral browser gets
+  Playwright's `proxy` from the tenant's `proxy_url` (read from the backend `wanted` list, the
+  same value the daemon / held browser use), via `newStealthContext`. A direct datacenter-IP
+  visit to account.uber.com reads as a new device/location and can sign the session out, so a
+  company with no (parsable) proxy returns `no_proxy` before anything is read or launched.
+  Missing/unreadable state file => `not_authenticated`, nothing launched.
 - Idempotent twice: the backend says `registered` => skip; otherwise `getPasskeysInfo` first and
   any existing passkey => `uber_has_passkey`, skip (never piled up).
-- After every attempt one normal keep-warm runs; if the session is no longer `active` the result
+- After every attempt one normal keep-warm runs on the LIVE session (it should stay active; this
+  only verifies); if the session is no longer `active` the result
   is `session_lost`, `console.error [passkey][ALERT]` fires, the backend records the failure
   (`Log::critical` + audit `passkey.failed`) and `uber:passkey-backfill` halts the run.
 - If Uber accepted the passkey but the backend would not store the key (3 tries): `store_failed`,
   loud alert; the orphan passkey must be removed on account.uber.com/passkeys by a human.
 - The daemon is never stopped/relinked. Cookie rotation from the visit goes through the normal
   capture path (the daemon resumes seq across teardowns).
-- Caveat: a context SEEDED from stored cookies only carries the vsdispatch/fleethub jars; if
-  account.uber.com does not accept it the result is `not_authenticated` (nothing changed). The
-  after-connect hook (login/co-browse contexts) is the primary path.
+- Caveat: the state copy must carry account.uber.com cookies; if Uber does not accept it the
+  result is `not_authenticated` (nothing changed). The after-connect hook and the backfill
+  command both use this same isolated path.
 
 ## Mechanism (proven in spike/passkey-api)
 CDP `WebAuthn.addVirtualAuthenticator` (ctap2/internal/resident/UV/autoPresence) on
