@@ -21,6 +21,16 @@ const SESSION_POLL_ALERT_AFTER = 5; // ~5 min at the 60s poll interval
 // doesn't fire every company's TLS handshakes through the proxies in one tick.
 const START_STAGGER_MS = 100;
 
+// Carries a stream's RAMEN position (`seq`) across a supervisor-level teardown so the
+// replacement stream resumes instead of restarting at seq 0. A jar_version bump — a
+// browser/persistent-session capture, or the extension re-posting a rotated jwt-session
+// cookie — tears down EVERY channel of that company; rebuilding at seq 0 dropped the
+// offers Uber dispatched in the reconnect gap (the fleet-wide "cookies changed → seq 0"
+// churn). Bounded by a short TTL: a position older than this may be too stale for Uber
+// to honour, so the stream starts clean instead. Keyed by `${sessionId}:${ramenPath}`.
+const resumeSeq = new Map();
+const RESUME_SEQ_TTL_MS = 60_000;
+
 // Adaptive poll cadence. `lastActiveIds` is the set of session ids the previous
 // poll returned; `recovering` maps the id of a company that has since VANISHED
 // from the list (Uber rejected it → needs_relink, or it expired) to the moment
@@ -167,6 +177,12 @@ async function reconcile() {
     if (!wantedKeys.has(key) || proxyChanged || cookiesChanged) {
       const reason = !wantedKeys.has(key) ? "no longer active" : proxyChanged ? "proxy changed" : "cookies changed";
       console.log(`stopping stream ${key} (${reason})`);
+      // Only when the session stays wanted (so a stream WILL be rebuilt below): remember
+      // the live position so the replacement resumes from it instead of seq 0. Skipped
+      // for a session going away, so the map can't grow without bound.
+      if (wantedKeys.has(key) && Number.isFinite(stream.seq) && stream.seq > 0) {
+        resumeSeq.set(key, { seq: stream.seq, at: Date.now() });
+      }
       stream.stop();
       streams.delete(key);
     }
@@ -192,6 +208,16 @@ function startSessionStreams(session) {
       if (streams.has(key)) return;
       console.log(`starting stream ${key} (${session.uber_org_uuid})`);
       const stream = new RamenStream(session, path, { primary: index === 0, onStaleJar: reconcileSoon });
+      // Resume the position saved when this exact key was torn down a moment ago (a
+      // jar_version/proxy change), so a rolling-cookie teardown no longer resets seq to 0
+      // and drops offers in the gap. The replacement opens with /recv?seq=N — the same
+      // resume the in-object reopen uses — and offers are idempotent on offer_uuid, so a
+      // short replay is harmless. Stale positions (> RESUME_SEQ_TTL_MS) start clean.
+      const resume = resumeSeq.get(key);
+      if (resume && Date.now() - resume.at <= RESUME_SEQ_TTL_MS) {
+        stream.seq = resume.seq;
+      }
+      resumeSeq.delete(key);
       // Registered synchronously so the next reconcile pass never starts it twice.
       streams.set(key, stream);
       created.push([key, stream]);
