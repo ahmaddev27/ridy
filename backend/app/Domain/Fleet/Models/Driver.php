@@ -64,6 +64,7 @@ class Driver extends Authenticatable implements PasskeyHolder
         'heading' => 'decimal:2',
         'trip_waypoints' => 'array',
         'auto_decline' => 'array',
+        'is_manager' => 'boolean',
         'is_online' => 'boolean',
         'engagement' => 'integer',
         'password' => 'hashed',

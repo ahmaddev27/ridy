@@ -57,6 +57,7 @@ use App\Http\Controllers\Api\V1\Driver\DriverWebauthnCredentialController;
 use App\Http\Controllers\Api\V1\Driver\FleetController;
 use App\Http\Controllers\Api\V1\Driver\FleetDeviceController;
 use App\Http\Controllers\Api\V1\Driver\FleetSubmissionController;
+use App\Http\Controllers\Api\V1\Driver\ManagerController;
 use App\Http\Controllers\Api\V1\DriverController;
 use App\Http\Controllers\Api\V1\DriverInviteController;
 use App\Http\Controllers\Api\V1\DriverMetricController;
@@ -192,6 +193,18 @@ Route::prefix('v1')->group(function () {
                 Route::get('auto-decline', [DriverAutoDeclineController::class, 'show']);
                 Route::put('auto-decline', [DriverAutoDeclineController::class, 'update']);
                 Route::get('auto-decline/history', [DriverAutoDeclineController::class, 'history']);
+
+                // Manager mode: a company admin who is also a driver (drivers.is_manager,
+                // set from the dashboard). The only write is the Early-decline permission
+                // + rules — never an offer action. `driver.manager` re-reads the flag per
+                // request, so a demotion bites at once.
+                Route::middleware('driver.manager')->prefix('manager')->group(function () {
+                    Route::get('auto-decline/drivers', [ManagerController::class, 'autoDeclineDrivers']);
+                    Route::put('auto-decline/drivers/{driver}', [ManagerController::class, 'updateAutoDecline'])->whereNumber('driver');
+                    Route::get('drivers', [ManagerController::class, 'drivers']);
+                    Route::get('drivers/live', [ManagerController::class, 'live']);
+                });
+
                 Route::get('offers', [DriverOfferController::class, 'index']);
                 Route::post('offers/seen', [DriverOfferController::class, 'markSeen']);
                 Route::get('offers/{offer}', [DriverOfferController::class, 'show']);
@@ -355,6 +368,10 @@ Route::prefix('v1')->group(function () {
         Route::get('drivers/{driver}', [DriverController::class, 'show']);
         Route::patch('drivers/{driver}', [DriverController::class, 'update'])->middleware('can:drivers.manage');
         Route::delete('drivers/{driver}', [DriverController::class, 'destroy'])->middleware('can:drivers.manage');
+        // Mark a driver as a manager (their app runs with manager features). OWNER only:
+        // users.manage, never drivers.manage — a fleet_manager promoting drivers would be
+        // privilege escalation.
+        Route::patch('drivers/{driver}/manager', [DriverController::class, 'setManager'])->middleware('can:users.manage');
         Route::get('drivers/{driver}/stats', [DriverController::class, 'stats']);
         // Browser-fed ingest: only for a company that has connected its own Uber
         // account (a stored session), never an arbitrary account the manager is

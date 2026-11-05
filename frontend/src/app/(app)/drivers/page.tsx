@@ -10,7 +10,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { formatNumber } from "@/lib/utils";
 import { useAsync } from "@/hooks/use-async";
-import { listDrivers, syncDrivers, inviteDriver, testDriverPush, updateDriverEmail, type Driver } from "@/lib/api/drivers";
+import { listDrivers, syncDrivers, inviteDriver, testDriverPush, updateDriverEmail, setDriverManager, type Driver } from "@/lib/api/drivers";
+import { Switch } from "@/components/ui/switch";
 import { apiErrorMessage } from "@/lib/api/error-message";
 import { syncRosterViaExtension, fetchDriverStatusesViaExtension } from "@/lib/extension";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -32,7 +33,23 @@ export default function DriversPage() {
   const [emailValue, setEmailValue] = useState("");
   const [savingEmail, setSavingEmail] = useState(false);
   const [inviteTarget, setInviteTarget] = useState<Driver | null>(null);
+  const [managerBusyId, setManagerBusyId] = useState<number | null>(null);
   const didAutoSync = useRef(false);
+  // Owner only (users.manage): a fleet manager must not promote drivers.
+  const canPromote = user?.permissions?.includes("users.manage") ?? false;
+
+  async function toggleManager(d: Driver) {
+    setManagerBusyId(d.id);
+    try {
+      await setDriverManager(d.id, !d.is_manager);
+      toast.success(t("screens.drivers.managerSaved"));
+      await refetch();
+    } catch (e) {
+      toast.error(apiErrorMessage(e, t));
+    } finally {
+      setManagerBusyId(null);
+    }
+  }
 
   function openEmailModal(d: Driver) {
     setEmailDriver(d);
@@ -210,6 +227,7 @@ export default function DriversPage() {
                     <th>{d_("colTrips")}</th>
                     <th>{d_("colStatus")}</th>
                     <th>Uber</th>
+                    {canPromote && <th>{d_("colManager")}</th>}
                     <th className="r">{d_("colApp")}</th>
                   </tr>
                 </thead>
@@ -259,6 +277,17 @@ export default function DriversPage() {
                           <span className="badge outline square">{d_("notLinked")}</span>
                         )}
                       </td>
+                      {canPromote && (
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <Switch
+                            checked={d.is_manager === true}
+                            onChange={() => void toggleManager(d)}
+                            // The server refuses your own record too; this just avoids a dead control.
+                            disabled={managerBusyId === d.id || (!!d.email && d.email.toLowerCase() === user?.email?.toLowerCase())}
+                            label={d_("managerHint")}
+                          />
+                        </td>
+                      )}
                       <td className="r" onClick={(e) => e.stopPropagation()}>
                         <AppCell
                           d={d}
