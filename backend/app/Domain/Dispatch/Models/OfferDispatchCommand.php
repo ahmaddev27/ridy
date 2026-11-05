@@ -28,7 +28,7 @@ class OfferDispatchCommand extends Model
     use BelongsToTenant;
 
     protected $fillable = [
-        'tenant_id', 'dispatch_offer_id', 'uber_fleet_session_id', 'action',
+        'tenant_id', 'dispatch_offer_id', 'uber_fleet_session_id', 'action', 'is_auto',
         'driver_id', 'user_id',
         'offer_uuid', 'real_offer_uuid', 'offer_type', 'driver_uuid',
         'status', 'attempts', 'session_token_expired', 'uber_success', 'uber_error', 'latency_ms',
@@ -37,6 +37,7 @@ class OfferDispatchCommand extends Model
 
     protected $casts = [
         'action' => DispatchCommandAction::class,
+        'is_auto' => 'boolean',
         'status' => DispatchCommandStatus::class,
         'attempts' => 'integer',
         'session_token_expired' => 'boolean',

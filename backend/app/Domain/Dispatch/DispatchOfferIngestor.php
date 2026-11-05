@@ -4,6 +4,7 @@ namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Jobs\GeocodeOffer;
 use App\Domain\Dispatch\Models\DispatchOffer;
+use App\Domain\Dispatch\Models\OfferDispatchCommand;
 use App\Domain\Fleet\DriverStatsService;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Notifications\DispatchNotifier;
@@ -232,7 +233,7 @@ class DispatchOfferIngestor
             return null;
         }
 
-        $result = app(DispatchActionService::class)->requestReject($record, $driver);
+        $result = app(DispatchActionService::class)->requestReject($record, $driver, auto: true);
         $queued = in_array($result['status'] ?? '', ['queued', 'already_declined', 'duplicate'], true);
         if (! $queued) {
             return null;
@@ -240,7 +241,24 @@ class DispatchOfferIngestor
 
         $record->forceFill(['auto_decline_reason' => $reason])->save();
 
+        // The claim-time admin gate may have closed the command in the instant between
+        // queueing and this stamp (it could not push: no reason was set yet). Hand the
+        // offer back so the driver is never left un-declined AND un-notified.
+        if (isset($result['command_id']) && $this->commandExpired((int) $result['command_id'])) {
+            app(AutoDeclineFallback::class)->recover($record);
+
+            return null;
+        }
+
         return $reason;
+    }
+
+    private function commandExpired(int $commandId): bool
+    {
+        return OfferDispatchCommand::withoutGlobalScopes()
+            ->whereKey($commandId)
+            ->where('status', DispatchCommandStatus::Expired)
+            ->exists();
     }
 
     /**
