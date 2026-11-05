@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class AutoDeclineSettings
 {
-    public const REASONS = ['min_fare', 'reject_cities', 'max_pickup_distance', 'max_trip_distance'];
+    public const REASONS = ['min_fare', 'min_price_per_km', 'reject_cities', 'max_pickup_distance', 'max_trip_distance'];
 
     /** How many of the driver's latest offers we mine for the city picker. */
     private const CITY_SAMPLE = 300;
@@ -196,6 +196,11 @@ class AutoDeclineSettings
 
         return [
             'min_fare' => ['enabled' => $on('min_fare'), 'value_e2' => max(0, (int) ($rules['min_fare']['value_e2'] ?? 0))],
+            'min_price_per_km' => [
+                'enabled' => $on('min_price_per_km'),
+                'value_e2' => max(0, (int) ($rules['min_price_per_km']['value_e2'] ?? 0)),
+                'mode' => ($rules['min_price_per_km']['mode'] ?? 'and') === 'or' ? 'or' : 'and',
+            ],
             'reject_cities' => ['enabled' => $on('reject_cities'), 'cities' => $this->cities($rules['reject_cities']['cities'] ?? [])],
             'max_pickup_distance' => ['enabled' => $on('max_pickup_distance'), 'km' => $this->km($rules['max_pickup_distance']['km'] ?? 0)],
             'max_trip_distance' => ['enabled' => $on('max_trip_distance'), 'km' => $this->km($rules['max_trip_distance']['km'] ?? 0)],
