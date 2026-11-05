@@ -338,15 +338,15 @@ export function CompanyDetail({
               </div>
               <div className="row-wrap" style={{ gap: 8, marginTop: 8 }}>
                 {company.state === null ? (
-                  <Badge status="connected" dot>{c("subActive")}</Badge>
+                  <Badge status="connected" dot>{c("subscription")}: {c("subActive")}</Badge>
                 ) : (
                   <Badge status={company.state === "banned" || company.state === "disabled" ? "error" : "expiring"} dot>
-                    {c(`sub_${company.state}`)}
+                    {c("subscription")}: {c(`sub_${company.state}`)}
                   </Badge>
                 )}
                 {company.session_status && (
                   <Badge status={headBadgeSession[company.session_status] ?? "gap"} dot>
-                    {c(`session_${company.session_status}`)}
+                    {c("colSession")}: {c(`session_${company.session_status}`)}
                   </Badge>
                 )}
               </div>
