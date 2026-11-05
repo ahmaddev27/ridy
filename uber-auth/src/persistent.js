@@ -121,7 +121,7 @@ export async function backendHasSession(companyKey, { activeOnly = false } = {})
 
 const passkeyUrl = (key) => `/api/v1/internal/session-browser/${encodeURIComponent(key)}/passkey`;
 
-// Backend side of the passkey registration (docs/29). The credential only ever goes OUT through
+// Backend side of the passkey registration (docs/31). The credential only ever goes OUT through
 // store(); nothing here reads one back.
 const passkeyBackend = {
   async status(key) {

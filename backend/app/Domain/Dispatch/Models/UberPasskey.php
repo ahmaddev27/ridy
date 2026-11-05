@@ -6,7 +6,7 @@ use App\Domain\Tenancy\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * The software passkey registered on a company's Uber account (docs/29). `credential`
+ * The software passkey registered on a company's Uber account (docs/31). `credential`
  * holds the PRIVATE KEY - a high-value secret that authenticates the Uber account. It is
  * encrypted at rest, hidden from serialization, and must never reach a log, an API
  * response, an audit entry or a Sentry payload.

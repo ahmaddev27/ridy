@@ -1,4 +1,4 @@
-// Software-passkey REGISTRATION on a company's Uber account (docs/29). OFF unless
+// Software-passkey REGISTRATION on a company's Uber account (docs/31). OFF unless
 // UBER_AUTH_PASSKEY_REGISTER=1 AND the backend says the company is enabled.
 //
 // Safety model (the owner's constraints):

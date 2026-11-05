@@ -97,7 +97,7 @@ return [
         'secret' => (string) env('UBER_AUTH_SECRET'),
     ],
 
-    // Software passkey REGISTRATION on the company's Uber account (docs/29). A scoped account
+    // Software passkey REGISTRATION on the company's Uber account (docs/31). A scoped account
     // WRITE: every gate defaults OFF. `tenants` = optional allowlist (empty = no limit); a
     // company also needs `settings.passkey.enabled`. uber-auth has its own UBER_AUTH_PASSKEY_REGISTER.
     'passkey' => [

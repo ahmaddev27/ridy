@@ -146,7 +146,7 @@ async function onLoginSuccess(companyKey, outcome, res, mode = null) {
   return send(res, 200, { status: STATUS.SUCCESS, persistent: true, org_uuid: outcome.result?.org_uuid ?? null });
 }
 
-// Trigger (a) of docs/29: after a successful connect / co-browse, try a passkey registration in
+// Trigger (a) of docs/31: after a successful connect / co-browse, try a passkey registration in
 // the background. Needs BOTH UBER_AUTH_PASSKEY_REGISTER and UBER_AUTH_PASSKEY_ON_CONNECT (default
 // off), plus the backend's per-company flag. The delay lets the first capture settle; the response
 // never waits for it and a failure never touches the login outcome.

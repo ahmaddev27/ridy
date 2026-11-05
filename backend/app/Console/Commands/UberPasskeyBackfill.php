@@ -11,7 +11,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 
 /**
- * Explicit, operator-run passkey registration (docs/29). Never scheduled, never run by a
+ * Explicit, operator-run passkey registration (docs/31). Never scheduled, never run by a
  * deploy. DRY-RUN unless --run; one tenant with --tenant=ID; fleet-wide additionally
  * needs --confirm. A `session_lost` outcome halts the whole run.
  */
@@ -24,7 +24,7 @@ class UberPasskeyBackfill extends Command
         {--limit=5 : Max companies per fleet-wide run}
         {--sleep=60 : Seconds between companies}';
 
-    protected $description = 'Register a software passkey on eligible companies\' Uber accounts (dry-run by default, flag-gated, docs/29)';
+    protected $description = 'Register a software passkey on eligible companies\' Uber accounts (dry-run by default, flag-gated, docs/31)';
 
     public function handle(PasskeyService $passkeys, UberAuthClient $uberAuth): int
     {

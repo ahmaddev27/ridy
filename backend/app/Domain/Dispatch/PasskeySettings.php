@@ -5,7 +5,7 @@ namespace App\Domain\Dispatch;
 use App\Domain\Tenancy\Models\Tenant;
 
 /**
- * Whether a company may have a software passkey registered on its Uber account (docs/29).
+ * Whether a company may have a software passkey registered on its Uber account (docs/31).
  * Every gate defaults OFF: the global switch (UBER_PASSKEY_REGISTER), the optional
  * allowlist (UBER_PASSKEY_TENANTS, empty = no limit) and the super-admin's per-company
  * flag (`tenants.settings.passkey.enabled`). REGISTRATION only: signing in with the

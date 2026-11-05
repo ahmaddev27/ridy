@@ -299,7 +299,7 @@ Route::prefix('v1')->group(function () {
         Route::get('rescue', [SessionBrowserController::class, 'rescue']);
         Route::post('status', [SessionBrowserController::class, 'status']);
         Route::post('{tenant}/capture', [SessionBrowserController::class, 'capture']);
-        // Software passkey registration (docs/29). Deliberately no GET of the credential itself.
+        // Software passkey registration (docs/31). Deliberately no GET of the credential itself.
         Route::get('{tenant}/passkey', [PasskeyController::class, 'show']);
         Route::post('{tenant}/passkey', [PasskeyController::class, 'store']);
         Route::post('{tenant}/passkey/failure', [PasskeyController::class, 'failure']);

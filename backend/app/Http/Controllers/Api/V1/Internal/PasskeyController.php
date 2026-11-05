@@ -10,7 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Internal (X-Dispatch-Secret) endpoints for uber-auth's passkey registration (docs/29).
+ * Internal (X-Dispatch-Secret) endpoints for uber-auth's passkey registration (docs/31).
  * Receives and stores the credential; it leaves ONLY via credential() (same flags), for co-browse injection.
  */
 class PasskeyController extends Controller

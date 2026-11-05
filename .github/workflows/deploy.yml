@@ -386,7 +386,7 @@ jobs:
             env_line UBER_SERVER_SYNC "$UBER_SERVER_SYNC"
             # Optional tenant-id allowlist for the server-side sync rollout (empty = all).
             env_line UBER_SERVER_SYNC_TENANTS "$UBER_SERVER_SYNC_TENANTS"
-            # Software passkey registration (docs/29): scoped Uber account write, ALL OFF (empty) by default.
+            # Software passkey registration (docs/31): scoped Uber account write, ALL OFF (empty) by default.
             env_line UBER_PASSKEY_REGISTER "$UBER_PASSKEY_REGISTER"
             env_line UBER_PASSKEY_TENANTS "$UBER_PASSKEY_TENANTS"
             env_line UBER_AUTH_PASSKEY_REGISTER "$UBER_AUTH_PASSKEY_REGISTER"

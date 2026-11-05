@@ -100,7 +100,7 @@ class UberAuthClient
 
     /**
      * Ask uber-auth to register a software passkey from the company's HELD session browser
-     * (docs/29). The credential goes straight to the internal passkey endpoint, never through
+     * (docs/31). The credential goes straight to the internal passkey endpoint, never through
      * here; the answer is a status word only.
      *
      * @return array<string, mixed>

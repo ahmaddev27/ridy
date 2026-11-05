@@ -45,7 +45,7 @@ then grep before writing. Reuse the existing service/helper — the backend is s
   (`DriverStatusIngestor` + `OfferLifecycle`); the decline is the one thing we command, and we
   record Uber's answer rather than assume it. Do not reintroduce a timeline reconciler — it was
   tried and reverted.
-- **Amendment to rule #1 - software passkey REGISTRATION (docs/29).** Registering a software
+- **Amendment to rule #1 - software passkey REGISTRATION (docs/31).** Registering a software
   passkey on a company's Uber account is a second, owner-approved account WRITE. It is allowed
   ONLY when gated by BOTH the global `UBER_PASSKEY_REGISTER` + uber-auth's own
   `UBER_AUTH_PASSKEY_REGISTER` AND the per-company `settings['passkey']['enabled']` (all OFF by

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Persists the software passkey uber-auth registered (docs/29). The credential (private
+ * Persists the software passkey uber-auth registered (docs/31). The credential (private
  * key) is stored encrypted and is NEVER logged or audited - only its sha256 id hash is.
  */
 class PasskeyService
