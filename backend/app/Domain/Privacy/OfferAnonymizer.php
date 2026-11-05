@@ -39,6 +39,14 @@ class OfferAnonymizer
         'route_geometry' => null,
         'stops' => null,
         'raw_payload' => '{}',
+        // Driver-geo study (receipt position + chained ride): same retention as raw_payload.
+        'receipt_driver_lat' => null,
+        'receipt_driver_lng' => null,
+        'receipt_driver_fix_at' => null,
+        'receipt_driver_status' => null,
+        'receipt_driver_heading' => null,
+        'chained_after_offer_id' => null,
+        'chain_context' => null,
     ];
 
     /**

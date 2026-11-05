@@ -27,6 +27,8 @@ class DispatchOffer extends Model
         'distance_m', 'route_geometry', 'geo_confidence', 'geo_source', 'stops', 'stops_count', 'geo_synced_at', 'geo_attempts',
         'status', 'fare_amount', 'started_at', 'completed_at', 'rejected_at', 'canceled_at',
         'dispatch_rejected_at',
+        'receipt_driver_lat', 'receipt_driver_lng', 'receipt_driver_fix_at', 'receipt_driver_status',
+        'receipt_driver_heading', 'chained_after_offer_id', 'chain_context',
     ];
 
     protected $casts = [
@@ -54,6 +56,12 @@ class DispatchOffer extends Model
         'rejected_at' => 'datetime',
         'canceled_at' => 'datetime',
         'dispatch_rejected_at' => 'datetime',
+        'receipt_driver_lat' => 'float',
+        'receipt_driver_lng' => 'float',
+        'receipt_driver_fix_at' => 'datetime',
+        'receipt_driver_heading' => 'float',
+        'chained_after_offer_id' => 'integer',
+        'chain_context' => 'array',
         'auto_decline_failed_at' => 'datetime',
     ];
 

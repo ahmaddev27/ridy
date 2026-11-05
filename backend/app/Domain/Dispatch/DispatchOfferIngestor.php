@@ -139,7 +139,7 @@ class DispatchOfferIngestor
                 'received_at' => CarbonImmutable::now(),
                 'status' => OfferStatus::Pending,
                 'raw_payload' => $offer,
-            ]);
+            ] + $this->receiptDriverFields($driver));
         } catch (QueryException $e) {
             // The same offer arrives near-simultaneously on two RAMEN channels; the
             // loser hits the unique(tenant_id, offer_uuid) index. That's a duplicate,
@@ -191,6 +191,8 @@ class DispatchOfferIngestor
                 Log::warning('dispatch_offer.supersede_failed', ['offer_id' => $record->id, 'error' => $e->getMessage()]);
             }
         }
+
+        $this->recordChainContext($record, $driver);
 
         $status = match (true) {
             $driver === null => 'unlinked_driver',
@@ -282,6 +284,75 @@ class DispatchOfferIngestor
      * With the switch off (the default for every company) this is byte-for-byte the
      * behaviour it always had.
      */
+    /**
+     * The driver's live position at receipt, copied from the already-loaded row (no
+     * query). Only an engaged driver has one (Uber sends 0,0 otherwise, stored as
+     * NULL), and a fix older than LIVE_STALE_MINUTES is never stamped.
+     *
+     * @return array<string, mixed>
+     */
+    private function receiptDriverFields(?Driver $driver): array
+    {
+        $fixAt = $driver?->location_updated_at;
+        if ($driver === null || $driver->latitude === null || $driver->longitude === null || $fixAt === null
+            || $fixAt->lt(now()->subMinutes(Driver::LIVE_STALE_MINUTES))) {
+            return [];
+        }
+
+        return [
+            'receipt_driver_lat' => round((float) $driver->latitude, 4),
+            'receipt_driver_lng' => round((float) $driver->longitude, 4),
+            'receipt_driver_fix_at' => $fixAt,
+            'receipt_driver_status' => $driver->online_status !== null ? mb_substr((string) $driver->online_status, 0, 32) : null,
+            'receipt_driver_heading' => $driver->heading !== null ? round((float) $driver->heading, 2) : null,
+        ];
+    }
+
+    /**
+     * Link the offer to the ride the driver is still on and freeze that ride's final
+     * destination (the gap distances are computed later, once this offer is geocoded).
+     * Runs AFTER the push and best-effort: a failure here must never fail the batch.
+     */
+    private function recordChainContext(DispatchOffer $record, ?Driver $driver): void
+    {
+        if ($driver === null) {
+            return;
+        }
+
+        try {
+            $active = $this->lifecycle->activeOfferFor($record->tenant_id, $record->driver_uuid);
+            if ($active === null || $active->id === $record->id) {
+                return;
+            }
+            $record->update([
+                'chained_after_offer_id' => $active->id,
+                'chain_context' => $this->chainContext($driver, $active),
+            ]);
+        } catch (Throwable $e) {
+            Log::warning('dispatch_offer.chain_context_failed', ['offer_id' => $record->id, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function chainContext(Driver $driver, DispatchOffer $active): array
+    {
+        $last = collect($driver->trip_waypoints ?? [])->last();
+        $fromWaypoints = is_array($last) && isset($last['lat'], $last['lng']);
+        $dest = $fromWaypoints ? $last : ['lat' => $active->dropoff_lat, 'lng' => $active->dropoff_lng];
+
+        return [
+            'current_dropoff' => $dest['lat'] === null || $dest['lng'] === null ? null : [
+                'lat' => round((float) $dest['lat'], 6),
+                'lng' => round((float) $dest['lng'], 6),
+            ],
+            'driver' => $driver->latitude === null ? null : [
+                'lat' => round((float) $driver->latitude, 4),
+                'lng' => round((float) $driver->longitude, 4),
+            ],
+            'dest_source' => $fromWaypoints ? 'waypoints' : 'active_offer',
+        ];
+    }
+
     private function notifyDriver(DispatchOffer $record, ?float $geocodeDeadline): void
     {
         $fast = $record->tenant?->dispatchRejectEnabled() === true;

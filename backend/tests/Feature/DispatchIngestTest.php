@@ -6,6 +6,7 @@ use App\Domain\Dispatch\Jobs\GeocodeOffer;
 use App\Domain\Dispatch\Models\DispatchNetworkLog;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Dispatch\Models\UberFleetSession;
+use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
 use App\Domain\Tenancy\TenantContext;
@@ -94,6 +95,78 @@ class DispatchIngestTest extends TestCase
         $this->assertNotNull($log, 'daemon ingest must record the offer to the Network feed');
         $this->assertSame($tenant->id, $log->tenant_id);
         $this->assertSame(self::DRIVER_UUID, $log->payload['driverInfo']['driverUUID']);
+    }
+
+    public function test_engaged_driver_fix_is_stamped_rounded_on_the_offer(): void
+    {
+        $this->tenantWithOrg();
+        app(TenantContext::class)->set(Tenant::first()->id);
+        Driver::create([
+            'name' => 'Mhmoud Zedya', 'uber_driver_uuid' => self::DRIVER_UUID, 'online_status' => 'ON_TRIP',
+            'latitude' => 51.51364217, 'longitude' => 7.46531899, 'heading' => 90.5,
+            'location_updated_at' => now()->subMinutes(2),
+        ]);
+
+        $this->ingestOffers([$this->offer()])->assertOk();
+
+        $offer = DispatchOffer::withoutGlobalScopes()->first();
+        $this->assertSame(51.5136, $offer->receipt_driver_lat);
+        $this->assertSame(7.4653, $offer->receipt_driver_lng);
+        $this->assertSame('ON_TRIP', $offer->receipt_driver_status);
+        $this->assertSame(90.5, $offer->receipt_driver_heading);
+        $this->assertNotNull($offer->receipt_driver_fix_at);
+        $this->assertNull($offer->chained_after_offer_id);
+    }
+
+    public function test_idle_stale_or_unlinked_driver_leaves_the_fix_null(): void
+    {
+        $this->tenantWithOrg();
+        app(TenantContext::class)->set(Tenant::first()->id);
+        $driver = Driver::create(['name' => 'Mhmoud Zedya', 'uber_driver_uuid' => self::DRIVER_UUID, 'online_status' => 'ONLINE']);
+
+        $this->ingestOffers([$this->offer(['offerUUID' => 'idle-1'])])->assertOk();
+
+        $driver->update(['latitude' => 51.5, 'longitude' => 7.4, 'location_updated_at' => now()->subMinutes(30)]);
+        $this->ingestOffers([$this->offer(['offerUUID' => 'stale-1'])])->assertOk();
+
+        $this->ingestOffers([$this->offer(['offerUUID' => 'unlinked-1', 'driverInfo' => ['driverUUID' => 'nobody']])])->assertOk();
+
+        foreach (['idle-1', 'stale-1', 'unlinked-1'] as $uuid) {
+            $offer = DispatchOffer::withoutGlobalScopes()->where('offer_uuid', $uuid)->first();
+            $this->assertNull($offer->receipt_driver_lat, $uuid);
+            $this->assertNull($offer->receipt_driver_fix_at, $uuid);
+            $this->assertNull($offer->receipt_driver_status, $uuid);
+        }
+    }
+
+    public function test_chain_link_and_destination_are_captured_for_a_driver_on_a_ride(): void
+    {
+        $tenant = $this->tenantWithOrg();
+        app(TenantContext::class)->set($tenant->id);
+        Driver::create([
+            'name' => 'Mhmoud Zedya', 'uber_driver_uuid' => self::DRIVER_UUID, 'online_status' => 'ON_TRIP',
+            'latitude' => 51.5136, 'longitude' => 7.4653, 'location_updated_at' => now(),
+            'trip_waypoints' => [['lat' => 51.50, 'lng' => 7.40], ['lat' => 51.4801, 'lng' => 7.2102]],
+        ]);
+        $active = DispatchOffer::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id, 'driver_uuid' => self::DRIVER_UUID, 'offer_uuid' => 'active-1',
+            'status' => OfferStatus::Started, 'received_at' => now()->subMinutes(15), 'raw_payload' => [],
+            'dropoff_lat' => 51.0, 'dropoff_lng' => 7.0,
+        ]);
+
+        $this->ingestOffers([$this->offer()])->assertOk();
+
+        $offer = DispatchOffer::withoutGlobalScopes()->where('offer_uuid', '!=', 'active-1')->first();
+        $this->assertSame($active->id, $offer->chained_after_offer_id);
+        $this->assertSame('waypoints', $offer->chain_context['dest_source']);
+        $this->assertEquals(51.4801, $offer->chain_context['current_dropoff']['lat']);
+        $this->assertEquals(7.4653, $offer->chain_context['driver']['lng']);
+
+        Driver::query()->update(['trip_waypoints' => null]);
+        $this->ingestOffers([$this->offer(['offerUUID' => 'second-1'])])->assertOk();
+        $second = DispatchOffer::withoutGlobalScopes()->where('offer_uuid', 'second-1')->first();
+        $this->assertSame('active_offer', $second->chain_context['dest_source']);
+        $this->assertEquals(51.0, $second->chain_context['current_dropoff']['lat']);
     }
 
     public function test_geocoding_is_enqueued_off_the_ingest_hot_path(): void
