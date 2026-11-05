@@ -47,6 +47,7 @@ export { default as Radio } from "lucide-react-native/icons/radio";
 export { default as Route } from "lucide-react-native/icons/route";
 export { default as Search } from "lucide-react-native/icons/search";
 export { default as Settings } from "lucide-react-native/icons/settings";
+export { default as Users } from "lucide-react-native/icons/users";
 export { default as ShieldCheck } from "lucide-react-native/icons/shield-check";
 export { default as SlidersHorizontal } from "lucide-react-native/icons/sliders-horizontal";
 export { default as Trash2 } from "lucide-react-native/icons/trash-2";

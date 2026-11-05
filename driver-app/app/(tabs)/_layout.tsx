@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Tabs, usePathname, useRouter } from "expo-router";
 import { View, Pressable, Platform, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Home, Package, BarChart3, User, FileText, Ban, Map, type LucideIcon } from "@/components/icons";
+import { Home, Package, BarChart3, User, FileText, Ban, Map, Users, type LucideIcon } from "@/components/icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Text } from "@/components/typography";
 import { t, useLocale, isRTL } from "@/lib/i18n";
@@ -10,15 +10,6 @@ import { useAuth } from "@/lib/auth";
 import { useAutoDeclineFeature } from "@/lib/auto-decline";
 import { submissionAccess } from "@/lib/submission-detail";
 import { useColors, isDarkPalette, type Palette } from "@/lib/theme";
-
-/**
- * Manager gate for the Live map tab. Prefers `isManager` (feat/manager-app-shell)
- * and falls back to `isOwner` (owner/manager read-only account) until it lands.
- */
-function useIsManager(): boolean {
-  const auth = useAuth();
-  return "isManager" in auth ? Boolean(auth.isManager) : auth.isOwner;
-}
 
 /** Lucide icon for each route (single outline cut; active state = color/stroke). */
 function iconFor(routeName: string): LucideIcon {
@@ -33,6 +24,8 @@ function iconFor(routeName: string): LucideIcon {
       return Ban;
     case "live-map":
       return Map;
+    case "manager-drivers":
+      return Users;
     case "profile":
       return User;
     default: // index / home
@@ -49,8 +42,7 @@ function iconFor(routeName: string): LucideIcon {
 function BottomBar({ state, descriptors, navigation, onHeight }: BottomTabBarProps & { onHeight: (h: number) => void }) {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const { driver, isOwner } = useAuth();
-  const showLiveMap = useIsManager();
+  const { driver, isOwner, isManager } = useAuth();
   const autoDecline = useAutoDeclineFeature(driver?.id ?? null, isOwner);
 
   // Submissions is never one of these tabs any more. A tab is a PLACE; sending
@@ -61,7 +53,8 @@ function BottomBar({ state, descriptors, navigation, onHeight }: BottomTabBarPro
   const routes = state.routes.filter(
     (route: BottomTabBarProps["state"]["routes"][number]) =>
       route.name !== "submissions" && (route.name !== "auto-decline" || autoDecline) &&
-      (route.name !== "live-map" || showLiveMap),
+      (route.name !== "live-map" || isManager) &&
+      (route.name !== "manager-drivers" || isManager),
   );
 
   const dark = isDarkPalette(c);
@@ -229,7 +222,8 @@ export default function TabsLayout() {
         <Tabs.Screen name="submissions" options={{ title: t("tabs.submissions") }} />
         {/* Early decline: drawn only when the company has the feature (see BottomBar). */}
         <Tabs.Screen name="auto-decline" options={{ title: t("tabs.autoDecline") }} />
-        {/* Manager live map: drawn only for managers (see BottomBar). */}
+        {/* Manager: drawn only for a driver flagged is_manager (see BottomBar). */}
+        <Tabs.Screen name="manager-drivers" options={{ title: t("tabs.manager") }} />
         <Tabs.Screen name="live-map" options={{ title: t("tabs.liveMap") }} />
         <Tabs.Screen name="profile" options={{ title: t("tabs.profile") }} />
       </Tabs>

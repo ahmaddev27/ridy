@@ -95,7 +95,7 @@ class DriverOfferController extends Controller
 
         return DispatchOffer::withoutGlobalScopes()
             ->where('driver_id', $request->user()->id)
-            ->when($request->filled('status'), fn ($q) => $q->where('status', (string) $request->string('status')))
+            ->when($request->filled('status'), fn ($q) => $q->withStatusFilter((string) $request->string('status')))
             ->when($from !== null, fn ($q) => $q->where('received_at', '>=', $from))
             ->when($to !== null, fn ($q) => $q->where('received_at', '<', $to))
             ->when($request->filled('search'), function ($q) use ($request) {

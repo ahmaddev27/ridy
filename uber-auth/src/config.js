@@ -40,6 +40,8 @@ export const config = {
   passkeyRegister: ["1", "true"].includes(String(process.env.UBER_AUTH_PASSKEY_REGISTER || "").toLowerCase()),
   // Additionally try to register right after a successful connect / co-browse. OFF by default
   // even with the flag above: the explicit route + `uber:passkey-backfill` work without it.
+  // Passkey USE + register INSIDE the co-browse login (docs/31 Path A). Needs passkeyRegister too.
+  passkeyCobrowse: ["1", "true"].includes(String(process.env.UBER_AUTH_PASSKEY_COBROWSE || "").toLowerCase()),
   passkeyOnConnect: ["1", "true"].includes(String(process.env.UBER_AUTH_PASSKEY_ON_CONNECT || "").toLowerCase()),
 
   // Per-step wait budget (ms).

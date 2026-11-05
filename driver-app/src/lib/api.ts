@@ -280,6 +280,8 @@ export type DriverProfile = {
   uber_linked: boolean;
   /** True when the signed-in account is a company owner/manager (read-only monitor). */
   is_owner?: boolean;
+  /** True when this driver is flagged a fleet manager (additive on top of the driver features). */
+  is_manager?: boolean;
   /**
    * Whether this driver's company is connected to El-Professor: a live
    * `elprofessor` token, not revoked, and El-Professor has actually used it at
@@ -371,6 +373,23 @@ export type AutoDeclineRules = {
   reject_cities: { enabled: boolean; cities: string[] };
   max_pickup_distance: { enabled: boolean; km: number };
   max_trip_distance: { enabled: boolean; km: number };
+};
+
+/** One row of the manager's Early-decline admin list. */
+export type ManagerAutoDeclineDriver = {
+  id: number;
+  name: string;
+  /** The manager allows this driver to use Early decline. */
+  admin_enabled: boolean;
+  /** The driver has switched it on themselves. */
+  enabled: boolean;
+  active?: boolean;
+  rules?: Partial<AutoDeclineRules> | null;
+};
+
+export type ManagerAutoDeclineList = {
+  feature_enabled: boolean;
+  drivers: ManagerAutoDeclineDriver[];
 };
 
 export type AutoDeclineConfig = {
@@ -797,6 +816,22 @@ export class ApiClient {
     }
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return this.request<{ data: Offer[]; meta: PaginationMeta }>(`/api/v1/driver/auto-decline/history${suffix}`);
+  }
+
+  // ---- Manager (a driver flagged is_manager) ----
+  managerAutoDeclineDrivers() {
+    return this.request<ManagerAutoDeclineList>("/api/v1/driver/manager/auto-decline/drivers");
+  }
+
+  setManagerDriverAdmin(driverId: number, enabled: boolean) {
+    return this.request<unknown>(`/api/v1/driver/manager/auto-decline/drivers/${driverId}`, {
+      method: "PUT",
+      body: JSON.stringify({ admin_enabled: enabled }),
+    });
+  }
+
+  managerDrivers() {
+    return this.request<{ data: { id: number; name: string }[] }>("/api/v1/driver/manager/drivers");
   }
 
   /** Manager live map: the company's drivers with GPS (same shape as the dashboard). */
