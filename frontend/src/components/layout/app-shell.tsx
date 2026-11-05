@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { ExtensionBanner } from "./extension-banner";
+import { UberConnectionBanner } from "./uber-connection-banner";
 import { RelinkBanner } from "./relink-banner";
 import { ImpersonationBanner } from "./impersonation-banner";
 
@@ -61,6 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <ImpersonationBanner />
           <RelinkBanner />
           <ExtensionBanner />
+          <UberConnectionBanner />
           <main id="main" className="page-scroll">
             <div className="page">{children}</div>
           </main>
