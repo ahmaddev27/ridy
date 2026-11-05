@@ -115,7 +115,7 @@ jobs:
           # The UBER_* block was defined in `env:` below but missing here, so on the server
           # $UBER_AUTH_SECRET & friends were empty and env_line wrote `KEY=""` every deploy —
           # the "flags keep getting wiped" bug. They are forwarded now.
-          envs: DEPLOY_SHA,DEPLOY_EVENT,ALLOW_OLDER,REPO_URL,DOMAIN,APP_KEY,DB_PASSWORD,DB_ROOT_PASSWORD,DISPATCH_INGEST_SECRET,SUPERADMIN_PASSWORD,EXTENSION_ORIGIN,FCM_CREDENTIALS_JSON,FCM_PROJECT_ID,NOMINATIM_URL,OSRM_URL,ALERT_EMAIL,OTP_TEST_CODE,SENTRY_LARAVEL_DSN,NEXT_PUBLIC_SENTRY_DSN,DAEMON_SENTRY_DSN,NEXT_PUBLIC_MAP_TILE_URL,NEXT_PUBLIC_MAP_ATTRIBUTION,CSP_EXTRA_CONNECT,ELPROFESSOR_INTAKE_URL,ELPROFESSOR_ANON_KEY,WEBAUTHN_ORIGINS,UBER_AUTH_SECRET,UBER_PASSWORDLESS_LOGIN,UBER_PASSWORDLESS_TENANTS,UBER_PASSWORDLESS_COLD,UBER_AUTH_PASSWORDLESS,UBER_AUTH_PASSWORDLESS_COLD,UBER_INBOUND_DOMAIN,UBER_COBROWSE_ENABLED,REAL_CHROME,UBER_SERVER_SYNC,UBER_SERVER_SYNC_TENANTS
+          envs: DEPLOY_SHA,DEPLOY_EVENT,ALLOW_OLDER,REPO_URL,DOMAIN,APP_KEY,DB_PASSWORD,DB_ROOT_PASSWORD,DISPATCH_INGEST_SECRET,SUPERADMIN_PASSWORD,EXTENSION_ORIGIN,FCM_CREDENTIALS_JSON,FCM_PROJECT_ID,NOMINATIM_URL,OSRM_URL,RECEIPT_VISION_URL,ALERT_EMAIL,OTP_TEST_CODE,SENTRY_LARAVEL_DSN,NEXT_PUBLIC_SENTRY_DSN,DAEMON_SENTRY_DSN,NEXT_PUBLIC_MAP_TILE_URL,NEXT_PUBLIC_MAP_ATTRIBUTION,CSP_EXTRA_CONNECT,ELPROFESSOR_INTAKE_URL,ELPROFESSOR_ANON_KEY,WEBAUTHN_ORIGINS,UBER_AUTH_SECRET,UBER_PASSWORDLESS_LOGIN,UBER_PASSWORDLESS_TENANTS,UBER_PASSWORDLESS_COLD,UBER_AUTH_PASSWORDLESS,UBER_AUTH_PASSWORDLESS_COLD,UBER_INBOUND_DOMAIN,UBER_COBROWSE_ENABLED,REAL_CHROME,UBER_SERVER_SYNC,UBER_SERVER_SYNC_TENANTS
           # NO script_stop: it makes drone-ssh insert an exit-check line after every
           # script line, which breaks multi-line constructs (the `case` in on_exit())
           # → "syntax error near unexpected token ;" before anything runs. The script
@@ -324,7 +324,12 @@ jobs:
             # 30.10 late — every deploy left it on the 11:11 image) instead of being
             # orphaned on a stale image — its sessions
             # resume from the state volume (resumeFromDisk) after the recreate.
-            env_line COMPOSE_PROFILES "browser"
+            # The self-hosted receipt vision model (Qwen3-VL-4B, profile "vision") runs
+            # exactly when the RECEIPT_VISION_URL secret is set (http://receipt-vision:8080),
+            # so the backend never points at a container that is not started.
+            COMPOSE_PROFILES_VALUE="browser"
+            if [ -n "$RECEIPT_VISION_URL" ]; then COMPOSE_PROFILES_VALUE="browser,vision"; fi
+            env_line COMPOSE_PROFILES "$COMPOSE_PROFILES_VALUE"
             env_line REVERB_APP_ID "$REVERB_APP_ID"
             env_line REVERB_APP_KEY "$REVERB_APP_KEY"
             env_line REVERB_APP_SECRET "$REVERB_APP_SECRET"
@@ -343,6 +348,7 @@ jobs:
             env_line DAEMON_SENTRY_DSN "$DAEMON_SENTRY_DSN"
             env_line NOMINATIM_URL "$NOMINATIM_URL"
             env_line OSRM_URL "$OSRM_URL"
+            env_line RECEIPT_VISION_URL "$RECEIPT_VISION_URL"
             env_line NEXT_PUBLIC_MAP_TILE_URL "$NEXT_PUBLIC_MAP_TILE_URL"
             env_line NEXT_PUBLIC_MAP_ATTRIBUTION "$NEXT_PUBLIC_MAP_ATTRIBUTION"
             env_line CSP_EXTRA_CONNECT "$CSP_EXTRA_CONNECT_VALUE"
@@ -386,7 +392,7 @@ jobs:
 
             # Every key must be present exactly once: a value that swallowed a newline
             # would otherwise silently shift the rest of the file into garbage.
-            for key in DOMAIN SITE_ADDRESS APP_KEY SESSION_SECURE_COOKIE SESSION_SAME_SITE REVERB_APP_ID REVERB_APP_KEY REVERB_APP_SECRET DB_DATABASE DB_USERNAME DB_PASSWORD DB_ROOT_PASSWORD DISPATCH_INGEST_SECRET EXTENSION_ORIGIN FCM_CREDENTIALS FCM_PROJECT_ID ALERT_EMAIL OTP_TEST_CODE SENTRY_LARAVEL_DSN NEXT_PUBLIC_SENTRY_DSN DAEMON_SENTRY_DSN NOMINATIM_URL OSRM_URL NEXT_PUBLIC_MAP_TILE_URL NEXT_PUBLIC_MAP_ATTRIBUTION CSP_EXTRA_CONNECT ELPROFESSOR_INTAKE_URL ELPROFESSOR_ANON_KEY WEBAUTHN_ORIGINS UBER_AUTH_SECRET UBER_PASSWORDLESS_LOGIN UBER_PASSWORDLESS_TENANTS UBER_PASSWORDLESS_COLD UBER_AUTH_PASSWORDLESS UBER_AUTH_PASSWORDLESS_COLD UBER_INBOUND_DOMAIN UBER_COBROWSE_ENABLED REAL_CHROME UBER_SERVER_SYNC UBER_SERVER_SYNC_TENANTS; do
+            for key in DOMAIN SITE_ADDRESS APP_KEY SESSION_SECURE_COOKIE SESSION_SAME_SITE REVERB_APP_ID REVERB_APP_KEY REVERB_APP_SECRET DB_DATABASE DB_USERNAME DB_PASSWORD DB_ROOT_PASSWORD DISPATCH_INGEST_SECRET EXTENSION_ORIGIN FCM_CREDENTIALS FCM_PROJECT_ID ALERT_EMAIL OTP_TEST_CODE SENTRY_LARAVEL_DSN NEXT_PUBLIC_SENTRY_DSN DAEMON_SENTRY_DSN NOMINATIM_URL OSRM_URL RECEIPT_VISION_URL NEXT_PUBLIC_MAP_TILE_URL NEXT_PUBLIC_MAP_ATTRIBUTION CSP_EXTRA_CONNECT ELPROFESSOR_INTAKE_URL ELPROFESSOR_ANON_KEY WEBAUTHN_ORIGINS UBER_AUTH_SECRET UBER_PASSWORDLESS_LOGIN UBER_PASSWORDLESS_TENANTS UBER_PASSWORDLESS_COLD UBER_AUTH_PASSWORDLESS UBER_AUTH_PASSWORDLESS_COLD UBER_INBOUND_DOMAIN UBER_COBROWSE_ENABLED REAL_CHROME UBER_SERVER_SYNC UBER_SERVER_SYNC_TENANTS; do
               count=$(grep -c "^$key=" .env || true)
               if [ "$count" != "1" ]; then
                 echo "::error::.env is malformed: $key appears $count time(s)"; exit 1
@@ -535,6 +541,8 @@ jobs:
             $COMPOSE up -d --no-build --no-deps --force-recreate --renew-anon-volumes --remove-orphans $APP_SERVICES
             $COMPOSE up -d --no-build --no-deps dispatch-daemon
             $COMPOSE up -d --no-build --no-deps uber-auth
+            # Receipt vision model: only when the secret enables it (profile "vision").
+            if [ -n "$RECEIPT_VISION_URL" ]; then $COMPOSE up -d --no-build --no-deps receipt-vision || echo "::warning::receipt-vision failed to start"; fi
 
             # Link public/storage so uploaded assets (invoice + email logos on the
             # public disk) are served at {APP_URL}/storage/... Needs root (public/).
@@ -586,6 +594,7 @@ jobs:
           FCM_PROJECT_ID: ${{ secrets.FCM_PROJECT_ID }}
           NOMINATIM_URL: ${{ secrets.NOMINATIM_URL }}
           OSRM_URL: ${{ secrets.OSRM_URL }}
+          RECEIPT_VISION_URL: ${{ secrets.RECEIPT_VISION_URL }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
           OTP_TEST_CODE: ${{ secrets.OTP_TEST_CODE }}
           SENTRY_LARAVEL_DSN: ${{ secrets.SENTRY_LARAVEL_DSN }}
