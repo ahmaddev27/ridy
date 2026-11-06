@@ -50,15 +50,8 @@ export function RulesModal({ driver, cities, saving, onClose, onSave }: {
   const r = driver.rules;
   const [fareOn, setFareOn] = useState(r.min_fare.enabled);
   const [fare, setFare] = useState(String(r.min_fare.value_e2 / 100));
-  const [perKmOn, setPerKmOn] = useState(r.min_price_per_km.enabled);
-  const [perKm, setPerKm] = useState(String(r.min_price_per_km.value_e2 / 100));
-  const [mode, setMode] = useState<"and" | "or">(r.min_price_per_km.mode);
   const [citiesOn, setCitiesOn] = useState(r.reject_cities.enabled);
   const [picked, setPicked] = useState<string[]>(r.reject_cities.cities);
-  const [pickupOn, setPickupOn] = useState(r.max_pickup_distance.enabled);
-  const [pickup, setPickup] = useState(String(r.max_pickup_distance.km));
-  const [tripOn, setTripOn] = useState(r.max_trip_distance.enabled);
-  const [trip, setTrip] = useState(String(r.max_trip_distance.km));
   const [invalid, setInvalid] = useState(false);
 
   // Keep cities already on the rule selectable even if no longer in the company's list.
@@ -66,31 +59,19 @@ export function RulesModal({ driver, cities, saving, onClose, onSave }: {
 
   function submit() {
     const f = parseNumber(fare);
-    const k = parseNumber(perKm);
-    const p = parseNumber(pickup);
-    const tr = parseNumber(trip);
     // A value only has to be valid while its rule is on.
-    if ((fareOn && !validCents(f)) || (perKmOn && !validCents(k)) || (pickupOn && p === null) || (tripOn && tr === null)) {
+    if (fareOn && !validCents(f)) {
       setInvalid(true);
       return;
     }
     setInvalid(false);
+    // Criteria hidden from the UI (distance/€-per-km) are sent back exactly as stored.
     onSave({
+      ...r,
       min_fare: { enabled: fareOn, value_e2: Math.round((f ?? r.min_fare.value_e2 / 100) * 100) },
-      min_price_per_km: {
-        enabled: perKmOn,
-        value_e2: Math.round((k ?? r.min_price_per_km.value_e2 / 100) * 100),
-        mode,
-      },
       reject_cities: { enabled: citiesOn, cities: picked },
-      max_pickup_distance: { enabled: pickupOn, km: p ?? r.max_pickup_distance.km },
-      max_trip_distance: { enabled: tripOn, km: tr ?? r.max_trip_distance.km },
     });
   }
-
-  // The "declined automatically" warning only makes sense while the rule is live.
-  const perKmValue = parseNumber(perKm);
-  const perKmWarns = perKmOn && perKmValue !== null && perKmValue > 0;
 
   const toggleCity = (city: string) =>
     setPicked((cur) => (cur.includes(city) ? cur.filter((x) => x !== city) : [...cur, city]));
@@ -111,34 +92,6 @@ export function RulesModal({ driver, cities, saving, onClose, onSave }: {
       <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
         <RuleRow label={c("minFareLabel")} on={fareOn} onToggle={() => setFareOn((v) => !v)}>
           <input dir="ltr" inputMode="decimal" className={inputClass} value={fare} onChange={(e) => setFare(e.target.value)} disabled={!fareOn} />
-        </RuleRow>
-        <RuleRow label={c("perKmLabel")} on={perKmOn} onToggle={() => setPerKmOn((v) => !v)}>
-          <input dir="ltr" inputMode="decimal" className={inputClass} value={perKm} onChange={(e) => setPerKm(e.target.value)} disabled={!perKmOn} />
-          <p className="text-xs text-ink-subtle">{perKmWarns ? c("perKmHint").replace("{v}", perKm) : c("perKmHintNeutral")}</p>
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label={c("modeLabel")}>
-            {(["and", "or"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                disabled={!perKmOn}
-                aria-pressed={mode === m}
-                onClick={() => setMode(m)}
-                className={
-                  "rounded-full border px-2.5 py-1 text-xs disabled:opacity-50 " +
-                  (mode === m ? "border-primary bg-primary text-primary-ink" : "border-line text-ink-muted hover:bg-surface-2")
-                }
-              >
-                {c(m === "and" ? "modeAnd" : "modeOr")}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-ink-subtle">{c(mode === "and" ? "modeAndHint" : "modeOrHint")}</p>
-        </RuleRow>
-        <RuleRow label={c("pickupLabel")} on={pickupOn} onToggle={() => setPickupOn((v) => !v)}>
-          <input dir="ltr" inputMode="decimal" className={inputClass} value={pickup} onChange={(e) => setPickup(e.target.value)} disabled={!pickupOn} />
-        </RuleRow>
-        <RuleRow label={c("tripLabel")} on={tripOn} onToggle={() => setTripOn((v) => !v)}>
-          <input dir="ltr" inputMode="decimal" className={inputClass} value={trip} onChange={(e) => setTrip(e.target.value)} disabled={!tripOn} />
         </RuleRow>
         <RuleRow label={c("citiesLabel")} on={citiesOn} onToggle={() => setCitiesOn((v) => !v)} className="md:col-span-2">
           {options.length === 0 ? (

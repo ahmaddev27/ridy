@@ -229,35 +229,10 @@ function SettingsPane({
         <NumberInput c={c} unit="€" value={drafts.min_fare} onChange={draft("min_fare")} placeholder="9,00" />
       </RuleCard>
 
-      <RuleCard c={c} row={row} title={t("ad.rule.min_price_per_km")} on={rules.min_price_per_km.enabled} bad={invalid.includes("min_price_per_km")}
-        onToggle={(v) => patch("min_price_per_km", { enabled: v })}>
-        <NumberInput c={c} unit="€/km" value={drafts.min_price_per_km} onChange={draft("min_price_per_km")} placeholder="3,00" />
-        <Text style={{ color: c.inkMuted, fontSize: 12.5, textAlign: textAlign() }}>
-          {t("ad.perKm.hint").replace("{v}", drafts.min_price_per_km || "3,00")}
-        </Text>
-        <View style={{ flexDirection: row, flexWrap: "wrap", gap: 8 }}>
-          <Chip c={c} label={t("ad.perKm.and")} active={rules.min_price_per_km.mode === "and"} onPress={() => patch("min_price_per_km", { mode: "and" })} />
-          <Chip c={c} label={t("ad.perKm.or")} active={rules.min_price_per_km.mode === "or"} onPress={() => patch("min_price_per_km", { mode: "or" })} />
-        </View>
-        <Text style={{ color: c.inkMuted, fontSize: 12.5, textAlign: textAlign() }}>
-          {t(rules.min_price_per_km.mode === "or" ? "ad.perKm.orHint" : "ad.perKm.andHint")}
-        </Text>
-      </RuleCard>
-
       <RuleCard c={c} row={row} title={t("ad.rule.reject_cities")} on={rules.reject_cities.enabled} bad={invalid.includes("reject_cities")}
         onToggle={(v) => patch("reject_cities", { enabled: v })}>
         <CityPicker c={c} row={row} options={config.available_cities} selected={rules.reject_cities.cities}
           onChange={(cities) => patch("reject_cities", { cities })} />
-      </RuleCard>
-
-      <RuleCard c={c} row={row} title={t("ad.rule.max_pickup_distance")} on={rules.max_pickup_distance.enabled} bad={invalid.includes("max_pickup_distance")}
-        onToggle={(v) => patch("max_pickup_distance", { enabled: v })}>
-        <NumberInput c={c} unit="km" value={drafts.max_pickup_distance} onChange={draft("max_pickup_distance")} placeholder="8" />
-      </RuleCard>
-
-      <RuleCard c={c} row={row} title={t("ad.rule.max_trip_distance")} on={rules.max_trip_distance.enabled} bad={invalid.includes("max_trip_distance")}
-        onToggle={(v) => patch("max_trip_distance", { enabled: v })}>
-        <NumberInput c={c} unit="km" value={drafts.max_trip_distance} onChange={draft("max_trip_distance")} placeholder="40" />
       </RuleCard>
 
       {invalid.length > 0 && <Text style={{ color: c.danger, fontSize: 13, textAlign: textAlign() }}>{t("ad.needValue")}</Text>}
@@ -469,7 +444,7 @@ function ReasonFilter({ c, row, value, onChange }: { c: Palette; row: Row; value
   return (
     <View style={{ flexDirection: row, flexWrap: "wrap", gap: 8 }}>
       <Chip c={c} label={t("ad.reason.all")} active={value === null} onPress={() => onChange(null)} />
-      {RULE_KEYS.map((k) => (
+      {RULE_KEYS.filter((k) => k === "min_fare" || k === "reject_cities").map((k) => (
         <Chip key={k} c={c} label={t(`ad.reason.${k}`)} active={value === k} onPress={() => onChange(k)} />
       ))}
     </View>

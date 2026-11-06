@@ -120,13 +120,7 @@ export default function AutoDeclinePage() {
     const r = d.rules;
     const lines: string[] = [];
     if (r.min_fare.enabled) lines.push(c("ruleMinFare").replace("{v}", formatMoney(r.min_fare.value_e2 / 100, locale)));
-    if (r.min_price_per_km.enabled) {
-      const mode = c(r.min_price_per_km.mode === "or" ? "modeOr" : "modeAnd");
-      lines.push(c("rulePerKm").replace("{v}", formatMoney(r.min_price_per_km.value_e2 / 100, locale)).replace("{m}", mode));
-    }
     if (r.reject_cities.enabled) lines.push(c("ruleCities").replace("{v}", r.reject_cities.cities.join(", ")));
-    if (r.max_pickup_distance.enabled) lines.push(c("rulePickup").replace("{v}", r.max_pickup_distance.km.toLocaleString(num)));
-    if (r.max_trip_distance.enabled) lines.push(c("ruleTrip").replace("{v}", r.max_trip_distance.km.toLocaleString(num)));
     return lines;
   }
 
