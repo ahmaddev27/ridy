@@ -81,6 +81,12 @@ class ProxyPool
         return $tenants->count();
     }
 
+    /** Manual trigger: re-copy every proxy's URL verbatim to its assigned companies. */
+    public function resyncUrls(): int
+    {
+        return Proxy::all()->sum(fn (Proxy $proxy) => $this->syncTenantsOf($proxy));
+    }
+
     /**
      * Delete a pool proxy: detach its companies (so the daemon stops using the
      * deleted credentials), delete it, then re-place the usable ones on another

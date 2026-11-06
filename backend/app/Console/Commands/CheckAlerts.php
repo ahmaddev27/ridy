@@ -53,7 +53,7 @@ class CheckAlerts extends Command
         // Isolate the two checks: one throwing (a bad row, a DB hiccup) must not
         // skip the other — a session-check failure used to blind shard alerts too.
         $ok = true;
-        foreach (['checkSessions', 'checkTokenExpiries', 'checkShards'] as $check) {
+        foreach (['checkSessions', 'checkTokenExpiries', 'checkShards', 'checkProxyCoverage'] as $check) {
             try {
                 $this->{$check}($alerts);
             } catch (\Throwable $e) {
@@ -189,6 +189,55 @@ class CheckAlerts extends Command
 
         return implode('
 ', $lines);
+    }
+
+    /**
+     * A usable company with a live Uber session but no proxy runs on the datacenter
+     * IP (wrong country, bannable), and a full pool means assign-missing cannot fix
+     * it. Both are de-duped incidents that resolve themselves once covered.
+     */
+    private function checkProxyCoverage(AlertService $alerts): void
+    {
+        $uncovered = Tenant::query()->usable()
+            ->whereNull('proxy_url')
+            ->whereIn('id', UberFleetSession::withoutGlobalScopes()
+                ->where('status', UberFleetSession::STATUS_ACTIVE)->select('tenant_id'))
+            ->get(['id', 'name']);
+
+        $current = [];
+        foreach ($uncovered as $tenant) {
+            $current["proxy_missing:{$tenant->id}"] = true;
+            $alerts->open(
+                "proxy_missing:{$tenant->id}",
+                'proxy_missing',
+                "No proxy for {$tenant->name}",
+                "\"{$tenant->name}\" has an active Uber session but no proxy: its traffic leaves from the datacenter IP, not Germany.",
+            );
+        }
+        $this->resolveStale('proxy_missing', $current, $alerts);
+
+        $unassigned = Tenant::query()->usable()->whereNull('proxy_url')->count();
+        if ($unassigned > 0) {
+            $alerts->open(
+                'proxy_pool_full',
+                'proxy_pool_full',
+                "pool full: {$unassigned} companies without a proxy",
+                'proxies:assign-missing cannot place them: add a proxy or raise capacity.',
+            );
+        } else {
+            $alerts->resolve('proxy_pool_full');
+        }
+    }
+
+    /** @param array<string, true> $current */
+    private function resolveStale(string $kind, array $current, AlertService $alerts): void
+    {
+        $open = AlertIncident::where('kind', $kind)->whereNull('resolved_at')->pluck('key');
+        foreach ($open as $key) {
+            if (! isset($current[$key])) {
+                $alerts->resolve((string) $key);
+            }
+        }
     }
 
     /** An active shard that stopped heartbeating means its daemon box is down. */
