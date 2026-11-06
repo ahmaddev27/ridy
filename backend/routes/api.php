@@ -405,6 +405,7 @@ Route::prefix('v1')->group(function () {
 
         // Fleet vehicles (synced from Uber via the extension)
         Route::get('vehicles', [VehicleController::class, 'index']);
+        Route::post('vehicles/sync-now', [VehicleController::class, 'syncNow'])->middleware(['throttle:6,1', 'can:connections.manage']);
         Route::post('vehicles', [VehicleController::class, 'ingest'])->middleware(['throttle:ext-ingest', 'fleet.connected', 'can:connections.manage']);
 
         // Generic supplier capture — the extension pulls any Uber Fleet tab

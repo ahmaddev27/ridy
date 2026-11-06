@@ -4,6 +4,7 @@ namespace App\Domain\Dispatch;
 
 use App\Domain\Dispatch\Models\FleetSessionOutage;
 use App\Domain\Dispatch\Models\UberFleetSession;
+use App\Domain\Fleet\FleetHub\FleetDataSync;
 use App\Domain\Notifications\Notifier;
 use App\Domain\Tenancy\Models\Tenant;
 use Carbon\CarbonImmutable;
@@ -19,6 +20,7 @@ class FleetSessionService
         private readonly Notifier $notifier,
         private readonly SupplierNetworkRecorder $recorder,
         private readonly SessionOutageTracker $outages,
+        private readonly FleetDataSync $fleetData,
     ) {}
 
     /**
@@ -38,7 +40,8 @@ class FleetSessionService
         string $via = FleetSessionOutage::VIA_PAGE,
     ): UberFleetSession {
         $refused = [];
-        [$session, $wasActive] = DB::transaction(function () use ($tenant, $uberOrgUuid, $cookies, $expiresAt, $uberOrgName, $supplierCookies, $replaceOtherOrgs, $via, &$refused) {
+        $gainedSupplierJar = false;
+        [$session, $wasActive] = DB::transaction(function () use ($tenant, $uberOrgUuid, $cookies, $expiresAt, $uberOrgName, $supplierCookies, $replaceOtherOrgs, $via, &$refused, &$gainedSupplierJar) {
             // Serialize captures per company (the extension auto-captures on every
             // Uber page load, so two can race).
             Tenant::whereKey($tenant->id)->lockForUpdate()->first();
@@ -77,6 +80,10 @@ class FleetSessionService
             if ($supplierCookies !== null && $supplierCookies !== []) {
                 $attributes['supplier_cookies'] = $supplierCookies;
             }
+            // Routine re-captures happen on every Uber page load; only a company that
+            // had no supplier jar yet (or was not streaming) needs its Fleet Hub data now.
+            $gainedSupplierJar = ! empty($attributes['supplier_cookies'] ?? null)
+                && ($existing === null || empty($existing->supplier_cookies) || $existing->status !== UberFleetSession::STATUS_ACTIVE);
 
             if ($existing !== null && $via !== FleetSessionOutage::VIA_MANUAL) {
                 [$attributes, $refused] = $this->withoutDowngrades($existing, $attributes);
@@ -107,6 +114,12 @@ class FleetSessionService
 
         foreach ($refused as $jar => $expiries) {
             $this->recorder->session((int) $session->tenant_id, 'capture_downgrade_refused', ['jar' => $jar, 'via' => $via] + $expiries);
+        }
+
+        // The supplier session just became usable: pull vehicles/earnings/metrics now
+        // rather than at the next hourly tick (that stays as the backstop).
+        if ($gainedSupplierJar) {
+            $this->fleetData->dispatchFor($tenant);
         }
 
         // During an outage a capture is only an attempt — the jar may already be
