@@ -17,6 +17,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { config } from "./config.js";
 import { scopeCookies } from "./cookieScope.js";
+import { gotoDispatch } from "./dispatchGoto.js";
 
 const AUTH_RE = /auth\.uber|\/(auth|login|oauth)/i;
 const FLEETHUB_URL = "https://fleethub.uber.com/";
@@ -42,6 +43,38 @@ function jwtExpiryMs(value) {
 function cookieValue(list, name) {
   const c = list.find((x) => x.name === name);
   return c ? c.value : null;
+}
+
+/**
+ * Whether a captured RAMEN jar is provably safe to hand the daemon. Returns null when
+ * good, else a reason code (never a value). A refused jar is simply not posted: the
+ * daemon keeps its current good jar. `backendJar` is what the daemon already holds,
+ * so a token older than it would be a downgrade.
+ */
+function ramenJarProblem(ramen, backendJar) {
+  const jwt = cookieValue(ramen, "jwt-session");
+  if (!jwt) return "missing_jwt";
+  const known = jwtExpiryMs(cookieValue(backendJar?.cookies ?? [], "jwt-session"));
+  if (known === null) return null;
+  const fresh = jwtExpiryMs(jwt);
+  return fresh === null || fresh < known ? "stale_jar" : null;
+}
+
+function onDispatchHost(url) {
+  try {
+    return new URL(url).hostname === "vsdispatch.uber.com";
+  } catch {
+    return false;
+  }
+}
+
+/** Dispatch visit that never throws: false = loop/failed nav, so the held jar cannot be trusted. */
+async function visitDispatch(page, context) {
+  try {
+    return await gotoDispatch(page, context);
+  } catch {
+    return false;
+  }
 }
 
 function isRedirectLoop(e) {
@@ -127,10 +160,15 @@ export function createWarmDriver() {
           }
         }
 
-        // The dispatch host so the RAMEN jar (jwt-session, 24h) stays fresh.
-        await page.goto(DISPATCH_URL, { waitUntil: "domcontentloaded", timeout: config.stepTimeout }).catch(() => {});
-        if (AUTH_RE.test(page.url())) {
+        // The dispatch host so the RAMEN jar (jwt-session, 24h) stays fresh. A loop or
+        // failed navigation means the held jar is dead: post NOTHING (the daemon keeps its
+        // current good jar) rather than read whatever the context now holds.
+        const reached = await visitDispatch(page, context);
+        if (reached && AUTH_RE.test(page.url())) {
           return { ok: true, loggedOut: true };
+        }
+        if (!reached || !onDispatchHost(page.url())) {
+          return { ok: false, refused: true, error: "dispatch_unreachable" };
         }
 
         const ramen = (await context.cookies(RAMEN_COOKIE_URL)).map((c) => ({ name: c.name, value: c.value }));
@@ -138,6 +176,8 @@ export function createWarmDriver() {
         // supplier jar — omit it rather than post a stale copy the backend would refuse.
         const supplier = rescue || supplierSkipped ? undefined : (await context.cookies(FLEETHUB_URL)).map((c) => ({ name: c.name, value: c.value }));
         if (ramen.length === 0) return { ok: false, error: "empty_jar" };
+        const problem = ramenJarProblem(ramen, entry.backendJar);
+        if (problem) return { ok: false, refused: true, error: problem };
 
         const orgUuid = await captureOrg(page);
 
@@ -174,4 +214,4 @@ export function createWarmDriver() {
   };
 }
 
-export { statePath, jwtExpiryMs, visitFleetHub };
+export { statePath, jwtExpiryMs, visitFleetHub, ramenJarProblem };

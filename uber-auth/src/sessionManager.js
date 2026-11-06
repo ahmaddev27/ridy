@@ -262,6 +262,14 @@ export class PersistentSessionManager {
       return;
     }
 
+    if (r && r.ok === false && r.refused) {
+      // The browser declined to post a jar it cannot vouch for (redirect loop, missing or
+      // older jwt-session). Not a keep-warm failure: the daemon stays on its current good
+      // jar, the session state is untouched and nothing counts toward DOWN.
+      this.log(`[${companyKey}] keep-warm refused to post a jar: ${r.error}`);
+      return;
+    }
+
     if (!r || r.ok === false) {
       entry.consecutiveErrors += 1;
       this.log(`[${companyKey}] keep-warm error (${entry.consecutiveErrors}): ${r?.error ?? "unknown"}`);
