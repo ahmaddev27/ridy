@@ -28,7 +28,7 @@ class UberPasskeyTest extends TestCase
     {
         return Tenant::create([
             'name' => 'YA', 'country' => 'DE', 'status' => 'active', 'activated_at' => now(),
-            'settings' => $perTenant ? ['passkey' => ['enabled' => true]] : [],
+            'settings' => ['passkey' => ['enabled' => $perTenant]],
         ]);
     }
 
@@ -130,6 +130,9 @@ class UberPasskeyTest extends TestCase
         $this->assertTrue($settings->availableFor($tenant));
         $this->assertFalse($settings->availableFor($off), 'per-tenant off');
         $this->assertFalse($settings->availableFor(null));
+
+        $unset = Tenant::create(['name' => 'U', 'country' => 'DE', 'status' => 'active', 'activated_at' => now()]);
+        $this->assertTrue($settings->availableFor($unset), 'no passkey settings = on by default');
 
         config(['services.passkey.tenants' => ['999999']]);
         $this->assertFalse($settings->availableFor($tenant), 'not allowlisted');

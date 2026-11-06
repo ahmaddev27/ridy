@@ -6,10 +6,11 @@ use App\Domain\Tenancy\Models\Tenant;
 
 /**
  * Whether a company may have a software passkey registered on its Uber account (docs/31).
- * Every gate defaults OFF: the global switch (UBER_PASSKEY_REGISTER), the optional
- * allowlist (UBER_PASSKEY_TENANTS, empty = no limit) and the super-admin's per-company
- * flag (`tenants.settings.passkey.enabled`). Signing in with it on the unattended re-login
- * has its own extra gates (UBER_PASSKEY_RELOGIN + `settings.passkey.relogin`).
+ * The global switch (UBER_PASSKEY_REGISTER, default OFF) and the optional
+ * allowlist (UBER_PASSKEY_TENANTS, empty = no limit) gate it; the per-company flag
+ * (`tenants.settings.passkey.enabled`) is opt-OUT: unset = on, only an explicit false disables.
+ * Signing in with it on the unattended re-login has its own gates (UBER_PASSKEY_RELOGIN,
+ * default OFF, + `settings.passkey.relogin`, also opt-out).
  */
 class PasskeySettings
 {
@@ -18,15 +19,15 @@ class PasskeySettings
         return $tenant !== null
             && (bool) config('services.passkey.enabled')
             && $this->allowlisted($tenant)
-            && ($tenant->settings['passkey']['enabled'] ?? false) === true;
+            && ($tenant->settings['passkey']['enabled'] ?? true) !== false;
     }
 
-    /** May the unattended re-login SIGN IN with the stored passkey? Every gate defaults OFF. */
+    /** May the unattended re-login SIGN IN with the stored passkey? The global flag defaults OFF; the per-company flag is opt-out. */
     public function reloginAvailableFor(?Tenant $tenant): bool
     {
         return $this->availableFor($tenant)
             && (bool) config('services.passkey.relogin')
-            && ($tenant->settings['passkey']['relogin'] ?? false) === true;
+            && ($tenant->settings['passkey']['relogin'] ?? true) !== false;
     }
 
     private function allowlisted(Tenant $tenant): bool
