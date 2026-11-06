@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Audit\AuditLogger;
 use App\Domain\Dispatch\PasswordlessLoginService;
 use App\Domain\Dispatch\PasswordlessLoginSettings;
 use App\Http\Controllers\Controller;
@@ -22,6 +23,7 @@ class UberLoginController extends Controller
     public function __construct(
         private readonly PasswordlessLoginService $login,
         private readonly PasswordlessLoginSettings $settings,
+        private readonly AuditLogger $audit,
     ) {}
 
     public function status(Request $request): JsonResponse
@@ -40,6 +42,13 @@ class UberLoginController extends Controller
         // Automatic (emailed code) by default for a company that set it up; the service
         // falls back to manual when it is not actually available.
         $mode = $data['mode'] ?? ($this->settings->autoCodeEnabled($tenant) ? 'auto' : 'manual');
+
+        // A human pressing Connect is a deliberate reconnect: an admin "Stop session" only
+        // blocks the AUTOMATIC paths, so it must not trap the company out of the capture.
+        if ($tenant->isAutolinkBlocked()) {
+            $tenant->unblockAutolink();
+            $this->audit->log('fleet_session.autolink_unblocked_by_connect', null, ['user_id' => $request->user()->id]);
+        }
 
         $result = $this->login->start($tenant, $data['email'] ?? '', $mode);
 
