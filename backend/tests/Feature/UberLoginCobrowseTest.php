@@ -103,6 +103,16 @@ class UberLoginCobrowseTest extends TestCase
         Http::assertSent(fn (HttpRequest $r) => str_ends_with($r->url(), '/login/start') && $r['cobrowse'] === true);
     }
 
+    public function test_a_manual_connect_clears_an_admin_stop_block(): void
+    {
+        $this->fakeUber();
+        $this->manager->tenant->blockAutolink();
+
+        $this->start()->assertStatus(202);
+
+        $this->assertFalse($this->manager->tenant->fresh()->isAutolinkBlocked());
+    }
+
     public function test_start_does_not_ask_for_cobrowse_when_the_company_flag_is_off(): void
     {
         $other = $this->makeTenant('Plain', false);
