@@ -370,3 +370,28 @@ test("releaseIfDead still never touches an ACTIVE entry (forceDrop is the only p
   assert.equal(await m.releaseIfDead("acme", "other-fp"), null);
   assert.equal(m.has("acme"), true);
 });
+
+test("adoptAndCapture: a valid jar posts once and is captured", async () => {
+  const { m, posted } = manager(fakeDriver([{ ok: true, cookies: [{ name: "jwt-session", value: "a" }], supplierCookies: [], orgUuid: "org-1" }]));
+  const out = await m.adoptAndCapture("acme", { id: 1 }, { orgUuid: "org-1" });
+  assert.equal(out.captured, true);
+  assert.equal(posted.length, 1);
+});
+
+test("adoptAndCapture: a backend-refused (blocked) post is reported, not overridden, and the session stays active", async () => {
+  const { m } = manager(fakeDriver([{ ok: true, cookies: [{ name: "jwt-session", value: "a" }], orgUuid: "org-1" }]), {
+    post: async () => "blocked",
+  });
+  const out = await m.adoptAndCapture("acme", { id: 1 }, { orgUuid: "org-1" });
+  assert.deepEqual(out, { captured: false, reason: "blocked" });
+  assert.equal(m.stateOf("acme"), SESSION_STATE.ACTIVE);
+});
+
+test("adoptAndCapture: a refused (missing/poisoned) RAMEN jar never posts and keeps the session", async () => {
+  let posts = 0;
+  const { m } = manager(fakeDriver([{ ok: false, refused: true, error: "ramen_jar_stale" }]), { post: async () => (posts++, "posted") });
+  const out = await m.adoptAndCapture("acme", { id: 1 }, { orgUuid: "org-1" });
+  assert.equal(out.captured, false);
+  assert.equal(posts, 0);
+  assert.equal(m.stateOf("acme"), SESSION_STATE.ACTIVE);
+});

@@ -139,12 +139,15 @@ async function onLoginSuccess(companyKey, outcome, res, mode = null) {
     markNeedsOtp(String(companyKey));
     return send(res, 503, { status: STATUS.ERROR, message: "at_capacity" });
   }
+  // The login LANDED and the session is adopted ACTIVE, so register the passkey now, independent of
+  // whether the backend accepted the first capture (a refused/blocked post must not skip it).
+  const passkeyScheduled = scheduleCobrowsePasskey(String(companyKey), outcome.session);
   // Success means the backend ACCEPTED the capture, not merely that Uber let us in.
   if (!adopted.captured) {
+    console.warn(`[server] ${companyKey} capture not accepted (${adopted.reason ?? "not_posted"}); passkey register ${passkeyScheduled ? "scheduled" : "not scheduled"}`);
     return send(res, 200, { status: STATUS.CAPTURE_FAILED, message: adopted.reason ?? "not_posted" });
   }
-  if (outcome.session?.fullLogin && config.passkeyRegister && config.passkeyCobrowse) registerPasskeyInCobrowseLater(String(companyKey), outcome.session);
-  else maybeRegisterPasskeyAfterConnect(String(companyKey));
+  if (!passkeyScheduled) maybeRegisterPasskeyAfterConnect(String(companyKey));
   return send(res, 200, { status: STATUS.SUCCESS, persistent: true, org_uuid: outcome.result?.org_uuid ?? null });
 }
 
@@ -164,6 +167,14 @@ function registerPasskeyInCobrowseLater(companyKey, session) {
       .then((r) => console.log(`[passkey][cobrowse] ${companyKey}: ${r.status}`))
       .catch((e) => console.warn(`[passkey][cobrowse] ${companyKey} failed: ${e?.message}`));
   }, PASSKEY_IN_COBROWSE_DELAY_MS).unref?.();
+}
+
+// A real fullLogin (co-browse) with both passkey flags on registers in its own context. Returns
+// whether it was scheduled; called exactly once per login, so it can never double-register.
+function scheduleCobrowsePasskey(companyKey, session) {
+  if (!(session?.fullLogin && config.passkeyRegister && config.passkeyCobrowse)) return false;
+  registerPasskeyInCobrowseLater(companyKey, session);
+  return true;
 }
 
 function maybeRegisterPasskeyAfterConnect(companyKey) {
