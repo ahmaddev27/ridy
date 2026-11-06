@@ -28,6 +28,7 @@ import {
   invalidRules,
   kmToText,
   parseKm,
+  isAutoDeclineAvailable,
   setAutoDeclineFeature,
   type AutoDeclineRuleKey,
 } from "@/lib/auto-decline";
@@ -55,7 +56,7 @@ export default function AutoDeclineScreen() {
     try {
       const r = await api.autoDecline();
       setConfig(r.data);
-      setAutoDeclineFeature(r.data.feature_enabled === true);
+      setAutoDeclineFeature(isAutoDeclineAvailable(r.data));
     } catch {
       setFailed(true);
     }
