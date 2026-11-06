@@ -11,6 +11,7 @@ use App\Domain\Tenancy\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -39,12 +40,12 @@ class UberPasskeyReloginTest extends TestCase
         return Tenant::create(['name' => 'YA', 'country' => 'DE', 'status' => 'active', 'activated_at' => now(), 'settings' => ['passkey' => $passkey]]);
     }
 
-    private function register(Tenant $tenant): void
+    private function register(Tenant $tenant, ?string $account = null): void
     {
         app(PasskeyService::class)->store($tenant, [
             'credentialId' => 'cid', 'privateKey' => 'SECRET-KEY', 'rpId' => 'uber.com',
             'userHandle' => 'uh', 'signCount' => 3, 'isResidentCredential' => true,
-        ]);
+        ] + ($account !== null ? ['account' => $account] : []));
     }
 
     private function startBody(Tenant $tenant): array
@@ -177,6 +178,35 @@ class UberPasskeyReloginTest extends TestCase
         $this->assertTrue($body['passkey']);
         $this->assertSame('', $body['email']);
         $this->assertStringNotContainsString('SECRET-KEY', json_encode($body));
+    }
+
+    public function test_passkey_ready_tenant_without_configured_email_starts_with_the_stored_account_email(): void
+    {
+        Queue::fake();
+        Log::spy();
+        $tenant = $this->tenant();
+        $this->register($tenant, 'owner@fleet.de');
+        $this->needsOtp($tenant);
+        $auto = app(AutoReloginService::class);
+
+        $this->assertTrue($auto->onNeedsOtp($tenant->id));
+        Http::fake(['*/login/start' => Http::response(['status' => 'success'])]);
+        $auto->run($tenant->id);
+
+        $body = Http::recorded()[0][0]->data();
+        $this->assertTrue($body['passkey']);
+        $this->assertSame('owner@fleet.de', $body['email']);
+        $this->assertStringNotContainsString('SECRET-KEY', json_encode($body));
+        Log::shouldHaveReceived('info')->withArgs(fn ($m, $ctx = []) => ! str_contains(json_encode([$m, $ctx]), 'owner@fleet.de'));
+        Log::shouldNotHaveReceived('info', fn ($m, $ctx = []) => str_contains(json_encode([$m, $ctx]), 'owner@fleet.de'));
+    }
+
+    public function test_account_email_is_ignored_when_it_is_not_an_email(): void
+    {
+        $tenant = $this->tenant();
+        $this->register($tenant, 'not-an-email');
+
+        $this->assertNull(app(PasskeyService::class)->accountEmailFor($tenant));
     }
 
     public function test_tenant_without_passkey_and_without_email_still_does_nothing(): void

@@ -388,6 +388,7 @@ export async function finishChallenge(session, step) {
     if (step === "passkey") return { status: STATUS.PASSKEY_UNSUPPORTED };
     return { status: step === "password" ? STATUS.PASSWORD_REQUIRED : STATUS.CHANNEL_UNAVAILABLE };
   } catch (e) {
+    navLog(`startLogin failed: ${e.message}`);
     await closeSession(session).catch(() => {});
     return { status: STATUS.ERROR, message: e.message };
   }
@@ -579,6 +580,7 @@ export const PASSKEY_LAND_WAIT_MS = 8000;
 export async function trySignInWithPasskey(page, { clickWaitMs = PASSKEY_CLICK_WAIT_MS, landWaitMs = PASSKEY_LAND_WAIT_MS } = {}) {
   try {
     const control = await findPasskeyControl(page, clickWaitMs);
+    navLog(`passkey control ${control ? "found" : "NOT found"}`);
     if (control) await control.click({ timeout: 3000 }).catch(() => {});
     const deadline = Date.now() + landWaitMs;
     while (Date.now() < deadline) {
@@ -696,11 +698,15 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
     if (session.passkeyInjected && !password) {
       session.passkeyTried = true;
       session.passkeyOutcome = await trySignInWithPasskey(page);
+      navLog(`passkey tier1 (usernameless) outcome=${session.passkeyOutcome}`);
       if (session.passkeyOutcome === "landed") return passkeyLanded(session, context, page);
       await page.goto(config.dashboardUrl, { waitUntil: "domcontentloaded" }).catch(() => {});
       // Usernameless-only attempt (no email) that did not land: there is no identifier to type
       // or account to match, so stop cleanly. The reused handle is left open for the manager.
-      if (!email) return { status: STATUS.PASSKEY_UNSUPPORTED, message: "passkey_unsupported" };
+      if (!email) {
+        navLog("passkey tier1 missed and no identifier to continue with -> passkey_unsupported");
+        return { status: STATUS.PASSKEY_UNSUPPORTED, message: "passkey_unsupported" };
+      }
     }
 
     // A remembered account ("Welcome back") may not ask for the identifier again. Then we
@@ -743,6 +749,7 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
     if ((step === "channel_choice" || step === "passkey") && !password && session.passkeyInjected) {
       session.passkeyTried = true;
       const outcome = (session.passkeyOutcome = await trySignInWithPasskey(page));
+      navLog(`passkey tier2 (identifier-first, step=${step}) outcome=${outcome}`);
       if (outcome === "landed") return passkeyLanded(session, context, page);
       if (outcome === "arkose") step = "arkose";
     }
