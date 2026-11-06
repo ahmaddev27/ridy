@@ -698,6 +698,9 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
       session.passkeyOutcome = await trySignInWithPasskey(page);
       if (session.passkeyOutcome === "landed") return passkeyLanded(session, context, page);
       await page.goto(config.dashboardUrl, { waitUntil: "domcontentloaded" }).catch(() => {});
+      // Usernameless-only attempt (no email) that did not land: there is no identifier to type
+      // or account to match, so stop cleanly. The reused handle is left open for the manager.
+      if (!email) return { status: STATUS.PASSKEY_UNSUPPORTED, message: "passkey_unsupported" };
     }
 
     // A remembered account ("Welcome back") may not ask for the identifier again. Then we
