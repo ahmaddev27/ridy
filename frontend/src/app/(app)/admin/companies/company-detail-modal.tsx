@@ -31,6 +31,7 @@ import {
   endCompanySubscription,
   listProxies,
   getCompanyDrivers,
+  setCompanyDriverManager,
   getCompanyOffers,
   getCompanyVehicles,
   getCompanyNetwork,
@@ -1169,6 +1170,20 @@ function CompanyDataTab({ id, tab }: { id: number; tab: "drivers" | "vehicles" }
   const c = (k: string) => t(`screens.companies.${k}`);
   const [rows, setRows] = useState<CompanyDriverRow[] | CompanyVehicleRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  async function toggleManager(d: CompanyDriverRow) {
+    setBusyId(d.id);
+    try {
+      const next = await setCompanyDriverManager(id, d.id, !d.is_manager);
+      setRows((prev) => (prev as CompanyDriverRow[]).map((r) => (r.id === d.id ? { ...r, is_manager: next.is_manager === true } : r)));
+      toast.success(c("managerSaved"));
+    } catch {
+      toast.error(c("managerFailed"));
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -1214,6 +1229,12 @@ function CompanyDataTab({ id, tab }: { id: number; tab: "drivers" | "vehicles" }
                 <span className="muted num">{d.total_trips.toLocaleString(latnLocale(locale))} {c("trips")}</span>
               )}
               <Badge status={d.uber_linked ? "connected" : "neutral"} dot>{d.uber_linked ? c("linked") : c("unlinked")}</Badge>
+              <Switch
+                checked={d.is_manager === true}
+                onChange={() => void toggleManager(d)}
+                disabled={busyId === d.id}
+                label={`${c("managerMode")} — ${c("managerModeHint")}`}
+              />
             </div>
           ))}
         </div>

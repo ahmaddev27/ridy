@@ -421,6 +421,7 @@ export async function endCompanySubscription(id: number): Promise<void> {
 export type CompanyDriverRow = {
   id: number; name: string; online: boolean; online_status: string | null;
   uber_linked: boolean; rating: number | null; total_trips: number | null;
+  is_manager?: boolean;
 };
 export type CompanyOfferRow = {
   id: number; received_at: string | null; driver_name: string | null;
@@ -442,6 +443,15 @@ export type CompanyNetworkRow = {
 
 export async function getCompanyDrivers(id: number): Promise<CompanyDriverRow[]> {
   const res = await apiFetch<{ data: CompanyDriverRow[] }>(`${base}/${id}/drivers`);
+  return res.data;
+}
+/** Super-admin: mark/unmark one of a company's drivers as a manager (dual-role). */
+export async function setCompanyDriverManager(id: number, driverId: number, isManager: boolean): Promise<CompanyDriverRow> {
+  const res = await apiFetch<{ data: CompanyDriverRow }>(`${base}/${id}/drivers/${driverId}/manager`, {
+    method: "PATCH",
+    withCsrf: true,
+    body: { is_manager: isManager },
+  });
   return res.data;
 }
 export async function getCompanyOffers(

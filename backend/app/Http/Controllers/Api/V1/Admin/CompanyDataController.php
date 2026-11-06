@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Audit\AuditLogger;
 use App\Domain\Dispatch\Models\DispatchNetworkLog;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\Models\Driver;
@@ -32,6 +33,24 @@ class CompanyDataController extends Controller
             ->get();
 
         return DriverResource::collection($drivers);
+    }
+
+    /**
+     * Super-admin: mark one of this company's drivers as a manager (dual-role). Mirrors
+     * DriverController::setManager; not mass-assignable so it goes through forceFill, and
+     * the audit entry is written against the company, not the (tenant-less) admin.
+     */
+    public function setManager(Request $request, Tenant $tenant, int $driver, AuditLogger $audit): DriverResource
+    {
+        $model = Driver::withoutGlobalScopes()->where('tenant_id', $tenant->id)->findOrFail($driver);
+        $isManager = (bool) $request->validate(['is_manager' => ['required', 'boolean']])['is_manager'];
+
+        if ($model->is_manager !== $isManager) {
+            $model->forceFill(['is_manager' => $isManager])->save();
+            $audit->log($isManager ? 'driver.manager_enabled' : 'driver.manager_disabled', $model, [], $tenant->id);
+        }
+
+        return new DriverResource($model->load('latestDeviceToken'));
     }
 
     public function offers(Tenant $tenant): AnonymousResourceCollection

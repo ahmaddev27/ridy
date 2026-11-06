@@ -105,6 +105,7 @@ class LiveFleetPositions
                     ]);
                 })->all(),
                 'location_updated_at' => $d->location_updated_at,
+                'is_manager' => (bool) $d->is_manager,
             ];
         });
 

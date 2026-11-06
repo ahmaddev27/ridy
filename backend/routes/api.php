@@ -604,6 +604,7 @@ Route::prefix('v1')->group(function () {
 
         // Read-only drill-down into a company's fleet data (admin tabs).
         Route::get('companies/{tenant}/drivers', [CompanyDataController::class, 'drivers']);
+        Route::patch('companies/{tenant}/drivers/{driver}/manager', [CompanyDataController::class, 'setManager']);
         Route::get('companies/{tenant}/offers', [CompanyDataController::class, 'offers']);
         Route::get('companies/{tenant}/vehicles', [CompanyDataController::class, 'vehicles']);
         Route::get('companies/{tenant}/network', [CompanyDataController::class, 'network']);

@@ -555,7 +555,12 @@ export function LiveMap({ heightClass = "h-[70vh]" }: { heightClass?: string }) 
                   />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-ink">{dr.name}</span>
+                  <span className="block truncate text-sm font-medium text-ink">
+                    {dr.name}
+                    {dr.is_manager && (
+                      <span className="badge outline square ltr:ml-1.5 rtl:mr-1.5">{t("screens.drivers.colManager")}</span>
+                    )}
+                  </span>
                   {dr.city && (
                     <span className="block truncate text-[11px] text-ink-subtle">
                       {dr.plz ? `${dr.plz} ${dr.city}` : dr.city}
