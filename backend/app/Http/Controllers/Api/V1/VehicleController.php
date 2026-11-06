@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Fleet\Earnings\UberEarningsException;
+use App\Domain\Fleet\FleetHub\EarningsSync;
+use App\Domain\Fleet\FleetHub\FleetDataSync;
 use App\Domain\Fleet\FleetHub\VehicleIngestService;
+use App\Domain\Fleet\FleetHub\VehicleSync;
 use App\Domain\Fleet\Models\Vehicle;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -51,5 +55,20 @@ class VehicleController extends Controller
         $count = $service->ingest((int) $request->user()->tenant_id, (array) $request->input('vehicles'));
 
         return response()->json(['data' => ['synced' => $count]]);
+    }
+
+    /**
+     * "Sync now": pull vehicles + earnings from Fleet Hub for the caller's company
+     * through its proxy. Always 200 with a status so the page can explain a skip.
+     */
+    public function syncNow(Request $request, FleetDataSync $fleetData, VehicleSync $vehicles, EarningsSync $earnings): JsonResponse
+    {
+        try {
+            $result = $fleetData->runNow($request->user()->tenant, $vehicles, $earnings);
+        } catch (UberEarningsException $e) {
+            $result = ['status' => 'skipped', 'reason' => $e->reason];
+        }
+
+        return response()->json(['data' => $result]);
     }
 }
