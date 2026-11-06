@@ -35,7 +35,6 @@ export const STATUS = {
   NO_PROXY: "no_proxy", // no residential proxy for the company: never register datacenter-direct
   BUSY: "busy",
   ALREADY_REGISTERED: "already_registered", // the backend already holds ours
-  UBER_HAS_PASSKEY: "uber_has_passkey", // a passkey exists on Uber's side: skipped, never piled up
   NOT_AUTHENTICATED: "not_authenticated", // account.uber.com did not accept this context
   FAILED: "failed",
   STORE_FAILED: "store_failed", // registered on Uber but the backend would not take the key
@@ -178,7 +177,6 @@ async function registerOnPage(context, page, log) {
 
   const before = await page.evaluate(probeInPage);
   if (!before?.ok) return { status: STATUS.FAILED, reason: "probe_failed" };
-  if (before.count > 0) return { status: STATUS.UBER_HAS_PASSKEY };
 
   const reg = await page.evaluate(registerInPage);
   if (reg?.step !== "done") return { status: STATUS.FAILED, reason: `register_${reg?.step ?? "unknown"}` };
