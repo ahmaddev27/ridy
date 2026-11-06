@@ -60,12 +60,10 @@ class ProxyController extends Controller
         }
 
         DB::transaction(function () use ($proxy, $data, $pool) {
-            $urlChanged = isset($data['url']) && $data['url'] !== $proxy->url;
             $proxy->update($data);
-            // Rotated credentials must reach the daemon for every assigned company.
-            if ($urlChanged) {
-                $pool->syncTenantsOf($proxy);
-            }
+            // Every edit re-copies the URL verbatim to all assigned companies, so the
+            // admin's URL is what each one uses even if a copy had drifted.
+            $pool->syncTenantsOf($proxy);
             // A bigger (or newly added) proxy may now have room for unassigned companies.
             $pool->assignMissing();
         });

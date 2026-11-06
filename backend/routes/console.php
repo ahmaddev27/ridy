@@ -62,6 +62,10 @@ Schedule::command('offers:backfill-geo --limit=12')->everyTenMinutes()->withoutO
 Schedule::command('notifications:scan')->dailyAt('08:00')->withoutOverlapping(60);
 
 // Ops alerting: broken Uber sessions / down daemon shards (emailed once each).
+// Safety net: assignment otherwise only runs at activation and is silently null when
+// the pool is full, leaving a company on the datacenter IP.
+Schedule::command('proxies:assign-missing')->everyFiveMinutes()->withoutOverlapping(10);
+
 Schedule::command('alerts:check')->everyFiveMinutes()->withoutOverlapping(10);
 
 // Detect a silently-broken Uber connection: an active company whose live driver-status

@@ -29,7 +29,7 @@ class SessionTokenExpiryTest extends TestCase
 
     private function tenant(): Tenant
     {
-        return Tenant::create(['name' => 'Smoothfahrt', 'country' => 'DE', 'status' => 'active', 'activated_at' => now()]);
+        return Tenant::create(['name' => 'Smoothfahrt', 'country' => 'DE', 'status' => 'active', 'activated_at' => now(), 'proxy_url' => 'http://u:p@h:1']);
     }
 
     private function sessionExpiring(Tenant $tenant, string $column, ?CarbonImmutable $at): UberFleetSession
