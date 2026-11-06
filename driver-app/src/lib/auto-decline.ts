@@ -5,7 +5,7 @@
  * is read once, shared module-wide and re-read when the signed-in driver changes.
  */
 import { useEffect, useSyncExternalStore } from "react";
-import { api, type AutoDeclineRules } from "@/lib/api";
+import { api, type AutoDeclineConfig, type AutoDeclineRules } from "@/lib/api";
 import { toAsciiDigits } from "@/lib/format";
 
 /** Server cap for a money rule (cents). */
@@ -22,6 +22,14 @@ function publish(next: boolean): void {
   if (next === featureEnabled) return;
   featureEnabled = next;
   listeners.forEach((fn) => fn());
+}
+
+/**
+ * The tab shows only when the company has the feature AND its admin allowed THIS
+ * driver. A locked driver (admin_enabled false) must not see the feature at all.
+ */
+export function isAutoDeclineAvailable(cfg: Pick<AutoDeclineConfig, "feature_enabled" | "admin_enabled">): boolean {
+  return cfg.feature_enabled === true && cfg.admin_enabled === true;
 }
 
 /** The screen reports what the server just said, so the tab follows without a refetch. */
@@ -54,9 +62,9 @@ export function useAutoDeclineFeature(driverId: number | null, isOwner: boolean)
     loadedFor = driverId;
     api
       .autoDecline()
-      .then((r) => publish(r.data.feature_enabled === true))
+      .then((r) => publish(isAutoDeclineAvailable(r.data)))
       .catch(() => {
-        // Unknown is "off": a tab that leads nowhere is worse than a late one.
+        // Unknown (loading/failed) is "off": a tab that leads nowhere is worse than a late one.
         loadedFor = null;
       });
   }, [driverId, isOwner]);
