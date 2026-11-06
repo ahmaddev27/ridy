@@ -53,7 +53,10 @@ async function postCapture(companyKey, cap) {
     supplier_cookies: cap.supplierCookies && cap.supplierCookies.length ? cap.supplierCookies : undefined,
   });
   // The refusal arrives as 202 { data: { status: "blocked", reason } }.
-  return res?.data?.status === "blocked" ? "blocked" : "posted";
+  if (res?.data?.status !== "blocked") return "posted";
+  // The reason is a short code (autolink_blocked / org_change_requires_connect), never a secret.
+  console.warn(`[persistent] ${companyKey} capture refused by backend: ${res.data.reason ?? "unknown"}`);
+  return "blocked";
 }
 
 const manager = new PersistentSessionManager({
