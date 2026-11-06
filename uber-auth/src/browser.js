@@ -7,6 +7,7 @@
 import { chromium } from "playwright";
 import { config } from "./config.js";
 import { parseProxyUrl } from "./proxy.js";
+import { gotoDispatch } from "./dispatchGoto.js";
 import { tenantScreen } from "./fingerprint.js";
 
 // Browsers launched as REAL Chrome (headed under Xvfb): they emit their own genuine UA.
@@ -676,7 +677,10 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
   page.setDefaultTimeout(config.stepTimeout);
 
   try {
-    await page.goto(config.dashboardUrl, { waitUntil: "domcontentloaded" });
+    if (!(await gotoDispatch(page, context))) {
+      // Handle stays open for the manager; only this attempt is abandoned.
+      return { status: STATUS.NO_SESSION, message: "no_session" };
+    }
 
     // Already authenticated (stored cookies). Keep the browser open so the
     // persistent manager can adopt it; the caller closes it if it won't.
@@ -700,7 +704,7 @@ export async function startLogin({ email, password = null, proxyUrl = null, comp
       session.passkeyOutcome = await trySignInWithPasskey(page);
       navLog(`passkey tier1 (usernameless) outcome=${session.passkeyOutcome}`);
       if (session.passkeyOutcome === "landed") return passkeyLanded(session, context, page);
-      await page.goto(config.dashboardUrl, { waitUntil: "domcontentloaded" }).catch(() => {});
+      await gotoDispatch(page, context).catch(() => {});
       // Usernameless-only attempt (no email) that did not land: there is no identifier to type
       // or account to match, so stop cleanly. The reused handle is left open for the manager.
       if (!email) {
