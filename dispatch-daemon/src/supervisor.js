@@ -29,6 +29,11 @@ const START_STAGGER_MS = 100;
 // churn). Bounded by a short TTL: a position older than this may be too stale for Uber
 // to honour, so the stream starts clean instead. Keyed by `${sessionId}:${ramenPath}`.
 const resumeSeq = new Map();
+// The previous jar of a stream a jar_version change just replaced, kept only if it had
+// delivered a frame (known good). The replacement retries once on it if the new jar is
+// refused before delivering — see RamenStream.handleStreamAuthFailure. Short-lived.
+const lastGoodJar = new Map();
+const LAST_GOOD_JAR_TTL_MS = 10 * 60 * 1000;
 const RESUME_SEQ_TTL_MS = 60_000;
 
 // Adaptive poll cadence. `lastActiveIds` is the set of session ids the previous
@@ -193,6 +198,10 @@ async function reconcile() {
       if (wantedKeys.has(key) && Number.isFinite(stream.seq) && stream.seq > 0) {
         resumeSeq.set(key, { seq: stream.seq, at: Date.now() });
       }
+      if (wantedKeys.has(key) && cookiesChanged && !proxyChanged) {
+        const good = stream.goodJarSnapshot();
+        if (good) lastGoodJar.set(key, { ...good, at: Date.now() });
+      }
       stream.stop();
       streams.delete(key);
     }
@@ -247,7 +256,10 @@ function startSessionStreams(session) {
       const key = streamKey(session.id, path);
       if (streams.has(key)) return;
       console.log(`starting stream ${key} (${session.uber_org_uuid})`);
-      const stream = new RamenStream(session, path, { primary: index === 0, onStaleJar: reconcileSoon });
+      const good = lastGoodJar.get(key);
+      lastGoodJar.delete(key);
+      const fallbackJar = good && Date.now() - good.at <= LAST_GOOD_JAR_TTL_MS ? good : null;
+      const stream = new RamenStream(session, path, { primary: index === 0, onStaleJar: reconcileSoon, fallbackJar });
       // Resume the position saved when this exact key was torn down a moment ago (a
       // jar_version/proxy change), so a rolling-cookie teardown no longer resets seq to 0
       // and drops offers in the gap. The replacement opens with /recv?seq=N — the same

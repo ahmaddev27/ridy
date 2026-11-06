@@ -221,7 +221,7 @@ export class RamenStream {
    *   this stream's cookie jar (409 stale_jar), so the supervisor can restart on
    *   the fresh jar without waiting for its next poll.
    */
-  constructor(session, ramenPath = config.ramenPaths[0], { primary = true, onStaleJar = null } = {}) {
+  constructor(session, ramenPath = config.ramenPaths[0], { primary = true, onStaleJar = null, fallbackJar = null } = {}) {
     this.session = session; // { id, tenant_id, uber_org_uuid, cookies: [{name,value}] }
     this.ramenPath = ramenPath;
     this.primary = primary;
@@ -245,6 +245,13 @@ export class RamenStream {
     this.jarVersion = Number.isInteger(session.jar_version) ? session.jar_version : null;
     this.jarStale = false;
     this.onStaleJar = onStaleJar;
+    // Grace for a bad swap: the previous jar that was streaming fine when a jar_version
+    // change replaced it. One auth rejection BEFORE this jar delivers a frame retries once
+    // on it (see handleStreamAuthFailure). Ignored when it is identical to the new jar.
+    this.fallbackJar = fallbackJar && this.differsFromOwnJar(fallbackJar) ? fallbackJar : null;
+    this.graceSpent = false; // the grace fires at most once per stream object
+    this.onFallbackJar = false; // running on the older jar: never write it over the backend's newer one
+    this.hasDelivered = false; // set by the first frame; only then is this jar "known good"
     this.seq = 0;
     this.stopped = false;
     this.reconnectDelay = config.reconnectMinDelay;
@@ -684,7 +691,7 @@ export class RamenStream {
         this.persistDirty = false;
         // A torn-down stream (or one a reconnect superseded) must not overwrite a
         // newer re-link with its old jar.
-        if (this.stopped || this.jarStale) return;
+        if (this.stopped || this.jarStale || this.onFallbackJar) return;
         const { cookies, supplierCookies, fp } = this.liveJarFingerprint();
         if (fp === this.cookieFp || cookies.length === 0) continue;
         try {
@@ -725,6 +732,29 @@ export class RamenStream {
     }
   }
 
+  /** True when `jar` ({cookies, supplierCookies}) differs from the jar this stream was built on. */
+  differsFromOwnJar(jar) {
+    return `${jarFingerprint(jar.cookies)}:${jarFingerprint(jar.supplierCookies)}` !== sessionJarFingerprint(this.session);
+  }
+
+  /** The live jars if this stream has proven them good (delivered a frame), else null. */
+  goodJarSnapshot() {
+    if (!this.hasDelivered) return null;
+    const { cookies, supplierCookies } = this.liveJarFingerprint();
+    return { cookies, supplierCookies };
+  }
+
+  /** Swap to the previous good jar for the one-shot grace retry. Returns true when swapped. */
+  useFallbackJar() {
+    if (!this.fallbackJar || this.graceSpent || this.hasDelivered) return false;
+    this.graceSpent = true;
+    this.jar = new Map(this.fallbackJar.cookies.map((c) => [c.name, c.value]));
+    this.supplierJar = new Map(this.fallbackJar.supplierCookies.map((c) => [c.name, c.value]));
+    this.fallbackJar = null;
+    this.onFallbackJar = true;
+    return true;
+  }
+
   tag() {
     const channel = this.ramenPath.split("/").filter(Boolean)[0] ?? "ramen";
     return `session ${this.session.id}/${String(this.session.uber_org_uuid).slice(0, 8)} ${channel}`;
@@ -737,6 +767,13 @@ export class RamenStream {
    */
   async handleStreamAuthFailure(status) {
     if (status === 401 || status === 403) {
+      // Grace: the freshly adopted jar was refused before it ever delivered. Retry ONCE on
+      // the previous good jar (the run loop reopens, seq preserved) instead of declaring
+      // the session dead. If that also fails, the next call falls through below.
+      if (this.useFallbackJar()) {
+        console.warn(`[${this.tag()}] stream auth rejected (${status}) on the new jar v${this.jarVersion} — retrying once on the previous good jar`);
+        return true;
+      }
       console.warn(`[${this.tag()}] stream auth rejected (${status}) -> needs relink`);
       // A 401 on a jar a reconnect already replaced says nothing about the fresh
       // one: the backend refuses it (stale_jar) and we just make way for it.
@@ -1085,6 +1122,9 @@ export class RamenStream {
         const { done, value } = await reader.read();
         if (done) break;
         lastFrameAt = Date.now();
+        // The jar in use just proved itself: the grace episode is over.
+        this.hasDelivered = true;
+        this.fallbackJar = null;
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");

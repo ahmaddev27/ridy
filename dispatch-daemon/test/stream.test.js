@@ -493,3 +493,49 @@ test("adoptJar takes the source stream's live cookie VALUES, not just its finger
   primary.jar.set("sid", "newer");
   assert.equal(secondary.jar.get("sid"), "rotated", "the jar is copied, not aliased");
 });
+
+// --- jar-change grace: one retry on the previous good jar ---------------------------
+
+const oldJar = { cookies: [{ name: "sid", value: "old" }], supplierCookies: [{ name: "sid", value: "old" }] };
+
+test("grace: a 401 on a fresh, never-delivered jar retries once on the previous good jar", async () => {
+  const stream = newStream({ fallbackJar: oldJar });
+  let relinked = 0;
+  api.needsRelink = async () => { relinked++; return {}; };
+  assert.equal(await stream.handleStreamAuthFailure(401), true);
+  assert.equal(relinked, 0);
+  assert.equal(stream.stopped, false);
+  assert.equal(stream.jar.get("sid"), "old");
+  assert.equal(stream.onFallbackJar, true);
+});
+
+test("grace: a second auth failure on the previous jar still flags needs-relink, and the grace fires only once", async () => {
+  const stream = newStream({ fallbackJar: oldJar });
+  let relinked = 0;
+  api.needsRelink = async () => { relinked++; return {}; };
+  await stream.handleStreamAuthFailure(403);
+  assert.equal(await stream.handleStreamAuthFailure(403), true);
+  assert.equal(relinked, 1);
+  assert.equal(stream.stopped, true);
+});
+
+test("grace: no distinct previous jar, or a jar that already delivered, goes straight to needs-relink", async () => {
+  let relinked = 0;
+  api.needsRelink = async () => { relinked++; return {}; };
+  const same = newStream({ fallbackJar: { cookies: [{ name: "sid", value: "v1" }], supplierCookies: [{ name: "sid", value: "v1" }] } });
+  await same.handleStreamAuthFailure(401);
+  const delivered = newStream({ fallbackJar: oldJar });
+  delivered.hasDelivered = true;
+  await delivered.handleStreamAuthFailure(401);
+  assert.equal(relinked, 2);
+});
+
+test("grace: the fallback jar is never persisted over the backend's newer jar", async () => {
+  const stream = newStream({ fallbackJar: oldJar });
+  let writes = 0;
+  api.refreshCookies = async () => { writes++; return {}; };
+  await stream.handleStreamAuthFailure(401);
+  stream.absorbCookies(response({ setCookies: ["sid=rot"] }));
+  await settle();
+  assert.equal(writes, 0);
+});
