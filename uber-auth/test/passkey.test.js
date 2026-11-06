@@ -73,9 +73,9 @@ test("no held session / not active: refused without any attempt", async () => {
   assert.equal(calls.attempts, 0);
 });
 
-test("Uber already has a passkey: skipped, nothing stored", async () => {
-  const { calls, deps } = await setup({ attemptResult: { status: STATUS.UBER_HAS_PASSKEY } });
-  assert.equal((await registerPasskey("7", deps)).status, STATUS.UBER_HAS_PASSKEY);
+test("attempt reports already registered: skipped, nothing stored", async () => {
+  const { calls, deps } = await setup({ attemptResult: { status: STATUS.ALREADY_REGISTERED } });
+  assert.equal((await registerPasskey("7", deps)).status, STATUS.ALREADY_REGISTERED);
   assert.equal(calls.stored.length, 0);
 });
 
@@ -120,13 +120,13 @@ test("concurrent calls for one company: the second is busy", async () => {
   const { deps } = await setup();
   deps.attemptFn = async () => {
     await gate;
-    return { status: STATUS.UBER_HAS_PASSKEY };
+    return { status: STATUS.ALREADY_REGISTERED };
   };
   const first = registerPasskey("7", deps);
   await new Promise((r) => setTimeout(r, 10));
   assert.equal((await registerPasskey("7", deps)).status, STATUS.BUSY);
   release();
-  assert.equal((await first).status, STATUS.UBER_HAS_PASSKEY);
+  assert.equal((await first).status, STATUS.ALREADY_REGISTERED);
 });
 
 test("no company proxy: skipped as no_proxy, nothing read or launched", async () => {

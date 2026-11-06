@@ -31,8 +31,8 @@ A second, owner-approved account WRITE. Allowed only when ALL hold:
   visit to account.uber.com reads as a new device/location and can sign the session out, so a
   company with no (parsable) proxy returns `no_proxy` before anything is read or launched.
   Missing/unreadable state file => `not_authenticated`, nothing launched.
-- Idempotent twice: the backend says `registered` => skip; otherwise `getPasskeysInfo` first and
-  any existing passkey => `uber_has_passkey`, skip (never piled up).
+- Idempotent twice: the backend says `registered` (an ACTIVE stored row) => skip; otherwise register,
+  even if Uber lists an orphaned passkey we hold no key for (no Uber-side de-register exists).
 - After every attempt one normal keep-warm runs on the LIVE session (it should stay active; this
   only verifies); if the session is no longer `active` the result
   is `session_lost`, `console.error [passkey][ALERT]` fires, the backend records the failure

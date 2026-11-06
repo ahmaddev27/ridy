@@ -84,10 +84,10 @@ test("register in session: registers on the adopted context, stores it, closes o
   assert.equal(closed.page, true);
 });
 
-test("register in session: Uber already has a passkey -> skipped, nothing stored", async () => {
-  const { d, context, stored } = await inSessionSetup({ probe: { ok: true, count: 1 }, reg: {} });
-  assert.equal((await registerPasskeyInSession("7", context, d)).status, STATUS.UBER_HAS_PASSKEY);
-  assert.equal(stored.length, 0);
+test("register in session: Uber has an orphaned passkey but we hold none -> still registers and stores", async () => {
+  const { d, context, stored } = await inSessionSetup({ probe: { ok: true, count: 1 }, reg: { step: "done", account: "a@b.de", count: 2 } });
+  assert.equal((await registerPasskeyInSession("7", context, d)).status, STATUS.REGISTERED);
+  assert.equal(stored.length, 1);
 });
 
 test("register in session: backend already holds one / flag off / no active session", async () => {
