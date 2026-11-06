@@ -241,6 +241,7 @@ export default function DriversPage() {
                             {/* A real link so keyboard users can open the profile. */}
                             <Link href={`/drivers/${d.id}`} onClick={(e) => e.stopPropagation()} className="n truncate strong" style={{ display: "block" }}>
                               {d.name}
+                              {d.is_manager && <span className="badge outline square" style={{ marginInlineStart: 8 }}>{d_("colManager")}</span>}
                             </Link>
                             {(d.email || d.uber_email) && <div className="s truncate">{d.email || d.uber_email}</div>}
                           </div>

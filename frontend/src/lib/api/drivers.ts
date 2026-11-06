@@ -146,6 +146,7 @@ export type LiveDriver = {
   heading: number | null;
   waypoints: LiveWaypoint[] | null;
   location_updated_at: string | null;
+  is_manager?: boolean;
 };
 
 export async function getLiveDrivers(): Promise<LiveDriver[]> {
