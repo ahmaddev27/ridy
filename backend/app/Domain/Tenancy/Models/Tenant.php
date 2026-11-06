@@ -106,10 +106,10 @@ class Tenant extends Model
         $this->forceFill(['settings' => $settings])->save();
     }
 
-    /** Per-company passkey eligibility (docs/31). The real register is still gated by PasskeySettings' global/allowlist flags. */
+    /** Per-company passkey eligibility (docs/31). Opt-OUT: unset = on, only an explicit false disables. The real register is still gated by PasskeySettings' global/allowlist flags. */
     public function passkeyEnabled(): bool
     {
-        return ($this->settings['passkey']['enabled'] ?? false) === true;
+        return ($this->settings['passkey']['enabled'] ?? true) !== false;
     }
 
     public function setPasskeyEnabled(bool $enabled): void

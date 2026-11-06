@@ -6,6 +6,7 @@ use App\Domain\Dispatch\AutoReloginService;
 use App\Domain\Dispatch\Models\SessionBrowser;
 use App\Domain\Dispatch\Models\UberPasskey;
 use App\Domain\Dispatch\PasskeyService;
+use App\Domain\Dispatch\PasskeySettings;
 use App\Domain\Dispatch\UberAuthClient;
 use App\Domain\Tenancy\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -67,6 +68,26 @@ class UberPasskeyReloginTest extends TestCase
         $this->assertStringNotContainsString('cid', json_encode($body));
     }
 
+    public function test_a_tenant_with_no_passkey_settings_is_register_and_relogin_enabled_by_default(): void
+    {
+        $settings = new PasskeySettings;
+        $tenant = Tenant::create(['name' => 'N', 'country' => 'DE', 'status' => 'active', 'activated_at' => now()]);
+        $this->assertTrue($settings->availableFor($tenant));
+        $this->assertTrue($settings->reloginAvailableFor($tenant));
+
+        $tenant->update(['settings' => ['passkey' => ['relogin' => false]]]);
+        $this->assertTrue($settings->availableFor($tenant->fresh()));
+        $this->assertFalse($settings->reloginAvailableFor($tenant->fresh()));
+
+        $tenant->update(['settings' => ['passkey' => ['enabled' => false]]]);
+        $this->assertFalse($settings->availableFor($tenant->fresh()));
+        $this->assertFalse($settings->reloginAvailableFor($tenant->fresh()));
+
+        config(['services.passkey.enabled' => false]);
+        $tenant->update(['settings' => []]);
+        $this->assertFalse($settings->availableFor($tenant->fresh()), 'global master off');
+    }
+
     public function test_each_gate_off_means_no_passkey_flag(): void
     {
         $tenant = $this->tenant();
@@ -74,7 +95,7 @@ class UberPasskeyReloginTest extends TestCase
         config(['services.passkey.relogin' => false]);
         $this->assertArrayNotHasKey('passkey', $this->startBody($tenant));
         config(['services.passkey.relogin' => true]);
-        $tenant->update(['settings' => ['passkey' => ['enabled' => true]]]);
+        $tenant->update(['settings' => ['passkey' => ['enabled' => true, 'relogin' => false]]]);
         $this->assertArrayNotHasKey('passkey', $this->startBody($tenant->fresh()));
     }
 
