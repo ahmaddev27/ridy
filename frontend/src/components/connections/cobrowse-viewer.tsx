@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/context";
 import type { CobrowseTicket } from "@/lib/api/uber-login";
@@ -194,16 +195,20 @@ export function CobrowseViewer({
 
   const showCanvas = state === "live" || state === "connecting";
 
-  return (
+  // Portal to <body>: the viewer is mounted inside a glass Card, and an ancestor with
+  // backdrop-filter/transform becomes the containing block of `fixed`, which shrank the "full
+  // viewport" modal to the card's box (tiny puzzle inside a big grey area).
+  if (typeof document === "undefined") return null;
+  return createPortal(
     // A large, focused modal over the whole viewport: the small embedded card was unusable for a
     // real sign-in. Refocus the hidden key-capture input on any press inside the modal.
     <div
-      className="app-modal-scrim fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm sm:p-6"
+      className="app-modal-scrim fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2 backdrop-blur-sm sm:p-4"
       role="dialog"
       aria-modal="true"
       onPointerDown={() => state === "live" && inputRef.current?.focus({ preventScroll: true })}
     >
-      <div className="app-modal flex max-h-[96vh] w-full max-w-7xl flex-col gap-3 rounded-2xl border border-line-strong bg-surface p-4 shadow-2xl sm:p-5">
+      <div className="app-modal flex max-h-[98vh] w-full max-w-[1500px] flex-col gap-3 overflow-y-auto rounded-2xl border border-line-strong bg-surface p-3 shadow-2xl sm:p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h3 className="truncate text-base font-semibold text-ink">{c("cobrowseTitle")}</h3>
@@ -261,7 +266,7 @@ export function CobrowseViewer({
             width={size.w}
             height={size.h}
             // Fill the modal, but never taller than the viewport: cap width by the aspect ratio.
-            style={{ aspectRatio: `${size.w} / ${size.h}`, maxWidth: `min(100%, calc(80vh * ${size.w / size.h}))`, touchAction: "none" }}
+            style={{ aspectRatio: `${size.w} / ${size.h}`, maxWidth: `min(100%, calc((100vh - 190px) * ${size.w / size.h}))`, touchAction: "none" }}
             className="mx-auto block h-auto w-full cursor-pointer rounded-xl border border-line-strong bg-white object-contain"
             onPointerMove={(e) => send("move", e)}
             onPointerDown={(e) => {
@@ -276,6 +281,7 @@ export function CobrowseViewer({
           />
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

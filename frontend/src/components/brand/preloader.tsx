@@ -14,7 +14,7 @@ export function Preloader({ inline = false }: { inline?: boolean } = {}) {
       className={
         inline
           ? "flex min-h-[60vh] flex-col items-center justify-center gap-7"
-          : "fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-7 bg-surface"
+          : "fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-7 bg-surface-solid"
       }
     >
       <style>{`
