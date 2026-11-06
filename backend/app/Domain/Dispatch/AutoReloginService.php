@@ -49,8 +49,10 @@ class AutoReloginService
         if (! $this->eligible($tenant)) {
             return;
         }
-        // A passkey signs in usernameless, so the email is optional there; the email-code path still needs it.
-        $email = $this->settings->email($tenant);
+        // Uber offers the passkey only after the identifier is typed, so a passkey-ready company with
+        // no configured email signs in with the account email stored at registration. Never logged.
+        $email = $this->settings->email($tenant)
+            ?? ($this->passkeyReloginReady($tenant) ? $this->passkeys->accountEmailFor($tenant) : null);
         if (($email === null && ! $this->passkeyReloginReady($tenant)) || ! $this->stillNeedsOtp($tenantId)) {
             return;
         }

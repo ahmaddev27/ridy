@@ -316,6 +316,7 @@ async function runStartNow(body, { companyKey, password, cold, fresh }, res) {
     return onLoginSuccess(companyKey, outcome, res, adoptMode({ cold, fresh }));
   }
   if (passwordless) markNeedsOtp(companyKey);
+  console.log(`[login/start] ${companyKey}: outcome=${outcome.status}${outcome.message ? ` message=${outcome.message}` : ""}`);
   return send(res, 200, { status: outcome.status, message: outcome.message });
 }
 

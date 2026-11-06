@@ -18,6 +18,8 @@ import { attachCobrowseAuthenticator, ATTACH, readSignCount, removeAuthenticator
 
 const driver = createWarmDriver();
 
+const BACKEND_TIMEOUT_MS = 10_000; // a slow backend must never hang a caller's .finally
+
 async function backendPost(path, body) {
   const res = await fetch(`${config.apiBaseUrl}${path}`, {
     method: "POST",
@@ -27,6 +29,7 @@ async function backendPost(path, body) {
       "X-Dispatch-Secret": config.dispatchSecret,
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(BACKEND_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`backend ${path} -> ${res.status}`);
   return res.json().catch(() => ({}));
@@ -437,13 +440,18 @@ export async function finishReloginPasskey(handle, companyKey) {
       // An unreadable signCount must not hide a real sign-in: still reset the breaker + record the use.
       const signCount = await readSignCount(handle);
       await backendPost(`${base}/used`, signCount != null ? { signCount } : {});
+      console.log(`[passkey][relogin] ${companyKey}: outcome=landed (use recorded)`);
     } else if (handle.passkeyInjected && handle.passkeyTried && PASSKEY_MISSES.has(handle.passkeyOutcome)) {
       await backendPost(`${base}/login-failed`, {});
+      console.log(`[passkey][relogin] ${companyKey}: outcome=login-failed (${handle.passkeyOutcome})`);
+    } else {
+      console.log(`[passkey][relogin] ${companyKey}: outcome=not-counted (${handle.passkeyOutcome ?? "none"})`);
     }
   } catch (e) {
     console.warn(`[passkey][relogin] ${companyKey}: outcome report failed: ${e?.message}`);
   } finally {
     await removeAuthenticator(handle);
+    console.log(`[passkey][relogin] ${companyKey}: authenticator removed`);
     handle.passkeyTried = false;
     handle.passkeyLanded = false;
     handle.passkeyOutcome = null;

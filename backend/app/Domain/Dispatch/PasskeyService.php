@@ -160,6 +160,22 @@ class PasskeyService
         ];
     }
 
+    /**
+     * The Uber account email captured at registration (the credential's `account`), or null
+     * when absent / not an email. Uber offers the passkey only after the identifier is typed,
+     * so the unattended re-login supplies this. Sensitive: never log it.
+     */
+    public function accountEmailFor(Tenant $tenant): ?string
+    {
+        $passkey = UberPasskey::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->id)
+            ->where('status', UberPasskey::STATUS_ACTIVE)
+            ->first();
+        $account = is_array($passkey?->credential) ? trim((string) ($passkey->credential['account'] ?? '')) : '';
+
+        return filter_var($account, FILTER_VALIDATE_EMAIL) ? $account : null;
+    }
+
     public function revoke(int $tenantId): void
     {
         UberPasskey::withoutGlobalScopes()->where('tenant_id', $tenantId)
