@@ -27,6 +27,7 @@ class AutoReloginService
         private readonly PasswordlessLoginSettings $settings,
         private readonly PasswordlessLoginService $login,
         private readonly UberAuthClient $client,
+        private readonly PasskeyService $passkeys,
     ) {}
 
     /** Called when the browser service reports a company newly in needs_otp. Never throws. */
@@ -45,20 +46,34 @@ class AutoReloginService
     public function run(int $tenantId): void
     {
         $tenant = Tenant::find($tenantId);
-        $email = $tenant === null ? null : $this->settings->email($tenant);
-        if (! $this->eligible($tenant) || $email === null || ! $this->stillNeedsOtp($tenantId)) {
+        if (! $this->eligible($tenant)) {
+            return;
+        }
+        // A passkey signs in usernameless, so the email is optional there; the email-code path still needs it.
+        $email = $this->settings->email($tenant);
+        if (($email === null && ! $this->passkeyReloginReady($tenant)) || ! $this->stillNeedsOtp($tenantId)) {
             return;
         }
         if ($this->login->pendingAutoAttempt($tenant) !== null) {
             return; // an automatic login is already waiting for its code
         }
-        $result = $this->login->start($tenant, $email, PasswordlessLoginService::MODE_AUTO, interactive: false);
+        $result = $this->login->start($tenant, $email ?? '', PasswordlessLoginService::MODE_AUTO, interactive: false);
         Log::info('uber_login.auto_relogin', ['tenant_id' => $tenantId, 'state' => $result['state'] ?? null, 'failure' => $result['failure'] ?? null]);
     }
 
     private function eligible(?Tenant $tenant): bool
     {
-        return $tenant !== null && $this->client->configured() && ! $tenant->isAutolinkBlocked() && $this->settings->autoReloginEnabled($tenant);
+        if ($tenant === null || ! $this->client->configured() || $tenant->isAutolinkBlocked()) {
+            return false;
+        }
+
+        return $this->settings->autoReloginEnabled($tenant) || $this->passkeyReloginReady($tenant);
+    }
+
+    /** Passkey re-auth is on for the company, a key is registered and its failure breaker is closed. */
+    private function passkeyReloginReady(Tenant $tenant): bool
+    {
+        return $this->passkeys->shouldOfferForRelogin($tenant);
     }
 
     private function stillNeedsOtp(int $tenantId): bool

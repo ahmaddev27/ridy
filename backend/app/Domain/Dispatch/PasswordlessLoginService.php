@@ -83,6 +83,7 @@ class PasswordlessLoginService
         private readonly PasswordlessLoginSettings $settings,
         private readonly CobrowseTicketSigner $signer,
         private readonly AlertService $alerts,
+        private readonly PasskeyService $passkeys,
     ) {}
 
     /** @return array<string, mixed> */
@@ -139,7 +140,8 @@ class PasswordlessLoginService
         $full = $cobrowse;
         if ($full) {
             $mode = self::MODE_MANUAL;
-        } elseif ($email === '') {
+        } elseif ($email === '' && ! $this->passkeys->shouldOfferForRelogin($tenant)) {
+            // No email: only the passkey path signs in without one (usernameless).
             return $this->failedView('unavailable');
         }
 

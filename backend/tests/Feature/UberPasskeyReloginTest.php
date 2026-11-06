@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Dispatch\AutoReloginService;
+use App\Domain\Dispatch\Models\SessionBrowser;
 use App\Domain\Dispatch\Models\UberPasskey;
 use App\Domain\Dispatch\PasskeyService;
 use App\Domain\Dispatch\UberAuthClient;
@@ -9,6 +11,7 @@ use App\Domain\Tenancy\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class UberPasskeyReloginTest extends TestCase
@@ -151,5 +154,53 @@ class UberPasskeyReloginTest extends TestCase
         config(['services.passkey.enabled' => false]);
         $this->withHeader('X-Dispatch-Secret', self::SECRET)
             ->getJson("/api/v1/internal/session-browser/{$tenant->id}/passkey/credential")->assertNotFound();
+    }
+
+    private function needsOtp(Tenant $tenant): void
+    {
+        SessionBrowser::create(['tenant_id' => $tenant->id, 'state' => SessionBrowser::STATE_NEEDS_OTP]);
+    }
+
+    public function test_passkey_ready_tenant_without_email_or_opt_in_triggers_and_starts_usernameless(): void
+    {
+        Queue::fake();
+        $tenant = $this->tenant();
+        $this->register($tenant);
+        $this->needsOtp($tenant);
+        $auto = app(AutoReloginService::class);
+
+        $this->assertTrue($auto->onNeedsOtp($tenant->id));
+        Http::fake(['*/login/start' => Http::response(['status' => 'mfa_required', 'login_id' => 'L1', 'channel' => 'email'])]);
+        $auto->run($tenant->id);
+
+        $body = Http::recorded()[0][0]->data();
+        $this->assertTrue($body['passkey']);
+        $this->assertSame('', $body['email']);
+        $this->assertStringNotContainsString('SECRET-KEY', json_encode($body));
+    }
+
+    public function test_tenant_without_passkey_and_without_email_still_does_nothing(): void
+    {
+        Queue::fake();
+        $tenant = $this->tenant();
+        $this->needsOtp($tenant);
+        Http::fake();
+        $auto = app(AutoReloginService::class);
+
+        $this->assertFalse($auto->onNeedsOtp($tenant->id));
+        $auto->run($tenant->id);
+        Http::assertNothingSent();
+    }
+
+    public function test_slot_caps_still_apply_to_passkey_tenants(): void
+    {
+        Queue::fake();
+        $tenant = $this->tenant();
+        $this->register($tenant);
+        $this->needsOtp($tenant);
+        $auto = app(AutoReloginService::class);
+
+        $this->assertTrue($auto->onNeedsOtp($tenant->id));
+        $this->assertFalse($auto->onNeedsOtp($tenant->id)); // MIN_GAP
     }
 }
