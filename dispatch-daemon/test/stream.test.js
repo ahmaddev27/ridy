@@ -493,3 +493,74 @@ test("adoptJar takes the source stream's live cookie VALUES, not just its finger
   primary.jar.set("sid", "newer");
   assert.equal(secondary.jar.get("sid"), "rotated", "the jar is copied, not aliased");
 });
+
+// --- jar-change grace: one retry on the previous good jar ---------------------------
+
+const oldJar = { cookies: [{ name: "sid", value: "old" }], supplierCookies: [{ name: "sid", value: "old" }] };
+
+test("grace: a 401 on a fresh, never-delivered jar retries once on the previous good jar", async () => {
+  const stream = newStream({ fallbackJar: oldJar });
+  let relinked = 0;
+  api.needsRelink = async () => { relinked++; return {}; };
+  assert.equal(await stream.handleStreamAuthFailure(401), true);
+  assert.equal(relinked, 0);
+  assert.equal(stream.stopped, false);
+  assert.equal(stream.jar.get("sid"), "old");
+  assert.equal(stream.onFallbackJar, true);
+});
+
+test("grace: a second auth failure on the previous jar still flags needs-relink, and the grace fires only once", async () => {
+  const stream = newStream({ fallbackJar: oldJar });
+  let relinked = 0;
+  api.needsRelink = async () => { relinked++; return {}; };
+  await stream.handleStreamAuthFailure(403);
+  assert.equal(await stream.handleStreamAuthFailure(403), true);
+  assert.equal(relinked, 1);
+  assert.equal(stream.stopped, true);
+});
+
+test("grace: no distinct previous jar, or a jar that already delivered, goes straight to needs-relink", async () => {
+  let relinked = 0;
+  api.needsRelink = async () => { relinked++; return {}; };
+  const same = newStream({ fallbackJar: { cookies: [{ name: "sid", value: "v1" }], supplierCookies: [{ name: "sid", value: "v1" }] } });
+  await same.handleStreamAuthFailure(401);
+  const delivered = newStream({ fallbackJar: oldJar });
+  delivered.hasDelivered = true;
+  await delivered.handleStreamAuthFailure(401);
+  assert.equal(relinked, 2);
+});
+
+test("grace: the fallback jar is not persisted before its first frame, then heals the backend once it delivers", async () => {
+  const stream = newStream({ fallbackJar: oldJar });
+  const writes = [];
+  api.refreshCookies = async (_id, cookies, _x, version) => { writes.push([cookies[0].value, version]); return {}; };
+  await stream.handleStreamAuthFailure(401);
+  assert.equal(stream.skipBackoffOnce, true);
+  stream.absorbCookies(response({ setCookies: ["sid=rot"] }));
+  await settle();
+  assert.equal(writes.length, 0);
+  stream.handleData = () => {};
+  await stream.readSse(response({ frames: ["data: {}\n\n"] }).body);
+  await settle();
+  assert.deepEqual(writes, [["rot", null]]);
+});
+
+test("grace: a 409 stale_jar on the healing write marks the jar stale", async () => {
+  let restarted = 0;
+  const stream = newStream({ fallbackJar: oldJar, onStaleJar: () => restarted++ });
+  api.refreshCookies = async () => { const e = new Error("stale"); e.status = 409; e.apiMessage = "stale_jar"; throw e; };
+  await stream.handleStreamAuthFailure(401);
+  stream.hasDelivered = true;
+  await stream.persistJar();
+  assert.equal(stream.jarStale, true);
+  assert.equal(restarted, 1);
+});
+
+test("goodJarSnapshot is null for a stopped (auth-dead) stream and for one that never delivered", () => {
+  const stream = newStream();
+  assert.equal(stream.goodJarSnapshot(), null);
+  stream.hasDelivered = true;
+  assert.ok(stream.goodJarSnapshot());
+  stream.stop();
+  assert.equal(stream.goodJarSnapshot(), null);
+});
