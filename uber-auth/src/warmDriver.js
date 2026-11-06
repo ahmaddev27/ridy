@@ -44,6 +44,35 @@ function cookieValue(list, name) {
   return c ? c.value : null;
 }
 
+function isRedirectLoop(e) {
+  return /ERR_TOO_MANY_REDIRECTS/i.test(e?.message || "");
+}
+
+/**
+ * Fleet Hub visit for a routine keep-warm. A dead fleethub sp-jwt-session can
+ * redirect-loop against auth; that must not block the RAMEN (dispatch) capture the
+ * daemon lives on. On a loop: drop the fleethub cookies, retry once, then give up
+ * on the supplier jar only. Returns false when the visit was skipped.
+ */
+async function visitFleetHub(page, context) {
+  const go = () => page.goto(FLEETHUB_URL, { waitUntil: "domcontentloaded", timeout: config.stepTimeout });
+  try {
+    await go();
+    return true;
+  } catch (e) {
+    if (!isRedirectLoop(e)) throw e;
+  }
+  try {
+    await context.clearCookies({ domain: "fleethub.uber.com" });
+    await go();
+    return true;
+  } catch (e) {
+    if (!isRedirectLoop(e)) throw e;
+    console.warn("keep-warm: fleethub redirect loop, skipped supplier capture");
+    return false;
+  }
+}
+
 function statePath(companyKey) {
   return join(config.stateDir, `${String(companyKey).replace(/[^a-z0-9_-]/gi, "_")}.json`);
 }
@@ -87,12 +116,15 @@ export function createWarmDriver() {
         // two, which is the whole point of a rescue (every second is lost offers). The
         // supplier jar keeps its stored value. A routine keep-warm still visits Fleet
         // Hub first, where sp-jwt-session (14d) rotates.
+        let supplierSkipped = false;
         if (!rescue) {
-          await page.goto(FLEETHUB_URL, { waitUntil: "domcontentloaded", timeout: config.stepTimeout });
-          if (AUTH_RE.test(page.url())) {
-            return { ok: true, loggedOut: true };
+          supplierSkipped = !(await visitFleetHub(page, context));
+          if (!supplierSkipped) {
+            if (AUTH_RE.test(page.url())) {
+              return { ok: true, loggedOut: true };
+            }
+            await page.waitForTimeout(800);
           }
-          await page.waitForTimeout(800);
         }
 
         // The dispatch host so the RAMEN jar (jwt-session, 24h) stays fresh.
@@ -104,7 +136,7 @@ export function createWarmDriver() {
         const ramen = (await context.cookies(RAMEN_COOKIE_URL)).map((c) => ({ name: c.name, value: c.value }));
         // A rescue did not refresh Fleet Hub, so it has nothing new to say about the
         // supplier jar — omit it rather than post a stale copy the backend would refuse.
-        const supplier = rescue ? undefined : (await context.cookies(FLEETHUB_URL)).map((c) => ({ name: c.name, value: c.value }));
+        const supplier = rescue || supplierSkipped ? undefined : (await context.cookies(FLEETHUB_URL)).map((c) => ({ name: c.name, value: c.value }));
         if (ramen.length === 0) return { ok: false, error: "empty_jar" };
 
         const orgUuid = await captureOrg(page);
@@ -120,7 +152,7 @@ export function createWarmDriver() {
           orgVerified: !!orgUuid && !!entry.orgUuid && orgUuid.toLowerCase() === String(entry.orgUuid).toLowerCase(),
           tokenExpiries: {
             ramen: jwtExpiryMs(cookieValue(ramen, "jwt-session")),
-            supplier: jwtExpiryMs(cookieValue(supplier, "sp-jwt-session")),
+            supplier: jwtExpiryMs(cookieValue(supplier ?? [], "sp-jwt-session")),
           },
         };
       } catch (e) {
@@ -142,4 +174,4 @@ export function createWarmDriver() {
   };
 }
 
-export { statePath, jwtExpiryMs };
+export { statePath, jwtExpiryMs, visitFleetHub };
