@@ -230,3 +230,15 @@ test("adoptAndCapture replaces a dead (needs_otp) entry and closes its old brows
   assert.equal(m.stateOf("7"), SESSION_STATE.ACTIVE);
   assert.deepEqual(closed, [dead]);
 });
+
+test("an email-less passkey relogin is admitted on a rideable state", () => {
+  const r = admitStart({ email: "", passkey: true, company_key: "7" }, on("needs_otp"));
+  assert.equal(r.ok, true);
+});
+
+test("an email-less start without the passkey flag still needs the email", () => {
+  const r = admitStart({ email: "", company_key: "7" }, on("needs_otp"));
+  assert.equal(r.ok, false);
+  assert.equal(r.http, 422);
+  assert.equal(r.body.error, "email required");
+});

@@ -19,7 +19,9 @@ export function admitStart(body, { passwordless, stateOf, coldEnabled = false })
   // A fullLogin start (docs/28 §11) has the manager type the email themselves inside the stream,
   // so the backend sends none; every other start still requires it. Eligibility is re-checked in
   // runStartNow (canFullLogin), which 409s a full start that is not a cold co-browse one.
-  if (!body.email && body.full !== true) return reject(422, { error: "email required" });
+  // A usernameless passkey re-login also sends no email: the resident credential identifies the
+  // account. The passkey/held-handle gates run downstream, unchanged.
+  if (!body.email && body.full !== true && body.passkey !== true) return reject(422, { error: "email required" });
   if (!password) {
     // Passwordless is opt-in and only ever for a known company (it feeds the persistent manager).
     if (!passwordless) return reject(422, { error: "email and password required" });
