@@ -104,3 +104,22 @@ test("a new jar_version restarts the streams even when the cookies match the pri
     assert.equal(streams.get(key).jarVersion, 2);
   }
 });
+
+test("a version change hands the replaced stream's good jar to its successor as fallbackJar", async () => {
+  const withVersion = (v, value) => ({ ...good(90), cookies: [{ name: "sid", value }], jar_version: v });
+  api.sessions = async () => ({ sessions: [withVersion(1, "a")], globalProxyUrl: "" });
+  await reconcileTick();
+  const key = [...streams.keys()].find((k) => k.startsWith("90:"));
+  streams.get(key).hasDelivered = true; // proven good
+
+  api.sessions = async () => ({ sessions: [withVersion(2, "b")], globalProxyUrl: "" });
+  await reconcileTick();
+  assert.equal(streams.get(key).fallbackJar?.cookies[0].value, "a");
+
+  // A replaced stream that died (stopped) yields no fallback.
+  streams.get(key).hasDelivered = true;
+  streams.get(key).stop();
+  api.sessions = async () => ({ sessions: [withVersion(3, "c")], globalProxyUrl: "" });
+  await reconcileTick();
+  assert.equal(streams.get(key).fallbackJar, null);
+});

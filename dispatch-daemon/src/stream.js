@@ -250,7 +250,8 @@ export class RamenStream {
     // on it (see handleStreamAuthFailure). Ignored when it is identical to the new jar.
     this.fallbackJar = fallbackJar && this.differsFromOwnJar(fallbackJar) ? fallbackJar : null;
     this.graceSpent = false; // the grace fires at most once per stream object
-    this.onFallbackJar = false; // running on the older jar: never write it over the backend's newer one
+    this.onFallbackJar = false; // running on the older jar; persisted only once it has delivered (backend version-guards a newer capture)
+    this.skipBackoffOnce = false; // the single grace reopen is immediate (5s accept window)
     this.hasDelivered = false; // set by the first frame; only then is this jar "known good"
     this.seq = 0;
     this.stopped = false;
@@ -691,7 +692,9 @@ export class RamenStream {
         this.persistDirty = false;
         // A torn-down stream (or one a reconnect superseded) must not overwrite a
         // newer re-link with its old jar.
-        if (this.stopped || this.jarStale || this.onFallbackJar) return;
+        if (this.stopped || this.jarStale) return;
+        // Before the older jar's first frame we are not yet sure it is good: don't write it.
+        if (this.onFallbackJar && !this.hasDelivered) return;
         const { cookies, supplierCookies, fp } = this.liveJarFingerprint();
         if (fp === this.cookieFp || cookies.length === 0) continue;
         try {
@@ -739,7 +742,7 @@ export class RamenStream {
 
   /** The live jars if this stream has proven them good (delivered a frame), else null. */
   goodJarSnapshot() {
-    if (!this.hasDelivered) return null;
+    if (!this.hasDelivered || this.stopped) return null; // a self-stopped (auth-dead) stream's jar is not good
     const { cookies, supplierCookies } = this.liveJarFingerprint();
     return { cookies, supplierCookies };
   }
@@ -752,6 +755,7 @@ export class RamenStream {
     this.supplierJar = new Map(this.fallbackJar.supplierCookies.map((c) => [c.name, c.value]));
     this.fallbackJar = null;
     this.onFallbackJar = true;
+    this.skipBackoffOnce = true;
     return true;
   }
 
@@ -977,6 +981,10 @@ export class RamenStream {
    * successful open, so a storm of open-then-drop cycles never grew past 2s.
    */
   async afterCycle() {
+    if (this.skipBackoffOnce) {
+      this.skipBackoffOnce = false;
+      return;
+    }
     const storming = this.streamOpened ? this.dropStorm() : false;
     if (this.streamOpened && !storming) {
       this.reconnectDelay = config.reconnectMinDelay;
@@ -1123,8 +1131,12 @@ export class RamenStream {
         if (done) break;
         lastFrameAt = Date.now();
         // The jar in use just proved itself: the grace episode is over.
+        const firstFrameOnFallback = this.onFallbackJar && !this.hasDelivered;
         this.hasDelivered = true;
         this.fallbackJar = null;
+        // Heal the backend: it still holds the jar that was refused. The version guard
+        // (409 stale_jar -> markJarStale) protects a newer human capture.
+        if (firstFrameOnFallback && this.primary) this.persistJar().catch(() => {});
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
