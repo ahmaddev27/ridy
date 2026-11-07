@@ -57,6 +57,12 @@ class SessionBrowserController extends Controller
         return response()->json(['data' => ['updated' => $updated]]);
     }
 
+    /** Whether uber-auth may run the device-hygiene pass for this company (fails closed on its side). */
+    public function deviceHygiene(Tenant $tenant): JsonResponse
+    {
+        return response()->json(['data' => ['enabled' => $tenant->sessionHygieneEnabled()]]);
+    }
+
     /** A cookie jar the browser service captured; stored through the shared service. */
     public function capture(Request $request, Tenant $tenant, FleetSessionService $service): JsonResponse
     {

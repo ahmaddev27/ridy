@@ -106,6 +106,22 @@ class Tenant extends Model
         $this->forceFill(['settings' => $settings])->save();
     }
 
+    /**
+     * Per-company opt-in for uber-auth's device-hygiene pass (signing stale sessions out of
+     * account.uber.com/devices). Absent = OFF; uber-auth fails closed when this is false.
+     */
+    public function sessionHygieneEnabled(): bool
+    {
+        return ($this->settings['session_hygiene']['enabled'] ?? false) === true;
+    }
+
+    public function setSessionHygiene(bool $enabled): void
+    {
+        $settings = $this->settings ?? [];
+        $settings['session_hygiene'] = array_merge($settings['session_hygiene'] ?? [], ['enabled' => $enabled]);
+        $this->forceFill(['settings' => $settings])->save();
+    }
+
     /** Per-company passkey eligibility (docs/31). Opt-OUT: unset = on, only an explicit false disables. The real register is still gated by PasskeySettings' global/allowlist flags. */
     public function passkeyEnabled(): bool
     {

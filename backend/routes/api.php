@@ -346,6 +346,7 @@ Route::prefix('v1')->group(function () {
         Route::get('rescue', [SessionBrowserController::class, 'rescue']);
         Route::post('status', [SessionBrowserController::class, 'status']);
         Route::post('{tenant}/capture', [SessionBrowserController::class, 'capture']);
+        Route::get('{tenant}/device-hygiene', [SessionBrowserController::class, 'deviceHygiene']);
         // Software passkey registration (docs/31). Deliberately no GET of the credential itself.
         Route::get('{tenant}/passkey', [PasskeyController::class, 'show']);
         Route::post('{tenant}/passkey', [PasskeyController::class, 'store']);
