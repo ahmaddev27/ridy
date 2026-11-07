@@ -50,6 +50,9 @@ export function RulesModal({ driver, cities, saving, onClose, onSave }: {
   const r = driver.rules;
   const [fareOn, setFareOn] = useState(r.min_fare.enabled);
   const [fare, setFare] = useState(String(r.min_fare.value_e2 / 100));
+  const [perKmOn, setPerKmOn] = useState(r.min_price_per_km.enabled);
+  const [perKm, setPerKm] = useState(String(r.min_price_per_km.value_e2 / 100));
+  const [mode, setMode] = useState<"and" | "or">(r.min_price_per_km.mode);
   const [citiesOn, setCitiesOn] = useState(r.reject_cities.enabled);
   const [picked, setPicked] = useState<string[]>(r.reject_cities.cities);
   const [invalid, setInvalid] = useState(false);
@@ -64,11 +67,17 @@ export function RulesModal({ driver, cities, saving, onClose, onSave }: {
       setInvalid(true);
       return;
     }
+    const k = parseNumber(perKm);
+    if (perKmOn && !validCents(k)) {
+      setInvalid(true);
+      return;
+    }
     setInvalid(false);
-    // Criteria hidden from the UI (distance/€-per-km) are sent back exactly as stored.
+    // Criteria hidden from the UI (distance) are sent back exactly as stored.
     onSave({
       ...r,
       min_fare: { enabled: fareOn, value_e2: Math.round((f ?? r.min_fare.value_e2 / 100) * 100) },
+      min_price_per_km: { enabled: perKmOn, value_e2: Math.round((k ?? r.min_price_per_km.value_e2 / 100) * 100), mode },
       reject_cities: { enabled: citiesOn, cities: picked },
     });
   }
@@ -92,6 +101,22 @@ export function RulesModal({ driver, cities, saving, onClose, onSave }: {
       <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
         <RuleRow label={c("minFareLabel")} on={fareOn} onToggle={() => setFareOn((v) => !v)}>
           <input dir="ltr" inputMode="decimal" className={inputClass} value={fare} onChange={(e) => setFare(e.target.value)} disabled={!fareOn} />
+        </RuleRow>
+        <RuleRow label={c("perKmLabel")} on={perKmOn} onToggle={() => setPerKmOn((v) => !v)}>
+          <input dir="ltr" inputMode="decimal" className={inputClass} value={perKm} onChange={(e) => setPerKm(e.target.value)} disabled={!perKmOn} />
+          <div className="flex items-center gap-2 text-xs text-ink-muted">
+            <span>{c("modeLabel")}</span>
+            <select
+              className={inputClass}
+              value={mode}
+              disabled={!perKmOn}
+              onChange={(e) => setMode(e.target.value === "or" ? "or" : "and")}
+            >
+              <option value="and">{c("modeAnd")}</option>
+              <option value="or">{c("modeOr")}</option>
+            </select>
+          </div>
+          <p className="text-xs text-ink-subtle">{c(mode === "or" ? "modeOrHint" : "modeAndHint")}</p>
         </RuleRow>
         <RuleRow label={c("citiesLabel")} on={citiesOn} onToggle={() => setCitiesOn((v) => !v)} className="md:col-span-2">
           {options.length === 0 ? (

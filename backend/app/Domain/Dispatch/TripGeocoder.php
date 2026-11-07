@@ -109,6 +109,51 @@ class TripGeocoder
         }
     }
 
+    /**
+     * Endpoints resolved by the most recent {@see enrich()} call (null when it did not
+     * geocode, e.g. already synced). Lets {@see DeclineGradeGeo} inspect confidence/labels.
+     *
+     * @var array{pickup: ?array<string, mixed>, dropoff: ?array<string, mixed>}|null
+     */
+    private ?array $lastEndpoints = null;
+
+    /** @return array{pickup: ?array<string, mixed>, dropoff: ?array<string, mixed>}|null */
+    public function lastEndpoints(): ?array
+    {
+        return $this->lastEndpoints;
+    }
+
+    /**
+     * A tightly bounded sibling of {@see enrichForNotify()} for the €/km Early-decline
+     * rule: geocodes inline so the decision can use a road distance. A haversine
+     * ('estimated') result — OSRM unreachable or out of budget — is NEVER kept: it is
+     * wiped so the async GeocodeOffer still computes the real road route later.
+     */
+    public function enrichForDecline(DispatchOffer $offer, float $deadline): void
+    {
+        $this->httpTimeout = 2;
+        $this->deadline = $deadline;
+        try {
+            $this->enrich($offer);
+        } finally {
+            $this->httpTimeout = 6;
+            $this->deadline = null;
+        }
+
+        if ($offer->geo_confidence === 'estimated') {
+            $this->discardEstimate($offer);
+        }
+    }
+
+    private function discardEstimate(DispatchOffer $offer): void
+    {
+        $blank = ['distance_m' => null, 'route_geometry' => null, 'geo_confidence' => null, 'geo_synced_at' => null];
+        if ($offer->exists) {
+            DispatchOffer::withoutGlobalScopes()->whereKey($offer->getKey())->update($blank);
+        }
+        $offer->forceFill($blank)->syncOriginal();
+    }
+
     /** True once a bounded run has spent its time budget — stop making network calls. */
     private function pastDeadline(): bool
     {
@@ -130,6 +175,7 @@ class TripGeocoder
 
     public function enrich(DispatchOffer $offer): DispatchOffer
     {
+        $this->lastEndpoints = null;
         if ($offer->geo_synced_at !== null) {
             return $offer; // already done
         }
@@ -189,6 +235,7 @@ class TripGeocoder
             $dropoff = $this->geocode($dropoffQuery, $pickup['lat'] ?? $dLat, $pickup['lng'] ?? $dLng);
         }
 
+        $this->lastEndpoints = ['pickup' => $pickup, 'dropoff' => $dropoff];
         $offer->pickup_lat = $pickup['lat'] ?? null;
         $offer->pickup_lng = $pickup['lng'] ?? null;
         $offer->dropoff_lat = $dropoff['lat'] ?? null;
