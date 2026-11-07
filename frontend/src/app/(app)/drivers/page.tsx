@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useI18n } from "@/lib/i18n/context";
 import { formatNumber } from "@/lib/utils";
 import { useAsync } from "@/hooks/use-async";
-import { listDrivers, syncDrivers, inviteDriver, testDriverPush, updateDriverEmail, setDriverManager, type Driver } from "@/lib/api/drivers";
+import { listDrivers, syncDrivers, inviteDriver, testDriverPush, updateDriverEmail, setDriverManager, setDriverOwnerLink, type Driver } from "@/lib/api/drivers";
 import { Switch } from "@/components/ui/switch";
 import { apiErrorMessage } from "@/lib/api/error-message";
 import { syncRosterViaExtension, fetchDriverStatusesViaExtension } from "@/lib/extension";
@@ -37,6 +37,20 @@ export default function DriversPage() {
   const didAutoSync = useRef(false);
   // Owner only (users.manage): a fleet manager must not promote drivers.
   const canPromote = user?.permissions?.includes("users.manage") ?? false;
+
+  async function toggleOwnerLink(d: Driver) {
+    const linking = !(d.owner_linked || d.is_me);
+    setManagerBusyId(d.id);
+    try {
+      await setDriverOwnerLink(d.id, linking);
+      toast.success(t(linking ? "screens.drivers.linkSaved" : "screens.drivers.linkRemoved"));
+      await refetch();
+    } catch (e) {
+      toast.error(apiErrorMessage(e, t));
+    } finally {
+      setManagerBusyId(null);
+    }
+  }
 
   async function toggleManager(d: Driver) {
     setManagerBusyId(d.id);
@@ -280,13 +294,29 @@ export default function DriversPage() {
                       </td>
                       {canPromote && (
                         <td onClick={(e) => e.stopPropagation()}>
-                          <Switch
-                            checked={d.is_manager === true}
-                            onChange={() => void toggleManager(d)}
-                            // The server refuses your own record too; this just avoids a dead control.
-                            disabled={managerBusyId === d.id || (!!d.email && d.email.toLowerCase() === user?.email?.toLowerCase())}
-                            label={d_("managerHint")}
-                          />
+                          {(() => {
+                            const linked = d.owner_linked === true || d.is_me === true;
+                            return (
+                              <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                                <Switch
+                                  checked={d.is_manager === true}
+                                  onChange={() => void toggleManager(d)}
+                                  // The server refuses your own record too; this just avoids a dead control.
+                                  disabled={linked || managerBusyId === d.id || (!!d.email && d.email.toLowerCase() === user?.email?.toLowerCase())}
+                                  label={linked ? d_("linkHint") : d_("managerHint")}
+                                />
+                                {linked && <span className="badge outline square" title={d_("linkHint")}>{d_("linkedOwner")}</span>}
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary"
+                                  disabled={managerBusyId === d.id}
+                                  onClick={() => void toggleOwnerLink(d)}
+                                >
+                                  {linked ? d_("unlink") : d_("thisIsMe")}
+                                </button>
+                              </div>
+                            );
+                          })()}
                         </td>
                       )}
                       <td className="r" onClick={(e) => e.stopPropagation()}>
