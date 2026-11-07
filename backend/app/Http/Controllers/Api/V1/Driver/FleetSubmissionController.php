@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\V1\Driver;
 
 use App\Domain\Fleet\Models\ElProfessorSubmission;
 use App\Domain\Fleet\SubmissionDetailPresenter;
+use App\Http\Controllers\Api\V1\Driver\Concerns\ResolvesFleetTenant;
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,6 +30,8 @@ use Illuminate\Http\Request;
  */
 class FleetSubmissionController extends Controller
 {
+    use ResolvesFleetTenant;
+
     private const PER_PAGE = 50;
 
     public function index(Request $request, SubmissionDetailPresenter $presenter): JsonResponse
@@ -66,11 +68,8 @@ class FleetSubmissionController extends Controller
     /** @return Builder<ElProfessorSubmission> */
     private function tenantSubmissions(Request $request): Builder
     {
-        $user = $request->user();
-        abort_unless($user instanceof User && $user->tenant_id !== null, 403, 'fleet_owner_only');
-
         return ElProfessorSubmission::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $user->tenant_id);
+            ->where('tenant_id', $this->fleetTenantId($request));
     }
 }
