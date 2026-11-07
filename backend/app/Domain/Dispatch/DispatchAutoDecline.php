@@ -5,6 +5,7 @@ namespace App\Domain\Dispatch;
 use App\Domain\Dispatch\Models\DispatchOffer;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Tenancy\Models\Tenant;
+use Throwable;
 
 /**
  * Evaluates a driver's auto-decline ("Early decline") rules against an incoming
@@ -13,9 +14,10 @@ use App\Domain\Tenancy\Models\Tenant;
  * Deliberately evaluates only data that is ALREADY to hand (no live geocode, no
  * network call): the engine runs on the ingest hot path inside a ~3–4 s budget,
  * so a rule whose inputs are not instantly available is skipped for this offer
- * rather than delaying the decline. Phase 1 ships the fare rule plus the €/km
- * floor (combinable by AND/OR); the city and distance rules (cache geocode + the
- * driver's Fleet-Hub position) land later.
+ * rather than delaying the decline. Live: the fare rule, the €/km floor (combinable
+ * by AND/OR) and `reject_cities` (decided from the address's authoritative PLZ via
+ * {@see CityMatcher} — table lookups only, never a geocode). The distance rules
+ * (cache geocode + the driver's Fleet-Hub position) land later.
  *
  * This NEVER decides to accept and never acts on its own judgement — it only reads
  * the driver's own standing rules. See AGENTS.md golden rule #1.
@@ -36,7 +38,48 @@ class DispatchAutoDecline
 
         $rules = $driver->autoDeclineRules();
 
-        return $this->priceReason($offer, $rules['min_fare'] ?? null, $rules['min_price_per_km'] ?? null);
+        $priceReason = $this->priceReason($offer, $rules['min_fare'] ?? null, $rules['min_price_per_km'] ?? null);
+        if ($priceReason !== null) {
+            return $priceReason;
+        }
+
+        return $this->pickupOrDropoffInRejectedCity($offer, $rules['reject_cities'] ?? null) ? 'reject_cities' : null;
+    }
+
+    /**
+     * Reject when either end of the ride is in a city the driver blocked. Only an end
+     * whose city is TRUSTED (see {@see CityMatcher::trustedCity()}) can block; the
+     * match is exact on the normalised name, never a substring. Any fault or doubt
+     * means "no" — an engine error must never change routing.
+     *
+     * @param  array<string, mixed>|null  $rule
+     */
+    private function pickupOrDropoffInRejectedCity(DispatchOffer $offer, ?array $rule): bool
+    {
+        if (($rule['enabled'] ?? false) !== true || ! is_array($rule['cities'] ?? null)) {
+            return false;
+        }
+
+        try {
+            $blocked = [];
+            foreach ($rule['cities'] as $city) {
+                $key = is_string($city) ? CityMatcher::key($city) : '';
+                if ($key !== '') {
+                    $blocked[$key] = true;
+                }
+            }
+
+            foreach ([$offer->pickup_address, $offer->dropoff_address] as $address) {
+                $city = $blocked === [] ? null : CityMatcher::trustedCity($address);
+                if ($city !== null && isset($blocked[CityMatcher::key($city)])) {
+                    return true;
+                }
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return false;
     }
 
     /**

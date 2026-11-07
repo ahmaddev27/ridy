@@ -90,7 +90,14 @@ In `DispatchOfferIngestor`, after the driver is matched and BEFORE `notifyDriver
 2. Evaluate rules on **instantly-available** data only (the ≤3–4 s budget forbids a
    cold network call):
    - `min_fare` — `fare_amount` from the payload. Always instant.
-   - `reject_cities` / `max_trip_distance` — pickup/dropoff **geocoded from CACHE
+   - `reject_cities` — **LIVE (2026-11-07)**, PLZ-only, no geocode, no network. The city of
+     each end is the authoritative `PostalCodes::city(PLZ)` (`CityMatcher::trustedCity`), TRUSTED only
+     when the address has exactly one distinct 5-digit PLZ, the PLZ is in the table, and any
+     free-text town does not contradict it (veto only, never a source). Match = exact token equality
+     after case/umlaut folding (`Mannheim` != `Mannheim-Neckarau`). Declines when EITHER end's
+     trusted city is blocked; an untrusted end never blocks; any fault = keep. Precedence: after the
+     price rules. Caveat: an address with no PLZ is never filtered.
+   - `max_trip_distance` — pickup/dropoff **geocoded from CACHE
      only** (the fleet's recurring streets are warm). A cache miss = rule skipped for
      this offer (do NOT geocode live — never delay the decline).
    - `max_pickup_distance` — haversine(`drivers.latitude/longitude` [Uber Fleet-Hub
