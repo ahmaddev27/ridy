@@ -899,6 +899,14 @@ export class ApiClient {
     });
   }
 
+  /** In-app star rating (our own capture; feedback never reaches a store). */
+  submitAppRating(body: { stars: number; feedback?: string; platform: "android" | "ios"; app_version?: string }) {
+    return this.request<{ data: { saved: boolean } }>("/api/v1/driver/app-rating", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
   registerDevice(token: string, platform: "android" | "ios", device?: DeviceInfo) {
     return this.request<{ data: { id: number } }>("/api/v1/driver/devices", {
       method: "POST",

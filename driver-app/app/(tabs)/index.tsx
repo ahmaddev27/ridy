@@ -15,6 +15,7 @@ import { useLiveReload } from "@/lib/use-live-reload";
 import { Logo, SectionLabel, StatusBadge } from "@/components/ui";
 import { OfferCard } from "@/components/offer-card";
 import { OnlineDriversCard } from "@/components/online-drivers";
+import { RatingPrompt } from "@/components/rating-prompt";
 import { LoadErrorBanner, PushHealthBanner } from "@/components/status-banner";
 
 /** The newest pending offer: the backend's `pending_offer` when it sends one
@@ -215,6 +216,9 @@ export default function HomeScreen() {
             </View>
           </View>
         )}
+
+        {/* Own star rating — driver mode only, after a finished ride (see rating-prompt.tsx) */}
+        {!isOwner && <RatingPrompt positive={recent.some((o) => o.status === "completed")} />}
 
         {/* TODAY — 2×2 grid (design: income / avg €/km / offers / accepted) */}
         <View style={{ gap: 10 }}>

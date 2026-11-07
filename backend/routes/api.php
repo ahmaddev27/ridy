@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\V1\DispatchIngestController;
 use App\Http\Controllers\Api\V1\DispatchLinkController;
 use App\Http\Controllers\Api\V1\DispatchOfferController;
 use App\Http\Controllers\Api\V1\Driver\AccountDeletionController;
+use App\Http\Controllers\Api\V1\Driver\DriverAppRatingController;
 use App\Http\Controllers\Api\V1\Driver\DriverAuthController;
 use App\Http\Controllers\Api\V1\Driver\DriverAutoDeclineController;
 use App\Http\Controllers\Api\V1\Driver\DriverDashboardController;
@@ -188,6 +189,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('webauthn/credentials', [DriverWebauthnCredentialController::class, 'index']);
                 Route::delete('webauthn/credentials/{credential}', [DriverWebauthnCredentialController::class, 'destroy']);
                 Route::post('devices', [DriverDeviceController::class, 'store']);
+                Route::post('app-rating', [DriverAppRatingController::class, 'store'])->middleware('throttle:10,1,driver-app-rating');
                 Route::delete('devices', [DriverDeviceController::class, 'destroy']);
                 Route::get('home', [DriverDashboardController::class, 'home']);
                 Route::get('stats', [DriverDashboardController::class, 'stats']);
