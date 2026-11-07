@@ -20,6 +20,10 @@ export type Driver = {
   email: string | null;
   /** Driver-app manager mode (set by the company owner only). */
   is_manager?: boolean;
+  /** This driver record is linked to the company owner's user. */
+  owner_linked?: boolean;
+  /** The linked record is the current viewer's own. */
+  is_me?: boolean;
   /** Mobile-app onboarding state. */
   app_status: "none" | "invited" | "invite_expired" | "active";
   /** Human label of the driver's most-recent app device, e.g. "Pixel 7 · Android 14". */
@@ -125,6 +129,16 @@ export async function setDriverManager(id: number, isManager: boolean): Promise<
     method: "PATCH",
     withCsrf: true,
     body: { is_manager: isManager },
+  });
+  return res.data;
+}
+
+/** Owner-only: link/unlink this driver record to the owner's own user ("This is me"). */
+export async function setDriverOwnerLink(id: number, linked: boolean): Promise<Driver> {
+  const res = await apiFetch<{ data: Driver }>(`/api/v1/drivers/${id}/owner-link`, {
+    method: "PATCH",
+    withCsrf: true,
+    body: { linked },
   });
   return res.data;
 }
