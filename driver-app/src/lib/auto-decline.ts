@@ -49,11 +49,11 @@ function subscribe(fn: () => void): () => void {
  * sessions are always false: the endpoints are driver-scoped (see the owner gap in
  * the PR), so there is nothing for an owner to open yet.
  */
-export function useAutoDeclineFeature(driverId: number | null, isOwner: boolean): boolean {
+export function useAutoDeclineFeature(driverId: number | null, fleetView: boolean): boolean {
   const on = useSyncExternalStore(subscribe, () => featureEnabled);
 
   useEffect(() => {
-    if (driverId === null || isOwner) {
+    if (driverId === null || fleetView) {
       loadedFor = null;
       publish(false);
       return;
@@ -67,9 +67,9 @@ export function useAutoDeclineFeature(driverId: number | null, isOwner: boolean)
         // Unknown (loading/failed) is "off": a tab that leads nowhere is worse than a late one.
         loadedFor = null;
       });
-  }, [driverId, isOwner]);
+  }, [driverId, fleetView]);
 
-  return driverId !== null && !isOwner && on;
+  return driverId !== null && !fleetView && on;
 }
 
 /** "9,50" / "9.5" / Arabic-keyboard digits to integer cents; null when not a number. */

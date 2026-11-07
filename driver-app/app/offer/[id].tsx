@@ -46,7 +46,7 @@ export default function OfferScreen() {
   const id = typeof rawId === "string" && /^\d+$/.test(rawId) ? rawId : null;
   const router = useRouter();
   const c = useColors();
-  const { isOwner } = useAuth();
+  const { fleetView } = useAuth();
   useLocale(); // re-render on a language switch
   const [offer, setOffer] = useState<Offer | null>(null);
   const [failure, setFailure] = useState<LoadFailure>(id ? null : "not_found");
@@ -61,7 +61,7 @@ export default function OfferScreen() {
     async () => {
       if (!id) return;
       try {
-        const r = await (isOwner ? api.fleetOffer(id) : api.offer(id));
+        const r = await (fleetView ? api.fleetOffer(id) : api.offer(id));
         setOffer(r.data);
         setFailure(null);
       } catch (e) {
@@ -222,12 +222,12 @@ export default function OfferScreen() {
           <SecondaryButton label={t("offer.openMaps")} icon={Map} onPress={openMaps} />
 
           {/* People — rider (when captured) and, in fleet-owner mode, the driver. */}
-          {(offer.rider_name || (isOwner && offer.driver_name)) && (
+          {(offer.rider_name || (fleetView && offer.driver_name)) && (
             <View style={{ flexDirection: row, alignItems: "center", justifyContent: "center", gap: 18, flexWrap: "wrap" }}>
               {offer.rider_name && (
                 <PersonTag icon={User} name={offer.rider_name} role={t("offer.rider")} row={row} c={c} />
               )}
-              {isOwner && offer.driver_name && (
+              {fleetView && offer.driver_name && (
                 <PersonTag icon={UserCircle} name={offer.driver_name} role={t("fleet.driver")} row={row} c={c} />
               )}
             </View>

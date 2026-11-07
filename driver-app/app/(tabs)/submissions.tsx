@@ -110,10 +110,14 @@ export default function SubmissionsScreen() {
   // The company's connection, not the driver's. Hiding the Profil row is the
   // message; this is what a deep link, a stale screen or a company that revoked
   // its token after the app loaded runs into. The endpoint refuses them too.
-  const { driver } = useAuth();
+  const { driver, fleetView } = useAuth();
   // Sending needs the connection; viewing is the account's own history and
   // outlives it. An owner only views, and sees the whole company's.
-  const { canSend: connected, canView, fleetWide } = submissionAccess(driver);
+  const access = submissionAccess(driver);
+  const { canSend: connected } = access;
+  // Admin view of a linked owner-driver reads the company's list like an owner.
+  const fleetWide = access.fleetWide || fleetView;
+  const canView = access.canView || fleetView;
 
   const [rows, setRows] = useState<DriverSubmission[] | null>(null);
   const [failed, setFailed] = useState(false);

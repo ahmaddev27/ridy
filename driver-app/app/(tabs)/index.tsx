@@ -15,6 +15,7 @@ import { useLiveReload } from "@/lib/use-live-reload";
 import { Logo, SectionLabel, StatusBadge } from "@/components/ui";
 import { OfferCard } from "@/components/offer-card";
 import { OnlineDriversCard } from "@/components/online-drivers";
+import { ViewModeToggle } from "@/components/view-mode-toggle";
 import { RatingPrompt } from "@/components/rating-prompt";
 import { LoadErrorBanner, PushHealthBanner } from "@/components/status-banner";
 
@@ -41,7 +42,7 @@ function sameJson<T>(a: T | null, b: T): boolean {
 export default function HomeScreen() {
   const c = useColors();
   const router = useRouter();
-  const { driver, isOwner } = useAuth();
+  const { driver, fleetView } = useAuth();
   useLocale(); // re-render on a language switch
   const [data, setData] = useState<HomeData | null>(null);
   const [fleet, setFleet] = useState<FleetHomeData | null>(null);
@@ -52,7 +53,7 @@ export default function HomeScreen() {
 
   async function load() {
     try {
-      if (isOwner) {
+      if (fleetView) {
         const next = (await api.fleetHome()).data;
         setFleet((prev) => (sameJson(prev, next) ? prev : next));
       } else {
@@ -72,7 +73,7 @@ export default function HomeScreen() {
   // Live home: load on focus; poll every 4s while the socket is down and every
   // 30s while it's up (then it's only a safety net); reload on every socket
   // event / push / resume. Owners have no socket, so they poll every 8s.
-  const run = useLiveReload(load, { fastMs: isOwner ? 8_000 : 4_000, slowMs: 30_000 });
+  const run = useLiveReload(load, { fastMs: fleetView ? 8_000 : 4_000, slowMs: 30_000 });
 
   async function pullToRefresh() {
     setRefreshing(true);
@@ -88,7 +89,7 @@ export default function HomeScreen() {
   // Identical polls don't re-render (sameJson), so re-render once when the shown
   // pending offer's accept window closes — the "New offer" card then disappears.
   const [, setExpiryTick] = useState(0);
-  const latest = !isOwner && data ? latestPendingOf(data) : null;
+  const latest = !fleetView && data ? latestPendingOf(data) : null;
   const latestExpiry = latest ? freshUntil(latest) : NaN;
   useEffect(() => {
     const ms = latestExpiry - Date.now();
@@ -98,16 +99,16 @@ export default function HomeScreen() {
   }, [latestExpiry]);
 
   const greeting = new Date().getHours() >= 17 ? t("home.greetingEvening") : t("home.greetingDay");
-  const today = isOwner ? fleet?.today : data?.today;
+  const today = fleetView ? fleet?.today : data?.today;
   const active = data?.active_offer ?? null;
-  const pending = !isOwner && data ? freshPendingOf(data, Date.now()) : null;
-  const noData = isOwner ? !fleet : !data;
-  const headline = isOwner ? (fleet?.owner.company_name ?? driver?.company_name ?? "…") : (data?.driver.name ?? "…");
-  const sub = isOwner ? t("home.fleetTitle") : (driver?.company_name ?? "");
-  const recent = isOwner ? fleet?.recent ?? [] : data?.recent ?? [];
+  const pending = !fleetView && data ? freshPendingOf(data, Date.now()) : null;
+  const noData = fleetView ? !fleet : !data;
+  const headline = fleetView ? (fleet?.owner.company_name ?? driver?.company_name ?? "…") : (data?.driver.name ?? "…");
+  const sub = fleetView ? t("home.fleetTitle") : (driver?.company_name ?? "");
+  const recent = fleetView ? fleet?.recent ?? [] : data?.recent ?? [];
   const activeOffers = fleet?.active_offers ?? [];
 
-  const online = isOwner ? (fleet?.online_drivers ?? 0) > 0 : !!data?.driver.online;
+  const online = fleetView ? (fleet?.online_drivers ?? 0) > 0 : !!data?.driver.online;
   const engagement = data?.driver.engagement ?? 0;
   const avgKm = today && today.km > 0 ? today.earnings / today.km : 0;
 
@@ -131,6 +132,7 @@ export default function HomeScreen() {
               </Text>
               {!!sub && <Text numberOfLines={1} style={{ color: c.inkSubtle, fontSize: 12.5, textAlign: align }}>{sub}</Text>}
             </View>
+            <ViewModeToggle compact />
           </View>
 
           <View style={{ height: 1, backgroundColor: c.line }} />
@@ -140,7 +142,7 @@ export default function HomeScreen() {
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: online ? c.accent : c.inkFaint }} />
               <View>
                 <Text style={{ color: c.ink, fontSize: 14.5, fontWeight: "600", textAlign: align }}>
-                  {isOwner
+                  {fleetView
                     ? `${fleet?.online_drivers ?? 0} ${t("fleet.onlineDrivers")}`
                     : online
                       ? t(`home.engagement.${engagement}`)
@@ -164,7 +166,7 @@ export default function HomeScreen() {
 
         {/* Live / active offer — the driver's current offer as the full €/km card,
             with a quick "open in map" shortcut for its pickup → drop-off route. */}
-        {!isOwner && active && (
+        {!fleetView && active && (
           <View style={{ gap: 10 }}>
             <SectionLabel>{t("home.activeOffer")}</SectionLabel>
             <OfferCard offer={active} onOpen={openOffer} />
@@ -199,14 +201,14 @@ export default function HomeScreen() {
         )}
 
         {/* Owner: WHO is online (older backends send only the count — then this hides). */}
-        {isOwner && fleet?.online_drivers_list && fleet.online_drivers_list.length > 0 && (
+        {fleetView && fleet?.online_drivers_list && fleet.online_drivers_list.length > 0 && (
           <View style={{ gap: 10 }}>
             <SectionLabel>{t("fleet.whoOnline")}</SectionLabel>
             <OnlineDriversCard drivers={fleet.online_drivers_list} total={fleet.online_drivers} />
           </View>
         )}
 
-        {isOwner && activeOffers.length > 0 && (
+        {fleetView && activeOffers.length > 0 && (
           <View style={{ gap: 10 }}>
             <SectionLabel>{t("fleet.activeNow")}</SectionLabel>
             <View style={cardStyle(c)}>
@@ -218,7 +220,7 @@ export default function HomeScreen() {
         )}
 
         {/* Own star rating — driver mode only, after a finished ride (see rating-prompt.tsx) */}
-        {!isOwner && <RatingPrompt positive={recent.some((o) => o.status === "completed")} />}
+        {!fleetView && <RatingPrompt positive={recent.some((o) => o.status === "completed")} />}
 
         {/* TODAY — 2×2 grid (design: income / avg €/km / offers / accepted) */}
         <View style={{ gap: 10 }}>
@@ -256,7 +258,7 @@ export default function HomeScreen() {
             </View>
             <View style={cardStyle(c)}>
               {recent.slice(0, 4).map((o, i, arr) => (
-                <RecentRow key={o.id} offer={o} showDriver={isOwner} onPress={() => router.push(`/offer/${o.id}`)} last={i === arr.length - 1} c={c} />
+                <RecentRow key={o.id} offer={o} showDriver={fleetView} onPress={() => router.push(`/offer/${o.id}`)} last={i === arr.length - 1} c={c} />
               ))}
             </View>
           </View>

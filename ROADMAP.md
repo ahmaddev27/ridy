@@ -21,7 +21,7 @@
 
 ## 📅 شغل (2026-11-07) — المالك اللي بيسوق كمان (الدفعة A من 4، باكند فقط، خامل)
 
-ربط يوزر المالك بسجل سائق (`drivers.user_id`) + `PATCH drivers/{driver}/owner-link` (للمالك فقط) + دخول التطبيق كسائق مع صلاحية أدمن (`admin_capable`) + ميدلوير `driver.admin` (يرجّع 403 `admin_revoked` مش 401). ما في UI بعد ولا مسارات محمية فيه: **B** = قراءات الأسطول + تسجيل الـBeleg لـ`driver.admin` عبر `driver/admin/*` (✅ منجز، `feat/owner-driver-phase-b`)، **C** = سويتش بالتطبيق، **D** = رابط من الموقع. بعد النشر تحقق `Schema::hasColumn('drivers','user_id')`.
+ربط يوزر المالك بسجل سائق (`drivers.user_id`) + `PATCH drivers/{driver}/owner-link` (للمالك فقط) + دخول التطبيق كسائق مع صلاحية أدمن (`admin_capable`) + ميدلوير `driver.admin` (يرجّع 403 `admin_revoked` مش 401). ما في UI بعد ولا مسارات محمية فيه: **B** = قراءات الأسطول + تسجيل الـBeleg لـ`driver.admin` عبر `driver/admin/*` (✅ منجز، `feat/owner-driver-phase-b`)، **C** = سويتش بالتطبيق (✅ منجز، `feat/owner-driver-phase-c`، يطلع مع build 1.1.3)، **D** = رابط من الموقع. بعد النشر تحقق `Schema::hasColumn('drivers','user_id')`.
 
 ---
 

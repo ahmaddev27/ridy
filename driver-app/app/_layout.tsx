@@ -7,7 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
-import { ToastProvider } from "@/components/toast";
+import { ToastProvider, useToast } from "@/components/toast";
 import { registerOfferCategory, startPushRegistration } from "@/lib/push";
 import { OfferPopupHost, openOfferFromNotification } from "@/components/offer-popup";
 import { markAlerted } from "@/lib/offer-alert";
@@ -16,7 +16,7 @@ import { startLive, stopLive } from "@/lib/live";
 import { openRouteInMaps } from "@/lib/maps";
 import { useColors, isDarkPalette, setThemeMode, type ThemeMode } from "@/lib/theme";
 import { useAppFonts } from "@/lib/fonts";
-import { setLocale } from "@/lib/i18n";
+import { setLocale, t } from "@/lib/i18n";
 import { ensureFreshInstall } from "@/lib/install-guard";
 import { useOtaUpdates } from "@/lib/ota";
 import { UpdateGate } from "@/components/update-gate";
@@ -178,7 +178,7 @@ const PRE_APP_SEGMENTS = new Set(["splash", "onboarding", "login"]);
 /** Routes the user between auth screens and the app based on session state, and
  *  wires push registration + notification-tap navigation once signed in. */
 function Gate() {
-  const { ready, driver, isOwner, offline, suspended, clearSuspended, retry } = useAuth();
+  const { ready, driver, isOwner, canAdmin, setViewMode, offline, suspended, clearSuspended, retry } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const navState = useRootNavigationState();
@@ -223,6 +223,14 @@ function Gate() {
       stopLive();
     };
   }, [driverId, isOwner]);
+
+  // The admin grant was withdrawn while signed in (profile re-read dropped it).
+  const toast = useToast();
+  const hadAdmin = useRef(false);
+  useEffect(() => {
+    if (hadAdmin.current && !canAdmin && driverId != null) toast.show(t("view.revoked"), "info");
+    hadAdmin.current = canAdmin;
+  }, [canAdmin, driverId, toast]);
 
   // The offer notification categories. Nothing about them is per-company any
   // more — the first push carries no actions at all and the decision lives in the
@@ -286,6 +294,8 @@ function Gate() {
     const seg = segments[0];
     if (!seg || PRE_APP_SEGMENTS.has(seg)) return;
     pendingOffer.current = null;
+    // A tapped offer is the driver's own: always land on the driver offer screen.
+    if (canAdmin) setViewMode("driver");
     // The decision while the offer still is one — the pop-up resolves that before
     // anything navigates — and its detail screen otherwise.
     openOfferFromNotification(Number(id), () => {
@@ -295,7 +305,7 @@ function Gate() {
       if (seg === "offer") router.replace(`/offer/${id}`);
       else router.push(`/offer/${id}`);
     });
-  }, [driver, segments, router, navState?.key, pendingTick]);
+  }, [driver, segments, router, navState?.key, pendingTick, canAdmin, setViewMode]);
 
   // A suspended company: explain it instead of "no internet" / "invalid code".
   // These early returns sit AFTER every hook — returning before them renders

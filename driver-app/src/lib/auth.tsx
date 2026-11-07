@@ -12,6 +12,11 @@ import { Sentry } from "./sentry";
 const TOKEN_KEY = "reidey_driver_token";
 const OWNER_KEY = "reidey_is_owner";
 
+/** Which side of the app a linked owner-driver is looking at. UI mode only. */
+export type ViewMode = "admin" | "driver";
+
+const viewModeKey = (driverId: number): string => `view_mode_${driverId}`;
+
 /** Why the company is blocked, and how to reach support (403 account_suspended). */
 export type SuspendedInfo = {
   reason: string | null;
@@ -37,6 +42,13 @@ type AuthState = {
   isOwner: boolean;
   /** True when this DRIVER is also a fleet manager (additive; separate from isOwner). */
   isManager: boolean;
+  /** True when this DRIVER token may flip into the company (admin) view. */
+  canAdmin: boolean;
+  /** The persisted Admin/Driver choice (always 'driver' unless canAdmin). */
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
+  /** Presentation switch: show fleet/company data (an owner, or admin mode). */
+  fleetView: boolean;
   /** True when a stored session exists but the server is unreachable (offline). */
   offline: boolean;
   /** Set when the company is suspended — the app shows the suspension screen. */
@@ -80,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [offline, setOffline] = useState(false);
   const [suspended, setSuspended] = useState<SuspendedInfo | null>(null);
   const [passkeyOffer, setPasskeyOffer] = useState(false);
+  const [storedViewMode, setStoredViewMode] = useState<ViewMode>("driver");
   const loggingOut = useRef(false);
 
   // Derive owner-ness from the profile itself — a SEPARATE isOwner state could
@@ -90,6 +103,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Same derivation for managers; restore() re-reads /driver/me on every
   // foreground, so a promotion/demotion applies without a re-login.
   const isManager = !isOwner && driver?.is_manager === true;
+  // Admin capability rides on the same /driver/me profile. It is NOT an
+  // authorization signal — the server re-checks driver.admin on every request.
+  const canAdmin = !isOwner && driver?.admin_capable === true;
+  const viewMode: ViewMode = canAdmin ? storedViewMode : "driver";
+  const fleetView = isOwner || (canAdmin && viewMode === "admin");
+  const driverId = driver?.id ?? null;
+
+  useEffect(() => {
+    if (driverId === null) {
+      setStoredViewMode("driver");
+      return;
+    }
+    SecureStore.getItemAsync(viewModeKey(driverId))
+      .then((v) => setStoredViewMode(v === "admin" ? "admin" : "driver"))
+      .catch(() => setStoredViewMode("driver"));
+  }, [driverId]);
+
+  const setViewMode = useCallback(
+    (mode: ViewMode) => {
+      setStoredViewMode(mode);
+      if (driverId !== null) SecureStore.setItemAsync(viewModeKey(driverId), mode).catch(() => {});
+    },
+    [driverId],
+  );
 
   const applyProfile = useCallback((d: DriverProfile, owner: boolean) => {
     // Do NOT override the language from the server profile: the user's in-app
@@ -175,8 +212,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.onSessionInvalid = (body) => {
       void endSession(suspendedFrom(body));
     };
+    // The admin grant was withdrawn but the Driver session is fine: fall back to
+    // the driver view now and re-read the profile (drops admin_capable).
+    api.onAdminRevoked = () => {
+      setViewMode("driver");
+      void restore();
+    };
     restore().catch(() => setReady(true));
-  }, [restore, endSession]);
+  }, [restore, endSession, setViewMode]);
 
   /**
    * Re-read the profile when the app comes back to the foreground.
@@ -305,6 +348,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         driver,
         isOwner,
         isManager,
+        canAdmin,
+        viewMode,
+        setViewMode,
+        fleetView,
         offline,
         suspended,
         clearSuspended,

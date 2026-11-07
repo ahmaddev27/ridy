@@ -64,7 +64,7 @@ const SEARCH_DEBOUNCE_MS = 350;
 export default function OffersScreen() {
   const c = useColors();
   const router = useRouter();
-  const { isOwner } = useAuth();
+  const { fleetView } = useAuth();
   useLocale(); // re-render on a language switch
   const align = isRTL() ? "right" : "left";
 
@@ -113,8 +113,8 @@ export default function OffersScreen() {
       const params: OffersQuery = { per_page: PER_PAGE, page: target, from, to };
       if (q.status !== "all") params.status = q.status;
       if (q.search) params.search = q.search;
-      if (isOwner && q.driverId != null) params.driver_id = q.driverId;
-      const res = isOwner ? await api.fleetOffers(params) : await api.offers(params);
+      if (fleetView && q.driverId != null) params.driver_id = q.driverId;
+      const res = fleetView ? await api.fleetOffers(params) : await api.offers(params);
       if (mine !== seq.current) return; // stale: a newer query already answered
       setLastPage(res.meta?.last_page ?? 1);
       setTotal(res.meta?.total ?? res.data.length);
@@ -123,16 +123,16 @@ export default function OffersScreen() {
       setLoadError(false);
       setLoaded(true);
       // Fallback chime for a new offer that surfaced without its push (driver only).
-      if (target === 1 && !isOwner) alertOffer(res.data.find((o) => o.status === "pending"));
+      if (target === 1 && !fleetView) alertOffer(res.data.find((o) => o.status === "pending"));
     },
-    [isOwner],
+    [fleetView],
   );
 
   // Load the tenant's drivers once, for the owner-only driver filter.
   useEffect(() => {
-    if (!isOwner) return;
+    if (!fleetView) return;
     api.fleetDrivers().then((r) => setDrivers(r.data)).catch(() => { /* keep empty */ });
-  }, [isOwner]);
+  }, [fleetView]);
 
   // Only auto-refresh while the driver is near the top of the feed: a silent
   // reset to page 1 mustn't yank away rows they scrolled down to. Tracked by
@@ -198,8 +198,8 @@ export default function OffersScreen() {
 
   const openOffer = useCallback((id: number) => router.push(`/offer/${id}`), [router]);
   const renderItem = useCallback(
-    ({ item }: { item: Offer }) => <OfferCard offer={item} showDriver={isOwner} onOpen={openOffer} />,
-    [isOwner, openOffer],
+    ({ item }: { item: Offer }) => <OfferCard offer={item} showDriver={fleetView} onOpen={openOffer} />,
+    [fleetView, openOffer],
   );
 
   // Sort is applied client-side over the loaded pages.
@@ -276,7 +276,7 @@ export default function OffersScreen() {
             </View>
 
             {/* Owner-only: filter the feed by driver (horizontal pills + "all"). */}
-            {isOwner && drivers.length > 0 && (
+            {fleetView && drivers.length > 0 && (
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
