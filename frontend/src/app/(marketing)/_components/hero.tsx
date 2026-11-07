@@ -130,9 +130,7 @@ export function Hero() {
         <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-8">
           <div className="text-center lg:text-left">
             <h1 className="font-heading text-[2rem] font-bold leading-[1.05] tracking-[-0.03em] text-balance text-white sm:text-5xl lg:text-[3.4rem]">
-              Jedes Fahrtangebot{" "}
-              <span className="text-gradient">klar bewertet</span>, bevor dein
-              Fahrer zusagt.
+              Driver <span className="text-gradient">Management</span>
             </h1>
 
             <p className="mx-auto mt-6 max-w-lg text-base leading-relaxed text-muted-foreground sm:text-lg lg:mx-0">
