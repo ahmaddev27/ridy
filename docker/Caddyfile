@@ -7,6 +7,13 @@
 # SITE_ADDRESS env value that could revert on a deploy. To change domains, edit
 # it here (one place). For a local HTTP-only test, use the :80 form instead.
 
+# www → apex canonical redirect. Without this block Caddy held no TLS cert for
+# www.reidey.de, so the host answered with a TLS alert (SSL_ERROR). Caddy now
+# provisions a cert for www too and 301s to the bare domain (one canonical origin).
+www.reidey.de {
+	redir https://reidey.de{uri} permanent
+}
+
 reidey.de {
 	encode zstd gzip
 
