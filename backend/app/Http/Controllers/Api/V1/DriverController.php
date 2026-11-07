@@ -21,6 +21,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\IngestDriverStatusesRequest;
 use App\Http\Requests\FleetDayRange;
 use App\Http\Resources\DriverResource;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -147,6 +148,9 @@ class DriverController extends Controller
 
         $ownEmail = strtolower((string) $request->user()->email);
         abort_if($ownEmail !== '' && $ownEmail === strtolower((string) $driver->email), 403, 'cannot_change_own_manager_flag');
+        abort_if($driver->user_id !== null && $driver->user_id === $request->user()->id, 403, 'cannot_change_own_manager_flag');
+        // A linked driver's manager flag belongs to the owner link, not to this toggle.
+        abort_if($driver->user_id !== null, 409, 'managed_by_link');
 
         if ($driver->is_manager !== $isManager) {
             $driver->forceFill(['is_manager' => $isManager])->save();
@@ -154,6 +158,50 @@ class DriverController extends Controller
         }
 
         return new DriverResource($driver->load('latestDeviceToken'));
+    }
+
+    /**
+     * Link / unlink the calling owner to this driver row ("owner who also drives").
+     * Linking makes the owner sign into the app as this driver, with admin
+     * capability; unlinking restores the plain read-only owner sign-in.
+     */
+    public function linkOwner(Request $request, Driver $driver, AuditLogger $audit): DriverResource
+    {
+        $this->authorizeTenant($driver);
+
+        $linked = (bool) $request->validate(['linked' => ['required', 'boolean']])['linked'];
+        $owner = $request->user();
+
+        $linked ? $this->assertLinkable($owner, $driver) : $this->assertUnlinkable($owner, $driver);
+
+        if ($linked !== ($driver->user_id !== null)) {
+            DB::transaction(fn () => $driver->forceFill([
+                'user_id' => $linked ? $owner->id : null,
+                'is_manager' => $linked,
+            ])->save());
+            $audit->log($linked ? 'driver.owner_linked' : 'driver.owner_unlinked', $driver);
+        }
+
+        return new DriverResource($driver->load('latestDeviceToken'));
+    }
+
+    private function assertLinkable(User $owner, Driver $driver): void
+    {
+        abort_unless($owner->tenant_id === $driver->tenant_id, 404);
+        abort_if($driver->user_id !== null && $driver->user_id !== $owner->id, 409, 'driver_linked_to_other');
+
+        $alreadyLinked = Driver::query()->where('user_id', $owner->id)->whereKeyNot($driver->id)->exists();
+        abort_if($alreadyLinked, 409, 'already_linked');
+
+        // "Driver wins" at sign-in: another row with the owner's email would be picked instead.
+        $emailTaken = filled($owner->email) && Driver::query()
+            ->where('email', $owner->email)->whereKeyNot($driver->id)->exists();
+        abort_if($emailTaken, 409, 'email_belongs_to_other_driver');
+    }
+
+    private function assertUnlinkable(User $owner, Driver $driver): void
+    {
+        abort_if($driver->user_id !== null && $driver->user_id !== $owner->id, 409, 'driver_linked_to_other');
     }
 
     /** Work stats for one driver, computed from our own offers/acceptance data. */
