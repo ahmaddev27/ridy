@@ -1,3 +1,5 @@
+const parseList = (v, d) => (v ? String(v).split("|").map((x) => x.trim()).filter(Boolean) : d);
+
 export const config = {
   port: Number(process.env.UBER_AUTH_PORT || 8791),
 
@@ -46,6 +48,16 @@ export const config = {
   // the backend must also have UBER_PASSKEY_RELOGIN + the company's settings.passkey.relogin.
   passkeyRelogin: ["1", "true"].includes(String(process.env.UBER_AUTH_PASSKEY_RELOGIN || "").toLowerCase()),
   passkeyOnConnect: ["1", "true"].includes(String(process.env.UBER_AUTH_PASSKEY_ON_CONNECT || "").toLowerCase()),
+
+  // Device-session hygiene (PHASE A = DRY-RUN ONLY, read-only). OFF unless UBER_AUTH_DEVICE_HYGIENE=1
+  // AND the backend's per-company flag is on. `mode` is ALWAYS dry_run: no enforce path exists yet,
+  // so nothing here can click on Uber. Signatures/regions are '|'-separated allowlists.
+  deviceHygiene: {
+    enabled: ["1", "true"].includes(String(process.env.UBER_AUTH_DEVICE_HYGIENE || "").toLowerCase()),
+    mode: "dry_run",
+    signatures: parseList(process.env.UBER_AUTH_DEVICE_HYGIENE_SIGNATURES, ["Chrome on Linux"]),
+    regions: parseList(process.env.UBER_AUTH_DEVICE_HYGIENE_REGIONS, []),
+  },
 
   // Per-step wait budget (ms).
   stepTimeout: Number(process.env.UBER_AUTH_STEP_TIMEOUT || 30000),
