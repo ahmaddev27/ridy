@@ -171,7 +171,7 @@ class DispatchOfferIngestor
                 'removed_at' => $driver->roster_removed_at->toIso8601String(),
             ]);
         } elseif ($driver !== null) {
-            $autoDeclineReason = $this->autoDeclineIfMatched($record, $driver);
+            $autoDeclineReason = $this->autoDeclineIfMatched($record, $driver, $geocodeDeadline);
             if ($autoDeclineReason === null) {
                 $this->notifyDriver($record, $geocodeDeadline);
             }
@@ -228,9 +228,9 @@ class DispatchOfferIngestor
      * push still goes out, so a matched rule can never silently swallow an offer and
      * leave the driver with neither a notification nor a decline.
      */
-    private function autoDeclineIfMatched(DispatchOffer $record, Driver $driver): ?string
+    private function autoDeclineIfMatched(DispatchOffer $record, Driver $driver, ?float $geocodeDeadline = null): ?string
     {
-        $reason = $this->autoDecline->match($record, $driver);
+        $reason = $this->autoDecline->match($record, $driver, $geocodeDeadline);
         if ($reason === null) {
             return null;
         }
