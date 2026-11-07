@@ -49,9 +49,9 @@ const tajawal = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Reidey · Flottenmanagement",
+  title: "Reidey · Driver Management",
   description:
-    "Reidey ist die Flottenmanagement-Plattform für moderne Fahrdienst-Flotten: Fahrerverwaltung, Echtzeit-Benachrichtigungen, Live-Karte, Abrechnung und mehr.",
+    "Reidey — Driver Management.",
 };
 
 export default function RootLayout({

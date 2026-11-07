@@ -44,6 +44,7 @@ class CompanyDataController extends Controller
     {
         $model = Driver::withoutGlobalScopes()->where('tenant_id', $tenant->id)->findOrFail($driver);
         $isManager = (bool) $request->validate(['is_manager' => ['required', 'boolean']])['is_manager'];
+        abort_if($model->user_id !== null, 409, 'managed_by_link');
 
         if ($model->is_manager !== $isManager) {
             $model->forceFill(['is_manager' => $isManager])->save();

@@ -10,9 +10,9 @@ import { Cta } from "./_components/cta";
 import { ContactForm } from "./_components/contact-form";
 
 export const metadata: Metadata = {
-  title: "Reidey — Jedes Fahrtangebot klar bewertet",
+  title: "Reidey — Driver Management",
   description:
-    "Reidey bewertet jedes Fahrtangebot klar, bevor dein Fahrer zusagt. €/km, Distanz und Route auf einen Blick – für Flotten in ganz Deutschland.",
+    "Reidey — Driver Management.",
 };
 
 export default function LandingPage() {

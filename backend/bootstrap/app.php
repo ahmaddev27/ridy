@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureCobrowseEnabled;
 use App\Http\Middleware\EnsureDashboardToken;
 use App\Http\Middleware\EnsureDriverAccount;
+use App\Http\Middleware\EnsureDriverAdmin;
 use App\Http\Middleware\EnsureDriverManager;
 use App\Http\Middleware\EnsureDriverTenantActive;
 use App\Http\Middleware\EnsureElProfessorEnabled;
@@ -72,6 +73,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'driver.account' => EnsureDriverAccount::class,
             // Driver-app manager mode: Driver token with is_manager, re-read per request.
             'driver.manager' => EnsureDriverManager::class,
+            // Owner who also drives: linked Driver + still-owner User, else 403 admin_revoked.
+            'driver.admin' => EnsureDriverAdmin::class,
             'fleet.owner' => EnsureFleetOwner::class,
             // The platform's per-company switch for the El-Professor link.
             'elprofessor.enabled' => EnsureElProfessorEnabled::class,

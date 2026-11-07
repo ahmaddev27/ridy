@@ -391,6 +391,8 @@ Route::prefix('v1')->group(function () {
         // users.manage, never drivers.manage — a fleet_manager promoting drivers would be
         // privilege escalation.
         Route::patch('drivers/{driver}/manager', [DriverController::class, 'setManager'])->middleware('can:users.manage');
+        // Link the calling OWNER to this driver row (owner who also drives). Owner only.
+        Route::patch('drivers/{driver}/owner-link', [DriverController::class, 'linkOwner'])->middleware('can:users.manage');
         Route::get('drivers/{driver}/stats', [DriverController::class, 'stats']);
         // Browser-fed ingest: only for a company that has connected its own Uber
         // account (a stored session), never an arbitrary account the manager is

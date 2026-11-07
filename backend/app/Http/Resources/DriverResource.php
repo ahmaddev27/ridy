@@ -34,6 +34,8 @@ class DriverResource extends JsonResource
             'location_updated_at' => $this->location_updated_at?->toIso8601String(),
             'email' => $this->email,
             'is_manager' => (bool) $this->is_manager,
+            'owner_linked' => $this->user_id !== null,
+            'is_me' => $this->user_id !== null && $this->user_id === $request->user()?->id,
             'app_status' => $this->appStatus(),
             // Server-computed: false when there is no email (own or from Uber) to invite,
             // so the dashboard can say "cannot be invited — no email" instead of a dead button.
