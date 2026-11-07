@@ -97,6 +97,13 @@ In `DispatchOfferIngestor`, after the driver is matched and BEFORE `notifyDriver
      after case/umlaut folding (`Mannheim` != `Mannheim-Neckarau`). Declines when EITHER end's
      trusted city is blocked; an untrusted end never blocks; any fault = keep. Precedence: after the
      price rules. Caveat: an address with no PLZ is never filtered.
+   - `min_price_per_km` - **LIVE (2026-11-07)**, confidence-guarded. `min_fare` is judged first with zero
+     I/O. Only if the EUR/km outcome can still matter, a bounded (~0.35 s) inline
+     `TripGeocoder::enrichForDecline()` runs and `DeclineGradeGeo` must vouch for the road distance
+     (both ends `exact` + house number + known PLZ + label agreeing on PLZ/number/city, real OSRM
+     route, not Uber-sourced, 1-150 km, plausible route/crow-flies ratio). Anything else (street/area/
+     postal confidence, haversine estimate, timeout, exception) => distance unknown => the rule passes
+     and the offer is kept. Coverage caveat: it fires only when BOTH ends geocode to high confidence.
    - `max_trip_distance` — pickup/dropoff **geocoded from CACHE
      only** (the fleet's recurring streets are warm). A cache miss = rule skipped for
      this offer (do NOT geocode live — never delay the decline).

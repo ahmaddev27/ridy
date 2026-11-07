@@ -7,7 +7,10 @@ use App\Domain\Auth\Webauthn\PasskeyHolder;
 use App\Domain\Fleet\DriverInvitationService;
 use App\Domain\Notifications\Models\DeviceToken;
 use App\Domain\Tenancy\Concerns\BelongsToTenant;
+use App\Http\Middleware\EnsureFleetOwner;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -81,6 +84,36 @@ class Driver extends Authenticatable implements PasskeyHolder
     public function latestDeviceToken(): HasOne
     {
         return $this->hasOne(DeviceToken::class)->latestOfMany('last_used_at');
+    }
+
+    /** The dashboard owner this driver row is the same person as (see isLinkedOwner). */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /** Linked to an owner's User ("owner who also drives"). */
+    public function isLinkedOwner(): bool
+    {
+        return $this->user_id !== null;
+    }
+
+    /**
+     * Admin capability, decided server-side on every call: the manager flag, a
+     * link, and the linked user is still an owner-role member of THIS company.
+     */
+    public function adminCapable(): bool
+    {
+        if ($this->is_manager !== true || $this->user_id === null) {
+            return false;
+        }
+
+        $user = $this->user;
+
+        return $user instanceof User
+            && $user->tenant_id !== null
+            && (int) $user->tenant_id === (int) $this->tenant_id
+            && $user->hasAnyRole(EnsureFleetOwner::ROLES);
     }
 
     /** True once the driver has completed activation (set a password) for the app. */

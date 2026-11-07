@@ -3,9 +3,9 @@ import type { DispatchOffer, PageMeta } from "./offers";
 
 export type AutoDeclineReason = "min_fare" | "min_price_per_km" | "reject_cities" | "max_pickup_distance" | "max_trip_distance";
 
-/** Reasons offered in the filter UI. min_price_per_km / max_pickup_distance / max_trip_distance are
- * hidden until the engine can evaluate them (no distance at ingest time). */
-export const AUTO_DECLINE_REASONS: AutoDeclineReason[] = ["min_fare", "reject_cities"];
+/** Reasons offered in the filter UI. max_pickup_distance / max_trip_distance are
+ * hidden until the engine can evaluate them. min_price_per_km fires only on a trusted inline distance. */
+export const AUTO_DECLINE_REASONS: AutoDeclineReason[] = ["min_fare", "min_price_per_km", "reject_cities"];
 
 export type AutoDeclineRules = {
   min_fare: { enabled: boolean; value_e2: number };

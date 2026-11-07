@@ -114,7 +114,7 @@ const en = {
     tour: "Show the tour",
     sidebarCollapse: "Collapse sidebar",
     sidebarExpand: "Expand sidebar",
-    brandSub: "Fleet management",
+    brandSub: "Driver Management",
   },
   push: {
     enable: "Enable notifications",
@@ -290,7 +290,7 @@ const de: typeof en = {
     tour: "Tour anzeigen",
     sidebarCollapse: "Seitenleiste einklappen",
     sidebarExpand: "Seitenleiste ausklappen",
-    brandSub: "Flottenmanagement",
+    brandSub: "Driver Management",
   },
   push: {
     enable: "Benachrichtigungen aktivieren",
@@ -467,7 +467,7 @@ const ar: typeof en = {
     tour: "عرض الجولة",
     sidebarCollapse: "طي القائمة الجانبية",
     sidebarExpand: "توسيع القائمة الجانبية",
-    brandSub: "إدارة الأسطول",
+    brandSub: "Driver Management",
   },
   push: {
     enable: "تفعيل الإشعارات",
