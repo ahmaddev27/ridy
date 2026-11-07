@@ -200,6 +200,13 @@ export type PushHealth = {
    * says nothing about whether a sound plays through the car.
    */
   carPlayDisplay: boolean | null;
+  /**
+   * iOS only: whether Critical Alerts are granted (they ring through the silent
+   * switch and car audio). Diagnostic, never a nag — null/false until Apple's
+   * entitlement is in the build and the driver agreed; offers still ring with
+   * the normal time-sensitive sound.
+   */
+  criticalAlerts: boolean | null;
 };
 
 export async function getPushHealth(): Promise<PushHealth> {
@@ -207,6 +214,7 @@ export async function getPushHealth(): Promise<PushHealth> {
   let channelOk = true;
   let soundOk: boolean | null = null;
   let carPlayDisplay: boolean | null = null;
+  let criticalAlerts: boolean | null = null;
   // Android < 8 (API 26) has no notification channels — expo returns null there,
   // so only the app-level permission decides whether offers can ring.
   if (Platform.OS === "android" && Number(Platform.Version) >= 26) {
@@ -223,13 +231,26 @@ export async function getPushHealth(): Promise<PushHealth> {
     // `false` means iOS will deliver silently; `null` means it did not say.
     soundOk = perm.ios.allowsSound ?? null;
     carPlayDisplay = perm.ios.allowsDisplayInCarPlay ?? null;
+    criticalAlerts = perm.ios.allowsCriticalAlerts ?? null;
   }
-  return { granted: perm.granted, canAskAgain: perm.canAskAgain, channelOk, soundOk, carPlayDisplay };
+  return { granted: perm.granted, canAskAgain: perm.canAskAgain, channelOk, soundOk, carPlayDisplay, criticalAlerts };
+}
+
+/**
+ * Prompt for notifications, asking iOS for Critical Alerts in the same sheet.
+ * The critical option is only honoured when the build carries Apple's
+ * entitlement; without it iOS ignores it and the normal permission still
+ * resolves, so a denial or a missing entitlement never affects regular offers.
+ */
+function requestPermissions() {
+  return Notifications.requestPermissionsAsync({
+    ios: { allowAlert: true, allowSound: true, allowBadge: true, allowCriticalAlerts: true },
+  });
 }
 
 /** Ask for notification permission when the OS still allows the prompt. */
 export async function requestPushPermission(): Promise<boolean> {
-  const perm = await Notifications.requestPermissionsAsync();
+  const perm = await requestPermissions();
   if (perm.granted) void ensurePushRegistered(true);
   return perm.granted;
 }
@@ -348,7 +369,7 @@ export function ensurePushRegistered(force = false): Promise<boolean> {
       if (!Device.isDevice) return false;
       await ensureChannels().catch(() => {});
       let perm = await Notifications.getPermissionsAsync();
-      if (!perm.granted && perm.canAskAgain) perm = await Notifications.requestPermissionsAsync();
+      if (!perm.granted && perm.canAskAgain) perm = await requestPermissions();
       if (!perm.granted) return false;
       const token = await fetchDeviceToken();
       if (!token) return false;
