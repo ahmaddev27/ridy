@@ -14,6 +14,7 @@ import { launchBrowser, newStealthContext } from "./browser.js";
 import { parseProxyUrl } from "./proxy.js";
 import { scopeCookies } from "./cookieScope.js";
 import { registerPasskey, registerPasskeyInSession } from "./passkey.js";
+import { runHygiene } from "./deviceHygiene.js";
 import { attachCobrowseAuthenticator, ATTACH, readSignCount, removeAuthenticator } from "./cobrowsePasskey.js";
 
 const driver = createWarmDriver();
@@ -199,6 +200,69 @@ export const registerPasskeyForCompany = (companyKey) =>
     statePath: driverStatePath,
     log: (m) => console.log(`[passkey] ${m}`),
   });
+
+const HYGIENE_TIMEOUT_MS = 90_000;
+const HYGIENE_COOLDOWN_MS = 6 * 3_600_000;
+const hygieneRunning = new Set();
+const hygieneLastRun = new Map();
+const hygieneUrl = (key) => `/api/v1/internal/session-browser/${encodeURIComponent(key)}/device-hygiene`;
+
+// Per-company flag, read like the passkey flags (same endpoint family + secret). Fails CLOSED:
+// any error, non-200 or missing endpoint means "off".
+async function hygieneCompanyEnabled(key) {
+  try {
+    const res = await fetch(`${config.apiBaseUrl}${hygieneUrl(key)}`, {
+      headers: { Accept: "application/json", "X-Dispatch-Secret": config.dispatchSecret },
+    });
+    return res.ok && (await res.json()).data?.enabled === true;
+  } catch {
+    return false;
+  }
+}
+
+async function hygienePass(key) {
+  const log = (m) => console.log(`[hygiene][dry-run] ${key}: ${m}`);
+  const ctx = { signatures: config.deviceHygiene.signatures, regions: config.deviceHygiene.regions };
+  const guarded = await manager.withBusy(key, async (entry) => {
+    const page = await entry.handle.context.newPage(); // a SEPARATE tab; never the renew() page
+    try {
+      return await runHygiene(page, { ctx, log });
+    } finally {
+      await page.close?.().catch(() => {});
+    }
+  });
+  if (!guarded.ok) log("skipped: session not active/idle");
+  return guarded.ok ? guarded.value : { status: "busy" };
+}
+
+/**
+ * Device-session hygiene, PHASE A (DRY-RUN): list devices, log what WOULD be signed out. Clicks
+ * nothing. Gated by UBER_AUTH_DEVICE_HYGIENE + the company flag, per-company cooldown, in-memory
+ * running guard, hard timeout. Resolves { status }; NEVER throws and never touches the
+ * capture, jar or daemon.
+ */
+export async function runDeviceHygiene(companyKey, session) {
+  const key = String(companyKey);
+  try {
+    if (!config.deviceHygiene.enabled) return { status: "disabled" };
+    if (!session?.fullLogin) return { status: "not_full_login" };
+    if (hygieneRunning.has(key)) return { status: "busy" };
+    if (Date.now() - (hygieneLastRun.get(key) ?? 0) < HYGIENE_COOLDOWN_MS) return { status: "cooldown" };
+    hygieneRunning.add(key);
+    try {
+      if (!(await hygieneCompanyEnabled(key))) return { status: "company_disabled" };
+      hygieneLastRun.set(key, Date.now());
+      let timer;
+      const timeout = new Promise((r) => { timer = setTimeout(() => r({ status: "timeout" }), HYGIENE_TIMEOUT_MS); });
+      return await Promise.race([hygienePass(key), timeout]).finally(() => clearTimeout(timer));
+    } finally {
+      hygieneRunning.delete(key);
+    }
+  } catch (e) {
+    console.warn(`[hygiene][dry-run] ${key} failed: ${e?.message}`);
+    return { status: "error" };
+  }
+}
 
 export function statusList() {
   return manager.status();

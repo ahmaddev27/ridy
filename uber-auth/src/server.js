@@ -11,7 +11,7 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { startLogin, submitMfa, closeSession, challengeTick, finishChallenge, STATUS } from "./browser.js";
-import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf, forceDrop, registerPasskeyForCompany, attachCobrowsePasskey, registerPasskeyInCobrowse, attachReloginPasskey, finishReloginPasskey } from "./persistent.js";
+import { adoptLogin, backendHasSession, liveSessionCount, statusList, resumeFromDisk, syncFromBackend, startLoops, sessionState, markLoggingIn, markNeedsOtp, handleOf, forceDrop, registerPasskeyForCompany, attachCobrowsePasskey, registerPasskeyInCobrowse, runDeviceHygiene, attachReloginPasskey, finishReloginPasskey } from "./persistent.js";
 import { removeAuthenticator } from "./cobrowsePasskey.js";
 import { admitStart, adoptGuard, adoptMode, canCobrowse, canFullLogin, companyMatches, createStartGate } from "./loginPolicy.js";
 import { createCobrowse, createCobrowseServer, FULL_LOGIN_HARD_CAP_MS } from "./cobrowse.js";
@@ -175,6 +175,18 @@ function scheduleCobrowsePasskey(companyKey, session) {
   if (!(session?.fullLogin && config.passkeyRegister && config.passkeyCobrowse)) return false;
   registerPasskeyInCobrowseLater(companyKey, session);
   return true;
+}
+
+// Device hygiene PHASE A (dry-run, read-only): after the passkey step has had its window. fullLogin
+// only (a captured login), OFF unless UBER_AUTH_DEVICE_HYGIENE; never delays or fails the login.
+const HYGIENE_DELAY_MS = PASSKEY_IN_COBROWSE_DELAY_MS + 25_000;
+function scheduleDeviceHygiene(companyKey, session) {
+  if (!(session?.fullLogin && config.deviceHygiene.enabled)) return;
+  setTimeout(() => {
+    runDeviceHygiene(companyKey, session)
+      .then((r) => console.log(`[hygiene][dry-run] ${companyKey}: ${r.status}`))
+      .catch(() => {});
+  }, HYGIENE_DELAY_MS).unref?.();
 }
 
 function maybeRegisterPasskeyAfterConnect(companyKey) {
