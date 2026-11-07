@@ -5,8 +5,9 @@ namespace App\Http\Controllers\Api\V1\Driver;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\SubmissionRecorder;
 use App\Domain\Receipts\ReceiptVision;
+use App\Domain\Tenancy\Models\Tenant;
+use App\Http\Controllers\Api\V1\Driver\Concerns\ResolvesFleetTenant;
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -36,14 +37,16 @@ use Throwable;
  */
 class FleetReceiptController extends Controller
 {
+    use ResolvesFleetTenant;
+
     public function store(Request $request, SubmissionRecorder $recorder): JsonResponse
     {
-        $user = $this->owner($request);
-        if (! ($user->tenant?->isElprofessorConnected() ?? false)) {
+        $tenantId = $this->fleetTenantId($request);
+        if (! (Tenant::find($tenantId)?->isElprofessorConnected() ?? false)) {
             return $this->notConnected();
         }
 
-        $driver = $this->driverOf($request, $user);
+        $driver = $this->driverOf($request, $tenantId);
         // Zero image storage: the photo is analysed in memory by `vision` and
         // only the figures are filed; a `document` sent anyway is dropped.
         $request->merge(['subject' => 'receipt']);
@@ -61,9 +64,9 @@ class FleetReceiptController extends Controller
      */
     public function vision(Request $request, ReceiptVision $vision): JsonResponse
     {
-        $user = $this->owner($request);
+        $tenantId = $this->fleetTenantId($request);
         $request->validate(['image' => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:4096']]);
-        $driver = $this->driverOf($request, $user);
+        $driver = $this->driverOf($request, $tenantId);
 
         if (! $vision->isConfigured()) {
             return response()->json(['message' => 'Receipt vision is not available.'], 503);
@@ -80,21 +83,13 @@ class FleetReceiptController extends Controller
         return response()->json(['data' => ['fields' => $fields]]);
     }
 
-    private function owner(Request $request): User
-    {
-        $user = $request->user();
-        abort_unless($user instanceof User && $user->tenant_id !== null, 403, 'fleet_owner_only');
-
-        return $user;
-    }
-
     /** The picked driver, only if they belong to the caller's company. */
-    private function driverOf(Request $request, User $user): Driver
+    private function driverOf(Request $request, int $tenantId): Driver
     {
         $id = $request->validate(['driver_id' => ['required', 'integer']])['driver_id'];
 
         return Driver::withoutGlobalScopes()
-            ->where('tenant_id', $user->tenant_id)
+            ->where('tenant_id', $tenantId)
             ->findOrFail($id);
     }
 

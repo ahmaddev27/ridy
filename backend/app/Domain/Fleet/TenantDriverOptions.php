@@ -20,4 +20,21 @@ class TenantDriverOptions
             ->orderBy('name')
             ->get(['id', 'name']);
     }
+
+    /**
+     * The same picker for an owner who also drives: each row gains `is_me` (the
+     * driver linked to `$userId`) and that row sorts first.
+     *
+     * @return Collection<int, array{id: int, name: string, is_me: bool}>
+     */
+    public function forTenantMarking(int $tenantId, int $userId): Collection
+    {
+        return Driver::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->orderBy('name')
+            ->get(['id', 'name', 'user_id'])
+            ->map(fn (Driver $d) => ['id' => $d->id, 'name' => $d->name, 'is_me' => (int) $d->user_id === $userId])
+            ->sortByDesc('is_me')
+            ->values();
+    }
 }

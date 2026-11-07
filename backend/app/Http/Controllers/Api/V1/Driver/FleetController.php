@@ -7,10 +7,10 @@ use App\Domain\Dispatch\Models\UberFleetSession;
 use App\Domain\Dispatch\OfferStatus;
 use App\Domain\Fleet\Models\Driver;
 use App\Domain\Fleet\TenantDriverOptions;
+use App\Http\Controllers\Api\V1\Driver\Concerns\ResolvesFleetTenant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FleetDayRange;
 use App\Http\Resources\DispatchOfferResource;
-use App\Models\User;
 use App\Support\FleetDay;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -26,6 +26,8 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
  */
 class FleetController extends Controller
 {
+    use ResolvesFleetTenant;
+
     /** Most online drivers named on the owner home (the count is always exact). */
     private const ONLINE_LIST_LIMIT = 50;
 
@@ -133,7 +135,13 @@ class FleetController extends Controller
     /** The tenant's drivers, for the offers-view driver picker (id + name only). */
     public function drivers(Request $request, TenantDriverOptions $options): JsonResponse
     {
-        return response()->json(['data' => $options->forTenant($this->tenantId($request))]);
+        $tenantId = $this->tenantId($request);
+        $caller = $request->user();
+
+        // Admin mode (a linked owner-driver): flag his own row and sort it first.
+        return response()->json(['data' => $caller instanceof Driver
+            ? $options->forTenantMarking($tenantId, (int) $caller->user_id)
+            : $options->forTenant($tenantId)]);
     }
 
     /**
@@ -277,12 +285,9 @@ class FleetController extends Controller
         return DispatchOffer::withoutGlobalScopes()->where('tenant_id', $tenantId);
     }
 
-    /** Ensure the caller is a tenant-bound owner/manager and return their tenant id. */
+    /** The caller's tenant: a tenant-bound owner/manager, or an admin-capable driver. */
     private function tenantId(Request $request): int
     {
-        $user = $request->user();
-        abort_unless($user instanceof User && $user->tenant_id !== null, 403, 'fleet_owner_only');
-
-        return $user->tenant_id;
+        return $this->fleetTenantId($request);
     }
 }

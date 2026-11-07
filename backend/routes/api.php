@@ -209,6 +209,28 @@ Route::prefix('v1')->group(function () {
                     Route::get('drivers/live', [ManagerController::class, 'live']);
                 });
 
+                // Admin mode: a linked owner who also drives reads the WHOLE company and
+                // files Belege for any driver, through the SAME controllers as the
+                // owner app's `/driver/fleet/*`. `driver.admin` re-reads the capability
+                // per request (403 `admin_revoked`). Identity-bound routes (me, logout,
+                // devices, webauthn) are deliberately not mirrored.
+                Route::middleware('driver.admin')->prefix('admin')->group(function () {
+                    Route::get('home', [FleetController::class, 'home']);
+                    Route::get('drivers', [FleetController::class, 'drivers']);
+                    Route::get('offers', [FleetController::class, 'offers']);
+                    Route::get('offers/{offer}', [FleetController::class, 'showOffer']);
+                    Route::get('stats', [FleetController::class, 'stats']);
+                    Route::get('submissions', [FleetSubmissionController::class, 'index']);
+                    Route::get('submissions/{uuid}', [FleetSubmissionController::class, 'show'])->whereUuid('uuid');
+                    Route::post('submissions', [FleetReceiptController::class, 'store'])
+                        ->middleware('throttle:30,1,admin-submissions');
+                    Route::post('receipt-vision', [FleetReceiptController::class, 'vision'])
+                        ->middleware('throttle:10,1,admin-receipt-vision');
+                    Route::get('postal-codes/{plz}', [DriverPostalCodeController::class, 'show'])
+                        ->where('plz', '[0-9]{5}')
+                        ->middleware('throttle:60,1,admin-postal-code');
+                });
+
                 Route::get('offers', [DriverOfferController::class, 'index']);
                 Route::post('offers/seen', [DriverOfferController::class, 'markSeen']);
                 Route::get('offers/{offer}', [DriverOfferController::class, 'show']);
