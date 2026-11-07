@@ -150,14 +150,34 @@ class DriverAuthController extends Controller
      */
     private function signInDriverByPasskey(Driver $driver): JsonResponse
     {
-        $resolved = filled($driver->email) ? $this->resolveAppAccount((string) $driver->email) : null;
-        if (! $resolved instanceof Driver || ! $resolved->is($driver)) {
+        if (! $this->driverIdentityHolds($driver)) {
             throw PasskeyAuthenticator::refusal();
         }
 
         $this->guardSuspendedTenant($driver->loadMissing('tenant')->tenant);
 
         return $this->completeSignIn($driver);
+    }
+
+    /**
+     * A driver row still resolves to itself by its own email. A linked owner-driver
+     * with no email of its own is identified by the owner's address instead.
+     */
+    private function driverIdentityHolds(Driver $driver): bool
+    {
+        if (filled($driver->email)) {
+            $resolved = $this->resolveAppAccount((string) $driver->email);
+
+            return $resolved instanceof Driver && $resolved->is($driver);
+        }
+
+        $owner = $driver->user_id !== null ? $driver->user : null;
+        if (! $owner instanceof User || ! filled($owner->email) || ! $driver->adminCapable()) {
+            return false;
+        }
+        $resolved = $this->resolveAppAccount((string) $owner->email);
+
+        return $resolved instanceof User && $resolved->is($owner);
     }
 
     /**
@@ -182,11 +202,19 @@ class DriverAuthController extends Controller
         return $this->completeSignIn($owner);
     }
 
-    /** Mint the app token for a verified account (owner read-only, or driver). */
+    /**
+     * Mint the app token for a verified account. An owner linked to a driver row
+     * signs in AS that driver (with admin capability); an unlinked owner keeps the
+     * read-only fleet:read token.
+     */
     private function completeSignIn(Driver|User $account): JsonResponse
     {
         if ($account instanceof User) {
-            return $this->ownerTokenResponse($account);
+            $linked = $this->linkedDriverFor($account);
+            if ($linked === null) {
+                return $this->ownerTokenResponse($account);
+            }
+            $account = $linked;
         }
 
         $account->forceFill([
@@ -196,6 +224,26 @@ class DriverAuthController extends Controller
         ])->save();
 
         return $this->tokenResponse($account);
+    }
+
+    /** The driver row an owner is linked to, if they still qualify (role, tenant, not suspended). */
+    private function linkedDriverFor(User $owner): ?Driver
+    {
+        if ($owner->tenant_id === null || ! $owner->hasAnyRole(EnsureFleetOwner::ROLES)) {
+            return null;
+        }
+
+        $driver = Driver::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->where('user_id', $owner->id)
+            ->where('is_manager', true)
+            ->first();
+
+        if ($driver === null || $driver->loadMissing('tenant')->tenant?->stateReason() !== null) {
+            return null;
+        }
+
+        return $driver;
     }
 
     /**
@@ -426,6 +474,9 @@ class DriverAuthController extends Controller
             // Manager mode (driver token + flag) — NOT is_owner, which is the separate
             // read-only User/fleet:read mode.
             'is_manager' => (bool) $driver->is_manager,
+            // Owner who also drives: linked, and (server-checked now) still an owner.
+            'owner_linked' => $driver->user_id !== null,
+            'admin_capable' => $driver->adminCapable(),
             // MAY SEND: needs the live connection and stops when it ends.
             'documents_enabled' => $driver->tenant?->isElprofessorConnected() ?? false,
             // MAY VIEW: the archive stays the driver's own after a disconnect, so
