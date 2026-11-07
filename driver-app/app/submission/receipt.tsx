@@ -173,18 +173,26 @@ export default function ReceiptScreen() {
   const row = isRTL() ? "row-reverse" : "row";
   // The company's connection. The endpoint answers 403 `not_connected` without
   // it, so offering the form would be offering a send that cannot land.
-  const { driver, isOwner } = useAuth();
+  const { driver, fleetView } = useAuth();
   const connected = driver?.documents_enabled === true;
   // Owner mode: a manager files the receipt FOR one of their own drivers, picked
   // here. Everything else (scan, checks, wire format) is the driver's flow.
   const [fleetDrivers, setFleetDrivers] = useState<FleetDriver[]>([]);
   const [forDriver, setForDriver] = useState<number | null>(null);
-  const forDriverId = isOwner && forDriver !== null ? forDriver : undefined;
-  const needsDriver = isOwner && forDriver === null;
+  const forDriverId = fleetView && forDriver !== null ? forDriver : undefined;
+  const needsDriver = fleetView && forDriver === null;
   useEffect(() => {
-    if (!isOwner) return;
-    api.fleetDrivers().then((r) => setFleetDrivers(r.data)).catch(() => {});
-  }, [isOwner]);
+    if (!fleetView) return;
+    api
+      .fleetDrivers()
+      .then((r) => {
+        setFleetDrivers(r.data);
+        // "For myself" needs no extra tap: preselect the owner-driver's own row.
+        const me = r.data.find((d) => d.is_me === true);
+        if (me) setForDriver((cur) => cur ?? me.id);
+      })
+      .catch(() => {});
+  }, [fleetView]);
   // A camera photo is taken now, of something in front of the driver; a
   // gallery picture can be any image on the phone. So the company decides,
   // and an older server that sends nothing here means camera only.
@@ -639,12 +647,12 @@ export default function ReceiptScreen() {
           <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t("receipt.photoIntro")}</Text>
         </View>
 
-        {isOwner && (
+        {fleetView && (
           <>
             <SectionLabel>{t("receipt.forDriver")}</SectionLabel>
             <View style={{ flexDirection: row, flexWrap: "wrap", gap: 8 }}>
               {fleetDrivers.map((d) => (
-                <Chip key={d.id} c={c} label={d.name} active={forDriver === d.id} onPress={() => setForDriver(d.id)} />
+                <Chip key={d.id} c={c} label={d.is_me ? `${t("view.me")} · ${d.name}` : d.name} active={forDriver === d.id} onPress={() => setForDriver(d.id)} />
               ))}
             </View>
             {needsDriver && (

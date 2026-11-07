@@ -141,7 +141,7 @@ export default function SubmissionDetailScreen() {
   const row = isRTL() ? "row-reverse" : "row";
   const { id } = useLocalSearchParams<{ id: string }>();
   // An owner reads the company's submission through the read-only fleet route.
-  const { isOwner } = useAuth();
+  const { fleetView } = useAuth();
 
   const [item, setItem] = useState<SubmissionFull | null>(null);
   const [error, setError] = useState<"gone" | "failed" | null>(null);
@@ -149,12 +149,12 @@ export default function SubmissionDetailScreen() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      setItem((await (isOwner ? api.fleetSubmission(String(id)) : api.submission(String(id)))).data);
+      setItem((await (fleetView ? api.fleetSubmission(String(id)) : api.submission(String(id)))).data);
     } catch (e) {
       // 404 is the server's one answer for "not yours" and "not there".
       setError(e instanceof ApiError && e.status === 404 ? "gone" : "failed");
     }
-  }, [id, isOwner]);
+  }, [id, fleetView]);
 
   useEffect(() => {
     void load();

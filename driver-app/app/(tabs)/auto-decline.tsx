@@ -45,7 +45,7 @@ const textAlign = () => (isRTL() ? "right" : "left") as "right" | "left";
 export default function AutoDeclineScreen() {
   useLocale();
   const c = useColors();
-  const { isOwner } = useAuth();
+  const { fleetView } = useAuth();
   const [segment, setSegment] = useState<Segment>("settings");
   const [config, setConfig] = useState<AutoDeclineConfig | null>(null);
   const [failed, setFailed] = useState(false);
@@ -64,8 +64,8 @@ export default function AutoDeclineScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (!isOwner) void load();
-    }, [load, isOwner]),
+      if (!fleetView) void load();
+    }, [load, fleetView]),
   );
 
   return (
@@ -74,7 +74,7 @@ export default function AutoDeclineScreen() {
         {t("ad.title")}
       </Text>
       <Segments c={c} row={row} value={segment} onChange={setSegment} />
-      {isOwner ? (
+      {fleetView ? (
         <Notice c={c} title={t("ad.ownerTitle")} body={t("ad.ownerBody")} />
       ) : failed ? (
         <Notice c={c} title={t("ad.loadFailed")} body={t("ad.loadFailedBody")} tone="danger" />

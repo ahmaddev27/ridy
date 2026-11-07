@@ -25,7 +25,7 @@ const mondayIndex = (d: Date) => (d.getDay() + 6) % 7;
 
 export default function StatisticsScreen() {
   const c = useColors();
-  const { isOwner } = useAuth();
+  const { fleetView } = useAuth();
   const locale = useLocale(); // re-render (and re-label weekdays) on a language switch
   const align = isRTL() ? "right" : "left";
   const [range, setRange] = useState<PeriodRange>("week");
@@ -59,7 +59,7 @@ export default function StatisticsScreen() {
     return { window: { from: w.from, to: w.to }, weekMon: w.weekMonday, label: w.label, selectedStart: startOfPeriod(range, offset) };
     // dayKey: recompute when the fleet-day rolls over while the app stays open.
   }, [range, offset, dayKey, locale]);
-  const windowKey = `${isOwner ? "o" : "d"}|${window.from}|${window.to}`;
+  const windowKey = `${fleetView ? "o" : "d"}|${window.from}|${window.to}`;
 
   const seq = useRef(0);
   const load = useCallback(
@@ -68,7 +68,7 @@ export default function StatisticsScreen() {
       if (!silent) setRefreshing(true); // focus reloads stay quiet; pull-to-refresh spins
       try {
         const wk = { from: ymd(mon), to: ymd(addDays(mon, 6)) };
-        const fetchStats = (from: string, to: string) => (isOwner ? api.fleetStats(from, to) : api.stats(from, to));
+        const fetchStats = (from: string, to: string) => (fleetView ? api.fleetStats(from, to) : api.stats(from, to));
         // The week view's own response already carries the daily series — one call.
         const sameWindow = range === "week";
         const [s, w] = await Promise.all([
@@ -86,7 +86,7 @@ export default function StatisticsScreen() {
         if (mine === seq.current) setRefreshing(false);
       }
     },
-    [isOwner, range],
+    [fleetView, range],
   );
 
   useFocusEffect(useCallback(() => { void load(window, weekMon, windowKey, true); }, [load, window, weekMon, windowKey]));

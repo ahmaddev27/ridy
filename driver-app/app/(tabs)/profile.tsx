@@ -16,6 +16,7 @@ import {
 } from "@/components/icons";
 import { Text } from "@/components/typography";
 import { useAuth } from "@/lib/auth";
+import { ViewModeToggle } from "@/components/view-mode-toggle";
 import { submissionAccess } from "@/lib/submission-detail";
 import { t, isRTL, useLocale } from "@/lib/i18n";
 import { PRIVACY_URL, SUPPORT_EMAIL } from "@/lib/links";
@@ -54,6 +55,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: c.canvas }}>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 18 }}>
+        <ViewModeToggle />
         {/* Header */}
         <View style={{ flexDirection: row, alignItems: "center", justifyContent: "space-between" }}>
           <Text style={{ color: c.ink, fontSize: 26, fontWeight: "700", textAlign: align }}>

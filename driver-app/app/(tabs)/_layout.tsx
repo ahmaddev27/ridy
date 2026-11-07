@@ -42,8 +42,8 @@ function iconFor(routeName: string): LucideIcon {
 function BottomBar({ state, descriptors, navigation, onHeight }: BottomTabBarProps & { onHeight: (h: number) => void }) {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const { driver, isOwner, isManager } = useAuth();
-  const autoDecline = useAutoDeclineFeature(driver?.id ?? null, isOwner);
+  const { driver, fleetView, canAdmin, isManager } = useAuth();
+  const autoDecline = useAutoDeclineFeature(driver?.id ?? null, fleetView);
 
   // Submissions is never one of these tabs any more. A tab is a PLACE; sending
   // a Beleg or a Notiz is an ACT, and an act sitting in a row of places reads
@@ -53,8 +53,8 @@ function BottomBar({ state, descriptors, navigation, onHeight }: BottomTabBarPro
   const routes = state.routes.filter(
     (route: BottomTabBarProps["state"]["routes"][number]) =>
       route.name !== "submissions" && (route.name !== "auto-decline" || autoDecline) &&
-      (route.name !== "live-map" || isManager) &&
-      (route.name !== "manager-drivers" || isManager),
+      (route.name !== "live-map" || isManager || (canAdmin && fleetView)) &&
+      (route.name !== "manager-drivers" || isManager || (canAdmin && fleetView)),
   );
 
   const dark = isDarkPalette(c);

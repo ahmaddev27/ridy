@@ -282,6 +282,8 @@ export type DriverProfile = {
   is_owner?: boolean;
   /** True when this driver is flagged a fleet manager (additive on top of the driver features). */
   is_manager?: boolean;
+  /** A linked owner signed in as a Driver: may flip the app into the company (admin) view. */
+  admin_capable?: boolean;
   /**
    * Whether this driver's company is connected to El-Professor: a live
    * `elprofessor` token, not revoked, and El-Professor has actually used it at
@@ -411,7 +413,7 @@ export type AutoDeclineHistoryQuery = {
 };
 
 /** A tenant driver, for the fleet-owner offers picker. */
-export type FleetDriver = { id: number; name: string };
+export type FleetDriver = { id: number; name: string; /** Admin view: the signed-in owner-driver's own row (sorted first). */ is_me?: boolean };
 
 export type PaginationMeta = {
   current_page: number;
@@ -460,6 +462,9 @@ export class ApiClient {
    *  Receives the response body so a suspension can show its reason + support. */
   onSessionInvalid: ((body: SessionInvalidBody) => void) | null = null;
 
+  /** Called on 403 admin_revoked: the admin grant is gone but the Driver session is fine. */
+  onAdminRevoked: (() => void) | null = null;
+
   /** Whether the signed-in identity is a fleet owner (User token) vs a driver.
    *  Used so a 401 from a driver-only endpoint — which an owner hits by design
    *  if a screen mis-routes for a frame — never ends the owner's valid session. */
@@ -478,6 +483,12 @@ export class ApiClient {
 
   setOwner(owner: boolean) {
     this.owner = owner;
+  }
+
+  /** Company-data base: an owner's User token uses /fleet; a linked owner-driver's
+   *  Driver token uses /admin (server re-checks driver.admin on every request). */
+  private fleetBase(): string {
+    return this.owner ? "/api/v1/driver/fleet" : "/api/v1/driver/admin";
   }
 
   private async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -560,6 +571,7 @@ export class ApiClient {
         authenticated &&
         ((res.status === 403 && body.message === "account_suspended") ||
           (res.status === 401 && !(this.owner && driverOnly)));
+      if (res.status === 403 && body.message === "admin_revoked") this.onAdminRevoked?.();
       if (sessionDead) {
         // Diagnostic: which request forced the sign-out. The path is logged
         // WITHOUT its query string — that can carry a free-text search term.
@@ -672,13 +684,13 @@ export class ApiClient {
   /** Owner mode, READ-ONLY: every driver's submissions of the company, newest first, one page at a time. */
   fleetSubmissions(page = 1) {
     return this.request<{ data: DriverSubmission[]; meta: { has_more: boolean; page: number } }>(
-      `/api/v1/driver/fleet/submissions?page=${page}`,
+      `${this.fleetBase()}/submissions?page=${page}`,
     );
   }
 
   /** Owner mode: one submission of the company in full. 404 for another company's. */
   fleetSubmission(id: string) {
-    return this.request<{ data: SubmissionFull }>(`/api/v1/driver/fleet/submissions/${encodeURIComponent(id)}`);
+    return this.request<{ data: SubmissionFull }>(`${this.fleetBase()}/submissions/${encodeURIComponent(id)}`);
   }
 
   /** What this driver has sent their company, newest first, with the decision. */
@@ -704,7 +716,7 @@ export class ApiClient {
   submitReceipt(draft: ReceiptDraft, forDriverId?: number) {
     // Owner mode: the manager files it for one of their drivers (tenant-checked
     // server-side). A driver's own send takes the driver from the token.
-    const path = forDriverId === undefined ? "/api/v1/driver/submissions" : "/api/v1/driver/fleet/submissions";
+    const path = forDriverId === undefined ? "/api/v1/driver/submissions" : `${this.fleetBase()}/submissions`;
     return this.request<{ data: DriverSubmission }>(path, {
       method: "POST",
       body: JSON.stringify({ subject: "receipt", ...draft, ...(forDriverId !== undefined ? { driver_id: forDriverId } : {}) }),
@@ -731,7 +743,7 @@ export class ApiClient {
    */
   async postalCity(plz: string, owner = false): Promise<string | null> {
     try {
-      const base = owner ? "/api/v1/driver/fleet" : "/api/v1/driver";
+      const base = owner ? this.fleetBase() : "/api/v1/driver";
       const r = await this.request<{ data: { city: string } }>(`${base}/postal-codes/${plz}`, {
         timeoutMs: 4_000,
       });
@@ -753,7 +765,7 @@ export class ApiClient {
     // An owner/manager reads it for the driver they picked (tenant-checked
     // server-side); a driver reads their own.
     if (forDriverId !== undefined) form.append("driver_id", String(forDriverId));
-    const path = forDriverId === undefined ? "/api/v1/driver/receipt-vision" : "/api/v1/driver/fleet/receipt-vision";
+    const path = forDriverId === undefined ? "/api/v1/driver/receipt-vision" : `${this.fleetBase()}/receipt-vision`;
     return this.request<{ data: { fields: VisionFields } }>(path, {
       method: "POST",
       body: form,
@@ -768,11 +780,11 @@ export class ApiClient {
   }
 
   fleetHome() {
-    return this.request<{ data: FleetHomeData }>("/api/v1/driver/fleet/home");
+    return this.request<{ data: FleetHomeData }>(`${this.fleetBase()}/home`);
   }
 
   fleetDrivers() {
-    return this.request<{ data: FleetDriver[] }>("/api/v1/driver/fleet/drivers");
+    return this.request<{ data: FleetDriver[] }>(`${this.fleetBase()}/drivers`);
   }
 
   /** Owner-mode push registration (User token) — mirrors registerDevice for drivers. */
@@ -844,7 +856,7 @@ export class ApiClient {
     if (from) qs.set("from", from);
     if (to) qs.set("to", to);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return this.request<{ data: DriverStats }>(`/api/v1/driver/fleet/stats${suffix}`);
+    return this.request<{ data: DriverStats }>(`${this.fleetBase()}/stats${suffix}`);
   }
 
   fleetOffers(params: OffersQuery = {}) {
@@ -853,12 +865,12 @@ export class ApiClient {
       if (value !== undefined && value !== null && value !== "") qs.set(key, String(value));
     }
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return this.request<{ data: Offer[]; meta: PaginationMeta }>(`/api/v1/driver/fleet/offers${suffix}`);
+    return this.request<{ data: Offer[]; meta: PaginationMeta }>(`${this.fleetBase()}/offers${suffix}`);
   }
 
   /** One fleet offer by id (owner mode) — resolves offers off list page 1. */
   fleetOffer(id: string | number) {
-    return this.request<{ data: Offer }>(offerPath("/api/v1/driver/fleet/offers", id));
+    return this.request<{ data: Offer }>(offerPath(`${this.fleetBase()}/offers`, id));
   }
 
   updateProfile(patch: { name?: string; locale?: string }) {
